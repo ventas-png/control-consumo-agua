@@ -153,7 +153,20 @@
       <input type="email" id="login-email" placeholder="Email Address" onkeypress="if(event.keyCode == 13) login()">
       <input type="password" id="login-password" placeholder="Password" onkeypress="if(event.keyCode == 13) login()">
       <button class="btn btn-primary" onclick="login()">Secure Login</button>
-      <p id="login-error" style="color: #ef4444; margin-top: 15px; font-weight: 600; display: none;"></p>
+     
+      <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+        <button class="btn btn-secondary" onclick="runLoginDiagnostics()" style="flex: 1; font-size: 14px;">🔍 Diagnose</button>
+        <button class="btn btn-warning" onclick="clearLoginData()" style="flex: 1; font-size: 14px;">🧹 Clear Data</button>
+      </div>
+     
+      <div id="diagnostic-results" style="margin-top: 15px; display: none;">
+        <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <h4 style="margin: 0 0 10px 0; color: #475569;">Diagnostic Results</h4>
+          <div id="diagnostic-content"></div>
+        </div>
+      </div>
+
+     <p id="login-error" style="color: #ef4444; margin-top: 15px; font-weight: 600; display: none;"></p>
     </div>
   </div>
 
@@ -427,6 +440,62 @@
     let mapInstance = null; // Variable global para el mapa
     let currentUserSession = null; // Store current user session
 
+    // ==========================================
+    // NETWORK STATUS MONITORING
+    // ==========================================
+    function initNetworkMonitoring() {
+        console.log('🌐 Initializing network monitoring...');
+
+     // Listen for online/offline events
+        window.addEventListener('online', () => {
+            console.log('🌐 Network connection restored');
+            Toast.fire({
+                icon: 'success',
+                title: 'Conexión restaurada'
+            });
+            disableOfflineMode();
+        });
+
+     window.addEventListener('offline', () => {
+            console.log('📴 Network connection lost');
+            enableOfflineMode();
+            Toast.fire({
+                icon: 'warning',
+                title: 'Modo offline activado',
+                text: 'Algunas funciones pueden no estar disponibles'
+            });
+        });
+
+     // Check network status periodically
+        setInterval(async () => {
+            try {
+                const response = await fetch(APP_CONFIG.SUPABASE_URL, {
+                    method: 'HEAD',
+                    cache: 'no-cache',
+                    signal: AbortSignal.timeout(5000)
+                });
+                if (!navigator.onLine) {
+                    console.log('🔄 Network status mismatch detected');
+                }
+            } catch (error) {
+                if (navigator.onLine) {
+                    console.warn('⚠️ Supabase unreachable but online');
+                }
+            }
+        }, 30000); // Check every 30 seconds
+    }
+
+   function getNetworkStatus() {
+        return {
+            online: navigator.onLine,
+            effectiveType: navigator.connection?.effectiveType || 'unknown',
+            downlink: navigator.connection?.downlink || 0,
+            rtt: navigator.connection?.rtt || 0,
+            saveData: navigator.connection?.saveData || false,
+            offlineMode: checkOfflineMode()
+        };
+    }
+   
     const Toast = Swal.mixin({
       toast: true,
       position: 'top-end',
@@ -521,44 +590,390 @@
     // LOGIN / LOGOUT
     // ==========================================
     function checkLogin() {
+        console.group('🔐 Session Check');
         const sessionData = JSON.parse(sessionStorage.getItem('userSession') || '{}');
         const now = new Date();
         const expiresAt = new Date(sessionData.expires_at);
 
+        console.log('📅 Current time:', now);
+        console.log('⏰ Session expires:', expiresAt);
+        console.log('🌐 Online status:', navigator.onLine);
+        console.log('📴 Offline mode:', checkOfflineMode());
+     
+        // Check if we have a valid current session
         if (sessionData.user_id && now < expiresAt) {
+            console.log('✅ Valid session found');
             currentUserSession = sessionData;
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('app-content-wrapper').style.display = 'block';
             updateUIForRole(sessionData.role);
+
+            // Cache the session for offline use
+            cacheCurrentSession();
+         
+            console.groupEnd();
             return true;
-        } else {
-            sessionStorage.removeItem('userSession');
-            currentUserSession = null;
-            document.getElementById('login-screen').style.display = 'flex';
-            document.getElementById('app-content-wrapper').style.display = 'none';
-            return false;
+        }
+
+     // Check if we should use cached session (offline mode)
+        if (checkOfflineMode() && hasValidSessionCache()) {
+            console.log('📂 Using cached session for offline mode');
+            const success = useCachedSession();
+
+         if (success) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-content-wrapper').style.display = 'block';
+                updateUIForRole(currentUserSession.role);
+
+          // Show offline notification
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Modo Offline',
+                    text: 'Estás trabajando en modo offline. Algunas funciones pueden no estar disponibles.',
+                    timer: 3000,
+                    showConfirmButton: false
+                });
+
+          onsole.groupEnd();
+                return true;
+            }
+        }
+
+     // No valid session - show login screen
+        console.log('❌ No valid session available');
+        sessionStorage.removeItem('userSession');
+        currentUserSession = null;
+        document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('app-content-wrapper').style.display = 'none';
+        console.groupEnd();
+        return false;
+    }
+
+   // ==========================================
+    // LOGIN DIAGNOSTIC TOOLS
+    // ==========================================
+    async function testSupabaseConnection() {
+        const startTime = performance.now();
+        try {
+            // Test basic Supabase connectivity
+            const { data, error } = await supabaseClient
+                .from('clientes')
+                .select('count', { count: 'exact', head: true });
+
+         const endTime = performance.now();
+         const responseTime = (endTime - startTime).toFixed(2);
+
+         return {
+                success: !error,
+                responseTime: `${responseTime}ms`,
+                error: error?.message,
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message,
+                timestamp: new Date().toISOString()
+            };
         }
     }
 
+   async function testSecureLoginFunction() {
+        try {
+            // Test RPC function availability with test credentials
+            const { data, error } = await supabaseClient.rpc('secure_login', {
+                email_input: 'test@diagnostic.com',
+                password_input: 'test_password',
+                ip_address: '127.0.0.1'
+            });
+
+         return {
+                available: true,
+                responds: true,
+                error: error?.message,
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            return {
+                available: false,
+                responds: false,
+                error: error.message,
+                timestamp: new Date().toISOString()
+            };
+        }
+    }
+
+   async function runDiagnostics() {
+        const diagnostics = {
+            timestamp: new Date().toISOString(),
+            browser: navigator.userAgent,
+            sessionStorage: !!sessionStorage,
+            localStorage: !!localStorage,
+            javascript: true
+        };
+
+    // Test Supabase connection
+        const connectionTest = await testSupabaseConnection();
+        diagnostics.supabaseConnection = connectionTest;
+
+    // Test secure_login function
+        const functionTest = await testSecureLoginFunction();
+        diagnostics.secureLoginFunction = functionTest;
+
+    // Test network connectivity
+        diagnostics.networkConnectivity = navigator.onLine;
+
+    // Log diagnostics
+        console.group('🔍 Login Diagnostics');
+        console.table(diagnostics);
+        console.groupEnd();
+
+    await logSecurityEvent('diagnostic_check', diagnostics);
+        return diagnostics;
+    }
+
+   async function runLoginDiagnostics() {
+        console.group('🔍 Running Login Diagnostics');
+        const diagnosticDiv = document.getElementById('diagnostic-results');
+        const contentDiv = document.getElementById('diagnostic-content');
+
+    diagnosticDiv.style.display = 'block';
+        contentDiv.innerHTML = '<div style="text-align: center; padding: 20px;">🔍 Running diagnostics...</div>';
+
+    try {
+            // Check basic browser capabilities
+            const browserInfo = {
+                userAgent: navigator.userAgent,
+                language: navigator.language,
+                cookieEnabled: navigator.cookieEnabled,
+                onLine: navigator.onLine,
+                platform: navigator.platform
+            };
+
+     // Test network connectivity
+            const networkTest = await testNetworkConnectivity();
+
+     // Test Supabase connection
+            const supabaseTest = await testSupabaseConnection();
+
+     // Test secure_login RPC function
+            const rpcTest = await testSecureLoginFunction();
+
+     // Check localStorage and sessionStorage
+            const storageTest = {
+                localStorage: testLocalStorage(),
+                sessionStorage: testSessionStorage()
+            };
+
+     // Check CSP and security policies
+            const securityTest = await testSecurityPolicies();
+
+     // Compile results
+            const results = {
+                browser: browserInfo,
+                network: networkTest,
+                supabase: supabaseTest,
+                rpc: rpcTest,
+                storage: storageTest,
+                security: securityTest,
+                timestamp: new Date().toISOString()
+            };
+
+     // Display results
+            displayDiagnosticResults(results);
+            console.log('🔍 Diagnostic Results:', results);
+
+     // Log diagnostic event
+            await logSecurityEvent('login_diagnostic_run', results);
+
+     } catch (error) {
+            console.error('❌ Diagnostic error:', error);
+            contentDiv.innerHTML = `
+                <div style="color: #dc2626; padding: 15px; background: #fef2f2; border-radius: 8px;">
+                    <strong>❌ Diagnostic Error:</strong><br>
+                    ${error.message}
+                </div>
+            `;
+        }
+
+        console.groupEnd();
+    }
+
+   async function testNetworkConnectivity() {
+        const tests = [];
+
+    // Test basic connectivity
+        try {
+            const response = await fetch('https://httpbin.org/get', { method: 'HEAD', mode: 'no-cors' });
+            tests.push({ name: 'Basic HTTP', status: '✅', details: 'Network reachable' });
+        } catch (error) {
+            tests.push({ name: 'Basic HTTP', status: '❌', details: error.message });
+        }
+
+    // Test Supabase connectivity
+        try {
+            const startTime = performance.now();
+            const response = await fetch(APP_CONFIG.SUPABASE_URL, { method: 'HEAD' });
+            const endTime = performance.now();
+            tests.push({
+                name: 'Supabase',
+                status: '✅',
+                details: `${(endTime - startTime).toFixed(2)}ms response time`
+            });
+        } catch (error) {
+            tests.push({ name: 'Supabase', status: '❌', details: error.message });
+        }
+
+    return tests;
+    }
+
+   function testLocalStorage() {
+        const testKey = 'test_storage_key';
+        try {
+            localStorage.setItem(testKey, 'test_value');
+            const value = localStorage.getItem(testKey);
+            localStorage.removeItem(testKey);
+            return value === 'test_value' ? '✅ Working' : '❌ Failed';
+        } catch (error) {
+            return `❌ ${error.message}`;
+        }
+    }
+
+   function testSessionStorage() {
+        const testKey = 'test_session_key';
+        try {
+            sessionStorage.setItem(testKey, 'test_value');
+            const value = sessionStorage.getItem(testKey);
+            sessionStorage.removeItem(testKey);
+            return value === 'test_value' ? '✅ Working' : '❌ Failed';
+        } catch (error) {
+            return `❌ ${error.message}`;
+        }
+    }
+
+   async function testSecurityPolicies() {
+        const policies = [];
+
+     // Check if fetch API works (CORS)
+        try {
+            const response = await fetch('https://api.ipify.org?format=json');
+            policies.push({ name: 'CORS Policy', status: '✅', details: 'Fetch API working' });
+        } catch (error) {
+            policies.push({ name: 'CORS Policy', status: '⚠️', details: 'CORS restrictions detected' });
+        }
+
+    return policies;
+    }
+
+   function displayDiagnosticResults(results) {
+        const contentDiv = document.getElementById('diagnostic-content');
+        
+        let html = `
+            <div style="font-family: monospace; font-size: 13px; line-height: 1.4;">
+                <div style="margin-bottom: 15px;">
+                    <strong>🕐 Timestamp:</strong> ${new Date(results.timestamp).toLocaleString()}
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <strong>🌐 Network Status:</strong> ${results.network.map(t =>
+                        `<div style="margin-left: 10px;">${t.status} ${t.name}: ${t.details}</div>`
+                    ).join('')}
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <strong>🔌 Storage:</strong>
+                    <div style="margin-left: 10px;">${results.storage.localStorage} localStorage</div>
+                    <div style="margin-left: 10px;">${results.storage.sessionStorage} sessionStorage</div>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <strong>🗄️ Supabase:</strong>
+                    <div style="margin-left: 10px;">${results.supabase.success ? '✅' : '❌'} Connection: ${results.supabase.responseTime || results.supabase.error}</div>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <strong>🔐 RPC Function:</strong>
+                    <div style="margin-left: 10px;">${results.rpc.available ? '✅' : '❌'} secure_login: ${results.rpc.error || 'Available'}</div>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <strong>🛡️ Security:</strong> ${results.security.map(p =>
+                        `<div style="margin-left: 10px;">${p.status} ${p.name}: ${p.details}</div>`
+                    ).join('')}
+                </div>
+                
+                <div style="margin-top: 15px; padding: 10px; background: #f0f9ff; border-radius: 6px;">
+                    <strong>💡 Troubleshooting Tips:</strong>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li>If Supabase fails: Check internet connection and firewall settings</li>
+                        <li>If RPC function fails: Contact administrator - database function may be missing</li>
+                        <li>If storage fails: Check browser privacy settings</li>
+                        <li>If CORS fails: This may be a configuration issue with the server</li>
+                    </ul>
+                </div>
+            </div>
+        `;
+    
+        contentDiv.innerHTML = html;
+    }
+    
+   function clearLoginData() {
+        // Clear all authentication-related data
+        sessionStorage.removeItem('userSession');
+        localStorage.clear();
+        
+    // Reset login form
+        document.getElementById('login-email').value = '';
+        document.getElementById('login-password').value = '';
+        document.getElementById('login-error').style.display = 'none';
+        document.getElementById('diagnostic-results').style.display = 'none';
+    
+    // Log data clearing event
+        logSecurityEvent('login_data_cleared', {
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent
+        });
+    
+    Swal.fire({
+            icon: 'success',
+            title: 'Data Cleared',
+            text: 'All login data has been cleared. Please try logging in again.',
+            timer: 2000,
+            showConfirmButton: false
+        });`
+    }
+      
     async function login() {
+        const loginStartTime = performance.now();
+        console.group('🔐 Login Attempt');
+        
         const emailInput = document.getElementById('login-email');
         const passwordInput = document.getElementById('login-password');
         const email = sanitizeInput(emailInput.value.trim());
         const password = passwordInput.value;
         const errorMsg = document.getElementById('login-error');
 
+        console.log('📧 Email:', email);
+        console.log('🔑 Password Length:', password.length);
+        console.log('🌐 User Agent:', navigator.userAgent);
+        console.log('📡 Online Status:', navigator.onLine);
+        
         // Client-side validation
         if (!email || !password) {
+            console.warn('⚠️ Validation failed: Missing credentials');
             errorMsg.textContent = "Email and password are required";
             errorMsg.style.display = 'block';
+            console.groupEnd();
             return;
         }
 
         // Validate email format
         if (!validateEmail(email)) {
+            console.warn('⚠️ Validation failed: Invalid email format');
             errorMsg.textContent = "Please enter a valid email address";
             errorMsg.style.display = 'block';
             emailInput.focus();
+            console.groupEnd();
             return;
         }
 
@@ -566,17 +981,43 @@
         const loginBtn = document.querySelector('#login-screen button');
         const originalText = loginBtn.innerHTML;
         loginBtn.disabled = true;
-        loginBtn.innerHTML = 'Logging in...';
+        loginBtn.innerHTML = 'Authenticating...';
+        console.log('⏳ Authentication started...');
 
         try {
+            // Get client IP for logging
+            const clientIP = await getClientIP();
+            console.log('🌍 Client IP:', clientIP);
+            
+            console.log('🔄 Calling secure_login RPC function...');
+            const rpcStartTime = performance.now();
+
             // Call secure login function
             const { data, error } = await supabaseClient.rpc('secure_login', {
                 email_input: email.toLowerCase(),
                 password_input: password,
-                ip_address: await getClientIP()
+                ip_address: clientIP
             });
 
+            const rpcEndTime = performance.now();
+            const rpcResponseTime = (rpcEndTime - rpcStartTime).toFixed(2);
+            console.log(`📊 RPC Response Time: ${rpcResponseTime}ms`);
+            console.log('📤 RPC Response:', data);
+            
+            if (error) {
+                console.error('❌ RPC Error:', error);
+            }
+
             if (data && data.success) {
+                console.log('✅ Authentication successful!');
+                console.log('👤 User:', {
+                    id: data.user_id,
+                    email: data.email,
+                    name: data.name,
+                    role: data.role,
+                    session_expires: data.session_expires
+                });
+                
                 // Store secure session data
                 const sessionData = {
                     user_id: data.user_id,
@@ -589,9 +1030,13 @@
 
                 currentUserSession = sessionData;
                 sessionStorage.setItem('userSession', JSON.stringify(sessionData));
+                console.log('💾 Session stored successfully');
 
                 // Log successful login
-                await logSecurityEvent('login_success', { email: email });
+                await logSecurityEvent('login_success', {
+                    email: email,
+                    response_time: rpcResponseTime
+                });
 
                 errorMsg.style.display = 'none';
                 document.getElementById('login-screen').style.display = 'none';
@@ -600,8 +1045,16 @@
                 // Update UI for user role
                 updateUIForRole(data.role);
 
+                console.log('🔄 Loading application data...');
+                const dataLoadStartTime = performance.now();
                 await cargarDatos();
                 actualizarUI();
+                const dataLoadEndTime = performance.now();
+                const dataLoadTime = (dataLoadEndTime - dataLoadStartTime).toFixed(2);
+                console.log(`📊 Data Load Time: ${dataLoadTime}ms`);
+                
+                const totalLoginTime = (rpcEndTime - loginStartTime).toFixed(2);
+                console.log(`⏱️ Total Login Time: ${totalLoginTime}ms`);
 
                 Swal.fire({
                     icon: 'success',
@@ -613,30 +1066,132 @@
                 // Clear form
                 emailInput.value = '';
                 passwordInput.value = '';
+
+                console.log('🎉 Login process completed successfully!');
             } else {
                 // Log failed login attempt
+                console.warn('❌ Authentication failed:', data?.message || 'Unknown error');
                 await logSecurityEvent('failed_login_attempt', {
                     email: email,
-                    reason: data?.message || 'authentication_failed'
+                    reason: data?.message || 'authentication_failed',
+                    response_time: rpcResponseTime
                 });
 
-                errorMsg.textContent = data?.message || 'Login failed';
+                // Enhanced error messages based on specific issues
+                let errorMessage = data?.message || 'Login failed';
+                let troubleshootingTip = '';
+
+                if (data?.message?.includes('user not found')) {
+                    troubleshootingTip = '\n\n💡 Tip: Check if your email is registered in the system.';
+                } else if (data?.message?.includes('invalid password')) {
+                    troubleshootingTip = '\n\n💡 Tip: Make sure you entered the correct password. Check caps lock.';
+                } else if (data?.message?.includes('network') || data?.message?.includes('connection')) {
+                    troubleshootingTip = '\n\n💡 Tip: Check your internet connection and try again.';
+                } else if (!data) {
+                    errorMessage = 'Unable to connect to authentication service';
+                    troubleshootingTip = '\n\n💡 Tip: The authentication service may be temporarily unavailable. Please try again later.';
+                }
+
+                errorMsg.textContent = errorMessage + troubleshootingTip;
                 errorMsg.style.display = 'block';
                 passwordInput.value = '';
                 passwordInput.focus();
             }
         } catch (error) {
-            console.error('Login error:', error);
-            await logSecurityEvent('login_error', { email: email, error: error.message });
+            console.error('💥 Critical login error:', error);
+            console.error('📋 Error stack:', error.stack);
 
-            errorMsg.textContent = 'Connection error. Please try again.';
+            await logSecurityEvent('login_error', {
+                email: email,
+                error: error.message,
+                error_type: error.constructor.name
+            });
+
+            // Enhanced error handling with specific guidance
+            let errorMessage = 'Connection error. Please try again.';
+            let troubleshootingTip = '';
+            
+            if (error.message?.includes('fetch')) {
+                errorMessage = 'Network connection failed';
+                troubleshootingTip = '\n\n💡 Tip: Check your internet connection and firewall settings.';
+            } else if (error.message?.includes('CORS')) {
+                errorMessage = 'CORS policy error';
+                troubleshootingTip = '\n\n💡 Tip: This may be a configuration issue. Contact support.';
+            } else if (error.message?.includes('timeout')) {
+                errorMessage = 'Request timeout';
+                troubleshootingTip = '\n\n💡 Tip: The server is taking too long to respond. Please try again.';
+            }
+            
+            errorMsg.textContent = errorMessage + troubleshootingTip;
             errorMsg.style.display = 'block';
         } finally {
+            const loginEndTime = performance.now();
+            const totalLoginTime = (loginEndTime - loginStartTime).toFixed(2);
+            console.log(`⏱️ Total Login Attempt Time: ${totalLoginTime}ms`);
+
             loginBtn.disabled = false;
             loginBtn.innerHTML = originalText;
+            console.groupEnd();
+        }
+    }
+
+    // ==========================================
+    // FALLBACK AUTHENTICATION MECHANISMS
+    // ==========================================
+    function checkOfflineMode() {
+        return !navigator.onLine || localStorage.getItem('offline_mode') === 'true';
+    }
+    
+    function enableOfflineMode() {
+        localStorage.setItem('offline_mode', 'true');
+        console.log('📴 Offline mode enabled');
+    }
+    
+    function disableOfflineMode() {
+        localStorage.removeItem('offline_mode');
+        console.log('🌐 Offline mode disabled');
+    }
+    
+    function hasValidSessionCache() {
+        const cached = localStorage.getItem('cached_session');
+        if (!cached) return false;
+    
+        try {
+            const session = JSON.parse(cached);
+            const expires = new Date(session.expires_at);
+            const now = new Date();
+            return now < expires;
+        } catch (error) {
+            console.warn('Invalid cached session:', error);
+            localStorage.removeItem('cached_session');
+            return false;
         }
     }
     
+    function useCachedSession() {
+        try {
+            const cached = localStorage.getItem('cached_session');
+            if (!cached) return false;
+            
+            const session = JSON.parse(cached);
+            currentUserSession = session;
+            sessionStorage.setItem('userSession', JSON.stringify(session));
+            
+            console.log('📂 Using cached session:', session.email);
+            return true;
+        } catch (error) {
+            console.error('Failed to use cached session:', error);
+            return false;
+        }
+    }
+    
+    function cacheCurrentSession() {
+        if (currentUserSession) {
+            localStorage.setItem('cached_session', JSON.stringify(currentUserSession));
+            console.log('💾 Session cached for offline use');
+        }
+    }
+
     function logout() {
         Swal.fire({
             title: 'Cerrar Sesión?',
@@ -657,7 +1212,10 @@
                     });
                 }
 
+                // Clear all session data
                 sessionStorage.removeItem('userSession');
+                localStorage.removeItem('cached_session');
+                disableOfflineMode();
                 currentUserSession = null;
                 window.location.reload();
             }
@@ -727,10 +1285,61 @@
     // INICIALIZACIÓN
     // ==========================================
     document.addEventListener('DOMContentLoaded', async () => {
-        if (checkLogin()) {
-            await cargarDatos();
-            actualizarUI();
+        console.log('🚀 Application initializing...');
+        console.log('📱 User Agent:', navigator.userAgent);
+        console.log('🌐 Initial Network Status:', getNetworkStatus());
+        
+        // Initialize network monitoring
+        initNetworkMonitoring();
+        
+        // Check login and handle offline mode
+        const loggedIn = checkLogin();
+        if (loggedIn) {
+            console.log('🔐 User authenticated, loading data...');
+            try {
+                await cargarDatos();
+                actualizarUI();
+                console.log('✅ Application loaded successfully');
+            } catch (error) {
+                console.error('❌ Error loading application data:', error);
+                if (!checkOfflineMode()) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error Loading Data',
+                        text: 'Could not load application data. Please try refreshing the page.',
+                        confirmButtonText: 'Refresh'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            window.location.reload();
+                        }
+                    });
+                }
+            }
+        } else {
+            console.log('🔓 User not authenticated, showing login screen');
+        
+            // Auto-run diagnostics on first load if there were recent login failures
+            const recentFailures = localStorage.getItem('login_failures');
+            if (recentFailures && parseInt(recentFailures) >= 3) {
+                console.log('⚠️ Recent login failures detected, running diagnostics');
+                localStorage.removeItem('login_failures');
+            
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Login Issues Detected',
+                    text: 'We\'ve detected recent login problems. Would you like to run diagnostics?',
+                    showCancelButton: true,
+                    confirmButtonText: 'Run Diagnostics',
+                    cancelButtonText: 'Skip'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        runLoginDiagnostics();
+                    }
+                });
+            }
         }
+        
+        console.log('🎉 Application initialization complete');
     });
 
     async function cargarDatos() {
