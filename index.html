@@ -3,6 +3,24 @@
  <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Security Headers -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com;
+  style-src 'self' 'unsafe-inline' https://unpkg.com;
+  img-src 'self' data: blob:;
+  connect-src 'self' https://nnsqmeigtgewatameexo.supabase.co https://api.emailjs.com;
+  font-src 'self' https://cdnjs.cloudflare.com;
+  frame-src 'none';
+  object-src 'none';
+  base-uri 'self';
+">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Frame-Options" content="DENY">
+<meta http-equiv="X-XSS-Protection" content="1; mode=block">
+<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+
   <title>Control de Consumo de Agua</title>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -130,11 +148,12 @@
   
   <div id="login-screen">
     <div class="login-box">
-      <h2>🔑 Acceso al Sistema</h2>
-      <p style="margin-bottom: 20px; color: #64748b;">Ingrese la clave de acceso para continuar. (Clave: admin)</p>
-      <input type="password" id="login-password" placeholder="Clave Maestra" onkeypress="if(event.keyCode == 13) login()">
-      <button class="btn btn-primary" onclick="login()">Ingresar</button>
-      <p id="login-error" style="color: #ef4444; margin-top: 15px; font-weight: 600; display: none;">Clave incorrecta.</p>
+      <h2>🔐 Secure System Access</h2>
+      <p style="margin-bottom: 20px; color: #64748b;">Enter your credentials to continue</p>
+      <input type="email" id="login-email" placeholder="Email Address" onkeypress="if(event.keyCode == 13) login()">
+      <input type="password" id="login-password" placeholder="Password" onkeypress="if(event.keyCode == 13) login()">
+      <button class="btn btn-primary" onclick="login()">Secure Login</button>
+      <p id="login-error" style="color: #ef4444; margin-top: 15px; font-weight: 600; display: none;"></p>
     </div>
   </div>
 
@@ -153,11 +172,12 @@
     </div>
 
     <div class="nav-tabs">
-        <button class="nav-tab active" onclick="showSection('clientes')">👥 Clientes</button>
-        <button class="nav-tab" onclick="showSection('lecturas')">💧 Nueva Lectura</button>
-        <button class="nav-tab" onclick="showSection('tabla')">📋 Historial</button>
-        <button class="nav-tab" onclick="showSection('dashboard')">📊 Dashboard</button>
-        <button class="nav-tab" onclick="showSection('mapa')">🗺️ Mapa</button> <button class="nav-tab" onclick="showSection('configuracion')">⚙️ Configuración</button>
+        <button class="nav-tab active operator-only" onclick="showSection('clientes')">👥 Clientes</button>
+        <button class="nav-tab operator-only" onclick="showSection('lecturas')">💧 Nueva Lectura</button>
+        <button class="nav-tab viewer-only" onclick="showSection('tabla')">📋 Historial</button>
+        <button class="nav-tab viewer-only" onclick="showSection('dashboard')">📊 Dashboard</button>
+        <button class="nav-tab viewer-only" onclick="showSection('mapa')">🗺️ Mapa</button>
+        <button class="nav-tab admin-only" onclick="showSection('configuracion')">⚙️ Configuración</button>
     </div>
 
     <div id="section-clientes" class="section active">
@@ -174,7 +194,7 @@
             <div class="form-group"><label>Canon Fijo (Q)</label><input type="number" id="nuevo-cliente-canon" value="20.00" step="0.01"></div>
             <div class="form-group"><label>Lectura Inicial</label><input type="number" id="nuevo-cliente-lectura-inicial" value="0"></div>
         </div>
-        <div class="btn-group">
+        <div class="btn-group operator-only">
             <button class="btn btn-primary" onclick="agregarCliente()" id="btn-guardar-cliente">💾 Guardar Cliente</button>
             <button class="btn btn-secondary" onclick="limpiarFormularioCliente()">Limpiar</button>
         </div>
@@ -256,7 +276,7 @@
             </div>
             </div>
 
-            <div class="btn-group">
+            <div class="btn-group operator-only">
             <button class="btn btn-primary" onclick="agregarLectura()" id="btn-guardar-lectura">💾 Guardar Lectura</button>
             <button class="btn btn-secondary" onclick="limpiarFormularioLectura()">Cancelar</button>
             </div>
@@ -383,8 +403,11 @@
       EMAILJS_PUBLIC_KEY: 'AaKdY-HQgiru-q-xJ',
       EMAILJS_SERVICE_ID: 'service_663ome3',
       EMAILJS_TEMPLATE_RECIBO: 'template_ow5uddr',
-      MASTER_PASSWORD: 'admin',
-      COUNTRY_CODE: '502' // Guatemala
+      // REMOVE: MASTER_PASSWORD: 'admin', // Removed for security
+      COUNTRY_CODE: '502', // Guatemala
+      SESSION_TIMEOUT: 8 * 60 * 60 * 1000, // 8 hours
+      MAX_LOGIN_ATTEMPTS: 3,
+      LOGIN_LOCKOUT_TIME: 5 * 60 * 1000 // 5 minutes
     };
 
     // Inicializar Clientes
@@ -399,9 +422,10 @@
     let fotoBase64 = null;
     let rutaActiva = false;
     let rutaIndex = 0;
-    let empresa = {}; 
+    let empresa = {};
     let chartInstance = null;
     let mapInstance = null; // Variable global para el mapa
+    let currentUserSession = null; // Store current user session
 
     const Toast = Swal.mixin({
       toast: true,
@@ -410,6 +434,70 @@
       timer: 3000,
       timerProgressBar: true
     });
+
+    // ==========================================
+    // INPUT VALIDATION AND XSS PROTECTION
+    // ==========================================
+    function sanitizeInput(input) {
+      return input
+        .replace(/[<>]/g, '') // Remove HTML tags
+        .replace(/javascript:/gi, '') // Remove javascript protocol
+        .replace(/on\w+=/gi, '') // Remove event handlers
+        .trim();
+    }
+
+    function sanitizeHTML(html) {
+      const temp = document.createElement('div');
+      temp.textContent = html;
+      return temp.innerHTML;
+    }
+
+    function validateEmail(email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(email.toLowerCase());
+    }
+
+    function validatePhoneNumber(phone) {
+      const phoneRegex = /^\d{8}$/; // Guatemala format
+      return phoneRegex.test(phone.replace(/\D/g, ''));
+    }
+
+    function validateNumber(input, min = 0, max = Infinity) {
+      const num = parseFloat(input);
+      return !isNaN(num) && num >= min && num <= max;
+    }
+
+    // ==========================================
+    // SECURITY LOGGING
+    // ==========================================
+    async function logSecurityEvent(eventType, details) {
+      try {
+        // Get client IP for security logging
+        const clientIP = await getClientIP();
+
+        await supabaseClient.from('security_logs').insert({
+          user_id: currentUserSession?.user_id || null,
+          event_type: eventType,
+          details: details,
+          ip_address: clientIP,
+          user_agent: navigator.userAgent,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Failed to log security event:', error);
+      }
+    }
+
+    // IP address detection
+    async function getClientIP() {
+      try {
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        return data.ip;
+      } catch (error) {
+        return 'unknown';
+      }
+    }
 
     // ==========================================
     // LÓGICA DE NEGOCIO
@@ -433,56 +521,207 @@
     // LOGIN / LOGOUT
     // ==========================================
     function checkLogin() {
-        const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
-        if (loggedIn) {
+        const sessionData = JSON.parse(sessionStorage.getItem('userSession') || '{}');
+        const now = new Date();
+        const expiresAt = new Date(sessionData.expires_at);
+
+        if (sessionData.user_id && now < expiresAt) {
+            currentUserSession = sessionData;
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('app-content-wrapper').style.display = 'block';
+            updateUIForRole(sessionData.role);
             return true;
         } else {
+            sessionStorage.removeItem('userSession');
+            currentUserSession = null;
             document.getElementById('login-screen').style.display = 'flex';
-            document.getElementById('app-content-wrapper').style.display = 'none'; 
+            document.getElementById('app-content-wrapper').style.display = 'none';
             return false;
         }
     }
-    
-    function login() {
+
+    async function login() {
+        const emailInput = document.getElementById('login-email');
         const passwordInput = document.getElementById('login-password');
+        const email = sanitizeInput(emailInput.value.trim());
         const password = passwordInput.value;
         const errorMsg = document.getElementById('login-error');
 
-        if (password === APP_CONFIG.MASTER_PASSWORD) {
-            localStorage.setItem('isLoggedIn', 'true');
-            errorMsg.style.display = 'none';
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('app-content-wrapper').style.display = 'block';
-            cargarDatos().then(actualizarUI);
-            Toast.fire({ icon: 'success', title: '¡Bienvenido!' });
-        } else {
-            errorMsg.textContent = "Clave incorrecta. Intente de nuevo.";
+        // Client-side validation
+        if (!email || !password) {
+            errorMsg.textContent = "Email and password are required";
             errorMsg.style.display = 'block';
-            passwordInput.value = ''; 
-            passwordInput.focus();
-            Swal.fire({ icon: 'error', title: 'Acceso Denegado', text: 'La clave ingresada es incorrecta', confirmButtonColor: '#ef4444' });
+            return;
+        }
+
+        // Validate email format
+        if (!validateEmail(email)) {
+            errorMsg.textContent = "Please enter a valid email address";
+            errorMsg.style.display = 'block';
+            emailInput.focus();
+            return;
+        }
+
+        // Show loading state
+        const loginBtn = document.querySelector('#login-screen button');
+        const originalText = loginBtn.innerHTML;
+        loginBtn.disabled = true;
+        loginBtn.innerHTML = 'Logging in...';
+
+        try {
+            // Call secure login function
+            const { data, error } = await supabaseClient.rpc('secure_login', {
+                email_input: email.toLowerCase(),
+                password_input: password,
+                ip_address: await getClientIP()
+            });
+
+            if (data && data.success) {
+                // Store secure session data
+                const sessionData = {
+                    user_id: data.user_id,
+                    email: data.email,
+                    name: data.name,
+                    role: data.role,
+                    login_time: new Date().toISOString(),
+                    expires_at: new Date(data.session_expires).toISOString()
+                };
+
+                currentUserSession = sessionData;
+                sessionStorage.setItem('userSession', JSON.stringify(sessionData));
+
+                // Log successful login
+                await logSecurityEvent('login_success', { email: email });
+
+                errorMsg.style.display = 'none';
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-content-wrapper').style.display = 'block';
+
+                // Update UI for user role
+                updateUIForRole(data.role);
+
+                await cargarDatos();
+                actualizarUI();
+
+                Swal.fire({
+                    icon: 'success',
+                    title: `Welcome back, ${data.name}!`,
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+
+                // Clear form
+                emailInput.value = '';
+                passwordInput.value = '';
+            } else {
+                // Log failed login attempt
+                await logSecurityEvent('failed_login_attempt', {
+                    email: email,
+                    reason: data?.message || 'authentication_failed'
+                });
+
+                errorMsg.textContent = data?.message || 'Login failed';
+                errorMsg.style.display = 'block';
+                passwordInput.value = '';
+                passwordInput.focus();
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            await logSecurityEvent('login_error', { email: email, error: error.message });
+
+            errorMsg.textContent = 'Connection error. Please try again.';
+            errorMsg.style.display = 'block';
+        } finally {
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = originalText;
         }
     }
     
     function logout() {
         Swal.fire({
-            title: '¿Cerrar Sesión?',
-            text: "Tendrás que ingresar tu clave nuevamente",
+            title: 'Cerrar Sesión?',
+            text: "Tendrás que ingresar tus credenciales nuevamente",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
             cancelButtonColor: '#64748b',
             confirmButtonText: 'Sí, salir',
             cancelButtonText: 'Cancelar'
-        }).then((result) => {
+        }).then(async (result) => {
             if (result.isConfirmed) {
-                localStorage.removeItem('isLoggedIn');
+                // Log session end if user is logged in
+                if (currentUserSession) {
+                    await logSecurityEvent('logout', {
+                        user_id: currentUserSession.user_id,
+                        session_duration: Date.now() - new Date(currentUserSession.login_time).getTime()
+                    });
+                }
+
+                sessionStorage.removeItem('userSession');
+                currentUserSession = null;
                 window.location.reload();
             }
         });
     }
+
+    // ==========================================
+    // SESSION MANAGEMENT
+    // ==========================================
+    function checkSession() {
+        const sessionData = JSON.parse(sessionStorage.getItem('userSession') || '{}');
+        const now = new Date();
+        const expiresAt = new Date(sessionData.expires_at);
+
+        if (now >= expiresAt) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Sesión Expirada',
+                text: 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.',
+                confirmButtonText: 'OK',
+                allowOutsideClick: false,
+                allowEscapeKey: false
+            }).then(() => {
+                sessionStorage.removeItem('userSession');
+                currentUserSession = null;
+                window.location.reload();
+            });
+            return false;
+        }
+        return true;
+    }
+
+    function updateUIForRole(role) {
+        // Hide/show elements based on role
+        const adminElements = document.querySelectorAll('.admin-only');
+        const operatorElements = document.querySelectorAll('.operator-only');
+        const viewerElements = document.querySelectorAll('.viewer-only');
+
+        // Super Admin and Admin see everything
+        if (role === 'super_admin' || role === 'admin') {
+            adminElements.forEach(el => el.style.display = 'block');
+            operatorElements.forEach(el => el.style.display = 'block');
+        }
+        // Operator sees limited elements
+        else if (role === 'operator') {
+            adminElements.forEach(el => el.style.display = 'none');
+            operatorElements.forEach(el => el.style.display = 'block');
+        }
+        // Viewer sees only read-only elements
+        else if (role === 'viewer') {
+            adminElements.forEach(el => el.style.display = 'none');
+            operatorElements.forEach(el => el.style.display = 'none');
+            viewerElements.forEach(el => el.style.display = 'block');
+        }
+
+        // Update header to show current user
+        const headerTitle = document.querySelector('.app-title span');
+        if (headerTitle && currentUserSession) {
+            headerTitle.textContent = `Control de Agua Potable - ${currentUserSession.name}`;
+        }
+    }
+
+    // Check session every minute
+    setInterval(checkSession, 60000);
 
     // ==========================================
     // INICIALIZACIÓN
@@ -539,23 +778,78 @@
         const originalText = btn.innerHTML;
         btn.disabled = true; btn.textContent = "Guardando...";
 
+        // Get and validate inputs
+        const nombre = sanitizeInput(document.getElementById('nuevo-cliente-nombre').value);
+        const codigo = sanitizeInput(document.getElementById('nuevo-cliente-codigo').value);
+        const medidor = sanitizeInput(document.getElementById('nuevo-cliente-medidor').value);
+        const email = sanitizeInput(document.getElementById('nuevo-cliente-email').value);
+        const direccion = sanitizeInput(document.getElementById('nuevo-cliente-direccion').value);
+        const telefono = sanitizeInput(document.getElementById('nuevo-cliente-telefono').value);
+        const tarifa = parseFloat(document.getElementById('nuevo-cliente-tarifa').value);
+        const canon = parseFloat(document.getElementById('nuevo-cliente-canon').value);
+        const lecturaInicial = parseFloat(document.getElementById('nuevo-cliente-lectura-inicial').value);
+
+        // Validation
+        const errors = [];
+
+        if (!nombre || nombre.length < 2) {
+            errors.push('Name must be at least 2 characters');
+        }
+
+        if (!codigo || codigo.length < 3) {
+            errors.push('Code must be at least 3 characters');
+        }
+
+        if (email && !validateEmail(email)) {
+            errors.push('Invalid email format');
+        }
+
+        if (telefono && !validatePhoneNumber(telefono)) {
+            errors.push('Phone must be 8 digits (Guatemala format)');
+        }
+
+        if (!validateNumber(tarifa, 0, 1000)) {
+            errors.push('Rate must be between 0 and 1000');
+        }
+
+        if (!validateNumber(canon, 0, 1000)) {
+            errors.push('Fixed fee must be between 0 and 1000');
+        }
+
+        if (!validateNumber(lecturaInicial, 0, 999999)) {
+            errors.push('Initial reading must be a valid number');
+        }
+
+        if (errors.length > 0) {
+            Swal.fire('Validation Error', errors.join('\n'), 'error');
+            btn.disabled = false; btn.innerHTML = originalText;
+            return;
+        }
+
         const nuevo = {
-            nombre: document.getElementById('nuevo-cliente-nombre').value,
-            codigo: document.getElementById('nuevo-cliente-codigo').value,
-            medidor: document.getElementById('nuevo-cliente-medidor').value,
-            email: document.getElementById('nuevo-cliente-email').value,
-            direccion: document.getElementById('nuevo-cliente-direccion').value,
-            telefono: document.getElementById('nuevo-cliente-telefono').value,
-            tarifa: parseFloat(document.getElementById('nuevo-cliente-tarifa').value) || 0,
-            canon: parseFloat(document.getElementById('nuevo-cliente-canon').value) || 0,
-            lectura_inicial: parseFloat(document.getElementById('nuevo-cliente-lectura-inicial').value) || 0
+            nombre: nombre,
+            codigo: codigo,
+            medidor: medidor,
+            email: email,
+            direccion: direccion,
+            telefono: telefono,
+            tarifa: tarifa || 0,
+            canon: canon || 0,
+            lectura_inicial: lecturaInicial || 0
         };
 
-        if(!nuevo.nombre || !nuevo.codigo) { 
+        if(!nuevo.nombre || !nuevo.codigo) {
             Swal.fire('Atención', 'Nombre y Código son obligatorios', 'warning');
-            btn.disabled=false; btn.innerHTML=originalText; 
-            return; 
+            btn.disabled=false; btn.innerHTML=originalText;
+            return;
         }
+
+        // Log security event for client creation
+        await logSecurityEvent('client_creation_attempt', {
+            action: 'create_client',
+            client_code: codigo,
+            user_role: currentUserSession?.role
+        });
 
         const { data, error } = await supabaseClient.from('clientes').insert(nuevo).select();
         
@@ -596,8 +890,8 @@
             div.className = 'card';
             div.style.padding = '15px'; div.style.marginBottom = '0';
             div.innerHTML = `
-                <div style="font-weight:700">${c.nombre}</div>
-                <div style="font-size:12px; color:#64748b; margin-top:4px;">${c.codigo} | ${c.medidor}</div>
+                <div style="font-weight:700">${sanitizeHTML(c.nombre)}</div>
+                <div style="font-size:12px; color:#64748b; margin-top:4px;">${sanitizeHTML(c.codigo)} | ${sanitizeHTML(c.medidor)}</div>
                 <div style="font-size:12px; color:#0ea5e9; margin-top:4px;">Tarifa: Q${c.tarifa} | Canon: Q${c.canon}</div>
             `;
             lista.appendChild(div);
