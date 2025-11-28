@@ -1112,12 +1112,72 @@
             console.log('🔄 Calling secure_login RPC function...');
             const rpcStartTime = performance.now();
 
-            // Call secure login function
-            const { data, error } = await supabaseClient.rpc('secure_login', {
-                email_input: email.toLowerCase(),
-                password_input: password,
-                ip_address: clientIP
-            });
+            // Sign in with Supabase Auth
+const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
+    email: email.toLowerCase(),
+    password
+});
+
+if (authError) {
+    console.error('❌ Auth error:', authError);
+    await logSecurityEvent('failed_login_attempt', {
+        email,
+        reason: authError.message || 'authentication_failed'
+    });
+
+    errorMsg.textContent = authError.message || 'Error de autenticación';
+    errorMsg.style.display = 'block';
+    loginBtn.disabled = false;
+    loginBtn.innerHTML = originalText;
+    console.groupEnd();
+    return;
+}
+
+const session = authData.session;
+const user    = authData.user || session.user;
+
+// Load profile (role + full_name) from user_profiles
+const { data: profile, error: profileError } = await supabaseClient
+    .from('user_profiles')
+    .select('full_name, role')
+    .eq('id', user.id)
+    .single();
+
+if (profileError) {
+    console.warn('⚠️ Could not load profile, using defaults:', profileError);
+}
+
+const role = profile?.role || 'viewer';
+const fullName = profile?.full_name || user.email;
+
+// Build the same kind of session object your app already expects
+const sessionData = {
+    user_id: user.id,
+    email: user.email,
+    name: fullName,
+    role,
+    login_time: new Date().toISOString(),
+    // session.expires_at is a unix timestamp (seconds)
+    expires_at: new Date(session.expires_at * 1000).toISOString()
+};
+
+currentUserSession = sessionData;
+sessionStorage.setItem('userSession', JSON.stringify(sessionData));
+localStorage.setItem('cached_session', JSON.stringify(sessionData)); // if you use offline mode
+
+await logSecurityEvent('login_success', {
+    email,
+    role
+});
+
+errorMsg.style.display = 'none';
+document.getElementById('login-screen').style.display = 'none';
+document.getElementById('app-content-wrapper').style.display = 'block';
+
+updateUIForRole(role);
+await cargarDatos();
+actualizarUI();
+
 
             const rpcEndTime = performance.now();
             const rpcResponseTime = (rpcEndTime - rpcStartTime).toFixed(2);
