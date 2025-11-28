@@ -136,6 +136,27 @@
     .login-box input { padding: 15px; border: 2px solid #e2e8f0; border-radius: 10px; width: 100%; margin-bottom: 20px; font-size: 16px; }
     .login-box button { width: 100%; padding: 15px; font-size: 18px; }
 
+    /* Password Reset Styles */
+    .reset-success {
+        background: #d1fae5;
+        color: #059669;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+        margin-bottom: 15px;
+        border: 1px solid #10b981;
+    }
+
+    .reset-error {
+        background: #fef2f2;
+        color: #dc2626;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+        margin-bottom: 15px;
+        border: 1px solid #ef4444;
+    }
+
     /* Responsive */
     @media (max-width: 768px) {
       .app-header { padding: 16px; }
@@ -153,6 +174,12 @@
       <input type="email" id="login-email" placeholder="Email Address" onkeypress="if(event.keyCode == 13) login()">
       <input type="password" id="login-password" placeholder="Password" onkeypress="if(event.keyCode == 13) login()">
       <button class="btn btn-primary" onclick="login()">Secure Login</button>
+
+      <div style="margin-top: 15px; text-align: center;">
+        <a href="#" onclick="showPasswordReset()" style="color: #0ea5e9; text-decoration: none; font-size: 14px;">
+            ¿Olvidaste tu contraseña?
+        </a>
+      </div>
 
       <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
         <button class="btn btn-secondary" onclick="runLoginDiagnostics()" style="flex: 1; font-size: 14px;">🔍 Diagnose</button>
@@ -373,9 +400,53 @@
         </div>
     </div>
     
-    </div> 
+    </div>
+
+    <!-- Password Reset Form (separate page) -->
+    <div id="password-reset-page" class="section" style="display: none;">
+        <div class="card">
+            <div class="card-header">Restablecer Contraseña</div>
+
+            <div id="reset-token-form">
+                <div class="form-group">
+                    <label>Nueva Contraseña</label>
+                    <input type="password" id="new-password" placeholder="Mínimo 6 caracteres">
+                    <div id="new-password-error" style="color: #dc2626; font-size: 12px; margin-top: 5px; display: none;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Confirmar Contraseña</label>
+                    <input type="password" id="confirm-password" placeholder="Repite tu nueva contraseña">
+                    <div id="confirm-password-error" style="color: #dc2626; font-size: 12px; margin-top: 5px; display: none;"></div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="updatePassword()" id="btn-update-password">
+                        Actualizar Contraseña
+                    </button>
+                    <button class="btn btn-secondary" onclick="backToLogin()">
+                        Volver al Inicio
+                    </button>
+                </div>
+            </div>
+
+            <div id="reset-success" style="display: none; text-align: center;">
+                <div style="padding: 20px; background: #d1fae5; border-radius: 8px; margin-bottom: 20px;">
+                    ✅ ¡Contraseña actualizada exitosamente!
+                </div>
+
+                <p style="margin-bottom: 20px; color: #64748b;">
+                    Tu contraseña ha sido actualizada. Ahora puedes iniciar sesión.
+                </p>
+
+                <button class="btn btn-primary" onclick="backToLogin()">
+                    Iniciar Sesión
+                </button>
+            </div>
+        </div>
+    </div>
   </div>
-  
+
     <div id="edit-status-modal" class="modal" onclick="if(event.target.id === 'edit-status-modal') closeEditStatusModal()">
       <div class="modal-content">
           <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
@@ -405,6 +476,54 @@
           </div>
       </div>
     </div>
+
+    <div id="password-reset-modal" class="modal" onclick="if(event.target.id === 'password-reset-modal') closePasswordReset()">
+      <div class="modal-content">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>Recuperar Contraseña</span>
+              <button onclick="closePasswordReset()" style="background:none; border:none; font-size:24px; cursor:pointer;">&times;</button>
+          </div>
+
+          <!-- Step 1: Request Reset -->
+          <div id="reset-step-1">
+              <p style="margin-bottom: 20px; color: #64748b;">
+                  Ingresa tu correo electrónico para recibir instrucciones de recuperación.
+              </p>
+
+              <div class="form-group">
+                  <label for="reset-email">Correo Electrónico</label>
+                  <input type="email" id="reset-email" placeholder="tu@correo.com" style="width:100%; padding:12px; border:2px solid #e2e8f0; border-radius:10px;">
+                  <div id="reset-email-error" style="color: #dc2626; font-size: 12px; margin-top: 5px; display: none;"></div>
+              </div>
+
+              <div class="btn-group" style="margin-top: 20px;">
+                  <button class="btn btn-primary" onclick="requestPasswordReset()" id="btn-request-reset" style="flex: 1;">
+                      Enviar Enlace de Recuperación
+                  </button>
+                  <button class="btn btn-secondary" onclick="closePasswordReset()" style="flex: 1;">
+                      Cancelar
+                  </button>
+              </div>
+          </div>
+
+          <!-- Step 2: Email Confirmation -->
+          <div id="reset-step-2" style="display: none;">
+              <div style="text-align: center; padding: 20px; background: #d1fae5; border-radius: 8px; margin-bottom: 20px;">
+                  ✅ ¡Correo enviado! Revisa tu bandeja de entrada.
+              </div>
+
+              <p style="margin-bottom: 20px; color: #64748b;">
+                  Hemos enviado instrucciones de recuperación a tu correo electrónico.
+              </p>
+
+              <div class="btn-group">
+                  <button class="btn btn-primary" onclick="closePasswordReset()" style="flex: 1;">
+                      Entendido
+                  </button>
+              </div>
+          </div>
+      </div>
+    </div>
   
   <script>
     // ==========================================
@@ -416,6 +535,7 @@
       EMAILJS_PUBLIC_KEY: 'AaKdY-HQgiru-q-xJ',
       EMAILJS_SERVICE_ID: 'service_663ome3',
       EMAILJS_TEMPLATE_RECIBO: 'template_ow5uddr',
+      EMAILJS_TEMPLATE_PASSWORD_RESET: 'template_password_reset', // New template to create in EmailJS
       // REMOVE: MASTER_PASSWORD: 'admin', // Removed for security
       COUNTRY_CODE: '502', // Guatemala
       SESSION_TIMEOUT: 8 * 60 * 60 * 1000, // 8 hours
@@ -1282,6 +1402,219 @@
     setInterval(checkSession, 60000);
 
     // ==========================================
+    // PASSWORD RESET FUNCTIONS
+    // ==========================================
+
+    function showPasswordReset() {
+        document.getElementById('password-reset-modal').classList.add('active');
+        document.getElementById('reset-step-1').style.display = 'block';
+        document.getElementById('reset-step-2').style.display = 'none';
+        document.getElementById('reset-email').value = '';
+        document.getElementById('reset-email-error').style.display = 'none';
+    }
+
+    function closePasswordReset() {
+        document.getElementById('password-reset-modal').classList.remove('active');
+    }
+
+    async function requestPasswordReset() {
+        const emailInput = document.getElementById('reset-email');
+        const email = sanitizeInput(emailInput.value.trim());
+        const errorDiv = document.getElementById('reset-email-error');
+        const btn = document.getElementById('btn-request-reset');
+
+        // Validation
+        if (!email || !validateEmail(email)) {
+            errorDiv.textContent = 'Por favor ingresa un correo electrónico válido';
+            errorDiv.style.display = 'block';
+            emailInput.focus();
+            return;
+        }
+
+        errorDiv.style.display = 'none';
+        btn.disabled = true;
+        btn.textContent = 'Enviando...';
+
+        try {
+            const clientIP = await getClientIP();
+
+            // Call RPC function to generate reset token
+            const { data, error } = await supabaseClient.rpc('request_password_reset', {
+                email_input: email.toLowerCase(),
+                ip_address: clientIP,
+                user_agent: navigator.userAgent
+            });
+
+            if (error) {
+                console.error('Password reset error:', error);
+                errorDiv.textContent = 'Error al solicitar restablecimiento. Intenta de nuevo.';
+                errorDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Enviar Enlace de Recuperación';
+                return;
+            }
+
+            if (data && data.success) {
+                // Send reset email via EmailJS
+                await sendPasswordResetEmail(email, data.token);
+
+                // Show success step
+                document.getElementById('reset-step-1').style.display = 'none';
+                document.getElementById('reset-step-2').style.display = 'block';
+
+                // Log successful request
+                await logSecurityEvent('password_reset_email_sent', {
+                    email: email,
+                    success: true
+                });
+            } else {
+                errorDiv.textContent = data?.message || 'Error al solicitar restablecimiento';
+                errorDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Enviar Enlace de Recuperación';
+            }
+
+        } catch (error) {
+            console.error('Password reset request error:', error);
+            errorDiv.textContent = 'Error de conexión. Intenta de nuevo.';
+            errorDiv.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Enviar Enlace de Recuperación';
+        }
+    }
+
+    async function sendPasswordResetEmail(email, token) {
+        const resetLink = `${window.location.origin}${window.location.pathname}?reset_token=${token}`;
+
+        const params = {
+            to_email: email,
+            reset_link: resetLink,
+            empresa_nombre: empresa.nombre || 'Control de Consumo de Agua',
+            hora_expiracion: '1 hora'
+        };
+
+        try {
+            await emailjs.send(
+                APP_CONFIG.EMAILJS_SERVICE_ID,
+                APP_CONFIG.EMAILJS_TEMPLATE_PASSWORD_RESET,
+                params
+            );
+
+            Toast.fire({
+                icon: 'success',
+                title: 'Correo de recuperación enviado'
+            });
+        } catch (error) {
+            console.error('EmailJS error:', error);
+            // Don't fail the whole process if email fails
+            Toast.fire({
+                icon: 'warning',
+                title: 'Correo enviado, pero verifica la conexión'
+            });
+        }
+    }
+
+    // Token validation from URL parameter
+    async function handlePasswordResetToken() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('reset_token');
+
+        if (token) {
+            // Hide login screen and app content, show password reset form
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('app-content-wrapper').style.display = 'none';
+            document.getElementById('password-reset-page').style.display = 'block';
+
+            // Validate token
+            const { data, error } = await supabaseClient.rpc('validate_reset_token', {
+                token_input: token
+            });
+
+            if (error || !data || !data.valid) {
+                document.getElementById('reset-token-form').innerHTML = `
+                    <div class="reset-error">
+                        Enlace inválido o expirado. Solicita un nuevo restablecimiento.
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="backToLogin()">Volver al Inicio</button>
+                    </div>
+                `;
+                return;
+            }
+
+            // Store email for password update
+            window.resetEmail = data.email;
+        }
+    }
+
+    async function updatePassword() {
+        const newPassword = document.getElementById('new-password').value;
+        const confirmPassword = document.getElementById('confirm-password').value;
+
+        // Clear previous errors
+        document.getElementById('new-password-error').style.display = 'none';
+        document.getElementById('confirm-password-error').style.display = 'none';
+
+        // Validation
+        if (newPassword.length < 6) {
+            document.getElementById('new-password-error').textContent = 'La contraseña debe tener al menos 6 caracteres';
+            document.getElementById('new-password-error').style.display = 'block';
+            document.getElementById('new-password').focus();
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            document.getElementById('confirm-password-error').textContent = 'Las contraseñas no coinciden';
+            document.getElementById('confirm-password-error').style.display = 'block';
+            document.getElementById('confirm-password').focus();
+            return;
+        }
+
+        const btn = document.getElementById('btn-update-password');
+        btn.disabled = true;
+        btn.textContent = 'Actualizando...';
+
+        try {
+            const { data, error } = await supabaseClient.rpc('update_user_password', {
+                email_input: window.resetEmail,
+                new_password: newPassword
+            });
+
+            if (error || !data || !data.success) {
+                Swal.fire('Error', 'No se pudo actualizar la contraseña. Intenta de nuevo.', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Actualizar Contraseña';
+                return;
+            }
+
+            // Show success
+            document.getElementById('reset-token-form').style.display = 'none';
+            document.getElementById('reset-success').style.display = 'block';
+
+            // Clear URL parameter
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            // Log successful password update
+            await logSecurityEvent('password_reset_completed', {
+                email: window.resetEmail,
+                success: true
+            });
+
+        } catch (error) {
+            console.error('Password update error:', error);
+            Swal.fire('Error', 'Error de conexión. Intenta de nuevo.', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Actualizar Contraseña';
+        }
+    }
+
+    function backToLogin() {
+        document.getElementById('password-reset-page').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+        window.resetEmail = null;
+    }
+
+    // ==========================================
     // INICIALIZACIÓN
     // ==========================================
     document.addEventListener('DOMContentLoaded', async () => {
@@ -1291,6 +1624,9 @@
 
         // Initialize network monitoring
         initNetworkMonitoring();
+
+        // Check for reset token in URL
+        handlePasswordResetToken();
 
         // Check login and handle offline mode
         const loggedIn = checkLogin();
