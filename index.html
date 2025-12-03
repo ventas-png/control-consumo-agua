@@ -799,29 +799,28 @@
     }
 
     async function testSecureLoginFunction() {
-        try {
-            // Test RPC function availability with test credentials
-            const { data, error } = await supabaseClient.rpc('secure_login', {
-                email_input: 'test@diagnostic.com',
-                password_input: 'test_password',
-                ip_address: '127.0.0.1'
-            });
+    try {
+        // Probar que el endpoint de Auth responde
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: 'nonexistent_diagnostic_user@example.com',
+            password: 'invalid_password'
+        });
 
-            return {
-                available: true,
-                responds: true,
-                error: error?.message,
-                timestamp: new Date().toISOString()
-            };
-        } catch (error) {
-            return {
-                available: false,
-                responds: false,
-                error: error.message,
-                timestamp: new Date().toISOString()
-            };
-        }
+        return {
+            available: true,
+            responds: true,
+            error: error?.message,
+            timestamp: new Date().toISOString()
+        };
+    } catch (error) {
+        return {
+            available: false,
+            responds: false,
+            error: error.message,
+            timestamp: new Date().toISOString()
+        };
     }
+}
 
     async function runDiagnostics() {
         const diagnostics = {
@@ -1064,196 +1063,221 @@
     }
 
     async function login() {
-        const loginStartTime = performance.now();
-        console.group('🔐 Login Attempt');
+    const loginStartTime = performance.now();
+    console.group('🔐 Login Attempt');
 
-        const emailInput = document.getElementById('login-email');
-        const passwordInput = document.getElementById('login-password');
-        const email = sanitizeInput(emailInput.value.trim());
-        const password = passwordInput.value;
-        const errorMsg = document.getElementById('login-error');
+    const emailInput = document.getElementById('login-email');
+    const passwordInput = document.getElementById('login-password');
+    const email = sanitizeInput(emailInput.value.trim());
+    const password = passwordInput.value;
+    const errorMsg = document.getElementById('login-error');
 
-        console.log('📧 Email:', email);
-        console.log('🔑 Password Length:', password.length);
-        console.log('🌐 User Agent:', navigator.userAgent);
-        console.log('📡 Online Status:', navigator.onLine);
+    console.log('📧 Email:', email);
+    console.log('🔑 Password Length:', password.length);
+    console.log('🌐 User Agent:', navigator.userAgent);
+    console.log('📡 Online Status:', navigator.onLine);
 
-        // Client-side validation
-        if (!email || !password) {
-            console.warn('⚠️ Validation failed: Missing credentials');
-            errorMsg.textContent = "Email and password are required";
-            errorMsg.style.display = 'block';
-            console.groupEnd();
-            return;
-        }
+    // Limpiar error previo
+    errorMsg.style.display = 'none';
+    errorMsg.textContent = '';
 
-        // Validate email format
-        if (!validateEmail(email)) {
-            console.warn('⚠️ Validation failed: Invalid email format');
-            errorMsg.textContent = "Please enter a valid email address";
-            errorMsg.style.display = 'block';
-            emailInput.focus();
-            console.groupEnd();
-            return;
-        }
+    // Validación básica
+    if (!email || !password) {
+        console.warn('⚠️ Validation failed: Missing credentials');
+        errorMsg.textContent = "Email and password are required";
+        errorMsg.style.display = 'block';
+        console.groupEnd();
+        return;
+    }
 
-        // Show loading state
-        const loginBtn = document.querySelector('#login-screen button');
-        const originalText = loginBtn.innerHTML;
-        loginBtn.disabled = true;
-        loginBtn.innerHTML = 'Authenticating...';
-        console.log('⏳ Authentication started...');
+    // Validar formato de email
+    if (!validateEmail(email)) {
+        console.warn('⚠️ Validation failed: Invalid email format');
+        errorMsg.textContent = "Please enter a valid email address";
+        errorMsg.style.display = 'block';
+        emailInput.focus();
+        console.groupEnd();
+        return;
+    }
 
-        try {
-            // Get client IP for logging
-            const clientIP = await getClientIP();
-            console.log('🌍 Client IP:', clientIP);
+    // Estado de botón
+    const loginBtn = document.querySelector('#login-screen button');
+    const originalText = loginBtn.innerHTML;
+    loginBtn.disabled = true;
+    loginBtn.innerHTML = 'Authenticating...';
+    console.log('⏳ Authentication started...');
 
-            console.log('🔄 Calling secure_login RPC function...');
-            const rpcStartTime = performance.now();
+    try {
+        // IP del cliente para logs
+        const clientIP = await getClientIP();
+        console.log('🌍 Client IP:', clientIP);
 
-            // Call secure login function
-            const { data, error } = await supabaseClient.rpc('secure_login', {
-                email_input: email.toLowerCase(),
-                password_input: password,
-                ip_address: clientIP
-            });
+        console.log('🔄 Calling Supabase Auth signInWithPassword...');
+        const authStartTime = performance.now();
 
-            const rpcEndTime = performance.now();
-            const rpcResponseTime = (rpcEndTime - rpcStartTime).toFixed(2);
-            console.log(`📊 RPC Response Time: ${rpcResponseTime}ms`);
-            console.log('📤 RPC Response:', data);
+        // 🔑 NUEVO: login con Supabase Auth
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: email.toLowerCase(),
+            password
+        });
 
-            if (error) {
-                console.error('❌ RPC Error:', error);
-            }
+        const authEndTime = performance.now();
+        const authResponseTime = (authEndTime - authStartTime).toFixed(2);
+        console.log(`📊 Auth Response Time: ${authResponseTime}ms`);
+        console.log('📤 Auth Response:', data);
 
-            if (data && data.success) {
-                console.log('✅ Authentication successful!');
-                console.log('👤 User:', {
-                    id: data.user_id,
-                    email: data.email,
-                    name: data.name,
-                    role: data.role,
-                    session_expires: data.session_expires
-                });
+        if (error || !data?.session || !data?.user) {
+            console.warn('❌ Authentication failed:', error?.message);
 
-                // Store secure session data
-                const sessionData = {
-                    user_id: data.user_id,
-                    email: data.email,
-                    name: data.name,
-                    role: data.role,
-                    login_time: new Date().toISOString(),
-                    expires_at: new Date(data.session_expires).toISOString()
-                };
-
-                currentUserSession = sessionData;
-                sessionStorage.setItem('userSession', JSON.stringify(sessionData));
-                console.log('💾 Session stored successfully');
-
-                // Log successful login
-                await logSecurityEvent('login_success', {
-                    email: email,
-                    response_time: rpcResponseTime
-                });
-
-                errorMsg.style.display = 'none';
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('app-content-wrapper').style.display = 'block';
-
-                // Update UI for user role
-                updateUIForRole(data.role);
-
-                console.log('🔄 Loading application data...');
-                const dataLoadStartTime = performance.now();
-                await cargarDatos();
-                actualizarUI();
-                const dataLoadEndTime = performance.now();
-                const dataLoadTime = (dataLoadEndTime - dataLoadStartTime).toFixed(2);
-                console.log(`📊 Data Load Time: ${dataLoadTime}ms`);
-
-                const totalLoginTime = (rpcEndTime - loginStartTime).toFixed(2);
-                console.log(`⏱️ Total Login Time: ${totalLoginTime}ms`);
-
-                Swal.fire({
-                    icon: 'success',
-                    title: `Welcome back, ${data.name}!`,
-                    timer: 2000,
-                    showConfirmButton: false
-                });
-
-                // Clear form
-                emailInput.value = '';
-                passwordInput.value = '';
-
-                console.log('🎉 Login process completed successfully!');
-            } else {
-                // Log failed login attempt
-                console.warn('❌ Authentication failed:', data?.message || 'Unknown error');
-                await logSecurityEvent('failed_login_attempt', {
-                    email: email,
-                    reason: data?.message || 'authentication_failed',
-                    response_time: rpcResponseTime
-                });
-
-                // Enhanced error messages based on specific issues
-                let errorMessage = data?.message || 'Login failed';
-                let troubleshootingTip = '';
-
-                if (data?.message?.includes('user not found')) {
-                    troubleshootingTip = '\n\n💡 Tip: Check if your email is registered in the system.';
-                } else if (data?.message?.includes('invalid password')) {
-                    troubleshootingTip = '\n\n💡 Tip: Make sure you entered the correct password. Check caps lock.';
-                } else if (data?.message?.includes('network') || data?.message?.includes('connection')) {
-                    troubleshootingTip = '\n\n💡 Tip: Check your internet connection and try again.';
-                } else if (!data) {
-                    errorMessage = 'Unable to connect to authentication service';
-                    troubleshootingTip = '\n\n💡 Tip: The authentication service may be temporarily unavailable. Please try again later.';
-                }
-
-                errorMsg.textContent = errorMessage + troubleshootingTip;
-                errorMsg.style.display = 'block';
-                passwordInput.value = '';
-                passwordInput.focus();
-            }
-        } catch (error) {
-            console.error('💥 Critical login error:', error);
-            console.error('📋 Error stack:', error.stack);
-
-            await logSecurityEvent('login_error', {
+            // Log security event de intento fallido
+            await logSecurityEvent('failed_login_attempt', {
                 email: email,
-                error: error.message,
-                error_type: error.constructor.name
+                reason: error?.message || 'invalid_credentials',
+                response_time: authResponseTime
             });
 
-            // Enhanced error handling with specific guidance
-            let errorMessage = 'Connection error. Please try again.';
+            // Contador de fallos para diagnósticos
+            const failures = parseInt(localStorage.getItem('login_failures') || '0') + 1;
+            localStorage.setItem('login_failures', failures.toString());
+
+            let errorMessage = 'Login failed';
             let troubleshootingTip = '';
 
-            if (error.message?.includes('fetch')) {
-                errorMessage = 'Network connection failed';
-                troubleshootingTip = '\n\n💡 Tip: Check your internet connection and firewall settings.';
-            } else if (error.message?.includes('CORS')) {
-                errorMessage = 'CORS policy error';
-                troubleshootingTip = '\n\n💡 Tip: This may be a configuration issue. Contact support.';
-            } else if (error.message?.includes('timeout')) {
-                errorMessage = 'Request timeout';
-                troubleshootingTip = '\n\n💡 Tip: The server is taking too long to respond. Please try again.';
+            const msg = (error?.message || '').toLowerCase();
+            if (msg.includes('invalid login credentials')) {
+                errorMessage = 'Invalid email or password';
+                troubleshootingTip = '\n\n💡 Tip: Check if your email and password are correct.';
+            } else if (msg.includes('email not confirmed')) {
+                errorMessage = 'Email not confirmed';
+                troubleshootingTip = '\n\n💡 Tip: Please confirm your email before logging in.';
             }
 
             errorMsg.textContent = errorMessage + troubleshootingTip;
             errorMsg.style.display = 'block';
-        } finally {
-            const loginEndTime = performance.now();
-            const totalLoginTime = (loginEndTime - loginStartTime).toFixed(2);
-            console.log(`⏱️ Total Login Attempt Time: ${totalLoginTime}ms`);
+            passwordInput.value = '';
+            passwordInput.focus();
 
-            loginBtn.disabled = false;
-            loginBtn.innerHTML = originalText;
-            console.groupEnd();
+            return;
         }
+
+        const { user, session } = data;
+
+        // Obtener perfil y rol desde app_users
+        const { data: profile, error: profileError } = await supabaseClient
+            .from('app_users')
+            .select('full_name, role')
+            .eq('id', user.id)
+            .single();
+
+        if (profileError) {
+            console.warn('⚠️ Could not load app_users profile:', profileError.message);
+        }
+
+        // role en BD (lo que usamos en policies): admin / operador / visor
+        const dbRole = profile?.role || 'visor';
+
+        // role para la UI (lo que espera updateUIForRole)
+        let uiRole = dbRole;
+        if (dbRole === 'operador') uiRole = 'operator';
+        if (dbRole === 'visor') uiRole = 'viewer';
+
+        const displayName = profile?.full_name || user.email;
+
+        // Calcular vencimiento de la sesión (usamos el de Supabase)
+        const expiresAtIso = session.expires_at
+            ? new Date(session.expires_at * 1000).toISOString()
+            : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString();
+
+        // Estructura de sesión que ya usa tu app
+        const sessionData = {
+            user_id: user.id,
+            email: user.email,
+            name: displayName,
+            role: uiRole,
+            login_time: new Date().toISOString(),
+            expires_at: expiresAtIso
+        };
+
+        currentUserSession = sessionData;
+        sessionStorage.setItem('userSession', JSON.stringify(sessionData));
+        localStorage.setItem('cached_session', JSON.stringify(sessionData));
+        localStorage.removeItem('login_failures');
+        console.log('💾 Session stored successfully', sessionData);
+
+        // Log security event de éxito
+        await logSecurityEvent('login_success', {
+            email: email,
+            response_time: authResponseTime
+        });
+
+        // Mostrar app
+        errorMsg.style.display = 'none';
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app-content-wrapper').style.display = 'block';
+
+        // UI según rol
+        updateUIForRole(uiRole);
+
+        console.log('🔄 Loading application data...');
+        const dataLoadStartTime = performance.now();
+        await cargarDatos();
+        actualizarUI();
+        const dataLoadEndTime = performance.now();
+        const dataLoadTime = (dataLoadEndTime - dataLoadStartTime).toFixed(2);
+        console.log(`📊 Data Load Time: ${dataLoadTime}ms`);
+
+        const totalLoginTime = (authEndTime - loginStartTime).toFixed(2);
+        console.log(`⏱️ Total Login Time: ${totalLoginTime}ms`);
+
+        Swal.fire({
+            icon: 'success',
+            title: `Welcome back, ${displayName}!`,
+            timer: 2000,
+            showConfirmButton: false
+        });
+
+        // Limpiar formulario
+        emailInput.value = '';
+        passwordInput.value = '';
+
+        console.log('🎉 Login process completed successfully!');
+    } catch (error) {
+        console.error('💥 Critical login error:', error);
+        console.error('📋 Error stack:', error.stack);
+
+        await logSecurityEvent('login_error', {
+            email: email,
+            error: error.message,
+            error_type: error.constructor.name
+        });
+
+        let errorMessage = 'Connection error. Please try again.';
+        let troubleshootingTip = '';
+
+        const msg = error.message || '';
+        if (msg.includes('fetch')) {
+            errorMessage = 'Network connection failed';
+            troubleshootingTip = '\n\n💡 Tip: Check your internet connection and firewall settings.';
+        } else if (msg.includes('CORS')) {
+            errorMessage = 'CORS policy error';
+            troubleshootingTip = '\n\n💡 Tip: This may be a configuration issue. Contact support.';
+        } else if (msg.includes('timeout')) {
+            errorMessage = 'Request timeout';
+            troubleshootingTip = '\n\n💡 Tip: The server is taking too long to respond. Please try again.';
+        }
+
+        errorMsg.textContent = errorMessage + troubleshootingTip;
+        errorMsg.style.display = 'block';
+    } finally {
+        const loginEndTime = performance.now();
+        const totalLoginTime = (loginEndTime - loginStartTime).toFixed(2);
+        console.log(`⏱️ Total Login Attempt Time: ${totalLoginTime}ms`);
+
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = originalText;
+        console.groupEnd();
     }
+}
     
     // ==========================================
     // FALLBACK AUTHENTICATION MECHANISMS
@@ -1313,34 +1337,43 @@
     }
 
     function logout() {
-        Swal.fire({
-            title: 'Cerrar Sesión?',
-            text: "Tendrás que ingresar tus credenciales nuevamente",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#ef4444',
-            cancelButtonColor: '#64748b',
-            confirmButtonText: 'Sí, salir',
-            cancelButtonText: 'Cancelar'
-        }).then(async (result) => {
-            if (result.isConfirmed) {
-                // Log session end if user is logged in
-                if (currentUserSession) {
-                    await logSecurityEvent('logout', {
-                        user_id: currentUserSession.user_id,
-                        session_duration: Date.now() - new Date(currentUserSession.login_time).getTime()
-                    });
-                }
-
-                // Clear all session data
-                sessionStorage.removeItem('userSession');
-                localStorage.removeItem('cached_session');
-                disableOfflineMode();
-                currentUserSession = null;
-                window.location.reload();
+    Swal.fire({
+        title: 'Cerrar Sesión?',
+        text: "Tendrás que ingresar tus credenciales nuevamente",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, salir',
+        cancelButtonText: 'Cancelar'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            // Log session end si hay sesión
+            if (currentUserSession) {
+                await logSecurityEvent('logout', {
+                    user_id: currentUserSession.user_id,
+                    session_duration: Date.now() - new Date(currentUserSession.login_time).getTime()
+                });
             }
-        });
-    }
+
+            // 🔑 Cerrar sesión en Supabase Auth
+            try {
+                await supabaseClient.auth.signOut();
+            } catch (error) {
+                console.error('Error signing out from Supabase:', error);
+            }
+
+            // Limpiar sesión local
+            sessionStorage.removeItem('userSession');
+            localStorage.removeItem('cached_session');
+            disableOfflineMode();
+            currentUserSession = null;
+
+            window.location.reload();
+        }
+    });
+}
+
 
     // ==========================================
     // SESSION MANAGEMENT
