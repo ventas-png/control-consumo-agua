@@ -410,7 +410,7 @@
             <div id="reset-token-form">
                 <div class="form-group">
                     <label>Nueva Contraseña</label>
-                    <input type="password" id="new-password" placeholder="Mínimo 6 caracteres">
+                    <input type="password" id="new-password" placeholder="Mínimo 8 caracteres, 1 mayúscula, 1 número">
                     <div id="new-password-error" style="color: #dc2626; font-size: 12px; margin-top: 5px; display: none;"></div>
                 </div>
 
@@ -642,6 +642,7 @@
     }
 
     function validateEmail(email) {
+      if (!email || email.length > 254) return false; // RFC 5321 max length
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return emailRegex.test(email.toLowerCase());
     }
@@ -907,12 +908,17 @@
 
         } catch (error) {
             console.error('❌ Diagnostic error:', error);
-            contentDiv.innerHTML = `
-                <div style="color: #dc2626; padding: 15px; background: #fef2f2; border-radius: 8px;">
-                    <strong>❌ Diagnostic Error:</strong><br>
-                    ${error.message}
-                </div>
-            `;
+            const errDiv = document.createElement('div');
+            errDiv.style.cssText = 'color:#dc2626;padding:15px;background:#fef2f2;border-radius:8px;';
+            const label = document.createElement('strong');
+            label.textContent = '❌ Diagnostic Error:';
+            const msg = document.createElement('span');
+            msg.textContent = ' ' + error.message;
+            errDiv.appendChild(label);
+            errDiv.appendChild(document.createElement('br'));
+            errDiv.appendChild(msg);
+            contentDiv.innerHTML = '';
+            contentDiv.appendChild(errDiv);
         }
 
         console.groupEnd();
@@ -1589,8 +1595,9 @@
         document.getElementById('confirm-password-error').style.display = 'none';
 
         // Validation
-        if (newPassword.length < 6) {
-            document.getElementById('new-password-error').textContent = 'La contraseña debe tener al menos 6 caracteres';
+        const passwordStrengthRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+        if (!passwordStrengthRegex.test(newPassword)) {
+            document.getElementById('new-password-error').textContent = 'La contraseña debe tener al menos 8 caracteres, una mayúscula y un número';
             document.getElementById('new-password-error').style.display = 'block';
             document.getElementById('new-password').focus();
             return;
@@ -1654,6 +1661,13 @@
         console.log('🚀 Application initializing...');
         console.log('📱 User Agent:', navigator.userAgent);
         console.log('🌐 Initial Network Status:', getNetworkStatus());
+
+        // Enforce HTTPS in production
+        const isLocal = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
+        if (!isLocal && window.location.protocol !== 'https:') {
+            window.location.replace('https:' + window.location.href.slice(window.location.protocol.length));
+            return;
+        }
 
         // Initialize network monitoring
         initNetworkMonitoring();
@@ -1752,6 +1766,12 @@
     // GESTIÓN DE CLIENTES
     // ==========================================
     async function agregarCliente() {
+        const allowedRoles = ['admin', 'super_admin', 'operator'];
+        if (!currentUserSession || !allowedRoles.includes(currentUserSession.role)) {
+            Swal.fire('Acceso Denegado', 'No tienes permisos para realizar esta acción.', 'error');
+            return;
+        }
+
         const btn = document.getElementById('btn-guardar-cliente');
         const originalText = btn.innerHTML;
         btn.disabled = true; btn.textContent = "Guardando...";
@@ -2039,6 +2059,12 @@
     }
 
     async function agregarLectura() {
+        const allowedRoles = ['admin', 'super_admin', 'operator'];
+        if (!currentUserSession || !allowedRoles.includes(currentUserSession.role)) {
+            Swal.fire('Acceso Denegado', 'No tienes permisos para realizar esta acción.', 'error');
+            return;
+        }
+
         if (!clienteSeleccionado) return Swal.fire('Atención', 'Seleccione un cliente primero', 'warning');
         
         const actual = parseFloat(document.getElementById('lectura-actual').value);
@@ -2190,15 +2216,16 @@
                 </div>
             `;
 
+            const safeEstado = ['pendiente', 'pagado', 'mora'].includes(r.estado) ? r.estado : 'pendiente';
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${new Date(r.fecha).toLocaleDateString()}</td>
-                <td>${r.cliente_nombre}</td>
-                <td>${r.lectura_anterior}</td>
-                <td>${r.lectura_actual}</td>
+                <td>${sanitizeHTML(r.cliente_nombre)}</td>
+                <td>${parseFloat(r.lectura_anterior).toFixed(2)}</td>
+                <td>${parseFloat(r.lectura_actual).toFixed(2)}</td>
                 <td><strong>${r.consumo.toFixed(2)}</strong></td>
                 <td>Q${total.toFixed(2)}</td>
-                <td><span class="status-pill status-${r.estado}">${r.estado}</span></td>
+                <td><span class="status-pill status-${safeEstado}">${safeEstado}</span></td>
                 <td>${acciones}</td>
             `;
             tbody.appendChild(tr);
@@ -2285,10 +2312,11 @@ Gracias por su pago puntual.`;
                 const ultima = lecturasCliente[0];
                 const { lat, lng } = ultima.gps;
 
+                const safeEstadoPin = ['pendiente', 'pagado', 'mora'].includes(ultima.estado) ? ultima.estado : 'pendiente';
                 let colorPin = 'blue';
-                if (ultima.estado === 'mora') colorPin = 'red';
-                else if (ultima.estado === 'pendiente') colorPin = 'gold';
-                else if (ultima.estado === 'pagado') colorPin = 'green';
+                if (safeEstadoPin === 'mora') colorPin = 'red';
+                else if (safeEstadoPin === 'pendiente') colorPin = 'gold';
+                else if (safeEstadoPin === 'pagado') colorPin = 'green';
                 
                 const customIcon = L.divIcon({
                     className: 'custom-div-icon',
@@ -2300,9 +2328,9 @@ Gracias por su pago puntual.`;
                 const marker = L.marker([lat, lng], { icon: customIcon }).addTo(mapInstance);
                 
                 marker.bindPopup(`
-                    <strong>${cliente.nombre}</strong><br>
-                    Estado: <b style="color:${colorPin}">${ultima.estado.toUpperCase()}</b><br>
-                    Consumo: ${ultima.consumo} m³<br>
+                    <strong>${sanitizeHTML(cliente.nombre)}</strong><br>
+                    Estado: <b style="color:${colorPin}">${sanitizeHTML(safeEstadoPin)}</b><br>
+                    Consumo: ${parseFloat(ultima.consumo).toFixed(2)} m³<br>
                     <small>${new Date(ultima.fecha).toLocaleDateString()}</small><br>
                     <button class="btn btn-primary" style="padding:2px 8px; font-size:10px; margin-top:5px" onclick="enviarWhatsAppManual('${ultima.id}')">WhatsApp</button>
                 `);
