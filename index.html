@@ -1858,6 +1858,50 @@
         document.getElementById('nuevo-cliente-lectura-inicial').value = '0';
     }
 
+    async function eliminarCliente(clienteId) {
+        const cliente = clientes.find(c => c.id == clienteId);
+        if (!cliente) return;
+
+        const lecturasPendientes = registros.filter(r => r.cliente_id == clienteId && r.estado !== 'pagado');
+
+        let warningText = `¿Deseas eliminar a ${cliente.nombre} (${cliente.codigo})?`;
+        if (lecturasPendientes.length > 0) {
+            warningText += `\n\n⚠️ Este cliente tiene ${lecturasPendientes.length} lectura(s) sin pagar.`;
+        }
+
+        const result = await Swal.fire({
+            title: 'Eliminar Cliente',
+            text: warningText,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (!result.isConfirmed) return;
+
+        const { error } = await supabaseClient.from('clientes').delete().eq('id', clienteId);
+
+        if (error) {
+            Swal.fire('Error', 'No se pudo eliminar el cliente. Verifique la conexión.', 'error');
+            console.error(error);
+            return;
+        }
+
+        clientes = clientes.filter(c => c.id != clienteId);
+
+        await logSecurityEvent('client_deleted', {
+            client_id: clienteId,
+            client_name: cliente.nombre,
+            user_role: currentUserSession?.role
+        });
+
+        actualizarUI();
+        Toast.fire({ icon: 'success', title: 'Cliente eliminado' });
+    }
+
     function actualizarListaClientes() {
         const busqueda = document.getElementById('buscar-cliente').value.toLowerCase();
         const lista = document.getElementById('lista-clientes');
@@ -1867,10 +1911,12 @@
             const div = document.createElement('div');
             div.className = 'card';
             div.style.padding = '15px'; div.style.marginBottom = '0';
+            const canDelete = currentUserSession && (currentUserSession.role === 'admin' || currentUserSession.role === 'super_admin' || currentUserSession.role === 'operator');
             div.innerHTML = `
                 <div style="font-weight:700">${sanitizeHTML(c.nombre)}</div>
                 <div style="font-size:12px; color:#64748b; margin-top:4px;">${sanitizeHTML(c.codigo)} | ${sanitizeHTML(c.medidor)}</div>
                 <div style="font-size:12px; color:#0ea5e9; margin-top:4px;">Tarifa: Q${c.tarifa} | Canon: Q${c.canon}</div>
+                ${canDelete ? `<div style="margin-top:10px; text-align:right;"><button class="btn btn-danger" style="padding:5px 10px; font-size:12px;" onclick="eliminarCliente('${c.id}')">🗑️ Eliminar</button></div>` : ''}
             `;
             lista.appendChild(div);
         });
