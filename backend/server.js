@@ -13,6 +13,7 @@ const clientesRoutes = require('./routes/clientes');
 const registrosRoutes = require('./routes/registros');
 const empresaRoutes = require('./routes/empresa');
 const pdfRoutes = require('./routes/pdf');
+const usersRoutes = require('./routes/users');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -78,6 +79,7 @@ app.use('/api/clientes', clientesRoutes);
 app.use('/api/registros', registrosRoutes);
 app.use('/api/empresa', empresaRoutes);
 app.use('/api/pdf', pdfRoutes);
+app.use('/api/users', usersRoutes);
 
 // ── Serve frontend ────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {

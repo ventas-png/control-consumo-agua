@@ -372,13 +372,65 @@
     </div>
 
     <div id="section-configuracion" class="section">
+        <!-- User Management -->
         <div class="card">
-        <div class="card-header">Configuración</div>
-        <p style="color:#64748b; margin-bottom:20px;">Edite este archivo HTML para cambiar las credenciales de Supabase y EmailJS en la variable <code>APP_CONFIG</code>.</p>
-        <div class="btn-group">
-            <button class="btn btn-primary" onclick="Swal.fire('Info', 'La configuración se edita en el código fuente.', 'info')">Guardar Cambios</button>
-            <button class="btn btn-danger" onclick="logout()">🚪 Cerrar Sesión</button>
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>Gestión de Usuarios</span>
+                <button class="btn btn-primary" onclick="showCreateUserForm()" style="font-size:14px; padding:8px 16px;">+ Nuevo Usuario</button>
+            </div>
+
+            <!-- Create user form (hidden by default) -->
+            <div id="create-user-form" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:24px;">
+                <h3 style="font-size:16px; font-weight:700; margin-bottom:16px; color:#0f172a;">Crear Nuevo Usuario</h3>
+                <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                    <div class="form-group">
+                        <label>Nombre Completo</label>
+                        <input type="text" id="new-user-name" placeholder="Juan Pérez">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="new-user-email" placeholder="usuario@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña</label>
+                        <input type="password" id="new-user-password" placeholder="Mín. 8 car., 1 mayúscula, 1 número">
+                    </div>
+                    <div class="form-group">
+                        <label>Rol</label>
+                        <select id="new-user-role">
+                            <option value="visor">Visor (solo lectura)</option>
+                            <option value="operador">Operador (lectura + edición)</option>
+                            <option value="admin">Administrador (acceso total)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="createUser()">Crear Usuario</button>
+                    <button class="btn btn-secondary" onclick="hideCreateUserForm()">Cancelar</button>
+                </div>
+            </div>
+
+            <!-- Users table -->
+            <div id="users-table-container">
+                <p style="color:#64748b; text-align:center; padding:20px;" id="users-loading">Cargando usuarios...</p>
+                <table id="users-table" style="display:none; width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:#f1f5f9; text-align:left;">
+                            <th style="padding:12px 16px; font-size:13px; color:#64748b; font-weight:600; border-radius:8px 0 0 8px;">NOMBRE</th>
+                            <th style="padding:12px 16px; font-size:13px; color:#64748b; font-weight:600;">EMAIL</th>
+                            <th style="padding:12px 16px; font-size:13px; color:#64748b; font-weight:600;">ROL</th>
+                            <th style="padding:12px 16px; font-size:13px; color:#64748b; font-weight:600; border-radius:0 8px 8px 0;">ACCIONES</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-tbody"></tbody>
+                </table>
+            </div>
         </div>
+
+        <!-- Danger zone -->
+        <div class="card" style="border: 1px solid #fee2e2;">
+            <div class="card-header" style="color:#dc2626;">Zona de Peligro</div>
+            <button class="btn btn-danger" onclick="logout()">🚪 Cerrar Sesión</button>
         </div>
     </div>
     
@@ -1010,6 +1062,9 @@
         // Inicializar mapa si es la sección activa
         if (id === 'mapa') {
             cargarMapa();
+        }
+        if (id === 'configuracion') {
+            loadUsers();
         }
     }
 
@@ -1688,6 +1743,134 @@ Gracias por su pago puntual.`;
     // PDF report is generated server-side
     function exportarPDFGlobal() {
         window.open('/api/pdf/reporte', '_blank');
+    }
+
+    // ==========================================
+    // GESTIÓN DE USUARIOS
+    // ==========================================
+
+    const ROLE_LABELS = { admin: 'Administrador', operador: 'Operador', visor: 'Visor' };
+    const ROLE_COLORS = { admin: '#7c3aed', operador: '#0369a1', visor: '#64748b' };
+
+    async function loadUsers() {
+        const loading = document.getElementById('users-loading');
+        const table = document.getElementById('users-table');
+        if (loading) loading.style.display = 'block';
+        if (table) table.style.display = 'none';
+
+        const res = await apiFetch('/api/users');
+        if (!res.ok) {
+            if (loading) loading.textContent = 'No tienes permiso para ver usuarios.';
+            return;
+        }
+        const { users } = await res.json();
+        renderUsersTable(users);
+    }
+
+    function renderUsersTable(users) {
+        const loading = document.getElementById('users-loading');
+        const table = document.getElementById('users-table');
+        const tbody = document.getElementById('users-tbody');
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+        if (users.length === 0) {
+            if (loading) { loading.textContent = 'No hay usuarios registrados.'; loading.style.display = 'block'; }
+            if (table) table.style.display = 'none';
+            return;
+        }
+
+        users.forEach(u => {
+            const isMe = currentUserSession && u.id === currentUserSession.id;
+            const roleLabel = ROLE_LABELS[u.role] || u.role;
+            const roleColor = ROLE_COLORS[u.role] || '#64748b';
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid #f1f5f9';
+            tr.innerHTML = `
+                <td style="padding:14px 16px; font-weight:600;">${escapeHtml(u.full_name)}${isMe ? ' <span style="font-size:11px;color:#0ea5e9;font-weight:500;">(tú)</span>' : ''}</td>
+                <td style="padding:14px 16px; color:#64748b; font-size:14px;">${escapeHtml(u.email)}</td>
+                <td style="padding:14px 16px;">
+                    <span style="background:${roleColor}18; color:${roleColor}; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600;">${escapeHtml(roleLabel)}</span>
+                </td>
+                <td style="padding:14px 16px;">
+                    ${isMe ? '<span style="color:#94a3b8; font-size:13px;">—</span>' : `<button onclick="deleteUser('${escapeHtml(u.id)}', '${escapeHtml(u.full_name)}')" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;font-weight:500;padding:4px 8px;border-radius:6px;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='none'">Eliminar</button>`}
+                </td>`;
+            tbody.appendChild(tr);
+        });
+
+        if (loading) loading.style.display = 'none';
+        if (table) table.style.display = 'table';
+    }
+
+    function showCreateUserForm() {
+        document.getElementById('create-user-form').style.display = 'block';
+        document.getElementById('new-user-name').focus();
+    }
+
+    function hideCreateUserForm() {
+        document.getElementById('create-user-form').style.display = 'none';
+        ['new-user-name','new-user-email','new-user-password'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        document.getElementById('new-user-role').value = 'visor';
+    }
+
+    async function createUser() {
+        const full_name = document.getElementById('new-user-name').value.trim();
+        const email = document.getElementById('new-user-email').value.trim();
+        const password = document.getElementById('new-user-password').value;
+        const role = document.getElementById('new-user-role').value;
+
+        if (!full_name || !email || !password) {
+            return Swal.fire('Campos requeridos', 'Completa todos los campos.', 'warning');
+        }
+
+        const btn = document.querySelector('#create-user-form .btn-primary');
+        btn.disabled = true;
+        btn.textContent = 'Creando...';
+
+        const res = await apiFetch('/api/users', {
+            method: 'POST',
+            body: JSON.stringify({ full_name, email, password, role })
+        });
+
+        btn.disabled = false;
+        btn.textContent = 'Crear Usuario';
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return Swal.fire('Error', err.error || 'No se pudo crear el usuario.', 'error');
+        }
+
+        hideCreateUserForm();
+        await loadUsers();
+        Swal.fire({ icon: 'success', title: 'Usuario creado', text: `${full_name} fue agregado exitosamente.`, timer: 2500, showConfirmButton: false });
+    }
+
+    async function deleteUser(id, name) {
+        const { isConfirmed } = await Swal.fire({
+            title: '¿Eliminar usuario?',
+            text: `Se eliminará a ${name} permanentemente.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            confirmButtonText: 'Eliminar',
+            cancelButtonText: 'Cancelar'
+        });
+        if (!isConfirmed) return;
+
+        const res = await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return Swal.fire('Error', err.error || 'No se pudo eliminar el usuario.', 'error');
+        }
+        await loadUsers();
+        Swal.fire({ icon: 'success', title: 'Usuario eliminado', timer: 2000, showConfirmButton: false });
+    }
+
+    function escapeHtml(str) {
+        if (str == null) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
   </script>
  </body>
