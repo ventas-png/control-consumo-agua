@@ -4,30 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Security Headers -->
-<meta http-equiv="Content-Security-Policy" content="
-  default-src 'self';
-  script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com;
-  style-src 'self' 'unsafe-inline' https://unpkg.com;
-  img-src 'self' data: blob:;
-  connect-src 'self' https://nnsqmeigtgewatameexo.supabase.co https://api.emailjs.com;
-  font-src 'self' https://cdnjs.cloudflare.com;
-  frame-src 'none';
-  object-src 'none';
-  base-uri 'self';
-">
+  <!-- Security headers are set server-side by helmet -->
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
-<meta http-equiv="X-Frame-Options" content="DENY">
-<meta http-equiv="X-XSS-Protection" content="1; mode=block">
 <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
 
   <title>Control de Consumo de Agua</title>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -205,8 +188,7 @@
         <span>Control de Agua Potable</span>
         </div>
         <div class="app-subtitle" style="margin-top: 8px;">
-        <span class="status-badge"><span class="status-dot"></span> Supabase Conectado</span>
-        <span class="status-badge">📧 EmailJS Activo</span>
+        <span class="status-badge"><span class="status-dot"></span> Conectado</span>
         <span class="status-badge" style="background:#dcfce7; color:#166534">📱 WhatsApp</span>
         </div>
     </div>
@@ -530,22 +512,8 @@
     // CONFIGURACIÓN
     // ==========================================
     const APP_CONFIG = {
-      SUPABASE_URL: 'https://nnsqmeigtgewatameexo.supabase.co',
-      SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5uc3FtZWlndGdld2F0YW1lZXhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM2NTkzMzUsImV4cCI6MjA3OTIzNTMzNX0.95GVR7OP46hEj6V6SYfTi4XmEzgB9TrIghR1GewLmOQ',
-      EMAILJS_PUBLIC_KEY: 'AaKdY-HQgiru-q-xJ',
-      EMAILJS_SERVICE_ID: 'service_663ome3',
-      EMAILJS_TEMPLATE_RECIBO: 'template_ow5uddr',
-      EMAILJS_TEMPLATE_PASSWORD_RESET: 'template_password_reset', // New template to create in EmailJS
-      // REMOVE: MASTER_PASSWORD: 'admin', // Removed for security
-      COUNTRY_CODE: '502', // Guatemala
-      SESSION_TIMEOUT: 8 * 60 * 60 * 1000, // 8 hours
-      MAX_LOGIN_ATTEMPTS: 3,
-      LOGIN_LOCKOUT_TIME: 5 * 60 * 1000 // 5 minutes
+      COUNTRY_CODE: '502' // Guatemala
     };
-
-    // Inicializar Clientes
-    const supabaseClient = supabase.createClient(APP_CONFIG.SUPABASE_URL, APP_CONFIG.SUPABASE_KEY);
-    emailjs.init(APP_CONFIG.EMAILJS_PUBLIC_KEY);
 
     // Estado Global
     let clientes = [];
@@ -557,63 +525,41 @@
     let rutaIndex = 0;
     let empresa = {};
     let chartInstance = null;
-    let mapInstance = null; // Variable global para el mapa
-    let currentUserSession = null; // Store current user session
+    let mapInstance = null;
+    let currentUserSession = null;
+    let csrfToken = null;
+
+    // ==========================================
+    // API HELPER
+    // ==========================================
+    async function initCSRF() {
+        try {
+            const res = await fetch('/api/csrf-token');
+            const data = await res.json();
+            csrfToken = data.token;
+        } catch (err) {
+            console.error('Failed to fetch CSRF token:', err);
+        }
+    }
+
+    async function apiFetch(url, options = {}) {
+        const headers = { 'Content-Type': 'application/json', ...options.headers };
+        if (csrfToken && ['POST', 'PUT', 'PATCH', 'DELETE'].includes((options.method || 'GET').toUpperCase())) {
+            headers['X-CSRF-Token'] = csrfToken;
+        }
+        return fetch(url, { ...options, headers, credentials: 'same-origin' });
+    }
 
     // ==========================================
     // NETWORK STATUS MONITORING
     // ==========================================
     function initNetworkMonitoring() {
-        console.log('🌐 Initializing network monitoring...');
-
-        // Listen for online/offline events
         window.addEventListener('online', () => {
-            console.log('🌐 Network connection restored');
-            Toast.fire({
-                icon: 'success',
-                title: 'Conexión restaurada'
-            });
-            disableOfflineMode();
+            Toast.fire({ icon: 'success', title: 'Conexión restaurada' });
         });
-
         window.addEventListener('offline', () => {
-            console.log('📴 Network connection lost');
-            enableOfflineMode();
-            Toast.fire({
-                icon: 'warning',
-                title: 'Modo offline activado',
-                text: 'Algunas funciones pueden no estar disponibles'
-            });
+            Toast.fire({ icon: 'warning', title: 'Sin conexión a internet' });
         });
-
-        // Check network status periodically
-        setInterval(async () => {
-            try {
-                const response = await fetch(APP_CONFIG.SUPABASE_URL, {
-                    method: 'HEAD',
-                    cache: 'no-cache',
-                    signal: AbortSignal.timeout(5000)
-                });
-                if (!navigator.onLine) {
-                    console.log('🔄 Network status mismatch detected');
-                }
-            } catch (error) {
-                if (navigator.onLine) {
-                    console.warn('⚠️ Supabase unreachable but online');
-                }
-            }
-        }, 30000); // Check every 30 seconds
-    }
-
-    function getNetworkStatus() {
-        return {
-            online: navigator.onLine,
-            effectiveType: navigator.connection?.effectiveType || 'unknown',
-            downlink: navigator.connection?.downlink || 0,
-            rtt: navigator.connection?.rtt || 0,
-            saveData: navigator.connection?.saveData || false,
-            offlineMode: checkOfflineMode()
-        };
     }
 
     const Toast = Swal.mixin({
@@ -657,37 +603,7 @@
       return !isNaN(num) && num >= min && num <= max;
     }
 
-    // ==========================================
-    // SECURITY LOGGING
-    // ==========================================
-    async function logSecurityEvent(eventType, details) {
-      try {
-        // Get client IP for security logging
-        const clientIP = await getClientIP();
-
-        await supabaseClient.from('security_logs').insert({
-          user_id: currentUserSession?.user_id || null,
-          event_type: eventType,
-          details: details,
-          ip_address: clientIP,
-          user_agent: navigator.userAgent,
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.error('Failed to log security event:', error);
-      }
-    }
-
-    // IP address detection
-    async function getClientIP() {
-      try {
-        const response = await fetch('https://api.ipify.org?format=json');
-        const data = await response.json();
-        return data.ip;
-      } catch (error) {
-        return 'unknown';
-      }
-    }
+    // Security events are logged server-side automatically.
 
     // ==========================================
     // LÓGICA DE NEGOCIO
@@ -710,701 +626,163 @@
     // ==========================================
     // LOGIN / LOGOUT
     // ==========================================
-    function checkLogin() {
-        console.group('🔐 Session Check');
-        const sessionData = JSON.parse(sessionStorage.getItem('userSession') || '{}');
-        const now = new Date();
-        const expiresAt = new Date(sessionData.expires_at);
-
-        console.log('📅 Current time:', now);
-        console.log('⏰ Session expires:', expiresAt);
-        console.log('🌐 Online status:', navigator.onLine);
-        console.log('📴 Offline mode:', checkOfflineMode());
-
-        // Check if we have a valid current session
-        if (sessionData.user_id && now < expiresAt) {
-            console.log('✅ Valid session found');
-            currentUserSession = sessionData;
+    async function checkLogin() {
+        try {
+            const res = await fetch('/api/auth/me');
+            if (!res.ok) throw new Error('Not authenticated');
+            const { user } = await res.json();
+            currentUserSession = user;
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('app-content-wrapper').style.display = 'block';
-            updateUIForRole(sessionData.role);
-
-            // Cache the session for offline use
-            cacheCurrentSession();
-
-            console.groupEnd();
+            updateUIForRole(user.role);
             return true;
+        } catch {
+            currentUserSession = null;
+            document.getElementById('login-screen').style.display = 'flex';
+            document.getElementById('app-content-wrapper').style.display = 'none';
+            return false;
         }
-
-        // Check if we should use cached session (offline mode)
-        if (checkOfflineMode() && hasValidSessionCache()) {
-            console.log('📂 Using cached session for offline mode');
-            const success = useCachedSession();
-
-            if (success) {
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('app-content-wrapper').style.display = 'block';
-                updateUIForRole(currentUserSession.role);
-
-                // Show offline notification
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Modo Offline',
-                    text: 'Estás trabajando en modo offline. Algunas funciones pueden no estar disponibles.',
-                    timer: 3000,
-                    showConfirmButton: false
-                });
-
-                console.groupEnd();
-                return true;
-            }
-        }
-
-        // No valid session - show login screen
-        console.log('❌ No valid session available');
-        sessionStorage.removeItem('userSession');
-        currentUserSession = null;
-        document.getElementById('login-screen').style.display = 'flex';
-        document.getElementById('app-content-wrapper').style.display = 'none';
-        console.groupEnd();
-        return false;
     }
 
     // ==========================================
-    // LOGIN DIAGNOSTIC TOOLS
+    // LOGIN DIAGNOSTICS (simplified)
     // ==========================================
-    async function testSupabaseConnection() {
-        const startTime = performance.now();
-        try {
-            // Test basic Supabase connectivity
-            const { data, error } = await supabaseClient
-                .from('clientes')
-                .select('count', { count: 'exact', head: true });
-
-            const endTime = performance.now();
-            const responseTime = (endTime - startTime).toFixed(2);
-
-            return {
-                success: !error,
-                responseTime: `${responseTime}ms`,
-                error: error?.message,
-                timestamp: new Date().toISOString()
-            };
-        } catch (error) {
-            return {
-                success: false,
-                error: error.message,
-                timestamp: new Date().toISOString()
-            };
-        }
-    }
-
-    async function testSecureLoginFunction() {
-    try {
-        // Probar que el endpoint de Auth responde
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-            email: 'nonexistent_diagnostic_user@example.com',
-            password: 'invalid_password'
-        });
-
-        return {
-            available: true,
-            responds: true,
-            error: error?.message,
-            timestamp: new Date().toISOString()
-        };
-    } catch (error) {
-        return {
-            available: false,
-            responds: false,
-            error: error.message,
-            timestamp: new Date().toISOString()
-        };
-    }
-}
-
-    async function runDiagnostics() {
-        const diagnostics = {
-            timestamp: new Date().toISOString(),
-            browser: navigator.userAgent,
-            sessionStorage: !!sessionStorage,
-            localStorage: !!localStorage,
-            javascript: true
-        };
-
-        // Test Supabase connection
-        const connectionTest = await testSupabaseConnection();
-        diagnostics.supabaseConnection = connectionTest;
-
-        // Test secure_login function
-        const functionTest = await testSecureLoginFunction();
-        diagnostics.secureLoginFunction = functionTest;
-
-        // Test network connectivity
-        diagnostics.networkConnectivity = navigator.onLine;
-
-        // Log diagnostics
-        console.group('🔍 Login Diagnostics');
-        console.table(diagnostics);
-        console.groupEnd();
-
-        await logSecurityEvent('diagnostic_check', diagnostics);
-        return diagnostics;
-    }
-
     async function runLoginDiagnostics() {
-        console.group('🔍 Running Login Diagnostics');
         const diagnosticDiv = document.getElementById('diagnostic-results');
         const contentDiv = document.getElementById('diagnostic-content');
-
         diagnosticDiv.style.display = 'block';
-        contentDiv.innerHTML = '<div style="text-align: center; padding: 20px;">🔍 Running diagnostics...</div>';
-
+        contentDiv.innerHTML = '<div style="text-align:center;padding:20px;">🔍 Verificando...</div>';
         try {
-            // Check basic browser capabilities
-            const browserInfo = {
-                userAgent: navigator.userAgent,
-                language: navigator.language,
-                cookieEnabled: navigator.cookieEnabled,
-                onLine: navigator.onLine,
-                platform: navigator.platform
-            };
-
-            // Test network connectivity
-            const networkTest = await testNetworkConnectivity();
-
-            // Test Supabase connection
-            const supabaseTest = await testSupabaseConnection();
-
-            // Test secure_login RPC function
-            const rpcTest = await testSecureLoginFunction();
-
-            // Check localStorage and sessionStorage
-            const storageTest = {
-                localStorage: testLocalStorage(),
-                sessionStorage: testSessionStorage()
-            };
-
-            // Check CSP and security policies
-            const securityTest = await testSecurityPolicies();
-
-            // Compile results
-            const results = {
-                browser: browserInfo,
-                network: networkTest,
-                supabase: supabaseTest,
-                rpc: rpcTest,
-                storage: storageTest,
-                security: securityTest,
-                timestamp: new Date().toISOString()
-            };
-
-            // Display results
-            displayDiagnosticResults(results);
-            console.log('🔍 Diagnostic Results:', results);
-
-            // Log diagnostic event
-            await logSecurityEvent('login_diagnostic_run', results);
-
-        } catch (error) {
-            console.error('❌ Diagnostic error:', error);
-            const errDiv = document.createElement('div');
-            errDiv.style.cssText = 'color:#dc2626;padding:15px;background:#fef2f2;border-radius:8px;';
-            const label = document.createElement('strong');
-            label.textContent = '❌ Diagnostic Error:';
-            const msg = document.createElement('span');
-            msg.textContent = ' ' + error.message;
-            errDiv.appendChild(label);
-            errDiv.appendChild(document.createElement('br'));
-            errDiv.appendChild(msg);
+            const t0 = performance.now();
+            const res = await fetch('/api/health');
+            const ms = (performance.now() - t0).toFixed(0);
+            const ok = res.ok;
+            const statusEl = document.createElement('div');
+            statusEl.style.cssText = 'font-family:monospace;font-size:13px;';
+            statusEl.textContent = `${ok ? '✅' : '❌'} Backend: ${ok ? 'OK' : 'ERROR'} (${ms}ms) | Cookies: ${navigator.cookieEnabled ? '✅' : '❌'} | Online: ${navigator.onLine ? '✅' : '❌'}`;
             contentDiv.innerHTML = '';
-            contentDiv.appendChild(errDiv);
+            contentDiv.appendChild(statusEl);
+        } catch (e) {
+            contentDiv.textContent = '❌ No se puede conectar al servidor backend.';
         }
-
-        console.groupEnd();
-    }
-
-    async function testNetworkConnectivity() {
-        const tests = [];
-
-        // Test basic connectivity
-        try {
-            const response = await fetch('https://httpbin.org/get', { method: 'HEAD', mode: 'no-cors' });
-            tests.push({ name: 'Basic HTTP', status: '✅', details: 'Network reachable' });
-        } catch (error) {
-            tests.push({ name: 'Basic HTTP', status: '❌', details: error.message });
-        }
-
-        // Test Supabase connectivity
-        try {
-            const startTime = performance.now();
-            const response = await fetch(APP_CONFIG.SUPABASE_URL, { method: 'HEAD' });
-            const endTime = performance.now();
-            tests.push({
-                name: 'Supabase',
-                status: '✅',
-                details: `${(endTime - startTime).toFixed(2)}ms response time`
-            });
-        } catch (error) {
-            tests.push({ name: 'Supabase', status: '❌', details: error.message });
-        }
-
-        return tests;
-    }
-
-    function testLocalStorage() {
-        const testKey = 'test_storage_key';
-        try {
-            localStorage.setItem(testKey, 'test_value');
-            const value = localStorage.getItem(testKey);
-            localStorage.removeItem(testKey);
-            return value === 'test_value' ? '✅ Working' : '❌ Failed';
-        } catch (error) {
-            return `❌ ${error.message}`;
-        }
-    }
-
-    function testSessionStorage() {
-        const testKey = 'test_session_key';
-        try {
-            sessionStorage.setItem(testKey, 'test_value');
-            const value = sessionStorage.getItem(testKey);
-            sessionStorage.removeItem(testKey);
-            return value === 'test_value' ? '✅ Working' : '❌ Failed';
-        } catch (error) {
-            return `❌ ${error.message}`;
-        }
-    }
-
-    async function testSecurityPolicies() {
-        const policies = [];
-
-        // Check if fetch API works (CORS)
-        try {
-            const response = await fetch('https://api.ipify.org?format=json');
-            policies.push({ name: 'CORS Policy', status: '✅', details: 'Fetch API working' });
-        } catch (error) {
-            policies.push({ name: 'CORS Policy', status: '⚠️', details: 'CORS restrictions detected' });
-        }
-
-        return policies;
-    }
-
-    function displayDiagnosticResults(results) {
-        const contentDiv = document.getElementById('diagnostic-content');
-
-        let html = `
-            <div style="font-family: monospace; font-size: 13px; line-height: 1.4;">
-                <div style="margin-bottom: 15px;">
-                    <strong>🕐 Timestamp:</strong> ${new Date(results.timestamp).toLocaleString()}
-                </div>
-
-                <div style="margin-bottom: 15px;">
-                    <strong>🌐 Network Status:</strong> ${results.network.map(t =>
-                        `<div style="margin-left: 10px;">${t.status} ${t.name}: ${t.details}</div>`
-                    ).join('')}
-                </div>
-
-                <div style="margin-bottom: 15px;">
-                    <strong>🔌 Storage:</strong>
-                    <div style="margin-left: 10px;">${results.storage.localStorage} localStorage</div>
-                    <div style="margin-left: 10px;">${results.storage.sessionStorage} sessionStorage</div>
-                </div>
-
-                <div style="margin-bottom: 15px;">
-                    <strong>🗄️ Supabase:</strong>
-                    <div style="margin-left: 10px;">${results.supabase.success ? '✅' : '❌'} Connection: ${results.supabase.responseTime || results.supabase.error}</div>
-                </div>
-
-                <div style="margin-bottom: 15px;">
-                    <strong>🔐 RPC Function:</strong>
-                    <div style="margin-left: 10px;">${results.rpc.available ? '✅' : '❌'} secure_login: ${results.rpc.error || 'Available'}</div>
-                </div>
-
-                <div style="margin-bottom: 15px;">
-                    <strong>🛡️ Security:</strong> ${results.security.map(p =>
-                        `<div style="margin-left: 10px;">${p.status} ${p.name}: ${p.details}</div>`
-                    ).join('')}
-                </div>
-
-                <div style="margin-top: 15px; padding: 10px; background: #f0f9ff; border-radius: 6px;">
-                    <strong>💡 Troubleshooting Tips:</strong>
-                    <ul style="margin: 5px 0; padding-left: 20px;">
-                        <li>If Supabase fails: Check internet connection and firewall settings</li>
-                        <li>If RPC function fails: Contact administrator - database function may be missing</li>
-                        <li>If storage fails: Check browser privacy settings</li>
-                        <li>If CORS fails: This may be a configuration issue with the server</li>
-                    </ul>
-                </div>
-            </div>
-        `;
-
-        contentDiv.innerHTML = html;
     }
 
     function clearLoginData() {
-        // Clear all authentication-related data
-        sessionStorage.removeItem('userSession');
-        localStorage.clear();
-
-        // Reset login form
         document.getElementById('login-email').value = '';
         document.getElementById('login-password').value = '';
         document.getElementById('login-error').style.display = 'none';
         document.getElementById('diagnostic-results').style.display = 'none';
-
-        // Log data clearing event
-        logSecurityEvent('login_data_cleared', {
-            timestamp: new Date().toISOString(),
-            userAgent: navigator.userAgent
-        });
-
-        Swal.fire({
-            icon: 'success',
-            title: 'Data Cleared',
-            text: 'All login data has been cleared. Please try logging in again.',
-            timer: 2000,
-            showConfirmButton: false
-        });
+        Swal.fire({ icon: 'success', title: 'Formulario limpiado', timer: 1500, showConfirmButton: false });
     }
 
     async function login() {
-    const loginStartTime = performance.now();
-    console.group('🔐 Login Attempt');
+        const emailInput = document.getElementById('login-email');
+        const passwordInput = document.getElementById('login-password');
+        const email = sanitizeInput(emailInput.value.trim());
+        const password = passwordInput.value;
+        const errorMsg = document.getElementById('login-error');
 
-    const emailInput = document.getElementById('login-email');
-    const passwordInput = document.getElementById('login-password');
-    const email = sanitizeInput(emailInput.value.trim());
-    const password = passwordInput.value;
-    const errorMsg = document.getElementById('login-error');
+        errorMsg.style.display = 'none';
+        errorMsg.textContent = '';
 
-    console.log('📧 Email:', email);
-    console.log('🔑 Password Length:', password.length);
-    console.log('🌐 User Agent:', navigator.userAgent);
-    console.log('📡 Online Status:', navigator.onLine);
-
-    // Limpiar error previo
-    errorMsg.style.display = 'none';
-    errorMsg.textContent = '';
-
-    // Validación básica
-    if (!email || !password) {
-        console.warn('⚠️ Validation failed: Missing credentials');
-        errorMsg.textContent = "Email and password are required";
-        errorMsg.style.display = 'block';
-        console.groupEnd();
-        return;
-    }
-
-    // Validar formato de email
-    if (!validateEmail(email)) {
-        console.warn('⚠️ Validation failed: Invalid email format');
-        errorMsg.textContent = "Please enter a valid email address";
-        errorMsg.style.display = 'block';
-        emailInput.focus();
-        console.groupEnd();
-        return;
-    }
-
-    // Estado de botón
-    const loginBtn = document.querySelector('#login-screen button');
-    const originalText = loginBtn.innerHTML;
-    loginBtn.disabled = true;
-    loginBtn.innerHTML = 'Authenticating...';
-    console.log('⏳ Authentication started...');
-
-    try {
-        // IP del cliente para logs
-        const clientIP = await getClientIP();
-        console.log('🌍 Client IP:', clientIP);
-
-        console.log('🔄 Calling Supabase Auth signInWithPassword...');
-        const authStartTime = performance.now();
-
-        // 🔑 NUEVO: login con Supabase Auth
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-            email: email.toLowerCase(),
-            password
-        });
-
-        const authEndTime = performance.now();
-        const authResponseTime = (authEndTime - authStartTime).toFixed(2);
-        console.log(`📊 Auth Response Time: ${authResponseTime}ms`);
-        console.log('📤 Auth Response:', data);
-
-        if (error || !data?.session || !data?.user) {
-            console.warn('❌ Authentication failed:', error?.message);
-
-            // Log security event de intento fallido
-            await logSecurityEvent('failed_login_attempt', {
-                email: email,
-                reason: error?.message || 'invalid_credentials',
-                response_time: authResponseTime
-            });
-
-            // Contador de fallos para diagnósticos
-            const failures = parseInt(localStorage.getItem('login_failures') || '0') + 1;
-            localStorage.setItem('login_failures', failures.toString());
-
-            let errorMessage = 'Login failed';
-            let troubleshootingTip = '';
-
-            const msg = (error?.message || '').toLowerCase();
-            if (msg.includes('invalid login credentials')) {
-                errorMessage = 'Invalid email or password';
-                troubleshootingTip = '\n\n💡 Tip: Check if your email and password are correct.';
-            } else if (msg.includes('email not confirmed')) {
-                errorMessage = 'Email not confirmed';
-                troubleshootingTip = '\n\n💡 Tip: Please confirm your email before logging in.';
-            }
-
-            errorMsg.textContent = errorMessage + troubleshootingTip;
+        if (!email || !password) {
+            errorMsg.textContent = 'Email y contraseña son requeridos';
             errorMsg.style.display = 'block';
-            passwordInput.value = '';
-            passwordInput.focus();
-
+            return;
+        }
+        if (!validateEmail(email)) {
+            errorMsg.textContent = 'Por favor ingresa un email válido';
+            errorMsg.style.display = 'block';
+            emailInput.focus();
             return;
         }
 
-        const { user, session } = data;
+        const loginBtn = document.querySelector('#login-screen .btn-primary');
+        const originalText = loginBtn.innerHTML;
+        loginBtn.disabled = true;
+        loginBtn.innerHTML = 'Autenticando...';
 
-        // Obtener perfil y rol desde app_users
-        const { data: profile, error: profileError } = await supabaseClient
-            .from('app_users')
-            .select('full_name, role')
-            .eq('id', user.id)
-            .single();
+        try {
+            const res = await apiFetch('/api/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
 
-        if (profileError) {
-            console.warn('⚠️ Could not load app_users profile:', profileError.message);
+            if (!res.ok) {
+                throw new Error(data.error || 'Error de autenticación');
+            }
+
+            currentUserSession = data.user;
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('app-content-wrapper').style.display = 'block';
+            updateUIForRole(data.user.role);
+
+            await cargarDatos();
+            actualizarUI();
+
+            emailInput.value = '';
+            passwordInput.value = '';
+
+            Swal.fire({
+                icon: 'success',
+                title: `Bienvenido, ${data.user.name}!`,
+                timer: 2000,
+                showConfirmButton: false
+            });
+        } catch (error) {
+            errorMsg.textContent = error.message || 'Error de conexión. Intenta de nuevo.';
+            errorMsg.style.display = 'block';
+            passwordInput.value = '';
+        } finally {
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = originalText;
         }
-
-        // role en BD (lo que usamos en policies): admin / operador / visor
-        const dbRole = profile?.role || 'visor';
-
-        // role para la UI (lo que espera updateUIForRole)
-        let uiRole = dbRole;
-        if (dbRole === 'operador') uiRole = 'operator';
-        if (dbRole === 'visor') uiRole = 'viewer';
-
-        const displayName = profile?.full_name || user.email;
-
-        // Calcular vencimiento de la sesión (usamos el de Supabase)
-        const expiresAtIso = session.expires_at
-            ? new Date(session.expires_at * 1000).toISOString()
-            : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString();
-
-        // Estructura de sesión que ya usa tu app
-        const sessionData = {
-            user_id: user.id,
-            email: user.email,
-            name: displayName,
-            role: uiRole,
-            login_time: new Date().toISOString(),
-            expires_at: expiresAtIso
-        };
-
-        currentUserSession = sessionData;
-        sessionStorage.setItem('userSession', JSON.stringify(sessionData));
-        localStorage.setItem('cached_session', JSON.stringify(sessionData));
-        localStorage.removeItem('login_failures');
-        console.log('💾 Session stored successfully', sessionData);
-
-        // Log security event de éxito
-        await logSecurityEvent('login_success', {
-            email: email,
-            response_time: authResponseTime
-        });
-
-        // Mostrar app
-        errorMsg.style.display = 'none';
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('app-content-wrapper').style.display = 'block';
-
-        // UI según rol
-        updateUIForRole(uiRole);
-
-        console.log('🔄 Loading application data...');
-        const dataLoadStartTime = performance.now();
-        await cargarDatos();
-        actualizarUI();
-        const dataLoadEndTime = performance.now();
-        const dataLoadTime = (dataLoadEndTime - dataLoadStartTime).toFixed(2);
-        console.log(`📊 Data Load Time: ${dataLoadTime}ms`);
-
-        const totalLoginTime = (authEndTime - loginStartTime).toFixed(2);
-        console.log(`⏱️ Total Login Time: ${totalLoginTime}ms`);
-
-        Swal.fire({
-            icon: 'success',
-            title: `Welcome back, ${displayName}!`,
-            timer: 2000,
-            showConfirmButton: false
-        });
-
-        // Limpiar formulario
-        emailInput.value = '';
-        passwordInput.value = '';
-
-        console.log('🎉 Login process completed successfully!');
-    } catch (error) {
-        console.error('💥 Critical login error:', error);
-        console.error('📋 Error stack:', error.stack);
-
-        await logSecurityEvent('login_error', {
-            email: email,
-            error: error.message,
-            error_type: error.constructor.name
-        });
-
-        let errorMessage = 'Connection error. Please try again.';
-        let troubleshootingTip = '';
-
-        const msg = error.message || '';
-        if (msg.includes('fetch')) {
-            errorMessage = 'Network connection failed';
-            troubleshootingTip = '\n\n💡 Tip: Check your internet connection and firewall settings.';
-        } else if (msg.includes('CORS')) {
-            errorMessage = 'CORS policy error';
-            troubleshootingTip = '\n\n💡 Tip: This may be a configuration issue. Contact support.';
-        } else if (msg.includes('timeout')) {
-            errorMessage = 'Request timeout';
-            troubleshootingTip = '\n\n💡 Tip: The server is taking too long to respond. Please try again.';
-        }
-
-        errorMsg.textContent = errorMessage + troubleshootingTip;
-        errorMsg.style.display = 'block';
-    } finally {
-        const loginEndTime = performance.now();
-        const totalLoginTime = (loginEndTime - loginStartTime).toFixed(2);
-        console.log(`⏱️ Total Login Attempt Time: ${totalLoginTime}ms`);
-
-        loginBtn.disabled = false;
-        loginBtn.innerHTML = originalText;
-        console.groupEnd();
     }
-}
     
-    // ==========================================
-    // FALLBACK AUTHENTICATION MECHANISMS
-    // ==========================================
-    function checkOfflineMode() {
-        return !navigator.onLine || localStorage.getItem('offline_mode') === 'true';
-    }
-
-    function enableOfflineMode() {
-        localStorage.setItem('offline_mode', 'true');
-        console.log('📴 Offline mode enabled');
-    }
-
-    function disableOfflineMode() {
-        localStorage.removeItem('offline_mode');
-        console.log('🌐 Offline mode disabled');
-    }
-
-    function hasValidSessionCache() {
-        const cached = localStorage.getItem('cached_session');
-        if (!cached) return false;
-
-        try {
-            const session = JSON.parse(cached);
-            const expires = new Date(session.expires_at);
-            const now = new Date();
-            return now < expires;
-        } catch (error) {
-            console.warn('Invalid cached session:', error);
-            localStorage.removeItem('cached_session');
-            return false;
-        }
-    }
-
-    function useCachedSession() {
-        try {
-            const cached = localStorage.getItem('cached_session');
-            if (!cached) return false;
-
-            const session = JSON.parse(cached);
-            currentUserSession = session;
-            sessionStorage.setItem('userSession', JSON.stringify(session));
-
-            console.log('📂 Using cached session:', session.email);
-            return true;
-        } catch (error) {
-            console.error('Failed to use cached session:', error);
-            return false;
-        }
-    }
-
-    function cacheCurrentSession() {
-        if (currentUserSession) {
-            localStorage.setItem('cached_session', JSON.stringify(currentUserSession));
-            console.log('💾 Session cached for offline use');
-        }
-    }
-
     function logout() {
-    Swal.fire({
-        title: 'Cerrar Sesión?',
-        text: "Tendrás que ingresar tus credenciales nuevamente",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#64748b',
-        confirmButtonText: 'Sí, salir',
-        cancelButtonText: 'Cancelar'
-    }).then(async (result) => {
-        if (result.isConfirmed) {
-            // Log session end si hay sesión
-            if (currentUserSession) {
-                await logSecurityEvent('logout', {
-                    user_id: currentUserSession.user_id,
-                    session_duration: Date.now() - new Date(currentUserSession.login_time).getTime()
-                });
+        Swal.fire({
+            title: 'Cerrar Sesión?',
+            text: 'Tendrás que ingresar tus credenciales nuevamente',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Sí, salir',
+            cancelButtonText: 'Cancelar'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                await apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+                currentUserSession = null;
+                window.location.reload();
             }
-
-            // 🔑 Cerrar sesión en Supabase Auth
-            try {
-                await supabaseClient.auth.signOut();
-            } catch (error) {
-                console.error('Error signing out from Supabase:', error);
-            }
-
-            // Limpiar sesión local
-            sessionStorage.removeItem('userSession');
-            localStorage.removeItem('cached_session');
-            disableOfflineMode();
-            currentUserSession = null;
-
-            window.location.reload();
-        }
-    });
-}
+        });
+    }
 
 
     // ==========================================
     // SESSION MANAGEMENT
     // ==========================================
-    function checkSession() {
-        const sessionData = JSON.parse(sessionStorage.getItem('userSession') || '{}');
-        const now = new Date();
-        const expiresAt = new Date(sessionData.expires_at);
-
-        if (now >= expiresAt) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Sesión Expirada',
-                text: 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.',
-                confirmButtonText: 'OK',
-                allowOutsideClick: false,
-                allowEscapeKey: false
-            }).then(() => {
-                sessionStorage.removeItem('userSession');
-                currentUserSession = null;
-                window.location.reload();
-            });
-            return false;
+    async function checkSession() {
+        if (!currentUserSession) return;
+        try {
+            const res = await fetch('/api/auth/me');
+            if (res.status === 401) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Sesión Expirada',
+                    text: 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.',
+                    confirmButtonText: 'OK',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false
+                }).then(() => {
+                    currentUserSession = null;
+                    window.location.reload();
+                });
+            }
+        } catch {
+            // Network error — ignore silently
         }
-        return true;
     }
 
     function updateUIForRole(role) {
@@ -1462,7 +840,6 @@
         const errorDiv = document.getElementById('reset-email-error');
         const btn = document.getElementById('btn-request-reset');
 
-        // Validation
         if (!email || !validateEmail(email)) {
             errorDiv.textContent = 'Por favor ingresa un correo electrónico válido';
             errorDiv.style.display = 'block';
@@ -1475,46 +852,13 @@
         btn.textContent = 'Enviando...';
 
         try {
-            const clientIP = await getClientIP();
-
-            // Call RPC function to generate reset token
-            const { data, error } = await supabaseClient.rpc('request_password_reset', {
-                email_input: email.toLowerCase(),
-                ip_address: clientIP,
-                user_agent: navigator.userAgent
+            await apiFetch('/api/auth/password-reset/request', {
+                method: 'POST',
+                body: JSON.stringify({ email })
             });
-
-            if (error) {
-                console.error('Password reset error:', error);
-                errorDiv.textContent = 'Error al solicitar restablecimiento. Intenta de nuevo.';
-                errorDiv.style.display = 'block';
-                btn.disabled = false;
-                btn.textContent = 'Enviar Enlace de Recuperación';
-                return;
-            }
-
-            if (data && data.success) {
-                // Send reset email via EmailJS
-                await sendPasswordResetEmail(email, data.token);
-
-                // Show success step
-                document.getElementById('reset-step-1').style.display = 'none';
-                document.getElementById('reset-step-2').style.display = 'block';
-
-                // Log successful request
-                await logSecurityEvent('password_reset_email_sent', {
-                    email: email,
-                    success: true
-                });
-            } else {
-                errorDiv.textContent = data?.message || 'Error al solicitar restablecimiento';
-                errorDiv.style.display = 'block';
-                btn.disabled = false;
-                btn.textContent = 'Enviar Enlace de Recuperación';
-            }
-
-        } catch (error) {
-            console.error('Password reset request error:', error);
+            document.getElementById('reset-step-1').style.display = 'none';
+            document.getElementById('reset-step-2').style.display = 'block';
+        } catch {
             errorDiv.textContent = 'Error de conexión. Intenta de nuevo.';
             errorDiv.style.display = 'block';
             btn.disabled = false;
@@ -1522,67 +866,35 @@
         }
     }
 
-    async function sendPasswordResetEmail(email, token) {
-        const resetLink = `${window.location.origin}${window.location.pathname}?reset_token=${token}`;
-
-        const params = {
-            to_email: email,
-            reset_link: resetLink,
-            empresa_nombre: empresa.nombre || 'Control de Consumo de Agua',
-            hora_expiracion: '1 hora'
-        };
-
-        try {
-            await emailjs.send(
-                APP_CONFIG.EMAILJS_SERVICE_ID,
-                APP_CONFIG.EMAILJS_TEMPLATE_PASSWORD_RESET,
-                params
-            );
-
-            Toast.fire({
-                icon: 'success',
-                title: 'Correo de recuperación enviado'
-            });
-        } catch (error) {
-            console.error('EmailJS error:', error);
-            // Don't fail the whole process if email fails
-            Toast.fire({
-                icon: 'warning',
-                title: 'Correo enviado, pero verifica la conexión'
-            });
-        }
-    }
-
-    // Token validation from URL parameter
     async function handlePasswordResetToken() {
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('reset_token');
+        if (!token) return;
 
-        if (token) {
-            // Hide login screen and app content, show password reset form
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('app-content-wrapper').style.display = 'none';
-            document.getElementById('password-reset-page').style.display = 'block';
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app-content-wrapper').style.display = 'none';
+        document.getElementById('password-reset-page').style.display = 'block';
 
-            // Validate token
-            const { data, error } = await supabaseClient.rpc('validate_reset_token', {
-                token_input: token
+        try {
+            const res = await apiFetch('/api/auth/password-reset/validate', {
+                method: 'POST',
+                body: JSON.stringify({ token })
             });
+            const data = await res.json();
 
-            if (error || !data || !data.valid) {
+            if (!res.ok || !data.valid) {
                 document.getElementById('reset-token-form').innerHTML = `
-                    <div class="reset-error">
-                        Enlace inválido o expirado. Solicita un nuevo restablecimiento.
-                    </div>
-                    <div class="btn-group">
-                        <button class="btn btn-primary" onclick="backToLogin()">Volver al Inicio</button>
-                    </div>
+                    <div class="reset-error">Enlace inválido o expirado. Solicita un nuevo restablecimiento.</div>
+                    <div class="btn-group"><button class="btn btn-primary" onclick="backToLogin()">Volver al Inicio</button></div>
                 `;
                 return;
             }
-
-            // Store email for password update
-            window.resetEmail = data.email;
+            window._resetToken = token;
+        } catch {
+            document.getElementById('reset-token-form').innerHTML = `
+                <div class="reset-error">Error de conexión. Intenta de nuevo.</div>
+                <div class="btn-group"><button class="btn btn-primary" onclick="backToLogin()">Volver al Inicio</button></div>
+            `;
         }
     }
 
@@ -1590,11 +902,9 @@
         const newPassword = document.getElementById('new-password').value;
         const confirmPassword = document.getElementById('confirm-password').value;
 
-        // Clear previous errors
         document.getElementById('new-password-error').style.display = 'none';
         document.getElementById('confirm-password-error').style.display = 'none';
 
-        // Validation
         const passwordStrengthRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
         if (!passwordStrengthRegex.test(newPassword)) {
             document.getElementById('new-password-error').textContent = 'La contraseña debe tener al menos 8 caracteres, una mayúscula y un número';
@@ -1602,7 +912,6 @@
             document.getElementById('new-password').focus();
             return;
         }
-
         if (newPassword !== confirmPassword) {
             document.getElementById('confirm-password-error').textContent = 'Las contraseñas no coinciden';
             document.getElementById('confirm-password-error').style.display = 'block';
@@ -1615,34 +924,22 @@
         btn.textContent = 'Actualizando...';
 
         try {
-            const { data, error } = await supabaseClient.rpc('update_user_password', {
-                email_input: window.resetEmail,
-                new_password: newPassword
+            const res = await apiFetch('/api/auth/password-reset/update', {
+                method: 'POST',
+                body: JSON.stringify({ token: window._resetToken, newPassword })
             });
+            const data = await res.json();
 
-            if (error || !data || !data.success) {
-                Swal.fire('Error', 'No se pudo actualizar la contraseña. Intenta de nuevo.', 'error');
-                btn.disabled = false;
-                btn.textContent = 'Actualizar Contraseña';
-                return;
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || 'No se pudo actualizar la contraseña');
             }
 
-            // Show success
             document.getElementById('reset-token-form').style.display = 'none';
             document.getElementById('reset-success').style.display = 'block';
-
-            // Clear URL parameter
             window.history.replaceState({}, document.title, window.location.pathname);
-
-            // Log successful password update
-            await logSecurityEvent('password_reset_completed', {
-                email: window.resetEmail,
-                success: true
-            });
-
+            window._resetToken = null;
         } catch (error) {
-            console.error('Password update error:', error);
-            Swal.fire('Error', 'Error de conexión. Intenta de nuevo.', 'error');
+            Swal.fire('Error', error.message || 'Error de conexión. Intenta de nuevo.', 'error');
             btn.disabled = false;
             btn.textContent = 'Actualizar Contraseña';
         }
@@ -1658,88 +955,42 @@
     // INICIALIZACIÓN
     // ==========================================
     document.addEventListener('DOMContentLoaded', async () => {
-        console.log('🚀 Application initializing...');
-        console.log('📱 User Agent:', navigator.userAgent);
-        console.log('🌐 Initial Network Status:', getNetworkStatus());
-
-        // Enforce HTTPS in production
         const isLocal = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
         if (!isLocal && window.location.protocol !== 'https:') {
             window.location.replace('https:' + window.location.href.slice(window.location.protocol.length));
             return;
         }
 
-        // Initialize network monitoring
+        await initCSRF();
         initNetworkMonitoring();
+        await handlePasswordResetToken();
 
-        // Check for reset token in URL
-        handlePasswordResetToken();
-
-        // Check login and handle offline mode
-        const loggedIn = checkLogin();
+        const loggedIn = await checkLogin();
         if (loggedIn) {
-            console.log('🔐 User authenticated, loading data...');
             try {
                 await cargarDatos();
                 actualizarUI();
-                console.log('✅ Application loaded successfully');
             } catch (error) {
-                console.error('❌ Error loading application data:', error);
-                if (!checkOfflineMode()) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error Loading Data',
-                        text: 'Could not load application data. Please try refreshing the page.',
-                        confirmButtonText: 'Refresh'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            window.location.reload();
-                        }
-                    });
-                }
-            }
-        } else {
-            console.log('🔓 User not authenticated, showing login screen');
-
-            // Auto-run diagnostics on first load if there were recent login failures
-            const recentFailures = localStorage.getItem('login_failures');
-            if (recentFailures && parseInt(recentFailures) >= 3) {
-                console.log('⚠️ Recent login failures detected, running diagnostics');
-                localStorage.removeItem('login_failures');
-
+                console.error('Error loading data:', error);
                 Swal.fire({
-                    icon: 'warning',
-                    title: 'Login Issues Detected',
-                    text: 'We\'ve detected recent login problems. Would you like to run diagnostics?',
-                    showCancelButton: true,
-                    confirmButtonText: 'Run Diagnostics',
-                    cancelButtonText: 'Skip'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        runLoginDiagnostics();
-                    }
-                });
+                    icon: 'error',
+                    title: 'Error al cargar datos',
+                    text: 'No se pudo conectar con el servidor. Por favor recarga la página.',
+                    confirmButtonText: 'Recargar'
+                }).then(r => { if (r.isConfirmed) window.location.reload(); });
             }
         }
-
-        console.log('🎉 Application initialization complete');
     });
 
     async function cargarDatos() {
-        try {
-            const { data: cl, error: ec } = await supabaseClient.from('clientes').select('*');
-            if (cl) clientes = cl;
-            
-            const { data: reg, error: er } = await supabaseClient.from('registros').select('*');
-            if (reg) registros = reg;
-            
-            const { data: emp, error: ee } = await supabaseClient.from('empresa').select('*').limit(1);
-            if (emp && emp.length > 0) empresa = emp[0]; else console.warn("No se encontró configuración de empresa.");
-
-            if (ec || er || ee) {
-                Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos. Verifique su internet.', 'warning');
-            }
-        } catch (e) { console.error(e); }
+        const [clRes, regRes, empRes] = await Promise.all([
+            fetch('/api/clientes'),
+            fetch('/api/registros'),
+            fetch('/api/empresa')
+        ]);
+        if (clRes.ok) clientes = await clRes.json();
+        if (regRes.ok) registros = await regRes.json();
+        if (empRes.ok) empresa = await empRes.json();
     }
 
     function actualizarUI() {
@@ -1766,8 +1017,7 @@
     // GESTIÓN DE CLIENTES
     // ==========================================
     async function agregarCliente() {
-        const allowedRoles = ['admin', 'super_admin', 'operator'];
-        if (!currentUserSession || !allowedRoles.includes(currentUserSession.role)) {
+        if (!currentUserSession) {
             Swal.fire('Acceso Denegado', 'No tienes permisos para realizar esta acción.', 'error');
             return;
         }
@@ -1842,32 +1092,21 @@
             return;
         }
 
-        // Log security event for client creation
-        await logSecurityEvent('client_creation_attempt', {
-            action: 'create_client',
-            client_code: codigo,
-            user_role: currentUserSession?.role
+        const res = await apiFetch('/api/clientes', {
+            method: 'POST',
+            body: JSON.stringify(nuevo)
         });
+        const data = await res.json();
 
-        const { data, error } = await supabaseClient.from('clientes').insert(nuevo).select();
-        
-        if (!error && data) {
-            nuevo.id = data[0].id;
-            clientes.push(nuevo);
+        if (res.ok) {
+            clientes.push(data);
             limpiarFormularioCliente();
             actualizarUI();
-            Swal.fire({
-                icon: 'success',
-                title: 'Cliente Guardado',
-                text: 'El cliente se ha registrado exitosamente',
-                timer: 2000,
-                showConfirmButton: false
-            });
+            Swal.fire({ icon: 'success', title: 'Cliente Guardado', timer: 2000, showConfirmButton: false });
         } else {
-            Swal.fire('Error', 'No se pudo guardar el cliente. Verifique conexión.', 'error');
-            console.error(error);
+            Swal.fire('Error', data.error || 'No se pudo guardar el cliente.', 'error');
         }
-        
+
         btn.disabled = false; btn.innerHTML = originalText;
     }
 
@@ -1902,22 +1141,15 @@
 
         if (!result.isConfirmed) return;
 
-        const { error } = await supabaseClient.from('clientes').delete().eq('id', clienteId);
+        const res = await apiFetch(`/api/clientes/${clienteId}`, { method: 'DELETE' });
 
-        if (error) {
-            Swal.fire('Error', 'No se pudo eliminar el cliente. Verifique la conexión.', 'error');
-            console.error(error);
+        if (!res.ok) {
+            const data = await res.json();
+            Swal.fire('Error', data.error || 'No se pudo eliminar el cliente.', 'error');
             return;
         }
 
         clientes = clientes.filter(c => c.id != clienteId);
-
-        await logSecurityEvent('client_deleted', {
-            client_id: clienteId,
-            client_name: cliente.nombre,
-            user_role: currentUserSession?.role
-        });
-
         actualizarUI();
         Toast.fire({ icon: 'success', title: 'Cliente eliminado' });
     }
@@ -1931,7 +1163,7 @@
             const div = document.createElement('div');
             div.className = 'card';
             div.style.padding = '15px'; div.style.marginBottom = '0';
-            const canDelete = currentUserSession && (currentUserSession.role === 'admin' || currentUserSession.role === 'super_admin' || currentUserSession.role === 'operator');
+            const canDelete = currentUserSession && ['admin', 'super_admin', 'operator'].includes(currentUserSession.role);
             div.innerHTML = `
                 <div style="font-weight:700">${sanitizeHTML(c.nombre)}</div>
                 <div style="font-size:12px; color:#64748b; margin-top:4px;">${sanitizeHTML(c.codigo)} | ${sanitizeHTML(c.medidor)}</div>
@@ -2059,8 +1291,7 @@
     }
 
     async function agregarLectura() {
-        const allowedRoles = ['admin', 'super_admin', 'operator'];
-        if (!currentUserSession || !allowedRoles.includes(currentUserSession.role)) {
+        if (!currentUserSession) {
             Swal.fire('Acceso Denegado', 'No tienes permisos para realizar esta acción.', 'error');
             return;
         }
@@ -2082,19 +1313,9 @@
         const txt = btn.innerHTML;
         btn.disabled = true; btn.innerHTML = "Guardando...";
 
-        const resultadoCobro = calcularTotalPagar(consumo, clienteSeleccionado.tarifa, clienteSeleccionado.canon);
-
         const registro = {
             cliente_id: clienteSeleccionado.id,
-            cliente_nombre: clienteSeleccionado.nombre,
-            fecha: new Date().toISOString(),
-            lectura_anterior: parseFloat(document.getElementById('info-ultima-lectura').textContent),
             lectura_actual: actual,
-            consumo: consumo,
-            tarifa_aplicada: clienteSeleccionado.tarifa,
-            canon_aplicado: clienteSeleccionado.canon,
-            monto_calculado: resultadoCobro.total,
-            tipo_cobro: resultadoCobro.tipo_cobro,
             estado: document.getElementById('lectura-estado').value,
             mes: document.getElementById('lectura-mes').value,
             notas: document.getElementById('lectura-notas').value,
@@ -2102,15 +1323,14 @@
             foto: fotoBase64
         };
 
-        const { data, error } = await supabaseClient.from('registros').insert(registro).select();
+        const res = await apiFetch('/api/registros', {
+            method: 'POST',
+            body: JSON.stringify(registro)
+        });
+        const data = await res.json();
 
-        if (!error) {
-            const nuevoRegistro = data[0];
-            registros.push(nuevoRegistro);
-            
-            if (clienteSeleccionado.email) {
-                enviarReciboEmail(clienteSeleccionado.email, nuevoRegistro);
-            }
+        if (res.ok) {
+            registros.unshift(data);
 
             Swal.fire({
                 icon: 'success',
@@ -2141,8 +1361,7 @@
             });
 
         } else {
-            Swal.fire('Error', 'No se pudo guardar en la base de datos', 'error');
-            console.error(error);
+            Swal.fire('Error', data.error || 'No se pudo guardar en la base de datos', 'error');
             btn.disabled = false; btn.innerHTML = txt;
         }
     }
@@ -2377,32 +1596,22 @@ Gracias por su pago puntual.`;
         const originalText = btn.innerHTML;
         btn.disabled = true; btn.textContent = "Guardando...";
 
-        const { data, error } = await supabaseClient
-            .from('registros')
-            .update({ estado: nuevoEstado })
-            .eq('id', registroId)
-            .select();
+        const res = await apiFetch(`/api/registros/${registroId}/estado`, {
+            method: 'PATCH',
+            body: JSON.stringify({ estado: nuevoEstado })
+        });
+        const data = await res.json();
 
-        if (!error) {
+        if (res.ok) {
             const index = registros.findIndex(r => r.id == registroId);
-            if (index !== -1) {
-                registros[index].estado = nuevoEstado;
-            }
-
+            if (index !== -1) registros[index].estado = nuevoEstado;
             closeEditStatusModal();
-            actualizarUI(); 
-            Swal.fire({
-                icon: 'success',
-                title: 'Actualizado',
-                text: 'Estado de pago modificado correctamente',
-                timer: 1500,
-                showConfirmButton: false
-            });
+            actualizarUI();
+            Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1500, showConfirmButton: false });
         } else {
-            Swal.fire('Error', 'No se pudo actualizar el estado', 'error');
-            console.error(error);
+            Swal.fire('Error', data.error || 'No se pudo actualizar el estado', 'error');
         }
-        
+
         btn.disabled = false; btn.innerHTML = originalText;
     }
 
@@ -2476,117 +1685,9 @@ Gracias por su pago puntual.`;
         });
     }
 
-    // ==========================================
-    // GENERAR PDF BASE64
-    // ==========================================
-    function generarReciboPDFBase64(registro) {
-        const doc = new jspdf.jsPDF();
-        const total = registro.monto_calculado.toFixed(2);
-        const fecha = new Date(registro.fecha).toLocaleDateString();
-        const nombreEmpresa = empresa.nombre || 'Control de Consumo de Agua';
-
-        doc.setFontSize(16);
-        doc.text(nombreEmpresa, 14, 15);
-        doc.setFontSize(12);
-        doc.text("Recibo de Consumo de Agua Potable", 14, 22);
-
-        doc.setFontSize(10);
-        doc.text(`Cliente: ${registro.cliente_nombre}`, 14, 32);
-        doc.text(`Fecha de Lectura: ${fecha}`, 14, 37);
-        doc.text(`Tipo de Cobro: ${registro.tipo_cobro}`, 14, 42);
-
-        const head = [['Concepto', 'Lectura/Tarifa', 'Detalle']];
-        const body = [
-            ['Lectura Anterior (m³)', registro.lectura_anterior, ''],
-            ['Lectura Actual (m³)', registro.lectura_actual, ''],
-            ['Consumo (m³)', registro.consumo.toFixed(2), ''],
-            ['Tarifa Aplicada (Q/m³)', `Q${registro.tarifa_aplicada.toFixed(2)}`, ''],
-            ['Canon Fijo (Q)', `Q${registro.canon_aplicado.toFixed(2)}`, ''],
-            ['Monto TOTAL a Pagar (Q)', '', `Q${total}`]
-        ];
-        
-        doc.autoTable({
-            startY: 48,
-            head: head,
-            body: body,
-            theme: 'striped',
-            styles: { fontSize: 9 },
-            headStyles: { fillColor: [14, 165, 233] },
-            didDrawCell: (data) => {
-                if (data.row.index === body.length - 1 && data.cell.section === 'body') {
-                    doc.setFillColor(212, 237, 218); 
-                    doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, 'F');
-                }
-            }
-        });
-        
-        let finalY = doc.autoTable.previous.finalY;
-        if (registro.notas) {
-            doc.setFontSize(10);
-            doc.text(`Notas: ${registro.notas}`, 14, finalY + 10);
-        }
-        
-        const pdfDataUri = doc.output('datauristring');
-        return pdfDataUri.split(',')[1]; 
-    }
-
-    // ==========================================
-    // EMAILS (Adjunto Foto + PDF)
-    // ==========================================
-    function enviarReciboEmail(email, registro) {
-        const total = registro.monto_calculado;
-        const fullDataUrl = registro.foto; 
-
-        let base64DataFoto = null;
-        let fileExtension = 'jpg';
-
-        if (fullDataUrl) {
-            const parts = fullDataUrl.split(',');
-            if (parts.length === 2) {
-                base64DataFoto = parts[1];
-                const mimePart = parts[0].match(/:(.*?);/);
-                if (mimePart && mimePart[1]) {
-                    const mimeType = mimePart[1];
-                    if (mimeType.includes('png')) fileExtension = 'png';
-                    else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) fileExtension = 'jpg';
-                    else if (mimeType.includes('heic')) fileExtension = 'heic';
-                }
-            }
-        }
-        
-        const adjunto_final = base64DataFoto 
-            ? `Foto_Medidor_${registro.cliente_nombre.replace(/\s/g, '_')}_${new Date().getTime()}.${fileExtension}|${base64DataFoto}` 
-            : null;
-
-        const pdfBase64Data = generarReciboPDFBase64(registro);
-        const pdf_adjunto_final = pdfBase64Data 
-            ? `Recibo_${registro.cliente_nombre.replace(/\s/g, '_')}_${new Date().getTime()}.pdf|${pdfBase64Data}` 
-            : null;
-        
-        const params = {
-            to_email: email,
-            nombre_cliente: registro.cliente_nombre,
-            lectura_actual: registro.lectura_actual,
-            lectura_anterior: registro.lectura_anterior,
-            consumo: registro.consumo,
-            total_pagar: total.toFixed(2),
-            fecha: new Date().toLocaleDateString(),
-            nombre_empresa: empresa.nombre || 'Control de Consumo de Agua',
-            tipo_cobro: registro.tipo_cobro,
-            foto_adjunta: adjunto_final, 
-            pdf_adjunto: pdf_adjunto_final 
-        };
-        
-        emailjs.send(APP_CONFIG.EMAILJS_SERVICE_ID, APP_CONFIG.EMAILJS_TEMPLATE_RECIBO, params)
-            .then(() => Toast.fire({ icon: 'success', title: 'Correo enviado' }))
-            .catch(err => console.error("Error Email", err));
-    }
-    
+    // PDF report is generated server-side
     function exportarPDFGlobal() {
-        const doc = new jspdf.jsPDF();
-        doc.text("Reporte de Lecturas", 14, 20);
-        doc.autoTable({ html: '#tabla-registros', startY: 30 });
-        doc.save('reporte_agua.pdf');
+        window.open('/api/pdf/reporte', '_blank');
     }
   </script>
  </body>
