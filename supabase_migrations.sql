@@ -3,6 +3,20 @@
 -- Run sections in order: 1A → 1B → 1C → 1D → (1E last, once backend is confirmed working)
 -- ============================================================
 
+-- ── 0. app_users table + trigger cleanup ─────────────────────────────────────
+-- Drop any broken trigger that auto-inserts into app_users on auth user creation.
+-- The backend handles inserting into app_users explicitly after creating the auth user.
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS handle_new_user();
+
+CREATE TABLE IF NOT EXISTS app_users (
+  id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name   TEXT NOT NULL,
+  role        TEXT NOT NULL CHECK (role IN ('admin', 'operador', 'visor')),
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+
 -- ── 1A. Session storage table ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS user_sessions (
   sid     VARCHAR NOT NULL COLLATE "default" PRIMARY KEY,
