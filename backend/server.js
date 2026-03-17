@@ -8,12 +8,16 @@ const path = require('path');
 const { csrfMiddleware } = require('./middleware/csrf');
 const { generalLimiter } = require('./middleware/rateLimiter');
 
-const authRoutes = require('./routes/auth');
-const clientesRoutes = require('./routes/clientes');
-const registrosRoutes = require('./routes/registros');
-const empresaRoutes = require('./routes/empresa');
-const pdfRoutes = require('./routes/pdf');
-const usersRoutes = require('./routes/users');
+const authRoutes       = require('./routes/auth');
+const clientesRoutes   = require('./routes/clientes');
+const registrosRoutes  = require('./routes/registros');
+const empresaRoutes    = require('./routes/empresa');
+const pdfRoutes        = require('./routes/pdf');
+const usersRoutes      = require('./routes/users');
+const projectsRoutes   = require('./routes/projects');
+const superadminRoutes = require('./routes/superadmin');
+const portalRoutes     = require('./routes/portal');
+const pagosRoutes      = require('./routes/pagos');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -74,12 +78,16 @@ app.get('/api/csrf-token', (req, res) => {
   res.json({ token: req.session.csrfToken });
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/clientes', clientesRoutes);
-app.use('/api/registros', registrosRoutes);
-app.use('/api/empresa', empresaRoutes);
-app.use('/api/pdf', pdfRoutes);
-app.use('/api/users', usersRoutes);
+app.use('/api/auth',       authRoutes);
+app.use('/api/clientes',   clientesRoutes);
+app.use('/api/registros',  registrosRoutes);
+app.use('/api/empresa',    empresaRoutes);
+app.use('/api/pdf',        pdfRoutes);
+app.use('/api/users',      usersRoutes);
+app.use('/api/projects',   projectsRoutes);
+app.use('/api/superadmin', superadminRoutes);
+app.use('/api/portal',     portalRoutes);
+app.use('/api/pagos',      pagosRoutes);
 
 // ── Serve frontend ────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {

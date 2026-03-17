@@ -29,22 +29,24 @@ router.post('/login', loginLimiter, async (req, res) => {
 
   const { data: profile } = await supabase
     .from('app_users')
-    .select('full_name, role')
+    .select('full_name, role, permission_type, company_id, project_id, cliente_id, activo')
     .eq('id', data.user.id)
     .single();
 
-  const dbRole = profile?.role || 'visor';
-  let role = dbRole;
-  if (dbRole === 'operador') role = 'operator';
-  if (dbRole === 'visor') role = 'viewer';
+  if (!profile || profile.activo === false) {
+    return res.status(403).json({ error: 'Cuenta desactivada. Contacta al administrador.' });
+  }
 
   req.session.user = {
-    id: data.user.id,
-    email: data.user.email,
-    name: profile?.full_name || data.user.email,
-    role,
-    dbRole,
-    loginTime: new Date().toISOString()
+    id:              data.user.id,
+    email:           data.user.email,
+    name:            profile.full_name || data.user.email,
+    role:            profile.role,
+    permission_type: profile.permission_type || null,
+    company_id:      profile.company_id || null,
+    project_id:      profile.project_id || null,
+    cliente_id:      profile.cliente_id || null,
+    loginTime:       new Date().toISOString()
   };
 
   await supabase.from('security_logs').insert({

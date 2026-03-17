@@ -140,6 +140,24 @@
         border: 1px solid #ef4444;
     }
 
+    /* Portal del Cliente */
+    .portal-header { text-align:center; padding: 30px 20px 10px; }
+    .portal-saldo { font-size: 42px; font-weight: 800; color: #0ea5e9; }
+    .portal-balance-card { background: linear-gradient(135deg, #0ea5e9, #14b8a6); color: white; border-radius: 24px; padding: 32px; text-align: center; margin-bottom: 24px; }
+    .portal-balance-card .label { font-size: 14px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; }
+    .portal-balance-card .amount { font-size: 48px; font-weight: 800; margin: 8px 0; }
+    .boleta-upload-zone { border: 3px dashed #0ea5e9; border-radius: 12px; padding: 24px; text-align:center; cursor: pointer; background: #f0f9ff; transition: 0.3s; }
+    .boleta-upload-zone:hover { background: #e0f2fe; }
+    .payment-method-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .payment-method-btn { padding: 16px; border: 2px solid #e2e8f0; border-radius: 12px; background: white; cursor: pointer; text-align:center; transition: 0.3s; font-weight: 600; }
+    .payment-method-btn:hover, .payment-method-btn.selected { border-color: #0ea5e9; background: #f0f9ff; color: #0ea5e9; }
+    .pago-row-pendiente { background: #fffbeb; }
+    .pago-row-verificado { background: #f0fdf4; }
+    .pago-row-rechazado { background: #fef2f2; }
+    /* Project selector */
+    .project-selector-bar { background: white; border-radius: 12px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .project-selector-bar label { font-weight: 600; font-size: 14px; color: #64748b; white-space: nowrap; }
+    .project-selector-bar select { flex: 1; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; }
     /* Responsive */
     @media (max-width: 768px) {
       .app-header { padding: 16px; }
@@ -193,13 +211,32 @@
         </div>
     </div>
 
-    <div class="nav-tabs">
-        <button class="nav-tab active operator-only" onclick="showSection('clientes')">👥 Clientes</button>
-        <button class="nav-tab operator-only" onclick="showSection('lecturas')">💧 Nueva Lectura</button>
-        <button class="nav-tab viewer-only" onclick="showSection('tabla')">📋 Historial</button>
-        <button class="nav-tab viewer-only" onclick="showSection('dashboard')">📊 Dashboard</button>
-        <button class="nav-tab viewer-only" onclick="showSection('mapa')">🗺️ Mapa</button>
-        <button class="nav-tab admin-only" onclick="showSection('configuracion')">⚙️ Configuración</button>
+    <div class="nav-tabs" id="main-nav">
+        <!-- roles: company_owner, admin, user:total, user:administrativo -->
+        <button class="nav-tab active perm-clientes" onclick="showSection('clientes')">👥 Clientes</button>
+        <!-- roles: all except financiero & visor & cliente -->
+        <button class="nav-tab perm-lecturas" onclick="showSection('lecturas')">💧 Nueva Lectura</button>
+        <!-- all internal roles -->
+        <button class="nav-tab perm-historial" onclick="showSection('tabla')">📋 Historial</button>
+        <!-- financiero, admin, company_owner, superadmin -->
+        <button class="nav-tab perm-pagos" onclick="showSection('pagos')">💳 Pagos</button>
+        <!-- all internal roles -->
+        <button class="nav-tab perm-historial" onclick="showSection('dashboard')">📊 Dashboard</button>
+        <!-- all internal roles -->
+        <button class="nav-tab perm-historial" onclick="showSection('mapa')">🗺️ Mapa</button>
+        <!-- company_owner, admin, superadmin -->
+        <button class="nav-tab perm-proyectos" onclick="showSection('proyectos')">🏗️ Proyectos</button>
+        <!-- superadmin only -->
+        <button class="nav-tab perm-empresas" onclick="showSection('empresas')">🏢 Empresas</button>
+        <!-- company_owner, admin, superadmin -->
+        <button class="nav-tab perm-usuarios" onclick="showSection('configuracion')">⚙️ Usuarios</button>
+    </div>
+    <!-- Project scope selector (hidden for superadmin; visible if user has >1 project) -->
+    <div class="project-selector-bar" id="project-selector-bar" style="display:none;">
+      <label>📁 Proyecto:</label>
+      <select id="active-project-select" onchange="onProjectChange()">
+        <option value="">Todos mis proyectos</option>
+      </select>
     </div>
 
     <div id="section-clientes" class="section active">
@@ -397,11 +434,25 @@
                     </div>
                     <div class="form-group">
                         <label>Rol</label>
-                        <select id="new-user-role">
-                            <option value="visor">Visor (solo lectura)</option>
-                            <option value="operador">Operador (lectura + edición)</option>
-                            <option value="admin">Administrador (acceso total)</option>
+                        <select id="new-user-role" onchange="onNewUserRoleChange()">
+                            <option value="user">Usuario (con permiso)</option>
+                            <option value="admin">Admin (1 proyecto)</option>
+                            <option value="company_owner">Dueño de Empresa</option>
+                            <option value="superadmin" class="perm-empresas-option">Superadmin</option>
                         </select>
+                    </div>
+                    <div class="form-group" id="new-user-permission-group">
+                        <label>Permiso del Usuario</label>
+                        <select id="new-user-permission">
+                            <option value="total">Total (acceso completo)</option>
+                            <option value="lectura">Lectura (solo tomar lecturas)</option>
+                            <option value="financiero">Financiero (gestionar pagos)</option>
+                            <option value="administrativo">Administrativo (clientes + lecturas)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="new-user-project-group">
+                        <label>Proyecto Asignado</label>
+                        <select id="new-user-project"><option value="">— Seleccionar —</option></select>
                     </div>
                 </div>
                 <div class="btn-group">
@@ -434,6 +485,163 @@
         </div>
     </div>
     
+    </div>
+
+    <!-- ── SECTION: PAGOS (financiero + admin) ── -->
+    <div id="section-pagos" class="section">
+      <div class="card">
+        <div class="card-header" style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+          <span>Gestión de Pagos / Boletas</span>
+          <div style="display:flex; gap:8px;">
+            <select id="filtro-pagos-estado" onchange="loadPagos()" style="padding:8px; border-radius:8px; border:1px solid #cbd5e0; font-size:14px;">
+              <option value="">Todos</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="verificado">Verificado</option>
+              <option value="rechazado">Rechazado</option>
+            </select>
+          </div>
+        </div>
+        <div id="pagos-loading" style="text-align:center; padding:20px; color:#64748b;">Cargando pagos...</div>
+        <div class="table-container" id="pagos-table-container" style="display:none;">
+          <table style="width:100%; border-collapse:collapse;">
+            <thead><tr>
+              <th>Fecha</th><th>Cliente</th><th>Monto</th><th>Método</th><th>Referencia</th><th>Estado</th><th>Boleta</th><th>Acciones</th>
+            </tr></thead>
+            <tbody id="pagos-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION: PROYECTOS ── -->
+    <div id="section-proyectos" class="section">
+      <div class="card">
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Proyectos</span>
+          <button class="btn btn-primary" onclick="showCreateProjectForm()" style="font-size:14px; padding:8px 16px;">+ Nuevo Proyecto</button>
+        </div>
+        <div id="create-project-form" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:24px;">
+          <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+            <div class="form-group"><label>Nombre del Proyecto</label><input type="text" id="new-project-name" placeholder="Residencial Las Flores"></div>
+            <div class="form-group"><label>Descripción</label><input type="text" id="new-project-desc" placeholder="Opcional"></div>
+            <div class="form-group perm-empresas" id="project-company-field" style="display:none;">
+              <label>Empresa</label>
+              <select id="new-project-company"><option value="">Seleccionar empresa...</option></select>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-primary" onclick="createProject()">Crear Proyecto</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('create-project-form').style.display='none'">Cancelar</button>
+          </div>
+        </div>
+        <div id="projects-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:16px;"></div>
+      </div>
+    </div>
+
+    <!-- ── SECTION: EMPRESAS (superadmin only) ── -->
+    <div id="section-empresas" class="section">
+      <div class="card">
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Gestión de Empresas</span>
+          <button class="btn btn-primary" onclick="showCreateCompanyForm()" style="font-size:14px; padding:8px 16px;">+ Nueva Empresa</button>
+        </div>
+        <div id="create-company-form" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:20px; margin-bottom:24px;">
+          <div class="form-grid">
+            <div class="form-group"><label>Nombre de la Empresa</label><input type="text" id="new-company-nombre" placeholder="Agua Pura S.A."></div>
+            <div class="form-group"><label>NIT</label><input type="text" id="new-company-nit" placeholder="12345678-9"></div>
+            <div class="form-group"><label>Email</label><input type="email" id="new-company-email" placeholder="empresa@email.com"></div>
+            <div class="form-group"><label>Teléfono</label><input type="tel" id="new-company-telefono" placeholder="55551234"></div>
+            <div class="form-group">
+              <label>Plan</label>
+              <select id="new-company-plan">
+                <option value="basico">Básico</option>
+                <option value="profesional">Profesional</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-primary" onclick="createCompany()">Crear Empresa</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('create-company-form').style.display='none'">Cancelar</button>
+          </div>
+        </div>
+        <div id="companies-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:16px;"></div>
+      </div>
+    </div>
+
+    <!-- ── SECTION: PORTAL CLIENTE ── -->
+    <div id="section-portal" class="section">
+      <div class="portal-balance-card">
+        <div class="label">Saldo Pendiente</div>
+        <div class="amount" id="portal-saldo">Q0.00</div>
+        <div id="portal-cliente-nombre" style="margin-top:8px; opacity:0.9; font-size:16px;"></div>
+      </div>
+
+      <!-- Quick action tabs inside portal -->
+      <div class="nav-tabs" style="margin-bottom:16px;">
+        <button class="nav-tab active" onclick="showPortalTab('mis-lecturas')">📋 Mis Lecturas</button>
+        <button class="nav-tab" onclick="showPortalTab('mis-pagos')">💳 Mis Pagos</button>
+        <button class="nav-tab" onclick="showPortalTab('pagar')">💰 Pagar</button>
+      </div>
+
+      <div id="portal-tab-mis-lecturas" class="card">
+        <div class="card-header">Historial de Lecturas</div>
+        <div class="table-container">
+          <table style="width:100%; border-collapse:collapse;">
+            <thead><tr><th>Mes</th><th>Fecha</th><th>Consumo (m³)</th><th>Total</th><th>Estado</th></tr></thead>
+            <tbody id="portal-lecturas-tbody"></tbody>
+          </table>
+        </div>
+        <div style="text-align:center; margin-top:12px;">
+          <button class="btn btn-secondary" onclick="loadMorePortalLecturas()" id="btn-portal-mas">Ver más</button>
+        </div>
+      </div>
+
+      <div id="portal-tab-mis-pagos" class="card" style="display:none;">
+        <div class="card-header">Historial de Pagos</div>
+        <div class="table-container">
+          <table style="width:100%; border-collapse:collapse;">
+            <thead><tr><th>Fecha</th><th>Monto</th><th>Método</th><th>Referencia</th><th>Estado</th></tr></thead>
+            <tbody id="portal-pagos-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="portal-tab-pagar" class="card" style="display:none;">
+        <div class="card-header">Registrar Pago</div>
+        <div class="form-group" style="margin-bottom:16px;">
+          <label>Monto a Pagar (Q)</label>
+          <input type="number" id="portal-monto" step="0.01" min="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+          <label>Referencia / No. de Operación (opcional)</label>
+          <input type="text" id="portal-referencia" placeholder="Número de transacción">
+        </div>
+        <div style="font-weight:600; margin-bottom:12px; color:#475569;">Selecciona tu método de pago:</div>
+        <div class="payment-method-grid">
+          <div class="payment-method-btn" onclick="selectPayMethod('transferencia')" id="pmt-transferencia">🏦 Transferencia / Boleta</div>
+          <div class="payment-method-btn" onclick="selectPayMethod('paypal')" id="pmt-paypal">🔵 PayPal</div>
+          <div class="payment-method-btn" onclick="selectPayMethod('tarjeta')" id="pmt-tarjeta">💳 Tarjeta</div>
+        </div>
+        <!-- Boleta upload (transferencia) -->
+        <div id="pago-boleta-section" style="display:none; margin-bottom:16px;">
+          <div class="boleta-upload-zone" onclick="document.getElementById('boleta-input').click()">
+            <input type="file" id="boleta-input" accept="image/*,application/pdf" hidden onchange="handleBoleta(event)">
+            <div id="boleta-placeholder">📎 Toca para adjuntar tu boleta de pago</div>
+            <div id="boleta-preview-name" style="color:#0ea5e9; font-weight:600; margin-top:8px;"></div>
+          </div>
+        </div>
+        <!-- PayPal button -->
+        <div id="pago-paypal-section" style="display:none; margin-bottom:16px; text-align:center;">
+          <p style="color:#64748b; margin-bottom:12px; font-size:14px;">Serás redirigido a PayPal para completar el pago de forma segura.</p>
+          <button class="btn btn-primary" onclick="payWithPayPal()" style="background: linear-gradient(135deg, #003087, #0070ba); min-width:200px;">
+            🔵 Pagar con PayPal
+          </button>
+        </div>
+        <div class="btn-group" id="portal-pago-btn-group">
+          <button class="btn btn-primary" onclick="submitPortalPago()">Registrar Pago</button>
+        </div>
+      </div>
     </div>
 
     <!-- Password Reset Form (separate page) -->
@@ -686,7 +894,7 @@
             currentUserSession = user;
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('app-content-wrapper').style.display = 'block';
-            updateUIForRole(user.role);
+            updateUIForRole(user.role, user.permission_type);
             return true;
         } catch {
             currentUserSession = null;
@@ -768,10 +976,10 @@
             currentUserSession = data.user;
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('app-content-wrapper').style.display = 'block';
-            updateUIForRole(data.user.role);
+            updateUIForRole(data.user.role, data.user.permission_type);
 
             await cargarDatos();
-            actualizarUI();
+            if (data.user.role !== 'cliente') actualizarUI();
 
             emailInput.value = '';
             passwordInput.value = '';
@@ -837,33 +1045,66 @@
         }
     }
 
-    function updateUIForRole(role) {
-        // Hide/show elements based on role
-        const adminElements = document.querySelectorAll('.admin-only');
-        const operatorElements = document.querySelectorAll('.operator-only');
-        const viewerElements = document.querySelectorAll('.viewer-only');
+    // Maps which nav/UI elements are visible per role
+    function updateUIForRole(role, permission_type) {
+        const u = currentUserSession;
+        const isSuper       = role === 'superadmin';
+        const isCompanyOwner= role === 'company_owner';
+        const isAdmin       = role === 'admin';
+        const isUser        = role === 'user';
+        const isCliente     = role === 'cliente';
+        const perm          = permission_type || '';
 
-        // Super Admin and Admin see everything
-        if (role === 'super_admin' || role === 'admin') {
-            adminElements.forEach(el => el.style.display = 'block');
-            operatorElements.forEach(el => el.style.display = 'block');
-        }
-        // Operator sees limited elements
-        else if (role === 'operator') {
-            adminElements.forEach(el => el.style.display = 'none');
-            operatorElements.forEach(el => el.style.display = 'block');
-        }
-        // Viewer sees only read-only elements
-        else if (role === 'viewer') {
-            adminElements.forEach(el => el.style.display = 'none');
-            operatorElements.forEach(el => el.style.display = 'none');
-            viewerElements.forEach(el => el.style.display = 'block');
+        // If client portal: hide everything and show portal section only
+        document.getElementById('main-nav').style.display    = isCliente ? 'none' : '';
+        document.getElementById('project-selector-bar').style.display = 'none'; // shown later if needed
+
+        const show = (sel) => document.querySelectorAll(sel).forEach(el => el.style.display = '');
+        const hide = (sel) => document.querySelectorAll(sel).forEach(el => el.style.display = 'none');
+
+        // Hide all permission-gated nav tabs first
+        hide('.perm-clientes, .perm-lecturas, .perm-historial, .perm-pagos, .perm-proyectos, .perm-empresas, .perm-usuarios');
+
+        if (isCliente) {
+            showSection('portal');
+            return;
         }
 
-        // Update header to show current user
+        // Historial/Dashboard/Mapa — all internal roles
+        show('.perm-historial');
+
+        if (isSuper || isCompanyOwner || isAdmin ||
+            (isUser && ['total','administrativo'].includes(perm))) {
+            show('.perm-clientes');
+        }
+        if (isSuper || isCompanyOwner || isAdmin ||
+            (isUser && ['total','lectura','administrativo'].includes(perm))) {
+            show('.perm-lecturas');
+        }
+        if (isSuper || isCompanyOwner || isAdmin ||
+            (isUser && ['total','financiero'].includes(perm))) {
+            show('.perm-pagos');
+        }
+        if (isSuper || isCompanyOwner || isAdmin) {
+            show('.perm-proyectos');
+            show('.perm-usuarios');
+        }
+        if (isSuper) {
+            show('.perm-empresas');
+        }
+
+        // Update header
         const headerTitle = document.querySelector('.app-title span');
-        if (headerTitle && currentUserSession) {
-            headerTitle.textContent = `Control de Agua Potable - ${currentUserSession.name}`;
+        if (headerTitle && u) {
+            const roleLbl = isUser ? `(${perm})` : `(${role})`;
+            headerTitle.textContent = `Control de Agua - ${u.name} ${roleLbl}`;
+        }
+
+        // Show first visible tab
+        const firstTab = document.querySelector('#main-nav .nav-tab:not([style*="none"])');
+        if (firstTab) {
+            const match = firstTab.getAttribute('onclick').match(/showSection\('([^']+)'\)/);
+            if (match) showSection(match[1]);
         }
     }
 
@@ -1021,7 +1262,7 @@
         if (loggedIn) {
             try {
                 await cargarDatos();
-                actualizarUI();
+                if (currentUserSession?.role !== 'cliente') actualizarUI();
             } catch (error) {
                 console.error('Error loading data:', error);
                 Swal.fire({
@@ -1035,14 +1276,25 @@
     });
 
     async function cargarDatos() {
+        const u = currentUserSession;
+        if (!u) return;
+
+        if (u.role === 'cliente') {
+            await loadPortal();
+            return;
+        }
+
         const [clRes, regRes, empRes] = await Promise.all([
-            fetch('/api/clientes'),
-            fetch('/api/registros'),
-            fetch('/api/empresa')
+            apiFetch('/api/clientes'),
+            apiFetch('/api/registros'),
+            apiFetch('/api/empresa')
         ]);
         if (clRes.ok) clientes = await clRes.json();
         if (regRes.ok) registros = await regRes.json();
         if (empRes.ok) empresa = await empRes.json();
+
+        // Load projects for project-selector
+        await loadProyectosForSelector();
     }
 
     function actualizarUI() {
@@ -1052,21 +1304,7 @@
         actualizarDashboard();
     }
 
-    function showSection(id) {
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.getElementById('section-'+id).classList.add('active');
-        document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
-        const targetButton = event.target || document.querySelector(`.nav-tab[onclick*="${id}"]`);
-        if(targetButton) targetButton.classList.add('active');
-
-        // Inicializar mapa si es la sección activa
-        if (id === 'mapa') {
-            cargarMapa();
-        }
-        if (id === 'configuracion') {
-            loadUsers();
-        }
-    }
+    // showSection defined below (with extended section support)
 
     // ==========================================
     // GESTIÓN DE CLIENTES
@@ -1218,7 +1456,11 @@
             const div = document.createElement('div');
             div.className = 'card';
             div.style.padding = '15px'; div.style.marginBottom = '0';
-            const canDelete = currentUserSession && ['admin', 'super_admin', 'operator'].includes(currentUserSession.role);
+            const u = currentUserSession;
+            const canDelete = u && (
+                ['superadmin','company_owner','admin'].includes(u.role) ||
+                (u.role === 'user' && ['total','administrativo'].includes(u.permission_type))
+            );
             div.innerHTML = `
                 <div style="font-weight:700">${sanitizeHTML(c.nombre)}</div>
                 <div style="font-size:12px; color:#64748b; margin-top:4px;">${sanitizeHTML(c.codigo)} | ${sanitizeHTML(c.medidor)}</div>
@@ -1749,8 +1991,15 @@ Gracias por su pago puntual.`;
     // GESTIÓN DE USUARIOS
     // ==========================================
 
-    const ROLE_LABELS = { admin: 'Administrador', operador: 'Operador', visor: 'Visor' };
-    const ROLE_COLORS = { admin: '#7c3aed', operador: '#0369a1', visor: '#64748b' };
+    const ROLE_LABELS = {
+        superadmin: 'Superadmin', company_owner: 'Dueño Empresa', admin: 'Administrador',
+        user: 'Usuario', cliente: 'Cliente'
+    };
+    const ROLE_COLORS = {
+        superadmin: '#dc2626', company_owner: '#7c3aed', admin: '#0369a1',
+        user: '#0891b2', cliente: '#059669'
+    };
+    const PERM_LABELS = { total: 'Total', lectura: 'Lectura', financiero: 'Financiero', administrativo: 'Administrativo' };
 
     async function loadUsers() {
         const loading = document.getElementById('users-loading');
@@ -1790,7 +2039,7 @@ Gracias por su pago puntual.`;
                 <td style="padding:14px 16px; font-weight:600;">${escapeHtml(u.full_name)}${isMe ? ' <span style="font-size:11px;color:#0ea5e9;font-weight:500;">(tú)</span>' : ''}</td>
                 <td style="padding:14px 16px; color:#64748b; font-size:14px;">${escapeHtml(u.email)}</td>
                 <td style="padding:14px 16px;">
-                    <span style="background:${roleColor}18; color:${roleColor}; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600;">${escapeHtml(roleLabel)}</span>
+                    <span style="background:${roleColor}18; color:${roleColor}; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600;">${escapeHtml(roleLabel)}${u.permission_type ? ' / '+escapeHtml(PERM_LABELS[u.permission_type]||u.permission_type) : ''}</span>
                 </td>
                 <td style="padding:14px 16px;">
                     ${isMe ? '<span style="color:#94a3b8; font-size:13px;">—</span>' : `<button onclick="deleteUser('${escapeHtml(u.id)}', '${escapeHtml(u.full_name)}')" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;font-weight:500;padding:4px 8px;border-radius:6px;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='none'">Eliminar</button>`}
@@ -1815,33 +2064,40 @@ Gracias por su pago puntual.`;
         document.getElementById('new-user-role').value = 'visor';
     }
 
+    function onNewUserRoleChange() {
+        const role = document.getElementById('new-user-role').value;
+        const permGroup = document.getElementById('new-user-permission-group');
+        const projGroup = document.getElementById('new-user-project-group');
+        permGroup.style.display = (role === 'user') ? '' : 'none';
+        projGroup.style.display = (role === 'user' || role === 'admin') ? '' : 'none';
+    }
+
     async function createUser() {
         const full_name = document.getElementById('new-user-name').value.trim();
         const email = document.getElementById('new-user-email').value.trim();
         const password = document.getElementById('new-user-password').value;
         const role = document.getElementById('new-user-role').value;
+        const permission_type = document.getElementById('new-user-permission').value;
+        const project_id = document.getElementById('new-user-project').value || undefined;
 
         if (!full_name || !email || !password) {
             return Swal.fire('Campos requeridos', 'Completa todos los campos.', 'warning');
         }
 
         const btn = document.querySelector('#create-user-form .btn-primary');
-        btn.disabled = true;
-        btn.textContent = 'Creando...';
+        btn.disabled = true; btn.textContent = 'Creando...';
 
-        const res = await apiFetch('/api/users', {
-            method: 'POST',
-            body: JSON.stringify({ full_name, email, password, role })
-        });
+        const payload = { full_name, email, password, role };
+        if (role === 'user') payload.permission_type = permission_type;
+        if (project_id) payload.project_id = project_id;
 
-        btn.disabled = false;
-        btn.textContent = 'Crear Usuario';
+        const res = await apiFetch('/api/users', { method: 'POST', body: JSON.stringify(payload) });
+        btn.disabled = false; btn.textContent = 'Crear Usuario';
 
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             return Swal.fire('Error', err.error || 'No se pudo crear el usuario.', 'error');
         }
-
         hideCreateUserForm();
         await loadUsers();
         Swal.fire({ icon: 'success', title: 'Usuario creado', text: `${full_name} fue agregado exitosamente.`, timer: 2500, showConfirmButton: false });
@@ -1871,6 +2127,366 @@ Gracias por su pago puntual.`;
     function escapeHtml(str) {
         if (str == null) return '';
         return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ==========================================
+    // PROYECTOS
+    // ==========================================
+    let allProjects = [];
+    let activeProjectId = null;
+
+    async function loadProyectosForSelector() {
+        const res = await apiFetch('/api/projects');
+        if (!res.ok) return;
+        const { projects } = await res.json();
+        allProjects = projects || [];
+        const sel = document.getElementById('active-project-select');
+        const newUserProjectSel = document.getElementById('new-user-project');
+        sel.innerHTML = '<option value="">Todos mis proyectos</option>';
+        if (newUserProjectSel) newUserProjectSel.innerHTML = '<option value="">— Seleccionar —</option>';
+        allProjects.forEach(p => {
+            sel.innerHTML += `<option value="${escapeHtml(p.id)}">${escapeHtml(p.nombre)}</option>`;
+            if (newUserProjectSel) newUserProjectSel.innerHTML += `<option value="${escapeHtml(p.id)}">${escapeHtml(p.nombre)}</option>`;
+        });
+        const bar = document.getElementById('project-selector-bar');
+        if (allProjects.length > 1 && currentUserSession?.role !== 'superadmin') {
+            bar.style.display = 'flex';
+        }
+    }
+
+    function onProjectChange() {
+        activeProjectId = document.getElementById('active-project-select').value || null;
+        cargarDatos();
+    }
+
+    async function loadProyectos() {
+        const res = await apiFetch('/api/projects');
+        if (!res.ok) return;
+        const { projects } = await res.json();
+        const grid = document.getElementById('projects-grid');
+        grid.innerHTML = '';
+        (projects || []).forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.style.cssText = 'padding:20px; margin:0; border-left:4px solid #0ea5e9;';
+            div.innerHTML = `
+                <div style="font-weight:700; font-size:16px;">${escapeHtml(p.nombre)}</div>
+                ${p.companies ? `<div style="font-size:12px; color:#64748b; margin-top:4px;">Empresa: ${escapeHtml(p.companies.nombre)}</div>` : ''}
+                ${p.descripcion ? `<div style="font-size:13px; color:#475569; margin-top:6px;">${escapeHtml(p.descripcion)}</div>` : ''}
+                <div style="margin-top:12px; display:flex; gap:8px;">
+                    <span style="padding:2px 10px; border-radius:20px; font-size:12px; background:${p.activo ? '#dcfce7' : '#fee2e2'}; color:${p.activo ? '#166534' : '#991b1b'};">
+                        ${p.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                    <button class="btn btn-danger" style="padding:4px 10px; font-size:12px;" onclick="deleteProject('${escapeHtml(p.id)}', '${escapeHtml(p.nombre)}')">Eliminar</button>
+                </div>`;
+            grid.appendChild(div);
+        });
+        if (!projects.length) grid.innerHTML = '<p style="color:#64748b; text-align:center; padding:20px;">No hay proyectos creados.</p>';
+    }
+
+    function showCreateProjectForm() {
+        const isSuper = currentUserSession?.role === 'superadmin';
+        document.getElementById('project-company-field').style.display = isSuper ? '' : 'none';
+        if (isSuper) loadCompaniesForSelect();
+        document.getElementById('create-project-form').style.display = '';
+    }
+
+    async function loadCompaniesForSelect() {
+        const res = await apiFetch('/api/superadmin/companies');
+        if (!res.ok) return;
+        const { companies } = await res.json();
+        const sel = document.getElementById('new-project-company');
+        sel.innerHTML = '<option value="">Seleccionar empresa...</option>';
+        (companies || []).forEach(c => {
+            sel.innerHTML += `<option value="${escapeHtml(c.id)}">${escapeHtml(c.nombre)}</option>`;
+        });
+    }
+
+    async function createProject() {
+        const nombre = document.getElementById('new-project-name').value.trim();
+        const descripcion = document.getElementById('new-project-desc').value.trim();
+        const company_id = document.getElementById('new-project-company')?.value || undefined;
+        if (!nombre) return Swal.fire('Requerido', 'El nombre del proyecto es obligatorio.', 'warning');
+        const res = await apiFetch('/api/projects', { method: 'POST', body: JSON.stringify({ nombre, descripcion, company_id }) });
+        if (!res.ok) {
+            const e = await res.json().catch(() => ({}));
+            return Swal.fire('Error', e.error || 'No se pudo crear el proyecto.', 'error');
+        }
+        document.getElementById('create-project-form').style.display = 'none';
+        await loadProyectos();
+        await loadProyectosForSelector();
+        Swal.fire({ icon: 'success', title: 'Proyecto creado', timer: 1800, showConfirmButton: false });
+    }
+
+    async function deleteProject(id, nombre) {
+        const { isConfirmed } = await Swal.fire({ title: `¿Eliminar "${nombre}"?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' });
+        if (!isConfirmed) return;
+        const res = await apiFetch(`/api/projects/${id}`, { method: 'DELETE' });
+        if (!res.ok) return Swal.fire('Error', 'No se pudo eliminar el proyecto.', 'error');
+        await loadProyectos();
+        Swal.fire({ icon: 'success', title: 'Proyecto eliminado', timer: 1800, showConfirmButton: false });
+    }
+
+    // ==========================================
+    // EMPRESAS (superadmin)
+    // ==========================================
+    async function loadEmpresas() {
+        const res = await apiFetch('/api/superadmin/companies');
+        if (!res.ok) return;
+        const { companies } = await res.json();
+        const grid = document.getElementById('companies-grid');
+        grid.innerHTML = '';
+        const PLAN_COLORS = { basico: '#6366f1', profesional: '#0891b2', enterprise: '#7c3aed' };
+        (companies || []).forEach(c => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.style.cssText = 'padding:20px; margin:0; border-left:4px solid '+( PLAN_COLORS[c.plan]||'#64748b')+';';
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:start;">
+                    <div style="font-weight:700; font-size:16px;">${escapeHtml(c.nombre)}</div>
+                    <span style="padding:2px 10px; border-radius:20px; font-size:11px; background:${c.activa?'#dcfce7':'#fee2e2'}; color:${c.activa?'#166534':'#991b1b'};">${c.activa?'Activa':'Inactiva'}</span>
+                </div>
+                <div style="font-size:12px; color:#64748b; margin-top:4px;">NIT: ${escapeHtml(c.nit||'—')} | ${escapeHtml(c.email||'—')}</div>
+                <div style="margin-top:8px;">
+                    <span style="background:${PLAN_COLORS[c.plan]||'#64748b'}22; color:${PLAN_COLORS[c.plan]||'#64748b'}; padding:2px 10px; border-radius:20px; font-size:12px; font-weight:600;">${escapeHtml(c.plan)}</span>
+                </div>
+                <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-warning" style="padding:4px 10px; font-size:12px;" onclick="toggleCompanyStatus('${escapeHtml(c.id)}', ${c.activa})">${c.activa?'Desactivar':'Activar'}</button>
+                    <button class="btn btn-danger" style="padding:4px 10px; font-size:12px;" onclick="deleteCompany('${escapeHtml(c.id)}', '${escapeHtml(c.nombre)}')">Eliminar</button>
+                </div>`;
+            grid.appendChild(div);
+        });
+        if (!companies.length) grid.innerHTML = '<p style="color:#64748b; text-align:center; padding:20px;">No hay empresas registradas.</p>';
+    }
+
+    function showCreateCompanyForm() { document.getElementById('create-company-form').style.display = ''; }
+
+    async function createCompany() {
+        const nombre   = document.getElementById('new-company-nombre').value.trim();
+        const nit      = document.getElementById('new-company-nit').value.trim();
+        const email    = document.getElementById('new-company-email').value.trim();
+        const telefono = document.getElementById('new-company-telefono').value.trim();
+        const plan     = document.getElementById('new-company-plan').value;
+        if (!nombre) return Swal.fire('Requerido', 'El nombre de la empresa es obligatorio.', 'warning');
+        const res = await apiFetch('/api/superadmin/companies', { method: 'POST', body: JSON.stringify({ nombre, nit, email, telefono, plan }) });
+        if (!res.ok) { const e = await res.json().catch(()=>{}); return Swal.fire('Error', e?.error||'Error al crear.', 'error'); }
+        document.getElementById('create-company-form').style.display = 'none';
+        await loadEmpresas();
+        Swal.fire({ icon: 'success', title: 'Empresa creada', timer: 1800, showConfirmButton: false });
+    }
+
+    async function toggleCompanyStatus(id, currentlyActive) {
+        const res = await apiFetch(`/api/superadmin/companies/${id}`, { method: 'PATCH', body: JSON.stringify({ activa: !currentlyActive }) });
+        if (!res.ok) return Swal.fire('Error', 'No se pudo actualizar.', 'error');
+        await loadEmpresas();
+    }
+
+    async function deleteCompany(id, nombre) {
+        const { isConfirmed } = await Swal.fire({ title: `¿Eliminar empresa "${nombre}"?`, text: 'Se eliminarán también todos sus proyectos.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' });
+        if (!isConfirmed) return;
+        const res = await apiFetch(`/api/superadmin/companies/${id}`, { method: 'DELETE' });
+        if (!res.ok) return Swal.fire('Error', 'No se pudo eliminar.', 'error');
+        await loadEmpresas();
+        Swal.fire({ icon: 'success', title: 'Empresa eliminada', timer: 1800, showConfirmButton: false });
+    }
+
+    // ==========================================
+    // PAGOS (financiero / admin)
+    // ==========================================
+    async function loadPagos() {
+        const estado = document.getElementById('filtro-pagos-estado')?.value || '';
+        document.getElementById('pagos-loading').style.display = '';
+        document.getElementById('pagos-table-container').style.display = 'none';
+        const url = '/api/pagos' + (estado ? `?estado=${estado}` : '');
+        const res = await apiFetch(url);
+        if (!res.ok) { document.getElementById('pagos-loading').textContent = 'No se pudo cargar los pagos.'; return; }
+        const { pagos } = await res.json();
+        renderPagos(pagos || []);
+    }
+
+    function renderPagos(pagos) {
+        const tbody = document.getElementById('pagos-tbody');
+        tbody.innerHTML = '';
+        pagos.forEach(p => {
+            const estadoClass = { pendiente: 'status-pendiente', verificado: 'status-pagado', rechazado: 'status-mora' }[p.estado] || 'status-pendiente';
+            const tr = document.createElement('tr');
+            tr.className = `pago-row-${p.estado}`;
+            tr.innerHTML = `
+                <td>${new Date(p.created_at).toLocaleDateString()}</td>
+                <td>${escapeHtml(p.clientes?.nombre || p.cliente_id)}</td>
+                <td>Q${parseFloat(p.monto).toFixed(2)}</td>
+                <td>${escapeHtml(p.metodo)}</td>
+                <td>${escapeHtml(p.referencia||'—')}</td>
+                <td><span class="status-pill ${estadoClass}">${escapeHtml(p.estado)}</span></td>
+                <td>${p.boleta_url ? `<a href="${p.boleta_url.startsWith('data:') ? p.boleta_url : '#'}" target="_blank" style="color:#0ea5e9; text-decoration:none;">Ver boleta</a>` : '—'}</td>
+                <td>
+                    ${p.estado==='pendiente' ? `
+                        <div style="display:flex;gap:4px;">
+                            <button class="btn btn-primary" style="padding:4px 8px; font-size:12px;" onclick="updatePagoEstado('${escapeHtml(p.id)}','verificado')">✓ Verificar</button>
+                            <button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="updatePagoEstado('${escapeHtml(p.id)}','rechazado')">✗ Rechazar</button>
+                        </div>` : '—'}
+                </td>`;
+            tbody.appendChild(tr);
+        });
+        document.getElementById('pagos-loading').style.display = 'none';
+        document.getElementById('pagos-table-container').style.display = '';
+        if (!pagos.length) {
+            document.getElementById('pagos-loading').textContent = 'No hay pagos que mostrar.';
+            document.getElementById('pagos-loading').style.display = '';
+        }
+    }
+
+    async function updatePagoEstado(id, estado) {
+        const res = await apiFetch(`/api/pagos/${id}`, { method: 'PATCH', body: JSON.stringify({ estado }) });
+        if (!res.ok) return Swal.fire('Error', 'No se pudo actualizar.', 'error');
+        Toast.fire({ icon: 'success', title: estado === 'verificado' ? 'Pago verificado' : 'Pago rechazado' });
+        await loadPagos();
+    }
+
+    // ==========================================
+    // PORTAL DEL CLIENTE
+    // ==========================================
+    let portalData = null;
+    let portalPage = 0;
+    let boletaBase64 = null;
+    let payMethod = null;
+
+    async function loadPortal() {
+        const res = await apiFetch('/api/portal/me');
+        if (!res.ok) return;
+        portalData = await res.json();
+        document.getElementById('portal-saldo').textContent = `Q${parseFloat(portalData.saldo_pendiente).toFixed(2)}`;
+        document.getElementById('portal-cliente-nombre').textContent = portalData.cliente?.nombre || '';
+        renderPortalLecturas(portalData.lecturas || []);
+        await loadPortalPagos();
+    }
+
+    function renderPortalLecturas(lecturas) {
+        const tbody = document.getElementById('portal-lecturas-tbody');
+        tbody.innerHTML = '';
+        const MESES = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        lecturas.forEach(r => {
+            const estadoClass = { pendiente:'status-pendiente', pagado:'status-pagado', mora:'status-mora' }[r.estado] || 'status-pendiente';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${MESES[parseInt(r.mes)]||r.mes}</td>
+                <td>${new Date(r.fecha).toLocaleDateString()}</td>
+                <td>${parseFloat(r.consumo).toFixed(2)}</td>
+                <td>Q${parseFloat(r.monto_calculado).toFixed(2)}</td>
+                <td><span class="status-pill ${estadoClass}">${r.estado}</span></td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function loadMorePortalLecturas() {
+        portalPage++;
+        const res = await apiFetch(`/api/portal/lecturas?page=${portalPage}&limit=12`);
+        if (!res.ok) return;
+        const { lecturas, total } = await res.json();
+        renderPortalLecturas([...(portalData.lecturas||[]), ...lecturas]);
+        if ((portalPage+1)*12 >= total) document.getElementById('btn-portal-mas').style.display = 'none';
+    }
+
+    async function loadPortalPagos() {
+        const res = await apiFetch('/api/portal/pagos');
+        if (!res.ok) return;
+        const { pagos } = await res.json();
+        const tbody = document.getElementById('portal-pagos-tbody');
+        tbody.innerHTML = '';
+        pagos.forEach(p => {
+            const estadoClass = { pendiente:'status-pendiente', verificado:'status-pagado', rechazado:'status-mora' }[p.estado] || 'status-pendiente';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${new Date(p.created_at).toLocaleDateString()}</td>
+                <td>Q${parseFloat(p.monto).toFixed(2)}</td>
+                <td>${escapeHtml(p.metodo)}</td>
+                <td>${escapeHtml(p.referencia||'—')}</td>
+                <td><span class="status-pill ${estadoClass}">${escapeHtml(p.estado)}</span></td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function showPortalTab(tab) {
+        ['mis-lecturas','mis-pagos','pagar'].forEach(t => {
+            document.getElementById(`portal-tab-${t}`).style.display = t === tab ? '' : 'none';
+        });
+        document.querySelectorAll('#section-portal .nav-tab').forEach((btn, i) => {
+            btn.classList.toggle('active', ['mis-lecturas','mis-pagos','pagar'][i] === tab);
+        });
+    }
+
+    function selectPayMethod(method) {
+        payMethod = method;
+        document.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('selected'));
+        document.getElementById(`pmt-${method}`).classList.add('selected');
+        document.getElementById('pago-boleta-section').style.display  = (method === 'transferencia') ? '' : 'none';
+        document.getElementById('pago-paypal-section').style.display  = (method === 'paypal') ? '' : 'none';
+        const btnGroup = document.getElementById('portal-pago-btn-group');
+        btnGroup.style.display = (method === 'paypal') ? 'none' : '';
+    }
+
+    function handleBoleta(e) {
+        const f = e.target.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = (ev) => {
+            boletaBase64 = ev.target.result;
+            document.getElementById('boleta-preview-name').textContent = '✅ ' + f.name;
+        };
+        r.readAsDataURL(f);
+    }
+
+    async function submitPortalPago() {
+        const monto = parseFloat(document.getElementById('portal-monto').value);
+        const referencia = document.getElementById('portal-referencia').value.trim();
+        if (!monto || monto <= 0) return Swal.fire('Atención', 'Ingresa un monto válido.', 'warning');
+        if (!payMethod) return Swal.fire('Atención', 'Selecciona un método de pago.', 'warning');
+        if (payMethod === 'transferencia' && !boletaBase64) return Swal.fire('Atención', 'Adjunta la boleta de pago.', 'warning');
+
+        const payload = { monto, referencia, boleta_base64: boletaBase64 };
+        const res = await apiFetch('/api/portal/pagos/boleta', { method: 'POST', body: JSON.stringify(payload) });
+        if (!res.ok) {
+            const e = await res.json().catch(()=>{});
+            return Swal.fire('Error', e?.error || 'No se pudo registrar el pago.', 'error');
+        }
+        Swal.fire({ icon: 'success', title: '¡Pago registrado!', text: 'Tu pago será verificado en breve.', timer: 3000, showConfirmButton: false });
+        document.getElementById('portal-monto').value = '';
+        document.getElementById('portal-referencia').value = '';
+        boletaBase64 = null;
+        payMethod = null;
+        document.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('selected'));
+        document.getElementById('pago-boleta-section').style.display = 'none';
+        document.getElementById('boleta-preview-name').textContent = '';
+        await loadPortal();
+        showPortalTab('mis-pagos');
+    }
+
+    async function payWithPayPal() {
+        const monto = parseFloat(document.getElementById('portal-monto').value);
+        if (!monto || monto <= 0) return Swal.fire('Atención', 'Ingresa el monto antes de pagar.', 'warning');
+        const res = await apiFetch('/api/portal/pagos/paypal/create', { method: 'POST', body: JSON.stringify({ monto }) });
+        if (!res.ok) {
+            const e = await res.json().catch(()=>{});
+            return Swal.fire('Error', e?.error || 'Error al conectar con PayPal.', 'error');
+        }
+        const { order_id } = await res.json();
+        // Redirect to PayPal approval URL; in a real integration use the JS SDK buttons
+        Swal.fire({ icon: 'info', title: 'Orden PayPal creada', text: `Order ID: ${order_id}. Integra el PayPal JS SDK para la aprobación.`, confirmButtonText: 'OK' });
+    }
+
+    function showSection(id) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        const target = document.getElementById('section-'+id);
+        if (target) target.classList.add('active');
+        document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+        const clickedBtn = document.querySelector(`.nav-tab[onclick*="showSection('${id}')"]`);
+        if (clickedBtn) clickedBtn.classList.add('active');
+        if (id === 'mapa')          cargarMapa();
+        if (id === 'configuracion') loadUsers();
+        if (id === 'pagos')         loadPagos();
+        if (id === 'proyectos')     loadProyectos();
+        if (id === 'empresas')      loadEmpresas();
+        if (id === 'portal')        loadPortal();
     }
   </script>
  </body>
