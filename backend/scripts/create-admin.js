@@ -37,7 +37,7 @@ async function main() {
   // 2. Insert profile
   const { error: profileError } = await supabase
     .from('app_users')
-    .insert({ id: userId, email: USER.email.toLowerCase(), full_name: USER.full_name, role: USER.role });
+    .insert({ id: userId, full_name: USER.full_name, role: USER.role });
 
   if (profileError) {
     console.error('❌ Profile insert error:', profileError.message);

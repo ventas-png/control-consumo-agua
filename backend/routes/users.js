@@ -5,13 +5,23 @@ const adminOnly = requireRole(['admin']);
 
 // GET /api/users — list all app users (admin only)
 router.get('/', requireAuth, adminOnly, async (req, res) => {
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('id, email, full_name, role, created_at')
-    .order('created_at', { ascending: true });
+  const [profilesRes, authRes] = await Promise.all([
+    supabase.from('app_users').select('id, full_name, role, created_at').order('created_at', { ascending: true }),
+    supabase.auth.admin.listUsers()
+  ]);
 
-  if (error) return res.status(500).json({ error: 'Error al obtener usuarios' });
-  res.json({ users: data });
+  if (profilesRes.error) return res.status(500).json({ error: 'Error al obtener usuarios' });
+
+  // Build email map from auth users
+  const emailMap = {};
+  (authRes.data?.users || []).forEach(u => { emailMap[u.id] = u.email; });
+
+  const users = profilesRes.data.map(p => ({
+    ...p,
+    email: emailMap[p.id] || ''
+  }));
+
+  res.json({ users });
 });
 
 // POST /api/users — create a new user (admin only)
@@ -49,18 +59,12 @@ router.post('/', requireAuth, adminOnly, async (req, res) => {
     return res.status(500).json({ error: 'Error al crear usuario en autenticación' });
   }
 
-  // Insert profile into app_users
+  // Insert profile into app_users (no email column)
   const { error: profileError } = await supabase
     .from('app_users')
-    .insert({
-      id: authData.user.id,
-      email: authData.user.email,
-      full_name: full_name.trim(),
-      role
-    });
+    .insert({ id: authData.user.id, full_name: full_name.trim(), role });
 
   if (profileError) {
-    // Rollback: delete the auth user
     await supabase.auth.admin.deleteUser(authData.user.id).catch(() => {});
     console.error('Profile insert error:', profileError);
     return res.status(500).json({ error: 'Error al guardar perfil del usuario' });
@@ -75,12 +79,7 @@ router.post('/', requireAuth, adminOnly, async (req, res) => {
   }).catch(() => {});
 
   res.status(201).json({
-    user: {
-      id: authData.user.id,
-      email: authData.user.email,
-      full_name: full_name.trim(),
-      role
-    }
+    user: { id: authData.user.id, email: authData.user.email, full_name: full_name.trim(), role }
   });
 });
 
@@ -98,7 +97,6 @@ router.delete('/:id', requireAuth, adminOnly, async (req, res) => {
     return res.status(500).json({ error: 'Error al eliminar usuario' });
   }
 
-  // app_users will cascade delete via FK if configured, otherwise delete manually
   await supabase.from('app_users').delete().eq('id', id).catch(() => {});
 
   await supabase.from('security_logs').insert({
