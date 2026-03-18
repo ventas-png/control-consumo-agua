@@ -229,15 +229,24 @@
     }
     .nav-tab:hover { background: rgba(255,255,255,0.1); color: white; }
     .nav-tab.active {
-      background: rgba(255,255,255,0.15);
+      background: rgba(56,189,248,0.18);
       color: white; font-weight: 600;
+      box-shadow: inset 0 0 0 1px rgba(56,189,248,0.25);
     }
     .nav-tab.active::before {
       content: '';
-      position: absolute; left: 0; top: 0; bottom: 0;
-      width: 3px; background: #38bdf8; border-radius: 0 2px 2px 0;
+      position: absolute; left: 0; top: 4px; bottom: 4px;
+      width: 4px; background: #38bdf8; border-radius: 0 3px 3px 0;
     }
     .nav-tab-icon { font-size: 18px; width: 22px; text-align: center; flex-shrink: 0; }
+    .nav-tab-arrow {
+      margin-left: auto; font-size: 10px; opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      color: rgba(255,255,255,0.6);
+    }
+    .nav-tab:hover .nav-tab-arrow,
+    .nav-tab.active .nav-tab-arrow { opacity: 1; }
+    .nav-tab.active .nav-tab-arrow { transform: translateX(2px); color: #38bdf8; }
 
     /* Project selector inside sidebar */
     .sidebar-project {
@@ -284,7 +293,19 @@
       transition: background 0.2s;
     }
     .topbar-toggle:hover { background: #f1f5f9; }
-    .topbar-title { font-size: 18px; font-weight: 700; color: #0f172a; flex: 1; }
+    .topbar-back {
+      background: none; border: none; cursor: pointer;
+      padding: 6px 10px; border-radius: 8px; color: #0ea5e9;
+      display: none; align-items: center; gap: 4px;
+      font-size: 13px; font-weight: 600;
+      transition: background 0.2s;
+    }
+    .topbar-back:hover { background: #f0f9ff; }
+    .topbar-back svg { flex-shrink: 0; }
+    .topbar-info { flex: 1; min-width: 0; }
+    .topbar-title { font-size: 18px; font-weight: 700; color: #0f172a; }
+    .topbar-breadcrumb { font-size: 12px; color: #94a3b8; margin-top: 1px; }
+    .topbar-breadcrumb span { color: #0ea5e9; }
     .topbar-status { display: flex; gap: 8px; }
 
     .content-area { padding: 24px; flex: 1; }
@@ -368,34 +389,34 @@
       <!-- Navigation -->
       <nav id="main-nav">
         <div class="nav-section-label">Principal</div>
-        <button class="nav-tab perm-historial" onclick="showSection('dashboard')">
-          <span class="nav-tab-icon">📊</span> Dashboard
+        <button class="nav-tab perm-historial" onclick="showSection('dashboard')" title="Resumen general del sistema">
+          <span class="nav-tab-icon">📊</span> Dashboard <span class="nav-tab-arrow">›</span>
         </button>
-        <button class="nav-tab perm-clientes" onclick="showSection('clientes')">
-          <span class="nav-tab-icon">👥</span> Clientes
+        <button class="nav-tab perm-clientes" onclick="showSection('clientes')" title="Gestionar clientes y medidores">
+          <span class="nav-tab-icon">👥</span> Clientes <span class="nav-tab-arrow">›</span>
         </button>
-        <button class="nav-tab perm-lecturas" onclick="showSection('lecturas')">
-          <span class="nav-tab-icon">💧</span> Nueva Lectura
+        <button class="nav-tab perm-lecturas" onclick="showSection('lecturas')" title="Ingresar nueva lectura de medidor">
+          <span class="nav-tab-icon">💧</span> Nueva Lectura <span class="nav-tab-arrow">›</span>
         </button>
-        <button class="nav-tab perm-historial" onclick="showSection('tabla')">
-          <span class="nav-tab-icon">📋</span> Historial
+        <button class="nav-tab perm-historial" onclick="showSection('tabla')" title="Ver historial de lecturas">
+          <span class="nav-tab-icon">📋</span> Historial <span class="nav-tab-arrow">›</span>
         </button>
-        <button class="nav-tab perm-pagos" onclick="showSection('pagos')">
-          <span class="nav-tab-icon">💳</span> Pagos
+        <button class="nav-tab perm-pagos" onclick="showSection('pagos')" title="Gestionar pagos y boletas">
+          <span class="nav-tab-icon">💳</span> Pagos <span class="nav-tab-arrow">›</span>
         </button>
-        <button class="nav-tab perm-historial" onclick="showSection('mapa')">
-          <span class="nav-tab-icon">🗺️</span> Mapa
+        <button class="nav-tab perm-historial" onclick="showSection('mapa')" title="Ver ubicación de medidores en el mapa">
+          <span class="nav-tab-icon">🗺️</span> Mapa <span class="nav-tab-arrow">›</span>
         </button>
 
         <div class="nav-section-label perm-proyectos perm-empresas perm-usuarios">Administración</div>
-        <button class="nav-tab perm-proyectos" onclick="showSection('proyectos')">
-          <span class="nav-tab-icon">🏗️</span> Proyectos
+        <button class="nav-tab perm-proyectos" onclick="showSection('proyectos')" title="Administrar proyectos">
+          <span class="nav-tab-icon">🏗️</span> Proyectos <span class="nav-tab-arrow">›</span>
         </button>
-        <button class="nav-tab perm-empresas" onclick="showSection('empresas')">
-          <span class="nav-tab-icon">🏢</span> Empresas
+        <button class="nav-tab perm-empresas" onclick="showSection('empresas')" title="Administrar empresas registradas">
+          <span class="nav-tab-icon">🏢</span> Empresas <span class="nav-tab-arrow">›</span>
         </button>
-        <button class="nav-tab perm-usuarios" onclick="showSection('configuracion')">
-          <span class="nav-tab-icon">⚙️</span> Usuarios
+        <button class="nav-tab perm-usuarios" onclick="showSection('configuracion')" title="Gestionar usuarios del sistema">
+          <span class="nav-tab-icon">⚙️</span> Usuarios <span class="nav-tab-arrow">›</span>
         </button>
       </nav>
 
@@ -427,7 +448,16 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
         </button>
-        <div class="topbar-title" id="topbar-title">Control de Consumo de Agua</div>
+        <button class="topbar-back" id="topbar-back" onclick="goBack()" title="Regresar">
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+          </svg>
+          Regresar
+        </button>
+        <div class="topbar-info">
+          <div class="topbar-title" id="topbar-title">Control de Consumo de Agua</div>
+          <div class="topbar-breadcrumb" id="topbar-breadcrumb"></div>
+        </div>
         <div class="topbar-status">
           <span class="status-badge"><span class="status-dot"></span> Conectado</span>
         </div>
@@ -2691,15 +2721,48 @@ Gracias por su pago puntual.`;
         portal:        '🏠 Portal del Cliente',
     };
 
-    function showSection(id) {
+    // Navigation history for back button
+    const _navHistory = [];
+    let _currentSection = null;
+
+    function showSection(id, fromBack) {
+        // Push previous section to history (unless navigating back)
+        if (!fromBack && _currentSection && _currentSection !== id) {
+            _navHistory.push(_currentSection);
+            if (_navHistory.length > 10) _navHistory.shift();
+        }
+        _currentSection = id;
+
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         const target = document.getElementById('section-'+id);
         if (target) target.classList.add('active');
         document.querySelectorAll('#main-nav .nav-tab').forEach(b => b.classList.remove('active'));
         const clickedBtn = document.querySelector(`#main-nav .nav-tab[onclick*="showSection('${id}')"]`);
         if (clickedBtn) clickedBtn.classList.add('active');
+
+        // Update topbar title and breadcrumb
+        const label = SECTION_LABELS[id] || 'Control de Consumo de Agua';
+        const cleanLabel = label.replace(/^[\p{Emoji}\s]+/u, '').trim();
         const titleEl = document.getElementById('topbar-title');
-        if (titleEl) titleEl.textContent = SECTION_LABELS[id] || 'Control de Consumo de Agua';
+        if (titleEl) titleEl.textContent = cleanLabel;
+
+        // Update breadcrumb
+        const sectionGroups = {
+            dashboard: 'Principal', clientes: 'Principal', lecturas: 'Principal',
+            tabla: 'Principal', mapa: 'Principal', pagos: 'Principal',
+            proyectos: 'Administración', empresas: 'Administración', configuracion: 'Administración',
+            portal: 'Portal'
+        };
+        const breadcrumbEl = document.getElementById('topbar-breadcrumb');
+        if (breadcrumbEl) {
+            const group = sectionGroups[id];
+            breadcrumbEl.innerHTML = group ? `${group} <span>/ ${cleanLabel}</span>` : '';
+        }
+
+        // Show/hide back button
+        const backBtn = document.getElementById('topbar-back');
+        if (backBtn) backBtn.style.display = _navHistory.length > 0 ? 'flex' : 'none';
+
         if (id === 'mapa')          cargarMapa();
         if (id === 'configuracion') loadUsers();
         if (id === 'pagos')         loadPagos();
@@ -2708,6 +2771,12 @@ Gracias por su pago puntual.`;
         if (id === 'portal')        loadPortal();
         // Close sidebar on mobile after navigating
         if (window.innerWidth <= 768) closeSidebar();
+    }
+
+    function goBack() {
+        if (_navHistory.length === 0) return;
+        const prev = _navHistory.pop();
+        showSection(prev, true);
     }
 
     function toggleSidebar() {
