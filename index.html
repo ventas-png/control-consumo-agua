@@ -158,11 +158,153 @@
     .project-selector-bar { background: white; border-radius: 12px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
     .project-selector-bar label { font-weight: 600; font-size: 14px; color: #64748b; white-space: nowrap; }
     .project-selector-bar select { flex: 1; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; }
+    /* ── SIDEBAR LAYOUT ─────────────────────────────────────────── */
+    body { padding: 0; }
+    .sidebar-layout { display: flex; min-height: 100vh; }
+
+    /* Sidebar */
+    #sidebar {
+      width: 260px;
+      min-width: 260px;
+      background: linear-gradient(180deg, #0c4a6e 0%, #075985 40%, #0369a1 100%);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0;
+      height: 100vh;
+      z-index: 100;
+      transition: transform 0.3s ease;
+      box-shadow: 4px 0 20px rgba(0,0,0,0.2);
+      overflow-y: auto;
+    }
+    #sidebar.collapsed { transform: translateX(-260px); }
+
+    .sidebar-logo {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .sidebar-logo svg { flex-shrink: 0; }
+    .sidebar-logo-text { color: white; }
+    .sidebar-logo-text h1 { font-size: 16px; font-weight: 700; line-height: 1.2; }
+    .sidebar-logo-text p  { font-size: 11px; opacity: 0.65; margin-top: 2px; }
+
+    .sidebar-user {
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .sidebar-avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: linear-gradient(135deg, #38bdf8, #14b8a6);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 15px; color: white; flex-shrink: 0;
+    }
+    .sidebar-user-info { min-width: 0; }
+    .sidebar-user-name { color: white; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-role-badge {
+      display: inline-block; margin-top: 3px;
+      padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600;
+      background: rgba(255,255,255,0.18); color: rgba(255,255,255,0.9);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    /* Nav items */
+    #main-nav { flex: 1; padding: 12px 0; }
+    .nav-section-label {
+      padding: 10px 20px 4px;
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      color: rgba(255,255,255,0.4); text-transform: uppercase;
+    }
+    .nav-tab {
+      display: flex; align-items: center; gap: 12px;
+      width: 100%; padding: 11px 20px;
+      border: none; background: transparent;
+      color: rgba(255,255,255,0.75);
+      font-size: 14px; font-weight: 500;
+      cursor: pointer; text-align: left;
+      border-radius: 0;
+      transition: background 0.2s, color 0.2s;
+      position: relative;
+    }
+    .nav-tab:hover { background: rgba(255,255,255,0.1); color: white; }
+    .nav-tab.active {
+      background: rgba(255,255,255,0.15);
+      color: white; font-weight: 600;
+    }
+    .nav-tab.active::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: 3px; background: #38bdf8; border-radius: 0 2px 2px 0;
+    }
+    .nav-tab-icon { font-size: 18px; width: 22px; text-align: center; flex-shrink: 0; }
+
+    /* Project selector inside sidebar */
+    .sidebar-project {
+      padding: 12px 16px;
+      border-top: 1px solid rgba(255,255,255,0.12);
+    }
+    .sidebar-project label { color: rgba(255,255,255,0.6); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px; }
+    .sidebar-project select { width: 100%; padding: 7px 10px; border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; background: rgba(255,255,255,0.1); color: white; font-size: 13px; }
+    .sidebar-project select option { background: #075985; color: white; }
+
+    /* Sidebar footer */
+    .sidebar-footer { padding: 16px; border-top: 1px solid rgba(255,255,255,0.12); }
+    .sidebar-footer .btn-logout {
+      width: 100%; padding: 10px; border: 1px solid rgba(255,255,255,0.25);
+      background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85);
+      border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: background 0.2s;
+    }
+    .sidebar-footer .btn-logout:hover { background: rgba(239,68,68,0.3); color: white; border-color: rgba(239,68,68,0.5); }
+
+    /* Main content area */
+    #main-content {
+      flex: 1;
+      margin-left: 260px;
+      display: flex; flex-direction: column;
+      min-height: 100vh;
+      transition: margin-left 0.3s ease;
+    }
+    #main-content.expanded { margin-left: 0; }
+
+    /* Top bar */
+    .topbar {
+      background: white;
+      padding: 14px 24px;
+      display: flex; align-items: center; gap: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      position: sticky; top: 0; z-index: 50;
+    }
+    .topbar-toggle {
+      background: none; border: none; cursor: pointer;
+      padding: 6px; border-radius: 8px; color: #475569;
+      display: flex; align-items: center;
+      transition: background 0.2s;
+    }
+    .topbar-toggle:hover { background: #f1f5f9; }
+    .topbar-title { font-size: 18px; font-weight: 700; color: #0f172a; flex: 1; }
+    .topbar-status { display: flex; gap: 8px; }
+
+    .content-area { padding: 24px; flex: 1; }
+
+    /* Sidebar overlay (mobile) */
+    #sidebar-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 99;
+    }
+    #sidebar-overlay.active { display: block; }
+
     /* Responsive */
     @media (max-width: 768px) {
-      .app-header { padding: 16px; }
-      .nav-tabs { flex-wrap: nowrap; }
+      #sidebar { transform: translateX(-260px); }
+      #sidebar.mobile-open { transform: translateX(0); }
+      #main-content { margin-left: 0; }
       .form-grid { grid-template-columns: 1fr; }
+      .content-area { padding: 16px; }
     }
   </style>
  </head>
@@ -199,45 +341,99 @@
   </div>
 
   <div id="app-content-wrapper" style="display:none;">
-    <div class="app-container">
-    <div class="app-header">
-        <div class="app-title">
-        <svg style="width: 32px; height: 32px;" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-        <span>Control de Agua Potable</span>
-        </div>
-        <div class="app-subtitle" style="margin-top: 8px;">
-        <span class="status-badge"><span class="status-dot"></span> Conectado</span>
-        <span class="status-badge" style="background:#dcfce7; color:#166534">📱 WhatsApp</span>
-        </div>
-    </div>
+    <div class="sidebar-layout">
 
-    <div class="nav-tabs" id="main-nav">
-        <!-- roles: company_owner, admin, user:total, user:administrativo -->
-        <button class="nav-tab active perm-clientes" onclick="showSection('clientes')">👥 Clientes</button>
-        <!-- roles: all except financiero & visor & cliente -->
-        <button class="nav-tab perm-lecturas" onclick="showSection('lecturas')">💧 Nueva Lectura</button>
-        <!-- all internal roles -->
-        <button class="nav-tab perm-historial" onclick="showSection('tabla')">📋 Historial</button>
-        <!-- financiero, admin, company_owner, superadmin -->
-        <button class="nav-tab perm-pagos" onclick="showSection('pagos')">💳 Pagos</button>
-        <!-- all internal roles -->
-        <button class="nav-tab perm-historial" onclick="showSection('dashboard')">📊 Dashboard</button>
-        <!-- all internal roles -->
-        <button class="nav-tab perm-historial" onclick="showSection('mapa')">🗺️ Mapa</button>
-        <!-- company_owner, admin, superadmin -->
-        <button class="nav-tab perm-proyectos" onclick="showSection('proyectos')">🏗️ Proyectos</button>
-        <!-- superadmin only -->
-        <button class="nav-tab perm-empresas" onclick="showSection('empresas')">🏢 Empresas</button>
-        <!-- company_owner, admin, superadmin -->
-        <button class="nav-tab perm-usuarios" onclick="showSection('configuracion')">⚙️ Usuarios</button>
-    </div>
-    <!-- Project scope selector (hidden for superadmin; visible if user has >1 project) -->
-    <div class="project-selector-bar" id="project-selector-bar" style="display:none;">
-      <label>📁 Proyecto:</label>
-      <select id="active-project-select" onchange="onProjectChange()">
-        <option value="">Todos mis proyectos</option>
-      </select>
-    </div>
+    <!-- ── SIDEBAR ──────────────────────────────────────────────── -->
+    <aside id="sidebar">
+      <!-- Logo -->
+      <div class="sidebar-logo">
+        <svg style="width:32px;height:32px;flex-shrink:0;" fill="none" stroke="white" viewbox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+        </svg>
+        <div class="sidebar-logo-text">
+          <h1>Control de Agua</h1>
+          <p>Potable</p>
+        </div>
+      </div>
+
+      <!-- User info -->
+      <div class="sidebar-user" id="sidebar-user">
+        <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="sidebar-user-name">Cargando...</div>
+          <span class="sidebar-role-badge" id="sidebar-role-badge">-</span>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav id="main-nav">
+        <div class="nav-section-label">Principal</div>
+        <button class="nav-tab perm-historial" onclick="showSection('dashboard')">
+          <span class="nav-tab-icon">📊</span> Dashboard
+        </button>
+        <button class="nav-tab perm-clientes" onclick="showSection('clientes')">
+          <span class="nav-tab-icon">👥</span> Clientes
+        </button>
+        <button class="nav-tab perm-lecturas" onclick="showSection('lecturas')">
+          <span class="nav-tab-icon">💧</span> Nueva Lectura
+        </button>
+        <button class="nav-tab perm-historial" onclick="showSection('tabla')">
+          <span class="nav-tab-icon">📋</span> Historial
+        </button>
+        <button class="nav-tab perm-pagos" onclick="showSection('pagos')">
+          <span class="nav-tab-icon">💳</span> Pagos
+        </button>
+        <button class="nav-tab perm-historial" onclick="showSection('mapa')">
+          <span class="nav-tab-icon">🗺️</span> Mapa
+        </button>
+
+        <div class="nav-section-label perm-proyectos perm-empresas perm-usuarios">Administración</div>
+        <button class="nav-tab perm-proyectos" onclick="showSection('proyectos')">
+          <span class="nav-tab-icon">🏗️</span> Proyectos
+        </button>
+        <button class="nav-tab perm-empresas" onclick="showSection('empresas')">
+          <span class="nav-tab-icon">🏢</span> Empresas
+        </button>
+        <button class="nav-tab perm-usuarios" onclick="showSection('configuracion')">
+          <span class="nav-tab-icon">⚙️</span> Usuarios
+        </button>
+      </nav>
+
+      <!-- Project selector (shown when user has multiple projects) -->
+      <div class="sidebar-project" id="project-selector-bar" style="display:none;">
+        <label>📁 Proyecto activo</label>
+        <select id="active-project-select" onchange="onProjectChange()">
+          <option value="">Todos mis proyectos</option>
+        </select>
+      </div>
+
+      <!-- Footer / Logout -->
+      <div class="sidebar-footer">
+        <button class="btn-logout" onclick="logout()">
+          <span>🚪</span> Cerrar Sesión
+        </button>
+      </div>
+    </aside>
+
+    <!-- Mobile overlay -->
+    <div id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+    <!-- ── MAIN CONTENT ──────────────────────────────────────────── -->
+    <div id="main-content">
+      <!-- Top bar -->
+      <div class="topbar">
+        <button class="topbar-toggle" onclick="toggleSidebar()" title="Menú">
+          <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <div class="topbar-title" id="topbar-title">Control de Consumo de Agua</div>
+        <div class="topbar-status">
+          <span class="status-badge"><span class="status-dot"></span> Conectado</span>
+        </div>
+      </div>
+
+      <div class="content-area">
 
     <div id="section-clientes" class="section active">
         <div class="card">
@@ -478,11 +674,6 @@
             </div>
         </div>
 
-        <!-- Danger zone -->
-        <div class="card" style="border: 1px solid #fee2e2;">
-            <div class="card-header" style="color:#dc2626;">Zona de Peligro</div>
-            <button class="btn btn-danger" onclick="logout()">🚪 Cerrar Sesión</button>
-        </div>
     </div>
     
     </div>
@@ -686,8 +877,10 @@
                 </button>
             </div>
         </div>
-    </div>
-  </div>
+      </div><!-- /.content-area -->
+    </div><!-- /#main-content -->
+  </div><!-- /.sidebar-layout -->
+</div><!-- /#app-content-wrapper -->
 
     <div id="edit-status-modal" class="modal" onclick="if(event.target.id === 'edit-status-modal') closeEditStatusModal()">
       <div class="modal-content">
@@ -1048,21 +1241,38 @@
     // Maps which nav/UI elements are visible per role
     function updateUIForRole(role, permission_type) {
         const u = currentUserSession;
-        const isSuper       = role === 'superadmin';
-        const isCompanyOwner= role === 'company_owner';
-        const isAdmin       = role === 'admin';
-        const isUser        = role === 'user';
-        const isCliente     = role === 'cliente';
-        const perm          = permission_type || '';
+        const isSuper        = role === 'superadmin';
+        const isCompanyOwner = role === 'company_owner';
+        const isAdmin        = role === 'admin';
+        const isUser         = role === 'user';
+        const isCliente      = role === 'cliente';
+        const perm           = permission_type || '';
 
-        // If client portal: hide everything and show portal section only
-        document.getElementById('main-nav').style.display    = isCliente ? 'none' : '';
+        // ── Sidebar user info ───────────────────────────────────
+        if (u) {
+            const name = u.name || u.email || 'Usuario';
+            const initials = name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+            document.getElementById('sidebar-avatar').textContent   = initials;
+            document.getElementById('sidebar-user-name').textContent = name;
+            const ROLE_LABELS = {
+                superadmin:    'Super Admin',
+                company_owner: 'Company Owner',
+                admin:         'Administrador',
+                user:          perm ? `Usuario · ${perm}` : 'Usuario',
+                cliente:       'Cliente',
+            };
+            document.getElementById('sidebar-role-badge').textContent = ROLE_LABELS[role] || role;
+        }
+
+        // If client portal: hide sidebar and show portal only
+        document.getElementById('sidebar').style.display      = isCliente ? 'none' : '';
+        document.getElementById('main-content').style.marginLeft = isCliente ? '0' : '';
         document.getElementById('project-selector-bar').style.display = 'none'; // shown later if needed
 
         const show = (sel) => document.querySelectorAll(sel).forEach(el => el.style.display = '');
         const hide = (sel) => document.querySelectorAll(sel).forEach(el => el.style.display = 'none');
 
-        // Hide all permission-gated nav tabs first
+        // Hide all permission-gated nav items first
         hide('.perm-clientes, .perm-lecturas, .perm-historial, .perm-pagos, .perm-proyectos, .perm-empresas, .perm-usuarios');
 
         if (isCliente) {
@@ -1070,7 +1280,7 @@
             return;
         }
 
-        // Historial/Dashboard/Mapa — all internal roles
+        // Historial / Dashboard / Mapa — all internal roles
         show('.perm-historial');
 
         if (isSuper || isCompanyOwner || isAdmin ||
@@ -1093,14 +1303,7 @@
             show('.perm-empresas');
         }
 
-        // Update header
-        const headerTitle = document.querySelector('.app-title span');
-        if (headerTitle && u) {
-            const roleLbl = isUser ? `(${perm})` : `(${role})`;
-            headerTitle.textContent = `Control de Agua - ${u.name} ${roleLbl}`;
-        }
-
-        // Show first visible tab
+        // Show first visible nav tab
         const firstTab = document.querySelector('#main-nav .nav-tab:not([style*="none"])');
         if (firstTab) {
             const match = firstTab.getAttribute('onclick').match(/showSection\('([^']+)'\)/);
@@ -2474,19 +2677,55 @@ Gracias por su pago puntual.`;
         Swal.fire({ icon: 'info', title: 'Orden PayPal creada', text: `Order ID: ${order_id}. Integra el PayPal JS SDK para la aprobación.`, confirmButtonText: 'OK' });
     }
 
+    // ── Sidebar labels for topbar title ─────────────────────────
+    const SECTION_LABELS = {
+        dashboard:     '📊 Dashboard',
+        clientes:      '👥 Clientes',
+        lecturas:      '💧 Nueva Lectura',
+        tabla:         '📋 Historial',
+        pagos:         '💳 Pagos',
+        mapa:          '🗺️ Mapa',
+        proyectos:     '🏗️ Proyectos',
+        empresas:      '🏢 Empresas',
+        configuracion: '⚙️ Usuarios',
+        portal:        '🏠 Portal del Cliente',
+    };
+
     function showSection(id) {
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         const target = document.getElementById('section-'+id);
         if (target) target.classList.add('active');
-        document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
-        const clickedBtn = document.querySelector(`.nav-tab[onclick*="showSection('${id}')"]`);
+        document.querySelectorAll('#main-nav .nav-tab').forEach(b => b.classList.remove('active'));
+        const clickedBtn = document.querySelector(`#main-nav .nav-tab[onclick*="showSection('${id}')"]`);
         if (clickedBtn) clickedBtn.classList.add('active');
+        const titleEl = document.getElementById('topbar-title');
+        if (titleEl) titleEl.textContent = SECTION_LABELS[id] || 'Control de Consumo de Agua';
         if (id === 'mapa')          cargarMapa();
         if (id === 'configuracion') loadUsers();
         if (id === 'pagos')         loadPagos();
         if (id === 'proyectos')     loadProyectos();
         if (id === 'empresas')      loadEmpresas();
         if (id === 'portal')        loadPortal();
+        // Close sidebar on mobile after navigating
+        if (window.innerWidth <= 768) closeSidebar();
+    }
+
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        const mainContent = document.getElementById('main-content');
+        if (window.innerWidth <= 768) {
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('active');
+        } else {
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+        }
+    }
+
+    function closeSidebar() {
+        document.getElementById('sidebar').classList.remove('mobile-open');
+        document.getElementById('sidebar-overlay').classList.remove('active');
     }
   </script>
  </body>
