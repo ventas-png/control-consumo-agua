@@ -111,29 +111,28 @@ export function SuperAdminSection() {
       return
     }
 
-    // 2. Crear el company_owner en Auth
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email: formValues.ownerEmail,
-      password: formValues.ownerPass,
-      email_confirm: true,
+    // 2. Crear el company_owner via Edge Function (requiere service role)
+    const { data: session } = await supabase.auth.getSession()
+    const token = session.session?.access_token
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+    const res = await fetch(`${supabaseUrl}/functions/v1/create-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token ?? ''}`,
+      },
+      body: JSON.stringify({
+        email: formValues.ownerEmail,
+        password: formValues.ownerPass,
+        full_name: formValues.ownerNombre,
+        role: 'company_owner',
+        company_id: (nuevaEmpresa as { id: string }).id,
+      }),
     })
 
-    if (authError || !authData.user) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: authError?.message ?? 'No se pudo crear el usuario.' })
-      return
-    }
-
-    // 3. Crear perfil del company_owner
-    const { error: profileError } = await supabase.from('app_users').insert({
-      id: authData.user.id,
-      full_name: formValues.ownerNombre,
-      role: 'company_owner',
-      company_id: (nuevaEmpresa as { id: string }).id,
-      activo: true,
-    })
-
-    if (profileError) {
-      void Swal.fire({ icon: 'error', title: 'Advertencia', text: 'Empresa creada pero hubo un error al crear el perfil del administrador.' })
+    if (!res.ok) {
+      const err = await res.json() as { error?: string }
+      void Swal.fire({ icon: 'error', title: 'Advertencia', text: `Empresa creada pero error al crear administrador: ${err.error ?? 'Error desconocido'}` })
     } else {
       void Swal.fire({ icon: 'success', title: 'Empresa creada', text: `"${formValues.empresaNombre}" lista con su administrador.`, timer: 2000, showConfirmButton: false })
       void cargar()

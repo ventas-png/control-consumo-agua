@@ -127,29 +127,28 @@ export function EmpresaSection({ currentUser }: Props) {
 
     if (!formValues) return
 
-    // Crear usuario en Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email: formValues.email,
-      password: formValues.password,
-      email_confirm: true,
+    // Llamar al Edge Function para crear el usuario (requiere service role key)
+    const { data: session } = await supabase.auth.getSession()
+    const token = session.session?.access_token
+    const { data: { supabaseUrl } } = { data: { supabaseUrl: import.meta.env.VITE_SUPABASE_URL as string } }
+    const res = await fetch(`${supabaseUrl}/functions/v1/create-user`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token ?? ''}`,
+      },
+      body: JSON.stringify({
+        email: formValues.email,
+        password: formValues.password,
+        full_name: formValues.nombre,
+        role: formValues.rol,
+        company_id: currentUser.company_id,
+      }),
     })
 
-    if (authError || !authData.user) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: authError?.message ?? 'No se pudo crear el usuario.' })
-      return
-    }
-
-    // Crear perfil en app_users
-    const { error: profileError } = await supabase.from('app_users').insert({
-      id: authData.user.id,
-      full_name: formValues.nombre,
-      role: formValues.rol,
-      company_id: currentUser.company_id,
-      activo: true,
-    })
-
-    if (profileError) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'Usuario creado en Auth pero falló el perfil. Contacta soporte.' })
+    if (!res.ok) {
+      const err = await res.json() as { error?: string }
+      void Swal.fire({ icon: 'error', title: 'Error', text: err.error ?? 'No se pudo crear el usuario.' })
     } else {
       void Swal.fire({ icon: 'success', title: 'Usuario creado', timer: 1500, showConfirmButton: false })
       void cargar()
