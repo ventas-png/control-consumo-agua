@@ -54,7 +54,8 @@ async function buildSessionFromSupabase(
 
   const dbRole: string = (profile as { full_name?: string; role?: string } | null)?.role ?? 'visor'
   let uiRole: UserRole = 'viewer'
-  if (dbRole === 'admin') uiRole = 'admin'
+  if (dbRole === 'super_admin') uiRole = 'super_admin'
+  else if (dbRole === 'admin') uiRole = 'admin'
   else if (dbRole === 'operador') uiRole = 'operator'
   else if (dbRole === 'visor') uiRole = 'viewer'
 
