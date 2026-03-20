@@ -41,23 +41,103 @@ function clearSession(): void {
   localStorage.removeItem('cached_session')
 }
 
+async function buildSessionFromSupabase(
+  userId: string,
+  email: string,
+  expiresAt: number | undefined
+): Promise<UserSession> {
+  const { data: profile } = await supabase
+    .from('app_users')
+    .select('full_name, role')
+    .eq('id', userId)
+    .single()
+
+  const dbRole: string = (profile as { full_name?: string; role?: string } | null)?.role ?? 'visor'
+  let uiRole: UserRole = 'viewer'
+  if (dbRole === 'admin') uiRole = 'admin'
+  else if (dbRole === 'operador') uiRole = 'operator'
+  else if (dbRole === 'visor') uiRole = 'viewer'
+
+  const displayName = (profile as { full_name?: string } | null)?.full_name ?? email
+
+  return {
+    user_id: userId,
+    email,
+    name: displayName,
+    role: uiRole,
+    login_time: new Date().toISOString(),
+    expires_at: expiresAt
+      ? new Date(expiresAt * 1000).toISOString()
+      : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString(),
+  }
+}
+
 export function useAuth() {
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // On mount: restore session
+  // On mount: restore session + handle OAuth redirect
   useEffect(() => {
     const stored = getStoredSession()
     if (stored) {
       setCurrentUser(stored)
-    } else {
-      const offline = !navigator.onLine || localStorage.getItem('offline_mode') === 'true'
-      if (offline) {
-        const cached = getCachedSession()
-        if (cached) setCurrentUser(cached)
-      }
+      setLoading(false)
+      return
     }
-    setLoading(false)
+
+    const offline = !navigator.onLine || localStorage.getItem('offline_mode') === 'true'
+    if (offline) {
+      const cached = getCachedSession()
+      if (cached) setCurrentUser(cached)
+      setLoading(false)
+      return
+    }
+
+    // Check for active Supabase session (e.g. after Google OAuth redirect)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const existing = getStoredSession()
+        if (!existing) {
+          try {
+            const sessionData = await buildSessionFromSupabase(
+              session.user.id,
+              session.user.email ?? '',
+              session.expires_at
+            )
+            storeSession(sessionData)
+            setCurrentUser(sessionData)
+            await logSecurityEvent('login_success', { email: session.user.email, provider: 'google' }, session.user.id)
+          } catch {
+            // ignore
+          }
+        }
+      }
+      setLoading(false)
+    })
+  }, [])
+
+  // Listen for Supabase auth state changes (OAuth callback)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if ((event === 'SIGNED_IN') && session?.user) {
+        const existing = getStoredSession()
+        if (!existing) {
+          try {
+            const sessionData = await buildSessionFromSupabase(
+              session.user.id,
+              session.user.email ?? '',
+              session.expires_at
+            )
+            storeSession(sessionData)
+            setCurrentUser(sessionData)
+            await logSecurityEvent('login_success', { email: session.user.email, provider: 'oauth' }, session.user.id)
+          } catch {
+            // ignore
+          }
+        }
+      }
+    })
+    return () => subscription.unsubscribe()
   }, [])
 
   // Periodic session expiry check
@@ -107,32 +187,7 @@ export function useAuth() {
 
       const { user, session } = data
 
-      const { data: profile } = await supabase
-        .from('app_users')
-        .select('full_name, role')
-        .eq('id', user.id)
-        .single()
-
-      const dbRole: string = (profile as { full_name?: string; role?: string } | null)?.role ?? 'visor'
-      let uiRole: UserRole = 'viewer'
-      if (dbRole === 'admin') uiRole = 'admin'
-      else if (dbRole === 'operador') uiRole = 'operator'
-      else if (dbRole === 'visor') uiRole = 'viewer'
-
-      const displayName = (profile as { full_name?: string } | null)?.full_name ?? user.email ?? ''
-      const expiresAt = session.expires_at
-        ? new Date(session.expires_at * 1000).toISOString()
-        : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString()
-
-      const sessionData: UserSession = {
-        user_id: user.id,
-        email: user.email ?? '',
-        name: displayName,
-        role: uiRole,
-        login_time: new Date().toISOString(),
-        expires_at: expiresAt,
-      }
-
+      const sessionData = await buildSessionFromSupabase(user.id, user.email ?? '', session.expires_at)
       storeSession(sessionData)
       setCurrentUser(sessionData)
       localStorage.removeItem('login_failures')
@@ -145,6 +200,19 @@ export function useAuth() {
 
       if (msg.includes('fetch') || msg.includes('network')) return 'Error de red. Verifique su conexión.'
       return 'Error de conexión. Intente de nuevo.'
+    }
+  }, [])
+
+  const loginWithGoogle = useCallback(async (): Promise<string | null> => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      })
+      if (error) return 'Error al iniciar sesión con Google'
+      return null
+    } catch {
+      return 'Error al iniciar sesión con Google'
     }
   }, [])
 
@@ -178,5 +246,5 @@ export function useAuth() {
     }
   }, [currentUser])
 
-  return { currentUser, loading, login, logout }
+  return { currentUser, loading, login, loginWithGoogle, logout }
 }

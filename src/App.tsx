@@ -25,7 +25,7 @@ function getResetToken(): string | null {
 }
 
 export default function App() {
-  const { currentUser, loading, login, logout } = useAuth()
+  const { currentUser, loading, login, loginWithGoogle, logout } = useAuth()
   const {
     clientes, registros, empresa, fuentesAgua, registrosCalidad,
     cargarDatos, addCliente, addRegistro, updateRegistroEstado,
@@ -73,7 +73,7 @@ export default function App() {
   if (!currentUser) {
     return (
       <>
-        <LoginScreen onLogin={login} onForgotPassword={() => setShowPasswordReset(true)} />
+        <LoginScreen onLogin={login} onLoginWithGoogle={loginWithGoogle} onForgotPassword={() => setShowPasswordReset(true)} />
         {showPasswordReset && (
           <PasswordResetModal empresa={empresa} onClose={() => setShowPasswordReset(false)} />
         )}
