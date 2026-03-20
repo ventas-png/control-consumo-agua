@@ -42,6 +42,18 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword }: Pr
   const [showDiag, setShowDiag] = useState(false)
   const [diagContent, setDiagContent] = useState('')
   const [shake, setShake] = useState(false)
+  const [superAdminMode, setSuperAdminMode] = useState(
+    () => new URLSearchParams(window.location.search).get('superadmin') === '1'
+  )
+
+  function toggleSuperAdminMode() {
+    const next = !superAdminMode
+    setSuperAdminMode(next)
+    const url = new URL(window.location.href)
+    if (next) url.searchParams.set('superadmin', '1')
+    else url.searchParams.delete('superadmin')
+    window.history.replaceState(null, '', url.toString())
+  }
 
   async function handleLogin() {
     setError('')
@@ -238,11 +250,24 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword }: Pr
             justifyContent: 'center',
             minWidth: '300px',
           }}>
-            <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', margin: '0 0 4px', letterSpacing: '-0.5px' }}>
-              Bienvenido
+            {superAdminMode && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                color: 'white', borderRadius: '20px', padding: '4px 12px',
+                fontSize: '12px', fontWeight: 700, letterSpacing: '0.5px',
+                marginBottom: '12px',
+              }}>
+                🛡️ MODO SUPER ADMINISTRADOR
+              </div>
+            )}
+            <h2 style={{ fontSize: '26px', fontWeight: 800, color: superAdminMode ? '#6d28d9' : '#0f172a', margin: '0 0 4px', letterSpacing: '-0.5px' }}>
+              {superAdminMode ? 'Acceso Privilegiado' : 'Bienvenido'}
             </h2>
             <p style={{ color: '#64748b', fontSize: '14px', margin: '0 0 28px' }}>
-              Inicia sesión para acceder al sistema
+              {superAdminMode
+                ? 'Área restringida — Solo personal autorizado'
+                : 'Inicia sesión para acceder al sistema'}
             </p>
 
             {/* Google button */}
@@ -362,7 +387,9 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword }: Pr
               disabled={loading || googleLoading}
               style={{
                 width: '100%', padding: '14px', fontSize: '16px', fontWeight: 700,
-                background: 'linear-gradient(135deg, #0ea5e9 0%, #0891b2 50%, #0d9488 100%)',
+                background: superAdminMode
+                  ? 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)'
+                  : 'linear-gradient(135deg, #0ea5e9 0%, #0891b2 50%, #0d9488 100%)',
                 color: 'white', border: 'none', borderRadius: '12px',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.8 : 1,
@@ -432,6 +459,22 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword }: Pr
                   </button>
                 </div>
               )}
+            </div>
+
+            {/* Super Admin link */}
+            <div style={{ marginTop: '20px', textAlign: 'center' }}>
+              <button
+                onClick={toggleSuperAdminMode}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: '12px', color: superAdminMode ? '#6d28d9' : '#94a3b8',
+                  fontWeight: superAdminMode ? 700 : 400,
+                  textDecoration: 'underline', textUnderlineOffset: '3px',
+                  transition: 'color 0.2s',
+                }}
+              >
+                {superAdminMode ? '← Volver al acceso estándar' : '¿Super Administrador? Ingresar aquí'}
+              </button>
             </div>
           </div>
         </div>
