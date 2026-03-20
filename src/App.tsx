@@ -7,8 +7,8 @@ import { initEmailJS } from './lib/email'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { PasswordResetModal } from './components/auth/PasswordResetModal'
 import { PasswordResetPage } from './components/auth/PasswordResetPage'
-import { Header } from './components/layout/Header'
-import { NavTabs } from './components/layout/NavTabs'
+import { Sidebar } from './components/layout/Sidebar'
+import { Topbar } from './components/layout/Topbar'
 import { ClientesSection } from './components/clientes/ClientesSection'
 import { LecturasSection } from './components/lecturas/LecturasSection'
 import { HistorialSection } from './components/historial/HistorialSection'
@@ -83,58 +83,61 @@ export default function App() {
 
   // Authenticated app
   return (
-    <div style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #14b8a6 100%)', minHeight: '100vh', padding: '20px' }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        <Header currentUser={currentUser} />
-        <NavTabs
-          activeSection={activeSection}
-          userRole={currentUser.role}
-          onSelect={setActiveSection}
-        />
-
-        {activeSection === 'clientes' && (
-          <ClientesSection
-            clientes={clientes}
-            userRole={currentUser.role}
-            userId={currentUser.user_id}
-            onClienteAdded={addCliente}
-          />
-        )}
-        {activeSection === 'lecturas' && (
-          <LecturasSection
-            clientes={clientes}
-            registros={registros}
-            userRole={currentUser.role}
-            onRegistroAdded={addRegistro}
-          />
-        )}
-        {activeSection === 'tabla' && (
-          <HistorialSection
-            registros={registros}
-            clientes={clientes}
-            userRole={currentUser.role}
-            onEstadoUpdated={updateRegistroEstado}
-          />
-        )}
-        {activeSection === 'dashboard' && (
-          <DashboardSection registros={registros} />
-        )}
-        {activeSection === 'mapa' && (
-          <MapaSection clientes={clientes} registros={registros} />
-        )}
-        {activeSection === 'calidad' && (
-          <CalidadSection
-            fuentesAgua={fuentesAgua}
-            registrosCalidad={registrosCalidad}
-            empresa={empresa}
-            userId={currentUser.user_id}
-            onFuentesUpdated={setFuentesAgua}
-            onRegistrosCalidadUpdated={setRegistrosCalidad}
-          />
-        )}
-        {activeSection === 'configuracion' && (
-          <ConfiguracionSection onLogout={logout} />
-        )}
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9' }}>
+      <Sidebar
+        activeSection={activeSection}
+        userRole={currentUser.role}
+        currentUser={currentUser}
+        onSelect={setActiveSection}
+        onLogout={logout}
+      />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        <Topbar activeSection={activeSection} currentUser={currentUser} />
+        <main style={{ flex: 1, overflowY: 'auto', padding: '28px' }}>
+          {activeSection === 'clientes' && (
+            <ClientesSection
+              clientes={clientes}
+              userRole={currentUser.role}
+              userId={currentUser.user_id}
+              onClienteAdded={addCliente}
+            />
+          )}
+          {activeSection === 'lecturas' && (
+            <LecturasSection
+              clientes={clientes}
+              registros={registros}
+              userRole={currentUser.role}
+              onRegistroAdded={addRegistro}
+            />
+          )}
+          {activeSection === 'tabla' && (
+            <HistorialSection
+              registros={registros}
+              clientes={clientes}
+              userRole={currentUser.role}
+              onEstadoUpdated={updateRegistroEstado}
+            />
+          )}
+          {activeSection === 'dashboard' && (
+            <DashboardSection registros={registros} />
+          )}
+          {activeSection === 'mapa' && (
+            <MapaSection clientes={clientes} registros={registros} />
+          )}
+          {activeSection === 'calidad' && (
+            <CalidadSection
+              fuentesAgua={fuentesAgua}
+              registrosCalidad={registrosCalidad}
+              empresa={empresa}
+              userId={currentUser.user_id}
+              onFuentesUpdated={setFuentesAgua}
+              onRegistrosCalidadUpdated={setRegistrosCalidad}
+            />
+          )}
+          {activeSection === 'configuracion' && (
+            <ConfiguracionSection onLogout={logout} />
+          )}
+        </main>
       </div>
     </div>
   )
