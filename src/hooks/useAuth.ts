@@ -48,16 +48,18 @@ async function buildSessionFromSupabase(
 ): Promise<UserSession> {
   const { data: profile } = await supabase
     .from('app_users')
-    .select('full_name, role')
+    .select('full_name, role, company_id')
     .eq('id', userId)
     .single()
 
-  const dbRole: string = (profile as { full_name?: string; role?: string } | null)?.role ?? ''
+  const dbRole: string = (profile as { full_name?: string; role?: string; company_id?: string } | null)?.role ?? ''
+  const companyId: string | undefined = (profile as { full_name?: string; role?: string; company_id?: string } | null)?.company_id ?? undefined
   let uiRole: UserRole = 'viewer'
   if (dbRole === 'super_admin' || dbRole === 'superadmin') uiRole = 'super_admin'
-  else if (dbRole === 'admin' || dbRole === 'company_owner') uiRole = 'admin'
-  else if (dbRole === 'operador' || dbRole === 'user') uiRole = 'operator'
-  else if (dbRole === 'visor' || dbRole === 'cliente') uiRole = 'viewer'
+  else if (dbRole === 'company_owner') uiRole = 'company_owner'
+  else if (dbRole === 'admin') uiRole = 'admin'
+  else if (dbRole === 'operador' || dbRole === 'user' || dbRole === 'operator') uiRole = 'operator'
+  else if (dbRole === 'visor' || dbRole === 'cliente' || dbRole === 'viewer') uiRole = 'viewer'
 
   const displayName = (profile as { full_name?: string } | null)?.full_name ?? email
 
@@ -66,6 +68,7 @@ async function buildSessionFromSupabase(
     email,
     name: displayName,
     role: uiRole,
+    company_id: companyId,
     login_time: new Date().toISOString(),
     expires_at: expiresAt
       ? new Date(expiresAt * 1000).toISOString()

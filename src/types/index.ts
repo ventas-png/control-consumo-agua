@@ -80,13 +80,14 @@ export interface RegistroCalidad {
   };
 }
 
-export type UserRole = 'admin' | 'super_admin' | 'operator' | 'viewer';
+export type UserRole = 'admin' | 'super_admin' | 'company_owner' | 'operator' | 'viewer';
 
 export interface UserSession {
   user_id: string;
   email: string;
   name: string;
   role: UserRole;
+  company_id?: string;
   login_time: string;
   expires_at: string;
 }
@@ -99,7 +100,9 @@ export type AppSection =
   | 'mapa'
   | 'calidad'
   | 'configuracion'
-  | 'perfil';
+  | 'perfil'
+  | 'empresa_proyectos'
+  | 'superadmin_empresas';
 
 export interface CostoCalculo {
   total: number;
