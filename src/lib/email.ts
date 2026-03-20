@@ -1,0 +1,76 @@
+import emailjs from '@emailjs/browser'
+import type { Registro, Empresa } from '../types'
+import { APP_CONFIG } from './config'
+import { generarReciboPDFBase64 } from './pdf'
+
+export function initEmailJS(): void {
+  emailjs.init(APP_CONFIG.EMAILJS_PUBLIC_KEY)
+}
+
+export async function enviarReciboEmail(
+  email: string,
+  registro: Registro,
+  empresa: Empresa
+): Promise<void> {
+  const fullDataUrl = registro.foto
+  let base64DataFoto: string | null = null
+  let fileExtension = 'jpg'
+
+  if (fullDataUrl) {
+    const parts = fullDataUrl.split(',')
+    if (parts.length === 2) {
+      base64DataFoto = parts[1]
+      const mimePart = parts[0].match(/:(.*?);/)
+      if (mimePart?.[1]) {
+        const mimeType = mimePart[1]
+        if (mimeType.includes('png')) fileExtension = 'png'
+        else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) fileExtension = 'jpg'
+        else if (mimeType.includes('heic')) fileExtension = 'heic'
+      }
+    }
+  }
+
+  const adjunto_final = base64DataFoto
+    ? `Foto_Medidor_${registro.cliente_nombre.replace(/\s/g, '_')}_${Date.now()}.${fileExtension}|${base64DataFoto}`
+    : null
+
+  const pdfBase64Data = generarReciboPDFBase64(registro, empresa)
+  const pdf_adjunto_final = pdfBase64Data
+    ? `Recibo_${registro.cliente_nombre.replace(/\s/g, '_')}_${Date.now()}.pdf|${pdfBase64Data}`
+    : null
+
+  const params = {
+    to_email: email,
+    nombre_cliente: registro.cliente_nombre,
+    lectura_actual: registro.lectura_actual,
+    lectura_anterior: registro.lectura_anterior,
+    consumo: registro.consumo,
+    total_pagar: registro.monto_calculado.toFixed(2),
+    fecha: new Date().toLocaleDateString(),
+    nombre_empresa: empresa.nombre ?? 'Control de Consumo de Agua',
+    tipo_cobro: registro.tipo_cobro,
+    foto_adjunta: adjunto_final,
+    pdf_adjunto: pdf_adjunto_final,
+  }
+
+  await emailjs.send(APP_CONFIG.EMAILJS_SERVICE_ID, APP_CONFIG.EMAILJS_TEMPLATE_RECIBO, params)
+}
+
+export async function sendPasswordResetEmail(
+  email: string,
+  token: string,
+  empresa: Empresa
+): Promise<void> {
+  const resetLink = `${window.location.origin}${window.location.pathname}?reset_token=${token}`
+  const params = {
+    to_email: email,
+    reset_link: resetLink,
+    empresa_nombre: empresa.nombre ?? 'Control de Consumo de Agua',
+    hora_expiracion: '1 hora',
+  }
+  await emailjs.send(
+    APP_CONFIG.EMAILJS_SERVICE_ID,
+    APP_CONFIG.EMAILJS_TEMPLATE_PASSWORD_RESET,
+    params
+  )
+}

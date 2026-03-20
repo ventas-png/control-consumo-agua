@@ -1,0 +1,8 @@
+export const APP_CONFIG = {
+  SESSION_TIMEOUT: 8 * 60 * 60 * 1000, // 8 hours
+  COUNTRY_CODE: import.meta.env.VITE_COUNTRY_CODE ?? '502',
+  EMAILJS_PUBLIC_KEY: import.meta.env.VITE_EMAILJS_PUBLIC_KEY as string,
+  EMAILJS_SERVICE_ID: import.meta.env.VITE_EMAILJS_SERVICE_ID as string,
+  EMAILJS_TEMPLATE_RECIBO: import.meta.env.VITE_EMAILJS_TEMPLATE_RECIBO as string,
+  EMAILJS_TEMPLATE_PASSWORD_RESET: import.meta.env.VITE_EMAILJS_TEMPLATE_PASSWORD_RESET as string,
+} as const
