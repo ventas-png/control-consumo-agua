@@ -52,12 +52,12 @@ async function buildSessionFromSupabase(
     .eq('id', userId)
     .single()
 
-  const dbRole: string = (profile as { full_name?: string; role?: string } | null)?.role ?? 'visor'
+  const dbRole: string = (profile as { full_name?: string; role?: string } | null)?.role ?? ''
   let uiRole: UserRole = 'viewer'
   if (dbRole === 'super_admin' || dbRole === 'superadmin') uiRole = 'super_admin'
-  else if (dbRole === 'admin') uiRole = 'admin'
-  else if (dbRole === 'operador') uiRole = 'operator'
-  else if (dbRole === 'visor') uiRole = 'viewer'
+  else if (dbRole === 'admin' || dbRole === 'company_owner') uiRole = 'admin'
+  else if (dbRole === 'operador' || dbRole === 'user') uiRole = 'operator'
+  else if (dbRole === 'visor' || dbRole === 'cliente') uiRole = 'viewer'
 
   const displayName = (profile as { full_name?: string } | null)?.full_name ?? email
 
