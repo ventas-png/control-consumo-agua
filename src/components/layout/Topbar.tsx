@@ -10,6 +10,8 @@ const PAGE_TITLES: Record<AppSection, string> = {
   calidad: 'Calidad del Agua',
   configuracion: 'Configuración',
   perfil: 'Mi Cuenta',
+  empresa_proyectos: 'Mis Proyectos',
+  superadmin_empresas: 'Gestión de Empresas',
 }
 
 function getInitials(name: string): string {
