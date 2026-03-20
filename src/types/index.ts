@@ -98,7 +98,8 @@ export type AppSection =
   | 'dashboard'
   | 'mapa'
   | 'calidad'
-  | 'configuracion';
+  | 'configuracion'
+  | 'perfil';
 
 export interface CostoCalculo {
   total: number;

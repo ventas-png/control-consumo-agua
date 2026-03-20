@@ -80,6 +80,16 @@ const TABS: Tab[] = [
       </svg>
     ),
   },
+  {
+    id: 'perfil',
+    label: 'Mi Cuenta',
+    roles: ['admin', 'super_admin', 'operator', 'viewer'],
+    icon: (
+      <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+    ),
+  },
 ]
 
 interface Props {
@@ -109,6 +119,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogout }: Props) {
   const [hoveredTab, setHoveredTab] = useState<AppSection | null>(null)
   const [hoveredLogout, setHoveredLogout] = useState(false)
+  const [hoveredProfile, setHoveredProfile] = useState(false)
   const visibleTabs = TABS.filter(t => t.roles.includes(userRole))
 
   return (
@@ -213,15 +224,23 @@ export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogo
           borderTop: '1px solid rgba(255,255,255,0.06)',
         }}
       >
-        <div
+        <button
+          onClick={() => onSelect('perfil')}
+          onMouseEnter={() => setHoveredProfile(true)}
+          onMouseLeave={() => setHoveredProfile(false)}
           style={{
+            width: '100%',
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
             padding: '10px 12px',
             borderRadius: '10px',
-            background: 'rgba(255,255,255,0.04)',
+            background: hoveredProfile ? 'rgba(14,165,233,0.1)' : 'rgba(255,255,255,0.04)',
             marginBottom: '8px',
+            border: 'none',
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'background 0.15s',
           }}
         >
           <div
@@ -241,7 +260,7 @@ export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogo
           >
             {getInitials(currentUser.name)}
           </div>
-          <div style={{ overflow: 'hidden' }}>
+          <div style={{ overflow: 'hidden', flex: 1 }}>
             <div
               style={{
                 color: '#e2e8f0',
@@ -258,7 +277,10 @@ export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogo
               {ROLE_LABELS[currentUser.role]}
             </div>
           </div>
-        </div>
+          <svg width="14" height="14" fill="none" stroke="#475569" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
 
         <button
           onClick={onLogout}

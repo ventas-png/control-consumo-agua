@@ -265,5 +265,18 @@ export function useAuth() {
     }
   }, [currentUser])
 
-  return { currentUser, loading, login, loginWithGoogle, logout }
+  const updateProfile = useCallback(async (newName: string): Promise<string | null> => {
+    if (!currentUser) return 'No hay sesión activa'
+    const { error } = await supabase
+      .from('app_users')
+      .update({ full_name: newName.trim() })
+      .eq('id', currentUser.user_id)
+    if (error) return 'Error al actualizar el nombre'
+    const updated = { ...currentUser, name: newName.trim() }
+    storeSession(updated)
+    setCurrentUser(updated)
+    return null
+  }, [currentUser])
+
+  return { currentUser, loading, login, loginWithGoogle, logout, updateProfile }
 }
