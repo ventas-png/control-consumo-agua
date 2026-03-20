@@ -16,6 +16,7 @@ import { DashboardSection } from './components/dashboard/DashboardSection'
 import { MapaSection } from './components/mapa/MapaSection'
 import { CalidadSection } from './components/calidad/CalidadSection'
 import { ConfiguracionSection } from './components/configuracion/ConfiguracionSection'
+import { PerfilSection } from './components/perfil/PerfilSection'
 
 initEmailJS()
 
@@ -25,7 +26,7 @@ function getResetToken(): string | null {
 }
 
 export default function App() {
-  const { currentUser, loading, login, loginWithGoogle, logout } = useAuth()
+  const { currentUser, loading, login, loginWithGoogle, logout, updateProfile } = useAuth()
   const {
     clientes, registros, empresa, fuentesAgua, registrosCalidad,
     cargarDatos, addCliente, addRegistro, updateRegistroEstado,
@@ -136,6 +137,9 @@ export default function App() {
           )}
           {activeSection === 'configuracion' && (
             <ConfiguracionSection onLogout={logout} />
+          )}
+          {activeSection === 'perfil' && (
+            <PerfilSection currentUser={currentUser} onUpdateProfile={updateProfile} />
           )}
         </main>
       </div>
