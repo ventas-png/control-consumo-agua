@@ -60,7 +60,7 @@ export default function App() {
     if (currentUser && !dataLoaded) {
       cargarDatos()
         .then(() => setDataLoaded(true))
-        .catch(err => {
+        .catch((err: unknown) => {
           console.error('Error loading data:', err)
           if (navigator.onLine) {
             Swal.fire({
@@ -68,7 +68,7 @@ export default function App() {
               title: 'Error al cargar datos',
               text: 'No se pudieron cargar los datos. Intente recargar la página.',
               confirmButtonText: 'Recargar',
-            }).then(r => r.isConfirmed && window.location.reload())
+            }).then((r: { isConfirmed: boolean }) => r.isConfirmed && window.location.reload())
           }
         })
     }
