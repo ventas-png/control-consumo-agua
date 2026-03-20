@@ -17,6 +17,8 @@ import { MapaSection } from './components/mapa/MapaSection'
 import { CalidadSection } from './components/calidad/CalidadSection'
 import { ConfiguracionSection } from './components/configuracion/ConfiguracionSection'
 import { PerfilSection } from './components/perfil/PerfilSection'
+import { EmpresaSection } from './components/empresa/EmpresaSection'
+import { SuperAdminSection } from './components/superadmin/SuperAdminSection'
 
 initEmailJS()
 
@@ -33,10 +35,25 @@ export default function App() {
     setFuentesAgua, setRegistrosCalidad,
   } = useData()
 
-  const [activeSection, setActiveSection] = useState<AppSection>('clientes')
+  const defaultSection = (): AppSection => {
+    // Will be resolved after login when currentUser is available
+    return 'clientes'
+  }
+  const [activeSection, setActiveSection] = useState<AppSection>(defaultSection)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
   const [resetToken] = useState<string | null>(getResetToken)
   const [dataLoaded, setDataLoaded] = useState(false)
+
+  // Set default section based on role after login
+  useEffect(() => {
+    if (currentUser) {
+      if (currentUser.role === 'company_owner') {
+        setActiveSection('empresa_proyectos')
+      } else if (currentUser.role === 'super_admin') {
+        setActiveSection('superadmin_empresas')
+      }
+    }
+  }, [currentUser?.user_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load data after login
   useEffect(() => {
@@ -140,6 +157,12 @@ export default function App() {
           )}
           {activeSection === 'perfil' && (
             <PerfilSection currentUser={currentUser} onUpdateProfile={updateProfile} />
+          )}
+          {activeSection === 'empresa_proyectos' && (
+            <EmpresaSection currentUser={currentUser} />
+          )}
+          {activeSection === 'superadmin_empresas' && (
+            <SuperAdminSection />
           )}
         </main>
       </div>
