@@ -83,6 +83,24 @@ export function useAuth() {
     if (stored) {
       setCurrentUser(stored)
       setLoading(false)
+      // Background role refresh: if role changed in DB, update cached session
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
+        if (session?.user) {
+          try {
+            const fresh = await buildSessionFromSupabase(
+              session.user.id,
+              session.user.email ?? '',
+              session.expires_at
+            )
+            if (fresh.role !== stored.role) {
+              storeSession(fresh)
+              setCurrentUser(fresh)
+            }
+          } catch {
+            // keep existing session on error
+          }
+        }
+      })
       return
     }
 
