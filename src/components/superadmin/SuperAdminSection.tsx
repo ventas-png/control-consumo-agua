@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 
@@ -217,7 +217,7 @@ export function SuperAdminSection() {
                       type="number"
                       min={1}
                       value={isEditing ? editingMax[e.id] : e.max_projects}
-                      onChange={ev => setEditingMax(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
+                      onChange={(ev: React.ChangeEvent<HTMLInputElement>) => setEditingMax(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
                       style={{
                         width: '64px', padding: '6px 8px', borderRadius: '6px',
                         border: `1px solid ${isEditing ? '#0ea5e9' : 'rgba(255,255,255,0.1)'}`,

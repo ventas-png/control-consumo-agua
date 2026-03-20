@@ -74,7 +74,7 @@ export function EmpresaSection({ currentUser }: Props) {
       showCancelButton: true,
       confirmButtonText: 'Crear',
       cancelButtonText: 'Cancelar',
-      inputValidator: v => !v.trim() ? 'El nombre es obligatorio' : null,
+      inputValidator: (v: string) => !v.trim() ? 'El nombre es obligatorio' : null,
     })
 
     if (!nombre) return
@@ -130,7 +130,7 @@ export function EmpresaSection({ currentUser }: Props) {
     // Llamar al Edge Function para crear el usuario (requiere service role key)
     const { data: session } = await supabase.auth.getSession()
     const token = session.session?.access_token
-    const { data: { supabaseUrl } } = { data: { supabaseUrl: import.meta.env.VITE_SUPABASE_URL as string } }
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
     const res = await fetch(`${supabaseUrl}/functions/v1/create-user`, {
       method: 'POST',
       headers: {
@@ -365,7 +365,7 @@ export function EmpresaSection({ currentUser }: Props) {
         <AsignacionModal
           usuario={usuarioAsignar}
           proyectos={proyectos}
-          companyId={currentUser.company_id ?? ''}
+
           onClose={() => setUsuarioAsignar(null)}
           onSaved={() => void cargar()}
         />

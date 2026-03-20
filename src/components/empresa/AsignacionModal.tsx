@@ -15,12 +15,11 @@ interface Proyecto {
 interface AsignacionModalProps {
   usuario: Usuario
   proyectos: Proyecto[]
-  companyId: string
   onClose: () => void
   onSaved: () => void
 }
 
-export function AsignacionModal({ usuario, proyectos, companyId, onClose, onSaved }: AsignacionModalProps) {
+export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: AsignacionModalProps) {
   const [asignados, setAsignados] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
