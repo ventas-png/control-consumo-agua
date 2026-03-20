@@ -9,6 +9,7 @@ const PAGE_TITLES: Record<AppSection, string> = {
   mapa: 'Mapa de Clientes',
   calidad: 'Calidad del Agua',
   configuracion: 'Configuración',
+  perfil: 'Mi Cuenta',
 }
 
 function getInitials(name: string): string {

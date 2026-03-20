@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 
@@ -130,6 +130,15 @@ function SubmitBtn({ loading, label, color = '#0ea5e9' }: { loading: boolean; la
 }
 
 export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
+  const [isOAuthUser, setIsOAuthUser] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const provider = data.user?.app_metadata?.provider
+      if (provider && provider !== 'email') setIsOAuthUser(true)
+    })
+  }, [])
+
   // — Nombre —
   const [name, setName] = useState(currentUser.name)
   const [nameLoading, setNameLoading] = useState(false)
@@ -260,36 +269,44 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
         </Card>
 
         {/* Card 2 — Contraseña */}
-        <Card title="Cambiar contraseña">
-          <form onSubmit={handlePasswordSubmit}>
-            <InputField
-              label="Contraseña actual"
-              type={showPw.current ? 'text' : 'password'}
-              value={pwCurrent}
-              onChange={setPwCurrent}
-              placeholder="••••••••"
-              rightEl={eyeBtn(showPw.current, () => setShowPw(s => ({ ...s, current: !s.current })))}
-            />
-            <InputField
-              label="Nueva contraseña"
-              type={showPw.new ? 'text' : 'password'}
-              value={pwNew}
-              onChange={setPwNew}
-              placeholder="Mínimo 8 caracteres"
-              rightEl={eyeBtn(showPw.new, () => setShowPw(s => ({ ...s, new: !s.new })))}
-            />
-            <InputField
-              label="Confirmar nueva contraseña"
-              type={showPw.confirm ? 'text' : 'password'}
-              value={pwConfirm}
-              onChange={setPwConfirm}
-              placeholder="Repite la nueva contraseña"
-              rightEl={eyeBtn(showPw.confirm, () => setShowPw(s => ({ ...s, confirm: !s.confirm })))}
-            />
-            <SubmitBtn loading={pwLoading} label="Cambiar contraseña" color="#7c3aed" />
-            <FeedbackMsg fb={pwFb} />
-          </form>
-        </Card>
+        {isOAuthUser ? (
+          <Card title="Cambiar contraseña">
+            <div style={{ color: '#64748b', fontSize: '14px', padding: '8px 0' }}>
+              ℹ️ Tu cuenta está vinculada con Google. El cambio de contraseña se gestiona desde tu cuenta de Google.
+            </div>
+          </Card>
+        ) : (
+          <Card title="Cambiar contraseña">
+            <form onSubmit={handlePasswordSubmit}>
+              <InputField
+                label="Contraseña actual"
+                type={showPw.current ? 'text' : 'password'}
+                value={pwCurrent}
+                onChange={setPwCurrent}
+                placeholder="••••••••"
+                rightEl={eyeBtn(showPw.current, () => setShowPw(s => ({ ...s, current: !s.current })))}
+              />
+              <InputField
+                label="Nueva contraseña"
+                type={showPw.new ? 'text' : 'password'}
+                value={pwNew}
+                onChange={setPwNew}
+                placeholder="Mínimo 8 caracteres"
+                rightEl={eyeBtn(showPw.new, () => setShowPw(s => ({ ...s, new: !s.new })))}
+              />
+              <InputField
+                label="Confirmar nueva contraseña"
+                type={showPw.confirm ? 'text' : 'password'}
+                value={pwConfirm}
+                onChange={setPwConfirm}
+                placeholder="Repite la nueva contraseña"
+                rightEl={eyeBtn(showPw.confirm, () => setShowPw(s => ({ ...s, confirm: !s.confirm })))}
+              />
+              <SubmitBtn loading={pwLoading} label="Cambiar contraseña" color="#7c3aed" />
+              <FeedbackMsg fb={pwFb} />
+            </form>
+          </Card>
+        )}
 
         {/* Card 3 — Correo */}
         <Card title="Cambiar correo electrónico">
