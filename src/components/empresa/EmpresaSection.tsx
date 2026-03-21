@@ -234,9 +234,9 @@ export function EmpresaSection({ currentUser }: Props) {
               <button
                 onClick={() => void editarEmpresa()}
                 style={{
-                  padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
-                  border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)',
-                  color: '#94a3b8', cursor: 'pointer',
+                  padding: '6px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
+                  border: '1px solid rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.12)',
+                  color: '#cbd5e1', cursor: 'pointer',
                 }}
               >
                 Editar información
