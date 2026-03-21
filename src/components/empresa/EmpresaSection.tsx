@@ -19,6 +19,9 @@ interface Usuario {
 interface EmpresaInfo {
   id: string
   nombre: string
+  nit: string | null
+  email: string | null
+  telefono: string | null
   max_projects: number
 }
 
@@ -38,7 +41,7 @@ export function EmpresaSection({ currentUser }: Props) {
     if (!currentUser.company_id) { setLoading(false); return }
 
     const [empresaRes, proyectosRes, usuariosRes] = await Promise.all([
-      supabase.from('companies').select('id, nombre, max_projects').eq('id', currentUser.company_id).single(),
+      supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects').eq('id', currentUser.company_id).single(),
       supabase.from('projects').select('id, nombre').eq('company_id', currentUser.company_id).order('nombre'),
       supabase.from('app_users').select('id, full_name, role, activo')
         .eq('company_id', currentUser.company_id)
@@ -53,6 +56,40 @@ export function EmpresaSection({ currentUser }: Props) {
   }, [currentUser.company_id, currentUser.user_id])
 
   useEffect(() => { void cargar() }, [cargar])
+
+  async function editarEmpresa() {
+    if (!empresa) return
+    const { value: formValues } = await Swal.fire({
+      title: 'Editar Información de Empresa',
+      html: `
+        <input id="swal-nombre" class="swal2-input" placeholder="Nombre de la empresa *" value="${empresa.nombre}" />
+        <input id="swal-nit" class="swal2-input" placeholder="NIT" value="${empresa.nit ?? ''}" />
+        <input id="swal-email" class="swal2-input" placeholder="Email de contacto" type="email" value="${empresa.email ?? ''}" />
+        <input id="swal-telefono" class="swal2-input" placeholder="Teléfono" value="${empresa.telefono ?? ''}" />
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => {
+        const nombre = (document.getElementById('swal-nombre') as HTMLInputElement)?.value?.trim()
+        if (!nombre) { Swal.showValidationMessage('El nombre es obligatorio'); return false }
+        return {
+          nombre,
+          nit: (document.getElementById('swal-nit') as HTMLInputElement)?.value?.trim() || null,
+          email: (document.getElementById('swal-email') as HTMLInputElement)?.value?.trim() || null,
+          telefono: (document.getElementById('swal-telefono') as HTMLInputElement)?.value?.trim() || null,
+        }
+      },
+    })
+    if (!formValues) return
+    const { error } = await supabase.from('companies').update(formValues).eq('id', empresa.id)
+    if (error) {
+      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar la información.' })
+    } else {
+      void Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1200, showConfirmButton: false })
+      void cargar()
+    }
+  }
 
   async function crearProyecto() {
     if (!empresa) return
@@ -189,13 +226,30 @@ export function EmpresaSection({ currentUser }: Props) {
         border: '1px solid rgba(255,255,255,0.06)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h1 style={{ color: '#f1f5f9', fontSize: '22px', fontWeight: 700, margin: 0 }}>
-              {empresa?.nombre ?? 'Mi Empresa'}
-            </h1>
-            <p style={{ color: '#64748b', fontSize: '14px', marginTop: '4px' }}>
-              Panel de administración de empresa
-            </p>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <h1 style={{ color: '#f1f5f9', fontSize: '22px', fontWeight: 700, margin: 0 }}>
+                {empresa?.nombre ?? 'Mi Empresa'}
+              </h1>
+              <button
+                onClick={() => void editarEmpresa()}
+                style={{
+                  padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
+                  border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)',
+                  color: '#94a3b8', cursor: 'pointer',
+                }}
+              >
+                Editar información
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: '16px', marginTop: '6px', flexWrap: 'wrap' }}>
+              {empresa?.nit && <span style={{ color: '#64748b', fontSize: '13px' }}>NIT: {empresa.nit}</span>}
+              {empresa?.email && <span style={{ color: '#64748b', fontSize: '13px' }}>{empresa.email}</span>}
+              {empresa?.telefono && <span style={{ color: '#64748b', fontSize: '13px' }}>{empresa.telefono}</span>}
+              {!empresa?.nit && !empresa?.email && !empresa?.telefono && (
+                <span style={{ color: '#475569', fontSize: '13px' }}>Sin datos de contacto — haz clic en "Editar información"</span>
+              )}
+            </div>
           </div>
           <div style={{
             background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.25)',
