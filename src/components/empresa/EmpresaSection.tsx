@@ -23,6 +23,7 @@ interface EmpresaInfo {
   email: string | null
   telefono: string | null
   max_projects: number
+  logo_url: string | null
 }
 
 interface Props {
@@ -41,7 +42,7 @@ export function EmpresaSection({ currentUser }: Props) {
     if (!currentUser.company_id) { setLoading(false); return }
 
     const [empresaRes, proyectosRes, usuariosRes] = await Promise.all([
-      supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects').eq('id', currentUser.company_id).single(),
+      supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects, logo_url').eq('id', currentUser.company_id).single(),
       supabase.from('projects').select('id, nombre').eq('company_id', currentUser.company_id).order('nombre'),
       supabase.from('app_users').select('id, full_name, role, activo')
         .eq('company_id', currentUser.company_id)
@@ -89,6 +90,22 @@ export function EmpresaSection({ currentUser }: Props) {
       void Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1200, showConfirmButton: false })
       void cargar()
     }
+  }
+
+  async function subirLogo(file: File) {
+    if (!empresa) return
+    const path = `${empresa.id}/logo`
+    const { error: uploadError } = await supabase.storage
+      .from('company-logos')
+      .upload(path, file, { upsert: true, contentType: file.type })
+    if (uploadError) {
+      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo subir el logo.' })
+      return
+    }
+    const { data } = supabase.storage.from('company-logos').getPublicUrl(path)
+    const url = `${data.publicUrl}?t=${Date.now()}`
+    await supabase.from('companies').update({ logo_url: url }).eq('id', empresa.id)
+    void cargar()
   }
 
   async function crearProyecto() {
@@ -219,6 +236,15 @@ export function EmpresaSection({ currentUser }: Props) {
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+      {/* Input de archivo oculto para subir logo */}
+      <input
+        id="logo-upload"
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        style={{ display: 'none' }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) void subirLogo(f) }}
+      />
+
       {/* Header empresa */}
       <div style={{
         background: 'linear-gradient(135deg, #0f172a, #1e293b)',
@@ -226,7 +252,30 @@ export function EmpresaSection({ currentUser }: Props) {
         border: '1px solid rgba(255,255,255,0.06)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Avatar logo */}
+            <div
+              onClick={() => document.getElementById('logo-upload')?.click()}
+              title="Haz clic para cambiar el logo"
+              style={{
+                width: 52, height: 52, borderRadius: 10, overflow: 'hidden',
+                cursor: 'pointer', flexShrink: 0,
+                border: '2px solid rgba(255,255,255,0.15)',
+              }}
+            >
+              {empresa?.logo_url
+                ? <img src={empresa.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <div style={{
+                    background: 'linear-gradient(135deg,#0ea5e9,#0d9488)',
+                    width: '100%', height: '100%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'white', fontSize: 22, fontWeight: 700,
+                  }}>
+                    {empresa?.nombre?.[0]?.toUpperCase() ?? 'E'}
+                  </div>
+              }
+            </div>
+            <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <h1 style={{ color: '#f1f5f9', fontSize: '22px', fontWeight: 700, margin: 0 }}>
                 {empresa?.nombre ?? 'Mi Empresa'}
@@ -249,6 +298,7 @@ export function EmpresaSection({ currentUser }: Props) {
               {!empresa?.nit && !empresa?.email && !empresa?.telefono && (
                 <span style={{ color: '#475569', fontSize: '13px' }}>Sin datos de contacto — haz clic en "Editar información"</span>
               )}
+            </div>
             </div>
           </div>
           <div style={{
