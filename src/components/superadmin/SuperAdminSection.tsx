@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 
 interface Empresa {
   id: string
-  name: string
+  nombre: string
   max_projects: number
   project_count?: number
   user_count?: number
@@ -19,8 +19,8 @@ export function SuperAdminSection() {
     setLoading(true)
     const { data: companiesData } = await supabase
       .from('companies')
-      .select('id, name, max_projects')
-      .order('name')
+      .select('id, nombre, max_projects')
+      .order('nombre')
 
     if (!companiesData) { setLoading(false); return }
 
@@ -102,7 +102,7 @@ export function SuperAdminSection() {
     // 1. Crear la empresa
     const { data: nuevaEmpresa, error: empresaError } = await supabase
       .from('companies')
-      .insert({ name: formValues.empresaNombre, max_projects: formValues.maxProj })
+      .insert({ nombre: formValues.empresaNombre, max_projects: formValues.maxProj })
       .select()
       .single()
 
@@ -199,7 +199,7 @@ export function SuperAdminSection() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '16px' }}>{e.name}</div>
+                    <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '16px' }}>{e.nombre}</div>
                     <div style={{ display: 'flex', gap: '16px', marginTop: '6px', flexWrap: 'wrap' }}>
                       <span style={{ color: '#64748b', fontSize: '13px' }}>
                         <span style={{ color: '#38bdf8', fontWeight: 600 }}>{e.project_count}</span>/{e.max_projects} proyectos
