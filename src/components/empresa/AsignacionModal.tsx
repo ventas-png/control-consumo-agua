@@ -9,7 +9,7 @@ interface Usuario {
 
 interface Proyecto {
   id: string
-  name: string
+  nombre: string
 }
 
 interface AsignacionModalProps {
@@ -128,7 +128,7 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
                     style={{ accentColor: '#0ea5e9', width: '16px', height: '16px', cursor: 'pointer' }}
                   />
                   <span style={{ color: checked ? '#38bdf8' : '#cbd5e1', fontSize: '14px', fontWeight: checked ? 600 : 400 }}>
-                    {p.name}
+                    {p.nombre}
                   </span>
                 </label>
               )

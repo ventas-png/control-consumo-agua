@@ -6,7 +6,7 @@ import { AsignacionModal } from './AsignacionModal'
 
 interface Proyecto {
   id: string
-  name: string
+  nombre: string
 }
 
 interface Usuario {
@@ -18,7 +18,7 @@ interface Usuario {
 
 interface EmpresaInfo {
   id: string
-  name: string
+  nombre: string
   max_projects: number
 }
 
@@ -38,8 +38,8 @@ export function EmpresaSection({ currentUser }: Props) {
     if (!currentUser.company_id) { setLoading(false); return }
 
     const [empresaRes, proyectosRes, usuariosRes] = await Promise.all([
-      supabase.from('companies').select('id, name, max_projects').eq('id', currentUser.company_id).single(),
-      supabase.from('projects').select('id, name').eq('company_id', currentUser.company_id).order('name'),
+      supabase.from('companies').select('id, nombre, max_projects').eq('id', currentUser.company_id).single(),
+      supabase.from('projects').select('id, nombre').eq('company_id', currentUser.company_id).order('nombre'),
       supabase.from('app_users').select('id, full_name, role, activo')
         .eq('company_id', currentUser.company_id)
         .neq('id', currentUser.user_id)
@@ -80,7 +80,7 @@ export function EmpresaSection({ currentUser }: Props) {
     if (!nombre) return
 
     const { error } = await supabase.from('projects').insert({
-      name: nombre.trim(),
+      nombre: nombre.trim(),
       company_id: currentUser.company_id,
     })
 
@@ -191,7 +191,7 @@ export function EmpresaSection({ currentUser }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <h1 style={{ color: '#f1f5f9', fontSize: '22px', fontWeight: 700, margin: 0 }}>
-              {empresa?.name ?? 'Mi Empresa'}
+              {empresa?.nombre ?? 'Mi Empresa'}
             </h1>
             <p style={{ color: '#64748b', fontSize: '14px', marginTop: '4px' }}>
               Panel de administración de empresa
@@ -252,7 +252,7 @@ export function EmpresaSection({ currentUser }: Props) {
                     width: '8px', height: '8px', borderRadius: '50%',
                     background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
                   }} />
-                  <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '14px' }}>{p.name}</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '14px' }}>{p.nombre}</span>
                 </div>
                 <div style={{ color: '#475569', fontSize: '11px', marginBottom: '12px', paddingLeft: '18px' }}>
                   ID: {p.id.slice(0, 8)}...
