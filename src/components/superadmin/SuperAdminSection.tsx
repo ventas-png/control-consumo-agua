@@ -5,6 +5,11 @@ import { supabase } from '../../lib/supabase'
 interface Empresa {
   id: string
   nombre: string
+  nit: string | null
+  email: string | null
+  telefono: string | null
+  plan: string
+  activa: boolean
   max_projects: number
   project_count?: number
   user_count?: number
@@ -19,7 +24,7 @@ export function SuperAdminSection() {
     setLoading(true)
     const { data: companiesData } = await supabase
       .from('companies')
-      .select('id, nombre, max_projects')
+      .select('id, nombre, nit, email, telefono, plan, activa, max_projects')
       .order('nombre')
 
     if (!companiesData) { setLoading(false); return }
@@ -66,15 +71,69 @@ export function SuperAdminSection() {
     }
   }
 
+  async function editarEmpresa(empresa: Empresa) {
+    const { value: formValues } = await Swal.fire({
+      title: 'Editar Empresa',
+      html: `
+        <input id="swal-nombre" class="swal2-input" placeholder="Nombre de la empresa *" value="${empresa.nombre}" />
+        <input id="swal-nit" class="swal2-input" placeholder="NIT" value="${empresa.nit ?? ''}" />
+        <input id="swal-email" class="swal2-input" placeholder="Email de contacto" type="email" value="${empresa.email ?? ''}" />
+        <input id="swal-telefono" class="swal2-input" placeholder="Teléfono" value="${empresa.telefono ?? ''}" />
+        <select id="swal-plan" class="swal2-select">
+          <option value="basico" ${empresa.plan === 'basico' ? 'selected' : ''}>Plan Básico</option>
+          <option value="profesional" ${empresa.plan === 'profesional' ? 'selected' : ''}>Plan Profesional</option>
+          <option value="enterprise" ${empresa.plan === 'enterprise' ? 'selected' : ''}>Plan Enterprise</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;justify-content:center;color:#94a3b8;font-size:14px;">
+          <input id="swal-activa" type="checkbox" ${empresa.activa ? 'checked' : ''} style="width:16px;height:16px;accent-color:#0ea5e9;" />
+          Empresa activa
+        </label>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => {
+        const nombre = (document.getElementById('swal-nombre') as HTMLInputElement)?.value?.trim()
+        if (!nombre) { Swal.showValidationMessage('El nombre es obligatorio'); return false }
+        return {
+          nombre,
+          nit: (document.getElementById('swal-nit') as HTMLInputElement)?.value?.trim() || null,
+          email: (document.getElementById('swal-email') as HTMLInputElement)?.value?.trim() || null,
+          telefono: (document.getElementById('swal-telefono') as HTMLInputElement)?.value?.trim() || null,
+          plan: (document.getElementById('swal-plan') as HTMLSelectElement)?.value,
+          activa: (document.getElementById('swal-activa') as HTMLInputElement)?.checked,
+        }
+      },
+    })
+
+    if (!formValues) return
+
+    const { error } = await supabase
+      .from('companies')
+      .update(formValues)
+      .eq('id', empresa.id)
+
+    if (error) {
+      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar la empresa.' })
+    } else {
+      void Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1200, showConfirmButton: false })
+      void cargar()
+    }
+  }
+
   async function crearEmpresa() {
     const { value: formValues } = await Swal.fire({
       title: 'Nueva Empresa',
       html: `
-        <input id="swal-empresa" class="swal2-input" placeholder="Nombre de la empresa" />
-        <input id="swal-owner-nombre" class="swal2-input" placeholder="Nombre del administrador" />
-        <input id="swal-owner-email" class="swal2-input" placeholder="Email del administrador" type="email" />
-        <input id="swal-owner-pass" class="swal2-input" placeholder="Contraseña temporal" type="password" />
+        <input id="swal-empresa" class="swal2-input" placeholder="Nombre de la empresa *" />
+        <input id="swal-nit" class="swal2-input" placeholder="NIT (opcional)" />
+        <input id="swal-email-empresa" class="swal2-input" placeholder="Email de la empresa (opcional)" type="email" />
+        <input id="swal-telefono" class="swal2-input" placeholder="Teléfono (opcional)" />
         <input id="swal-max" class="swal2-input" placeholder="Límite de proyectos" type="number" value="5" min="1" />
+        <hr style="border-color:rgba(255,255,255,0.1);margin:8px 0;" />
+        <input id="swal-owner-nombre" class="swal2-input" placeholder="Nombre del administrador *" />
+        <input id="swal-owner-email" class="swal2-input" placeholder="Email del administrador *" type="email" />
+        <input id="swal-owner-pass" class="swal2-input" placeholder="Contraseña temporal *" type="password" />
       `,
       showCancelButton: true,
       confirmButtonText: 'Crear',
@@ -86,14 +145,23 @@ export function SuperAdminSection() {
         const ownerPass = (document.getElementById('swal-owner-pass') as HTMLInputElement)?.value
         const maxProj = parseInt((document.getElementById('swal-max') as HTMLInputElement)?.value ?? '5')
         if (!empresaNombre || !ownerNombre || !ownerEmail || !ownerPass) {
-          Swal.showValidationMessage('Todos los campos son obligatorios')
+          Swal.showValidationMessage('Los campos marcados con * son obligatorios')
           return false
         }
         if (ownerPass.length < 8) {
           Swal.showValidationMessage('La contraseña debe tener al menos 8 caracteres')
           return false
         }
-        return { empresaNombre, ownerNombre, ownerEmail, ownerPass, maxProj: isNaN(maxProj) ? 5 : maxProj }
+        return {
+          empresaNombre,
+          nit: (document.getElementById('swal-nit') as HTMLInputElement)?.value?.trim() || null,
+          emailEmpresa: (document.getElementById('swal-email-empresa') as HTMLInputElement)?.value?.trim() || null,
+          telefono: (document.getElementById('swal-telefono') as HTMLInputElement)?.value?.trim() || null,
+          ownerNombre,
+          ownerEmail,
+          ownerPass,
+          maxProj: isNaN(maxProj) ? 5 : maxProj,
+        }
       },
     })
 
@@ -102,7 +170,13 @@ export function SuperAdminSection() {
     // 1. Crear la empresa
     const { data: nuevaEmpresa, error: empresaError } = await supabase
       .from('companies')
-      .insert({ nombre: formValues.empresaNombre, max_projects: formValues.maxProj })
+      .insert({
+        nombre: formValues.empresaNombre,
+        nit: formValues.nit,
+        email: formValues.emailEmpresa,
+        telefono: formValues.telefono,
+        max_projects: formValues.maxProj,
+      })
       .select()
       .single()
 
@@ -197,9 +271,19 @@ export function SuperAdminSection() {
                 background: '#1e293b', borderRadius: '14px', padding: '20px 24px',
                 border: '1px solid rgba(255,255,255,0.06)',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '16px' }}>{e.nombre}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '16px' }}>{e.nombre}</div>
+                      {!e.activa && (
+                        <span style={{ background: '#ef444422', color: '#f87171', fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', border: '1px solid #ef444444' }}>
+                          Inactiva
+                        </span>
+                      )}
+                      <span style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8', fontSize: '11px', padding: '2px 8px', borderRadius: '20px' }}>
+                        {e.plan}
+                      </span>
+                    </div>
                     <div style={{ display: 'flex', gap: '16px', marginTop: '6px', flexWrap: 'wrap' }}>
                       <span style={{ color: '#64748b', fontSize: '13px' }}>
                         <span style={{ color: '#38bdf8', fontWeight: 600 }}>{e.project_count}</span>/{e.max_projects} proyectos
@@ -207,7 +291,24 @@ export function SuperAdminSection() {
                       <span style={{ color: '#64748b', fontSize: '13px' }}>
                         <span style={{ color: '#a78bfa', fontWeight: 600 }}>{e.user_count}</span> usuarios
                       </span>
+                      {e.nit && <span style={{ color: '#64748b', fontSize: '13px' }}>NIT: {e.nit}</span>}
+                      {e.email && <span style={{ color: '#64748b', fontSize: '13px' }}>{e.email}</span>}
+                      {e.telefono && <span style={{ color: '#64748b', fontSize: '13px' }}>{e.telefono}</span>}
                     </div>
+                  </div>
+
+                  {/* Acciones */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => void editarEmpresa(e)}
+                      style={{
+                        padding: '6px 14px', borderRadius: '6px',
+                        border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)',
+                        color: '#94a3b8', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                      }}
+                    >
+                      Editar
+                    </button>
                   </div>
 
                   {/* Control de límite de proyectos */}
