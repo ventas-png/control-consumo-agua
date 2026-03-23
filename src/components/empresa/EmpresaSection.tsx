@@ -7,6 +7,11 @@ import { AsignacionModal } from './AsignacionModal'
 interface Proyecto {
   id: string
   nombre: string
+  logo_url: string | null
+  descripcion: string | null
+  direccion: string | null
+  latitud: number | null
+  longitud: number | null
 }
 
 interface Usuario {
@@ -43,7 +48,7 @@ export function EmpresaSection({ currentUser }: Props) {
 
     const [empresaRes, proyectosRes, usuariosRes] = await Promise.all([
       supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects, logo_url').eq('id', currentUser.company_id).single(),
-      supabase.from('projects').select('id, nombre').eq('company_id', currentUser.company_id).order('nombre'),
+      supabase.from('projects').select('id, nombre, logo_url, descripcion, direccion, latitud, longitud').eq('company_id', currentUser.company_id).order('nombre'),
       supabase.from('app_users').select('id, full_name, role, activo')
         .eq('company_id', currentUser.company_id)
         .neq('id', currentUser.user_id)
@@ -105,6 +110,87 @@ export function EmpresaSection({ currentUser }: Props) {
     const { data } = supabase.storage.from('company-logos').getPublicUrl(path)
     const url = `${data.publicUrl}?t=${Date.now()}`
     await supabase.from('companies').update({ logo_url: url }).eq('id', empresa.id)
+    void cargar()
+  }
+
+  async function editarProyecto(proyecto: Proyecto) {
+    const { value: formValues } = await Swal.fire({
+      title: 'Editar Proyecto',
+      html: `
+        <div style="text-align:left;padding:0 4px">
+          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Nombre *</label>
+          <input id="swal-nombre" class="swal2-input" value="${proyecto.nombre}" style="margin:4px 0 14px" />
+          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Descripción</label>
+          <textarea id="swal-descripcion" class="swal2-textarea" style="margin:4px 0 14px;height:80px;resize:vertical">${proyecto.descripcion ?? ''}</textarea>
+          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Dirección</label>
+          <input id="swal-direccion" class="swal2-input" placeholder="Ej: Calle 123 #45-67" value="${proyecto.direccion ?? ''}" style="margin:4px 0 14px" />
+          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Geolocalización</label>
+          <div style="display:flex;gap:8px;margin:4px 0 6px">
+            <input id="swal-lat" class="swal2-input" placeholder="Latitud" value="${proyecto.latitud ?? ''}" style="margin:0" />
+            <input id="swal-lng" class="swal2-input" placeholder="Longitud" value="${proyecto.longitud ?? ''}" style="margin:0" />
+          </div>
+          <button id="swal-geolocate" type="button" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #0ea5e9;background:transparent;color:#0ea5e9;cursor:pointer;margin-top:4px">
+            📍 Usar mi ubicación actual
+          </button>
+        </div>
+      `,
+      didOpen: () => {
+        document.getElementById('swal-geolocate')?.addEventListener('click', () => {
+          const btn = document.getElementById('swal-geolocate') as HTMLButtonElement
+          btn.textContent = 'Obteniendo ubicación...'
+          btn.disabled = true
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              (document.getElementById('swal-lat') as HTMLInputElement).value = pos.coords.latitude.toFixed(6)
+              ;(document.getElementById('swal-lng') as HTMLInputElement).value = pos.coords.longitude.toFixed(6)
+              btn.textContent = '✅ Ubicación capturada'
+            },
+            () => {
+              btn.textContent = '❌ No se pudo obtener la ubicación'
+              btn.disabled = false
+            }
+          )
+        })
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => {
+        const nombre = (document.getElementById('swal-nombre') as HTMLInputElement).value.trim()
+        if (!nombre) { Swal.showValidationMessage('El nombre es obligatorio'); return false }
+        const latRaw = (document.getElementById('swal-lat') as HTMLInputElement).value.trim()
+        const lngRaw = (document.getElementById('swal-lng') as HTMLInputElement).value.trim()
+        return {
+          nombre,
+          descripcion: (document.getElementById('swal-descripcion') as HTMLTextAreaElement).value.trim() || null,
+          direccion: (document.getElementById('swal-direccion') as HTMLInputElement).value.trim() || null,
+          latitud: latRaw ? parseFloat(latRaw) : null,
+          longitud: lngRaw ? parseFloat(lngRaw) : null,
+        }
+      },
+    })
+    if (!formValues) return
+    const { error } = await supabase.from('projects').update(formValues).eq('id', proyecto.id)
+    if (error) {
+      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el proyecto.' })
+    } else {
+      void Swal.fire({ icon: 'success', title: 'Proyecto actualizado', timer: 1200, showConfirmButton: false })
+      void cargar()
+    }
+  }
+
+  async function subirLogoProyecto(proyectoId: string, file: File) {
+    const path = `${proyectoId}/logo`
+    const { error: uploadError } = await supabase.storage
+      .from('project-logos')
+      .upload(path, file, { upsert: true, contentType: file.type })
+    if (uploadError) {
+      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo subir el logo del proyecto.' })
+      return
+    }
+    const { data } = supabase.storage.from('project-logos').getPublicUrl(path)
+    const url = `${data.publicUrl}?t=${Date.now()}`
+    await supabase.from('projects').update({ logo_url: url }).eq('id', proyectoId)
     void cargar()
   }
 
@@ -345,22 +431,87 @@ export function EmpresaSection({ currentUser }: Props) {
             <p style={{ color: '#475569', margin: 0 }}>No hay proyectos. Crea el primero.</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '12px' }}>
             {proyectos.map(p => (
               <div key={p.id} style={{
-                background: '#1e293b', borderRadius: '12px', padding: '18px 20px',
+                background: '#1e293b', borderRadius: '12px',
                 border: '1px solid rgba(255,255,255,0.06)',
+                overflow: 'hidden',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                {/* Input oculto para logo de este proyecto */}
+                <input
+                  id={`proj-logo-${p.id}`}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) void subirLogoProyecto(p.id, f) }}
+                />
+                {/* Cabecera de la tarjeta */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 18px 12px' }}>
+                  {/* Avatar/logo del proyecto */}
+                  <div
+                    onClick={() => document.getElementById(`proj-logo-${p.id}`)?.click()}
+                    title="Clic para cambiar logo"
+                    style={{
+                      width: 40, height: 40, borderRadius: 8, overflow: 'hidden',
+                      cursor: 'pointer', flexShrink: 0,
+                      border: '1px solid rgba(255,255,255,0.1)',
+                    }}
+                  >
+                    {p.logo_url
+                      ? <img src={p.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <div style={{
+                          background: 'linear-gradient(135deg,#0ea5e9,#0d9488)',
+                          width: '100%', height: '100%',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: 'white', fontSize: 15, fontWeight: 700,
+                        }}>
+                          {p.nombre[0]?.toUpperCase()}
+                        </div>
+                    }
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '14px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {p.nombre}
+                    </span>
+                    <span style={{ color: '#475569', fontSize: '11px' }}>ID: {p.id.slice(0, 8)}...</span>
+                  </div>
+                  <button
+                    onClick={() => void editarProyecto(p)}
+                    title="Editar proyecto"
+                    style={{
+                      padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)',
+                      background: 'rgba(255,255,255,0.06)', color: '#94a3b8',
+                      cursor: 'pointer', fontSize: '12px', flexShrink: 0,
+                    }}
+                  >
+                    Editar
+                  </button>
+                </div>
+                {/* Datos del proyecto */}
+                {(p.descripcion || p.direccion || (p.latitud && p.longitud)) && (
                   <div style={{
-                    width: '8px', height: '8px', borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
-                  }} />
-                  <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '14px' }}>{p.nombre}</span>
-                </div>
-                <div style={{ color: '#475569', fontSize: '11px', marginBottom: '12px', paddingLeft: '18px' }}>
-                  ID: {p.id.slice(0, 8)}...
-                </div>
+                    padding: '0 18px 14px',
+                    borderTop: '1px solid rgba(255,255,255,0.05)',
+                    marginTop: '2px', paddingTop: '10px',
+                  }}>
+                    {p.descripcion && (
+                      <p style={{ color: '#64748b', fontSize: '12px', margin: '0 0 6px', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {p.descripcion}
+                      </p>
+                    )}
+                    {p.direccion && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#475569', fontSize: '11px', marginBottom: '4px' }}>
+                        <span>📍</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.direccion}</span>
+                      </div>
+                    )}
+                    {p.latitud && p.longitud && (
+                      <div style={{ color: '#334155', fontSize: '10px', fontFamily: 'monospace' }}>
+                        {p.latitud.toFixed(5)}, {p.longitud.toFixed(5)}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
