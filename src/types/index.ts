@@ -92,6 +92,20 @@ export interface UserSession {
   expires_at: string;
 }
 
+export interface Ruta {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  cliente_ids: string[];
+  asignado_a?: string;
+  asignado_nombre?: string;
+  asignado_email?: string;
+  asignado_telefono?: string;
+  fecha_programada?: string; // 'YYYY-MM-DD'
+  completada: boolean;
+  created_at: string;
+}
+
 export type AppSection =
   | 'clientes'
   | 'lecturas'
@@ -99,6 +113,7 @@ export type AppSection =
   | 'dashboard'
   | 'mapa'
   | 'calidad'
+  | 'rutas'
   | 'configuracion'
   | 'perfil'
   | 'empresa_proyectos'

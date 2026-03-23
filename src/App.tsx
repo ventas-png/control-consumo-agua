@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
-import type { AppSection } from './types'
+import type { AppSection, Ruta } from './types'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { initEmailJS } from './lib/email'
@@ -15,6 +15,7 @@ import { HistorialSection } from './components/historial/HistorialSection'
 import { DashboardSection } from './components/dashboard/DashboardSection'
 import { MapaSection } from './components/mapa/MapaSection'
 import { CalidadSection } from './components/calidad/CalidadSection'
+import { RutasSection } from './components/rutas/RutasSection'
 import { ConfiguracionSection } from './components/configuracion/ConfiguracionSection'
 import { PerfilSection } from './components/perfil/PerfilSection'
 import { EmpresaSection } from './components/empresa/EmpresaSection'
@@ -30,10 +31,12 @@ function getResetToken(): string | null {
 export default function App() {
   const { currentUser, loading, login, loginWithGoogle, logout, updateProfile } = useAuth()
   const {
-    clientes, registros, empresa, fuentesAgua, registrosCalidad,
+    clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas,
     cargarDatos, addCliente, addRegistro, updateRegistroEstado,
-    setFuentesAgua, setRegistrosCalidad,
+    setFuentesAgua, setRegistrosCalidad, addRuta, updateRuta, deleteRuta,
   } = useData()
+
+  const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
 
   const defaultSection = (): AppSection => {
     // Will be resolved after login when currentUser is available
@@ -99,6 +102,23 @@ export default function App() {
     )
   }
 
+  function onEjecutarRuta(ruta: Ruta) {
+    setRutaActivaParaLecturas(ruta)
+    setActiveSection('lecturas')
+  }
+
+  // Banner: rutas pendientes asignadas al usuario actual
+  const hoy = new Date().toISOString().split('T')[0]
+  const rutasPendientes = rutas.filter((r: Ruta) =>
+    r.asignado_a === currentUser.user_id &&
+    !r.completada &&
+    r.fecha_programada &&
+    r.fecha_programada >= hoy
+  )
+  const proximaRuta = rutasPendientes.sort((a: Ruta, b: Ruta) =>
+    (a.fecha_programada ?? '').localeCompare(b.fecha_programada ?? '')
+  )[0]
+
   // Authenticated app
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9' }}>
@@ -110,6 +130,21 @@ export default function App() {
         onLogout={logout}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        {proximaRuta && (
+          <div style={{ background: '#fef9c3', borderBottom: '2px solid #fde047', padding: '10px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+            <span style={{ fontSize: '14px', color: '#854d0e', fontWeight: 600 }}>
+              📋 Tienes {rutasPendientes.length} ruta{rutasPendientes.length !== 1 ? 's' : ''} programada{rutasPendientes.length !== 1 ? 's' : ''}.
+              {' '}Próxima: <strong>{proximaRuta.nombre}</strong> el{' '}
+              {new Date(proximaRuta.fecha_programada! + 'T12:00:00').toLocaleDateString('es-GT')}
+            </span>
+            <button
+              onClick={() => setActiveSection('rutas')}
+              style={{ padding: '6px 14px', background: '#d97706', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}
+            >
+              Ver Rutas
+            </button>
+          </div>
+        )}
         <Topbar activeSection={activeSection} currentUser={currentUser} />
         <main style={{ flex: 1, overflowY: 'auto', padding: '28px' }}>
           {activeSection === 'clientes' && (
@@ -126,6 +161,9 @@ export default function App() {
               registros={registros}
               userRole={currentUser.role}
               onRegistroAdded={addRegistro}
+              rutaActiva={rutaActivaParaLecturas}
+              onClearRuta={() => setRutaActivaParaLecturas(null)}
+              onRutaCompletada={id => updateRuta(id, { completada: true })}
             />
           )}
           {activeSection === 'tabla' && (
@@ -141,6 +179,17 @@ export default function App() {
           )}
           {activeSection === 'mapa' && (
             <MapaSection clientes={clientes} registros={registros} />
+          )}
+          {activeSection === 'rutas' && (
+            <RutasSection
+              clientes={clientes}
+              rutas={rutas}
+              userRole={currentUser.role}
+              onRutaAdded={addRuta}
+              onRutaUpdated={updateRuta}
+              onRutaDeleted={deleteRuta}
+              onEjecutarRuta={onEjecutarRuta}
+            />
           )}
           {activeSection === 'calidad' && (
             <CalidadSection
