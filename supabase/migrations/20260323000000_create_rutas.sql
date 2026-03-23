@@ -17,6 +17,11 @@ create table if not exists rutas (
 alter table rutas enable row level security;
 
 -- Permitir acceso a usuarios autenticados (la app gestiona roles en capa de aplicación)
+drop policy if exists "rutas_select" on rutas;
+drop policy if exists "rutas_insert" on rutas;
+drop policy if exists "rutas_update" on rutas;
+drop policy if exists "rutas_delete" on rutas;
+
 create policy "rutas_select" on rutas for select using (auth.role() = 'authenticated');
 create policy "rutas_insert" on rutas for insert with check (auth.role() = 'authenticated');
 create policy "rutas_update" on rutas for update using (auth.role() = 'authenticated');
