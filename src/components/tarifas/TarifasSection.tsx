@@ -133,6 +133,17 @@ export function TarifasSection({
         currentUser.company_id ??
         null
 
+      // For admin: project_id lives in user_project_assignments, not app_users
+      if (!projectId) {
+        const { data: assignment } = await supabase
+          .from('user_project_assignments')
+          .select('project_id')
+          .eq('user_id', currentUser.user_id)
+          .limit(1)
+          .single()
+        if (assignment) projectId = (assignment as { project_id: string }).project_id
+      }
+
       if (!projectId && companyId) {
         // For company_owner: pick first project of the company
         const { data: proj } = await supabase
@@ -405,7 +416,7 @@ export function TarifasSection({
               {search ? 'Sin resultados' : 'No hay tarifas registradas'}
             </div>
             <div style={{ fontSize: '14px' }}>
-              {search ? 'Intenta con otro término de búsqueda' : canEdit ? 'Crea la primera tarifa con el botón "+ Nueva Tarifa"' : 'No hay tarifas configuradas aún'}
+              {search ? 'Intenta con otro término de búsqueda' : canEdit ? 'Crea la primera tarifa con el botón "+  Nueva Tarifa"' : 'No hay tarifas configuradas aún'}
             </div>
           </div>
         ) : (
