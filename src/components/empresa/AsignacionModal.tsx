@@ -40,24 +40,32 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
 
   async function guardar() {
     setSaving(true)
-    // Eliminar asignaciones actuales del usuario
-    await supabase
-      .from('user_project_assignments')
-      .delete()
-      .eq('user_id', usuario.id)
+    try {
+      const { error: deleteError } = await supabase
+        .from('user_project_assignments')
+        .delete()
+        .eq('user_id', usuario.id)
+      if (deleteError) throw deleteError
 
-    // Insertar las seleccionadas
-    if (asignados.size > 0) {
-      const nuevas = Array.from(asignados).map(project_id => ({
-        user_id: usuario.id,
-        project_id,
-      }))
-      await supabase.from('user_project_assignments').insert(nuevas)
+      if (asignados.size > 0) {
+        const nuevas = Array.from(asignados).map(project_id => ({
+          user_id: usuario.id,
+          project_id,
+        }))
+        const { error: insertError } = await supabase
+          .from('user_project_assignments')
+          .insert(nuevas)
+        if (insertError) throw insertError
+      }
+
+      onSaved()
+      onClose()
+    } catch (err) {
+      console.error('Error guardando asignaciones:', err)
+      alert('Error al guardar las asignaciones. Por favor intente de nuevo.')
+    } finally {
+      setSaving(false)
     }
-
-    setSaving(false)
-    onSaved()
-    onClose()
   }
 
   function toggleProyecto(id: string) {
