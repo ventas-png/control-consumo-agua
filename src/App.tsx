@@ -20,6 +20,7 @@ import { ConfiguracionSection } from './components/configuracion/ConfiguracionSe
 import { PerfilSection } from './components/perfil/PerfilSection'
 import { EmpresaSection } from './components/empresa/EmpresaSection'
 import { SuperAdminSection } from './components/superadmin/SuperAdminSection'
+import { TarifasSection } from './components/tarifas/TarifasSection'
 
 initEmailJS()
 
@@ -31,9 +32,10 @@ function getResetToken(): string | null {
 export default function App() {
   const { currentUser, loading, login, loginWithGoogle, logout, updateProfile } = useAuth()
   const {
-    clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas,
+    clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas,
     cargarDatos, addCliente, addRegistro, updateRegistroEstado,
     setFuentesAgua, setRegistrosCalidad, addRuta, updateRuta, deleteRuta,
+    addTarifa, updateTarifa, deleteTarifa,
   } = useData()
 
   const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
@@ -209,6 +211,16 @@ export default function App() {
           )}
           {activeSection === 'empresa_proyectos' && (
             <EmpresaSection currentUser={currentUser} />
+          )}
+          {activeSection === 'tarifas' && (
+            <TarifasSection
+              tarifas={tarifas}
+              userRole={currentUser.role}
+              currentUser={currentUser}
+              onTarifaAdded={addTarifa}
+              onTarifaUpdated={updateTarifa}
+              onTarifaDeleted={deleteTarifa}
+            />
           )}
           {activeSection === 'superadmin_empresas' && (
             <SuperAdminSection />

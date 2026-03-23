@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta } from '../types'
+import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa } from '../types'
 import { supabase } from '../lib/supabase'
 
 interface AppData {
@@ -10,6 +10,7 @@ interface AppData {
   fuentesAgua: FuenteAgua[]
   registrosCalidad: RegistroCalidad[]
   rutas: Ruta[]
+  tarifas: Tarifa[]
 }
 
 const INITIAL_DATA: AppData = {
@@ -19,13 +20,14 @@ const INITIAL_DATA: AppData = {
   fuentesAgua: [],
   registrosCalidad: [],
   rutas: [],
+  tarifas: [],
 }
 
 export function useData() {
   const [data, setData] = useState<AppData>(INITIAL_DATA)
 
   const cargarDatos = useCallback(async () => {
-    const [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes] = await Promise.allSettled([
+    const [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes] = await Promise.allSettled([
       supabase.from('clientes').select('*'),
       supabase.from('registros').select('*'),
       supabase.from('empresa').select('*').limit(1),
@@ -35,6 +37,7 @@ export function useData() {
         .select('*, fuentes_agua(identificador, nombre, tipo_agua)')
         .order('fecha', { ascending: false }),
       supabase.from('rutas').select('*').order('created_at', { ascending: false }),
+      supabase.from('tarifas').select('*').order('created_at', { ascending: false }),
     ])
 
     setData(prev => {
@@ -56,6 +59,9 @@ export function useData() {
       }
       if (rutasRes.status === 'fulfilled' && rutasRes.value.data) {
         next.rutas = rutasRes.value.data as Ruta[]
+      }
+      if (tarifasRes.status === 'fulfilled' && tarifasRes.value.data) {
+        next.tarifas = tarifasRes.value.data as Tarifa[]
       }
       return next
     })
@@ -123,6 +129,21 @@ export function useData() {
     setData(prev => ({ ...prev, rutas: prev.rutas.filter(r => r.id !== id) }))
   }, [])
 
+  const addTarifa = useCallback((tarifa: Tarifa) => {
+    setData(prev => ({ ...prev, tarifas: [tarifa, ...prev.tarifas] }))
+  }, [])
+
+  const updateTarifa = useCallback((id: string, partial: Partial<Tarifa>) => {
+    setData(prev => ({
+      ...prev,
+      tarifas: prev.tarifas.map(t => (t.id === id ? { ...t, ...partial } : t)),
+    }))
+  }, [])
+
+  const deleteTarifa = useCallback((id: string) => {
+    setData(prev => ({ ...prev, tarifas: prev.tarifas.filter(t => t.id !== id) }))
+  }, [])
+
   return {
     ...data,
     cargarDatos,
@@ -136,5 +157,8 @@ export function useData() {
     addRuta,
     updateRuta,
     deleteRuta,
+    addTarifa,
+    updateTarifa,
+    deleteTarifa,
   }
 }
