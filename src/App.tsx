@@ -44,16 +44,21 @@ export default function App() {
   const [resetToken] = useState<string | null>(getResetToken)
   const [dataLoaded, setDataLoaded] = useState(false)
 
-  // Set default section based on role after login
+  // Set default section based on role after login, and redirect if role changes
   useEffect(() => {
     if (currentUser) {
       if (currentUser.role === 'company_owner') {
         setActiveSection('empresa_proyectos')
       } else if (currentUser.role === 'super_admin') {
         setActiveSection('superadmin_empresas')
+      } else if (
+        activeSection === 'superadmin_empresas' ||
+        activeSection === 'empresa_proyectos'
+      ) {
+        setActiveSection('clientes')
       }
     }
-  }, [currentUser?.user_id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentUser?.user_id, currentUser?.role]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load data after login
   useEffect(() => {
@@ -158,10 +163,10 @@ export default function App() {
           {activeSection === 'perfil' && (
             <PerfilSection currentUser={currentUser} onUpdateProfile={updateProfile} />
           )}
-          {activeSection === 'empresa_proyectos' && (
+          {activeSection === 'empresa_proyectos' && currentUser.role === 'company_owner' && (
             <EmpresaSection currentUser={currentUser} />
           )}
-          {activeSection === 'superadmin_empresas' && (
+          {activeSection === 'superadmin_empresas' && currentUser.role === 'super_admin' && (
             <SuperAdminSection />
           )}
         </main>
