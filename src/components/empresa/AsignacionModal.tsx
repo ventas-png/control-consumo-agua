@@ -51,6 +51,7 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
         const nuevas = Array.from(asignados).map(project_id => ({
           user_id: usuario.id,
           project_id,
+          permission_type: 'total',
         }))
         const { error: insertError } = await supabase
           .from('user_project_assignments')
