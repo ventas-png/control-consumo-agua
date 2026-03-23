@@ -115,23 +115,61 @@ export function EmpresaSection({ currentUser }: Props) {
 
   async function editarProyecto(proyecto: Proyecto) {
     const { value: formValues } = await Swal.fire({
-      title: 'Editar Proyecto',
+      title: '',
       html: `
-        <div style="text-align:left;padding:0 4px">
-          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Nombre *</label>
-          <input id="swal-nombre" class="swal2-input" value="${proyecto.nombre}" style="margin:4px 0 14px" />
-          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Descripción</label>
-          <textarea id="swal-descripcion" class="swal2-textarea" style="margin:4px 0 14px;height:80px;resize:vertical">${proyecto.descripcion ?? ''}</textarea>
-          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Dirección</label>
-          <input id="swal-direccion" class="swal2-input" placeholder="Ej: Calle 123 #45-67" value="${proyecto.direccion ?? ''}" style="margin:4px 0 14px" />
-          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Geolocalización</label>
-          <div style="display:flex;gap:8px;margin:4px 0 6px">
-            <input id="swal-lat" class="swal2-input" placeholder="Latitud" value="${proyecto.latitud ?? ''}" style="margin:0" />
-            <input id="swal-lng" class="swal2-input" placeholder="Longitud" value="${proyecto.longitud ?? ''}" style="margin:0" />
+        <div style="text-align:left;font-family:inherit">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e2e8f0">
+            <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">✏️</div>
+            <div>
+              <h3 style="margin:0;font-size:17px;font-weight:700;color:#1e293b">Editar Proyecto</h3>
+              <p style="margin:0;font-size:12px;color:#94a3b8">Actualiza la información del proyecto</p>
+            </div>
           </div>
-          <button id="swal-geolocate" type="button" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #0ea5e9;background:transparent;color:#0ea5e9;cursor:pointer;margin-top:4px">
-            📍 Usar mi ubicación actual
-          </button>
+
+          <div style="margin-bottom:14px">
+            <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">
+              Nombre <span style="color:#ef4444">*</span>
+            </label>
+            <input id="swal-nombre" class="swal2-input" value="${proyecto.nombre}"
+              style="margin:0;width:100%;box-sizing:border-box;border:1.5px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:14px;color:#1e293b;outline:none;transition:border-color .2s"
+              onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'" />
+          </div>
+
+          <div style="margin-bottom:14px">
+            <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Descripción</label>
+            <textarea id="swal-descripcion" class="swal2-textarea"
+              style="margin:0;width:100%;box-sizing:border-box;height:82px;resize:vertical;border:1.5px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:14px;color:#1e293b;outline:none;transition:border-color .2s"
+              onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'"
+              placeholder="Describe brevemente el proyecto...">${proyecto.descripcion ?? ''}</textarea>
+          </div>
+
+          <div style="margin-bottom:14px">
+            <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">
+              📍 Dirección
+            </label>
+            <input id="swal-direccion" class="swal2-input" placeholder="Ej: Calle 123 #45-67" value="${proyecto.direccion ?? ''}"
+              style="margin:0;width:100%;box-sizing:border-box;border:1.5px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:14px;color:#1e293b;outline:none;transition:border-color .2s"
+              onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'" />
+          </div>
+
+          <div style="margin-bottom:14px">
+            <label style="display:block;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">
+              🌐 Geolocalización
+            </label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <input id="swal-lat" class="swal2-input" placeholder="Latitud" value="${proyecto.latitud ?? ''}"
+                style="margin:0;border:1.5px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:14px;color:#1e293b;outline:none;transition:border-color .2s"
+                onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'" />
+              <input id="swal-lng" class="swal2-input" placeholder="Longitud" value="${proyecto.longitud ?? ''}"
+                style="margin:0;border:1.5px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:14px;color:#1e293b;outline:none;transition:border-color .2s"
+                onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'" />
+            </div>
+            <button id="swal-geolocate" type="button"
+              style="margin-top:8px;font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;border:1.5px solid #0ea5e9;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);color:#0284c7;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .2s"
+              onmouseover="this.style.background='#0ea5e9';this.style.color='#fff'" onmouseout="this.style.background='linear-gradient(135deg,#f0f9ff,#e0f2fe)';this.style.color='#0284c7'">
+              📍 Usar mi ubicación actual
+            </button>
+          </div>
         </div>
       `,
       didOpen: () => {
@@ -153,8 +191,12 @@ export function EmpresaSection({ currentUser }: Props) {
         })
       },
       showCancelButton: true,
-      confirmButtonText: 'Guardar',
+      confirmButtonText: 'Guardar cambios',
       cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#6366f1',
+      cancelButtonColor: '#94a3b8',
+      width: '500px',
+      padding: '24px',
       preConfirm: () => {
         const nombre = (document.getElementById('swal-nombre') as HTMLInputElement).value.trim()
         if (!nombre) { Swal.showValidationMessage('El nombre es obligatorio'); return false }
