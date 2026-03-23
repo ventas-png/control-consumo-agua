@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import type { Cliente, Registro, GPS, UserRole } from '../../types'
 import { supabase } from '../../lib/supabase'
@@ -20,10 +20,33 @@ export function LecturasSection({ clientes, registros, userRole, onRegistroAdded
   const [notas, setNotas] = useState('')
   const [gps, setGps] = useState<GPS | null>(null)
   const [gpsLoading, setGpsLoading] = useState(false)
+  const [gpsError, setGpsError] = useState<string | null>(null)
   const [foto, setFoto] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [rutaActiva, setRutaActiva] = useState(false)
   const [rutaIndex, setRutaIndex] = useState(0)
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setGpsError('Geolocalización no disponible en este dispositivo')
+      return
+    }
+    setGpsLoading(true)
+    setGpsError(null)
+    const watchId = navigator.geolocation.watchPosition(
+      pos => {
+        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setGpsLoading(false)
+        setGpsError(null)
+      },
+      err => {
+        setGpsLoading(false)
+        setGpsError(err.message)
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+    )
+    return () => navigator.geolocation.clearWatch(watchId)
+  }, [])
 
   const canEdit = userRole !== 'viewer'
   const clienteSeleccionado = clientes.find(c => c.id === selectedClienteId) ?? null
@@ -43,20 +66,6 @@ export function LecturasSection({ clientes, registros, userRole, onRegistroAdded
     consumo !== null && consumo >= 0 && clienteSeleccionado
       ? calcularTotalPagar(consumo, clienteSeleccionado.tarifa, clienteSeleccionado.canon)
       : null
-
-  function obtenerGPS() {
-    setGpsLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        setGpsLoading(false)
-      },
-      err => {
-        Swal.fire('Error GPS', err.message, 'error')
-        setGpsLoading(false)
-      }
-    )
-  }
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -82,8 +91,8 @@ export function LecturasSection({ clientes, registros, userRole, onRegistroAdded
     setLecturaActual('')
     setEstado('pendiente')
     setNotas('')
-    setGps(null)
     setFoto(null)
+    // GPS se mantiene activo y actualizado automáticamente
   }
 
   async function handleGuardar() {
@@ -255,10 +264,22 @@ export function LecturasSection({ clientes, registros, userRole, onRegistroAdded
             {/* GPS y Foto */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '20px' }}>
               <div>
-                <button onClick={obtenerGPS} disabled={gpsLoading} style={{ width: '100%', padding: '12px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', marginBottom: '8px' }}>
-                  {gpsLoading ? 'Buscando...' : '📍 Obtener GPS'}
-                </button>
-                {gps && <div style={{ textAlign: 'center', fontSize: '13px', color: '#166534', background: '#dcfce7', padding: '8px', borderRadius: '8px' }}>✅ {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}</div>}
+                <label style={labelStyle}>Ubicación GPS</label>
+                {gpsLoading && (
+                  <div style={{ padding: '12px', background: '#fef9c3', border: '1px solid #fde047', borderRadius: '10px', fontSize: '13px', color: '#854d0e' }}>
+                    📡 Obteniendo ubicación automáticamente...
+                  </div>
+                )}
+                {gps && !gpsLoading && (
+                  <div style={{ padding: '12px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: '10px', fontSize: '13px', color: '#166534' }}>
+                    ✅ GPS activo: {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
+                  </div>
+                )}
+                {gpsError && !gpsLoading && (
+                  <div style={{ padding: '12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', fontSize: '13px', color: '#dc2626' }}>
+                    ⚠️ {gpsError} — la lectura se guardará sin coordenadas
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ border: '3px dashed #cbd5e0', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: '#f7fafc', display: 'block' }}>
