@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad } from '../types'
+import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta } from '../types'
 import { supabase } from '../lib/supabase'
 
 interface AppData {
@@ -9,6 +9,7 @@ interface AppData {
   empresa: Empresa
   fuentesAgua: FuenteAgua[]
   registrosCalidad: RegistroCalidad[]
+  rutas: Ruta[]
 }
 
 const INITIAL_DATA: AppData = {
@@ -17,13 +18,14 @@ const INITIAL_DATA: AppData = {
   empresa: {},
   fuentesAgua: [],
   registrosCalidad: [],
+  rutas: [],
 }
 
 export function useData() {
   const [data, setData] = useState<AppData>(INITIAL_DATA)
 
   const cargarDatos = useCallback(async () => {
-    const [clRes, regRes, empRes, fuaRes, rcalRes] = await Promise.allSettled([
+    const [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes] = await Promise.allSettled([
       supabase.from('clientes').select('*'),
       supabase.from('registros').select('*'),
       supabase.from('empresa').select('*').limit(1),
@@ -32,6 +34,7 @@ export function useData() {
         .from('registros_calidad')
         .select('*, fuentes_agua(identificador, nombre, tipo_agua)')
         .order('fecha', { ascending: false }),
+      supabase.from('rutas').select('*').order('created_at', { ascending: false }),
     ])
 
     setData(prev => {
@@ -50,6 +53,9 @@ export function useData() {
       }
       if (rcalRes.status === 'fulfilled' && rcalRes.value.data) {
         next.registrosCalidad = rcalRes.value.data as RegistroCalidad[]
+      }
+      if (rutasRes.status === 'fulfilled' && rutasRes.value.data) {
+        next.rutas = rutasRes.value.data as Ruta[]
       }
       return next
     })
@@ -102,6 +108,21 @@ export function useData() {
     if (rcal) setData(prev => ({ ...prev, registrosCalidad: rcal as RegistroCalidad[] }))
   }, [])
 
+  const addRuta = useCallback((ruta: Ruta) => {
+    setData(prev => ({ ...prev, rutas: [ruta, ...prev.rutas] }))
+  }, [])
+
+  const updateRuta = useCallback((id: string, partial: Partial<Ruta>) => {
+    setData(prev => ({
+      ...prev,
+      rutas: prev.rutas.map(r => (r.id === id ? { ...r, ...partial } : r)),
+    }))
+  }, [])
+
+  const deleteRuta = useCallback((id: string) => {
+    setData(prev => ({ ...prev, rutas: prev.rutas.filter(r => r.id !== id) }))
+  }, [])
+
   return {
     ...data,
     cargarDatos,
@@ -112,5 +133,8 @@ export function useData() {
     setRegistrosCalidad,
     recargarFuentesAgua,
     recargarRegistrosCalidad,
+    addRuta,
+    updateRuta,
+    deleteRuta,
   }
 }

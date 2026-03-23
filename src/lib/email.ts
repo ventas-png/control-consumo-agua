@@ -1,5 +1,5 @@
 import emailjs from '@emailjs/browser'
-import type { Registro, Empresa } from '../types'
+import type { Registro, Empresa, Ruta } from '../types'
 import { APP_CONFIG } from './config'
 import { generarReciboPDFBase64 } from './pdf'
 
@@ -54,6 +54,19 @@ export async function enviarReciboEmail(
   }
 
   await emailjs.send(APP_CONFIG.EMAILJS_SERVICE_ID, APP_CONFIG.EMAILJS_TEMPLATE_RECIBO, params)
+}
+
+export async function enviarNotificacionRuta(ruta: Ruta): Promise<void> {
+  if (!ruta.asignado_email) return
+  const params = {
+    to_email: ruta.asignado_email,
+    to_name: ruta.asignado_nombre ?? ruta.asignado_email,
+    ruta_nombre: ruta.nombre,
+    ruta_descripcion: ruta.descripcion ?? '',
+    fecha_programada: ruta.fecha_programada ?? 'Sin fecha definida',
+    total_clientes: String(ruta.cliente_ids.length),
+  }
+  await emailjs.send(APP_CONFIG.EMAILJS_SERVICE_ID, APP_CONFIG.EMAILJS_TEMPLATE_RUTA_ASIGNADA, params)
 }
 
 export async function sendPasswordResetEmail(

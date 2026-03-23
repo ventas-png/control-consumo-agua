@@ -7,6 +7,7 @@ const PAGE_TITLES: Record<AppSection, string> = {
   tabla: 'Historial de Lecturas',
   dashboard: 'Dashboard',
   mapa: 'Mapa de Clientes',
+  rutas: 'Rutas de Lectura',
   calidad: 'Calidad del Agua',
   configuracion: 'Configuración',
   perfil: 'Mi Cuenta',

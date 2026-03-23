@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Registro, GPS, UserRole } from '../../types'
+import type { Cliente, Registro, GPS, UserRole, Ruta } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
@@ -10,9 +10,20 @@ interface Props {
   registros: Registro[]
   userRole: UserRole
   onRegistroAdded: (registro: Registro) => void
+  rutaActiva?: Ruta | null
+  onClearRuta?: () => void
+  onRutaCompletada?: (rutaId: string) => void
 }
 
-export function LecturasSection({ clientes, registros, userRole, onRegistroAdded }: Props) {
+export function LecturasSection({
+  clientes,
+  registros,
+  userRole,
+  onRegistroAdded,
+  rutaActiva,
+  onClearRuta,
+  onRutaCompletada,
+}: Props) {
   const [selectedClienteId, setSelectedClienteId] = useState('')
   const [lecturaActual, setLecturaActual] = useState('')
   const [estado, setEstado] = useState<Registro['estado']>('pendiente')
@@ -20,10 +31,53 @@ export function LecturasSection({ clientes, registros, userRole, onRegistroAdded
   const [notas, setNotas] = useState('')
   const [gps, setGps] = useState<GPS | null>(null)
   const [gpsLoading, setGpsLoading] = useState(false)
+  const [gpsError, setGpsError] = useState<string | null>(null)
   const [foto, setFoto] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [rutaActiva, setRutaActiva] = useState(false)
+  const [rutaModoManual, setRutaModoManual] = useState(false)
   const [rutaIndex, setRutaIndex] = useState(0)
+
+  // Clientes ordenados según ruta planificada o lista completa
+  const clientesOrdenados: Cliente[] = rutaActiva
+    ? rutaActiva.cliente_ids
+        .map(id => clientes.find(c => c.id === id))
+        .filter((c): c is Cliente => !!c)
+    : clientes
+
+  const enModoRuta = !!rutaActiva || rutaModoManual
+
+  // Cuando llega una ruta planificada desde el exterior, arrancar desde el primer cliente
+  useEffect(() => {
+    if (rutaActiva && clientesOrdenados.length > 0) {
+      setRutaIndex(0)
+      setSelectedClienteId(clientesOrdenados[0].id)
+      setLecturaActual('')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rutaActiva?.id])
+
+  // GPS automático con watchPosition
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setGpsError('Geolocalización no disponible en este dispositivo')
+      return
+    }
+    setGpsLoading(true)
+    setGpsError(null)
+    const watchId = navigator.geolocation.watchPosition(
+      pos => {
+        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setGpsLoading(false)
+        setGpsError(null)
+      },
+      err => {
+        setGpsLoading(false)
+        setGpsError(err.message)
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+    )
+    return () => navigator.geolocation.clearWatch(watchId)
+  }, [])
 
   const canEdit = userRole !== 'viewer'
   const clienteSeleccionado = clientes.find(c => c.id === selectedClienteId) ?? null
@@ -43,20 +97,6 @@ export function LecturasSection({ clientes, registros, userRole, onRegistroAdded
     consumo !== null && consumo >= 0 && clienteSeleccionado
       ? calcularTotalPagar(consumo, clienteSeleccionado.tarifa, clienteSeleccionado.canon)
       : null
-
-  function obtenerGPS() {
-    setGpsLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        setGpsLoading(false)
-      },
-      err => {
-        Swal.fire('Error GPS', err.message, 'error')
-        setGpsLoading(false)
-      }
-    )
-  }
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -82,8 +122,8 @@ export function LecturasSection({ clientes, registros, userRole, onRegistroAdded
     setLecturaActual('')
     setEstado('pendiente')
     setNotas('')
-    setGps(null)
     setFoto(null)
+    // GPS se mantiene activo y actualizado automáticamente
   }
 
   async function handleGuardar() {
@@ -137,31 +177,52 @@ export function LecturasSection({ clientes, registros, userRole, onRegistroAdded
 
     if (result.isConfirmed) enviarWhatsApp(nuevoRegistro)
 
-    if (rutaActiva) {
+    if (enModoRuta) {
       const nextIndex = rutaIndex + 1
-      if (nextIndex < clientes.length) {
+      if (nextIndex < clientesOrdenados.length) {
         setRutaIndex(nextIndex)
-        setSelectedClienteId(clientes[nextIndex].id)
+        setSelectedClienteId(clientesOrdenados[nextIndex].id)
         setLecturaActual('')
+        setNotas('')
+        setFoto(null)
       } else {
-        Swal.fire('Ruta Finalizada', '¡Has completado todas las lecturas!', 'info')
-        setRutaActiva(false)
+        // Ruta completada
+        if (rutaActiva) {
+          await supabase.from('rutas').update({ completada: true }).eq('id', rutaActiva.id)
+          onRutaCompletada?.(rutaActiva.id)
+          onClearRuta?.()
+        } else {
+          setRutaModoManual(false)
+        }
+        Swal.fire('Ruta Finalizada', '¡Has completado todas las lecturas de la ruta!', 'success')
         limpiarFormulario()
+        setRutaIndex(0)
       }
     } else {
       limpiarFormulario()
     }
   }
 
-  function toggleRuta() {
-    if (!rutaActiva) {
-      setRutaActiva(true)
-      setRutaIndex(0)
-      if (clientes.length > 0) setSelectedClienteId(clientes[0].id)
-    } else {
-      setRutaActiva(false)
+  function toggleModoManual() {
+    if (rutaModoManual) {
+      setRutaModoManual(false)
       limpiarFormulario()
+      setRutaIndex(0)
+    } else {
+      setRutaModoManual(true)
+      setRutaIndex(0)
+      if (clientesOrdenados.length > 0) setSelectedClienteId(clientesOrdenados[0].id)
     }
+  }
+
+  function detenerRuta() {
+    if (rutaActiva) {
+      onClearRuta?.()
+    } else {
+      setRutaModoManual(false)
+    }
+    limpiarFormulario()
+    setRutaIndex(0)
   }
 
   const inputStyle: React.CSSProperties = { padding: '12px 16px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
@@ -169,20 +230,46 @@ export function LecturasSection({ clientes, registros, userRole, onRegistroAdded
 
   const consumoInvalido = consumo !== null && consumo < 0
 
+  // Banner de ruta: diferente si viene de una ruta planificada o modo manual
+  const bannerRuta = rutaActiva
+    ? {
+        bg: '#eff6ff',
+        border: '#bfdbfe',
+        color: '#1e40af',
+        texto: `🗺️ Ruta: ${rutaActiva.nombre} — Cliente ${rutaIndex + 1} de ${clientesOrdenados.length}${rutaActiva.fecha_programada ? ` | 📅 ${new Date(rutaActiva.fecha_programada + 'T12:00:00').toLocaleDateString('es-GT')}` : ''}`,
+      }
+    : rutaModoManual
+    ? {
+        bg: '#f0fdf4',
+        border: '#bbf7d0',
+        color: '#166534',
+        texto: `Modo Ruta ACTIVO — Cliente ${rutaIndex + 1} de ${clientesOrdenados.length}`,
+      }
+    : { bg: '#f0fdf4', border: '#bbf7d0', color: '#166534', texto: 'Modo Manual' }
+
   return (
     <div>
       {/* Ruta Control */}
-      <div style={{ background: '#f0fdf4', padding: '15px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ color: '#166534', fontWeight: 600 }}>
-          {rutaActiva ? `Modo Ruta ACTIVO — Cliente ${rutaIndex + 1} de ${clientes.length}` : 'Modo Manual'}
+      <div style={{ background: bannerRuta.bg, padding: '15px', borderRadius: '12px', marginBottom: '20px', border: `1px solid ${bannerRuta.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ color: bannerRuta.color, fontWeight: 600 }}>
+          {bannerRuta.texto}
         </span>
         {canEdit && (
-          <button
-            onClick={toggleRuta}
-            style={{ padding: '8px 16px', background: rutaActiva ? '#ef4444' : '#f1f5f9', color: rutaActiva ? 'white' : '#475569', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
-          >
-            {rutaActiva ? 'Detener Ruta' : '🚀 Iniciar Ruta'}
-          </button>
+          enModoRuta ? (
+            <button
+              onClick={detenerRuta}
+              style={{ padding: '8px 16px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Detener Ruta
+            </button>
+          ) : (
+            <button
+              onClick={toggleModoManual}
+              style={{ padding: '8px 16px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
+            >
+              🚀 Iniciar Ruta Manual
+            </button>
+          )
         )}
       </div>
 
@@ -198,9 +285,10 @@ export function LecturasSection({ clientes, registros, userRole, onRegistroAdded
             value={selectedClienteId}
             onChange={e => { setSelectedClienteId(e.target.value); setLecturaActual('') }}
             style={inputStyle}
+            disabled={enModoRuta}
           >
             <option value="">-- Buscar Cliente --</option>
-            {clientes.map(c => (
+            {(enModoRuta ? clientesOrdenados : clientes).map(c => (
               <option key={c.id} value={c.id}>{c.nombre} ({c.codigo})</option>
             ))}
           </select>
@@ -255,10 +343,22 @@ export function LecturasSection({ clientes, registros, userRole, onRegistroAdded
             {/* GPS y Foto */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '20px' }}>
               <div>
-                <button onClick={obtenerGPS} disabled={gpsLoading} style={{ width: '100%', padding: '12px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', marginBottom: '8px' }}>
-                  {gpsLoading ? 'Buscando...' : '📍 Obtener GPS'}
-                </button>
-                {gps && <div style={{ textAlign: 'center', fontSize: '13px', color: '#166534', background: '#dcfce7', padding: '8px', borderRadius: '8px' }}>✅ {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}</div>}
+                <label style={labelStyle}>Ubicación GPS</label>
+                {gpsLoading && (
+                  <div style={{ padding: '12px', background: '#fef9c3', border: '1px solid #fde047', borderRadius: '10px', fontSize: '13px', color: '#854d0e' }}>
+                    📡 Obteniendo ubicación automáticamente...
+                  </div>
+                )}
+                {gps && !gpsLoading && (
+                  <div style={{ padding: '12px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: '10px', fontSize: '13px', color: '#166534' }}>
+                    ✅ GPS activo: {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
+                  </div>
+                )}
+                {gpsError && !gpsLoading && (
+                  <div style={{ padding: '12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', fontSize: '13px', color: '#dc2626' }}>
+                    ⚠️ {gpsError} — la lectura se guardará sin coordenadas
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ border: '3px dashed #cbd5e0', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: '#f7fafc', display: 'block' }}>
@@ -271,7 +371,7 @@ export function LecturasSection({ clientes, registros, userRole, onRegistroAdded
             {canEdit && (
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button onClick={handleGuardar} disabled={saving} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
-                  {saving ? 'Guardando...' : '💾 Guardar Lectura'}
+                  {saving ? 'Guardando...' : enModoRuta ? `💾 Guardar y Avanzar (${rutaIndex + 1}/${clientesOrdenados.length})` : '💾 Guardar Lectura'}
                 </button>
                 <button onClick={limpiarFormulario} style={{ padding: '12px 24px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
                   Cancelar
