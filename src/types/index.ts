@@ -8,6 +8,7 @@ export interface Cliente {
   telefono?: string;
   tarifa: number;
   canon: number;
+  consumo_minimo: number;
   lectura_inicial: number;
 }
 
@@ -115,6 +116,7 @@ export interface Tarifa {
   tipo_agua: string;
   precio_m3: number;
   canon_fijo: number;
+  consumo_minimo: number;
   activa: boolean;
   created_at?: string;
   updated_at?: string;

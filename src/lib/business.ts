@@ -3,12 +3,13 @@ import type { CostoCalculo } from '../types'
 export function calcularTotalPagar(
   consumo: number,
   tarifa: number,
-  canon: number
+  canon: number,
+  consumoMinimo = 0,
 ): CostoCalculo {
-  if (consumo <= 0.99 && consumo >= 0) {
+  if (consumo >= 0 && consumo <= consumoMinimo) {
     return { total: parseFloat(String(canon || 0)), tipo_cobro: 'Canon Fijo' }
   }
-  if (consumo > 0.99) {
+  if (consumo > consumoMinimo) {
     return {
       total: parseFloat(String(consumo)) * parseFloat(String(tarifa || 0)),
       tipo_cobro: 'Consumo',
