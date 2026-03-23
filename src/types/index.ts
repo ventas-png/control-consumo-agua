@@ -106,6 +106,20 @@ export interface Ruta {
   created_at: string;
 }
 
+export interface Tarifa {
+  id: string;
+  project_id: string;
+  company_id: string;
+  nombre: string;
+  descripcion?: string;
+  tipo_agua: string;
+  precio_m3: number;
+  canon_fijo: number;
+  activa: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export type AppSection =
   | 'clientes'
   | 'lecturas'
@@ -114,6 +128,7 @@ export type AppSection =
   | 'mapa'
   | 'calidad'
   | 'rutas'
+  | 'tarifas'
   | 'configuracion'
   | 'perfil'
   | 'empresa_proyectos'
