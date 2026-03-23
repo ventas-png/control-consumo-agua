@@ -119,38 +119,32 @@ export function TarifasSection({
         Swal.fire('Error', error?.message ?? 'No se pudo actualizar la tarifa.', 'error')
       }
     } else {
-      const payload: Record<string, unknown> = {
-        nombre,
-        tipo_agua: form.tipo_agua,
-        precio_m3,
-        canon_fijo,
-        descripcion: form.descripcion || null,
-        activa: form.activa,
-      }
-      if (currentUser.company_id) payload.company_id = currentUser.company_id
-
-      // project_id: admins have it in their profile; company_owner may not
+      // Fetch project_id and company_id with explicit types to satisfy TS strict mode
       const { data: userData } = await supabase
         .from('app_users')
         .select('project_id, company_id')
         .eq('id', currentUser.user_id)
         .single()
 
-      if (userData?.project_id) payload.project_id = userData.project_id
-      if (userData?.company_id) payload.company_id = userData.company_id
+      let projectId: string | null =
+        (userData as { project_id?: string } | null)?.project_id ?? null
+      let companyId: string | null =
+        (userData as { company_id?: string } | null)?.company_id ??
+        currentUser.company_id ??
+        null
 
-      if (!payload.project_id) {
-        // For company_owner: use first project of the company
+      if (!projectId && companyId) {
+        // For company_owner: pick first project of the company
         const { data: proj } = await supabase
           .from('projects')
           .select('id')
-          .eq('company_id', payload.company_id)
+          .eq('company_id', companyId)
           .limit(1)
           .single()
-        if (proj) payload.project_id = proj.id
+        if (proj) projectId = (proj as { id: string }).id
       }
 
-      if (!payload.project_id || !payload.company_id) {
+      if (!projectId || !companyId) {
         Swal.fire('Error', 'No se pudo determinar el proyecto o empresa. Contacte al administrador.', 'error')
         setLoading(false)
         return
@@ -158,7 +152,16 @@ export function TarifasSection({
 
       const { data, error } = await supabase
         .from('tarifas')
-        .insert(payload)
+        .insert({
+          nombre,
+          tipo_agua: form.tipo_agua,
+          precio_m3,
+          canon_fijo,
+          descripcion: form.descripcion || null,
+          activa: form.activa,
+          project_id: projectId,
+          company_id: companyId,
+        })
         .select()
         .single()
 
