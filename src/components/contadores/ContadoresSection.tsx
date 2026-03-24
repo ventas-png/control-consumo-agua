@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import type { Contador, TipoAgua, UserRole, UserSession, Cliente } from '../../types'
+import type { Contador, Tarifa, TipoAgua, UserRole, UserSession, Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
 
 interface Props {
   contadores: Contador[]
   clientes: Cliente[]
+  tarifas: Tarifa[]
   userRole: UserRole
   currentUser: UserSession
   onContadorAdded: (contador: Contador) => void
@@ -47,6 +48,7 @@ const EMPTY_FORM = {
   fecha_instalacion: '',
   lectura_inicial: '0',
   activo: true,
+  tarifa_id: '' as string,
 }
 
 type FormState = typeof EMPTY_FORM
@@ -54,6 +56,7 @@ type FormState = typeof EMPTY_FORM
 export function ContadoresSection({
   contadores,
   clientes,
+  tarifas,
   userRole,
   currentUser,
   onContadorAdded,
@@ -85,6 +88,7 @@ export function ContadoresSection({
       fecha_instalacion: c.fecha_instalacion ?? '',
       lectura_inicial: String(c.lectura_inicial),
       activo: c.activo,
+      tarifa_id: c.tarifa_id ?? '',
     })
     setEditingId(c.id)
     setShowForm(true)
@@ -125,6 +129,7 @@ export function ContadoresSection({
           fecha_instalacion: form.fecha_instalacion || null,
           lectura_inicial,
           activo: form.activo,
+          tarifa_id: form.tarifa_id || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingId)
@@ -190,6 +195,7 @@ export function ContadoresSection({
           fecha_instalacion: form.fecha_instalacion || null,
           lectura_inicial,
           activo: form.activo,
+          tarifa_id: form.tarifa_id || null,
           project_id: projectId,
           company_id: companyId,
         })
@@ -262,6 +268,12 @@ export function ContadoresSection({
 
   const clienteNombre = (id: string | null | undefined) =>
     id ? (clientes.find(c => c.id === id)?.nombre ?? 'Cliente desconocido') : null
+
+  const tarifasParaTipo = (tipo: TipoAgua) =>
+    tarifas.filter(t => t.tipo_agua === tipo && t.activa)
+
+  const tarifaNombre = (id: string | null | undefined) =>
+    id ? (tarifas.find(t => t.id === id)?.nombre ?? 'Tarifa desconocida') : null
 
   const filtered = contadores.filter(c => {
     const matchSearch =
@@ -402,11 +414,29 @@ export function ContadoresSection({
               <select
                 style={inputStyle}
                 value={form.tipo_agua}
-                onChange={e => setForm(f => ({ ...f, tipo_agua: e.target.value as TipoAgua }))}
+                onChange={e => setForm(f => ({ ...f, tipo_agua: e.target.value as TipoAgua, tarifa_id: '' }))}
               >
                 {TIPOS_AGUA.map(t => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Tarifa aplicable</label>
+              <select
+                style={inputStyle}
+                value={form.tarifa_id}
+                onChange={e => setForm(f => ({ ...f, tarifa_id: e.target.value }))}
+              >
+                <option value="">— Sin tarifa asignada —</option>
+                {tarifasParaTipo(form.tipo_agua).map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.nombre} — {t.precio_m3} €/m³{t.canon_fijo > 0 ? ` + ${t.canon_fijo} € canon` : ''}
+                  </option>
+                ))}
+                {tarifasParaTipo(form.tipo_agua).length === 0 && (
+                  <option disabled value="">No hay tarifas activas para este tipo</option>
+                )}
               </select>
             </div>
             <div>
@@ -542,6 +572,7 @@ export function ContadoresSection({
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Marca / Modelo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Lect. Inicial</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Cliente Asignado</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tarifa</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
                   {canEdit && (
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
@@ -605,6 +636,22 @@ export function ContadoresSection({
                           </span>
                         ) : (
                           <span style={{ color: '#cbd5e1', fontSize: '13px' }}>Sin asignar</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        {tarifaNombre(c.tarifa_id) ? (
+                          <span style={{
+                            padding: '3px 10px',
+                            borderRadius: '12px',
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                          }}>
+                            {tarifaNombre(c.tarifa_id)}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#cbd5e1', fontSize: '13px' }}>Sin tarifa</span>
                         )}
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>

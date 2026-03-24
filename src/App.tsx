@@ -230,6 +230,7 @@ export default function App() {
             <ContadoresSection
               contadores={contadores}
               clientes={clientes}
+              tarifas={tarifas}
               userRole={currentUser.role}
               currentUser={currentUser}
               onContadorAdded={addContador}
