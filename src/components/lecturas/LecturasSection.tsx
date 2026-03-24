@@ -95,7 +95,7 @@ export function LecturasSection({
   const consumo = !isNaN(lecturaNum) ? lecturaNum - ultimaLectura : null
   const calculo =
     consumo !== null && consumo >= 0 && clienteSeleccionado
-      ? calcularTotalPagar(consumo, clienteSeleccionado.tarifa, clienteSeleccionado.canon)
+      ? calcularTotalPagar(consumo, clienteSeleccionado.tarifa, clienteSeleccionado.canon, clienteSeleccionado.consumo_minimo ?? 0)
       : null
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
@@ -131,7 +131,7 @@ export function LecturasSection({
     if (consumo === null || isNaN(consumo)) return Swal.fire('Error', 'Datos de lectura inválidos', 'error')
     if (consumo < 0) return Swal.fire('Consumo Negativo', 'La lectura actual debe ser mayor o igual a la anterior.', 'error')
 
-    const resultadoCobro = calcularTotalPagar(consumo, clienteSeleccionado.tarifa, clienteSeleccionado.canon)
+    const resultadoCobro = calcularTotalPagar(consumo, clienteSeleccionado.tarifa, clienteSeleccionado.canon, clienteSeleccionado.consumo_minimo ?? 0)
     const mesNum = mes === 'auto' ? new Date().getMonth() + 1 : parseInt(mes)
 
     const registro = {
