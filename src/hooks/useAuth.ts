@@ -203,10 +203,10 @@ export function useAuth() {
       })
 
       if (error || !data?.session || !data?.user) {
-        await logSecurityEvent('failed_login_attempt', {
+        logSecurityEvent('failed_login_attempt', {
           email: cleanEmail,
           reason: error?.message ?? 'invalid_credentials',
-        })
+        }).catch(console.error)
 
         const msg = (error?.message ?? '').toLowerCase()
         if (msg.includes('invalid login credentials')) return 'Email o contraseña incorrectos'
@@ -221,11 +221,11 @@ export function useAuth() {
       setCurrentUser(sessionData)
       localStorage.removeItem('login_failures')
 
-      await logSecurityEvent('login_success', { email: cleanEmail }, user.id)
+      logSecurityEvent('login_success', { email: cleanEmail }, user.id).catch(console.error)
       return null
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'unknown'
-      await logSecurityEvent('login_error', { email: cleanEmail, error: msg })
+      logSecurityEvent('login_error', { email: cleanEmail, error: msg }).catch(console.error)
 
       if (msg.includes('fetch') || msg.includes('network')) return 'Error de red. Verifique su conexión.'
       return 'Error de conexión. Intente de nuevo.'
