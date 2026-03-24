@@ -11,20 +11,23 @@ interface Empresa {
   plan: string
   activa: boolean
   max_projects: number
+  max_units: number
   project_count?: number
   user_count?: number
+  unit_count?: number
 }
 
 export function SuperAdminSection() {
   const [empresas, setEmpresas] = useState<Empresa[]>([])
   const [loading, setLoading] = useState(true)
   const [editingMax, setEditingMax] = useState<Record<string, number>>({})
+  const [editingMaxUnits, setEditingMaxUnits] = useState<Record<string, number>>({})
 
   const cargar = useCallback(async () => {
     setLoading(true)
     const { data: companiesData } = await supabase
       .from('companies')
-      .select('id, nombre, nit, email, telefono, plan, activa, max_projects')
+      .select('id, nombre, nit, email, telefono, plan, activa, max_projects, max_units')
       .order('nombre')
 
     if (!companiesData) { setLoading(false); return }
@@ -32,14 +35,16 @@ export function SuperAdminSection() {
     // Obtener conteos por empresa
     const empresasConConteos = await Promise.all(
       (companiesData as Empresa[]).map(async (c) => {
-        const [{ count: projectCount }, { count: userCount }] = await Promise.all([
+        const [{ count: projectCount }, { count: userCount }, { count: unitCount }] = await Promise.all([
           supabase.from('projects').select('id', { count: 'exact', head: true }).eq('company_id', c.id),
           supabase.from('app_users').select('id', { count: 'exact', head: true }).eq('company_id', c.id),
+          supabase.from('unidades').select('id', { count: 'exact', head: true }).eq('company_id', c.id),
         ])
         return {
           ...c,
           project_count: projectCount ?? 0,
           user_count: userCount ?? 0,
+          unit_count: unitCount ?? 0,
         }
       })
     )
@@ -56,17 +61,36 @@ export function SuperAdminSection() {
       void Swal.fire({ icon: 'warning', title: 'Valor inválido', text: 'El mínimo es 1 proyecto.' })
       return
     }
-
-    const { error } = await supabase
-      .from('companies')
-      .update({ max_projects: nuevoMax })
-      .eq('id', empresaId)
-
+    const { error } = await supabase.from('companies').update({ max_projects: nuevoMax }).eq('id', empresaId)
     if (error) {
       void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el límite.' })
     } else {
       void Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1200, showConfirmButton: false })
       setEditingMax(prev => { const n = { ...prev }; delete n[empresaId]; return n })
+      void cargar()
+    }
+  }
+
+  async function actualizarMaxUnidades(empresaId: string) {
+    const nuevoMax = editingMaxUnits[empresaId]
+    const empresa = empresas.find(e => e.id === empresaId)
+    if (nuevoMax === undefined || nuevoMax < 1) {
+      void Swal.fire({ icon: 'warning', title: 'Valor inválido', text: 'El mínimo es 1 unidad.' })
+      return
+    }
+    if (empresa && nuevoMax < (empresa.unit_count ?? 0)) {
+      void Swal.fire({
+        icon: 'warning', title: 'Límite menor al uso actual',
+        text: `Esta empresa ya tiene ${empresa.unit_count} unidades creadas. El nuevo límite debe ser igual o mayor.`,
+      })
+      return
+    }
+    const { error } = await supabase.from('companies').update({ max_units: nuevoMax }).eq('id', empresaId)
+    if (error) {
+      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el límite de unidades.' })
+    } else {
+      void Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1200, showConfirmButton: false })
+      setEditingMaxUnits(prev => { const n = { ...prev }; delete n[empresaId]; return n })
       void cargar()
     }
   }
@@ -130,6 +154,7 @@ export function SuperAdminSection() {
         <input id="swal-email-empresa" class="swal2-input" placeholder="Email de la empresa (opcional)" type="email" />
         <input id="swal-telefono" class="swal2-input" placeholder="Teléfono (opcional)" />
         <input id="swal-max" class="swal2-input" placeholder="Límite de proyectos" type="number" value="5" min="1" />
+        <input id="swal-max-units" class="swal2-input" placeholder="Límite de unidades" type="number" value="50" min="1" />
         <hr style="border-color:rgba(255,255,255,0.1);margin:8px 0;" />
         <input id="swal-owner-nombre" class="swal2-input" placeholder="Nombre del administrador *" />
         <input id="swal-owner-email" class="swal2-input" placeholder="Email del administrador *" type="email" />
@@ -144,6 +169,7 @@ export function SuperAdminSection() {
         const ownerEmail = (document.getElementById('swal-owner-email') as HTMLInputElement)?.value?.trim()
         const ownerPass = (document.getElementById('swal-owner-pass') as HTMLInputElement)?.value
         const maxProj = parseInt((document.getElementById('swal-max') as HTMLInputElement)?.value ?? '5')
+        const maxUnits = parseInt((document.getElementById('swal-max-units') as HTMLInputElement)?.value ?? '50')
         if (!empresaNombre || !ownerNombre || !ownerEmail || !ownerPass) {
           Swal.showValidationMessage('Los campos marcados con * son obligatorios')
           return false
@@ -161,6 +187,7 @@ export function SuperAdminSection() {
           ownerEmail,
           ownerPass,
           maxProj: isNaN(maxProj) ? 5 : maxProj,
+          maxUnits: isNaN(maxUnits) ? 50 : maxUnits,
         }
       },
     })
@@ -176,6 +203,7 @@ export function SuperAdminSection() {
         email: formValues.emailEmpresa,
         telefono: formValues.telefono,
         max_projects: formValues.maxProj,
+        max_units: formValues.maxUnits,
       })
       .select()
       .single()
@@ -265,13 +293,17 @@ export function SuperAdminSection() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {empresas.map(e => {
-            const isEditing = editingMax[e.id] !== undefined
+            const isEditingProj = editingMax[e.id] !== undefined
+            const isEditingUnits = editingMaxUnits[e.id] !== undefined
+            const unitsUsoPct = Math.round(((e.unit_count ?? 0) / e.max_units) * 100)
+            const unitsAlerta = unitsUsoPct >= 80
             return (
               <div key={e.id} style={{
                 background: '#1e293b', borderRadius: '14px', padding: '20px 24px',
                 border: '1px solid rgba(255,255,255,0.06)',
               }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                {/* Fila superior: info + botón editar */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                       <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '16px' }}>{e.nombre}</div>
@@ -289,6 +321,9 @@ export function SuperAdminSection() {
                         <span style={{ color: '#38bdf8', fontWeight: 600 }}>{e.project_count}</span>/{e.max_projects} proyectos
                       </span>
                       <span style={{ color: '#64748b', fontSize: '13px' }}>
+                        <span style={{ color: unitsAlerta ? '#f59e0b' : '#34d399', fontWeight: 600 }}>{e.unit_count ?? 0}</span>/{e.max_units} unidades
+                      </span>
+                      <span style={{ color: '#64748b', fontSize: '13px' }}>
                         <span style={{ color: '#a78bfa', fontWeight: 600 }}>{e.user_count}</span> usuarios
                       </span>
                       {e.nit && <span style={{ color: '#64748b', fontSize: '13px' }}>NIT: {e.nit}</span>}
@@ -296,59 +331,86 @@ export function SuperAdminSection() {
                       {e.telefono && <span style={{ color: '#64748b', fontSize: '13px' }}>{e.telefono}</span>}
                     </div>
                   </div>
+                  <button
+                    onClick={() => void editarEmpresa(e)}
+                    style={{
+                      padding: '6px 14px', borderRadius: '6px',
+                      border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)',
+                      color: '#94a3b8', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                    }}
+                  >
+                    Editar
+                  </button>
+                </div>
 
-                  {/* Acciones */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <button
-                      onClick={() => void editarEmpresa(e)}
-                      style={{
-                        padding: '6px 14px', borderRadius: '6px',
-                        border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)',
-                        color: '#94a3b8', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
-                      }}
-                    >
-                      Editar
-                    </button>
+                {/* Barra de progreso de unidades */}
+                <div style={{ marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '11px', color: '#475569' }}>Uso de unidades</span>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: unitsAlerta ? '#f59e0b' : '#34d399' }}>
+                      {unitsUsoPct}%
+                    </span>
                   </div>
+                  <div style={{ height: '5px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${Math.min(unitsUsoPct, 100)}%`,
+                      background: unitsUsoPct >= 100 ? '#ef4444' : unitsAlerta ? '#f59e0b' : '#34d399',
+                      borderRadius: '3px',
+                      transition: 'width 0.3s',
+                    }} />
+                  </div>
+                </div>
 
-                  {/* Control de límite de proyectos */}
+                {/* Fila de controles de límites */}
+                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {/* Límite proyectos */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '13px', whiteSpace: 'nowrap' }}>Límite proyectos:</span>
+                    <span style={{ color: '#94a3b8', fontSize: '12px', whiteSpace: 'nowrap' }}>Proyectos:</span>
                     <input
-                      type="number"
-                      min={1}
-                      value={isEditing ? editingMax[e.id] : e.max_projects}
+                      type="number" min={1}
+                      value={isEditingProj ? editingMax[e.id] : e.max_projects}
                       onChange={(ev: React.ChangeEvent<HTMLInputElement>) => setEditingMax(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
                       style={{
-                        width: '64px', padding: '6px 8px', borderRadius: '6px',
-                        border: `1px solid ${isEditing ? '#0ea5e9' : 'rgba(255,255,255,0.1)'}`,
-                        background: '#0f172a', color: '#f1f5f9', fontSize: '14px',
-                        textAlign: 'center',
+                        width: '60px', padding: '5px 7px', borderRadius: '6px',
+                        border: `1px solid ${isEditingProj ? '#0ea5e9' : 'rgba(255,255,255,0.1)'}`,
+                        background: '#0f172a', color: '#f1f5f9', fontSize: '13px', textAlign: 'center',
                       }}
                     />
-                    {isEditing && (
-                      <button
-                        onClick={() => void actualizarMaxProyectos(e.id)}
-                        style={{
-                          padding: '6px 12px', borderRadius: '6px', border: 'none',
-                          background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
-                          color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
-                        }}
-                      >
-                        Guardar
-                      </button>
+                    {isEditingProj && (
+                      <>
+                        <button onClick={() => void actualizarMaxProyectos(e.id)} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
+                          Guardar
+                        </button>
+                        <button onClick={() => setEditingMax(prev => { const n = { ...prev }; delete n[e.id]; return n })} style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#64748b', cursor: 'pointer', fontSize: '11px' }}>
+                          ✕
+                        </button>
+                      </>
                     )}
-                    {isEditing && (
-                      <button
-                        onClick={() => setEditingMax(prev => { const n = { ...prev }; delete n[e.id]; return n })}
-                        style={{
-                          padding: '6px 10px', borderRadius: '6px',
-                          border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
-                          color: '#64748b', cursor: 'pointer', fontSize: '12px',
-                        }}
-                      >
-                        ✕
-                      </button>
+                  </div>
+
+                  {/* Límite unidades */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: '#94a3b8', fontSize: '12px', whiteSpace: 'nowrap' }}>Unidades:</span>
+                    <input
+                      type="number" min={1}
+                      value={isEditingUnits ? editingMaxUnits[e.id] : e.max_units}
+                      onChange={(ev: React.ChangeEvent<HTMLInputElement>) => setEditingMaxUnits(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
+                      style={{
+                        width: '60px', padding: '5px 7px', borderRadius: '6px',
+                        border: `1px solid ${isEditingUnits ? '#34d399' : 'rgba(255,255,255,0.1)'}`,
+                        background: '#0f172a', color: '#f1f5f9', fontSize: '13px', textAlign: 'center',
+                      }}
+                    />
+                    {isEditingUnits && (
+                      <>
+                        <button onClick={() => void actualizarMaxUnidades(e.id)} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg,#34d399,#059669)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
+                          Guardar
+                        </button>
+                        <button onClick={() => setEditingMaxUnits(prev => { const n = { ...prev }; delete n[e.id]; return n })} style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#64748b', cursor: 'pointer', fontSize: '11px' }}>
+                          ✕
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

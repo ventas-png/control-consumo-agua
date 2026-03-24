@@ -200,6 +200,24 @@ export function UnidadesSection({
         return
       }
 
+      // Verificar límite de unidades de la empresa
+      const [{ data: empresaData }, { count: unidadesCount }] = await Promise.all([
+        supabase.from('companies').select('max_units').eq('id', companyId).single(),
+        supabase.from('unidades').select('id', { count: 'exact', head: true }).eq('company_id', companyId),
+      ])
+      const maxUnits = (empresaData as { max_units?: number } | null)?.max_units ?? 50
+      const totalUnidades = unidadesCount ?? 0
+      if (totalUnidades >= maxUnits) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Límite de unidades alcanzado',
+          html: `Tu empresa ha alcanzado el límite de <b>${maxUnits}</b> unidades.<br>Contacta al superadministrador para aumentar el cupo.`,
+          confirmButtonText: 'Entendido',
+        })
+        setLoading(false)
+        return
+      }
+
       const { data, error } = await supabase
         .from('unidades')
         .insert({ ...payload, project_id: projectId, company_id: companyId })
