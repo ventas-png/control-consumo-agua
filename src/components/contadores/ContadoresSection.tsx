@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import type { Contador, Tarifa, TipoAgua, UserRole, UserSession, Cliente } from '../../types'
+import type { Contador, Tarifa, TipoAgua, UserRole, UserSession, Cliente, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
 
@@ -8,6 +8,7 @@ interface Props {
   contadores: Contador[]
   clientes: Cliente[]
   tarifas: Tarifa[]
+  unidades: Unidad[]
   userRole: UserRole
   currentUser: UserSession
   onContadorAdded: (contador: Contador) => void
@@ -49,6 +50,7 @@ const EMPTY_FORM = {
   lectura_inicial: '0',
   activo: true,
   tarifa_id: '' as string,
+  unidad_id: '' as string,
 }
 
 type FormState = typeof EMPTY_FORM
@@ -57,6 +59,7 @@ export function ContadoresSection({
   contadores,
   clientes,
   tarifas,
+  unidades,
   userRole,
   currentUser,
   onContadorAdded,
@@ -69,6 +72,7 @@ export function ContadoresSection({
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [filterTipo, setFilterTipo] = useState<TipoAgua | ''>('')
+  const [filterUnidad, setFilterUnidad] = useState<string>('')
 
   const canEdit = userRole !== 'viewer' && userRole !== 'operator'
 
@@ -89,6 +93,7 @@ export function ContadoresSection({
       lectura_inicial: String(c.lectura_inicial),
       activo: c.activo,
       tarifa_id: c.tarifa_id ?? '',
+      unidad_id: c.unidad_id ?? '',
     })
     setEditingId(c.id)
     setShowForm(true)
@@ -130,6 +135,7 @@ export function ContadoresSection({
           lectura_inicial,
           activo: form.activo,
           tarifa_id: form.tarifa_id || null,
+          unidad_id: form.unidad_id || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingId)
@@ -196,6 +202,7 @@ export function ContadoresSection({
           lectura_inicial,
           activo: form.activo,
           tarifa_id: form.tarifa_id || null,
+          unidad_id: form.unidad_id || null,
           project_id: projectId,
           company_id: companyId,
         })
@@ -275,6 +282,9 @@ export function ContadoresSection({
   const tarifaNombre = (id: string | null | undefined) =>
     id ? (tarifas.find(t => t.id === id)?.nombre ?? 'Tarifa desconocida') : null
 
+  const unidadNombre = (id: string | null | undefined) =>
+    id ? (unidades.find(u => u.id === id)?.nombre ?? 'Unidad desconocida') : null
+
   const filtered = contadores.filter(c => {
     const matchSearch =
       c.numero_serie.toLowerCase().includes(search.toLowerCase()) ||
@@ -282,7 +292,8 @@ export function ContadoresSection({
       (c.modelo ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (c.descripcion ?? '').toLowerCase().includes(search.toLowerCase())
     const matchTipo = filterTipo === '' || c.tipo_agua === filterTipo
-    return matchSearch && matchTipo
+    const matchUnidad = filterUnidad === '' || c.unidad_id === filterUnidad
+    return matchSearch && matchTipo && matchUnidad
   })
 
   const inputStyle: React.CSSProperties = {
@@ -320,6 +331,18 @@ export function ContadoresSection({
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {unidades.length > 0 && (
+            <select
+              value={filterUnidad}
+              onChange={e => setFilterUnidad(e.target.value)}
+              style={{ ...inputStyle, width: '180px' }}
+            >
+              <option value="">Todas las unidades</option>
+              {unidades.map(u => (
+                <option key={u.id} value={u.id}>{u.nombre}</option>
+              ))}
+            </select>
+          )}
           <select
             value={filterTipo}
             onChange={e => setFilterTipo(e.target.value as TipoAgua | '')}
@@ -439,6 +462,21 @@ export function ContadoresSection({
                 )}
               </select>
             </div>
+            {unidades.length > 0 && (
+              <div>
+                <label style={labelStyle}>Unidad asignada</label>
+                <select
+                  style={inputStyle}
+                  value={form.unidad_id}
+                  onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
+                >
+                  <option value="">— Sin unidad asignada —</option>
+                  {unidades.filter(u => u.activo).map(u => (
+                    <option key={u.id} value={u.id}>{u.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label style={labelStyle}>Marca</label>
               <input
@@ -571,6 +609,7 @@ export function ContadoresSection({
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tipología</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Marca / Modelo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Lect. Inicial</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Unidad</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Cliente Asignado</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tarifa</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
@@ -621,6 +660,22 @@ export function ContadoresSection({
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
                         {Number(c.lectura_inicial).toFixed(4)}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        {unidadNombre(c.unidad_id) ? (
+                          <span style={{
+                            padding: '3px 10px',
+                            borderRadius: '12px',
+                            background: '#f0fdf4',
+                            color: '#065f46',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                          }}>
+                            🏠 {unidadNombre(c.unidad_id)}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#cbd5e1', fontSize: '13px' }}>Sin unidad</span>
+                        )}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         {clienteName ? (
@@ -730,7 +785,8 @@ export function ContadoresSection({
         )}
         <div style={{ padding: '12px 16px', borderTop: '1px solid #f1f5f9', color: '#94a3b8', fontSize: '12px' }}>
           {filtered.length} contador{filtered.length !== 1 ? 'es' : ''}{' '}
-          {search || filterTipo ? 'encontrados' : 'registrados'} ·{' '}
+          {search || filterTipo || filterUnidad ? 'encontrados' : 'registrados'} ·{' '}
+          {contadores.filter(c => c.unidad_id).length} con unidad ·{' '}
           {contadores.filter(c => c.cliente_id).length} asignado{contadores.filter(c => c.cliente_id).length !== 1 ? 's' : ''} a clientes
         </div>
       </div>

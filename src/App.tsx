@@ -22,6 +22,7 @@ import { EmpresaSection } from './components/empresa/EmpresaSection'
 import { SuperAdminSection } from './components/superadmin/SuperAdminSection'
 import { TarifasSection } from './components/tarifas/TarifasSection'
 import { ContadoresSection } from './components/contadores/ContadoresSection'
+import { UnidadesSection } from './components/unidades/UnidadesSection'
 
 initEmailJS()
 
@@ -33,11 +34,12 @@ function getResetToken(): string | null {
 export default function App() {
   const { currentUser, loading, login, loginWithGoogle, logout, updateProfile } = useAuth()
   const {
-    clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores,
+    clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores, unidades,
     cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado,
     setFuentesAgua, setRegistrosCalidad, addRuta, updateRuta, deleteRuta,
     addTarifa, updateTarifa, deleteTarifa,
     addContador, updateContador, deleteContador,
+    addUnidad, updateUnidad, deleteUnidad,
   } = useData()
 
   const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
@@ -226,11 +228,23 @@ export default function App() {
               onTarifaDeleted={deleteTarifa}
             />
           )}
+          {activeSection === 'unidades' && (
+            <UnidadesSection
+              unidades={unidades}
+              contadores={contadores}
+              userRole={currentUser.role}
+              currentUser={currentUser}
+              onUnidadAdded={addUnidad}
+              onUnidadUpdated={updateUnidad}
+              onUnidadDeleted={deleteUnidad}
+            />
+          )}
           {activeSection === 'contadores' && (
             <ContadoresSection
               contadores={contadores}
               clientes={clientes}
               tarifas={tarifas}
+              unidades={unidades}
               userRole={currentUser.role}
               currentUser={currentUser}
               onContadorAdded={addContador}

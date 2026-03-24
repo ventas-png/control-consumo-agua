@@ -136,6 +136,33 @@ export interface Contador {
   activo: boolean;
   cliente_id?: string | null;
   tarifa_id?: string | null;
+  unidad_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type TipoUnidad =
+  | 'apartamento'
+  | 'casa'
+  | 'bodega'
+  | 'local_comercial'
+  | 'oficina'
+  | 'parqueadero'
+  | 'otro';
+
+export interface Unidad {
+  id: string;
+  project_id: string;
+  company_id: string;
+  nombre: string;
+  tipo: TipoUnidad;
+  descripcion?: string;
+  piso?: number | null;
+  area_m2?: number | null;
+  propietario_nombre?: string;
+  propietario_telefono?: string;
+  propietario_email?: string;
+  activo: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -149,6 +176,7 @@ export type AppSection =
   | 'calidad'
   | 'rutas'
   | 'tarifas'
+  | 'unidades'
   | 'contadores'
   | 'configuracion'
   | 'perfil'
