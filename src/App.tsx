@@ -34,7 +34,7 @@ export default function App() {
   const { currentUser, loading, login, loginWithGoogle, logout, updateProfile } = useAuth()
   const {
     clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores,
-    cargarDatos, addCliente, addRegistro, updateRegistroEstado,
+    cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado,
     setFuentesAgua, setRegistrosCalidad, addRuta, updateRuta, deleteRuta,
     addTarifa, updateTarifa, deleteTarifa,
     addContador, updateContador, deleteContador,
@@ -157,6 +157,8 @@ export default function App() {
               userRole={currentUser.role}
               userId={currentUser.user_id}
               onClienteAdded={addCliente}
+              onClienteUpdated={updateCliente}
+              onClienteDeleted={deleteCliente}
             />
           )}
           {activeSection === 'lecturas' && (

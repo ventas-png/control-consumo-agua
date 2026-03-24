@@ -85,6 +85,17 @@ export function useData() {
     setData(prev => ({ ...prev, clientes: [...prev.clientes, cliente] }))
   }, [])
 
+  const updateCliente = useCallback((id: string, partial: Partial<Cliente>) => {
+    setData(prev => ({
+      ...prev,
+      clientes: prev.clientes.map(c => (c.id === id ? { ...c, ...partial } : c)),
+    }))
+  }, [])
+
+  const deleteCliente = useCallback((id: string) => {
+    setData(prev => ({ ...prev, clientes: prev.clientes.filter(c => c.id !== id) }))
+  }, [])
+
   const addRegistro = useCallback((registro: Registro) => {
     setData(prev => ({ ...prev, registros: [...prev.registros, registro] }))
   }, [])
@@ -169,6 +180,8 @@ export function useData() {
     ...data,
     cargarDatos,
     addCliente,
+    updateCliente,
+    deleteCliente,
     addRegistro,
     updateRegistroEstado,
     setFuentesAgua,
