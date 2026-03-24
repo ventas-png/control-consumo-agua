@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.contadores (
   lectura_inicial   numeric(12,4) NOT NULL DEFAULT 0,
   activo            boolean       NOT NULL DEFAULT true,
   cliente_id        uuid          REFERENCES public.clientes(id) ON DELETE SET NULL,
+  tarifa_id         uuid          REFERENCES public.tarifas(id) ON DELETE SET NULL,
   created_at        timestamptz   DEFAULT now(),
   updated_at        timestamptz   DEFAULT now()
 );

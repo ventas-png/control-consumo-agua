@@ -135,6 +135,7 @@ export interface Contador {
   lectura_inicial: number;
   activo: boolean;
   cliente_id?: string | null;
+  tarifa_id?: string | null;
   created_at?: string;
   updated_at?: string;
 }
