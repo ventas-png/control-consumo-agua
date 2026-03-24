@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa } from '../types'
+import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador } from '../types'
 import { supabase } from '../lib/supabase'
 
 interface AppData {
@@ -11,6 +11,7 @@ interface AppData {
   registrosCalidad: RegistroCalidad[]
   rutas: Ruta[]
   tarifas: Tarifa[]
+  contadores: Contador[]
 }
 
 const INITIAL_DATA: AppData = {
@@ -21,13 +22,14 @@ const INITIAL_DATA: AppData = {
   registrosCalidad: [],
   rutas: [],
   tarifas: [],
+  contadores: [],
 }
 
 export function useData() {
   const [data, setData] = useState<AppData>(INITIAL_DATA)
 
   const cargarDatos = useCallback(async () => {
-    const [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes] = await Promise.allSettled([
+    const [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes, contadoresRes] = await Promise.allSettled([
       supabase.from('clientes').select('*'),
       supabase.from('registros').select('*'),
       supabase.from('empresa').select('*').limit(1),
@@ -38,6 +40,7 @@ export function useData() {
         .order('fecha', { ascending: false }),
       supabase.from('rutas').select('*').order('created_at', { ascending: false }),
       supabase.from('tarifas').select('*').order('created_at', { ascending: false }),
+      supabase.from('contadores').select('*').order('created_at', { ascending: false }),
     ])
 
     setData(prev => {
@@ -62,6 +65,9 @@ export function useData() {
       }
       if (tarifasRes.status === 'fulfilled' && tarifasRes.value.data) {
         next.tarifas = tarifasRes.value.data as Tarifa[]
+      }
+      if (contadoresRes.status === 'fulfilled' && contadoresRes.value.data) {
+        next.contadores = contadoresRes.value.data as Contador[]
       }
       return next
     })
@@ -144,6 +150,21 @@ export function useData() {
     setData(prev => ({ ...prev, tarifas: prev.tarifas.filter(t => t.id !== id) }))
   }, [])
 
+  const addContador = useCallback((contador: Contador) => {
+    setData(prev => ({ ...prev, contadores: [contador, ...prev.contadores] }))
+  }, [])
+
+  const updateContador = useCallback((id: string, partial: Partial<Contador>) => {
+    setData(prev => ({
+      ...prev,
+      contadores: prev.contadores.map(c => (c.id === id ? { ...c, ...partial } : c)),
+    }))
+  }, [])
+
+  const deleteContador = useCallback((id: string) => {
+    setData(prev => ({ ...prev, contadores: prev.contadores.filter(c => c.id !== id) }))
+  }, [])
+
   return {
     ...data,
     cargarDatos,
@@ -160,5 +181,8 @@ export function useData() {
     addTarifa,
     updateTarifa,
     deleteTarifa,
+    addContador,
+    updateContador,
+    deleteContador,
   }
 }

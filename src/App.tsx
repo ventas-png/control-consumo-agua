@@ -21,6 +21,7 @@ import { PerfilSection } from './components/perfil/PerfilSection'
 import { EmpresaSection } from './components/empresa/EmpresaSection'
 import { SuperAdminSection } from './components/superadmin/SuperAdminSection'
 import { TarifasSection } from './components/tarifas/TarifasSection'
+import { ContadoresSection } from './components/contadores/ContadoresSection'
 
 initEmailJS()
 
@@ -32,10 +33,11 @@ function getResetToken(): string | null {
 export default function App() {
   const { currentUser, loading, login, loginWithGoogle, logout, updateProfile } = useAuth()
   const {
-    clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas,
+    clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores,
     cargarDatos, addCliente, addRegistro, updateRegistroEstado,
     setFuentesAgua, setRegistrosCalidad, addRuta, updateRuta, deleteRuta,
     addTarifa, updateTarifa, deleteTarifa,
+    addContador, updateContador, deleteContador,
   } = useData()
 
   const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
@@ -220,6 +222,17 @@ export default function App() {
               onTarifaAdded={addTarifa}
               onTarifaUpdated={updateTarifa}
               onTarifaDeleted={deleteTarifa}
+            />
+          )}
+          {activeSection === 'contadores' && (
+            <ContadoresSection
+              contadores={contadores}
+              clientes={clientes}
+              userRole={currentUser.role}
+              currentUser={currentUser}
+              onContadorAdded={addContador}
+              onContadorUpdated={updateContador}
+              onContadorDeleted={deleteContador}
             />
           )}
           {activeSection === 'superadmin_empresas' && (
