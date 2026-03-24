@@ -22,6 +22,7 @@ export function SuperAdminSection() {
   const [loading, setLoading] = useState(true)
   const [editingMax, setEditingMax] = useState<Record<string, number>>({})
   const [editingMaxUnits, setEditingMaxUnits] = useState<Record<string, number>>({})
+  const [maxUnitsSupported, setMaxUnitsSupported] = useState(false)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -35,6 +36,7 @@ export function SuperAdminSection() {
 
     if (!fullError && fullData) {
       companiesData = fullData as Empresa[]
+      setMaxUnitsSupported(true)
     } else {
       // Column max_units may not exist yet — fetch without it
       const { data: fallbackData } = await supabase
@@ -44,6 +46,7 @@ export function SuperAdminSection() {
       if (fallbackData) {
         companiesData = (fallbackData as Omit<Empresa, 'max_units'>[]).map(c => ({ ...c, max_units: 50 }))
       }
+      setMaxUnitsSupported(false)
     }
 
     if (!companiesData) { setLoading(false); return }
@@ -212,16 +215,18 @@ export function SuperAdminSection() {
     if (!formValues) return
 
     // 1. Crear la empresa
+    const insertPayload: Record<string, unknown> = {
+      nombre: formValues.empresaNombre,
+      nit: formValues.nit,
+      email: formValues.emailEmpresa,
+      telefono: formValues.telefono,
+      max_projects: formValues.maxProj,
+    }
+    if (maxUnitsSupported) insertPayload.max_units = formValues.maxUnits
+
     const { data: nuevaEmpresa, error: empresaError } = await supabase
       .from('companies')
-      .insert({
-        nombre: formValues.empresaNombre,
-        nit: formValues.nit,
-        email: formValues.emailEmpresa,
-        telefono: formValues.telefono,
-        max_projects: formValues.maxProj,
-        max_units: formValues.maxUnits,
-      })
+      .insert(insertPayload)
       .select()
       .single()
 
@@ -337,9 +342,11 @@ export function SuperAdminSection() {
                       <span style={{ color: '#64748b', fontSize: '13px' }}>
                         <span style={{ color: '#38bdf8', fontWeight: 600 }}>{e.project_count}</span>/{e.max_projects} proyectos
                       </span>
-                      <span style={{ color: '#64748b', fontSize: '13px' }}>
-                        <span style={{ color: unitsAlerta ? '#f59e0b' : '#34d399', fontWeight: 600 }}>{e.unit_count ?? 0}</span>/{e.max_units} unidades
-                      </span>
+                      {maxUnitsSupported && (
+                        <span style={{ color: '#64748b', fontSize: '13px' }}>
+                          <span style={{ color: unitsAlerta ? '#f59e0b' : '#34d399', fontWeight: 600 }}>{e.unit_count ?? 0}</span>/{e.max_units} unidades
+                        </span>
+                      )}
                       <span style={{ color: '#64748b', fontSize: '13px' }}>
                         <span style={{ color: '#a78bfa', fontWeight: 600 }}>{e.user_count}</span> usuarios
                       </span>
@@ -361,23 +368,25 @@ export function SuperAdminSection() {
                 </div>
 
                 {/* Barra de progreso de unidades */}
-                <div style={{ marginBottom: '14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '11px', color: '#475569' }}>Uso de unidades</span>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: unitsAlerta ? '#f59e0b' : '#34d399' }}>
-                      {unitsUsoPct}%
-                    </span>
+                {maxUnitsSupported && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '11px', color: '#475569' }}>Uso de unidades</span>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: unitsAlerta ? '#f59e0b' : '#34d399' }}>
+                        {unitsUsoPct}%
+                      </span>
+                    </div>
+                    <div style={{ height: '5px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${Math.min(unitsUsoPct, 100)}%`,
+                        background: unitsUsoPct >= 100 ? '#ef4444' : unitsAlerta ? '#f59e0b' : '#34d399',
+                        borderRadius: '3px',
+                        transition: 'width 0.3s',
+                      }} />
+                    </div>
                   </div>
-                  <div style={{ height: '5px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${Math.min(unitsUsoPct, 100)}%`,
-                      background: unitsUsoPct >= 100 ? '#ef4444' : unitsAlerta ? '#f59e0b' : '#34d399',
-                      borderRadius: '3px',
-                      transition: 'width 0.3s',
-                    }} />
-                  </div>
-                </div>
+                )}
 
                 {/* Fila de controles de límites */}
                 <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -407,29 +416,31 @@ export function SuperAdminSection() {
                   </div>
 
                   {/* Límite unidades */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '12px', whiteSpace: 'nowrap' }}>Unidades:</span>
-                    <input
-                      type="number" min={1}
-                      value={isEditingUnits ? editingMaxUnits[e.id] : e.max_units}
-                      onChange={(ev: React.ChangeEvent<HTMLInputElement>) => setEditingMaxUnits(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
-                      style={{
-                        width: '60px', padding: '5px 7px', borderRadius: '6px',
-                        border: `1px solid ${isEditingUnits ? '#34d399' : 'rgba(255,255,255,0.1)'}`,
-                        background: '#0f172a', color: '#f1f5f9', fontSize: '13px', textAlign: 'center',
-                      }}
-                    />
-                    {isEditingUnits && (
-                      <>
-                        <button onClick={() => void actualizarMaxUnidades(e.id)} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg,#34d399,#059669)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
-                          Guardar
-                        </button>
-                        <button onClick={() => setEditingMaxUnits(prev => { const n = { ...prev }; delete n[e.id]; return n })} style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#64748b', cursor: 'pointer', fontSize: '11px' }}>
-                          ✕
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  {maxUnitsSupported && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: '#94a3b8', fontSize: '12px', whiteSpace: 'nowrap' }}>Unidades:</span>
+                      <input
+                        type="number" min={1}
+                        value={isEditingUnits ? editingMaxUnits[e.id] : e.max_units}
+                        onChange={(ev: React.ChangeEvent<HTMLInputElement>) => setEditingMaxUnits(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
+                        style={{
+                          width: '60px', padding: '5px 7px', borderRadius: '6px',
+                          border: `1px solid ${isEditingUnits ? '#34d399' : 'rgba(255,255,255,0.1)'}`,
+                          background: '#0f172a', color: '#f1f5f9', fontSize: '13px', textAlign: 'center',
+                        }}
+                      />
+                      {isEditingUnits && (
+                        <>
+                          <button onClick={() => void actualizarMaxUnidades(e.id)} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg,#34d399,#059669)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
+                            Guardar
+                          </button>
+                          <button onClick={() => setEditingMaxUnits(prev => { const n = { ...prev }; delete n[e.id]; return n })} style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#64748b', cursor: 'pointer', fontSize: '11px' }}>
+                            ✕
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )
