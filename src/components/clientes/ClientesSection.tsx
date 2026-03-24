@@ -12,7 +12,7 @@ interface Props {
   onClienteAdded: (cliente: Cliente) => void
 }
 
-const EMPTY_FORM = { nombre: '', codigo: '', medidor: '', email: '', direccion: '', telefono: '', tarifa: '3.00', canon: '20.00', lectura_inicial: '0' }
+const EMPTY_FORM = { nombre: '', codigo: '', medidor: '', email: '', direccion: '', telefono: '', tarifa: '3.00', canon: '20.00', consumo_minimo: '0', lectura_inicial: '0' }
 
 export function ClientesSection({ clientes, userRole, userId, onClienteAdded }: Props) {
   const [form, setForm] = useState(EMPTY_FORM)
@@ -30,6 +30,7 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded }: 
     const telefono = sanitizeInput(form.telefono)
     const tarifa = parseFloat(form.tarifa)
     const canon = parseFloat(form.canon)
+    const consumo_minimo = parseFloat(form.consumo_minimo)
     const lectura_inicial = parseFloat(form.lectura_inicial)
 
     const errors: string[] = []
@@ -49,7 +50,7 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded }: 
     setLoading(true)
     await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: userRole }, userId)
 
-    const nuevo = { nombre, codigo, medidor, email, direccion, telefono, tarifa, canon, lectura_inicial }
+    const nuevo = { nombre, codigo, medidor, email, direccion, telefono, tarifa, canon, consumo_minimo, lectura_inicial }
     const { data, error } = await supabase.from('clientes').insert(nuevo).select()
 
     if (!error && data) {
@@ -87,6 +88,7 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded }: 
               { label: 'Teléfono', key: 'telefono', placeholder: 'Ej. 55551234', type: 'tel' },
               { label: 'Tarifa Consumo (Q/m³)', key: 'tarifa', placeholder: '', type: 'number' },
               { label: 'Canon Fijo (Q)', key: 'canon', placeholder: '', type: 'number' },
+              { label: 'Consumo Mínimo (m³)', key: 'consumo_minimo', placeholder: '0', type: 'number' },
               { label: 'Lectura Inicial', key: 'lectura_inicial', placeholder: '', type: 'number' },
             ].map(f => (
               <div key={f.key}>

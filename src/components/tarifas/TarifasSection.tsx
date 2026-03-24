@@ -31,6 +31,7 @@ const EMPTY_FORM = {
   tipo_agua: 'potable',
   precio_m3: '0.00',
   canon_fijo: '0.00',
+  consumo_minimo: '0',
   descripcion: '',
   activa: true,
 }
@@ -65,6 +66,7 @@ export function TarifasSection({
       tipo_agua: t.tipo_agua,
       precio_m3: String(t.precio_m3),
       canon_fijo: String(t.canon_fijo),
+      consumo_minimo: String(t.consumo_minimo ?? 0),
       descripcion: t.descripcion ?? '',
       activa: t.activa,
     })
@@ -82,11 +84,13 @@ export function TarifasSection({
     const nombre = sanitizeInput(form.nombre)
     const precio_m3 = parseFloat(form.precio_m3)
     const canon_fijo = parseFloat(form.canon_fijo)
+    const consumo_minimo = parseFloat(form.consumo_minimo)
 
     const errors: string[] = []
     if (!nombre || nombre.length < 2) errors.push('Nombre debe tener al menos 2 caracteres')
     if (!validateNumber(precio_m3, 0, 99999)) errors.push('Precio por m³ debe ser un valor entre 0 y 99999')
     if (!validateNumber(canon_fijo, 0, 99999)) errors.push('Canon fijo debe ser un valor entre 0 y 99999')
+    if (!validateNumber(consumo_minimo, 0, 99999)) errors.push('Consumo mínimo debe ser un valor entre 0 y 99999')
 
     if (errors.length > 0) {
       Swal.fire('Error de validación', errors.join('<br>'), 'error')
@@ -103,6 +107,7 @@ export function TarifasSection({
           tipo_agua: form.tipo_agua,
           precio_m3,
           canon_fijo,
+          consumo_minimo,
           descripcion: form.descripcion || null,
           activa: form.activa,
           updated_at: new Date().toISOString(),
@@ -168,6 +173,7 @@ export function TarifasSection({
           tipo_agua: form.tipo_agua,
           precio_m3,
           canon_fijo,
+          consumo_minimo,
           descripcion: form.descripcion || null,
           activa: form.activa,
           project_id: projectId,
@@ -341,6 +347,18 @@ export function TarifasSection({
                 placeholder="0.00"
               />
             </div>
+            <div>
+              <label style={labelStyle}>Consumo Mínimo (m³)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min="0"
+                step="0.0001"
+                value={form.consumo_minimo}
+                onChange={e => setForm(f => ({ ...f, consumo_minimo: e.target.value }))}
+                placeholder="0"
+              />
+            </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Descripción</label>
               <textarea
@@ -428,6 +446,7 @@ export function TarifasSection({
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tipo de Agua</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Precio/m³</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Canon Fijo</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Cons. Mínimo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
                   {canEdit && (
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
@@ -465,6 +484,9 @@ export function TarifasSection({
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
                       Q {Number(t.canon_fijo).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
+                      {Number(t.consumo_minimo ?? 0).toFixed(4)} m³
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       {canEdit ? (
