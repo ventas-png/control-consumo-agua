@@ -35,6 +35,9 @@ export function useData() {
   const [data, setData] = useState<AppData>(INITIAL_DATA)
 
   const cargarDatos = useCallback(async () => {
+    // Auto-desactivar tarifas cuya fecha_revision ya pasó
+    await supabase.rpc('deactivate_expired_tarifas').catch(() => { /* silencioso */ })
+
     const [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes, contadoresRes, unidadesRes, proyectoRes] = await Promise.allSettled([
       supabase.from('clientes').select('*'),
       supabase.from('registros').select('*'),

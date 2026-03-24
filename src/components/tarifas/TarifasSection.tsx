@@ -35,6 +35,7 @@ const EMPTY_FORM = {
   consumo_minimo: '0.0000',
   descripcion: '',
   activa: true,
+  fecha_revision: '',
 }
 
 type FormState = typeof EMPTY_FORM
@@ -71,6 +72,7 @@ export function TarifasSection({
       consumo_minimo: String(t.consumo_minimo ?? 0),
       descripcion: t.descripcion ?? '',
       activa: t.activa,
+      fecha_revision: t.fecha_revision ?? '',
     })
     setEditingId(t.id)
     setShowForm(true)
@@ -111,7 +113,8 @@ export function TarifasSection({
           canon_fijo,
           consumo_minimo,
           descripcion: form.descripcion || null,
-          activa: form.activa,
+          activa: true,
+          fecha_revision: form.fecha_revision || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingId)
@@ -178,6 +181,7 @@ export function TarifasSection({
           consumo_minimo,
           descripcion: form.descripcion || null,
           activa: form.activa,
+          fecha_revision: form.fecha_revision || null,
           project_id: projectId,
           company_id: companyId,
         })
@@ -239,6 +243,17 @@ export function TarifasSection({
 
   const tipoLabel = (value: string) =>
     TIPOS_AGUA.find(t => t.value === value)?.label ?? value
+
+  function getRevisionStatus(t: Tarifa): 'expired' | 'soon' | 'ok' | 'none' {
+    if (!t.fecha_revision) return 'none'
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const rev = new Date(t.fecha_revision + 'T00:00:00')
+    const diff = Math.ceil((rev.getTime() - today.getTime()) / 86400000)
+    if (diff < 0) return 'expired'
+    if (diff <= 30) return 'soon'
+    return 'ok'
+  }
 
   const inputStyle: React.CSSProperties = {
     padding: '10px 14px',
@@ -374,6 +389,19 @@ export function TarifasSection({
                 maxLength={500}
               />
             </div>
+            <div>
+              <label style={labelStyle}>Fecha de Revisión</label>
+              <input
+                style={inputStyle}
+                type="date"
+                value={form.fecha_revision}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={e => setForm(f => ({ ...f, fecha_revision: e.target.value }))}
+              />
+              <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                Si la fecha pasa sin renovar la tarifa, se desactivará automáticamente
+              </span>
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <label style={{ ...labelStyle, marginBottom: 0 }}>Estado:</label>
               <button
@@ -453,6 +481,7 @@ export function TarifasSection({
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Canon Fijo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Cons. Mínimo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Revisión</th>
                   {canEdit && (
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
                   )}
@@ -523,6 +552,26 @@ export function TarifasSection({
                           {t.activa ? 'Activa' : 'Inactiva'}
                         </span>
                       )}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      {(() => {
+                        const status = getRevisionStatus(t)
+                        if (status === 'none') return <span style={{ color: '#94a3b8', fontSize: '12px' }}>—</span>
+                        const cfg = {
+                          expired: { bg: '#fee2e2', color: '#991b1b', prefix: 'Vencida: ' },
+                          soon:    { bg: '#fef9c3', color: '#854d0e', prefix: 'Próxima: ' },
+                          ok:      { bg: '#dcfce7', color: '#166534', prefix: '' },
+                        }[status]
+                        return (
+                          <span style={{
+                            padding: '3px 8px', borderRadius: '10px', fontSize: '11px',
+                            fontWeight: 600, background: cfg.bg, color: cfg.color,
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {cfg.prefix}{t.fecha_revision}
+                          </span>
+                        )
+                      })()}
                     </td>
                     {canEdit && (
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>

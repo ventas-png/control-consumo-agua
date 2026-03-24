@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Registro, GPS, UserRole, Ruta } from '../../types'
+import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
@@ -10,6 +10,7 @@ interface Props {
   registros: Registro[]
   userRole: UserRole
   moneda?: string
+  tarifas?: Tarifa[]
   onRegistroAdded: (registro: Registro) => void
   rutaActiva?: Ruta | null
   onClearRuta?: () => void
@@ -21,6 +22,7 @@ export function LecturasSection({
   registros,
   userRole,
   moneda = 'Q',
+  tarifas = [],
   onRegistroAdded,
   rutaActiva,
   onClearRuta,
@@ -84,6 +86,11 @@ export function LecturasSection({
   const canEdit = userRole !== 'viewer'
   const clienteSeleccionado = clientes.find(c => c.id === selectedClienteId) ?? null
 
+  const tarifaVigente = clienteSeleccionado?.tarifa_id
+    ? (tarifas.find(t => t.id === clienteSeleccionado.tarifa_id) ?? null)
+    : null
+  const tarifaExpirada = tarifaVigente !== null && !tarifaVigente.activa
+
   function getUltimaLectura(clienteId: string): number {
     const cliente = clientes.find(c => c.id === clienteId)
     const historial = registros
@@ -130,6 +137,15 @@ export function LecturasSection({
 
   async function handleGuardar() {
     if (!clienteSeleccionado) return Swal.fire('Atención', 'Seleccione un cliente primero', 'warning')
+    if (tarifaExpirada) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Tarifa No Vigente',
+        text: 'La tarifa asignada no está vigente. Por favor comuníquese con su empresa para actualizar la tarifa antes de registrar lecturas.',
+        confirmButtonColor: '#0ea5e9',
+      })
+      return
+    }
     if (consumo === null || isNaN(consumo)) return Swal.fire('Error', 'Datos de lectura inválidos', 'error')
     if (consumo < 0) return Swal.fire('Consumo Negativo', 'La lectura actual debe ser mayor o igual a la anterior.', 'error')
 
@@ -370,9 +386,14 @@ export function LecturasSection({
               </div>
             </div>
 
+            {tarifaExpirada && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', padding: '14px 18px', marginBottom: '12px', color: '#dc2626', fontWeight: 600, fontSize: '14px' }}>
+                Tarifa no vigente. No es posible registrar lecturas hasta que la empresa actualice la tarifa asignada.
+              </div>
+            )}
             {canEdit && (
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={handleGuardar} disabled={saving} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={handleGuardar} disabled={saving || tarifaExpirada} style={{ padding: '12px 24px', background: (saving || tarifaExpirada) ? '#94a3b8' : 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: (saving || tarifaExpirada) ? 'not-allowed' : 'pointer' }}>
                   {saving ? 'Guardando...' : enModoRuta ? `💾 Guardar y Avanzar (${rutaIndex + 1}/${clientesOrdenados.length})` : '💾 Guardar Lectura'}
                 </button>
                 <button onClick={limpiarFormulario} style={{ padding: '12px 24px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>

@@ -171,6 +171,7 @@ export default function App() {
               registros={registros}
               userRole={currentUser.role}
               moneda={moneda}
+              tarifas={tarifas}
               onRegistroAdded={addRegistro}
               rutaActiva={rutaActivaParaLecturas}
               onClearRuta={() => setRutaActivaParaLecturas(null)}
