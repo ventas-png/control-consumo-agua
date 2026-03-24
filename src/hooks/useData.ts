@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador } from '../types'
+import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad } from '../types'
 import { supabase } from '../lib/supabase'
 
 interface AppData {
@@ -12,6 +12,7 @@ interface AppData {
   rutas: Ruta[]
   tarifas: Tarifa[]
   contadores: Contador[]
+  unidades: Unidad[]
 }
 
 const INITIAL_DATA: AppData = {
@@ -23,13 +24,14 @@ const INITIAL_DATA: AppData = {
   rutas: [],
   tarifas: [],
   contadores: [],
+  unidades: [],
 }
 
 export function useData() {
   const [data, setData] = useState<AppData>(INITIAL_DATA)
 
   const cargarDatos = useCallback(async () => {
-    const [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes, contadoresRes] = await Promise.allSettled([
+    const [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes, contadoresRes, unidadesRes] = await Promise.allSettled([
       supabase.from('clientes').select('*'),
       supabase.from('registros').select('*'),
       supabase.from('empresa').select('*').limit(1),
@@ -41,6 +43,7 @@ export function useData() {
       supabase.from('rutas').select('*').order('created_at', { ascending: false }),
       supabase.from('tarifas').select('*').order('created_at', { ascending: false }),
       supabase.from('contadores').select('*').order('created_at', { ascending: false }),
+      supabase.from('unidades').select('*').order('nombre', { ascending: true }),
     ])
 
     setData(prev => {
@@ -68,6 +71,9 @@ export function useData() {
       }
       if (contadoresRes.status === 'fulfilled' && contadoresRes.value.data) {
         next.contadores = contadoresRes.value.data as Contador[]
+      }
+      if (unidadesRes.status === 'fulfilled' && unidadesRes.value.data) {
+        next.unidades = unidadesRes.value.data as Unidad[]
       }
       return next
     })
@@ -176,6 +182,21 @@ export function useData() {
     setData(prev => ({ ...prev, contadores: prev.contadores.filter(c => c.id !== id) }))
   }, [])
 
+  const addUnidad = useCallback((unidad: Unidad) => {
+    setData(prev => ({ ...prev, unidades: [...prev.unidades, unidad].sort((a, b) => a.nombre.localeCompare(b.nombre)) }))
+  }, [])
+
+  const updateUnidad = useCallback((id: string, partial: Partial<Unidad>) => {
+    setData(prev => ({
+      ...prev,
+      unidades: prev.unidades.map(u => (u.id === id ? { ...u, ...partial } : u)),
+    }))
+  }, [])
+
+  const deleteUnidad = useCallback((id: string) => {
+    setData(prev => ({ ...prev, unidades: prev.unidades.filter(u => u.id !== id) }))
+  }, [])
+
   return {
     ...data,
     cargarDatos,
@@ -197,5 +218,8 @@ export function useData() {
     addContador,
     updateContador,
     deleteContador,
+    addUnidad,
+    updateUnidad,
+    deleteUnidad,
   }
 }
