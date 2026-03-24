@@ -46,11 +46,17 @@ async function buildSessionFromSupabase(
   email: string,
   expiresAt: number | undefined
 ): Promise<UserSession> {
-  const { data: profile } = await supabase
+  const profileQuery = supabase
     .from('app_users')
     .select('full_name, role, company_id')
     .eq('id', userId)
     .single()
+
+  const timeout = new Promise<{ data: null; error: null }>(resolve =>
+    setTimeout(() => resolve({ data: null, error: null }), 5000)
+  )
+
+  const { data: profile } = await Promise.race([profileQuery, timeout])
 
   const dbRole: string = (profile as { full_name?: string; role?: string; company_id?: string } | null)?.role ?? ''
   const companyId: string | undefined = (profile as { full_name?: string; role?: string; company_id?: string } | null)?.company_id ?? undefined
