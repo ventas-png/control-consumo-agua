@@ -10,16 +10,62 @@ interface Props {
   userRole: UserRole
   userId: string
   onClienteAdded: (cliente: Cliente) => void
+  onClienteUpdated: (id: string, partial: Partial<Cliente>) => void
+  onClienteDeleted: (id: string) => void
 }
 
-const EMPTY_FORM = { nombre: '', codigo: '', medidor: '', email: '', direccion: '', telefono: '', tarifa: '3.00', canon: '20.00', consumo_minimo: '0', lectura_inicial: '0' }
+const EMPTY_FORM = {
+  nombre: '',
+  codigo: '',
+  medidor: '',
+  email: '',
+  direccion: '',
+  telefono: '',
+  tarifa: '3.00',
+  canon: '20.00',
+  consumo_minimo: '0',
+  lectura_inicial: '0',
+}
 
-export function ClientesSection({ clientes, userRole, userId, onClienteAdded }: Props) {
-  const [form, setForm] = useState(EMPTY_FORM)
+type FormState = typeof EMPTY_FORM
+
+export function ClientesSection({ clientes, userRole, userId, onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
+  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
 
   const canEdit = userRole !== 'viewer'
+
+  function startCreate() {
+    setForm(EMPTY_FORM)
+    setEditingId(null)
+    setShowForm(true)
+  }
+
+  function startEdit(c: Cliente) {
+    setForm({
+      nombre: c.nombre,
+      codigo: c.codigo,
+      medidor: c.medidor,
+      email: c.email ?? '',
+      direccion: c.direccion ?? '',
+      telefono: c.telefono ?? '',
+      tarifa: String(c.tarifa),
+      canon: String(c.canon),
+      consumo_minimo: String(c.consumo_minimo),
+      lectura_inicial: String(c.lectura_inicial),
+    })
+    setEditingId(c.id)
+    setShowForm(true)
+  }
+
+  function cancelForm() {
+    setShowForm(false)
+    setEditingId(null)
+    setForm(EMPTY_FORM)
+  }
 
   async function handleGuardar() {
     const nombre = sanitizeInput(form.nombre)
@@ -40,6 +86,7 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded }: 
     if (telefono && !validatePhoneNumber(telefono)) errors.push('Teléfono debe tener 8 dígitos (Guatemala)')
     if (!validateNumber(tarifa, 0, 1000)) errors.push('Tarifa debe estar entre 0 y 1000')
     if (!validateNumber(canon, 0, 1000)) errors.push('Canon debe estar entre 0 y 1000')
+    if (!validateNumber(consumo_minimo, 0, 999999)) errors.push('Consumo mínimo inválido')
     if (!validateNumber(lectura_inicial, 0, 999999)) errors.push('Lectura inicial inválida')
 
     if (errors.length > 0) {
@@ -48,19 +95,60 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded }: 
     }
 
     setLoading(true)
-    await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: userRole }, userId)
 
-    const nuevo = { nombre, codigo, medidor, email, direccion, telefono, tarifa, canon, consumo_minimo, lectura_inicial }
-    const { data, error } = await supabase.from('clientes').insert(nuevo).select()
+    if (editingId) {
+      const payload = { nombre, codigo, medidor, email: email || null, direccion: direccion || null, telefono: telefono || null, tarifa, canon, consumo_minimo, lectura_inicial }
+      const { data, error } = await supabase
+        .from('clientes')
+        .update(payload)
+        .eq('id', editingId)
+        .select()
+        .single()
 
-    if (!error && data) {
-      onClienteAdded(data[0] as Cliente)
-      setForm(EMPTY_FORM)
-      Swal.fire({ icon: 'success', title: 'Cliente Guardado', timer: 2000, showConfirmButton: false })
+      if (!error && data) {
+        onClienteUpdated(editingId, data as Cliente)
+        cancelForm()
+        Swal.fire({ icon: 'success', title: 'Cliente actualizado', timer: 1800, showConfirmButton: false })
+      } else {
+        Swal.fire('Error', error?.message ?? 'No se pudo actualizar el cliente.', 'error')
+      }
     } else {
-      Swal.fire('Error', 'No se pudo guardar el cliente. Verifique conexión.', 'error')
+      await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: userRole }, userId)
+      const nuevo = { nombre, codigo, medidor, email: email || null, direccion: direccion || null, telefono: telefono || null, tarifa, canon, consumo_minimo, lectura_inicial }
+      const { data, error } = await supabase.from('clientes').insert(nuevo).select()
+
+      if (!error && data) {
+        onClienteAdded(data[0] as Cliente)
+        cancelForm()
+        Swal.fire({ icon: 'success', title: 'Cliente guardado', timer: 2000, showConfirmButton: false })
+      } else {
+        Swal.fire('Error', 'No se pudo guardar el cliente. Verifique conexión.', 'error')
+      }
     }
+
     setLoading(false)
+  }
+
+  async function handleEliminar(c: Cliente) {
+    const result = await Swal.fire({
+      title: '¿Eliminar cliente?',
+      html: `<b>${c.nombre}</b> y todos sus datos asociados serán eliminados permanentemente.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+    })
+    if (!result.isConfirmed) return
+
+    const { error } = await supabase.from('clientes').delete().eq('id', c.id)
+    if (!error) {
+      onClienteDeleted(c.id)
+      Swal.fire({ icon: 'success', title: 'Cliente eliminado', timer: 1500, showConfirmButton: false })
+    } else {
+      Swal.fire('Error', error.message ?? 'No se pudo eliminar el cliente.', 'error')
+    }
   }
 
   const filtered = clientes.filter(c =>
@@ -68,85 +156,236 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded }: 
     c.codigo.toLowerCase().includes(search.toLowerCase())
   )
 
-  const inputStyle: React.CSSProperties = { padding: '12px 16px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
-  const labelStyle: React.CSSProperties = { fontSize: '14px', fontWeight: 600, color: '#4a5568', marginBottom: '6px', display: 'block' }
+  const inputStyle: React.CSSProperties = {
+    padding: '10px 14px',
+    border: '2px solid #e2e8f0',
+    borderRadius: '8px',
+    fontSize: '14px',
+    width: '100%',
+    boxSizing: 'border-box',
+    outline: 'none',
+  }
+  const labelStyle: React.CSSProperties = {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#4a5568',
+    marginBottom: '5px',
+    display: 'block',
+  }
+
+  const FIELDS = [
+    { label: 'Nombre Completo *', key: 'nombre', placeholder: 'Ej. Juan Pérez', type: 'text' },
+    { label: 'Código *', key: 'codigo', placeholder: 'Ej. CLI-001', type: 'text' },
+    { label: 'N° Medidor', key: 'medidor', placeholder: 'Ej. MED-123456', type: 'text' },
+    { label: 'Email', key: 'email', placeholder: 'cliente@email.com', type: 'email' },
+    { label: 'Dirección', key: 'direccion', placeholder: '', type: 'text' },
+    { label: 'Teléfono', key: 'telefono', placeholder: 'Ej. 55551234', type: 'tel' },
+    { label: 'Tarifa Consumo (Q/m³)', key: 'tarifa', placeholder: '3.00', type: 'number' },
+    { label: 'Canon Fijo (Q)', key: 'canon', placeholder: '20.00', type: 'number' },
+    { label: 'Consumo Mínimo (m³)', key: 'consumo_minimo', placeholder: '0', type: 'number' },
+    { label: 'Lectura Inicial', key: 'lectura_inicial', placeholder: '0', type: 'number' },
+  ]
 
   return (
     <div>
-      {canEdit && (
-        <div style={{ background: 'white', borderRadius: '24px', padding: '32px', marginBottom: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', borderBottom: '2px solid #e2e8f0', paddingBottom: '12px' }}>
-            Registrar Nuevo Cliente
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>Clientes</h2>
+          <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>
+            {clientes.length} cliente{clientes.length !== 1 ? 's' : ''} registrado{clientes.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="Buscar por nombre o código..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ ...inputStyle, width: '240px' }}
+          />
+          {canEdit && (
+            <button
+              onClick={startCreate}
+              style={{
+                padding: '10px 20px',
+                background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '14px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              + Nuevo Cliente
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Form */}
+      {showForm && canEdit && (
+        <div style={{ background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+          <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '20px', color: '#1e293b' }}>
+            {editingId ? 'Editar Cliente' : 'Nuevo Cliente'}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-            {[
-              { label: 'Nombre Completo', key: 'nombre', placeholder: 'Ej. Juan Pérez', type: 'text' },
-              { label: 'Código', key: 'codigo', placeholder: 'Ej. CLI-001', type: 'text' },
-              { label: 'Medidor', key: 'medidor', placeholder: 'Ej. MED-123456', type: 'text' },
-              { label: 'Email', key: 'email', placeholder: 'cliente@email.com', type: 'email' },
-              { label: 'Dirección', key: 'direccion', placeholder: '', type: 'text' },
-              { label: 'Teléfono', key: 'telefono', placeholder: 'Ej. 55551234', type: 'tel' },
-              { label: 'Tarifa Consumo (Q/m³)', key: 'tarifa', placeholder: '', type: 'number' },
-              { label: 'Canon Fijo (Q)', key: 'canon', placeholder: '', type: 'number' },
-              { label: 'Consumo Mínimo (m³)', key: 'consumo_minimo', placeholder: '0', type: 'number' },
-              { label: 'Lectura Inicial', key: 'lectura_inicial', placeholder: '', type: 'number' },
-            ].map(f => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+            {FIELDS.map(f => (
               <div key={f.key}>
                 <label style={labelStyle}>{f.label}</label>
                 <input
                   type={f.type}
-                  value={form[f.key as keyof typeof form]}
+                  value={form[f.key as keyof FormState]}
                   onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                   placeholder={f.placeholder}
                   style={inputStyle}
+                  min={f.type === 'number' ? '0' : undefined}
+                  step={f.type === 'number' ? '0.01' : undefined}
                 />
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '10px' }}>
             <button
               onClick={handleGuardar}
               disabled={loading}
-              style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+              style={{
+                padding: '10px 24px',
+                background: loading ? '#94a3b8' : 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+              }}
             >
-              {loading ? 'Guardando...' : '💾 Guardar Cliente'}
+              {loading ? 'Guardando...' : editingId ? 'Actualizar' : 'Guardar'}
             </button>
             <button
-              onClick={() => setForm(EMPTY_FORM)}
-              style={{ padding: '12px 24px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+              onClick={cancelForm}
+              style={{
+                padding: '10px 24px',
+                background: '#f1f5f9',
+                color: '#475569',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
             >
-              Limpiar
+              Cancelar
             </button>
           </div>
         </div>
       )}
 
-      <div style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
-        <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>
-          Directorio de Clientes ({clientes.length})
-        </div>
-        <input
-          type="text"
-          placeholder="Buscar..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ ...inputStyle, marginBottom: '16px' }}
-        />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
-          {filtered.map(c => (
-            <div key={c.id} style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontWeight: 700, marginBottom: '4px' }}>{sanitizeHTML(c.nombre)}</div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
-                {sanitizeHTML(c.codigo)} | {sanitizeHTML(c.medidor)}
-              </div>
-              <div style={{ fontSize: '12px', color: '#0ea5e9' }}>
-                Tarifa: Q{c.tarifa} | Canon: Q{c.canon}
-              </div>
+      {/* Grid */}
+      <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+        {filtered.length === 0 ? (
+          <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>👤</div>
+            <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '6px' }}>
+              {search ? 'Sin resultados' : 'No hay clientes registrados'}
             </div>
-          ))}
-          {filtered.length === 0 && (
-            <p style={{ color: '#94a3b8', gridColumn: '1/-1' }}>No se encontraron clientes.</p>
-          )}
+            <div style={{ fontSize: '14px' }}>
+              {search ? 'Intenta con otro término' : canEdit ? 'Crea el primer cliente con el botón "+ Nuevo Cliente"' : 'No hay clientes aún'}
+            </div>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Cliente</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Código</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Medidor</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Contacto</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Tarifa</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Canon</th>
+                  {canEdit && (
+                    <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((c, idx) => (
+                  <tr
+                    key={c.id}
+                    style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? 'white' : '#fafbfc' }}
+                  >
+                    <td style={{ padding: '12px 16px', fontWeight: 600, color: '#1e293b' }}>
+                      {sanitizeHTML(c.nombre)}
+                      {c.direccion && (
+                        <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 400, marginTop: '2px' }}>
+                          {sanitizeHTML(c.direccion)}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
+                      {sanitizeHTML(c.codigo)}
+                    </td>
+                    <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
+                      {c.medidor ? sanitizeHTML(c.medidor) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                    </td>
+                    <td style={{ padding: '12px 16px', color: '#475569' }}>
+                      {c.email && <div style={{ fontSize: '13px' }}>{sanitizeHTML(c.email)}</div>}
+                      {c.telefono && <div style={{ fontSize: '12px', color: '#94a3b8' }}>{sanitizeHTML(c.telefono)}</div>}
+                      {!c.email && !c.telefono && <span style={{ color: '#cbd5e1' }}>—</span>}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
+                      Q {Number(c.tarifa).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
+                      Q {Number(c.canon).toFixed(2)}
+                    </td>
+                    {canEdit && (
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                          <button
+                            onClick={() => startEdit(c)}
+                            style={{
+                              padding: '5px 12px',
+                              background: '#eff6ff',
+                              color: '#1d4ed8',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              fontSize: '12px',
+                            }}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleEliminar(c)}
+                            style={{
+                              padding: '5px 12px',
+                              background: '#fef2f2',
+                              color: '#dc2626',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              fontSize: '12px',
+                            }}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div style={{ padding: '12px 16px', borderTop: '1px solid #f1f5f9', color: '#94a3b8', fontSize: '12px' }}>
+          {filtered.length} cliente{filtered.length !== 1 ? 's' : ''} {search ? 'encontrados' : 'registrados'}
         </div>
       </div>
     </div>

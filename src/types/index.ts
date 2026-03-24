@@ -122,6 +122,23 @@ export interface Tarifa {
   updated_at?: string;
 }
 
+export interface Contador {
+  id: string;
+  project_id: string;
+  company_id: string;
+  numero_serie: string;
+  tipo_agua: TipoAgua;
+  descripcion?: string;
+  marca?: string;
+  modelo?: string;
+  fecha_instalacion?: string;
+  lectura_inicial: number;
+  activo: boolean;
+  cliente_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export type AppSection =
   | 'clientes'
   | 'lecturas'
@@ -131,6 +148,7 @@ export type AppSection =
   | 'calidad'
   | 'rutas'
   | 'tarifas'
+  | 'contadores'
   | 'configuracion'
   | 'perfil'
   | 'empresa_proyectos'

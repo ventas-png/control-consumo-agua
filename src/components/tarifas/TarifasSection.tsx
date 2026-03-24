@@ -31,7 +31,7 @@ const EMPTY_FORM = {
   tipo_agua: 'potable',
   precio_m3: '0.00',
   canon_fijo: '0.00',
-  consumo_minimo: '0',
+  consumo_minimo: '0.0000',
   descripcion: '',
   activa: true,
 }
@@ -356,8 +356,11 @@ export function TarifasSection({
                 step="0.0001"
                 value={form.consumo_minimo}
                 onChange={e => setForm(f => ({ ...f, consumo_minimo: e.target.value }))}
-                placeholder="0"
+                placeholder="0.0000"
               />
+              <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                Si consumo ≤ este valor, se cobra solo el canon fijo
+              </span>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Descripción</label>

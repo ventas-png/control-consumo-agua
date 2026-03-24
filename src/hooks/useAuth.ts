@@ -116,7 +116,11 @@ export function useAuth() {
     }
 
     // Check for active Supabase session (e.g. after Google OAuth redirect)
+    // Timeout prevents infinite "Cargando..." if Supabase is unreachable
+    const timeoutId = setTimeout(() => setLoading(false), 8000)
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(timeoutId)
       if (session?.user) {
         const existing = getStoredSession()
         if (!existing) {
@@ -134,6 +138,9 @@ export function useAuth() {
           }
         }
       }
+      setLoading(false)
+    }).catch(() => {
+      clearTimeout(timeoutId)
       setLoading(false)
     })
   }, [])
