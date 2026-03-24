@@ -25,17 +25,33 @@ export function SuperAdminSection() {
 
   const cargar = useCallback(async () => {
     setLoading(true)
-    const { data: companiesData } = await supabase
+
+    // Try with max_units first; fall back without it if the column doesn't exist yet
+    let companiesData: Empresa[] | null = null
+    const { data: fullData, error: fullError } = await supabase
       .from('companies')
       .select('id, nombre, nit, email, telefono, plan, activa, max_projects, max_units')
       .order('nombre')
+
+    if (!fullError && fullData) {
+      companiesData = fullData as Empresa[]
+    } else {
+      // Column max_units may not exist yet — fetch without it
+      const { data: fallbackData } = await supabase
+        .from('companies')
+        .select('id, nombre, nit, email, telefono, plan, activa, max_projects')
+        .order('nombre')
+      if (fallbackData) {
+        companiesData = (fallbackData as Omit<Empresa, 'max_units'>[]).map(c => ({ ...c, max_units: 50 }))
+      }
+    }
 
     if (!companiesData) { setLoading(false); return }
 
     // Obtener conteos por empresa
     const empresasConConteos = await Promise.all(
-      (companiesData as Empresa[]).map(async (c) => {
-        const [{ count: projectCount }, { count: userCount }, { count: unitCount }] = await Promise.all([
+      companiesData.map(async (c) => {
+        const [{ count: projectCount }, { count: userCount }, unidadesResult] = await Promise.all([
           supabase.from('projects').select('id', { count: 'exact', head: true }).eq('company_id', c.id),
           supabase.from('app_users').select('id', { count: 'exact', head: true }).eq('company_id', c.id),
           supabase.from('unidades').select('id', { count: 'exact', head: true }).eq('company_id', c.id),
@@ -44,7 +60,8 @@ export function SuperAdminSection() {
           ...c,
           project_count: projectCount ?? 0,
           user_count: userCount ?? 0,
-          unit_count: unitCount ?? 0,
+          // unidades table may not exist yet
+          unit_count: unidadesResult.error ? 0 : (unidadesResult.count ?? 0),
         }
       })
     )
