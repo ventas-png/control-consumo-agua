@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import type { Unidad, TipoUnidad, UserRole, UserSession, Contador } from '../../types'
+import type { Unidad, TipoUnidad, UserRole, UserSession, Contador, MaxUnidadesPorTipo } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
 
@@ -9,6 +9,7 @@ interface Props {
   contadores: Contador[]
   userRole: UserRole
   currentUser: UserSession
+  maxUnidadesPorTipo?: MaxUnidadesPorTipo | null
   onUnidadAdded: (unidad: Unidad) => void
   onUnidadUpdated: (id: string, partial: Partial<Unidad>) => void
   onUnidadDeleted: (id: string) => void
@@ -53,6 +54,7 @@ export function UnidadesSection({
   contadores,
   userRole,
   currentUser,
+  maxUnidadesPorTipo,
   onUnidadAdded,
   onUnidadUpdated,
   onUnidadDeleted,
@@ -107,6 +109,24 @@ export function UnidadesSection({
     if (errors.length > 0) {
       Swal.fire('Error de validación', errors.join('<br>'), 'error')
       return
+    }
+
+    // Check per-type unit limit (only for new units, not edits)
+    if (!editingId && maxUnidadesPorTipo) {
+      const max = maxUnidadesPorTipo[form.tipo as TipoUnidad]
+      if (max !== null && max !== undefined) {
+        const currentCount = unidades.filter(u => u.tipo === form.tipo).length
+        if (currentCount >= max) {
+          const tipoLabel = TIPOS_UNIDAD.find(t => t.value === form.tipo)?.label ?? form.tipo
+          Swal.fire({
+            icon: 'warning',
+            title: 'Límite alcanzado',
+            text: `Este proyecto tiene un máximo de ${max} unidad${max !== 1 ? 'es' : ''} de tipo "${tipoLabel}". Ya se han registrado ${currentCount}.`,
+            confirmButtonText: 'Entendido',
+          })
+          return
+        }
+      }
     }
 
     setLoading(true)
@@ -257,7 +277,8 @@ export function UnidadesSection({
   const resumen = TIPOS_UNIDAD.map(t => ({
     ...t,
     total: unidades.filter(u => u.tipo === t.value).length,
-  })).filter(t => t.total > 0)
+    max: maxUnidadesPorTipo?.[t.value as TipoUnidad] ?? null,
+  })).filter(t => t.total > 0 || (t.max !== null))
 
   const inputStyle: React.CSSProperties = {
     padding: '10px 14px',
@@ -349,8 +370,8 @@ export function UnidadesSection({
                 <div style={{ fontSize: '11px', fontWeight: 600, color: col.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {r.label}
                 </div>
-                <div style={{ fontSize: '22px', fontWeight: 700, color: '#0f172a', margin: '2px 0' }}>
-                  {r.total}
+                <div style={{ fontSize: '22px', fontWeight: 700, color: r.max !== null && r.total >= r.max ? '#ef4444' : '#0f172a', margin: '2px 0' }}>
+                  {r.total}{r.max !== null ? <span style={{ fontSize: '13px', fontWeight: 500, color: '#94a3b8' }}>/{r.max}</span> : null}
                 </div>
               </div>
             )

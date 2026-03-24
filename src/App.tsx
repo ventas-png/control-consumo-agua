@@ -35,6 +35,7 @@ export default function App() {
   const { currentUser, loading, login, loginWithGoogle, logout, updateProfile } = useAuth()
   const {
     clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores, unidades,
+    moneda, maxUnidadesPorTipo,
     cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado,
     setFuentesAgua, setRegistrosCalidad, addRuta, updateRuta, deleteRuta,
     addTarifa, updateTarifa, deleteTarifa,
@@ -158,6 +159,7 @@ export default function App() {
               clientes={clientes}
               userRole={currentUser.role}
               userId={currentUser.user_id}
+              moneda={moneda}
               onClienteAdded={addCliente}
               onClienteUpdated={updateCliente}
               onClienteDeleted={deleteCliente}
@@ -168,6 +170,7 @@ export default function App() {
               clientes={clientes}
               registros={registros}
               userRole={currentUser.role}
+              moneda={moneda}
               onRegistroAdded={addRegistro}
               rutaActiva={rutaActivaParaLecturas}
               onClearRuta={() => setRutaActivaParaLecturas(null)}
@@ -179,11 +182,12 @@ export default function App() {
               registros={registros}
               clientes={clientes}
               userRole={currentUser.role}
+              moneda={moneda}
               onEstadoUpdated={updateRegistroEstado}
             />
           )}
           {activeSection === 'dashboard' && (
-            <DashboardSection registros={registros} />
+            <DashboardSection registros={registros} moneda={moneda} />
           )}
           {activeSection === 'mapa' && (
             <MapaSection clientes={clientes} registros={registros} />
@@ -223,6 +227,7 @@ export default function App() {
               tarifas={tarifas}
               userRole={currentUser.role}
               currentUser={currentUser}
+              moneda={moneda}
               onTarifaAdded={addTarifa}
               onTarifaUpdated={updateTarifa}
               onTarifaDeleted={deleteTarifa}
@@ -234,6 +239,7 @@ export default function App() {
               contadores={contadores}
               userRole={currentUser.role}
               currentUser={currentUser}
+              maxUnidadesPorTipo={maxUnidadesPorTipo}
               onUnidadAdded={addUnidad}
               onUnidadUpdated={updateUnidad}
               onUnidadDeleted={deleteUnidad}
@@ -247,6 +253,7 @@ export default function App() {
               unidades={unidades}
               userRole={currentUser.role}
               currentUser={currentUser}
+              moneda={moneda}
               onContadorAdded={addContador}
               onContadorUpdated={updateContador}
               onContadorDeleted={deleteContador}

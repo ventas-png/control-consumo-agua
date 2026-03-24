@@ -9,6 +9,7 @@ interface Props {
   clientes: Cliente[]
   registros: Registro[]
   userRole: UserRole
+  moneda?: string
   onRegistroAdded: (registro: Registro) => void
   rutaActiva?: Ruta | null
   onClearRuta?: () => void
@@ -19,6 +20,7 @@ export function LecturasSection({
   clientes,
   registros,
   userRole,
+  moneda = 'Q',
   onRegistroAdded,
   rutaActiva,
   onClearRuta,
@@ -113,7 +115,7 @@ export function LecturasSection({
     telefono = telefono.replace(/[^0-9]/g, '')
     if (telefono.length === 8) telefono = APP_CONFIG.COUNTRY_CODE + telefono
     const total = registro.monto_calculado
-    const msg = `Hola ${registro.cliente_nombre}, su recibo de agua potable:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: Q${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
+    const msg = `Hola ${registro.cliente_nombre}, su recibo de agua potable:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: ${moneda}${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
@@ -301,7 +303,7 @@ export function LecturasSection({
               <div><small style={{ color: '#64748b' }}>Cliente</small><div style={{ fontWeight: 700 }}>{clienteSeleccionado.nombre}</div></div>
               <div><small style={{ color: '#64748b' }}>Medidor</small><div style={{ fontWeight: 700 }}>{clienteSeleccionado.medidor}</div></div>
               <div><small style={{ color: '#64748b' }}>Última Lectura</small><div style={{ fontWeight: 700 }}>{ultimaLectura}</div></div>
-              <div><small style={{ color: '#64748b' }}>Tarifas</small><div style={{ fontSize: '13px' }}>Q{clienteSeleccionado.tarifa}/m³ | Canon: Q{clienteSeleccionado.canon}</div></div>
+              <div><small style={{ color: '#64748b' }}>Tarifas</small><div style={{ fontSize: '13px' }}>{moneda}{clienteSeleccionado.tarifa}/m³ | Canon: {moneda}{clienteSeleccionado.canon}</div></div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '20px' }}>
@@ -314,8 +316,8 @@ export function LecturasSection({
                 <input type="text" readOnly value={consumo !== null ? (consumoInvalido ? consumo.toFixed(2) + ' (ERROR)' : consumo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? '#dc2626' : '#0ea5e9', background: '#f7fafc' }} />
               </div>
               <div>
-                <label style={labelStyle}>Monto Estimado (Q)</label>
-                <input type="text" readOnly value={calculo ? `Q${calculo.total.toFixed(2)} (${calculo.tipo_cobro})` : ''} style={{ ...inputStyle, fontWeight: 'bold', color: '#166534', background: '#f0fdf4' }} />
+                <label style={labelStyle}>Monto Estimado ({moneda})</label>
+                <input type="text" readOnly value={calculo ? `${moneda}${calculo.total.toFixed(2)} (${calculo.tipo_cobro})` : ''} style={{ ...inputStyle, fontWeight: 'bold', color: '#166534', background: '#f0fdf4' }} />
               </div>
               <div>
                 <label style={labelStyle}>Mes Facturación</label>

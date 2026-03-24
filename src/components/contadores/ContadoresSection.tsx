@@ -11,6 +11,7 @@ interface Props {
   unidades: Unidad[]
   userRole: UserRole
   currentUser: UserSession
+  moneda?: string
   onContadorAdded: (contador: Contador) => void
   onContadorUpdated: (id: string, partial: Partial<Contador>) => void
   onContadorDeleted: (id: string) => void
@@ -62,6 +63,7 @@ export function ContadoresSection({
   unidades,
   userRole,
   currentUser,
+  moneda = 'Q',
   onContadorAdded,
   onContadorUpdated,
   onContadorDeleted,
@@ -454,7 +456,7 @@ export function ContadoresSection({
                 <option value="">— Sin tarifa asignada —</option>
                 {tarifasParaTipo(form.tipo_agua).map(t => (
                   <option key={t.id} value={t.id}>
-                    {t.nombre} — {t.precio_m3} €/m³{t.canon_fijo > 0 ? ` + ${t.canon_fijo} € canon` : ''}
+                    {t.nombre} — {t.precio_m3} {moneda}/m³{t.canon_fijo > 0 ? ` + ${t.canon_fijo} ${moneda} canon` : ''}
                   </option>
                 ))}
                 {tarifasParaTipo(form.tipo_agua).length === 0 && (

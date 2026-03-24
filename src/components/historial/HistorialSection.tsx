@@ -10,10 +10,11 @@ interface Props {
   registros: Registro[]
   clientes: Cliente[]
   userRole: UserRole
+  moneda?: string
   onEstadoUpdated: (id: string, estado: Registro['estado']) => void
 }
 
-export function HistorialSection({ registros, clientes, userRole, onEstadoUpdated }: Props) {
+export function HistorialSection({ registros, clientes, userRole, moneda = 'Q', onEstadoUpdated }: Props) {
   const [filtroTexto, setFiltroTexto] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [editModal, setEditModal] = useState<{ registroId: string; estado: Registro['estado'] } | null>(null)
@@ -40,7 +41,7 @@ export function HistorialSection({ registros, clientes, userRole, onEstadoUpdate
     telefono = telefono.replace(/[^0-9]/g, '')
     if (telefono.length === 8) telefono = APP_CONFIG.COUNTRY_CODE + telefono
     const total = getTotal(registro)
-    const msg = `Hola ${registro.cliente_nombre}, su recibo de agua potable:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: Q${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
+    const msg = `Hola ${registro.cliente_nombre}, su recibo de agua potable:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: ${moneda}${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
@@ -96,7 +97,7 @@ export function HistorialSection({ registros, clientes, userRole, onEstadoUpdate
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
           <thead style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white' }}>
             <tr>
-              {['Fecha', 'Cliente', 'Lect. Ant.', 'Lect. Act.', 'Consumo', 'Total (Q)', 'Estado', 'Acciones'].map(h => (
+              {['Fecha', 'Cliente', 'Lect. Ant.', 'Lect. Act.', 'Consumo', `Total (${moneda})`, 'Estado', 'Acciones'].map(h => (
                 <th key={h} style={{ padding: '14px 12px', textAlign: 'left' }}>{h}</th>
               ))}
             </tr>
@@ -111,7 +112,7 @@ export function HistorialSection({ registros, clientes, userRole, onEstadoUpdate
                   <td style={{ padding: '14px 12px' }}>{r.lectura_anterior}</td>
                   <td style={{ padding: '14px 12px' }}>{r.lectura_actual}</td>
                   <td style={{ padding: '14px 12px' }}><strong>{r.consumo.toFixed(2)}</strong></td>
-                  <td style={{ padding: '14px 12px' }}>Q{total.toFixed(2)}</td>
+                  <td style={{ padding: '14px 12px' }}>{moneda}{total.toFixed(2)}</td>
                   <td style={{ padding: '14px 12px' }}><span style={pillStyle(r.estado)}>{r.estado}</span></td>
                   <td style={{ padding: '14px 12px' }}>
                     <div style={{ display: 'flex', gap: '5px' }}>

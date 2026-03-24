@@ -9,6 +9,7 @@ interface Props {
   clientes: Cliente[]
   userRole: UserRole
   userId: string
+  moneda?: string
   onClienteAdded: (cliente: Cliente) => void
   onClienteUpdated: (id: string, partial: Partial<Cliente>) => void
   onClienteDeleted: (id: string) => void
@@ -29,7 +30,7 @@ const EMPTY_FORM = {
 
 type FormState = typeof EMPTY_FORM
 
-export function ClientesSection({ clientes, userRole, userId, onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
+export function ClientesSection({ clientes, userRole, userId, moneda = 'Q', onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -180,8 +181,8 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
     { label: 'Email', key: 'email', placeholder: 'cliente@email.com', type: 'email' },
     { label: 'Dirección', key: 'direccion', placeholder: '', type: 'text' },
     { label: 'Teléfono', key: 'telefono', placeholder: 'Ej. 55551234', type: 'tel' },
-    { label: 'Tarifa Consumo (Q/m³)', key: 'tarifa', placeholder: '3.00', type: 'number' },
-    { label: 'Canon Fijo (Q)', key: 'canon', placeholder: '20.00', type: 'number' },
+    { label: `Tarifa Consumo (${moneda}/m³)`, key: 'tarifa', placeholder: '3.00', type: 'number' },
+    { label: `Canon Fijo (${moneda})`, key: 'canon', placeholder: '20.00', type: 'number' },
     { label: 'Consumo Mínimo (m³)', key: 'consumo_minimo', placeholder: '0', type: 'number' },
     { label: 'Lectura Inicial', key: 'lectura_inicial', placeholder: '0', type: 'number' },
   ]
@@ -337,10 +338,10 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
                       {!c.email && !c.telefono && <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
-                      Q {Number(c.tarifa).toFixed(2)}
+                      {moneda} {Number(c.tarifa).toFixed(2)}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
-                      Q {Number(c.canon).toFixed(2)}
+                      {moneda} {Number(c.canon).toFixed(2)}
                     </td>
                     {canEdit && (
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>

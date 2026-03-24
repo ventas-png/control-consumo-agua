@@ -167,6 +167,47 @@ export interface Unidad {
   updated_at?: string;
 }
 
+export type EstadoProyecto = 'activo' | 'inactivo' | 'suspendido'
+
+export type MaxUnidadesPorTipo = {
+  apartamento: number | null
+  casa: number | null
+  bodega: number | null
+  local_comercial: number | null
+  oficina: number | null
+  parqueadero: number | null
+  otro: number | null
+}
+
+export interface Proyecto {
+  id: string
+  nombre: string
+  logo_url: string | null
+  descripcion: string | null
+  direccion: string | null
+  latitud: number | null
+  longitud: number | null
+  moneda: string
+  estado: EstadoProyecto
+  max_unidades_apartamento: number | null
+  max_unidades_casa: number | null
+  max_unidades_bodega: number | null
+  max_unidades_local_comercial: number | null
+  max_unidades_oficina: number | null
+  max_unidades_parqueadero: number | null
+  max_unidades_otro: number | null
+}
+
+export const MONEDAS = [
+  { simbolo: 'Q',   nombre: 'Quetzal (Guatemala)' },
+  { simbolo: '$',   nombre: 'Dólar' },
+  { simbolo: '€',   nombre: 'Euro' },
+  { simbolo: 'C$',  nombre: 'Córdoba (Nicaragua)' },
+  { simbolo: 'L',   nombre: 'Lempira (Honduras)' },
+  { simbolo: '₡',   nombre: 'Colón (Costa Rica)' },
+  { simbolo: 'B/.', nombre: 'Balboa (Panamá)' },
+] as const
+
 export type AppSection =
   | 'clientes'
   | 'lecturas'

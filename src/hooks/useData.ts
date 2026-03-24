@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad } from '../types'
+import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, MaxUnidadesPorTipo } from '../types'
 import { supabase } from '../lib/supabase'
 
 interface AppData {
@@ -13,6 +13,8 @@ interface AppData {
   tarifas: Tarifa[]
   contadores: Contador[]
   unidades: Unidad[]
+  moneda: string
+  maxUnidadesPorTipo: MaxUnidadesPorTipo | null
 }
 
 const INITIAL_DATA: AppData = {
@@ -25,13 +27,15 @@ const INITIAL_DATA: AppData = {
   tarifas: [],
   contadores: [],
   unidades: [],
+  moneda: 'Q',
+  maxUnidadesPorTipo: null,
 }
 
 export function useData() {
   const [data, setData] = useState<AppData>(INITIAL_DATA)
 
   const cargarDatos = useCallback(async () => {
-    const [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes, contadoresRes, unidadesRes] = await Promise.allSettled([
+    const [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes, contadoresRes, unidadesRes, proyectoRes] = await Promise.allSettled([
       supabase.from('clientes').select('*'),
       supabase.from('registros').select('*'),
       supabase.from('empresa').select('*').limit(1),
@@ -44,6 +48,7 @@ export function useData() {
       supabase.from('tarifas').select('*').order('created_at', { ascending: false }),
       supabase.from('contadores').select('*').order('created_at', { ascending: false }),
       supabase.from('unidades').select('*').order('nombre', { ascending: true }),
+      supabase.from('projects').select('moneda, max_unidades_apartamento, max_unidades_casa, max_unidades_bodega, max_unidades_local_comercial, max_unidades_oficina, max_unidades_parqueadero, max_unidades_otro').limit(1),
     ])
 
     setData(prev => {
@@ -74,6 +79,19 @@ export function useData() {
       }
       if (unidadesRes.status === 'fulfilled' && unidadesRes.value.data) {
         next.unidades = unidadesRes.value.data as Unidad[]
+      }
+      if (proyectoRes.status === 'fulfilled' && proyectoRes.value.data?.[0]) {
+        const p = proyectoRes.value.data[0]
+        next.moneda = p.moneda ?? 'Q'
+        next.maxUnidadesPorTipo = {
+          apartamento:     p.max_unidades_apartamento ?? null,
+          casa:            p.max_unidades_casa ?? null,
+          bodega:          p.max_unidades_bodega ?? null,
+          local_comercial: p.max_unidades_local_comercial ?? null,
+          oficina:         p.max_unidades_oficina ?? null,
+          parqueadero:     p.max_unidades_parqueadero ?? null,
+          otro:            p.max_unidades_otro ?? null,
+        }
       }
       return next
     })
