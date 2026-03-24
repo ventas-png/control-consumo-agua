@@ -157,6 +157,7 @@ export default function App() {
           {activeSection === 'clientes' && (
             <ClientesSection
               clientes={clientes}
+              tarifas={tarifas}
               userRole={currentUser.role}
               userId={currentUser.user_id}
               moneda={moneda}
