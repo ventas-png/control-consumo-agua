@@ -1,18 +1,25 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
-import type { UserSession } from '../../types'
+import type { UserSession, Proyecto } from '../../types'
+import { MONEDAS } from '../../types'
 import { AsignacionModal } from './AsignacionModal'
 
-interface Proyecto {
-  id: string
-  nombre: string
-  logo_url: string | null
-  descripcion: string | null
-  direccion: string | null
-  latitud: number | null
-  longitud: number | null
+const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
+  activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: '#22c55e' },
+  inactivo:   { label: 'Inactivo',   bg: 'rgba(100,116,139,0.2)', color: '#94a3b8' },
+  suspendido: { label: 'Suspendido', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
 }
+
+const TIPOS_UNIDAD_LABELS: { key: keyof Proyecto; label: string }[] = [
+  { key: 'max_unidades_apartamento',     label: 'Apartamentos' },
+  { key: 'max_unidades_casa',            label: 'Casas' },
+  { key: 'max_unidades_bodega',          label: 'Bodegas' },
+  { key: 'max_unidades_local_comercial', label: 'Locales Comerciales' },
+  { key: 'max_unidades_oficina',         label: 'Oficinas' },
+  { key: 'max_unidades_parqueadero',     label: 'Parqueaderos' },
+  { key: 'max_unidades_otro',            label: 'Otros' },
+]
 
 interface Usuario {
   id: string
@@ -48,7 +55,7 @@ export function EmpresaSection({ currentUser }: Props) {
 
     const [empresaRes, proyectosRes, usuariosRes] = await Promise.all([
       supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects, logo_url').eq('id', currentUser.company_id).single(),
-      supabase.from('projects').select('id, nombre, logo_url, descripcion, direccion, latitud, longitud').eq('company_id', currentUser.company_id).order('nombre'),
+      supabase.from('projects').select('id, nombre, logo_url, descripcion, direccion, latitud, longitud, moneda, estado, max_unidades_apartamento, max_unidades_casa, max_unidades_bodega, max_unidades_local_comercial, max_unidades_oficina, max_unidades_parqueadero, max_unidades_otro').eq('company_id', currentUser.company_id).order('nombre'),
       supabase.from('app_users').select('id, full_name, role, activo')
         .eq('company_id', currentUser.company_id)
         .neq('id', currentUser.user_id)
@@ -114,24 +121,70 @@ export function EmpresaSection({ currentUser }: Props) {
   }
 
   async function editarProyecto(proyecto: Proyecto) {
+    const monedasOpts = MONEDAS.map(m =>
+      `<option value="${m.simbolo}" ${proyecto.moneda === m.simbolo ? 'selected' : ''}>${m.simbolo} — ${m.nombre}</option>`
+    ).join('')
+
+    const tiposLimites = TIPOS_UNIDAD_LABELS.map(t => {
+      const val = (proyecto[t.key] as number | null) ?? ''
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:12px;color:#475569;min-width:140px">${t.label}</span>
+          <input id="swal-${t.key}" type="number" min="0" step="1"
+            class="swal2-input"
+            placeholder="Sin límite"
+            value="${val}"
+            style="margin:0;width:110px;text-align:right;font-size:13px" />
+        </div>`
+    }).join('')
+
     const { value: formValues } = await Swal.fire({
       title: 'Editar Proyecto',
+      width: 560,
       html: `
-        <div style="text-align:left;padding:0 4px">
+        <div style="text-align:left;padding:0 4px;max-height:70vh;overflow-y:auto">
           <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Nombre *</label>
           <input id="swal-nombre" class="swal2-input" value="${proyecto.nombre}" style="margin:4px 0 14px" />
+
           <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Descripción</label>
-          <textarea id="swal-descripcion" class="swal2-textarea" style="margin:4px 0 14px;height:80px;resize:vertical">${proyecto.descripcion ?? ''}</textarea>
+          <textarea id="swal-descripcion" class="swal2-textarea" style="margin:4px 0 14px;height:72px;resize:vertical">${proyecto.descripcion ?? ''}</textarea>
+
           <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Dirección</label>
           <input id="swal-direccion" class="swal2-input" placeholder="Ej: Calle 123 #45-67" value="${proyecto.direccion ?? ''}" style="margin:4px 0 14px" />
+
           <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Geolocalización</label>
           <div style="display:flex;gap:8px;margin:4px 0 6px">
             <input id="swal-lat" class="swal2-input" placeholder="Latitud" value="${proyecto.latitud ?? ''}" style="margin:0" />
             <input id="swal-lng" class="swal2-input" placeholder="Longitud" value="${proyecto.longitud ?? ''}" style="margin:0" />
           </div>
-          <button id="swal-geolocate" type="button" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #0ea5e9;background:transparent;color:#0ea5e9;cursor:pointer;margin-top:4px">
+          <button id="swal-geolocate" type="button" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #0ea5e9;background:transparent;color:#0ea5e9;cursor:pointer;margin-top:4px;margin-bottom:16px">
             📍 Usar mi ubicación actual
           </button>
+
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0" />
+
+          <div style="display:flex;gap:16px;margin-bottom:14px">
+            <div style="flex:1">
+              <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Moneda</label>
+              <select id="swal-moneda" class="swal2-select" style="margin:4px 0 0;width:100%;padding:9px 10px;border-radius:6px;border:1px solid #d0d3d4;font-size:13px">
+                ${monedasOpts}
+              </select>
+            </div>
+            <div style="flex:1">
+              <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Estado</label>
+              <select id="swal-estado" class="swal2-select" style="margin:4px 0 0;width:100%;padding:9px 10px;border-radius:6px;border:1px solid #d0d3d4;font-size:13px">
+                <option value="activo"     ${proyecto.estado === 'activo'     ? 'selected' : ''}>Activo</option>
+                <option value="inactivo"   ${proyecto.estado === 'inactivo'   ? 'selected' : ''}>Inactivo</option>
+                <option value="suspendido" ${proyecto.estado === 'suspendido' ? 'selected' : ''}>Suspendido</option>
+              </select>
+            </div>
+          </div>
+
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0" />
+
+          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Límite de Unidades por Tipo</label>
+          <p style="font-size:11px;color:#94a3b8;margin:4px 0 10px">Dejar en blanco = sin límite</p>
+          ${tiposLimites}
         </div>
       `,
       didOpen: () => {
@@ -160,12 +213,27 @@ export function EmpresaSection({ currentUser }: Props) {
         if (!nombre) { Swal.showValidationMessage('El nombre es obligatorio'); return false }
         const latRaw = (document.getElementById('swal-lat') as HTMLInputElement).value.trim()
         const lngRaw = (document.getElementById('swal-lng') as HTMLInputElement).value.trim()
+        const getLimit = (id: string): number | null => {
+          const v = (document.getElementById(id) as HTMLInputElement).value.trim()
+          if (!v) return null
+          const n = parseInt(v, 10)
+          return isNaN(n) || n < 0 ? null : n
+        }
         return {
           nombre,
           descripcion: (document.getElementById('swal-descripcion') as HTMLTextAreaElement).value.trim() || null,
           direccion: (document.getElementById('swal-direccion') as HTMLInputElement).value.trim() || null,
           latitud: latRaw ? parseFloat(latRaw) : null,
           longitud: lngRaw ? parseFloat(lngRaw) : null,
+          moneda: (document.getElementById('swal-moneda') as HTMLSelectElement).value,
+          estado: (document.getElementById('swal-estado') as HTMLSelectElement).value,
+          max_unidades_apartamento:     getLimit('swal-max_unidades_apartamento'),
+          max_unidades_casa:            getLimit('swal-max_unidades_casa'),
+          max_unidades_bodega:          getLimit('swal-max_unidades_bodega'),
+          max_unidades_local_comercial: getLimit('swal-max_unidades_local_comercial'),
+          max_unidades_oficina:         getLimit('swal-max_unidades_oficina'),
+          max_unidades_parqueadero:     getLimit('swal-max_unidades_parqueadero'),
+          max_unidades_otro:            getLimit('swal-max_unidades_otro'),
         }
       },
     })
@@ -175,6 +243,48 @@ export function EmpresaSection({ currentUser }: Props) {
       void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el proyecto.' })
     } else {
       void Swal.fire({ icon: 'success', title: 'Proyecto actualizado', timer: 1200, showConfirmButton: false })
+      void cargar()
+    }
+  }
+
+  async function cambiarEstadoProyecto(proyecto: Proyecto) {
+    const estados: Proyecto['estado'][] = ['activo', 'inactivo', 'suspendido']
+    const actual = proyecto.estado ?? 'activo'
+    const config = ESTADO_CONFIG[actual]
+
+    const { value: nuevoEstado } = await Swal.fire({
+      title: 'Cambiar estado del proyecto',
+      html: `
+        <p style="color:#475569;margin-bottom:16px">Estado actual: <strong style="color:${config.color}">${config.label}</strong></p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${estados.filter(e => e !== actual).map(e => {
+            const c = ESTADO_CONFIG[e]
+            return `<button data-estado="${e}" type="button" style="padding:10px 16px;border-radius:8px;border:1px solid ${c.color}44;background:${c.bg};color:${c.color};font-weight:600;font-size:14px;cursor:pointer">${c.label}</button>`
+          }).join('')}
+        </div>
+      `,
+      showConfirmButton: false,
+      showCancelButton: true,
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        document.querySelectorAll('[data-estado]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            Swal.close()
+            const estado = (btn as HTMLElement).dataset.estado as Proyecto['estado']
+            // eslint-disable-next-line @typescript-eslint/no-use-before-define
+            void aplicarCambioEstado(proyecto.id, estado)
+          })
+        })
+      },
+    })
+    void nuevoEstado
+  }
+
+  async function aplicarCambioEstado(id: string, estado: Proyecto['estado']) {
+    const { error } = await supabase.from('projects').update({ estado }).eq('id', id)
+    if (error) {
+      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cambiar el estado.' })
+    } else {
       void cargar()
     }
   }
@@ -471,22 +581,58 @@ export function EmpresaSection({ currentUser }: Props) {
                     }
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '14px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {p.nombre}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.nombre}
+                      </span>
+                      {/* Estado badge */}
+                      {(() => {
+                        const cfg = ESTADO_CONFIG[p.estado ?? 'activo']
+                        return (
+                          <span style={{
+                            fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px',
+                            background: cfg.bg, color: cfg.color, whiteSpace: 'nowrap',
+                          }}>
+                            {cfg.label}
+                          </span>
+                        )
+                      })()}
+                      {/* Moneda badge */}
+                      <span style={{
+                        fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px',
+                        background: 'rgba(14,165,233,0.12)', color: '#38bdf8', whiteSpace: 'nowrap',
+                      }}>
+                        {p.moneda ?? 'Q'}
+                      </span>
+                    </div>
                     <span style={{ color: '#475569', fontSize: '11px' }}>ID: {p.id.slice(0, 8)}...</span>
                   </div>
-                  <button
-                    onClick={() => void editarProyecto(p)}
-                    title="Editar proyecto"
-                    style={{
-                      padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)',
-                      background: 'rgba(255,255,255,0.06)', color: '#94a3b8',
-                      cursor: 'pointer', fontSize: '12px', flexShrink: 0,
-                    }}
-                  >
-                    Editar
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
+                    <button
+                      onClick={() => void editarProyecto(p)}
+                      title="Editar proyecto"
+                      style={{
+                        padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)',
+                        background: 'rgba(255,255,255,0.06)', color: '#94a3b8',
+                        cursor: 'pointer', fontSize: '12px',
+                      }}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => void cambiarEstadoProyecto(p)}
+                      title="Cambiar estado"
+                      style={{
+                        padding: '4px 10px', borderRadius: '6px',
+                        border: `1px solid ${ESTADO_CONFIG[p.estado ?? 'activo'].color}44`,
+                        background: ESTADO_CONFIG[p.estado ?? 'activo'].bg,
+                        color: ESTADO_CONFIG[p.estado ?? 'activo'].color,
+                        cursor: 'pointer', fontSize: '11px', fontWeight: 600,
+                      }}
+                    >
+                      Estado
+                    </button>
+                  </div>
                 </div>
                 {/* Datos del proyecto */}
                 {(p.descripcion || p.direccion || (p.latitud && p.longitud)) && (

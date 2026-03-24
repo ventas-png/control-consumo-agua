@@ -7,9 +7,10 @@ Chart.register(...registerables)
 
 interface Props {
   registros: Registro[]
+  moneda?: string
 }
 
-export function DashboardSection({ registros }: Props) {
+export function DashboardSection({ registros, moneda = 'Q' }: Props) {
   const chartRef = useRef<HTMLCanvasElement>(null)
   const chartInstance = useRef<Chart | null>(null)
 
@@ -73,7 +74,7 @@ export function DashboardSection({ registros }: Props) {
 
   const statCards = [
     { label: 'Consumo Mes (m³)', value: consumoTotal.toFixed(2), bg: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)' },
-    { label: 'Recaudo Estimado (Q)', value: recaudoTotal.toFixed(2), bg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
+    { label: `Recaudo Estimado (${moneda})`, value: recaudoTotal.toFixed(2), bg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
     { label: 'Pendientes de Pago', value: String(pendientes), bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' },
   ]
 

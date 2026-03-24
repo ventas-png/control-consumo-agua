@@ -8,6 +8,7 @@ interface Props {
   tarifas: Tarifa[]
   userRole: UserRole
   currentUser: UserSession
+  moneda?: string
   onTarifaAdded: (tarifa: Tarifa) => void
   onTarifaUpdated: (id: string, partial: Partial<Tarifa>) => void
   onTarifaDeleted: (id: string) => void
@@ -42,6 +43,7 @@ export function TarifasSection({
   tarifas,
   userRole,
   currentUser,
+  moneda = 'Q',
   onTarifaAdded,
   onTarifaUpdated,
   onTarifaDeleted,
@@ -483,10 +485,10 @@ export function TarifasSection({
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
-                      Q {Number(t.precio_m3).toFixed(4)}
+                      {moneda} {Number(t.precio_m3).toFixed(4)}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
-                      Q {Number(t.canon_fijo).toFixed(2)}
+                      {moneda} {Number(t.canon_fijo).toFixed(2)}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
                       {Number(t.consumo_minimo ?? 0).toFixed(4)} m³
