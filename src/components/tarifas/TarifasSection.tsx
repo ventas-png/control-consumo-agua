@@ -66,7 +66,7 @@ export function TarifasSection({
       tipo_agua: t.tipo_agua,
       precio_m3: String(t.precio_m3),
       canon_fijo: String(t.canon_fijo),
-      consumo_minimo: String(t.consumo_minimo),
+      consumo_minimo: String(t.consumo_minimo ?? 0),
       descripcion: t.descripcion ?? '',
       activa: t.activa,
     })
@@ -437,7 +437,7 @@ export function TarifasSection({
               {search ? 'Sin resultados' : 'No hay tarifas registradas'}
             </div>
             <div style={{ fontSize: '14px' }}>
-              {search ? 'Intenta con otro término de búsqueda' : canEdit ? 'Crea la primera tarifa con el botón "+ Nueva Tarifa"' : 'No hay tarifas configuradas aún'}
+              {search ? 'Intenta con otro término de búsqueda' : canEdit ? 'Crea la primera tarifa con el botón "+  Nueva Tarifa"' : 'No hay tarifas configuradas aún'}
             </div>
           </div>
         ) : (
@@ -449,6 +449,7 @@ export function TarifasSection({
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tipo de Agua</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Precio/m³</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Canon Fijo</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Cons. Mínimo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
                   {canEdit && (
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
@@ -486,6 +487,9 @@ export function TarifasSection({
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
                       Q {Number(t.canon_fijo).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
+                      {Number(t.consumo_minimo ?? 0).toFixed(4)} m³
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       {canEdit ? (
