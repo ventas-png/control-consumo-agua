@@ -6,11 +6,7 @@ export interface Cliente {
   email?: string;
   direccion?: string;
   telefono?: string;
-  tarifa: number;
-  canon: number;
-  consumo_minimo: number;
   lectura_inicial: number;
-  tarifa_id?: string | null;
 }
 
 export interface GPS {
@@ -22,6 +18,7 @@ export interface Registro {
   id: string;
   cliente_id: string;
   cliente_nombre: string;
+  contador_id?: string | null;
   fecha: string;
   lectura_anterior: number;
   lectura_actual: number;
@@ -136,9 +133,16 @@ export interface Contador {
   fecha_instalacion?: string;
   lectura_inicial: number;
   activo: boolean;
-  cliente_id?: string | null;
   tarifa_id?: string | null;
   unidad_id?: string | null;
+  medida?: string | null;
+  material?: string | null;
+  tipo_contador?: string | null;
+  valvula_cheque?: string | null;
+  tipo_llave?: string | null;
+  llave_antifraude?: string | null;
+  valvula_aire?: string | null;
+  fecha_reemplazo_sugerida?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -165,6 +169,7 @@ export interface Unidad {
   propietario_telefono?: string;
   propietario_email?: string;
   activo: boolean;
+  cliente_id?: string | null;
   created_at?: string;
   updated_at?: string;
 }

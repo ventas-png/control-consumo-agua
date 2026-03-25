@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa } from '../../types'
+import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa, Contador, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
 
 interface Props {
   clientes: Cliente[]
+  unidades: Unidad[]
+  contadores: Contador[]
   registros: Registro[]
+  tarifas: Tarifa[]
   userRole: UserRole
   moneda?: string
-  tarifas?: Tarifa[]
   onRegistroAdded: (registro: Registro) => void
   rutaActiva?: Ruta | null
   onClearRuta?: () => void
@@ -19,16 +21,19 @@ interface Props {
 
 export function LecturasSection({
   clientes,
+  unidades,
+  contadores,
   registros,
+  tarifas,
   userRole,
   moneda = 'Q',
-  tarifas = [],
   onRegistroAdded,
   rutaActiva,
   onClearRuta,
   onRutaCompletada,
 }: Props) {
-  const [selectedClienteId, setSelectedClienteId] = useState('')
+  const [selectedUnidadId, setSelectedUnidadId] = useState('')
+  const [selectedContadorId, setSelectedContadorId] = useState('')
   const [lecturaActual, setLecturaActual] = useState('')
   const [estado, setEstado] = useState<Registro['estado']>('pendiente')
   const [mes, setMes] = useState('auto')
@@ -41,24 +46,29 @@ export function LecturasSection({
   const [rutaModoManual, setRutaModoManual] = useState(false)
   const [rutaIndex, setRutaIndex] = useState(0)
 
-  // Clientes ordenados según ruta planificada o lista completa
-  const clientesOrdenados: Cliente[] = rutaActiva
+  // En modo ruta, derivar unidades de los cliente_ids de la ruta
+  const unidadesOrdenadas: Unidad[] = rutaActiva
     ? rutaActiva.cliente_ids
-        .map(id => clientes.find(c => c.id === id))
-        .filter((c): c is Cliente => !!c)
-    : clientes
+        .flatMap(cid => unidades.filter(u => u.cliente_id === cid))
+    : unidades.filter(u => u.activo)
 
   const enModoRuta = !!rutaActiva || rutaModoManual
 
-  // Cuando llega una ruta planificada desde el exterior, arrancar desde el primer cliente
   useEffect(() => {
-    if (rutaActiva && clientesOrdenados.length > 0) {
+    if (rutaActiva && unidadesOrdenadas.length > 0) {
       setRutaIndex(0)
-      setSelectedClienteId(clientesOrdenados[0].id)
+      setSelectedUnidadId(unidadesOrdenadas[0].id)
+      setSelectedContadorId('')
       setLecturaActual('')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rutaActiva?.id])
+
+  // Al cambiar de unidad, limpiar contador seleccionado
+  useEffect(() => {
+    setSelectedContadorId('')
+    setLecturaActual('')
+  }, [selectedUnidadId])
 
   // GPS automático con watchPosition
   useEffect(() => {
@@ -84,27 +94,38 @@ export function LecturasSection({
   }, [])
 
   const canEdit = userRole !== 'viewer'
-  const clienteSeleccionado = clientes.find(c => c.id === selectedClienteId) ?? null
 
-  const tarifaVigente = clienteSeleccionado?.tarifa_id
-    ? (tarifas.find(t => t.id === clienteSeleccionado.tarifa_id) ?? null)
+  const unidadSeleccionada = unidades.find(u => u.id === selectedUnidadId) ?? null
+  const clienteDeUnidad = unidadSeleccionada?.cliente_id
+    ? clientes.find(c => c.id === unidadSeleccionada.cliente_id) ?? null
     : null
-  const tarifaExpirada = tarifaVigente !== null && !tarifaVigente.activa
 
-  function getUltimaLectura(clienteId: string): number {
-    const cliente = clientes.find(c => c.id === clienteId)
+  // Contadores de la unidad seleccionada
+  const contadoresDeUnidad = unidadSeleccionada
+    ? contadores.filter(c => c.unidad_id === unidadSeleccionada.id && c.activo)
+    : []
+
+  const contadorSeleccionado = contadores.find(c => c.id === selectedContadorId) ?? null
+  const tarifaDelContador = contadorSeleccionado?.tarifa_id
+    ? tarifas.find(t => t.id === contadorSeleccionado.tarifa_id) ?? null
+    : null
+  const tarifaExpirada = tarifaDelContador !== null && !tarifaDelContador.activa
+  const sinTarifa = contadorSeleccionado !== null && !tarifaDelContador
+
+  function getUltimaLectura(contadorId: string): number {
+    const contador = contadores.find(c => c.id === contadorId)
     const historial = registros
-      .filter(r => r.cliente_id === clienteId)
+      .filter(r => r.contador_id === contadorId)
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-    return historial.length > 0 ? historial[0].lectura_actual : (cliente?.lectura_inicial ?? 0)
+    return historial.length > 0 ? historial[0].lectura_actual : (contador?.lectura_inicial ?? 0)
   }
 
-  const ultimaLectura = clienteSeleccionado ? getUltimaLectura(clienteSeleccionado.id) : 0
+  const ultimaLectura = contadorSeleccionado ? getUltimaLectura(contadorSeleccionado.id) : 0
   const lecturaNum = parseFloat(lecturaActual)
   const consumo = !isNaN(lecturaNum) ? lecturaNum - ultimaLectura : null
   const calculo =
-    consumo !== null && consumo >= 0 && clienteSeleccionado
-      ? calcularTotalPagar(consumo, clienteSeleccionado.tarifa, clienteSeleccionado.canon, clienteSeleccionado.consumo_minimo ?? 0)
+    consumo !== null && consumo >= 0 && tarifaDelContador
+      ? calcularTotalPagar(consumo, tarifaDelContador.precio_m3, tarifaDelContador.canon_fijo, tarifaDelContador.consumo_minimo ?? 0)
       : null
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
@@ -116,32 +137,35 @@ export function LecturasSection({
   }
 
   function enviarWhatsApp(registro: Registro) {
-    const cliente = clientes.find(c => c.id === registro.cliente_id)
-    let telefono = cliente?.telefono ?? ''
+    let telefono = clienteDeUnidad?.telefono ?? ''
     if (!telefono) { Swal.fire('Sin Teléfono', 'Este cliente no tiene teléfono registrado.', 'warning'); return }
     telefono = telefono.replace(/[^0-9]/g, '')
     if (telefono.length === 8) telefono = APP_CONFIG.COUNTRY_CODE + telefono
     const total = registro.monto_calculado
-    const msg = `Hola ${registro.cliente_nombre}, su recibo de agua potable:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: ${moneda}${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
+    const msg = `Hola ${registro.cliente_nombre}, su recibo de agua:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}\n🔧 Contador: ${contadorSeleccionado?.numero_serie ?? ''}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: ${moneda}${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
   function limpiarFormulario() {
-    setSelectedClienteId('')
+    setSelectedContadorId('')
     setLecturaActual('')
     setEstado('pendiente')
     setNotas('')
     setFoto(null)
-    // GPS se mantiene activo y actualizado automáticamente
   }
 
   async function handleGuardar() {
-    if (!clienteSeleccionado) return Swal.fire('Atención', 'Seleccione un cliente primero', 'warning')
+    if (!unidadSeleccionada) return Swal.fire('Atención', 'Seleccione una unidad primero', 'warning')
+    if (!contadorSeleccionado) return Swal.fire('Atención', 'Seleccione un contador', 'warning')
+    if (sinTarifa) {
+      Swal.fire('Sin Tarifa', 'El contador no tiene tarifa asignada. Asigne una tarifa al contador antes de registrar lecturas.', 'warning')
+      return
+    }
     if (tarifaExpirada) {
       Swal.fire({
         icon: 'warning',
         title: 'Tarifa No Vigente',
-        text: 'La tarifa asignada no está vigente. Por favor comuníquese con su empresa para actualizar la tarifa antes de registrar lecturas.',
+        text: 'La tarifa del contador no está vigente. Por favor actualice la tarifa del contador antes de registrar lecturas.',
         confirmButtonColor: '#0ea5e9',
       })
       return
@@ -149,18 +173,19 @@ export function LecturasSection({
     if (consumo === null || isNaN(consumo)) return Swal.fire('Error', 'Datos de lectura inválidos', 'error')
     if (consumo < 0) return Swal.fire('Consumo Negativo', 'La lectura actual debe ser mayor o igual a la anterior.', 'error')
 
-    const resultadoCobro = calcularTotalPagar(consumo, clienteSeleccionado.tarifa, clienteSeleccionado.canon, clienteSeleccionado.consumo_minimo ?? 0)
+    const resultadoCobro = calcularTotalPagar(consumo, tarifaDelContador!.precio_m3, tarifaDelContador!.canon_fijo, tarifaDelContador!.consumo_minimo ?? 0)
     const mesNum = mes === 'auto' ? new Date().getMonth() + 1 : parseInt(mes)
 
     const registro = {
-      cliente_id: clienteSeleccionado.id,
-      cliente_nombre: clienteSeleccionado.nombre,
+      cliente_id: clienteDeUnidad?.id ?? null,
+      cliente_nombre: clienteDeUnidad?.nombre ?? unidadSeleccionada.nombre,
+      contador_id: contadorSeleccionado.id,
       fecha: new Date().toISOString(),
       lectura_anterior: ultimaLectura,
       lectura_actual: lecturaNum,
       consumo,
-      tarifa_aplicada: clienteSeleccionado.tarifa,
-      canon_aplicado: clienteSeleccionado.canon,
+      tarifa_aplicada: tarifaDelContador!.precio_m3,
+      canon_aplicado: tarifaDelContador!.canon_fijo,
       monto_calculado: resultadoCobro.total,
       tipo_cobro: resultadoCobro.tipo_cobro,
       estado,
@@ -197,14 +222,14 @@ export function LecturasSection({
 
     if (enModoRuta) {
       const nextIndex = rutaIndex + 1
-      if (nextIndex < clientesOrdenados.length) {
+      if (nextIndex < unidadesOrdenadas.length) {
         setRutaIndex(nextIndex)
-        setSelectedClienteId(clientesOrdenados[nextIndex].id)
+        setSelectedUnidadId(unidadesOrdenadas[nextIndex].id)
+        setSelectedContadorId('')
         setLecturaActual('')
         setNotas('')
         setFoto(null)
       } else {
-        // Ruta completada
         if (rutaActiva) {
           await supabase.from('rutas').update({ completada: true }).eq('id', rutaActiva.id)
           onRutaCompletada?.(rutaActiva.id)
@@ -214,6 +239,7 @@ export function LecturasSection({
         }
         Swal.fire('Ruta Finalizada', '¡Has completado todas las lecturas de la ruta!', 'success')
         limpiarFormulario()
+        setSelectedUnidadId('')
         setRutaIndex(0)
       }
     } else {
@@ -224,12 +250,13 @@ export function LecturasSection({
   function toggleModoManual() {
     if (rutaModoManual) {
       setRutaModoManual(false)
+      setSelectedUnidadId('')
       limpiarFormulario()
       setRutaIndex(0)
     } else {
       setRutaModoManual(true)
       setRutaIndex(0)
-      if (clientesOrdenados.length > 0) setSelectedClienteId(clientesOrdenados[0].id)
+      if (unidadesOrdenadas.length > 0) setSelectedUnidadId(unidadesOrdenadas[0].id)
     }
   }
 
@@ -239,6 +266,7 @@ export function LecturasSection({
     } else {
       setRutaModoManual(false)
     }
+    setSelectedUnidadId('')
     limpiarFormulario()
     setRutaIndex(0)
   }
@@ -248,20 +276,19 @@ export function LecturasSection({
 
   const consumoInvalido = consumo !== null && consumo < 0
 
-  // Banner de ruta: diferente si viene de una ruta planificada o modo manual
   const bannerRuta = rutaActiva
     ? {
         bg: '#eff6ff',
         border: '#bfdbfe',
         color: '#1e40af',
-        texto: `🗺️ Ruta: ${rutaActiva.nombre} — Cliente ${rutaIndex + 1} de ${clientesOrdenados.length}${rutaActiva.fecha_programada ? ` | 📅 ${new Date(rutaActiva.fecha_programada + 'T12:00:00').toLocaleDateString('es-GT')}` : ''}`,
+        texto: `🗺️ Ruta: ${rutaActiva.nombre} — Unidad ${rutaIndex + 1} de ${unidadesOrdenadas.length}${rutaActiva.fecha_programada ? ` | 📅 ${new Date(rutaActiva.fecha_programada + 'T12:00:00').toLocaleDateString('es-GT')}` : ''}`,
       }
     : rutaModoManual
     ? {
         bg: '#f0fdf4',
         border: '#bbf7d0',
         color: '#166534',
-        texto: `Modo Ruta ACTIVO — Cliente ${rutaIndex + 1} de ${clientesOrdenados.length}`,
+        texto: `Modo Ruta ACTIVO — Unidad ${rutaIndex + 1} de ${unidadesOrdenadas.length}`,
       }
     : { bg: '#f0fdf4', border: '#bbf7d0', color: '#166534', texto: 'Modo Manual' }
 
@@ -296,110 +323,174 @@ export function LecturasSection({
           Ingreso de Lectura
         </div>
 
-        {/* Selector de cliente */}
+        {/* Selector de unidad */}
         <div style={{ marginBottom: '20px' }}>
-          <label style={labelStyle}>Seleccionar Cliente</label>
+          <label style={labelStyle}>Seleccionar Unidad</label>
           <select
-            value={selectedClienteId}
-            onChange={e => { setSelectedClienteId(e.target.value); setLecturaActual('') }}
+            value={selectedUnidadId}
+            onChange={e => setSelectedUnidadId(e.target.value)}
             style={inputStyle}
             disabled={enModoRuta}
           >
-            <option value="">-- Buscar Cliente --</option>
-            {(enModoRuta ? clientesOrdenados : clientes).map(c => (
-              <option key={c.id} value={c.id}>{c.nombre} ({c.codigo})</option>
-            ))}
+            <option value="">-- Seleccionar Unidad --</option>
+            {(enModoRuta ? unidadesOrdenadas : unidades.filter(u => u.activo)).map(u => {
+              const cli = clientes.find(c => c.id === u.cliente_id)
+              return (
+                <option key={u.id} value={u.id}>
+                  {u.nombre}{cli ? ` — ${cli.nombre}` : ''}
+                </option>
+              )
+            })}
           </select>
         </div>
 
-        {/* Detalles cliente */}
-        {clienteSeleccionado && (
+        {unidadSeleccionada && (
           <>
-            <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px' }}>
-              <div><small style={{ color: '#64748b' }}>Cliente</small><div style={{ fontWeight: 700 }}>{clienteSeleccionado.nombre}</div></div>
-              <div><small style={{ color: '#64748b' }}>Medidor</small><div style={{ fontWeight: 700 }}>{clienteSeleccionado.medidor}</div></div>
-              <div><small style={{ color: '#64748b' }}>Última Lectura</small><div style={{ fontWeight: 700 }}>{ultimaLectura}</div></div>
-              <div><small style={{ color: '#64748b' }}>Tarifas</small><div style={{ fontSize: '13px' }}>{moneda}{clienteSeleccionado.tarifa}/m³ | Canon: {moneda}{clienteSeleccionado.canon}</div></div>
+            {/* Info de unidad y cliente */}
+            <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+              <div><small style={{ color: '#64748b' }}>Unidad</small><div style={{ fontWeight: 700 }}>{unidadSeleccionada.nombre}</div></div>
+              {clienteDeUnidad && (
+                <>
+                  <div><small style={{ color: '#64748b' }}>Cliente</small><div style={{ fontWeight: 700 }}>{clienteDeUnidad.nombre}</div></div>
+                  <div><small style={{ color: '#64748b' }}>Código</small><div style={{ fontWeight: 600, fontFamily: 'monospace' }}>{clienteDeUnidad.codigo}</div></div>
+                  {clienteDeUnidad.telefono && (
+                    <div><small style={{ color: '#64748b' }}>Teléfono</small><div style={{ fontWeight: 600 }}>{clienteDeUnidad.telefono}</div></div>
+                  )}
+                </>
+              )}
+              {!clienteDeUnidad && (
+                <div><small style={{ color: '#64748b' }}>Cliente</small><div style={{ color: '#94a3b8', fontSize: '13px' }}>Sin cliente asignado</div></div>
+              )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '20px' }}>
-              <div>
-                <label style={labelStyle}>Lectura Actual</label>
-                <input type="number" step="0.01" value={lecturaActual} onChange={e => setLecturaActual(e.target.value)} placeholder="Ingrese lectura del medidor" style={{ ...inputStyle, borderColor: consumoInvalido ? '#dc2626' : '#e2e8f0' }} />
+            {/* Selector de contador */}
+            {contadoresDeUnidad.length === 0 ? (
+              <div style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', color: '#854d0e', fontWeight: 600, fontSize: '14px' }}>
+                Esta unidad no tiene contadores activos asignados.
               </div>
-              <div>
-                <label style={labelStyle}>Consumo Calculado (m³)</label>
-                <input type="text" readOnly value={consumo !== null ? (consumoInvalido ? consumo.toFixed(2) + ' (ERROR)' : consumo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? '#dc2626' : '#0ea5e9', background: '#f7fafc' }} />
-              </div>
-              <div>
-                <label style={labelStyle}>Monto Estimado ({moneda})</label>
-                <input type="text" readOnly value={calculo ? `${moneda}${calculo.total.toFixed(2)} (${calculo.tipo_cobro})` : ''} style={{ ...inputStyle, fontWeight: 'bold', color: '#166534', background: '#f0fdf4' }} />
-              </div>
-              <div>
-                <label style={labelStyle}>Mes Facturación</label>
-                <select value={mes} onChange={e => setMes(e.target.value)} style={inputStyle}>
-                  <option value="auto">Mes Actual</option>
-                  {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
-                    <option key={i+1} value={String(i+1)}>{m}</option>
-                  ))}
+            ) : (
+              <div style={{ marginBottom: '20px' }}>
+                <label style={labelStyle}>Seleccionar Contador</label>
+                <select
+                  value={selectedContadorId}
+                  onChange={e => { setSelectedContadorId(e.target.value); setLecturaActual('') }}
+                  style={inputStyle}
+                >
+                  <option value="">-- Seleccionar Contador --</option>
+                  {contadoresDeUnidad.map(c => {
+                    const t = tarifas.find(t => t.id === c.tarifa_id)
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {c.numero_serie} ({c.tipo_agua}){t ? ` — ${t.nombre}` : ' — Sin tarifa'}
+                      </option>
+                    )
+                  })}
                 </select>
-              </div>
-              <div>
-                <label style={labelStyle}>Estado Pago</label>
-                <select value={estado} onChange={e => setEstado(e.target.value as Registro['estado'])} style={inputStyle}>
-                  <option value="pendiente">Pendiente</option>
-                  <option value="pagado">Pagado</option>
-                  <option value="mora">Mora</option>
-                </select>
-              </div>
-              <div style={{ gridColumn: '1/-1' }}>
-                <label style={labelStyle}>Observaciones</label>
-                <input type="text" value={notas} onChange={e => setNotas(e.target.value)} placeholder="Opcional" style={inputStyle} />
-              </div>
-            </div>
-
-            {/* GPS y Foto */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '20px' }}>
-              <div>
-                <label style={labelStyle}>Ubicación GPS</label>
-                {gpsLoading && (
-                  <div style={{ padding: '12px', background: '#fef9c3', border: '1px solid #fde047', borderRadius: '10px', fontSize: '13px', color: '#854d0e' }}>
-                    📡 Obteniendo ubicación automáticamente...
-                  </div>
-                )}
-                {gps && !gpsLoading && (
-                  <div style={{ padding: '12px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: '10px', fontSize: '13px', color: '#166534' }}>
-                    ✅ GPS activo: {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
-                  </div>
-                )}
-                {gpsError && !gpsLoading && (
-                  <div style={{ padding: '12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', fontSize: '13px', color: '#dc2626' }}>
-                    ⚠️ {gpsError} — la lectura se guardará sin coordenadas
-                  </div>
-                )}
-              </div>
-              <div>
-                <label style={{ border: '3px dashed #cbd5e0', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: '#f7fafc', display: 'block' }}>
-                  <input type="file" accept="image/*" capture="environment" hidden onChange={handlePhoto} />
-                  {foto ? <img src={foto} style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px' }} alt="foto" /> : <span>📷 Tocar para foto</span>}
-                </label>
-              </div>
-            </div>
-
-            {tarifaExpirada && (
-              <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', padding: '14px 18px', marginBottom: '12px', color: '#dc2626', fontWeight: 600, fontSize: '14px' }}>
-                Tarifa no vigente. No es posible registrar lecturas hasta que la empresa actualice la tarifa asignada.
               </div>
             )}
-            {canEdit && (
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={handleGuardar} disabled={saving || tarifaExpirada} style={{ padding: '12px 24px', background: (saving || tarifaExpirada) ? '#94a3b8' : 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: (saving || tarifaExpirada) ? 'not-allowed' : 'pointer' }}>
-                  {saving ? 'Guardando...' : enModoRuta ? `💾 Guardar y Avanzar (${rutaIndex + 1}/${clientesOrdenados.length})` : '💾 Guardar Lectura'}
-                </button>
-                <button onClick={limpiarFormulario} style={{ padding: '12px 24px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
-                  Cancelar
-                </button>
-              </div>
+
+            {contadorSeleccionado && (
+              <>
+                {/* Info del contador y tarifa */}
+                <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', fontSize: '13px' }}>
+                  <div><small style={{ color: '#64748b' }}>N° Serie</small><div style={{ fontWeight: 700, fontFamily: 'monospace' }}>{contadorSeleccionado.numero_serie}</div></div>
+                  <div><small style={{ color: '#64748b' }}>Tipo Agua</small><div style={{ fontWeight: 600 }}>{contadorSeleccionado.tipo_agua}</div></div>
+                  <div><small style={{ color: '#64748b' }}>Última Lectura</small><div style={{ fontWeight: 700 }}>{ultimaLectura}</div></div>
+                  {tarifaDelContador && (
+                    <>
+                      <div><small style={{ color: '#64748b' }}>Tarifa</small><div style={{ fontWeight: 600 }}>{tarifaDelContador.nombre}</div></div>
+                      <div><small style={{ color: '#64748b' }}>Precio/m³</small><div style={{ fontWeight: 600 }}>{moneda}{tarifaDelContador.precio_m3}</div></div>
+                      <div><small style={{ color: '#64748b' }}>Canon Fijo</small><div style={{ fontWeight: 600 }}>{moneda}{tarifaDelContador.canon_fijo}</div></div>
+                    </>
+                  )}
+                </div>
+
+                {sinTarifa && (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', padding: '14px 18px', marginBottom: '12px', color: '#dc2626', fontWeight: 600, fontSize: '14px' }}>
+                    El contador no tiene tarifa asignada. Vaya a Contadores y asigne una tarifa antes de registrar lecturas.
+                  </div>
+                )}
+                {tarifaExpirada && (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', padding: '14px 18px', marginBottom: '12px', color: '#dc2626', fontWeight: 600, fontSize: '14px' }}>
+                    Tarifa no vigente. No es posible registrar lecturas hasta que se actualice la tarifa del contador.
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+                  <div>
+                    <label style={labelStyle}>Lectura Actual</label>
+                    <input type="number" step="0.01" value={lecturaActual} onChange={e => setLecturaActual(e.target.value)} placeholder="Ingrese lectura del medidor" style={{ ...inputStyle, borderColor: consumoInvalido ? '#dc2626' : '#e2e8f0' }} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Consumo Calculado (m³)</label>
+                    <input type="text" readOnly value={consumo !== null ? (consumoInvalido ? consumo.toFixed(2) + ' (ERROR)' : consumo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? '#dc2626' : '#0ea5e9', background: '#f7fafc' }} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Monto Estimado ({moneda})</label>
+                    <input type="text" readOnly value={calculo ? `${moneda}${calculo.total.toFixed(2)} (${calculo.tipo_cobro})` : ''} style={{ ...inputStyle, fontWeight: 'bold', color: '#166534', background: '#f0fdf4' }} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Mes Facturación</label>
+                    <select value={mes} onChange={e => setMes(e.target.value)} style={inputStyle}>
+                      <option value="auto">Mes Actual</option>
+                      {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
+                        <option key={i+1} value={String(i+1)}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Estado Pago</label>
+                    <select value={estado} onChange={e => setEstado(e.target.value as Registro['estado'])} style={inputStyle}>
+                      <option value="pendiente">Pendiente</option>
+                      <option value="pagado">Pagado</option>
+                      <option value="mora">Mora</option>
+                    </select>
+                  </div>
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <label style={labelStyle}>Observaciones</label>
+                    <input type="text" value={notas} onChange={e => setNotas(e.target.value)} placeholder="Opcional" style={inputStyle} />
+                  </div>
+                </div>
+
+                {/* GPS y Foto */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+                  <div>
+                    <label style={labelStyle}>Ubicación GPS</label>
+                    {gpsLoading && (
+                      <div style={{ padding: '12px', background: '#fef9c3', border: '1px solid #fde047', borderRadius: '10px', fontSize: '13px', color: '#854d0e' }}>
+                        📡 Obteniendo ubicación automáticamente...
+                      </div>
+                    )}
+                    {gps && !gpsLoading && (
+                      <div style={{ padding: '12px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: '10px', fontSize: '13px', color: '#166534' }}>
+                        ✅ GPS activo: {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
+                      </div>
+                    )}
+                    {gpsError && !gpsLoading && (
+                      <div style={{ padding: '12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', fontSize: '13px', color: '#dc2626' }}>
+                        ⚠️ {gpsError} — la lectura se guardará sin coordenadas
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label style={{ border: '3px dashed #cbd5e0', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: '#f7fafc', display: 'block' }}>
+                      <input type="file" accept="image/*" capture="environment" hidden onChange={handlePhoto} />
+                      {foto ? <img src={foto} style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px' }} alt="foto" /> : <span>📷 Tocar para foto</span>}
+                    </label>
+                  </div>
+                </div>
+
+                {canEdit && (
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button onClick={handleGuardar} disabled={saving || tarifaExpirada || sinTarifa} style={{ padding: '12px 24px', background: (saving || tarifaExpirada || sinTarifa) ? '#94a3b8' : 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: (saving || tarifaExpirada || sinTarifa) ? 'not-allowed' : 'pointer' }}>
+                      {saving ? 'Guardando...' : enModoRuta ? `💾 Guardar y Avanzar (${rutaIndex + 1}/${unidadesOrdenadas.length})` : '💾 Guardar Lectura'}
+                    </button>
+                    <button onClick={limpiarFormulario} style={{ padding: '12px 24px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

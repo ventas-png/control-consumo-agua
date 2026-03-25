@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import type { Unidad, TipoUnidad, UserRole, UserSession, Contador, MaxUnidadesPorTipo } from '../../types'
+import type { Unidad, TipoUnidad, UserRole, UserSession, Contador, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
 
 interface Props {
   unidades: Unidad[]
   contadores: Contador[]
+  clientes: Cliente[]
   userRole: UserRole
   currentUser: UserSession
   maxUnidadesPorTipo?: MaxUnidadesPorTipo | null
@@ -45,6 +46,7 @@ const EMPTY_FORM = {
   propietario_telefono: '',
   propietario_email: '',
   activo: true,
+  cliente_id: '',
 }
 
 type FormState = typeof EMPTY_FORM
@@ -52,6 +54,7 @@ type FormState = typeof EMPTY_FORM
 export function UnidadesSection({
   unidades,
   contadores,
+  clientes,
   userRole,
   currentUser,
   maxUnidadesPorTipo,
@@ -85,6 +88,7 @@ export function UnidadesSection({
       propietario_telefono: u.propietario_telefono ?? '',
       propietario_email: u.propietario_email ?? '',
       activo: u.activo,
+      cliente_id: u.cliente_id ?? '',
     })
     setEditingId(u.id)
     setShowForm(true)
@@ -141,6 +145,7 @@ export function UnidadesSection({
       propietario_telefono: form.propietario_telefono || null,
       propietario_email: form.propietario_email || null,
       activo: form.activo,
+      cliente_id: form.cliente_id || null,
       updated_at: new Date().toISOString(),
     }
 
@@ -506,6 +511,22 @@ export function UnidadesSection({
             </div>
           </div>
 
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+              Cliente Asignado
+            </div>
+            <select
+              style={inputStyle}
+              value={form.cliente_id}
+              onChange={e => setForm(f => ({ ...f, cliente_id: e.target.value }))}
+            >
+              <option value="">— Sin cliente asignado —</option>
+              {clientes.map(c => (
+                <option key={c.id} value={c.id}>{c.nombre} ({c.codigo})</option>
+              ))}
+            </select>
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
             <label style={{ ...labelStyle, marginBottom: 0 }}>Estado:</label>
             <button
@@ -659,6 +680,16 @@ export function UnidadesSection({
                       <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>{u.descripcion}</div>
                     )}
                   </div>
+
+                  {/* Cliente asignado */}
+                  {u.cliente_id && (() => {
+                    const cli = clientes.find(c => c.id === u.cliente_id)
+                    return cli ? (
+                      <div style={{ marginBottom: '8px', fontSize: '13px', color: '#0369a1', fontWeight: 600 }}>
+                        👤 {cli.nombre} <span style={{ fontWeight: 400, color: '#64748b' }}>({cli.codigo})</span>
+                      </div>
+                    ) : null
+                  })()}
 
                   {/* Contadores badge */}
                   <div style={{ marginBottom: '14px' }}>
