@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import type { Unidad, TipoUnidad, UserRole, UserSession, Contador, MaxUnidadesPorTipo, Cliente } from '../../types'
+import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, UserSession, Contador, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
 
@@ -26,6 +26,34 @@ const TIPOS_UNIDAD: { value: TipoUnidad; label: string; icon: string }[] = [
   { value: 'otro',           label: 'Otro',            icon: '📦' },
 ]
 
+const TIPOS_REGIMEN: { value: TipoRegimen; label: string }[] = [
+  { value: 'no_sujeto',            label: 'No Sujeto' },
+  { value: 'urbanizacion',         label: 'Urbanización' },
+  { value: 'condominio',           label: 'Condominio' },
+  { value: 'propiedad_horizontal', label: 'Propiedad Horizontal' },
+  { value: 'otro',                 label: 'Otro' },
+]
+
+const ESTADOS_OCUPACIONALES: { value: EstadoOcupacional; label: string }[] = [
+  { value: 'en_construccion',       label: 'En Construcción' },
+  { value: 'habitado',              label: 'Habitado' },
+  { value: 'en_remodelacion',       label: 'En Remodelación' },
+  { value: 'desabitado',            label: 'Deshabitado' },
+  { value: 'en_proceso_de_mudanza', label: 'En Proceso de Mudanza' },
+  { value: 'desocupada',            label: 'Desocupada' },
+  { value: 'disponible_venta',      label: 'Disponible para Venta' },
+  { value: 'disponible_renta',      label: 'Disponible para Renta' },
+  { value: 'en_mantenimiento',      label: 'En Mantenimiento' },
+  { value: 'problemas_legales',     label: 'Problemas Legales' },
+  { value: 'activo_extraordinario', label: 'Activo Extraordinario de Entidad Financiera' },
+]
+
+const CONTRATOS_SUMINISTRO: { value: ContratoSuministro; label: string }[] = [
+  { value: 'si', label: 'Sí' },
+  { value: 'no', label: 'No' },
+  { value: 'na', label: 'N/A' },
+]
+
 const TIPO_COLORES: Record<TipoUnidad, { bg: string; color: string }> = {
   apartamento:     { bg: '#e0f2fe', color: '#0369a1' },
   casa:            { bg: '#dcfce7', color: '#166534' },
@@ -47,6 +75,18 @@ const EMPTY_FORM = {
   propietario_email: '',
   activo: true,
   cliente_id: '',
+  // Datos del inmueble
+  direccion: '',
+  datos_registrales: '',
+  tipo_regimen: '' as TipoRegimen | '',
+  fecha_construccion: '',
+  // Estado ocupacional
+  estado_ocupacional: '' as EstadoOcupacional | '',
+  // Contrato de suministro
+  contrato_suministro: '' as ContratoSuministro | '',
+  fecha_firma_contrato: '',
+  numero_contrato_suministro: '',
+  fecha_vencimiento_contrato: '',
 }
 
 type FormState = typeof EMPTY_FORM
@@ -89,6 +129,15 @@ export function UnidadesSection({
       propietario_email: u.propietario_email ?? '',
       activo: u.activo,
       cliente_id: u.cliente_id ?? '',
+      direccion: u.direccion ?? '',
+      datos_registrales: u.datos_registrales ?? '',
+      tipo_regimen: u.tipo_regimen ?? '',
+      fecha_construccion: u.fecha_construccion ?? '',
+      estado_ocupacional: u.estado_ocupacional ?? '',
+      contrato_suministro: u.contrato_suministro ?? '',
+      fecha_firma_contrato: u.fecha_firma_contrato ?? '',
+      numero_contrato_suministro: u.numero_contrato_suministro ?? '',
+      fecha_vencimiento_contrato: u.fecha_vencimiento_contrato ?? '',
     })
     setEditingId(u.id)
     setShowForm(true)
@@ -147,6 +196,15 @@ export function UnidadesSection({
       activo: form.activo,
       cliente_id: form.cliente_id || null,
       updated_at: new Date().toISOString(),
+      direccion: form.direccion || null,
+      datos_registrales: form.datos_registrales || null,
+      tipo_regimen: form.tipo_regimen || null,
+      fecha_construccion: form.fecha_construccion || null,
+      estado_ocupacional: form.estado_ocupacional || null,
+      contrato_suministro: form.contrato_suministro || null,
+      fecha_firma_contrato: form.fecha_firma_contrato || null,
+      numero_contrato_suministro: form.numero_contrato_suministro || null,
+      fecha_vencimiento_contrato: form.fecha_vencimiento_contrato || null,
     }
 
     if (editingId) {
@@ -511,6 +569,129 @@ export function UnidadesSection({
             </div>
           </div>
 
+          {/* Datos del Inmueble */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+              Datos del Inmueble
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Dirección</label>
+                <input
+                  style={inputStyle}
+                  value={form.direccion}
+                  onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))}
+                  placeholder="Dirección de la unidad..."
+                  maxLength={255}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Tipo de Régimen</label>
+                <select
+                  style={inputStyle}
+                  value={form.tipo_regimen}
+                  onChange={e => setForm(f => ({ ...f, tipo_regimen: e.target.value as TipoRegimen | '' }))}
+                >
+                  <option value="">— Sin especificar —</option>
+                  {TIPOS_REGIMEN.map(r => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Fecha de Construcción</label>
+                <input
+                  style={inputStyle}
+                  type="date"
+                  value={form.fecha_construccion}
+                  onChange={e => setForm(f => ({ ...f, fecha_construccion: e.target.value }))}
+                />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Datos Registrales</label>
+                <textarea
+                  style={{ ...inputStyle, minHeight: '72px', resize: 'vertical' }}
+                  value={form.datos_registrales}
+                  onChange={e => setForm(f => ({ ...f, datos_registrales: e.target.value }))}
+                  placeholder="Número de finca, tomo, folio, inscripción, etc..."
+                  maxLength={1000}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Estado Ocupacional */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+              Estado Ocupacional
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+              <div>
+                <label style={labelStyle}>Estado</label>
+                <select
+                  style={inputStyle}
+                  value={form.estado_ocupacional}
+                  onChange={e => setForm(f => ({ ...f, estado_ocupacional: e.target.value as EstadoOcupacional | '' }))}
+                >
+                  <option value="">— Sin especificar —</option>
+                  {ESTADOS_OCUPACIONALES.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Contrato de Suministro */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+              Contrato de Suministro
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+              <div>
+                <label style={labelStyle}>¿Tiene Contrato?</label>
+                <select
+                  style={inputStyle}
+                  value={form.contrato_suministro}
+                  onChange={e => setForm(f => ({ ...f, contrato_suministro: e.target.value as ContratoSuministro | '' }))}
+                >
+                  <option value="">— Sin especificar —</option>
+                  {CONTRATOS_SUMINISTRO.map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Número de Contrato</label>
+                <input
+                  style={inputStyle}
+                  value={form.numero_contrato_suministro}
+                  onChange={e => setForm(f => ({ ...f, numero_contrato_suministro: e.target.value }))}
+                  placeholder="Ej: CONT-2025-001..."
+                  maxLength={100}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Fecha de Firma</label>
+                <input
+                  style={inputStyle}
+                  type="date"
+                  value={form.fecha_firma_contrato}
+                  onChange={e => setForm(f => ({ ...f, fecha_firma_contrato: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Fecha de Vencimiento</label>
+                <input
+                  style={inputStyle}
+                  type="date"
+                  value={form.fecha_vencimiento_contrato}
+                  onChange={e => setForm(f => ({ ...f, fecha_vencimiento_contrato: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
           <div style={{ marginBottom: '20px' }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
               Cliente Asignado
@@ -678,6 +859,44 @@ export function UnidadesSection({
                     )}
                     {u.descripcion && (
                       <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>{u.descripcion}</div>
+                    )}
+                    {u.direccion && (
+                      <div>📍 {u.direccion}</div>
+                    )}
+                    {u.estado_ocupacional && (
+                      <div>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '2px 9px',
+                          borderRadius: '10px',
+                          background: '#f0f9ff',
+                          color: '#0369a1',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                        }}>
+                          {ESTADOS_OCUPACIONALES.find(e => e.value === u.estado_ocupacional)?.label ?? u.estado_ocupacional}
+                        </span>
+                      </div>
+                    )}
+                    {u.contrato_suministro && (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{
+                          padding: '2px 9px',
+                          borderRadius: '10px',
+                          background: u.contrato_suministro === 'si' ? '#dcfce7' : u.contrato_suministro === 'no' ? '#fee2e2' : '#f1f5f9',
+                          color: u.contrato_suministro === 'si' ? '#166534' : u.contrato_suministro === 'no' ? '#991b1b' : '#475569',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                        }}>
+                          📄 Contrato: {CONTRATOS_SUMINISTRO.find(c => c.value === u.contrato_suministro)?.label ?? u.contrato_suministro}
+                        </span>
+                        {u.numero_contrato_suministro && (
+                          <span style={{ fontSize: '11px', color: '#64748b' }}>#{u.numero_contrato_suministro}</span>
+                        )}
+                        {u.fecha_vencimiento_contrato && (
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>Vence: {u.fecha_vencimiento_contrato}</span>
+                        )}
+                      </div>
                     )}
                   </div>
 
