@@ -379,17 +379,28 @@ export function TarifasSection({
                 Si consumo ≤ este valor, se cobra solo el canon fijo
               </span>
             </div>
-            <div>
-              <label style={labelStyle}>Fecha de Revisión</label>
-              <input
-                style={inputStyle}
-                type="date"
-                value={form.fecha_revision}
-                onChange={e => setForm(f => ({ ...f, fecha_revision: e.target.value }))}
-              />
-              <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
-                Si la fecha pasa sin renovar, la tarifa se desactivará automáticamente
-              </span>
+            <div style={{ gridColumn: '1 / -1', background: '#f8fafc', borderRadius: '8px', padding: '14px 16px', border: '1px solid #e2e8f0' }}>
+              <label style={{ ...labelStyle, color: '#0f172a' }}>Fecha de Revisión</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <input
+                  style={{ ...inputStyle, width: 'auto', minWidth: '180px', background: 'white' }}
+                  type="date"
+                  value={form.fecha_revision}
+                  onChange={e => setForm(f => ({ ...f, fecha_revision: e.target.value }))}
+                />
+                {form.fecha_revision && (
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, fecha_revision: '' }))}
+                    style={{ fontSize: '12px', color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Quitar fecha
+                  </button>
+                )}
+                <span style={{ fontSize: '11px', color: '#64748b' }}>
+                  Si la fecha pasa sin renovar, la tarifa se desactivará automáticamente
+                </span>
+              </div>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Descripción</label>
