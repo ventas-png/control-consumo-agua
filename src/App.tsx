@@ -157,10 +157,8 @@ export default function App() {
           {activeSection === 'clientes' && (
             <ClientesSection
               clientes={clientes}
-              tarifas={tarifas}
               userRole={currentUser.role}
               userId={currentUser.user_id}
-              moneda={moneda}
               onClienteAdded={addCliente}
               onClienteUpdated={updateCliente}
               onClienteDeleted={deleteCliente}
@@ -169,10 +167,12 @@ export default function App() {
           {activeSection === 'lecturas' && (
             <LecturasSection
               clientes={clientes}
+              unidades={unidades}
+              contadores={contadores}
               registros={registros}
+              tarifas={tarifas}
               userRole={currentUser.role}
               moneda={moneda}
-              tarifas={tarifas}
               onRegistroAdded={addRegistro}
               rutaActiva={rutaActivaParaLecturas}
               onClearRuta={() => setRutaActivaParaLecturas(null)}
@@ -239,6 +239,7 @@ export default function App() {
             <UnidadesSection
               unidades={unidades}
               contadores={contadores}
+              clientes={clientes}
               userRole={currentUser.role}
               currentUser={currentUser}
               maxUnidadesPorTipo={maxUnidadesPorTipo}
@@ -250,7 +251,6 @@ export default function App() {
           {activeSection === 'contadores' && (
             <ContadoresSection
               contadores={contadores}
-              clientes={clientes}
               tarifas={tarifas}
               unidades={unidades}
               userRole={currentUser.role}

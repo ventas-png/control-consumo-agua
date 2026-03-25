@@ -1,16 +1,14 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Tarifa, UserRole } from '../../types'
+import type { Cliente, UserRole } from '../../types'
 import { supabase } from '../../lib/supabase'
-import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber, validateNumber } from '../../lib/validation'
+import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
 
 interface Props {
   clientes: Cliente[]
-  tarifas?: Tarifa[]
   userRole: UserRole
   userId: string
-  moneda?: string
   onClienteAdded: (cliente: Cliente) => void
   onClienteUpdated: (id: string, partial: Partial<Cliente>) => void
   onClienteDeleted: (id: string) => void
@@ -23,16 +21,12 @@ const EMPTY_FORM = {
   email: '',
   direccion: '',
   telefono: '',
-  tarifa: '3.00',
-  canon: '20.00',
-  consumo_minimo: '0',
   lectura_inicial: '0',
-  tarifa_id: '',
 }
 
 type FormState = typeof EMPTY_FORM
 
-export function ClientesSection({ clientes, tarifas = [], userRole, userId, moneda = 'Q', onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
+export function ClientesSection({ clientes, userRole, userId, onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -55,11 +49,7 @@ export function ClientesSection({ clientes, tarifas = [], userRole, userId, mone
       email: c.email ?? '',
       direccion: c.direccion ?? '',
       telefono: c.telefono ?? '',
-      tarifa: String(c.tarifa),
-      canon: String(c.canon),
-      consumo_minimo: String(c.consumo_minimo),
       lectura_inicial: String(c.lectura_inicial),
-      tarifa_id: c.tarifa_id ?? '',
     })
     setEditingId(c.id)
     setShowForm(true)
@@ -78,9 +68,6 @@ export function ClientesSection({ clientes, tarifas = [], userRole, userId, mone
     const email = sanitizeInput(form.email)
     const direccion = sanitizeInput(form.direccion)
     const telefono = sanitizeInput(form.telefono)
-    const tarifa = parseFloat(form.tarifa)
-    const canon = parseFloat(form.canon)
-    const consumo_minimo = parseFloat(form.consumo_minimo)
     const lectura_inicial = parseFloat(form.lectura_inicial)
 
     const errors: string[] = []
@@ -88,10 +75,7 @@ export function ClientesSection({ clientes, tarifas = [], userRole, userId, mone
     if (!codigo || codigo.length < 3) errors.push('Código debe tener al menos 3 caracteres')
     if (email && !validateEmail(email)) errors.push('Formato de email inválido')
     if (telefono && !validatePhoneNumber(telefono)) errors.push('Teléfono debe tener 8 dígitos (Guatemala)')
-    if (!validateNumber(tarifa, 0, 1000)) errors.push('Tarifa debe estar entre 0 y 1000')
-    if (!validateNumber(canon, 0, 1000)) errors.push('Canon debe estar entre 0 y 1000')
-    if (!validateNumber(consumo_minimo, 0, 999999)) errors.push('Consumo mínimo inválido')
-    if (!validateNumber(lectura_inicial, 0, 999999)) errors.push('Lectura inicial inválida')
+    if (isNaN(lectura_inicial) || lectura_inicial < 0) errors.push('Lectura inicial inválida')
 
     if (errors.length > 0) {
       Swal.fire('Error de validación', errors.join('<br>'), 'error')
@@ -101,7 +85,7 @@ export function ClientesSection({ clientes, tarifas = [], userRole, userId, mone
     setLoading(true)
 
     if (editingId) {
-      const payload = { nombre, codigo, medidor, email: email || null, direccion: direccion || null, telefono: telefono || null, tarifa, canon, consumo_minimo, lectura_inicial, tarifa_id: form.tarifa_id || null }
+      const payload = { nombre, codigo, medidor, email: email || null, direccion: direccion || null, telefono: telefono || null, lectura_inicial }
       const { data, error } = await supabase
         .from('clientes')
         .update(payload)
@@ -118,7 +102,7 @@ export function ClientesSection({ clientes, tarifas = [], userRole, userId, mone
       }
     } else {
       await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: userRole }, userId)
-      const nuevo = { nombre, codigo, medidor, email: email || null, direccion: direccion || null, telefono: telefono || null, tarifa, canon, consumo_minimo, lectura_inicial, tarifa_id: form.tarifa_id || null }
+      const nuevo = { nombre, codigo, medidor, email: email || null, direccion: direccion || null, telefono: telefono || null, lectura_inicial }
       const { data, error } = await supabase.from('clientes').insert(nuevo).select()
 
       if (!error && data) {
@@ -184,9 +168,6 @@ export function ClientesSection({ clientes, tarifas = [], userRole, userId, mone
     { label: 'Email', key: 'email', placeholder: 'cliente@email.com', type: 'email' },
     { label: 'Dirección', key: 'direccion', placeholder: '', type: 'text' },
     { label: 'Teléfono', key: 'telefono', placeholder: 'Ej. 55551234', type: 'tel' },
-    { label: `Tarifa Consumo (${moneda}/m³)`, key: 'tarifa', placeholder: '3.00', type: 'number' },
-    { label: `Canon Fijo (${moneda})`, key: 'canon', placeholder: '20.00', type: 'number' },
-    { label: 'Consumo Mínimo (m³)', key: 'consumo_minimo', placeholder: '0', type: 'number' },
     { label: 'Lectura Inicial', key: 'lectura_inicial', placeholder: '0', type: 'number' },
   ]
 
@@ -235,37 +216,6 @@ export function ClientesSection({ clientes, tarifas = [], userRole, userId, mone
           <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '20px', color: '#1e293b' }}>
             {editingId ? 'Editar Cliente' : 'Nuevo Cliente'}
           </div>
-          {tarifas.length > 0 && (
-            <div style={{ marginBottom: '16px', padding: '14px 16px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px' }}>
-              <label style={{ ...labelStyle, color: '#0369a1' }}>Seleccionar Tarifa del Sistema</label>
-              <select
-                style={{ ...inputStyle, borderColor: '#bae6fd' }}
-                value={form.tarifa_id}
-                onChange={e => {
-                  const id = e.target.value
-                  const t = tarifas.find(x => x.id === id)
-                  if (t) {
-                    setForm(f => ({ ...f, tarifa_id: id, tarifa: String(t.precio_m3), canon: String(t.canon_fijo), consumo_minimo: String(t.consumo_minimo ?? 0) }))
-                  } else {
-                    setForm(f => ({ ...f, tarifa_id: '' }))
-                  }
-                }}
-              >
-                <option value="">— Sin tarifa asignada —</option>
-                {tarifas.filter(t => t.activa).map(t => (
-                  <option key={t.id} value={t.id}>{t.nombre} ({t.tipo_agua})</option>
-                ))}
-              </select>
-              {form.tarifa_id && !tarifas.find(t => t.id === form.tarifa_id)?.activa && (
-                <span style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px', display: 'block' }}>
-                  La tarifa seleccionada no está vigente
-                </span>
-              )}
-              <span style={{ fontSize: '11px', color: '#0369a1', marginTop: '4px', display: 'block' }}>
-                Al seleccionar una tarifa se auto-completan los valores de cobro
-              </span>
-            </div>
-          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
             {FIELDS.map(f => (
               <div key={f.key}>
@@ -318,7 +268,7 @@ export function ClientesSection({ clientes, tarifas = [], userRole, userId, mone
         </div>
       )}
 
-      {/* Grid */}
+      {/* Table */}
       <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
         {filtered.length === 0 ? (
           <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
@@ -339,8 +289,7 @@ export function ClientesSection({ clientes, tarifas = [], userRole, userId, mone
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Código</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Medidor</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Contacto</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Tarifa</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Canon</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Lect. Inicial</th>
                   {canEdit && (
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
                   )}
@@ -371,11 +320,8 @@ export function ClientesSection({ clientes, tarifas = [], userRole, userId, mone
                       {c.telefono && <div style={{ fontSize: '12px', color: '#94a3b8' }}>{sanitizeHTML(c.telefono)}</div>}
                       {!c.email && !c.telefono && <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
-                      {moneda} {Number(c.tarifa).toFixed(2)}
-                    </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
-                      {moneda} {Number(c.canon).toFixed(2)}
+                      {Number(c.lectura_inicial).toFixed(2)}
                     </td>
                     {canEdit && (
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>

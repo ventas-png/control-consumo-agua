@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import type { Contador, Tarifa, TipoAgua, UserRole, UserSession, Cliente, Unidad } from '../../types'
+import type { Contador, Tarifa, TipoAgua, UserRole, UserSession, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
 
 interface Props {
   contadores: Contador[]
-  clientes: Cliente[]
   tarifas: Tarifa[]
   unidades: Unidad[]
   userRole: UserRole
@@ -58,7 +57,6 @@ type FormState = typeof EMPTY_FORM
 
 export function ContadoresSection({
   contadores,
-  clientes,
   tarifas,
   unidades,
   userRole,
@@ -237,31 +235,17 @@ export function ContadoresSection({
   }
 
   async function handleEliminar(c: Contador) {
-    if (c.cliente_id) {
-      const confirm = await Swal.fire({
-        title: '¿Eliminar contador?',
-        html: `El contador <b>${c.numero_serie}</b> está asignado a un cliente.<br>¿Deseas eliminarlo de todas formas?`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#64748b',
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar',
-      })
-      if (!confirm.isConfirmed) return
-    } else {
-      const confirm = await Swal.fire({
-        title: '¿Eliminar contador?',
-        html: `<b>${c.numero_serie}</b> será eliminado permanentemente.`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#64748b',
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar',
-      })
-      if (!confirm.isConfirmed) return
-    }
+    const confirm = await Swal.fire({
+      title: '¿Eliminar contador?',
+      html: `<b>${c.numero_serie}</b> será eliminado permanentemente.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+    })
+    if (!confirm.isConfirmed) return
 
     const { error } = await supabase.from('contadores').delete().eq('id', c.id)
     if (!error) {
@@ -274,9 +258,6 @@ export function ContadoresSection({
 
   const tipoLabel = (value: TipoAgua) =>
     TIPOS_AGUA.find(t => t.value === value)?.label ?? value
-
-  const clienteNombre = (id: string | null | undefined) =>
-    id ? (clientes.find(c => c.id === id)?.nombre ?? 'Cliente desconocido') : null
 
   const tarifasParaTipo = (tipo: TipoAgua) =>
     tarifas.filter(t => t.tipo_agua === tipo && t.activa)
@@ -319,7 +300,7 @@ export function ContadoresSection({
   const resumen = TIPOS_AGUA.map(t => ({
     ...t,
     total: contadores.filter(c => c.tipo_agua === t.value).length,
-    asignados: contadores.filter(c => c.tipo_agua === t.value && c.cliente_id).length,
+    conTarifa: contadores.filter(c => c.tipo_agua === t.value && c.tarifa_id).length,
   })).filter(t => t.total > 0)
 
   return (
@@ -409,7 +390,7 @@ export function ContadoresSection({
                   {r.total}
                 </div>
                 <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                  {r.asignados} asignado{r.asignados !== 1 ? 's' : ''}
+                  {r.conTarifa} con tarifa
                 </div>
               </div>
             )
@@ -612,7 +593,6 @@ export function ContadoresSection({
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Marca / Modelo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Lect. Inicial</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Unidad</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Cliente Asignado</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tarifa</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
                   {canEdit && (
@@ -623,7 +603,6 @@ export function ContadoresSection({
               <tbody>
                 {filtered.map((c, idx) => {
                   const col = TIPO_COLORES[c.tipo_agua]
-                  const clienteName = clienteNombre(c.cliente_id)
                   return (
                     <tr
                       key={c.id}
@@ -677,22 +656,6 @@ export function ContadoresSection({
                           </span>
                         ) : (
                           <span style={{ color: '#cbd5e1', fontSize: '13px' }}>Sin unidad</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        {clienteName ? (
-                          <span style={{
-                            padding: '3px 10px',
-                            borderRadius: '12px',
-                            background: '#f0fdf4',
-                            color: '#15803d',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                          }}>
-                            {clienteName}
-                          </span>
-                        ) : (
-                          <span style={{ color: '#cbd5e1', fontSize: '13px' }}>Sin asignar</span>
                         )}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
@@ -789,7 +752,7 @@ export function ContadoresSection({
           {filtered.length} contador{filtered.length !== 1 ? 'es' : ''}{' '}
           {search || filterTipo || filterUnidad ? 'encontrados' : 'registrados'} ·{' '}
           {contadores.filter(c => c.unidad_id).length} con unidad ·{' '}
-          {contadores.filter(c => c.cliente_id).length} asignado{contadores.filter(c => c.cliente_id).length !== 1 ? 's' : ''} a clientes
+          {contadores.filter(c => c.tarifa_id).length} con tarifa asignada
         </div>
       </div>
     </div>
