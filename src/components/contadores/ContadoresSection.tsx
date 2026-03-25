@@ -91,6 +91,7 @@ const EMPTY_FORM = {
   fecha_reemplazo_sugerida: '',
   numero_derecho_servicio: '',
   cantidad_derecho_servicio_m3: '',
+  periodicidad_lectura_dias: '',
 }
 
 type FormState = typeof EMPTY_FORM
@@ -144,6 +145,7 @@ export function ContadoresSection({
       fecha_reemplazo_sugerida: c.fecha_reemplazo_sugerida ?? '',
       numero_derecho_servicio: c.numero_derecho_servicio ?? '',
       cantidad_derecho_servicio_m3: c.cantidad_derecho_servicio_m3 != null ? String(c.cantidad_derecho_servicio_m3) : '',
+      periodicidad_lectura_dias: c.periodicidad_lectura_dias != null ? String(c.periodicidad_lectura_dias) : '',
     })
     setEditingId(c.id)
     setShowForm(true)
@@ -196,6 +198,7 @@ export function ContadoresSection({
           fecha_reemplazo_sugerida: form.fecha_reemplazo_sugerida || null,
           numero_derecho_servicio: form.numero_derecho_servicio || null,
           cantidad_derecho_servicio_m3: form.cantidad_derecho_servicio_m3 ? parseFloat(form.cantidad_derecho_servicio_m3) : null,
+          periodicidad_lectura_dias: form.periodicidad_lectura_dias ? parseInt(form.periodicidad_lectura_dias) : null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingId)
@@ -273,6 +276,7 @@ export function ContadoresSection({
           fecha_reemplazo_sugerida: form.fecha_reemplazo_sugerida || null,
           numero_derecho_servicio: form.numero_derecho_servicio || null,
           cantidad_derecho_servicio_m3: form.cantidad_derecho_servicio_m3 ? parseFloat(form.cantidad_derecho_servicio_m3) : null,
+          periodicidad_lectura_dias: form.periodicidad_lectura_dias ? parseInt(form.periodicidad_lectura_dias) : null,
           project_id: projectId,
           company_id: companyId,
         })
@@ -685,6 +689,18 @@ export function ContadoresSection({
                 placeholder="Ej: 15.00"
               />
             </div>
+            <div>
+              <label style={labelStyle}>Periodicidad de Lectura (días)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min="1"
+                step="1"
+                value={form.periodicidad_lectura_dias}
+                onChange={e => setForm(f => ({ ...f, periodicidad_lectura_dias: e.target.value }))}
+                placeholder="Ej: 30"
+              />
+            </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Descripción</label>
               <textarea
@@ -843,7 +859,10 @@ export function ContadoresSection({
                         {c.cantidad_derecho_servicio_m3 != null && (
                           <div><span style={{ color: '#94a3b8' }}>Caudal:</span> {Number(c.cantidad_derecho_servicio_m3).toFixed(2)} m³</div>
                         )}
-                        {!c.medida && !c.tipo_contador && !c.material && !c.valvula_cheque && !c.tipo_llave && !c.llave_antifraude && !c.valvula_aire && !c.fecha_reemplazo_sugerida && !c.numero_derecho_servicio && c.cantidad_derecho_servicio_m3 == null && (
+                        {c.periodicidad_lectura_dias != null && (
+                          <div><span style={{ color: '#94a3b8' }}>Lectura c/</span> {c.periodicidad_lectura_dias} días</div>
+                        )}
+                        {!c.medida && !c.tipo_contador && !c.material && !c.valvula_cheque && !c.tipo_llave && !c.llave_antifraude && !c.valvula_aire && !c.fecha_reemplazo_sugerida && !c.numero_derecho_servicio && c.cantidad_derecho_servicio_m3 == null && c.periodicidad_lectura_dias == null && (
                           <span style={{ color: '#cbd5e1' }}>—</span>
                         )}
                       </td>
