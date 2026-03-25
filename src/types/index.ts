@@ -7,6 +7,14 @@ export interface Cliente {
   direccion?: string;
   telefono?: string;
   lectura_inicial: number;
+  // Datos personales
+  nacionalidad?: string | null;
+  cui_dui?: string | null;
+  fecha_nacimiento?: string | null;
+  // Datos de facturación
+  numero_facturacion?: string | null;
+  // Contacto adicional
+  telefono_alterno?: string | null;
 }
 
 export interface GPS {
