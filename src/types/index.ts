@@ -135,6 +135,14 @@ export interface Contador {
   activo: boolean;
   tarifa_id?: string | null;
   unidad_id?: string | null;
+  medida?: string | null;
+  material?: string | null;
+  tipo_contador?: string | null;
+  valvula_cheque?: string | null;
+  tipo_llave?: string | null;
+  llave_antifraude?: string | null;
+  valvula_aire?: string | null;
+  fecha_reemplazo_sugerida?: string | null;
   created_at?: string;
   updated_at?: string;
 }

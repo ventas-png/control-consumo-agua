@@ -40,6 +40,13 @@ const TIPO_COLORES: Record<TipoAgua, { bg: string; color: string }> = {
   residuales_tratadas: { bg: '#f1f5f9', color: '#475569' },
 }
 
+const MEDIDAS_CONTADOR = ['1/2"', '3/4"', '1"', '1 1/4"', '1 1/2"', '2"', '3"', '4"', 'Otra']
+const MATERIALES_CONTADOR = ['Bronce', 'Latón', 'Hierro fundido', 'Acero inoxidable', 'Plástico (PVC)', 'Plástico (PP)', 'Otro']
+const TIPOS_CONTADOR = ['Analógico velocimétrico', 'Analógico volumétrico', 'Digital', 'Ultrasónico', 'Electromagnético', 'Otro']
+const OPCIONES_SIN = ['Sí', 'No', 'N/A']
+const OPCIONES_SI_NO = ['Sí', 'No']
+const TIPOS_LLAVE = ['Compuerta', 'Bola', 'Mariposa', 'Globo', 'Aguja', 'Otra']
+
 const EMPTY_FORM = {
   numero_serie: '',
   tipo_agua: 'potable' as TipoAgua,
@@ -51,6 +58,14 @@ const EMPTY_FORM = {
   activo: true,
   tarifa_id: '' as string,
   unidad_id: '' as string,
+  medida: '',
+  material: '',
+  tipo_contador: '',
+  valvula_cheque: '',
+  tipo_llave: '',
+  llave_antifraude: '',
+  valvula_aire: '',
+  fecha_reemplazo_sugerida: '',
 }
 
 type FormState = typeof EMPTY_FORM
@@ -94,6 +109,14 @@ export function ContadoresSection({
       activo: c.activo,
       tarifa_id: c.tarifa_id ?? '',
       unidad_id: c.unidad_id ?? '',
+      medida: c.medida ?? '',
+      material: c.material ?? '',
+      tipo_contador: c.tipo_contador ?? '',
+      valvula_cheque: c.valvula_cheque ?? '',
+      tipo_llave: c.tipo_llave ?? '',
+      llave_antifraude: c.llave_antifraude ?? '',
+      valvula_aire: c.valvula_aire ?? '',
+      fecha_reemplazo_sugerida: c.fecha_reemplazo_sugerida ?? '',
     })
     setEditingId(c.id)
     setShowForm(true)
@@ -136,6 +159,14 @@ export function ContadoresSection({
           activo: form.activo,
           tarifa_id: form.tarifa_id || null,
           unidad_id: form.unidad_id || null,
+          medida: form.medida || null,
+          material: form.material || null,
+          tipo_contador: form.tipo_contador || null,
+          valvula_cheque: form.valvula_cheque || null,
+          tipo_llave: form.tipo_llave || null,
+          llave_antifraude: form.llave_antifraude || null,
+          valvula_aire: form.valvula_aire || null,
+          fecha_reemplazo_sugerida: form.fecha_reemplazo_sugerida || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingId)
@@ -203,6 +234,14 @@ export function ContadoresSection({
           activo: form.activo,
           tarifa_id: form.tarifa_id || null,
           unidad_id: form.unidad_id || null,
+          medida: form.medida || null,
+          material: form.material || null,
+          tipo_contador: form.tipo_contador || null,
+          valvula_cheque: form.valvula_cheque || null,
+          tipo_llave: form.tipo_llave || null,
+          llave_antifraude: form.llave_antifraude || null,
+          valvula_aire: form.valvula_aire || null,
+          fecha_reemplazo_sugerida: form.fecha_reemplazo_sugerida || null,
           project_id: projectId,
           company_id: companyId,
         })
@@ -501,6 +540,98 @@ export function ContadoresSection({
                 placeholder="0.0000"
               />
             </div>
+            {/* Technical fields — separator */}
+            <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '4px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#0ea5e9', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Características Técnicas e Instalación
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Medida del Contador</label>
+              <select
+                style={inputStyle}
+                value={form.medida}
+                onChange={e => setForm(f => ({ ...f, medida: e.target.value }))}
+              >
+                <option value="">— Seleccionar —</option>
+                {MEDIDAS_CONTADOR.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Material del Contador</label>
+              <select
+                style={inputStyle}
+                value={form.material}
+                onChange={e => setForm(f => ({ ...f, material: e.target.value }))}
+              >
+                <option value="">— Seleccionar —</option>
+                {MATERIALES_CONTADOR.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Tipo de Contador</label>
+              <select
+                style={inputStyle}
+                value={form.tipo_contador}
+                onChange={e => setForm(f => ({ ...f, tipo_contador: e.target.value }))}
+              >
+                <option value="">— Seleccionar —</option>
+                {TIPOS_CONTADOR.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Válvula de Cheque instalada</label>
+              <select
+                style={inputStyle}
+                value={form.valvula_cheque}
+                onChange={e => setForm(f => ({ ...f, valvula_cheque: e.target.value }))}
+              >
+                <option value="">— Seleccionar —</option>
+                {OPCIONES_SIN.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Tipo de Llave instalada</label>
+              <select
+                style={inputStyle}
+                value={form.tipo_llave}
+                onChange={e => setForm(f => ({ ...f, tipo_llave: e.target.value }))}
+              >
+                <option value="">— Seleccionar —</option>
+                {TIPOS_LLAVE.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Llave Antifraude instalada</label>
+              <select
+                style={inputStyle}
+                value={form.llave_antifraude}
+                onChange={e => setForm(f => ({ ...f, llave_antifraude: e.target.value }))}
+              >
+                <option value="">— Seleccionar —</option>
+                {OPCIONES_SI_NO.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Válvula Liberadora de Aire</label>
+              <select
+                style={inputStyle}
+                value={form.valvula_aire}
+                onChange={e => setForm(f => ({ ...f, valvula_aire: e.target.value }))}
+              >
+                <option value="">— Seleccionar —</option>
+                {OPCIONES_SIN.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Fecha Sugerida de Reemplazo</label>
+              <input
+                style={inputStyle}
+                type="date"
+                value={form.fecha_reemplazo_sugerida}
+                onChange={e => setForm(f => ({ ...f, fecha_reemplazo_sugerida: e.target.value }))}
+              />
+            </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Descripción</label>
               <textarea
@@ -591,6 +722,7 @@ export function ContadoresSection({
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>N° Serie</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tipología</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Marca / Modelo</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Características</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Lect. Inicial</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Unidad</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tarifa</th>
@@ -638,6 +770,23 @@ export function ContadoresSection({
                         {c.marca && c.modelo && ' / '}
                         {c.modelo && <span style={{ color: '#94a3b8' }}>{c.modelo}</span>}
                         {!c.marca && !c.modelo && <span style={{ color: '#cbd5e1' }}>—</span>}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '12px', color: '#475569' }}>
+                        {c.medida && <div><span style={{ color: '#94a3b8' }}>Medida:</span> {c.medida}</div>}
+                        {c.tipo_contador && <div><span style={{ color: '#94a3b8' }}>Tipo:</span> {c.tipo_contador}</div>}
+                        {c.material && <div><span style={{ color: '#94a3b8' }}>Material:</span> {c.material}</div>}
+                        {c.valvula_cheque && <div><span style={{ color: '#94a3b8' }}>V. Cheque:</span> {c.valvula_cheque}</div>}
+                        {c.tipo_llave && <div><span style={{ color: '#94a3b8' }}>Llave:</span> {c.tipo_llave}</div>}
+                        {c.llave_antifraude && <div><span style={{ color: '#94a3b8' }}>Antifraude:</span> {c.llave_antifraude}</div>}
+                        {c.valvula_aire && <div><span style={{ color: '#94a3b8' }}>V. Aire:</span> {c.valvula_aire}</div>}
+                        {c.fecha_reemplazo_sugerida && (
+                          <div style={{ color: new Date(c.fecha_reemplazo_sugerida + 'T12:00:00') <= new Date() ? '#dc2626' : '#0369a1', fontWeight: 600 }}>
+                            Reemplazo: {new Date(c.fecha_reemplazo_sugerida + 'T12:00:00').toLocaleDateString('es-GT')}
+                          </div>
+                        )}
+                        {!c.medida && !c.tipo_contador && !c.material && !c.valvula_cheque && !c.tipo_llave && !c.llave_antifraude && !c.valvula_aire && !c.fecha_reemplazo_sugerida && (
+                          <span style={{ color: '#cbd5e1' }}>—</span>
+                        )}
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
                         {Number(c.lectura_inicial).toFixed(4)}
