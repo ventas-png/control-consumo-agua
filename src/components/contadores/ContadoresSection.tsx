@@ -89,6 +89,8 @@ const EMPTY_FORM = {
   llave_antifraude: '',
   valvula_aire: '',
   fecha_reemplazo_sugerida: '',
+  numero_derecho_servicio: '',
+  cantidad_derecho_servicio_m3: '',
 }
 
 type FormState = typeof EMPTY_FORM
@@ -140,6 +142,8 @@ export function ContadoresSection({
       llave_antifraude: c.llave_antifraude ?? '',
       valvula_aire: c.valvula_aire ?? '',
       fecha_reemplazo_sugerida: c.fecha_reemplazo_sugerida ?? '',
+      numero_derecho_servicio: c.numero_derecho_servicio ?? '',
+      cantidad_derecho_servicio_m3: c.cantidad_derecho_servicio_m3 != null ? String(c.cantidad_derecho_servicio_m3) : '',
     })
     setEditingId(c.id)
     setShowForm(true)
@@ -190,6 +194,8 @@ export function ContadoresSection({
           llave_antifraude: form.llave_antifraude || null,
           valvula_aire: form.valvula_aire || null,
           fecha_reemplazo_sugerida: form.fecha_reemplazo_sugerida || null,
+          numero_derecho_servicio: form.numero_derecho_servicio || null,
+          cantidad_derecho_servicio_m3: form.cantidad_derecho_servicio_m3 ? parseFloat(form.cantidad_derecho_servicio_m3) : null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingId)
@@ -265,6 +271,8 @@ export function ContadoresSection({
           llave_antifraude: form.llave_antifraude || null,
           valvula_aire: form.valvula_aire || null,
           fecha_reemplazo_sugerida: form.fecha_reemplazo_sugerida || null,
+          numero_derecho_servicio: form.numero_derecho_servicio || null,
+          cantidad_derecho_servicio_m3: form.cantidad_derecho_servicio_m3 ? parseFloat(form.cantidad_derecho_servicio_m3) : null,
           project_id: projectId,
           company_id: companyId,
         })
@@ -655,6 +663,28 @@ export function ContadoresSection({
                 onChange={e => setForm(f => ({ ...f, fecha_reemplazo_sugerida: e.target.value }))}
               />
             </div>
+            <div>
+              <label style={labelStyle}>N° Derecho de Servicio (Título de Agua)</label>
+              <input
+                style={inputStyle}
+                value={form.numero_derecho_servicio}
+                onChange={e => setForm(f => ({ ...f, numero_derecho_servicio: e.target.value }))}
+                placeholder="Ej: DS-2024-00123"
+                maxLength={100}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Cantidad Derecho de Servicio (m³)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.cantidad_derecho_servicio_m3}
+                onChange={e => setForm(f => ({ ...f, cantidad_derecho_servicio_m3: e.target.value }))}
+                placeholder="Ej: 15.00"
+              />
+            </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Descripción</label>
               <textarea
@@ -807,7 +837,13 @@ export function ContadoresSection({
                             Reemplazo: {new Date(c.fecha_reemplazo_sugerida + 'T12:00:00').toLocaleDateString('es-GT')}
                           </div>
                         )}
-                        {!c.medida && !c.tipo_contador && !c.material && !c.valvula_cheque && !c.tipo_llave && !c.llave_antifraude && !c.valvula_aire && !c.fecha_reemplazo_sugerida && (
+                        {c.numero_derecho_servicio && (
+                          <div><span style={{ color: '#94a3b8' }}>Derecho:</span> {c.numero_derecho_servicio}</div>
+                        )}
+                        {c.cantidad_derecho_servicio_m3 != null && (
+                          <div><span style={{ color: '#94a3b8' }}>Caudal:</span> {Number(c.cantidad_derecho_servicio_m3).toFixed(2)} m³</div>
+                        )}
+                        {!c.medida && !c.tipo_contador && !c.material && !c.valvula_cheque && !c.tipo_llave && !c.llave_antifraude && !c.valvula_aire && !c.fecha_reemplazo_sugerida && !c.numero_derecho_servicio && c.cantidad_derecho_servicio_m3 == null && (
                           <span style={{ color: '#cbd5e1' }}>—</span>
                         )}
                       </td>
