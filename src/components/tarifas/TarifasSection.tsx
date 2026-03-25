@@ -379,6 +379,18 @@ export function TarifasSection({
                 Si consumo ≤ este valor, se cobra solo el canon fijo
               </span>
             </div>
+            <div>
+              <label style={labelStyle}>Fecha de Revisión</label>
+              <input
+                style={inputStyle}
+                type="date"
+                value={form.fecha_revision}
+                onChange={e => setForm(f => ({ ...f, fecha_revision: e.target.value }))}
+              />
+              <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                Si la fecha pasa sin renovar, la tarifa se desactivará automáticamente
+              </span>
+            </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Descripción</label>
               <textarea
@@ -388,19 +400,6 @@ export function TarifasSection({
                 placeholder="Descripción opcional de la tarifa..."
                 maxLength={500}
               />
-            </div>
-            <div>
-              <label style={labelStyle}>Fecha de Revisión</label>
-              <input
-                style={inputStyle}
-                type="date"
-                value={form.fecha_revision}
-                min={new Date().toISOString().split('T')[0]}
-                onChange={e => setForm(f => ({ ...f, fecha_revision: e.target.value }))}
-              />
-              <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
-                Si la fecha pasa sin renovar la tarifa, se desactivará automáticamente
-              </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <label style={{ ...labelStyle, marginBottom: 0 }}>Estado:</label>
