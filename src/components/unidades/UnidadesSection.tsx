@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, UserSession, Contador, MaxUnidadesPorTipo, Cliente } from '../../types'
+import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, UserSession, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
 
@@ -8,12 +8,14 @@ interface Props {
   unidades: Unidad[]
   contadores: Contador[]
   clientes: Cliente[]
+  proyectos: Proyecto[]
   userRole: UserRole
   currentUser: UserSession
   maxUnidadesPorTipo?: MaxUnidadesPorTipo | null
   onUnidadAdded: (unidad: Unidad) => void
   onUnidadUpdated: (id: string, partial: Partial<Unidad>) => void
   onUnidadDeleted: (id: string) => void
+  onContadorUpdated: (id: string, partial: Partial<Contador>) => void
 }
 
 const TIPOS_UNIDAD: { value: TipoUnidad; label: string; icon: string }[] = [
@@ -54,6 +56,18 @@ const CONTRATOS_SUMINISTRO: { value: ContratoSuministro; label: string }[] = [
   { value: 'na', label: 'N/A' },
 ]
 
+const TIPO_AGUA_LABELS: Record<string, string> = {
+  potable:             '💧 Potable',
+  rehuso:              '♻️ Reúso',
+  piscina:             '🏊 Piscina',
+  desalinada:          '🌊 Desalinada',
+  riego:               '🌱 Riego',
+  jacuzzi:             '🛁 Jacuzzi',
+  consumo_humano:      '🚰 Consumo Humano',
+  desmineralizada:     '🧪 Desmineralizada',
+  residuales_tratadas: '🔄 Residuales Tratadas',
+}
+
 const TIPO_COLORES: Record<TipoUnidad, { bg: string; color: string }> = {
   apartamento:     { bg: '#e0f2fe', color: '#0369a1' },
   casa:            { bg: '#dcfce7', color: '#166534' },
@@ -75,6 +89,7 @@ const EMPTY_FORM = {
   propietario_email: '',
   activo: true,
   cliente_id: '',
+  project_id: '',
   // Datos del inmueble
   direccion: '',
   datos_registrales: '',
@@ -95,14 +110,17 @@ export function UnidadesSection({
   unidades,
   contadores,
   clientes,
+  proyectos,
   userRole,
   currentUser,
   maxUnidadesPorTipo,
   onUnidadAdded,
   onUnidadUpdated,
   onUnidadDeleted,
+  onContadorUpdated,
 }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [selectedContadorIds, setSelectedContadorIds] = useState<string[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -112,7 +130,8 @@ export function UnidadesSection({
   const canEdit = userRole !== 'viewer' && userRole !== 'operator'
 
   function startCreate() {
-    setForm(EMPTY_FORM)
+    setForm({ ...EMPTY_FORM, project_id: proyectos.length === 1 ? proyectos[0].id : '' })
+    setSelectedContadorIds([])
     setEditingId(null)
     setShowForm(true)
   }
@@ -129,6 +148,7 @@ export function UnidadesSection({
       propietario_email: u.propietario_email ?? '',
       activo: u.activo,
       cliente_id: u.cliente_id ?? '',
+      project_id: u.project_id ?? '',
       direccion: u.direccion ?? '',
       datos_registrales: u.datos_registrales ?? '',
       tipo_regimen: u.tipo_regimen ?? '',
@@ -139,6 +159,7 @@ export function UnidadesSection({
       numero_contrato_suministro: u.numero_contrato_suministro ?? '',
       fecha_vencimiento_contrato: u.fecha_vencimiento_contrato ?? '',
     })
+    setSelectedContadorIds(contadores.filter(c => c.unidad_id === u.id).map(c => c.id))
     setEditingId(u.id)
     setShowForm(true)
   }
@@ -147,6 +168,29 @@ export function UnidadesSection({
     setShowForm(false)
     setEditingId(null)
     setForm(EMPTY_FORM)
+    setSelectedContadorIds([])
+  }
+
+  async function batchUpdateContadores(savedUnitId: string) {
+    const previouslyAssigned = contadores
+      .filter(c => c.unidad_id === savedUnitId)
+      .map(c => c.id)
+    const toAdd = selectedContadorIds.filter(id => !previouslyAssigned.includes(id))
+    const toRemove = previouslyAssigned.filter(id => !selectedContadorIds.includes(id))
+    if (toAdd.length > 0) {
+      const { error } = await supabase
+        .from('contadores')
+        .update({ unidad_id: savedUnitId, updated_at: new Date().toISOString() })
+        .in('id', toAdd)
+      if (!error) toAdd.forEach(id => onContadorUpdated(id, { unidad_id: savedUnitId }))
+    }
+    if (toRemove.length > 0) {
+      const { error } = await supabase
+        .from('contadores')
+        .update({ unidad_id: null, updated_at: new Date().toISOString() })
+        .in('id', toRemove)
+      if (!error) toRemove.forEach(id => onContadorUpdated(id, { unidad_id: null }))
+    }
   }
 
   async function handleGuardar() {
@@ -210,13 +254,14 @@ export function UnidadesSection({
     if (editingId) {
       const { data, error } = await supabase
         .from('unidades')
-        .update(payload)
+        .update({ ...payload, ...(form.project_id && { project_id: form.project_id }) })
         .eq('id', editingId)
         .select()
         .single()
 
       if (!error && data) {
         onUnidadUpdated(editingId, data as Unidad)
+        await batchUpdateContadores(editingId)
         cancelForm()
         Swal.fire({ icon: 'success', title: 'Unidad actualizada', timer: 1800, showConfirmButton: false })
       } else {
@@ -230,8 +275,11 @@ export function UnidadesSection({
         .eq('id', currentUser.user_id)
         .single()
 
+      // Use project selected in form; fallback to auto-resolve
       let projectId: string | null =
-        (userData as { project_id?: string } | null)?.project_id ?? null
+        form.project_id ||
+        (userData as { project_id?: string } | null)?.project_id ||
+        null
       let companyId: string | null =
         (userData as { company_id?: string } | null)?.company_id ??
         currentUser.company_id ??
@@ -288,7 +336,9 @@ export function UnidadesSection({
         .single()
 
       if (!error && data) {
-        onUnidadAdded(data as Unidad)
+        const newUnit = data as Unidad
+        onUnidadAdded(newUnit)
+        await batchUpdateContadores(newUnit.id)
         cancelForm()
         Swal.fire({ icon: 'success', title: 'Unidad creada', timer: 1800, showConfirmButton: false })
       } else {
@@ -472,6 +522,21 @@ export function UnidadesSection({
               Datos de la Unidad
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+              {proyectos.length > 1 && (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={labelStyle}>Proyecto *</label>
+                  <select
+                    style={inputStyle}
+                    value={form.project_id}
+                    onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}
+                  >
+                    <option value="">— Seleccionar proyecto —</option>
+                    {proyectos.map(p => (
+                      <option key={p.id} value={p.id}>{p.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label style={labelStyle}>Nombre / Número *</label>
                 <input
@@ -708,6 +773,70 @@ export function UnidadesSection({
             </select>
           </div>
 
+          {/* Contadores Asignados */}
+          {(() => {
+            const disponibles = contadores.filter(c => c.unidad_id === null || c.unidad_id === editingId)
+            return (
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                  Contadores Asignados
+                </div>
+                {disponibles.length === 0 ? (
+                  <div style={{ fontSize: '13px', color: '#94a3b8', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    No hay contadores disponibles para asignar.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '8px' }}>
+                    {disponibles.map(c => {
+                      const checked = selectedContadorIds.includes(c.id)
+                      return (
+                        <label
+                          key={c.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '10px 14px',
+                            borderRadius: '8px',
+                            border: `2px solid ${checked ? '#0ea5e9' : '#e2e8f0'}`,
+                            background: checked ? '#f0f9ff' : '#fafafa',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                            transition: 'all 0.1s',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={e => {
+                              if (e.target.checked) setSelectedContadorIds(prev => [...prev, c.id])
+                              else setSelectedContadorIds(prev => prev.filter(id => id !== c.id))
+                            }}
+                            style={{ width: '16px', height: '16px', accentColor: '#0ea5e9', flexShrink: 0 }}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              🔧 {c.numero_serie}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>
+                              {TIPO_AGUA_LABELS[c.tipo_agua] ?? c.tipo_agua}
+                              {c.marca && ` · ${c.marca}`}
+                            </div>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+                {selectedContadorIds.length > 0 && (
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#0369a1' }}>
+                    {selectedContadorIds.length} contador{selectedContadorIds.length !== 1 ? 'es' : ''} seleccionado{selectedContadorIds.length !== 1 ? 's' : ''}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
             <label style={{ ...labelStyle, marginBottom: 0 }}>Estado:</label>
             <button
@@ -819,6 +948,12 @@ export function UnidadesSection({
                         }}>
                           {tipo.label}
                         </span>
+                        {proyectos.length > 1 && u.project_id && (() => {
+                          const p = proyectos.find(pr => pr.id === u.project_id)
+                          return p ? (
+                            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>🏗️ {p.nombre}</div>
+                          ) : null
+                        })()}
                       </div>
                     </div>
                     <span style={{

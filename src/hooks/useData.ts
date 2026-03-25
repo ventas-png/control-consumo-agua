@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, MaxUnidadesPorTipo } from '../types'
+import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo } from '../types'
 import { supabase } from '../lib/supabase'
 
 interface AppData {
@@ -13,6 +13,7 @@ interface AppData {
   tarifas: Tarifa[]
   contadores: Contador[]
   unidades: Unidad[]
+  proyectos: Proyecto[]
   moneda: string
   maxUnidadesPorTipo: MaxUnidadesPorTipo | null
 }
@@ -27,6 +28,7 @@ const INITIAL_DATA: AppData = {
   tarifas: [],
   contadores: [],
   unidades: [],
+  proyectos: [],
   moneda: 'Q',
   maxUnidadesPorTipo: null,
 }
@@ -51,7 +53,7 @@ export function useData() {
       supabase.from('tarifas').select('*').order('created_at', { ascending: false }),
       supabase.from('contadores').select('*').order('created_at', { ascending: false }),
       supabase.from('unidades').select('*').order('nombre', { ascending: true }),
-      supabase.from('projects').select('moneda, max_unidades_apartamento, max_unidades_casa, max_unidades_bodega, max_unidades_local_comercial, max_unidades_oficina, max_unidades_parqueadero, max_unidades_otro').limit(1),
+      supabase.from('projects').select('*').order('nombre', { ascending: true }),
     ])
 
     setData(prev => {
@@ -83,7 +85,8 @@ export function useData() {
       if (unidadesRes.status === 'fulfilled' && unidadesRes.value.data) {
         next.unidades = unidadesRes.value.data as Unidad[]
       }
-      if (proyectoRes.status === 'fulfilled' && proyectoRes.value.data?.[0]) {
+      if (proyectoRes.status === 'fulfilled' && proyectoRes.value.data?.length) {
+        next.proyectos = proyectoRes.value.data as Proyecto[]
         const p = proyectoRes.value.data[0]
         next.moneda = p.moneda ?? 'Q'
         next.maxUnidadesPorTipo = {

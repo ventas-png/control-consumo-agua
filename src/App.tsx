@@ -34,7 +34,7 @@ function getResetToken(): string | null {
 export default function App() {
   const { currentUser, loading, login, loginWithGoogle, logout, updateProfile } = useAuth()
   const {
-    clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores, unidades,
+    clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores, unidades, proyectos,
     moneda, maxUnidadesPorTipo,
     cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado,
     setFuentesAgua, setRegistrosCalidad, addRuta, updateRuta, deleteRuta,
@@ -240,12 +240,14 @@ export default function App() {
               unidades={unidades}
               contadores={contadores}
               clientes={clientes}
+              proyectos={proyectos}
               userRole={currentUser.role}
               currentUser={currentUser}
               maxUnidadesPorTipo={maxUnidadesPorTipo}
               onUnidadAdded={addUnidad}
               onUnidadUpdated={updateUnidad}
               onUnidadDeleted={deleteUnidad}
+              onContadorUpdated={updateContador}
             />
           )}
           {activeSection === 'contadores' && (
