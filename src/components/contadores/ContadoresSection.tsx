@@ -40,8 +40,31 @@ const TIPO_COLORES: Record<TipoAgua, { bg: string; color: string }> = {
   residuales_tratadas: { bg: '#f1f5f9', color: '#475569' },
 }
 
-const MEDIDAS_CONTADOR = ['1/2"', '3/4"', '1"', '1 1/4"', '1 1/2"', '2"', '3"', '4"', 'Otra']
-const MATERIALES_CONTADOR = ['Bronce', 'Latón', 'Hierro fundido', 'Acero inoxidable', 'Plástico (PVC)', 'Plástico (PP)', 'Otro']
+const MEDIDAS_CONTADOR = [
+  '1/2"  (½") — 15 mm',
+  '3/4"  (¾") — 20 mm',
+  '1"    — 25 mm',
+  '1 1/4" — 32 mm',
+  '1 1/2" — 40 mm',
+  '2"    — 50 mm',
+  '2 1/2" — 63 mm',
+  '3"    — 75 mm',
+  '4"    — 110 mm',
+  '5"    — 140 mm',
+  '6"    — 160 mm',
+]
+const MATERIALES_CONTADOR = [
+  'Bronce',
+  'Latón',
+  'Hierro fundido',
+  'Hierro galvanizado',
+  'Acero inoxidable',
+  'Cobre',
+  'Plástico (PVC)',
+  'Plástico (polipropileno)',
+  'Plástico (nylon reforzado)',
+  'Composite (plástico/metal)',
+]
 const TIPOS_CONTADOR = ['Analógico velocimétrico', 'Analógico volumétrico', 'Digital', 'Ultrasónico', 'Electromagnético', 'Otro']
 const OPCIONES_SIN = ['Sí', 'No', 'N/A']
 const OPCIONES_SI_NO = ['Sí', 'No']
