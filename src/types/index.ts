@@ -10,6 +10,7 @@ export interface Cliente {
   canon: number;
   consumo_minimo: number;
   lectura_inicial: number;
+  tarifa_id?: string | null;
 }
 
 export interface GPS {
@@ -118,6 +119,7 @@ export interface Tarifa {
   canon_fijo: number;
   consumo_minimo: number;
   activa: boolean;
+  fecha_revision?: string | null;
   created_at?: string;
   updated_at?: string;
 }

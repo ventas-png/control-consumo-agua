@@ -157,6 +157,7 @@ export default function App() {
           {activeSection === 'clientes' && (
             <ClientesSection
               clientes={clientes}
+              tarifas={tarifas}
               userRole={currentUser.role}
               userId={currentUser.user_id}
               moneda={moneda}
@@ -171,6 +172,7 @@ export default function App() {
               registros={registros}
               userRole={currentUser.role}
               moneda={moneda}
+              tarifas={tarifas}
               onRegistroAdded={addRegistro}
               rutaActiva={rutaActivaParaLecturas}
               onClearRuta={() => setRutaActivaParaLecturas(null)}

@@ -35,6 +35,7 @@ const EMPTY_FORM = {
   consumo_minimo: '0.0000',
   descripcion: '',
   activa: true,
+  fecha_revision: '',
 }
 
 type FormState = typeof EMPTY_FORM
@@ -71,6 +72,7 @@ export function TarifasSection({
       consumo_minimo: String(t.consumo_minimo ?? 0),
       descripcion: t.descripcion ?? '',
       activa: t.activa,
+      fecha_revision: t.fecha_revision ?? '',
     })
     setEditingId(t.id)
     setShowForm(true)
@@ -111,7 +113,8 @@ export function TarifasSection({
           canon_fijo,
           consumo_minimo,
           descripcion: form.descripcion || null,
-          activa: form.activa,
+          activa: true,
+          fecha_revision: form.fecha_revision || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingId)
@@ -178,6 +181,7 @@ export function TarifasSection({
           consumo_minimo,
           descripcion: form.descripcion || null,
           activa: form.activa,
+          fecha_revision: form.fecha_revision || null,
           project_id: projectId,
           company_id: companyId,
         })
@@ -239,6 +243,17 @@ export function TarifasSection({
 
   const tipoLabel = (value: string) =>
     TIPOS_AGUA.find(t => t.value === value)?.label ?? value
+
+  function getRevisionStatus(t: Tarifa): 'expired' | 'soon' | 'ok' | 'none' {
+    if (!t.fecha_revision) return 'none'
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const rev = new Date(t.fecha_revision + 'T00:00:00')
+    const diff = Math.ceil((rev.getTime() - today.getTime()) / 86400000)
+    if (diff < 0) return 'expired'
+    if (diff <= 30) return 'soon'
+    return 'ok'
+  }
 
   const inputStyle: React.CSSProperties = {
     padding: '10px 14px',
@@ -364,6 +379,29 @@ export function TarifasSection({
                 Si consumo ≤ este valor, se cobra solo el canon fijo
               </span>
             </div>
+            <div style={{ gridColumn: '1 / -1', background: '#f8fafc', borderRadius: '8px', padding: '14px 16px', border: '1px solid #e2e8f0' }}>
+              <label style={{ ...labelStyle, color: '#0f172a' }}>Fecha de Revisión</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <input
+                  style={{ ...inputStyle, width: 'auto', minWidth: '180px', background: 'white' }}
+                  type="date"
+                  value={form.fecha_revision}
+                  onChange={e => setForm(f => ({ ...f, fecha_revision: e.target.value }))}
+                />
+                {form.fecha_revision && (
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, fecha_revision: '' }))}
+                    style={{ fontSize: '12px', color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Quitar fecha
+                  </button>
+                )}
+                <span style={{ fontSize: '11px', color: '#64748b' }}>
+                  Si la fecha pasa sin renovar, la tarifa se desactivará automáticamente
+                </span>
+              </div>
+            </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Descripción</label>
               <textarea
@@ -453,6 +491,7 @@ export function TarifasSection({
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Canon Fijo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Cons. Mínimo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Revisión</th>
                   {canEdit && (
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
                   )}
@@ -523,6 +562,26 @@ export function TarifasSection({
                           {t.activa ? 'Activa' : 'Inactiva'}
                         </span>
                       )}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      {(() => {
+                        const status = getRevisionStatus(t)
+                        if (status === 'none') return <span style={{ color: '#94a3b8', fontSize: '12px' }}>—</span>
+                        const cfg = {
+                          expired: { bg: '#fee2e2', color: '#991b1b', prefix: 'Vencida: ' },
+                          soon:    { bg: '#fef9c3', color: '#854d0e', prefix: 'Próxima: ' },
+                          ok:      { bg: '#dcfce7', color: '#166534', prefix: '' },
+                        }[status]
+                        return (
+                          <span style={{
+                            padding: '3px 8px', borderRadius: '10px', fontSize: '11px',
+                            fontWeight: 600, background: cfg.bg, color: cfg.color,
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {cfg.prefix}{t.fecha_revision}
+                          </span>
+                        )
+                      })()}
                     </td>
                     {canEdit && (
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>

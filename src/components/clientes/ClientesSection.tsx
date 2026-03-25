@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, UserRole } from '../../types'
+import type { Cliente, Tarifa, UserRole } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber, validateNumber } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
 
 interface Props {
   clientes: Cliente[]
+  tarifas?: Tarifa[]
   userRole: UserRole
   userId: string
   moneda?: string
@@ -26,11 +27,12 @@ const EMPTY_FORM = {
   canon: '20.00',
   consumo_minimo: '0',
   lectura_inicial: '0',
+  tarifa_id: '',
 }
 
 type FormState = typeof EMPTY_FORM
 
-export function ClientesSection({ clientes, userRole, userId, moneda = 'Q', onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
+export function ClientesSection({ clientes, tarifas = [], userRole, userId, moneda = 'Q', onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -57,6 +59,7 @@ export function ClientesSection({ clientes, userRole, userId, moneda = 'Q', onCl
       canon: String(c.canon),
       consumo_minimo: String(c.consumo_minimo),
       lectura_inicial: String(c.lectura_inicial),
+      tarifa_id: c.tarifa_id ?? '',
     })
     setEditingId(c.id)
     setShowForm(true)
@@ -98,7 +101,7 @@ export function ClientesSection({ clientes, userRole, userId, moneda = 'Q', onCl
     setLoading(true)
 
     if (editingId) {
-      const payload = { nombre, codigo, medidor, email: email || null, direccion: direccion || null, telefono: telefono || null, tarifa, canon, consumo_minimo, lectura_inicial }
+      const payload = { nombre, codigo, medidor, email: email || null, direccion: direccion || null, telefono: telefono || null, tarifa, canon, consumo_minimo, lectura_inicial, tarifa_id: form.tarifa_id || null }
       const { data, error } = await supabase
         .from('clientes')
         .update(payload)
@@ -115,7 +118,7 @@ export function ClientesSection({ clientes, userRole, userId, moneda = 'Q', onCl
       }
     } else {
       await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: userRole }, userId)
-      const nuevo = { nombre, codigo, medidor, email: email || null, direccion: direccion || null, telefono: telefono || null, tarifa, canon, consumo_minimo, lectura_inicial }
+      const nuevo = { nombre, codigo, medidor, email: email || null, direccion: direccion || null, telefono: telefono || null, tarifa, canon, consumo_minimo, lectura_inicial, tarifa_id: form.tarifa_id || null }
       const { data, error } = await supabase.from('clientes').insert(nuevo).select()
 
       if (!error && data) {
@@ -232,6 +235,37 @@ export function ClientesSection({ clientes, userRole, userId, moneda = 'Q', onCl
           <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '20px', color: '#1e293b' }}>
             {editingId ? 'Editar Cliente' : 'Nuevo Cliente'}
           </div>
+          {tarifas.length > 0 && (
+            <div style={{ marginBottom: '16px', padding: '14px 16px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px' }}>
+              <label style={{ ...labelStyle, color: '#0369a1' }}>Seleccionar Tarifa del Sistema</label>
+              <select
+                style={{ ...inputStyle, borderColor: '#bae6fd' }}
+                value={form.tarifa_id}
+                onChange={e => {
+                  const id = e.target.value
+                  const t = tarifas.find(x => x.id === id)
+                  if (t) {
+                    setForm(f => ({ ...f, tarifa_id: id, tarifa: String(t.precio_m3), canon: String(t.canon_fijo), consumo_minimo: String(t.consumo_minimo ?? 0) }))
+                  } else {
+                    setForm(f => ({ ...f, tarifa_id: '' }))
+                  }
+                }}
+              >
+                <option value="">— Sin tarifa asignada —</option>
+                {tarifas.filter(t => t.activa).map(t => (
+                  <option key={t.id} value={t.id}>{t.nombre} ({t.tipo_agua})</option>
+                ))}
+              </select>
+              {form.tarifa_id && !tarifas.find(t => t.id === form.tarifa_id)?.activa && (
+                <span style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px', display: 'block' }}>
+                  La tarifa seleccionada no está vigente
+                </span>
+              )}
+              <span style={{ fontSize: '11px', color: '#0369a1', marginTop: '4px', display: 'block' }}>
+                Al seleccionar una tarifa se auto-completan los valores de cobro
+              </span>
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
             {FIELDS.map(f => (
               <div key={f.key}>
