@@ -30,13 +30,15 @@ function getInitials(name: string): string {
 interface Props {
   activeSection: AppSection
   currentUser: UserSession
+  onMenuToggle: () => void
 }
 
-export function Topbar({ activeSection, currentUser }: Props) {
+export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
   const { isOnline } = useOffline()
 
   return (
     <header
+      className="app-topbar"
       style={{
         background: '#ffffff',
         borderBottom: '1px solid #e2e8f0',
@@ -48,8 +50,30 @@ export function Topbar({ activeSection, currentUser }: Props) {
         flexShrink: 0,
       }}
     >
-      {/* Page title */}
-      <div>
+      {/* Left: hamburger (mobile only) + page title */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <button
+          className="app-hamburger"
+          onClick={onMenuToggle}
+          aria-label="Abrir menú"
+          style={{
+            display: 'none',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '44px',
+            height: '44px',
+            border: 'none',
+            background: 'transparent',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            color: '#0f172a',
+            flexShrink: 0,
+          }}
+        >
+          <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
         <h1
           style={{
             fontSize: '18px',
@@ -66,6 +90,7 @@ export function Topbar({ activeSection, currentUser }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         {/* Online / offline badge */}
         <span
+          className="app-online-badge"
           style={{
             display: 'inline-flex',
             alignItems: 'center',

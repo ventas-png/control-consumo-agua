@@ -44,6 +44,7 @@ export default function App() {
   } = useData()
 
   const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const defaultSection = (): AppSection => {
     // Will be resolved after login when currentUser is available
@@ -128,17 +129,58 @@ export default function App() {
 
   // Authenticated app
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9' }}>
+    <>
+      <style>{`
+        @media (max-width: 767px) {
+          .app-sidebar {
+            position: fixed !important;
+            top: 0; left: 0;
+            height: 100vh;
+            z-index: 200;
+            transform: translateX(-260px);
+            transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          .app-sidebar.open { transform: translateX(0); }
+          .app-backdrop { display: block !important; }
+          .app-hamburger { display: flex !important; }
+          .app-main { padding: 16px !important; }
+          .app-topbar { padding: 0 12px !important; }
+          .app-alert-banner { padding: 10px 12px !important; flex-wrap: wrap; gap: 8px; }
+        }
+        @media (max-width: 480px) {
+          .app-online-badge { display: none !important; }
+        }
+        @media (min-width: 768px) {
+          .app-sidebar { position: sticky !important; transform: none !important; transition: none; }
+          .app-backdrop { display: none !important; }
+          .app-hamburger { display: none !important; }
+        }
+      `}</style>
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9' }}>
+        <div
+          className="app-backdrop"
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            display: 'none',
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            zIndex: 199,
+            opacity: sidebarOpen ? 1 : 0,
+            pointerEvents: sidebarOpen ? 'auto' : 'none',
+            transition: 'opacity 0.28s',
+          }}
+        />
       <Sidebar
         activeSection={activeSection}
         userRole={currentUser.role}
         currentUser={currentUser}
-        onSelect={setActiveSection}
+        onSelect={(section) => { setActiveSection(section); setSidebarOpen(false) }}
         onLogout={logout}
+        isOpen={sidebarOpen}
       />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {proximaRuta && (
-          <div style={{ background: '#fef9c3', borderBottom: '2px solid #fde047', padding: '10px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <div className="app-alert-banner" style={{ background: '#fef9c3', borderBottom: '2px solid #fde047', padding: '10px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', gap: '8px' }}>
             <span style={{ fontSize: '14px', color: '#854d0e', fontWeight: 600 }}>
               📋 Tienes {rutasPendientes.length} ruta{rutasPendientes.length !== 1 ? 's' : ''} programada{rutasPendientes.length !== 1 ? 's' : ''}.
               {' '}Próxima: <strong>{proximaRuta.nombre}</strong> el{' '}
@@ -152,8 +194,8 @@ export default function App() {
             </button>
           </div>
         )}
-        <Topbar activeSection={activeSection} currentUser={currentUser} />
-        <main style={{ flex: 1, overflowY: 'auto', padding: '28px' }}>
+        <Topbar activeSection={activeSection} currentUser={currentUser} onMenuToggle={() => setSidebarOpen(prev => !prev)} />
+        <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px' }}>
           {activeSection === 'clientes' && (
             <ClientesSection
               clientes={clientes}
@@ -270,5 +312,6 @@ export default function App() {
         </main>
       </div>
     </div>
+    </>
   )
 }
