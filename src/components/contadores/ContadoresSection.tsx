@@ -3,6 +3,7 @@ import Swal from 'sweetalert2'
 import type { Contador, Tarifa, TipoAgua, UserRole, UserSession, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
+import { ImportContadoresModal } from './ImportContadoresModal'
 
 interface Props {
   contadores: Contador[]
@@ -114,6 +115,7 @@ export function ContadoresSection({
   const [search, setSearch] = useState('')
   const [filterTipo, setFilterTipo] = useState<TipoAgua | ''>('')
   const [filterUnidad, setFilterUnidad] = useState<string>('')
+  const [showImport, setShowImport] = useState(false)
 
   const canEdit = userRole !== 'viewer' && userRole !== 'operator'
 
@@ -378,6 +380,7 @@ export function ContadoresSection({
   })).filter(t => t.total > 0)
 
   return (
+    <>
     <div>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
@@ -418,22 +421,46 @@ export function ContadoresSection({
             style={{ ...inputStyle, width: '200px' }}
           />
           {canEdit && (
-            <button
-              onClick={startCreate}
-              style={{
-                padding: '10px 20px',
-                background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 600,
-                fontSize: '14px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              + Nuevo Contador
-            </button>
+            <>
+              <button
+                onClick={() => setShowImport(true)}
+                style={{
+                  padding: '10px 18px',
+                  background: '#ffffff',
+                  color: '#0ea5e9',
+                  border: '2px solid #0ea5e9',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Importar Excel
+              </button>
+              <button
+                onClick={startCreate}
+                style={{
+                  padding: '10px 20px',
+                  background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                + Nuevo Contador
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -983,5 +1010,17 @@ export function ContadoresSection({
         </div>
       </div>
     </div>
+
+    {showImport && (
+      <ImportContadoresModal
+        currentUser={currentUser}
+        onClose={() => setShowImport(false)}
+        onImportado={(nuevos) => {
+          nuevos.forEach(c => onContadorAdded(c))
+          setShowImport(false)
+        }}
+      />
+    )}
+    </>
   )
 }
