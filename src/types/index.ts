@@ -49,6 +49,7 @@ export interface Registro {
   lectura_actual: number;
   consumo: number;
   tarifa_aplicada: number;
+  tarifa_exceso_aplicada?: number;
   canon_aplicado: number;
   monto_calculado: number;
   tipo_cobro: string;
@@ -138,6 +139,7 @@ export interface Tarifa {
   descripcion?: string;
   tipo_agua: string;
   precio_m3: number;
+  precio_m3_exceso: number;
   canon_fijo: number;
   consumo_minimo: number;
   activa: boolean;
