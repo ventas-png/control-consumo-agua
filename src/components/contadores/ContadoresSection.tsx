@@ -40,8 +40,31 @@ const TIPO_COLORES: Record<TipoAgua, { bg: string; color: string }> = {
   residuales_tratadas: { bg: '#f1f5f9', color: '#475569' },
 }
 
-const MEDIDAS_CONTADOR = ['1/2"', '3/4"', '1"', '1 1/4"', '1 1/2"', '2"', '3"', '4"', 'Otra']
-const MATERIALES_CONTADOR = ['Bronce', 'Latón', 'Hierro fundido', 'Acero inoxidable', 'Plástico (PVC)', 'Plástico (PP)', 'Otro']
+const MEDIDAS_CONTADOR = [
+  '1/2"  (½") — 15 mm',
+  '3/4"  (¾") — 20 mm',
+  '1"    — 25 mm',
+  '1 1/4" — 32 mm',
+  '1 1/2" — 40 mm',
+  '2"    — 50 mm',
+  '2 1/2" — 63 mm',
+  '3"    — 75 mm',
+  '4"    — 110 mm',
+  '5"    — 140 mm',
+  '6"    — 160 mm',
+]
+const MATERIALES_CONTADOR = [
+  'Bronce',
+  'Latón',
+  'Hierro fundido',
+  'Hierro galvanizado',
+  'Acero inoxidable',
+  'Cobre',
+  'Plástico (PVC)',
+  'Plástico (polipropileno)',
+  'Plástico (nylon reforzado)',
+  'Composite (plástico/metal)',
+]
 const TIPOS_CONTADOR = ['Analógico velocimétrico', 'Analógico volumétrico', 'Digital', 'Ultrasónico', 'Electromagnético', 'Otro']
 const OPCIONES_SIN = ['Sí', 'No', 'N/A']
 const OPCIONES_SI_NO = ['Sí', 'No']
@@ -66,6 +89,9 @@ const EMPTY_FORM = {
   llave_antifraude: '',
   valvula_aire: '',
   fecha_reemplazo_sugerida: '',
+  numero_derecho_servicio: '',
+  cantidad_derecho_servicio_m3: '',
+  periodicidad_lectura_dias: '',
 }
 
 type FormState = typeof EMPTY_FORM
@@ -117,6 +143,9 @@ export function ContadoresSection({
       llave_antifraude: c.llave_antifraude ?? '',
       valvula_aire: c.valvula_aire ?? '',
       fecha_reemplazo_sugerida: c.fecha_reemplazo_sugerida ?? '',
+      numero_derecho_servicio: c.numero_derecho_servicio ?? '',
+      cantidad_derecho_servicio_m3: c.cantidad_derecho_servicio_m3 != null ? String(c.cantidad_derecho_servicio_m3) : '',
+      periodicidad_lectura_dias: c.periodicidad_lectura_dias != null ? String(c.periodicidad_lectura_dias) : '',
     })
     setEditingId(c.id)
     setShowForm(true)
@@ -167,6 +196,9 @@ export function ContadoresSection({
           llave_antifraude: form.llave_antifraude || null,
           valvula_aire: form.valvula_aire || null,
           fecha_reemplazo_sugerida: form.fecha_reemplazo_sugerida || null,
+          numero_derecho_servicio: form.numero_derecho_servicio || null,
+          cantidad_derecho_servicio_m3: form.cantidad_derecho_servicio_m3 ? parseFloat(form.cantidad_derecho_servicio_m3) : null,
+          periodicidad_lectura_dias: form.periodicidad_lectura_dias ? parseInt(form.periodicidad_lectura_dias) : null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingId)
@@ -242,6 +274,9 @@ export function ContadoresSection({
           llave_antifraude: form.llave_antifraude || null,
           valvula_aire: form.valvula_aire || null,
           fecha_reemplazo_sugerida: form.fecha_reemplazo_sugerida || null,
+          numero_derecho_servicio: form.numero_derecho_servicio || null,
+          cantidad_derecho_servicio_m3: form.cantidad_derecho_servicio_m3 ? parseFloat(form.cantidad_derecho_servicio_m3) : null,
+          periodicidad_lectura_dias: form.periodicidad_lectura_dias ? parseInt(form.periodicidad_lectura_dias) : null,
           project_id: projectId,
           company_id: companyId,
         })
@@ -632,6 +667,40 @@ export function ContadoresSection({
                 onChange={e => setForm(f => ({ ...f, fecha_reemplazo_sugerida: e.target.value }))}
               />
             </div>
+            <div>
+              <label style={labelStyle}>N° Derecho de Servicio (Título de Agua)</label>
+              <input
+                style={inputStyle}
+                value={form.numero_derecho_servicio}
+                onChange={e => setForm(f => ({ ...f, numero_derecho_servicio: e.target.value }))}
+                placeholder="Ej: DS-2024-00123"
+                maxLength={100}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Cantidad Derecho de Servicio (m³)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.cantidad_derecho_servicio_m3}
+                onChange={e => setForm(f => ({ ...f, cantidad_derecho_servicio_m3: e.target.value }))}
+                placeholder="Ej: 15.00"
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Periodicidad de Lectura (días)</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min="1"
+                step="1"
+                value={form.periodicidad_lectura_dias}
+                onChange={e => setForm(f => ({ ...f, periodicidad_lectura_dias: e.target.value }))}
+                placeholder="Ej: 30"
+              />
+            </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Descripción</label>
               <textarea
@@ -784,7 +853,16 @@ export function ContadoresSection({
                             Reemplazo: {new Date(c.fecha_reemplazo_sugerida + 'T12:00:00').toLocaleDateString('es-GT')}
                           </div>
                         )}
-                        {!c.medida && !c.tipo_contador && !c.material && !c.valvula_cheque && !c.tipo_llave && !c.llave_antifraude && !c.valvula_aire && !c.fecha_reemplazo_sugerida && (
+                        {c.numero_derecho_servicio && (
+                          <div><span style={{ color: '#94a3b8' }}>Derecho:</span> {c.numero_derecho_servicio}</div>
+                        )}
+                        {c.cantidad_derecho_servicio_m3 != null && (
+                          <div><span style={{ color: '#94a3b8' }}>Caudal:</span> {Number(c.cantidad_derecho_servicio_m3).toFixed(2)} m³</div>
+                        )}
+                        {c.periodicidad_lectura_dias != null && (
+                          <div><span style={{ color: '#94a3b8' }}>Lectura c/</span> {c.periodicidad_lectura_dias} días</div>
+                        )}
+                        {!c.medida && !c.tipo_contador && !c.material && !c.valvula_cheque && !c.tipo_llave && !c.llave_antifraude && !c.valvula_aire && !c.fecha_reemplazo_sugerida && !c.numero_derecho_servicio && c.cantidad_derecho_servicio_m3 == null && c.periodicidad_lectura_dias == null && (
                           <span style={{ color: '#cbd5e1' }}>—</span>
                         )}
                       </td>

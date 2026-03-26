@@ -151,6 +151,9 @@ export interface Contador {
   llave_antifraude?: string | null;
   valvula_aire?: string | null;
   fecha_reemplazo_sugerida?: string | null;
+  numero_derecho_servicio?: string | null;
+  cantidad_derecho_servicio_m3?: number | null;
+  periodicidad_lectura_dias?: number | null;
   created_at?: string;
   updated_at?: string;
 }
