@@ -22,6 +22,14 @@ const EMPTY_FORM = {
   direccion: '',
   telefono: '',
   lectura_inicial: '0',
+  // Datos personales
+  nacionalidad: '',
+  cui_dui: '',
+  fecha_nacimiento: '',
+  // Facturación
+  numero_facturacion: '',
+  // Contacto adicional
+  telefono_alterno: '',
 }
 
 type FormState = typeof EMPTY_FORM
@@ -50,6 +58,11 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
       direccion: c.direccion ?? '',
       telefono: c.telefono ?? '',
       lectura_inicial: String(c.lectura_inicial),
+      nacionalidad: c.nacionalidad ?? '',
+      cui_dui: c.cui_dui ?? '',
+      fecha_nacimiento: c.fecha_nacimiento ?? '',
+      numero_facturacion: c.numero_facturacion ?? '',
+      telefono_alterno: c.telefono_alterno ?? '',
     })
     setEditingId(c.id)
     setShowForm(true)
@@ -68,13 +81,15 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
     const email = sanitizeInput(form.email)
     const direccion = sanitizeInput(form.direccion)
     const telefono = sanitizeInput(form.telefono)
+    const telefono_alterno = sanitizeInput(form.telefono_alterno)
     const lectura_inicial = parseFloat(form.lectura_inicial)
 
     const errors: string[] = []
     if (!nombre || nombre.length < 2) errors.push('Nombre debe tener al menos 2 caracteres')
     if (!codigo || codigo.length < 3) errors.push('Código debe tener al menos 3 caracteres')
     if (email && !validateEmail(email)) errors.push('Formato de email inválido')
-    if (telefono && !validatePhoneNumber(telefono)) errors.push('Teléfono debe tener 8 dígitos (Guatemala)')
+    if (telefono && !validatePhoneNumber(telefono)) errors.push('Teléfono principal: formato inválido (debe tener 8 dígitos)')
+    if (telefono_alterno && !validatePhoneNumber(telefono_alterno)) errors.push('Teléfono alterno: formato inválido (debe tener 8 dígitos)')
     if (isNaN(lectura_inicial) || lectura_inicial < 0) errors.push('Lectura inicial inválida')
 
     if (errors.length > 0) {
@@ -84,8 +99,22 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
 
     setLoading(true)
 
+    const payload = {
+      nombre,
+      codigo,
+      medidor,
+      email: email || null,
+      direccion: direccion || null,
+      telefono: telefono || null,
+      lectura_inicial,
+      nacionalidad: sanitizeInput(form.nacionalidad) || null,
+      cui_dui: sanitizeInput(form.cui_dui) || null,
+      fecha_nacimiento: form.fecha_nacimiento || null,
+      numero_facturacion: sanitizeInput(form.numero_facturacion) || null,
+      telefono_alterno: telefono_alterno || null,
+    }
+
     if (editingId) {
-      const payload = { nombre, codigo, medidor, email: email || null, direccion: direccion || null, telefono: telefono || null, lectura_inicial }
       const { data, error } = await supabase
         .from('clientes')
         .update(payload)
@@ -102,8 +131,7 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
       }
     } else {
       await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: userRole }, userId)
-      const nuevo = { nombre, codigo, medidor, email: email || null, direccion: direccion || null, telefono: telefono || null, lectura_inicial }
-      const { data, error } = await supabase.from('clientes').insert(nuevo).select()
+      const { data, error } = await supabase.from('clientes').insert(payload).select()
 
       if (!error && data) {
         onClienteAdded(data[0] as Cliente)
@@ -141,7 +169,8 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
 
   const filtered = clientes.filter(c =>
     c.nombre.toLowerCase().includes(search.toLowerCase()) ||
-    c.codigo.toLowerCase().includes(search.toLowerCase())
+    c.codigo.toLowerCase().includes(search.toLowerCase()) ||
+    (c.cui_dui ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
   const inputStyle: React.CSSProperties = {
@@ -160,16 +189,14 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
     marginBottom: '5px',
     display: 'block',
   }
-
-  const FIELDS = [
-    { label: 'Nombre Completo *', key: 'nombre', placeholder: 'Ej. Juan Pérez', type: 'text' },
-    { label: 'Código *', key: 'codigo', placeholder: 'Ej. CLI-001', type: 'text' },
-    { label: 'N° Medidor', key: 'medidor', placeholder: 'Ej. MED-123456', type: 'text' },
-    { label: 'Email', key: 'email', placeholder: 'cliente@email.com', type: 'email' },
-    { label: 'Dirección', key: 'direccion', placeholder: '', type: 'text' },
-    { label: 'Teléfono', key: 'telefono', placeholder: 'Ej. 55551234', type: 'tel' },
-    { label: 'Lectura Inicial', key: 'lectura_inicial', placeholder: '0', type: 'number' },
-  ]
+  const sectionHeaderStyle: React.CSSProperties = {
+    fontSize: '12px',
+    fontWeight: 600,
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    marginBottom: '10px',
+  }
 
   return (
     <div>
@@ -184,10 +211,10 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             type="text"
-            placeholder="Buscar por nombre o código..."
+            placeholder="Buscar por nombre, código o CUI/DUI..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ ...inputStyle, width: '240px' }}
+            style={{ ...inputStyle, width: '280px' }}
           />
           {canEdit && (
             <button
@@ -216,22 +243,159 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
           <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '20px', color: '#1e293b' }}>
             {editingId ? 'Editar Cliente' : 'Nuevo Cliente'}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-            {FIELDS.map(f => (
-              <div key={f.key}>
-                <label style={labelStyle}>{f.label}</label>
+
+          {/* Datos de Identificación */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={sectionHeaderStyle}>Datos de Identificación</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Nombre Completo *</label>
                 <input
-                  type={f.type}
-                  value={form[f.key as keyof FormState]}
-                  onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  placeholder={f.placeholder}
                   style={inputStyle}
-                  min={f.type === 'number' ? '0' : undefined}
-                  step={f.type === 'number' ? '0.01' : undefined}
+                  value={form.nombre}
+                  onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+                  placeholder="Ej. Juan Pérez García"
+                  maxLength={150}
                 />
               </div>
-            ))}
+              <div>
+                <label style={labelStyle}>CUI / DUI</label>
+                <input
+                  style={inputStyle}
+                  value={form.cui_dui}
+                  onChange={e => setForm(f => ({ ...f, cui_dui: e.target.value }))}
+                  placeholder="Ej. 1234567890101"
+                  maxLength={20}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Fecha de Nacimiento</label>
+                <input
+                  style={inputStyle}
+                  type="date"
+                  value={form.fecha_nacimiento}
+                  onChange={e => setForm(f => ({ ...f, fecha_nacimiento: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Nacionalidad</label>
+                <input
+                  style={inputStyle}
+                  value={form.nacionalidad}
+                  onChange={e => setForm(f => ({ ...f, nacionalidad: e.target.value }))}
+                  placeholder="Ej. Guatemalteca, Salvadoreña..."
+                  maxLength={80}
+                />
+              </div>
+            </div>
           </div>
+
+          {/* Datos de Contacto */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={sectionHeaderStyle}>Datos de Contacto</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+              <div>
+                <label style={labelStyle}>Correo Electrónico</label>
+                <input
+                  style={inputStyle}
+                  type="email"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="cliente@email.com"
+                  maxLength={150}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Teléfono Principal</label>
+                <input
+                  style={inputStyle}
+                  type="tel"
+                  value={form.telefono}
+                  onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))}
+                  placeholder="Ej. 55551234"
+                  maxLength={20}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Teléfono Alterno</label>
+                <input
+                  style={inputStyle}
+                  type="tel"
+                  value={form.telefono_alterno}
+                  onChange={e => setForm(f => ({ ...f, telefono_alterno: e.target.value }))}
+                  placeholder="Ej. 44441234"
+                  maxLength={20}
+                />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Dirección</label>
+                <input
+                  style={inputStyle}
+                  value={form.direccion}
+                  onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))}
+                  placeholder="Dirección del cliente..."
+                  maxLength={255}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Datos de Facturación */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={sectionHeaderStyle}>Datos de Facturación</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+              <div>
+                <label style={labelStyle}>Código de Cliente *</label>
+                <input
+                  style={inputStyle}
+                  value={form.codigo}
+                  onChange={e => setForm(f => ({ ...f, codigo: e.target.value }))}
+                  placeholder="Ej. CLI-001"
+                  maxLength={50}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Número para Facturación (NIT)</label>
+                <input
+                  style={inputStyle}
+                  value={form.numero_facturacion}
+                  onChange={e => setForm(f => ({ ...f, numero_facturacion: e.target.value }))}
+                  placeholder="Ej. 12345678-9 o CF"
+                  maxLength={30}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Datos del Medidor */}
+          <div style={{ marginBottom: '20px' }}>
+            <div style={sectionHeaderStyle}>Datos del Medidor</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+              <div>
+                <label style={labelStyle}>N° Medidor</label>
+                <input
+                  style={inputStyle}
+                  value={form.medidor}
+                  onChange={e => setForm(f => ({ ...f, medidor: e.target.value }))}
+                  placeholder="Ej. MED-123456"
+                  maxLength={50}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Lectura Inicial</label>
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.lectura_inicial}
+                  onChange={e => setForm(f => ({ ...f, lectura_inicial: e.target.value }))}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          </div>
+
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
               onClick={handleGuardar}
@@ -287,8 +451,10 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Cliente</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Código</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Identificación</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Medidor</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Contacto</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Facturación</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Lect. Inicial</th>
                   {canEdit && (
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
@@ -308,17 +474,37 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
                           {sanitizeHTML(c.direccion)}
                         </div>
                       )}
+                      {c.fecha_nacimiento && (
+                        <div style={{ fontSize: '11px', color: '#cbd5e1', marginTop: '1px' }}>
+                          Nac: {c.fecha_nacimiento}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
                       {sanitizeHTML(c.codigo)}
+                    </td>
+                    <td style={{ padding: '12px 16px', color: '#475569' }}>
+                      {c.cui_dui ? (
+                        <div style={{ fontSize: '13px', fontFamily: 'monospace' }}>{sanitizeHTML(c.cui_dui)}</div>
+                      ) : null}
+                      {c.nacionalidad ? (
+                        <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{sanitizeHTML(c.nacionalidad)}</div>
+                      ) : null}
+                      {!c.cui_dui && !c.nacionalidad && <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
                     <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
                       {c.medidor ? sanitizeHTML(c.medidor) : <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
                     <td style={{ padding: '12px 16px', color: '#475569' }}>
-                      {c.email && <div style={{ fontSize: '13px' }}>{sanitizeHTML(c.email)}</div>}
-                      {c.telefono && <div style={{ fontSize: '12px', color: '#94a3b8' }}>{sanitizeHTML(c.telefono)}</div>}
-                      {!c.email && !c.telefono && <span style={{ color: '#cbd5e1' }}>—</span>}
+                      {c.email && <div style={{ fontSize: '13px' }}>✉️ {sanitizeHTML(c.email)}</div>}
+                      {c.telefono && <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>📞 {sanitizeHTML(c.telefono)}</div>}
+                      {c.telefono_alterno && <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>📱 {sanitizeHTML(c.telefono_alterno)}</div>}
+                      {!c.email && !c.telefono && !c.telefono_alterno && <span style={{ color: '#cbd5e1' }}>—</span>}
+                    </td>
+                    <td style={{ padding: '12px 16px', color: '#475569' }}>
+                      {c.numero_facturacion ? (
+                        <div style={{ fontSize: '13px', fontFamily: 'monospace' }}>{sanitizeHTML(c.numero_facturacion)}</div>
+                      ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
                       {Number(c.lectura_inicial).toFixed(2)}

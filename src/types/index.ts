@@ -7,6 +7,14 @@ export interface Cliente {
   direccion?: string;
   telefono?: string;
   lectura_inicial: number;
+  // Datos personales
+  nacionalidad?: string | null;
+  cui_dui?: string | null;
+  fecha_nacimiento?: string | null;
+  // Datos de facturación
+  numero_facturacion?: string | null;
+  // Contacto adicional
+  telefono_alterno?: string | null;
 }
 
 export interface GPS {
@@ -156,6 +164,28 @@ export type TipoUnidad =
   | 'parqueadero'
   | 'otro';
 
+export type TipoRegimen =
+  | 'no_sujeto'
+  | 'urbanizacion'
+  | 'condominio'
+  | 'propiedad_horizontal'
+  | 'otro';
+
+export type EstadoOcupacional =
+  | 'en_construccion'
+  | 'habitado'
+  | 'en_remodelacion'
+  | 'desabitado'
+  | 'en_proceso_de_mudanza'
+  | 'desocupada'
+  | 'disponible_venta'
+  | 'disponible_renta'
+  | 'en_mantenimiento'
+  | 'problemas_legales'
+  | 'activo_extraordinario';
+
+export type ContratoSuministro = 'si' | 'no' | 'na';
+
 export interface Unidad {
   id: string;
   project_id: string;
@@ -172,6 +202,18 @@ export interface Unidad {
   cliente_id?: string | null;
   created_at?: string;
   updated_at?: string;
+  // Datos del inmueble
+  direccion?: string | null;
+  datos_registrales?: string | null;
+  tipo_regimen?: TipoRegimen | null;
+  fecha_construccion?: string | null;
+  // Estado ocupacional
+  estado_ocupacional?: EstadoOcupacional | null;
+  // Contrato de suministro
+  contrato_suministro?: ContratoSuministro | null;
+  fecha_firma_contrato?: string | null;
+  numero_contrato_suministro?: string | null;
+  fecha_vencimiento_contrato?: string | null;
 }
 
 export type EstadoProyecto = 'activo' | 'inactivo' | 'suspendido'
