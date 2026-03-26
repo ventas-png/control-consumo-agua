@@ -158,6 +158,7 @@ interface Props {
   currentUser: UserSession
   onSelect: (section: AppSection) => void
   onLogout: () => void
+  isOpen: boolean
 }
 
 function getInitials(name: string): string {
@@ -177,7 +178,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   viewer: 'Visualizador',
 }
 
-export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogout }: Props) {
+export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogout, isOpen }: Props) {
   const [hoveredTab, setHoveredTab] = useState<AppSection | null>(null)
   const [hoveredLogout, setHoveredLogout] = useState(false)
   const [hoveredProfile, setHoveredProfile] = useState(false)
@@ -185,6 +186,7 @@ export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogo
 
   return (
     <aside
+      className={`app-sidebar${isOpen ? ' open' : ''}`}
       style={{
         width: '260px',
         minWidth: '260px',
@@ -195,6 +197,7 @@ export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogo
         position: 'sticky',
         top: 0,
         overflowY: 'auto',
+        transition: 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
       {/* Brand */}
@@ -251,7 +254,7 @@ export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogo
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
-                padding: '10px 12px',
+                padding: '11px 12px',
                 border: 'none',
                 borderRadius: '8px',
                 cursor: 'pointer',
