@@ -93,8 +93,20 @@ export default function App() {
   // Not authenticated
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #14b8a6 100%)' }}>
-        <div style={{ color: 'white', fontSize: '20px', fontWeight: 600 }}>Cargando...</div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #0d9488 100%)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+          <div style={{
+            width: '48px', height: '48px',
+            border: '3px solid rgba(255,255,255,0.25)',
+            borderTop: '3px solid white',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <div style={{ color: 'white', fontSize: '15px', fontWeight: 500, letterSpacing: '0.02em', opacity: 0.9 }}>
+            Cargando AquaControl…
+          </div>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
   }
@@ -137,15 +149,15 @@ export default function App() {
             top: 0; left: 0;
             height: 100vh;
             z-index: 200;
-            transform: translateX(-260px);
+            transform: translateX(-256px);
             transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
           }
           .app-sidebar.open { transform: translateX(0); }
           .app-backdrop { display: block !important; }
           .app-hamburger { display: flex !important; }
           .app-main { padding: 16px !important; }
-          .app-topbar { padding: 0 12px !important; }
-          .app-alert-banner { padding: 10px 12px !important; flex-wrap: wrap; gap: 8px; }
+          .app-topbar { padding: 0 14px !important; }
+          .app-alert-banner { padding: 10px 14px !important; flex-wrap: wrap; gap: 8px; }
         }
         @media (max-width: 480px) {
           .app-online-badge { display: none !important; }
@@ -156,7 +168,7 @@ export default function App() {
           .app-hamburger { display: none !important; }
         }
       `}</style>
-      <div style={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9' }}>
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#f0f4f8' }}>
         <div
           className="app-backdrop"
           onClick={() => setSidebarOpen(false)}
@@ -180,22 +192,51 @@ export default function App() {
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {proximaRuta && (
-          <div className="app-alert-banner" style={{ background: '#fef9c3', borderBottom: '2px solid #fde047', padding: '10px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap', gap: '8px' }}>
-            <span style={{ fontSize: '14px', color: '#854d0e', fontWeight: 600 }}>
-              📋 Tienes {rutasPendientes.length} ruta{rutasPendientes.length !== 1 ? 's' : ''} programada{rutasPendientes.length !== 1 ? 's' : ''}.
-              {' '}Próxima: <strong>{proximaRuta.nombre}</strong> el{' '}
-              {new Date(proximaRuta.fecha_programada! + 'T12:00:00').toLocaleDateString('es-GT')}
-            </span>
+          <div className="app-alert-banner" style={{
+            background: 'linear-gradient(90deg, #fffbeb, #fefce8)',
+            borderBottom: '1px solid #fde68a',
+            padding: '10px 24px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexShrink: 0,
+            flexWrap: 'wrap',
+            gap: '8px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '28px', height: '28px', borderRadius: '8px',
+                background: 'rgba(217,119,6,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '14px', flexShrink: 0,
+              }}>📋</div>
+              <span style={{ fontSize: '13.5px', color: '#78350f', fontWeight: 500 }}>
+                Tienes <strong style={{ color: '#92400e' }}>{rutasPendientes.length} ruta{rutasPendientes.length !== 1 ? 's' : ''}</strong> programada{rutasPendientes.length !== 1 ? 's' : ''}.
+                {' '}Próxima: <strong style={{ color: '#92400e' }}>{proximaRuta.nombre}</strong> el{' '}
+                {new Date(proximaRuta.fecha_programada! + 'T12:00:00').toLocaleDateString('es-GT')}
+              </span>
+            </div>
             <button
               onClick={() => setActiveSection('rutas')}
-              style={{ padding: '6px 14px', background: '#d97706', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}
+              style={{
+                padding: '6px 14px',
+                background: '#d97706',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontSize: '12.5px',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 1px 4px rgba(217,119,6,0.3)',
+              }}
             >
-              Ver Rutas
+              Ver Rutas →
             </button>
           </div>
         )}
         <Topbar activeSection={activeSection} currentUser={currentUser} onMenuToggle={() => setSidebarOpen(prev => !prev)} />
-        <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px' }}>
+        <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
           {activeSection === 'clientes' && (
             <ClientesSection
               clientes={clientes}
