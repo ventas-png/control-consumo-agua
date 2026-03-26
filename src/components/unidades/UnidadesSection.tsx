@@ -3,6 +3,7 @@ import Swal from 'sweetalert2'
 import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, UserSession, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
+import { ImportUnidadesModal } from './ImportUnidadesModal'
 
 interface Props {
   unidades: Unidad[]
@@ -126,6 +127,7 @@ export function UnidadesSection({
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [filterTipo, setFilterTipo] = useState<TipoUnidad | ''>('')
+  const [showImportModal, setShowImportModal] = useState(false)
 
   const canEdit = userRole !== 'viewer' && userRole !== 'operator'
 
@@ -457,22 +459,40 @@ export function UnidadesSection({
             style={{ ...inputStyle, width: '220px' }}
           />
           {canEdit && (
-            <button
-              onClick={startCreate}
-              style={{
-                padding: '10px 20px',
-                background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 600,
-                fontSize: '14px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              + Nueva Unidad
-            </button>
+            <>
+              <button
+                onClick={() => setShowImportModal(true)}
+                style={{
+                  padding: '10px 20px',
+                  background: '#f0f9ff',
+                  color: '#0369a1',
+                  border: '1px solid #bae6fd',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                ⬆ Importar Excel
+              </button>
+              <button
+                onClick={startCreate}
+                style={{
+                  padding: '10px 20px',
+                  background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                + Nueva Unidad
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -1124,6 +1144,17 @@ export function UnidadesSection({
         {search || filterTipo ? 'encontradas' : 'registradas'} ·{' '}
         {unidades.filter(u => u.activo).length} activa{unidades.filter(u => u.activo).length !== 1 ? 's' : ''}
       </div>
+
+      {showImportModal && (
+        <ImportUnidadesModal
+          currentUser={currentUser}
+          onClose={() => setShowImportModal(false)}
+          onImportado={(nuevas) => {
+            nuevas.forEach(u => onUnidadAdded(u))
+            setShowImportModal(false)
+          }}
+        />
+      )}
     </div>
   )
 }
