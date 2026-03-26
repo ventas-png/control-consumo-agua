@@ -19,6 +19,21 @@ export interface Cliente {
   telefono_alterno?: string | null;
 }
 
+export interface CompanyCliente {
+  id: string;
+  company_id: string;
+  cliente_id: string;
+  added_by?: string;
+  created_at?: string;
+}
+
+export interface ClienteLookupResult {
+  match_count: 0 | 2 | 3;
+  cliente_id: string | null;
+  cliente_nombre?: string;
+  mismatched_fields?: string[];
+}
+
 export interface GPS {
   lat: number;
   lng: number;

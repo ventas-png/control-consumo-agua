@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, UserRole } from '../../types'
+import type { Cliente, UserRole, ClienteLookupResult } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
@@ -9,6 +9,7 @@ interface Props {
   clientes: Cliente[]
   userRole: UserRole
   userId: string
+  companyId?: string
   onClienteAdded: (cliente: Cliente) => void
   onClienteUpdated: (id: string, partial: Partial<Cliente>) => void
   onClienteDeleted: (id: string) => void
@@ -34,19 +35,37 @@ const EMPTY_FORM = {
 
 type FormState = typeof EMPTY_FORM
 
-export function ClientesSection({ clientes, userRole, userId, onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
+type OnboardingStep = 'idle' | 'lookup' | 'lookup_loading' | 'result_match2' | 'result_no_match' | 'full_form'
+
+interface LookupForm {
+  cui_dui: string
+  fecha_nacimiento: string
+  email: string
+}
+
+const EMPTY_LOOKUP: LookupForm = { cui_dui: '', fecha_nacimiento: '', email: '' }
+
+export function ClientesSection({ clientes, userRole, userId, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
 
+  // Onboarding state
+  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('idle')
+  const [lookupForm, setLookupForm] = useState<LookupForm>(EMPTY_LOOKUP)
+  const [lookupResult, setLookupResult] = useState<ClienteLookupResult | null>(null)
+
   const canEdit = userRole !== 'viewer'
 
   function startCreate() {
     setForm(EMPTY_FORM)
     setEditingId(null)
-    setShowForm(true)
+    setShowForm(false)
+    setLookupForm(EMPTY_LOOKUP)
+    setLookupResult(null)
+    setOnboardingStep('lookup')
   }
 
   function startEdit(c: Cliente) {
@@ -65,6 +84,7 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
       telefono_alterno: c.telefono_alterno ?? '',
     })
     setEditingId(c.id)
+    setOnboardingStep('idle')
     setShowForm(true)
   }
 
@@ -72,6 +92,123 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
     setShowForm(false)
     setEditingId(null)
     setForm(EMPTY_FORM)
+    setOnboardingStep('idle')
+    setLookupForm(EMPTY_LOOKUP)
+    setLookupResult(null)
+  }
+
+  async function handleLookup() {
+    const cui_dui = sanitizeInput(lookupForm.cui_dui).trim()
+    const email = sanitizeInput(lookupForm.email).trim()
+    const fecha_nacimiento = lookupForm.fecha_nacimiento
+
+    const errors: string[] = []
+    if (!cui_dui) errors.push('CUI / DUI es requerido')
+    if (!fecha_nacimiento) errors.push('Fecha de nacimiento es requerida')
+    if (!email) errors.push('Correo electrónico es requerido')
+    if (email && !validateEmail(email)) errors.push('Formato de correo electrónico inválido')
+
+    if (errors.length > 0) {
+      Swal.fire('Datos incompletos', errors.join('<br>'), 'warning')
+      return
+    }
+
+    setOnboardingStep('lookup_loading')
+
+    const { data, error } = await supabase.rpc('buscar_cliente_para_onboarding', {
+      p_cui_dui: cui_dui,
+      p_fecha_nac: fecha_nacimiento,
+      p_email: email,
+    })
+
+    if (error) {
+      Swal.fire('Error', 'No se pudo realizar la búsqueda. Verifique conexión.', 'error')
+      setOnboardingStep('lookup')
+      return
+    }
+
+    const result = data as ClienteLookupResult
+
+    if (result.match_count === 3) {
+      // All 3 match - auto-add to company
+      await linkClientToCompany(result.cliente_id!, result.cliente_nombre!)
+    } else if (result.match_count === 2) {
+      // 2 of 3 match - warning
+      setLookupResult(result)
+      setOnboardingStep('result_match2')
+    } else {
+      // No match - proceed to registration
+      setLookupResult(result)
+      setOnboardingStep('result_no_match')
+    }
+  }
+
+  async function linkClientToCompany(clienteId: string, clienteNombre: string) {
+    if (!companyId) {
+      Swal.fire('Error', 'No se pudo determinar la empresa actual.', 'error')
+      setOnboardingStep('lookup')
+      return
+    }
+
+    const { error } = await supabase.from('company_clientes').insert({
+      company_id: companyId,
+      cliente_id: clienteId,
+      added_by: userId,
+    })
+
+    if (error) {
+      if (error.code === '23505') {
+        Swal.fire({
+          icon: 'info',
+          title: 'Cliente ya vinculado',
+          text: `${clienteNombre} ya se encuentra vinculado a tu empresa.`,
+          timer: 3000,
+          showConfirmButton: true,
+        })
+      } else {
+        Swal.fire('Error', error.message ?? 'No se pudo vincular el cliente.', 'error')
+      }
+      setOnboardingStep('lookup')
+      return
+    }
+
+    // Fetch the full client record to add to local state
+    const { data: clienteData } = await supabase
+      .from('clientes')
+      .select('*')
+      .eq('id', clienteId)
+      .single()
+
+    if (clienteData) {
+      // Only add to local list if not already present
+      const alreadyInList = clientes.some(c => c.id === clienteId)
+      if (!alreadyInList) {
+        onClienteAdded(clienteData as Cliente)
+      }
+    }
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Cliente adicionado con éxito',
+      html: `<b>${sanitizeHTML(clienteNombre)}</b> ha sido adicionado con éxito en tu empresa.`,
+      timer: 3000,
+      showConfirmButton: true,
+    })
+
+    cancelForm()
+  }
+
+  function proceedToFullForm() {
+    // Pre-fill the form with the lookup data
+    setForm({
+      ...EMPTY_FORM,
+      cui_dui: lookupForm.cui_dui,
+      fecha_nacimiento: lookupForm.fecha_nacimiento,
+      email: lookupForm.email,
+    })
+    setEditingId(null)
+    setOnboardingStep('full_form')
+    setShowForm(true)
   }
 
   async function handleGuardar() {
@@ -132,7 +269,18 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
       const { data, error } = await supabase.from('clientes').insert(payload).select()
 
       if (!error && data) {
-        onClienteAdded(data[0] as Cliente)
+        const newCliente = data[0] as Cliente
+        onClienteAdded(newCliente)
+
+        // Link new client to company if companyId is available
+        if (companyId) {
+          await supabase.from('company_clientes').insert({
+            company_id: companyId,
+            cliente_id: newCliente.id,
+            added_by: userId,
+          })
+        }
+
         cancelForm()
         Swal.fire({ icon: 'success', title: 'Cliente guardado', timer: 2000, showConfirmButton: false })
       } else {
@@ -196,6 +344,12 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
     marginBottom: '10px',
   }
 
+  const fieldLabelMap: Record<string, string> = {
+    cui_dui: 'CUI / DUI',
+    fecha_nacimiento: 'Fecha de Nacimiento',
+    email: 'Correo Electrónico',
+  }
+
   return (
     <div>
       {/* Header */}
@@ -235,7 +389,225 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
         </div>
       </div>
 
-      {/* Form */}
+      {/* Lookup Form - Step 1 */}
+      {(onboardingStep === 'lookup' || onboardingStep === 'lookup_loading') && (
+        <div style={{ background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+          <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '6px', color: '#1e293b' }}>
+            Solicitar Cliente
+          </div>
+          <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748b' }}>
+            Ingrese los datos del cliente para verificar si ya se encuentra registrado en la plataforma.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+            <div>
+              <label style={labelStyle}>CUI / DUI *</label>
+              <input
+                style={inputStyle}
+                value={lookupForm.cui_dui}
+                onChange={e => setLookupForm(f => ({ ...f, cui_dui: e.target.value }))}
+                placeholder="Ej. 1234567890101"
+                maxLength={20}
+                disabled={onboardingStep === 'lookup_loading'}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Fecha de Nacimiento *</label>
+              <input
+                style={inputStyle}
+                type="date"
+                value={lookupForm.fecha_nacimiento}
+                onChange={e => setLookupForm(f => ({ ...f, fecha_nacimiento: e.target.value }))}
+                disabled={onboardingStep === 'lookup_loading'}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Correo Electrónico *</label>
+              <input
+                style={inputStyle}
+                type="email"
+                value={lookupForm.email}
+                onChange={e => setLookupForm(f => ({ ...f, email: e.target.value }))}
+                placeholder="cliente@email.com"
+                maxLength={150}
+                disabled={onboardingStep === 'lookup_loading'}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+            <button
+              onClick={handleLookup}
+              disabled={onboardingStep === 'lookup_loading'}
+              style={{
+                padding: '10px 24px',
+                background: onboardingStep === 'lookup_loading' ? '#94a3b8' : 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: onboardingStep === 'lookup_loading' ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              {onboardingStep === 'lookup_loading' ? 'Buscando...' : 'Solicitar Cliente'}
+            </button>
+            <button
+              onClick={cancelForm}
+              disabled={onboardingStep === 'lookup_loading'}
+              style={{
+                padding: '10px 24px',
+                background: '#f1f5f9',
+                color: '#475569',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Result: 2 of 3 match - Warning */}
+      {onboardingStep === 'result_match2' && lookupResult && (
+        <div style={{ background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+          <div style={{
+            background: '#fffbeb',
+            border: '2px solid #f59e0b',
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '20px',
+          }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#92400e', marginBottom: '8px' }}>
+              Coincidencia parcial encontrada
+            </div>
+            <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#78350f', lineHeight: '1.5' }}>
+              Se encontró un cliente con datos similares: <b>{sanitizeHTML(lookupResult.cliente_nombre ?? '')}</b>.
+              Sin embargo, el/los siguiente(s) dato(s) no coincide(n):
+            </p>
+            {lookupResult.mismatched_fields && lookupResult.mismatched_fields.length > 0 && (
+              <ul style={{ margin: '0 0 12px', paddingLeft: '20px', color: '#92400e', fontSize: '14px' }}>
+                {lookupResult.mismatched_fields.map(field => (
+                  <li key={field} style={{ marginBottom: '4px', fontWeight: 600 }}>
+                    {fieldLabelMap[field] || field}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p style={{ margin: 0, fontSize: '14px', color: '#78350f', lineHeight: '1.5' }}>
+              Debe verificar con el cliente si ya cuenta con algún usuario en la plataforma para corregir el dato que no coincide.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={() => setOnboardingStep('lookup')}
+              style={{
+                padding: '10px 24px',
+                background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              Volver a buscar
+            </button>
+            <button
+              onClick={cancelForm}
+              style={{
+                padding: '10px 24px',
+                background: '#f1f5f9',
+                color: '#475569',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Result: No match - Proceed to register */}
+      {onboardingStep === 'result_no_match' && (
+        <div style={{ background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+          <div style={{
+            background: '#f0f9ff',
+            border: '2px solid #0ea5e9',
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '20px',
+          }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#0c4a6e', marginBottom: '8px' }}>
+              Cliente no encontrado
+            </div>
+            <p style={{ margin: 0, fontSize: '14px', color: '#0369a1', lineHeight: '1.5' }}>
+              No se encontró un cliente con esos datos en la plataforma.
+              Puede proceder a registrar un nuevo cliente con la información completa.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={proceedToFullForm}
+              style={{
+                padding: '10px 24px',
+                background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              Registrar Nuevo Cliente
+            </button>
+            <button
+              onClick={() => setOnboardingStep('lookup')}
+              style={{
+                padding: '10px 24px',
+                background: '#f1f5f9',
+                color: '#475569',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              Volver a buscar
+            </button>
+            <button
+              onClick={cancelForm}
+              style={{
+                padding: '10px 24px',
+                background: '#f1f5f9',
+                color: '#475569',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Full Form (for new registration after no-match, or for editing) */}
       {showForm && canEdit && (
         <div style={{ background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
           <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '20px', color: '#1e293b' }}>
