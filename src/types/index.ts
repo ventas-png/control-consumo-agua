@@ -171,6 +171,8 @@ export interface Contador {
   numero_derecho_servicio?: string | null;
   cantidad_derecho_servicio_m3?: number | null;
   periodicidad_lectura_dias?: number | null;
+  contratista_instalador?: string | null;
+  garantia_instalacion_vence?: string | null;
   created_at?: string;
   updated_at?: string;
 }

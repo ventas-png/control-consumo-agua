@@ -58,6 +58,11 @@ function validateRow(row: Record<string, unknown>, index: number): ParsedRow {
     periodicidad_lectura_dias: row['periodicidad_lectura_dias']
       ? parseInt(String(row['periodicidad_lectura_dias'])) || undefined
       : undefined,
+    contratista_instalador: String(row['contratista_instalador'] ?? '').trim() || undefined,
+    garantia_instalacion_vence: (() => {
+      const v = String(row['garantia_instalacion_vence'] ?? '').trim()
+      return v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined
+    })(),
     activo: true,
   }
 
@@ -77,24 +82,24 @@ export function ImportContadoresModal({ currentUser, onClose, onImportado }: Pro
       [
         'numero_serie', 'tipo_agua', 'lectura_inicial', 'descripcion', 'marca', 'modelo',
         'fecha_instalacion', 'medida', 'material', 'tipo_contador', 'valvula_cheque',
-        'tipo_llave', 'periodicidad_lectura_dias',
+        'tipo_llave', 'periodicidad_lectura_dias', 'contratista_instalador', 'garantia_instalacion_vence',
       ],
       [
         'MED-001', 'potable', 0, 'Medidor zona A', 'Sensus', '620',
         '2024-01-15', '1/2"', 'Latón', 'Analógico volumétrico', 'Sí',
-        'Bola', 30,
+        'Bola', 30, 'Instalaciones Pérez S.A.', '2027-01-15',
       ],
       [
         'MED-002', 'riego', 0, 'Medidor riego sur', '', '',
         '', '3/4"', '', '', '',
-        '', '',
+        '', '', '', '',
       ],
     ])
     // Column widths
     ws['!cols'] = [
       { wch: 14 }, { wch: 20 }, { wch: 16 }, { wch: 22 }, { wch: 12 }, { wch: 10 },
       { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 24 }, { wch: 14 },
-      { wch: 12 }, { wch: 24 },
+      { wch: 12 }, { wch: 24 }, { wch: 26 }, { wch: 26 },
     ]
     XLSX.utils.book_append_sheet(wb, ws, 'Contadores')
     XLSX.writeFile(wb, 'plantilla_contadores.xlsx')
