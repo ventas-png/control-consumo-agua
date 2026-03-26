@@ -93,6 +93,8 @@ const EMPTY_FORM = {
   numero_derecho_servicio: '',
   cantidad_derecho_servicio_m3: '',
   periodicidad_lectura_dias: '',
+  contratista_instalador: '',
+  garantia_instalacion_vence: '',
 }
 
 type FormState = typeof EMPTY_FORM
@@ -148,6 +150,8 @@ export function ContadoresSection({
       numero_derecho_servicio: c.numero_derecho_servicio ?? '',
       cantidad_derecho_servicio_m3: c.cantidad_derecho_servicio_m3 != null ? String(c.cantidad_derecho_servicio_m3) : '',
       periodicidad_lectura_dias: c.periodicidad_lectura_dias != null ? String(c.periodicidad_lectura_dias) : '',
+      contratista_instalador: c.contratista_instalador ?? '',
+      garantia_instalacion_vence: c.garantia_instalacion_vence ?? '',
     })
     setEditingId(c.id)
     setShowForm(true)
@@ -201,6 +205,8 @@ export function ContadoresSection({
           numero_derecho_servicio: form.numero_derecho_servicio || null,
           cantidad_derecho_servicio_m3: form.cantidad_derecho_servicio_m3 ? parseFloat(form.cantidad_derecho_servicio_m3) : null,
           periodicidad_lectura_dias: form.periodicidad_lectura_dias ? parseInt(form.periodicidad_lectura_dias) : null,
+          contratista_instalador: form.contratista_instalador || null,
+          garantia_instalacion_vence: form.garantia_instalacion_vence || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingId)
@@ -279,6 +285,8 @@ export function ContadoresSection({
           numero_derecho_servicio: form.numero_derecho_servicio || null,
           cantidad_derecho_servicio_m3: form.cantidad_derecho_servicio_m3 ? parseFloat(form.cantidad_derecho_servicio_m3) : null,
           periodicidad_lectura_dias: form.periodicidad_lectura_dias ? parseInt(form.periodicidad_lectura_dias) : null,
+          contratista_instalador: form.contratista_instalador || null,
+          garantia_instalacion_vence: form.garantia_instalacion_vence || null,
           project_id: projectId,
           company_id: companyId,
         })
@@ -695,6 +703,25 @@ export function ContadoresSection({
               />
             </div>
             <div>
+              <label style={labelStyle}>Contratista / Instalador</label>
+              <input
+                style={inputStyle}
+                value={form.contratista_instalador}
+                onChange={e => setForm(f => ({ ...f, contratista_instalador: e.target.value }))}
+                placeholder="Nombre del instalador o empresa"
+                maxLength={150}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Garantía de Instalación Vence</label>
+              <input
+                style={inputStyle}
+                type="date"
+                value={form.garantia_instalacion_vence}
+                onChange={e => setForm(f => ({ ...f, garantia_instalacion_vence: e.target.value }))}
+              />
+            </div>
+            <div>
               <label style={labelStyle}>N° Derecho de Servicio (Título de Agua)</label>
               <input
                 style={inputStyle}
@@ -889,7 +916,15 @@ export function ContadoresSection({
                         {c.periodicidad_lectura_dias != null && (
                           <div><span style={{ color: '#94a3b8' }}>Lectura c/</span> {c.periodicidad_lectura_dias} días</div>
                         )}
-                        {!c.medida && !c.tipo_contador && !c.material && !c.valvula_cheque && !c.tipo_llave && !c.llave_antifraude && !c.valvula_aire && !c.fecha_reemplazo_sugerida && !c.numero_derecho_servicio && c.cantidad_derecho_servicio_m3 == null && c.periodicidad_lectura_dias == null && (
+                        {c.contratista_instalador && (
+                          <div><span style={{ color: '#94a3b8' }}>Instalador:</span> {c.contratista_instalador}</div>
+                        )}
+                        {c.garantia_instalacion_vence && (
+                          <div style={{ color: new Date(c.garantia_instalacion_vence + 'T12:00:00') <= new Date() ? '#dc2626' : '#059669', fontWeight: 600 }}>
+                            Garantía: {new Date(c.garantia_instalacion_vence + 'T12:00:00').toLocaleDateString('es-GT')}
+                          </div>
+                        )}
+                        {!c.medida && !c.tipo_contador && !c.material && !c.valvula_cheque && !c.tipo_llave && !c.llave_antifraude && !c.valvula_aire && !c.fecha_reemplazo_sugerida && !c.numero_derecho_servicio && c.cantidad_derecho_servicio_m3 == null && c.periodicidad_lectura_dias == null && !c.contratista_instalador && !c.garantia_instalacion_vence && (
                           <span style={{ color: '#cbd5e1' }}>—</span>
                         )}
                       </td>
