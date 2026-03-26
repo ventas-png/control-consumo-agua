@@ -24,6 +24,9 @@ export function generarReciboPDFBase64(registro: Registro, empresa: Empresa): st
     ['Lectura Actual (m³)', String(registro.lectura_actual), ''],
     ['Consumo (m³)', registro.consumo.toFixed(2), ''],
     ['Tarifa Aplicada (Q/m³)', `Q${registro.tarifa_aplicada.toFixed(2)}`, ''],
+    ...(registro.tarifa_exceso_aplicada && registro.tarifa_exceso_aplicada > 0
+      ? [['Tarifa Exceso (Q/m³)', `Q${registro.tarifa_exceso_aplicada.toFixed(2)}`, '']]
+      : []),
     ['Canon Fijo (Q)', `Q${registro.canon_aplicado.toFixed(2)}`, ''],
     ['Monto TOTAL a Pagar (Q)', '', `Q${total}`],
   ]

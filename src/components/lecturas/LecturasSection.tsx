@@ -125,7 +125,7 @@ export function LecturasSection({
   const consumo = !isNaN(lecturaNum) ? lecturaNum - ultimaLectura : null
   const calculo =
     consumo !== null && consumo >= 0 && tarifaDelContador
-      ? calcularTotalPagar(consumo, tarifaDelContador.precio_m3, tarifaDelContador.canon_fijo, tarifaDelContador.consumo_minimo ?? 0)
+      ? calcularTotalPagar(consumo, tarifaDelContador.precio_m3, tarifaDelContador.canon_fijo, tarifaDelContador.consumo_minimo ?? 0, tarifaDelContador.precio_m3_exceso ?? 0)
       : null
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
@@ -173,7 +173,7 @@ export function LecturasSection({
     if (consumo === null || isNaN(consumo)) return Swal.fire('Error', 'Datos de lectura inválidos', 'error')
     if (consumo < 0) return Swal.fire('Consumo Negativo', 'La lectura actual debe ser mayor o igual a la anterior.', 'error')
 
-    const resultadoCobro = calcularTotalPagar(consumo, tarifaDelContador!.precio_m3, tarifaDelContador!.canon_fijo, tarifaDelContador!.consumo_minimo ?? 0)
+    const resultadoCobro = calcularTotalPagar(consumo, tarifaDelContador!.precio_m3, tarifaDelContador!.canon_fijo, tarifaDelContador!.consumo_minimo ?? 0, tarifaDelContador!.precio_m3_exceso ?? 0)
     const mesNum = mes === 'auto' ? new Date().getMonth() + 1 : parseInt(mes)
 
     const registro = {
@@ -185,6 +185,7 @@ export function LecturasSection({
       lectura_actual: lecturaNum,
       consumo,
       tarifa_aplicada: tarifaDelContador!.precio_m3,
+      tarifa_exceso_aplicada: tarifaDelContador!.precio_m3_exceso ?? 0,
       canon_aplicado: tarifaDelContador!.canon_fijo,
       monto_calculado: resultadoCobro.total,
       tipo_cobro: resultadoCobro.tipo_cobro,
@@ -400,6 +401,9 @@ export function LecturasSection({
                     <>
                       <div><small style={{ color: '#64748b' }}>Tarifa</small><div style={{ fontWeight: 600 }}>{tarifaDelContador.nombre}</div></div>
                       <div><small style={{ color: '#64748b' }}>Precio/m³</small><div style={{ fontWeight: 600 }}>{moneda}{tarifaDelContador.precio_m3}</div></div>
+                      {Number(tarifaDelContador.precio_m3_exceso ?? 0) > 0 && (
+                        <div><small style={{ color: '#64748b' }}>Precio Exceso/m³</small><div style={{ fontWeight: 600 }}>{moneda}{tarifaDelContador.precio_m3_exceso}</div></div>
+                      )}
                       <div><small style={{ color: '#64748b' }}>Canon Fijo</small><div style={{ fontWeight: 600 }}>{moneda}{tarifaDelContador.canon_fijo}</div></div>
                     </>
                   )}

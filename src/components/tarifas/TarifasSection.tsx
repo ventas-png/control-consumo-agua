@@ -31,6 +31,7 @@ const EMPTY_FORM = {
   nombre: '',
   tipo_agua: 'potable',
   precio_m3: '0.00',
+  precio_m3_exceso: '0.0000',
   canon_fijo: '0.00',
   consumo_minimo: '0.0000',
   descripcion: '',
@@ -68,6 +69,7 @@ export function TarifasSection({
       nombre: t.nombre,
       tipo_agua: t.tipo_agua,
       precio_m3: String(t.precio_m3),
+      precio_m3_exceso: String(t.precio_m3_exceso ?? 0),
       canon_fijo: String(t.canon_fijo),
       consumo_minimo: String(t.consumo_minimo ?? 0),
       descripcion: t.descripcion ?? '',
@@ -87,12 +89,14 @@ export function TarifasSection({
   async function handleGuardar() {
     const nombre = sanitizeInput(form.nombre)
     const precio_m3 = parseFloat(form.precio_m3)
+    const precio_m3_exceso = parseFloat(form.precio_m3_exceso)
     const canon_fijo = parseFloat(form.canon_fijo)
     const consumo_minimo = parseFloat(form.consumo_minimo)
 
     const errors: string[] = []
     if (!nombre || nombre.length < 2) errors.push('Nombre debe tener al menos 2 caracteres')
     if (!validateNumber(precio_m3, 0, 99999)) errors.push('Precio por m³ debe ser un valor entre 0 y 99999')
+    if (!validateNumber(precio_m3_exceso, 0, 99999)) errors.push('Precio por m³ exceso debe ser un valor entre 0 y 99999')
     if (!validateNumber(canon_fijo, 0, 99999)) errors.push('Canon fijo debe ser un valor entre 0 y 99999')
     if (!validateNumber(consumo_minimo, 0, 99999)) errors.push('Consumo mínimo debe ser un valor entre 0 y 99999')
 
@@ -110,6 +114,7 @@ export function TarifasSection({
           nombre,
           tipo_agua: form.tipo_agua,
           precio_m3,
+          precio_m3_exceso,
           canon_fijo,
           consumo_minimo,
           descripcion: form.descripcion || null,
@@ -177,6 +182,7 @@ export function TarifasSection({
           nombre,
           tipo_agua: form.tipo_agua,
           precio_m3,
+          precio_m3_exceso,
           canon_fijo,
           consumo_minimo,
           descripcion: form.descripcion || null,
@@ -353,6 +359,21 @@ export function TarifasSection({
               />
             </div>
             <div>
+              <label style={labelStyle}>Precio por m³ exceso</label>
+              <input
+                style={inputStyle}
+                type="number"
+                min="0"
+                step="0.0001"
+                value={form.precio_m3_exceso}
+                onChange={e => setForm(f => ({ ...f, precio_m3_exceso: e.target.value }))}
+                placeholder="0.0000"
+              />
+              <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                Precio diferenciado para consumo que exceda el mínimo
+              </span>
+            </div>
+            <div>
               <label style={labelStyle}>Canon Fijo (mensual)</label>
               <input
                 style={inputStyle}
@@ -488,6 +509,7 @@ export function TarifasSection({
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Nombre</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tipo de Agua</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Precio/m³</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Precio Exceso/m³</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Canon Fijo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Cons. Mínimo</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
@@ -525,6 +547,11 @@ export function TarifasSection({
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
                       {moneda} {Number(t.precio_m3).toFixed(4)}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
+                      {Number(t.precio_m3_exceso ?? 0) > 0
+                        ? `${moneda} ${Number(t.precio_m3_exceso).toFixed(4)}`
+                        : '—'}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
                       {moneda} {Number(t.canon_fijo).toFixed(2)}

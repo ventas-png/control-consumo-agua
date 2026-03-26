@@ -546,7 +546,7 @@ export function ContadoresSection({
                 <option value="">— Sin tarifa asignada —</option>
                 {tarifasParaTipo(form.tipo_agua).map(t => (
                   <option key={t.id} value={t.id}>
-                    {t.nombre} — {t.precio_m3} {moneda}/m³{t.canon_fijo > 0 ? ` + ${t.canon_fijo} ${moneda} canon` : ''}
+                    {t.nombre} — {t.precio_m3} {moneda}/m³{Number(t.precio_m3_exceso ?? 0) > 0 ? ` (exceso: ${t.precio_m3_exceso} ${moneda}/m³)` : ''}{t.canon_fijo > 0 ? ` + ${t.canon_fijo} ${moneda} canon` : ''}
                   </option>
                 ))}
                 {tarifasParaTipo(form.tipo_agua).length === 0 && (
