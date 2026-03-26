@@ -2,11 +2,13 @@ export interface Cliente {
   id: string;
   nombre: string;
   codigo: string;
-  medidor: string;
+  medidor?: string;
+  lectura_inicial?: number;
   email?: string;
   direccion?: string;
   telefono?: string;
-  lectura_inicial: number;
+  whatsapp?: string | null;
+  puede_crear_cuenta?: boolean;
   // Datos personales
   nacionalidad?: string | null;
   cui_dui?: string | null;

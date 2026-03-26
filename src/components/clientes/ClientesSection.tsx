@@ -17,11 +17,11 @@ interface Props {
 const EMPTY_FORM = {
   nombre: '',
   codigo: '',
-  medidor: '',
   email: '',
   direccion: '',
   telefono: '',
-  lectura_inicial: '0',
+  whatsapp: '',
+  puede_crear_cuenta: false,
   // Datos personales
   nacionalidad: '',
   cui_dui: '',
@@ -53,11 +53,11 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
     setForm({
       nombre: c.nombre,
       codigo: c.codigo,
-      medidor: c.medidor,
       email: c.email ?? '',
       direccion: c.direccion ?? '',
       telefono: c.telefono ?? '',
-      lectura_inicial: String(c.lectura_inicial),
+      whatsapp: c.whatsapp ?? '',
+      puede_crear_cuenta: c.puede_crear_cuenta ?? false,
       nacionalidad: c.nacionalidad ?? '',
       cui_dui: c.cui_dui ?? '',
       fecha_nacimiento: c.fecha_nacimiento ?? '',
@@ -77,12 +77,11 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
   async function handleGuardar() {
     const nombre = sanitizeInput(form.nombre)
     const codigo = sanitizeInput(form.codigo)
-    const medidor = sanitizeInput(form.medidor)
     const email = sanitizeInput(form.email)
     const direccion = sanitizeInput(form.direccion)
     const telefono = sanitizeInput(form.telefono)
+    const whatsapp = sanitizeInput(form.whatsapp)
     const telefono_alterno = sanitizeInput(form.telefono_alterno)
-    const lectura_inicial = parseFloat(form.lectura_inicial)
 
     const errors: string[] = []
     if (!nombre || nombre.length < 2) errors.push('Nombre debe tener al menos 2 caracteres')
@@ -90,7 +89,6 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
     if (email && !validateEmail(email)) errors.push('Formato de email inválido')
     if (telefono && !validatePhoneNumber(telefono)) errors.push('Teléfono principal: formato inválido (debe tener 8 dígitos)')
     if (telefono_alterno && !validatePhoneNumber(telefono_alterno)) errors.push('Teléfono alterno: formato inválido (debe tener 8 dígitos)')
-    if (isNaN(lectura_inicial) || lectura_inicial < 0) errors.push('Lectura inicial inválida')
 
     if (errors.length > 0) {
       Swal.fire('Error de validación', errors.join('<br>'), 'error')
@@ -102,11 +100,11 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
     const payload = {
       nombre,
       codigo,
-      medidor,
       email: email || null,
       direccion: direccion || null,
       telefono: telefono || null,
-      lectura_inicial,
+      whatsapp: whatsapp || null,
+      puede_crear_cuenta: form.puede_crear_cuenta,
       nacionalidad: sanitizeInput(form.nacionalidad) || null,
       cui_dui: sanitizeInput(form.cui_dui) || null,
       fecha_nacimiento: form.fecha_nacimiento || null,
@@ -327,6 +325,36 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
                   maxLength={20}
                 />
               </div>
+              <div>
+                <label style={labelStyle}>Número de WhatsApp</label>
+                <input
+                  style={inputStyle}
+                  type="tel"
+                  value={form.whatsapp}
+                  onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
+                  placeholder="Ej. 55551234"
+                  maxLength={20}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Habilitar acceso / Crear cuenta:</label>
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, puede_crear_cuenta: !f.puede_crear_cuenta }))}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: '20px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    background: form.puede_crear_cuenta ? '#dcfce7' : '#f1f5f9',
+                    color: form.puede_crear_cuenta ? '#166534' : '#64748b',
+                  }}
+                >
+                  {form.puede_crear_cuenta ? 'Sí' : 'No'}
+                </button>
+              </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={labelStyle}>Dirección</label>
                 <input
@@ -362,35 +390,6 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
                   onChange={e => setForm(f => ({ ...f, numero_facturacion: e.target.value }))}
                   placeholder="Ej. 12345678-9 o CF"
                   maxLength={30}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Datos del Medidor */}
-          <div style={{ marginBottom: '20px' }}>
-            <div style={sectionHeaderStyle}>Datos del Medidor</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
-              <div>
-                <label style={labelStyle}>N° Medidor</label>
-                <input
-                  style={inputStyle}
-                  value={form.medidor}
-                  onChange={e => setForm(f => ({ ...f, medidor: e.target.value }))}
-                  placeholder="Ej. MED-123456"
-                  maxLength={50}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Lectura Inicial</label>
-                <input
-                  style={inputStyle}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.lectura_inicial}
-                  onChange={e => setForm(f => ({ ...f, lectura_inicial: e.target.value }))}
-                  placeholder="0"
                 />
               </div>
             </div>
@@ -452,10 +451,9 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Cliente</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Código</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Identificación</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Medidor</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Contacto</th>
                   <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Facturación</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Lect. Inicial</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Cuenta</th>
                   {canEdit && (
                     <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
                   )}
@@ -492,22 +490,29 @@ export function ClientesSection({ clientes, userRole, userId, onClienteAdded, on
                       ) : null}
                       {!c.cui_dui && !c.nacionalidad && <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
-                    <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
-                      {c.medidor ? sanitizeHTML(c.medidor) : <span style={{ color: '#cbd5e1' }}>—</span>}
-                    </td>
                     <td style={{ padding: '12px 16px', color: '#475569' }}>
                       {c.email && <div style={{ fontSize: '13px' }}>✉️ {sanitizeHTML(c.email)}</div>}
                       {c.telefono && <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>📞 {sanitizeHTML(c.telefono)}</div>}
                       {c.telefono_alterno && <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>📱 {sanitizeHTML(c.telefono_alterno)}</div>}
-                      {!c.email && !c.telefono && !c.telefono_alterno && <span style={{ color: '#cbd5e1' }}>—</span>}
+                      {c.whatsapp && <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '2px' }}>💬 {sanitizeHTML(c.whatsapp)}</div>}
+                      {!c.email && !c.telefono && !c.telefono_alterno && !c.whatsapp && <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
                     <td style={{ padding: '12px 16px', color: '#475569' }}>
                       {c.numero_facturacion ? (
                         <div style={{ fontSize: '13px', fontFamily: 'monospace' }}>{sanitizeHTML(c.numero_facturacion)}</div>
                       ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>
-                      {Number(c.lectura_inicial).toFixed(2)}
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <span style={{
+                        padding: '3px 12px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        background: c.puede_crear_cuenta ? '#dcfce7' : '#f1f5f9',
+                        color: c.puede_crear_cuenta ? '#166534' : '#94a3b8',
+                      }}>
+                        {c.puede_crear_cuenta ? 'Sí' : 'No'}
+                      </span>
                     </td>
                     {canEdit && (
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>

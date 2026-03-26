@@ -390,7 +390,7 @@ export function RutasSection({
                 >
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '13px' }}>{c.nombre}</div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{c.codigo} | {c.medidor}</div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{c.codigo}</div>
                   </div>
                   <button
                     onClick={() => agregarCliente(c)}
