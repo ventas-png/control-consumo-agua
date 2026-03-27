@@ -36,10 +36,11 @@ export function HistorialSection({ registros, clientes, userRole, moneda = 'Q', 
 
   function enviarWhatsApp(registro: Registro) {
     const cliente = clientes.find(c => c.id === registro.cliente_id)
-    let telefono = cliente?.telefono ?? ''
-    if (!telefono) { Swal.fire('Sin Teléfono', 'Este cliente no tiene teléfono.', 'warning'); return }
-    telefono = telefono.replace(/[^0-9]/g, '')
-    if (telefono.length === 8) telefono = APP_CONFIG.COUNTRY_CODE + telefono
+    const rawTel = cliente?.whatsapp ?? cliente?.telefono ?? ''
+    if (!rawTel) { Swal.fire('Sin Teléfono', 'Este cliente no tiene teléfono.', 'warning'); return }
+    let telefono = rawTel.trim().replace(/[\s\-\.\(\)]/g, '')
+    if (telefono.startsWith('+')) telefono = telefono.slice(1)
+    else { telefono = telefono.replace(/\D/g, ''); if (telefono.length === 8) telefono = APP_CONFIG.COUNTRY_CODE + telefono }
     const total = getTotal(registro)
     const msg = `Hola ${registro.cliente_nombre}, su recibo de agua potable:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: ${moneda}${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank')

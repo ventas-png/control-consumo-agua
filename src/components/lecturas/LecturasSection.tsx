@@ -137,10 +137,11 @@ export function LecturasSection({
   }
 
   function enviarWhatsApp(registro: Registro) {
-    let telefono = clienteDeUnidad?.telefono ?? ''
-    if (!telefono) { Swal.fire('Sin Teléfono', 'Este cliente no tiene teléfono registrado.', 'warning'); return }
-    telefono = telefono.replace(/[^0-9]/g, '')
-    if (telefono.length === 8) telefono = APP_CONFIG.COUNTRY_CODE + telefono
+    const rawTel = clienteDeUnidad?.whatsapp ?? clienteDeUnidad?.telefono ?? ''
+    if (!rawTel) { Swal.fire('Sin Teléfono', 'Este cliente no tiene teléfono registrado.', 'warning'); return }
+    let telefono = rawTel.trim().replace(/[\s\-\.\(\)]/g, '')
+    if (telefono.startsWith('+')) telefono = telefono.slice(1)
+    else { telefono = telefono.replace(/\D/g, ''); if (telefono.length === 8) telefono = APP_CONFIG.COUNTRY_CODE + telefono }
     const total = registro.monto_calculado
     const msg = `Hola ${registro.cliente_nombre}, su recibo de agua:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}\n🔧 Contador: ${contadorSeleccionado?.numero_serie ?? ''}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: ${moneda}${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank')

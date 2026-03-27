@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import type { Cliente, UserRole, ClienteLookupResult } from '../../types'
 import { supabase } from '../../lib/supabase'
-import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber } from '../../lib/validation'
+import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber, formatPhoneForWa } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
 import { ImportClientesModal } from './ImportClientesModal'
 
@@ -226,8 +226,8 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
     if (!nombre || nombre.length < 2) errors.push('Nombre debe tener al menos 2 caracteres')
     if (!codigo || codigo.length < 3) errors.push('Código debe tener al menos 3 caracteres')
     if (email && !validateEmail(email)) errors.push('Formato de email inválido')
-    if (telefono && !validatePhoneNumber(telefono)) errors.push('Teléfono principal: formato inválido (debe tener 8 dígitos)')
-    if (telefono_alterno && !validatePhoneNumber(telefono_alterno)) errors.push('Teléfono alterno: formato inválido (debe tener 8 dígitos)')
+    if (telefono && !validatePhoneNumber(telefono)) errors.push('Teléfono principal: formato inválido (use 8 dígitos o +código+número, ej. +15551234567)')
+    if (telefono_alterno && !validatePhoneNumber(telefono_alterno)) errors.push('Teléfono alterno: formato inválido (use 8 dígitos o +código+número, ej. +15551234567)')
 
     if (errors.length > 0) {
       Swal.fire('Error de validación', errors.join('<br>'), 'error')
@@ -702,9 +702,10 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
                   type="tel"
                   value={form.telefono}
                   onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))}
-                  placeholder="Ej. 55551234"
+                  placeholder="Ej. 55551234 o +15551234567"
                   maxLength={20}
                 />
+                <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
               </div>
               <div>
                 <label style={labelStyle}>Teléfono Alterno</label>
@@ -713,9 +714,10 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
                   type="tel"
                   value={form.telefono_alterno}
                   onChange={e => setForm(f => ({ ...f, telefono_alterno: e.target.value }))}
-                  placeholder="Ej. 44441234"
+                  placeholder="Ej. 44441234 o +15551234567"
                   maxLength={20}
                 />
+                <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
               </div>
               <div>
                 <label style={labelStyle}>Número de WhatsApp</label>
@@ -724,9 +726,10 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
                   type="tel"
                   value={form.whatsapp}
                   onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
-                  placeholder="Ej. 55551234"
+                  placeholder="Ej. 55551234 o +15551234567"
                   maxLength={20}
                 />
+                <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <label style={{ ...labelStyle, marginBottom: 0 }}>Habilitar acceso / Crear cuenta:</label>
@@ -884,9 +887,33 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
                     </td>
                     <td style={{ padding: '12px 16px', color: '#475569' }}>
                       {c.email && <div style={{ fontSize: '13px' }}>✉️ {sanitizeHTML(c.email)}</div>}
-                      {c.telefono && <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>📞 {sanitizeHTML(c.telefono)}</div>}
-                      {c.telefono_alterno && <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>📱 {sanitizeHTML(c.telefono_alterno)}</div>}
-                      {c.whatsapp && <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '2px' }}>💬 {sanitizeHTML(c.whatsapp)}</div>}
+                      {c.telefono && (
+                        <div style={{ fontSize: '12px', marginTop: '2px' }}>
+                          <a href={`tel:${c.telefono}`} style={{ color: '#0369a1', textDecoration: 'none' }} title="Llamar">
+                            📞 {sanitizeHTML(c.telefono)}
+                          </a>
+                        </div>
+                      )}
+                      {c.telefono_alterno && (
+                        <div style={{ fontSize: '12px', marginTop: '2px' }}>
+                          <a href={`tel:${c.telefono_alterno}`} style={{ color: '#64748b', textDecoration: 'none' }} title="Llamar alterno">
+                            📱 {sanitizeHTML(c.telefono_alterno)}
+                          </a>
+                        </div>
+                      )}
+                      {c.whatsapp && (
+                        <div style={{ fontSize: '12px', marginTop: '2px' }}>
+                          <a
+                            href={`https://wa.me/${formatPhoneForWa(c.whatsapp)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: '#16a34a', textDecoration: 'none' }}
+                            title="Abrir WhatsApp"
+                          >
+                            💬 {sanitizeHTML(c.whatsapp)}
+                          </a>
+                        </div>
+                      )}
                       {!c.email && !c.telefono && !c.telefono_alterno && !c.whatsapp && <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
                     <td style={{ padding: '12px 16px', color: '#475569' }}>

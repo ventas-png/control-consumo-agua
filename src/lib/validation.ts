@@ -18,8 +18,22 @@ export function validateEmail(email: string): boolean {
 }
 
 export function validatePhoneNumber(phone: string): boolean {
-  const phoneRegex = /^\d{8}$/
-  return phoneRegex.test(phone.replace(/\D/g, ''))
+  const cleaned = phone.trim().replace(/[\s\-\.\(\)]/g, '')
+  // E.164 internacional: + seguido de 7 a 15 dígitos
+  if (/^\+\d{7,15}$/.test(cleaned)) return true
+  // Local: exactamente 8 dígitos
+  return /^\d{8}$/.test(cleaned.replace(/\D/g, ''))
+}
+
+export function formatPhoneForWa(phone: string, defaultCountryCode = '502'): string {
+  const cleaned = phone.trim().replace(/[\s\-\.\(\)]/g, '')
+  // E.164: quitar el + para wa.me
+  if (/^\+\d{7,15}$/.test(cleaned)) return cleaned.slice(1)
+  // Local 8 dígitos: agregar código de país
+  const digits = cleaned.replace(/\D/g, '')
+  if (digits.length === 8) return defaultCountryCode + digits
+  // Cualquier otro caso: devolver solo dígitos
+  return digits
 }
 
 export function validateNumber(
