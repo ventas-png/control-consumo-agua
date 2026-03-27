@@ -4,6 +4,8 @@ import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSumini
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
 import { ImportUnidadesModal } from './ImportUnidadesModal'
+import { EditModal } from '../shared/EditModal'
+import { getEditedTagInfo } from '../../lib/timeUtils'
 
 interface Props {
   unidades: Unidad[]
@@ -123,7 +125,7 @@ export function UnidadesSection({
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [selectedContadorIds, setSelectedContadorIds] = useState<string[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [showForm, setShowForm] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [filterTipo, setFilterTipo] = useState<TipoUnidad | ''>('')
@@ -135,7 +137,7 @@ export function UnidadesSection({
     setForm({ ...EMPTY_FORM, project_id: proyectos.length === 1 ? proyectos[0].id : '' })
     setSelectedContadorIds([])
     setEditingId(null)
-    setShowForm(true)
+    setIsModalOpen(true)
   }
 
   function startEdit(u: Unidad) {
@@ -163,11 +165,11 @@ export function UnidadesSection({
     })
     setSelectedContadorIds(contadores.filter(c => c.unidad_id === u.id).map(c => c.id))
     setEditingId(u.id)
-    setShowForm(true)
+    setIsModalOpen(true)
   }
 
   function cancelForm() {
-    setShowForm(false)
+    setIsModalOpen(false)
     setEditingId(null)
     setForm(EMPTY_FORM)
     setSelectedContadorIds([])
@@ -242,6 +244,8 @@ export function UnidadesSection({
       activo: form.activo,
       cliente_id: form.cliente_id || null,
       updated_at: new Date().toISOString(),
+      updated_by: currentUser.user_id,
+      updated_by_name: currentUser.name || currentUser.email,
       direccion: form.direccion || null,
       datos_registrales: form.datos_registrales || null,
       tipo_regimen: form.tipo_regimen || null,
@@ -530,13 +534,9 @@ export function UnidadesSection({
         </div>
       )}
 
-      {/* Form */}
-      {showForm && canEdit && (
-        <div style={{ background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '20px', color: '#1e293b' }}>
-            {editingId ? 'Editar Unidad' : 'Nueva Unidad'}
-          </div>
-
+      {/* Form Modal */}
+      {isModalOpen && canEdit && (
+        <EditModal title={editingId ? 'Editar Unidad' : 'Nueva Unidad'} onClose={cancelForm} maxWidth="820px">
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
               Datos de la Unidad
@@ -910,7 +910,7 @@ export function UnidadesSection({
               Cancelar
             </button>
           </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Cards / Table */}
@@ -1066,7 +1066,7 @@ export function UnidadesSection({
                   })()}
 
                   {/* Contadores badge */}
-                  <div style={{ marginBottom: '14px' }}>
+                  <div style={{ marginBottom: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{
                       padding: '4px 12px',
                       borderRadius: '20px',
@@ -1078,6 +1078,26 @@ export function UnidadesSection({
                     }}>
                       🔧 {nContadores} contador{nContadores !== 1 ? 'es' : ''} asignado{nContadores !== 1 ? 's' : ''}
                     </span>
+                    {(() => {
+                      const tag = getEditedTagInfo(u.updated_at, u.updated_by_name)
+                      if (!tag) return null
+                      return (
+                        <span
+                          title={tag.tooltip}
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: '10px',
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            color: tag.color,
+                            background: tag.bg,
+                            cursor: 'default',
+                          }}
+                        >
+                          {tag.label}
+                        </span>
+                      )
+                    })()}
                   </div>
 
                   {/* Actions */}

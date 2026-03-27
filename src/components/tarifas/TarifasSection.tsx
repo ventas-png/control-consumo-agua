@@ -3,6 +3,8 @@ import Swal from 'sweetalert2'
 import type { Tarifa, UserRole, UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, validateNumber } from '../../lib/validation'
+import { EditModal } from '../shared/EditModal'
+import { getEditedTagInfo } from '../../lib/timeUtils'
 
 interface Props {
   tarifas: Tarifa[]
@@ -52,7 +54,7 @@ export function TarifasSection({
 }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [showForm, setShowForm] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
 
@@ -61,7 +63,7 @@ export function TarifasSection({
   function startCreate() {
     setForm(EMPTY_FORM)
     setEditingId(null)
-    setShowForm(true)
+    setIsModalOpen(true)
   }
 
   function startEdit(t: Tarifa) {
@@ -77,11 +79,11 @@ export function TarifasSection({
       fecha_revision: t.fecha_revision ?? '',
     })
     setEditingId(t.id)
-    setShowForm(true)
+    setIsModalOpen(true)
   }
 
   function cancelForm() {
-    setShowForm(false)
+    setIsModalOpen(false)
     setEditingId(null)
     setForm(EMPTY_FORM)
   }
@@ -121,6 +123,8 @@ export function TarifasSection({
           activa: true,
           fecha_revision: form.fecha_revision || null,
           updated_at: new Date().toISOString(),
+          updated_by: currentUser.user_id,
+          updated_by_name: currentUser.name || currentUser.email,
         })
         .eq('id', editingId)
         .select()
@@ -317,12 +321,9 @@ export function TarifasSection({
         </div>
       </div>
 
-      {/* Form */}
-      {showForm && canEdit && (
-        <div style={{ background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '20px', color: '#1e293b' }}>
-            {editingId ? 'Editar Tarifa' : 'Nueva Tarifa'}
-          </div>
+      {/* Form Modal */}
+      {isModalOpen && canEdit && (
+        <EditModal title={editingId ? 'Editar Tarifa' : 'Nueva Tarifa'} onClose={cancelForm}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '20px' }}>
             <div>
               <label style={labelStyle}>Nombre *</label>
@@ -486,7 +487,7 @@ export function TarifasSection({
               Cancelar
             </button>
           </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Table */}
@@ -532,6 +533,28 @@ export function TarifasSection({
                           {t.descripcion}
                         </div>
                       )}
+                      {(() => {
+                        const tag = getEditedTagInfo(t.updated_at, t.updated_by_name)
+                        if (!tag) return null
+                        return (
+                          <span
+                            title={tag.tooltip}
+                            style={{
+                              display: 'inline-block',
+                              marginTop: '4px',
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              color: tag.color,
+                              background: tag.bg,
+                              cursor: 'default',
+                            }}
+                          >
+                            {tag.label}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{

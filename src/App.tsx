@@ -244,6 +244,7 @@ export default function App() {
                 clientes={clientes}
                 userRole={currentUser.role}
                 userId={currentUser.user_id}
+                currentUser={currentUser}
                 companyId={currentUser.company_id}
                 onClienteAdded={addCliente}
                 onClienteUpdated={updateCliente}
