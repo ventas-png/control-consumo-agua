@@ -129,7 +129,7 @@ export function UnidadesSection({
   const [filterTipo, setFilterTipo] = useState<TipoUnidad | ''>('')
   const [showImportModal, setShowImportModal] = useState(false)
 
-  const canEdit = userRole !== 'viewer' && userRole !== 'operator'
+  const canEdit = !['viewer', 'visor', 'cliente'].includes(userRole)
 
   function startCreate() {
     setForm({ ...EMPTY_FORM, project_id: proyectos.length === 1 ? proyectos[0].id : '' })
