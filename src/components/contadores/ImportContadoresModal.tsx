@@ -5,6 +5,47 @@ import type { Contador, TipoAgua, UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
 
+function normalizeDate(raw: unknown): string | null {
+  if (raw === null || raw === undefined || raw === '') return null
+
+  if (raw instanceof Date) {
+    if (isNaN(raw.getTime())) return null
+    const y = raw.getFullYear()
+    const m = String(raw.getMonth() + 1).padStart(2, '0')
+    const d = String(raw.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
+  if (typeof raw === 'number') {
+    const date = new Date((raw - 25569) * 86400 * 1000)
+    if (isNaN(date.getTime())) return null
+    const y = date.getUTCFullYear()
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(date.getUTCDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
+  const str = String(raw).trim()
+  if (!str) return null
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
+
+  const parts = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (parts) {
+    return `${parts[1]}-${parts[2].padStart(2, '0')}-${parts[3].padStart(2, '0')}`
+  }
+
+  const parsed = new Date(str)
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear()
+    const m = String(parsed.getMonth() + 1).padStart(2, '0')
+    const d = String(parsed.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
+  return null
+}
+
 const TIPOS_AGUA_VALIDOS: TipoAgua[] = [
   'potable', 'rehuso', 'piscina', 'desalinada', 'riego',
   'jacuzzi', 'consumo_humano', 'desmineralizada', 'residuales_tratadas',
@@ -37,10 +78,9 @@ function validateRow(row: Record<string, unknown>, index: number): ParsedRow {
   if (isNaN(lectura_inicial) || lectura_inicial < 0)
     errors.push('lectura_inicial debe ser un número ≥ 0')
 
-  const rawFecha = String(row['fecha_instalacion'] ?? '').trim()
-  const fecha_instalacion = rawFecha && /^\d{4}-\d{2}-\d{2}$/.test(rawFecha) ? rawFecha : (rawFecha ? null : null)
-  if (rawFecha && fecha_instalacion === null)
-    errors.push('fecha_instalacion debe tener formato YYYY-MM-DD')
+  const fecha_instalacion = normalizeDate(row['fecha_instalacion'])
+  if (row['fecha_instalacion'] && String(row['fecha_instalacion']).trim() !== '' && fecha_instalacion === null)
+    errors.push(`fecha_instalacion inválida — use YYYY-MM-DD o celda tipo fecha`)
 
   const data: Partial<Contador> = {
     numero_serie,
@@ -49,7 +89,7 @@ function validateRow(row: Record<string, unknown>, index: number): ParsedRow {
     descripcion: String(row['descripcion'] ?? '').trim() || undefined,
     marca: String(row['marca'] ?? '').trim() || undefined,
     modelo: String(row['modelo'] ?? '').trim() || undefined,
-    fecha_instalacion: rawFecha && /^\d{4}-\d{2}-\d{2}$/.test(rawFecha) ? rawFecha : undefined,
+    fecha_instalacion: fecha_instalacion ?? undefined,
     medida: String(row['medida'] ?? '').trim() || undefined,
     material: String(row['material'] ?? '').trim() || undefined,
     tipo_contador: String(row['tipo_contador'] ?? '').trim() || undefined,
@@ -59,10 +99,7 @@ function validateRow(row: Record<string, unknown>, index: number): ParsedRow {
       ? parseInt(String(row['periodicidad_lectura_dias'])) || undefined
       : undefined,
     contratista_instalador: String(row['contratista_instalador'] ?? '').trim() || undefined,
-    garantia_instalacion_vence: (() => {
-      const v = String(row['garantia_instalacion_vence'] ?? '').trim()
-      return v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined
-    })(),
+    garantia_instalacion_vence: normalizeDate(row['garantia_instalacion_vence']) ?? undefined,
     activo: true,
   }
 

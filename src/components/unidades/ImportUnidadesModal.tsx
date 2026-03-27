@@ -34,12 +34,55 @@ interface Props {
   onImportado: (unidades: Unidad[]) => void
 }
 
+function normalizeDate(raw: unknown): string | null {
+  if (raw === null || raw === undefined || raw === '') return null
+
+  if (raw instanceof Date) {
+    if (isNaN(raw.getTime())) return null
+    const y = raw.getFullYear()
+    const m = String(raw.getMonth() + 1).padStart(2, '0')
+    const d = String(raw.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
+  if (typeof raw === 'number') {
+    const date = new Date((raw - 25569) * 86400 * 1000)
+    if (isNaN(date.getTime())) return null
+    const y = date.getUTCFullYear()
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(date.getUTCDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
+  const str = String(raw).trim()
+  if (!str) return null
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
+
+  const parts = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (parts) {
+    return `${parts[1]}-${parts[2].padStart(2, '0')}-${parts[3].padStart(2, '0')}`
+  }
+
+  const parsed = new Date(str)
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear()
+    const m = String(parsed.getMonth() + 1).padStart(2, '0')
+    const d = String(parsed.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
+  return null
+}
+
 function parseOptionalDate(raw: unknown, fieldName: string, errors: string[]): string | undefined {
-  const val = String(raw ?? '').trim()
-  if (!val) return undefined
-  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val
-  errors.push(`${fieldName} debe tener formato YYYY-MM-DD`)
-  return undefined
+  if (raw === null || raw === undefined || String(raw).trim() === '') return undefined
+  const normalized = normalizeDate(raw)
+  if (normalized === null) {
+    errors.push(`${fieldName} inválido: "${raw}" — use YYYY-MM-DD o celda tipo fecha`)
+    return undefined
+  }
+  return normalized
 }
 
 function validateRow(row: Record<string, unknown>, index: number): ParsedRow {

@@ -5,6 +5,47 @@ import type { Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, validateEmail, validatePhoneNumber } from '../../lib/validation'
 
+function normalizeDate(raw: unknown): string | null {
+  if (raw === null || raw === undefined || raw === '') return null
+
+  if (raw instanceof Date) {
+    if (isNaN(raw.getTime())) return null
+    const y = raw.getFullYear()
+    const m = String(raw.getMonth() + 1).padStart(2, '0')
+    const d = String(raw.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
+  if (typeof raw === 'number') {
+    const date = new Date((raw - 25569) * 86400 * 1000)
+    if (isNaN(date.getTime())) return null
+    const y = date.getUTCFullYear()
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(date.getUTCDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
+  const str = String(raw).trim()
+  if (!str) return null
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
+
+  const parts = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (parts) {
+    return `${parts[1]}-${parts[2].padStart(2, '0')}-${parts[3].padStart(2, '0')}`
+  }
+
+  const parsed = new Date(str)
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear()
+    const m = String(parsed.getMonth() + 1).padStart(2, '0')
+    const d = String(parsed.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
+  return null
+}
+
 interface ParsedRow {
   index: number
   rawData: Record<string, string>
@@ -42,7 +83,7 @@ function validateRow(row: Record<string, unknown>, index: number): ParsedRow {
   const telefono = sanitizeInput(String(row['telefono'] ?? '').trim())
   const whatsapp = sanitizeInput(String(row['whatsapp'] ?? '').trim())
   const telefono_alterno = sanitizeInput(String(row['telefono_alterno'] ?? '').trim())
-  const fecha_nacimiento = String(row['fecha_nacimiento'] ?? '').trim()
+  const fecha_nacimiento = normalizeDate(row['fecha_nacimiento'])
 
   if (!nombre || nombre.length < 2)
     errors.push('nombre debe tener al menos 2 caracteres')
@@ -56,8 +97,8 @@ function validateRow(row: Record<string, unknown>, index: number): ParsedRow {
     errors.push('whatsapp debe tener 8 dígitos')
   if (telefono_alterno && !validatePhoneNumber(telefono_alterno))
     errors.push('telefono_alterno debe tener 8 dígitos')
-  if (fecha_nacimiento && !/^\d{4}-\d{2}-\d{2}$/.test(fecha_nacimiento))
-    errors.push('fecha_nacimiento debe tener formato YYYY-MM-DD')
+  if (row['fecha_nacimiento'] && String(row['fecha_nacimiento']).trim() !== '' && fecha_nacimiento === null)
+    errors.push(`fecha_nacimiento inválida: "${row['fecha_nacimiento']}" — use YYYY-MM-DD o celda tipo fecha`)
 
   const data: Partial<Cliente> = {
     nombre,
@@ -68,7 +109,7 @@ function validateRow(row: Record<string, unknown>, index: number): ParsedRow {
     whatsapp: whatsapp || null,
     nacionalidad: sanitizeInput(String(row['nacionalidad'] ?? '').trim()) || null,
     cui_dui: sanitizeInput(String(row['cui_dui'] ?? '').trim()) || null,
-    fecha_nacimiento: fecha_nacimiento && /^\d{4}-\d{2}-\d{2}$/.test(fecha_nacimiento) ? fecha_nacimiento : null,
+    fecha_nacimiento: fecha_nacimiento,
     numero_facturacion: sanitizeInput(String(row['numero_facturacion'] ?? '').trim()) || null,
     telefono_alterno: telefono_alterno || null,
     puede_crear_cuenta: false,
