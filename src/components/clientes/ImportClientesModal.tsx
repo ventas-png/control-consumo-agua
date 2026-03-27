@@ -257,12 +257,14 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
   }
 
   async function handleImportar() {
-    if (analyzed.nuevos.length === 0) return
+    const totalToProcess = analyzed.nuevos.length + analyzed.yaExisten.length
+    if (totalToProcess === 0) return
 
     setStep('importing')
     const BATCH_SIZE = 100
     const insertados: Cliente[] = []
 
+    // Insert truly new clients
     for (let i = 0; i < analyzed.nuevos.length; i += BATCH_SIZE) {
       const lote = analyzed.nuevos.slice(i, i + BATCH_SIZE).map(r => ({
         nombre: r.data.nombre,
@@ -296,6 +298,30 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
         Swal.fire('Error en inserción', error?.message ?? 'Error al guardar lote de clientes.', 'error')
         setStep('preview')
         return
+      }
+    }
+
+    // Link globally existing clients to this company (avoid duplicates in clientes table)
+    if (companyId && analyzed.yaExisten.length > 0) {
+      const links: { company_id: string; cliente_id: string; added_by: string }[] = []
+      const linkedClientes: Cliente[] = []
+
+      for (const row of analyzed.yaExisten) {
+        const match = existingClientes.find(c =>
+          c.codigo.toLowerCase() === row.data.codigo!.toLowerCase() ||
+          (row.data.cui_dui && c.cui_dui?.toLowerCase() === row.data.cui_dui.toLowerCase())
+        )
+        if (match) {
+          links.push({ company_id: companyId, cliente_id: match.id, added_by: userId })
+          linkedClientes.push(match)
+        }
+      }
+
+      if (links.length > 0) {
+        await supabase
+          .from('company_clientes')
+          .upsert(links, { onConflict: 'company_id,cliente_id', ignoreDuplicates: true })
+        insertados.push(...linkedClientes)
       }
     }
 
@@ -361,7 +387,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
     if (step === 'upload') return 'Descarga la plantilla, complétala y sube el archivo.'
     if (step === 'preview') {
       const total = yaExisten.length + nuevos.length + conErrores.length
-      return `${total} fila${total !== 1 ? 's' : ''} analizadas — ${nuevos.length} nueva${nuevos.length !== 1 ? 's' : ''}, ${yaExisten.length} ya en sistema, ${conErrores.length} con error${conErrores.length !== 1 ? 'es' : ''}`
+      return `${total} fila${total !== 1 ? 's' : ''} analizadas — ${nuevos.length} nueva${nuevos.length !== 1 ? 's' : ''}, ${yaExisten.length} ya en sistema${yaExisten.length > 0 ? ' (se vincularán)' : ''}, ${conErrores.length} con error${conErrores.length !== 1 ? 'es' : ''}`
     }
     if (step === 'importing') return 'Guardando clientes en la base de datos...'
     if (step === 'done') return `${importados} cliente${importados !== 1 ? 's' : ''} importado${importados !== 1 ? 's' : ''} exitosamente.`
@@ -543,7 +569,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                   ) : (
                     <>
                       <p style={{ fontSize: '13px', color: '#0369a1', background: '#f0f9ff', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid #bae6fd' }}>
-                        🔁 Estos clientes ya están registrados en tu empresa y no serán modificados.
+                        🔁 Estos clientes ya existen en el sistema y serán vinculados a tu empresa al confirmar.
                       </p>
                       <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -634,7 +660,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
               <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '16px', fontSize: '14px', color: '#64748b' }}>
                 {analyzed.yaExisten.length > 0 && (
                   <span style={{ padding: '6px 14px', background: '#e0f2fe', color: '#0369a1', borderRadius: '20px', fontWeight: 600 }}>
-                    🔁 {analyzed.yaExisten.length} ya existían
+                    🔁 {analyzed.yaExisten.length} vinculado{analyzed.yaExisten.length !== 1 ? 's' : ''} al proyecto
                   </span>
                 )}
                 {analyzed.conErrores.length > 0 && (
@@ -664,10 +690,14 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                 )}
                 <button
                   onClick={handleImportar}
-                  disabled={nuevos.length === 0}
-                  style={{ ...btnPrimary, opacity: nuevos.length === 0 ? 0.5 : 1, cursor: nuevos.length === 0 ? 'not-allowed' : 'pointer' }}
+                  disabled={nuevos.length === 0 && yaExisten.length === 0}
+                  style={{ ...btnPrimary, opacity: nuevos.length === 0 && yaExisten.length === 0 ? 0.5 : 1, cursor: nuevos.length === 0 && yaExisten.length === 0 ? 'not-allowed' : 'pointer' }}
                 >
-                  Grabar {nuevos.length} cliente{nuevos.length !== 1 ? 's' : ''} nuevo{nuevos.length !== 1 ? 's' : ''}
+                  {nuevos.length > 0 && yaExisten.length > 0
+                    ? `Grabar ${nuevos.length} nuevo${nuevos.length !== 1 ? 's' : ''} + vincular ${yaExisten.length}`
+                    : nuevos.length > 0
+                      ? `Grabar ${nuevos.length} cliente${nuevos.length !== 1 ? 's' : ''} nuevo${nuevos.length !== 1 ? 's' : ''}`
+                      : `Vincular ${yaExisten.length} cliente${yaExisten.length !== 1 ? 's' : ''} al proyecto`}
                 </button>
               </div>
             </>
