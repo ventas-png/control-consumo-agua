@@ -23,6 +23,7 @@ import { SuperAdminSection } from './components/superadmin/SuperAdminSection'
 import { TarifasSection } from './components/tarifas/TarifasSection'
 import { ContadoresSection } from './components/contadores/ContadoresSection'
 import { UnidadesSection } from './components/unidades/UnidadesSection'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 initEmailJS()
 
@@ -238,117 +239,145 @@ export default function App() {
         <Topbar activeSection={activeSection} currentUser={currentUser} onMenuToggle={() => setSidebarOpen(prev => !prev)} />
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
           {activeSection === 'clientes' && (
-            <ClientesSection
-              clientes={clientes}
-              userRole={currentUser.role}
-              userId={currentUser.user_id}
-              companyId={currentUser.company_id}
-              onClienteAdded={addCliente}
-              onClienteUpdated={updateCliente}
-              onClienteDeleted={deleteCliente}
-            />
+            <ErrorBoundary sectionName="clientes">
+              <ClientesSection
+                clientes={clientes}
+                userRole={currentUser.role}
+                userId={currentUser.user_id}
+                companyId={currentUser.company_id}
+                onClienteAdded={addCliente}
+                onClienteUpdated={updateCliente}
+                onClienteDeleted={deleteCliente}
+              />
+            </ErrorBoundary>
           )}
           {activeSection === 'lecturas' && (
-            <LecturasSection
-              clientes={clientes}
-              unidades={unidades}
-              contadores={contadores}
-              registros={registros}
-              tarifas={tarifas}
-              userRole={currentUser.role}
-              moneda={moneda}
-              onRegistroAdded={addRegistro}
-              rutaActiva={rutaActivaParaLecturas}
-              onClearRuta={() => setRutaActivaParaLecturas(null)}
-              onRutaCompletada={id => updateRuta(id, { completada: true })}
-            />
+            <ErrorBoundary sectionName="lecturas">
+              <LecturasSection
+                clientes={clientes}
+                unidades={unidades}
+                contadores={contadores}
+                registros={registros}
+                tarifas={tarifas}
+                userRole={currentUser.role}
+                moneda={moneda}
+                onRegistroAdded={addRegistro}
+                rutaActiva={rutaActivaParaLecturas}
+                onClearRuta={() => setRutaActivaParaLecturas(null)}
+                onRutaCompletada={id => updateRuta(id, { completada: true })}
+              />
+            </ErrorBoundary>
           )}
           {activeSection === 'tabla' && (
-            <HistorialSection
-              registros={registros}
-              clientes={clientes}
-              userRole={currentUser.role}
-              moneda={moneda}
-              onEstadoUpdated={updateRegistroEstado}
-            />
+            <ErrorBoundary sectionName="historial">
+              <HistorialSection
+                registros={registros}
+                clientes={clientes}
+                userRole={currentUser.role}
+                moneda={moneda}
+                onEstadoUpdated={updateRegistroEstado}
+              />
+            </ErrorBoundary>
           )}
           {activeSection === 'dashboard' && (
-            <DashboardSection registros={registros} moneda={moneda} />
+            <ErrorBoundary sectionName="dashboard">
+              <DashboardSection registros={registros} moneda={moneda} />
+            </ErrorBoundary>
           )}
           {activeSection === 'mapa' && (
-            <MapaSection clientes={clientes} registros={registros} />
+            <ErrorBoundary sectionName="mapa">
+              <MapaSection clientes={clientes} registros={registros} />
+            </ErrorBoundary>
           )}
           {activeSection === 'rutas' && (
-            <RutasSection
-              clientes={clientes}
-              rutas={rutas}
-              userRole={currentUser.role}
-              onRutaAdded={addRuta}
-              onRutaUpdated={updateRuta}
-              onRutaDeleted={deleteRuta}
-              onEjecutarRuta={onEjecutarRuta}
-            />
+            <ErrorBoundary sectionName="rutas">
+              <RutasSection
+                clientes={clientes}
+                rutas={rutas}
+                userRole={currentUser.role}
+                onRutaAdded={addRuta}
+                onRutaUpdated={updateRuta}
+                onRutaDeleted={deleteRuta}
+                onEjecutarRuta={onEjecutarRuta}
+              />
+            </ErrorBoundary>
           )}
           {activeSection === 'calidad' && (
-            <CalidadSection
-              fuentesAgua={fuentesAgua}
-              registrosCalidad={registrosCalidad}
-              empresa={empresa}
-              userId={currentUser.user_id}
-              onFuentesUpdated={setFuentesAgua}
-              onRegistrosCalidadUpdated={setRegistrosCalidad}
-            />
+            <ErrorBoundary sectionName="calidad">
+              <CalidadSection
+                fuentesAgua={fuentesAgua}
+                registrosCalidad={registrosCalidad}
+                empresa={empresa}
+                userId={currentUser.user_id}
+                onFuentesUpdated={setFuentesAgua}
+                onRegistrosCalidadUpdated={setRegistrosCalidad}
+              />
+            </ErrorBoundary>
           )}
           {activeSection === 'configuracion' && (
-            <ConfiguracionSection onLogout={logout} />
+            <ErrorBoundary sectionName="configuracion">
+              <ConfiguracionSection onLogout={logout} />
+            </ErrorBoundary>
           )}
           {activeSection === 'perfil' && (
-            <PerfilSection currentUser={currentUser} onUpdateProfile={updateProfile} />
+            <ErrorBoundary sectionName="perfil">
+              <PerfilSection currentUser={currentUser} onUpdateProfile={updateProfile} />
+            </ErrorBoundary>
           )}
           {activeSection === 'empresa_proyectos' && (
-            <EmpresaSection currentUser={currentUser} />
+            <ErrorBoundary sectionName="empresa">
+              <EmpresaSection currentUser={currentUser} />
+            </ErrorBoundary>
           )}
           {activeSection === 'tarifas' && (
-            <TarifasSection
-              tarifas={tarifas}
-              userRole={currentUser.role}
-              currentUser={currentUser}
-              moneda={moneda}
-              onTarifaAdded={addTarifa}
-              onTarifaUpdated={updateTarifa}
-              onTarifaDeleted={deleteTarifa}
-            />
+            <ErrorBoundary sectionName="tarifas">
+              <TarifasSection
+                tarifas={tarifas}
+                userRole={currentUser.role}
+                currentUser={currentUser}
+                moneda={moneda}
+                onTarifaAdded={addTarifa}
+                onTarifaUpdated={updateTarifa}
+                onTarifaDeleted={deleteTarifa}
+              />
+            </ErrorBoundary>
           )}
           {activeSection === 'unidades' && (
-            <UnidadesSection
-              unidades={unidades}
-              contadores={contadores}
-              clientes={clientes}
-              proyectos={proyectos}
-              userRole={currentUser.role}
-              currentUser={currentUser}
-              maxUnidadesPorTipo={maxUnidadesPorTipo}
-              onUnidadAdded={addUnidad}
-              onUnidadUpdated={updateUnidad}
-              onUnidadDeleted={deleteUnidad}
-              onContadorUpdated={updateContador}
-            />
+            <ErrorBoundary sectionName="unidades">
+              <UnidadesSection
+                unidades={unidades}
+                contadores={contadores}
+                clientes={clientes}
+                proyectos={proyectos}
+                userRole={currentUser.role}
+                currentUser={currentUser}
+                maxUnidadesPorTipo={maxUnidadesPorTipo}
+                onUnidadAdded={addUnidad}
+                onUnidadUpdated={updateUnidad}
+                onUnidadDeleted={deleteUnidad}
+                onContadorUpdated={updateContador}
+              />
+            </ErrorBoundary>
           )}
           {activeSection === 'contadores' && (
-            <ContadoresSection
-              contadores={contadores}
-              tarifas={tarifas}
-              unidades={unidades}
-              userRole={currentUser.role}
-              currentUser={currentUser}
-              moneda={moneda}
-              onContadorAdded={addContador}
-              onContadorUpdated={updateContador}
-              onContadorDeleted={deleteContador}
-            />
+            <ErrorBoundary sectionName="contadores">
+              <ContadoresSection
+                contadores={contadores}
+                tarifas={tarifas}
+                unidades={unidades}
+                userRole={currentUser.role}
+                currentUser={currentUser}
+                moneda={moneda}
+                onContadorAdded={addContador}
+                onContadorUpdated={updateContador}
+                onContadorDeleted={deleteContador}
+              />
+            </ErrorBoundary>
           )}
           {activeSection === 'superadmin_empresas' && (
-            <SuperAdminSection />
+            <ErrorBoundary sectionName="superadmin">
+              <SuperAdminSection />
+            </ErrorBoundary>
           )}
         </main>
       </div>
