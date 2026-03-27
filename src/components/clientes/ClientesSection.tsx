@@ -4,6 +4,7 @@ import type { Cliente, UserRole, ClienteLookupResult } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
+import { ImportClientesModal } from './ImportClientesModal'
 
 interface Props {
   clientes: Cliente[]
@@ -51,6 +52,7 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [showImportModal, setShowImportModal] = useState(false)
 
   // Onboarding state
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('idle')
@@ -369,22 +371,40 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
             style={{ ...inputStyle, width: '280px' }}
           />
           {canEdit && (
-            <button
-              onClick={startCreate}
-              style={{
-                padding: '10px 20px',
-                background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 600,
-                fontSize: '14px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              + Nuevo Cliente
-            </button>
+            <>
+              <button
+                onClick={() => setShowImportModal(true)}
+                style={{
+                  padding: '10px 20px',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                📥 Importar Excel
+              </button>
+              <button
+                onClick={startCreate}
+                style={{
+                  padding: '10px 20px',
+                  background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                + Nuevo Cliente
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -932,6 +952,19 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
           {filtered.length} cliente{filtered.length !== 1 ? 's' : ''} {search ? 'encontrados' : 'registrados'}
         </div>
       </div>
+
+      {showImportModal && (
+        <ImportClientesModal
+          existingClientes={clientes}
+          userId={userId}
+          companyId={companyId}
+          onClose={() => setShowImportModal(false)}
+          onImportado={(nuevos) => {
+            nuevos.forEach(c => onClienteAdded(c))
+            setShowImportModal(false)
+          }}
+        />
+      )}
     </div>
   )
 }
