@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, UserRole, ClienteLookupResult } from '../../types'
+import type { Cliente, UserRole, UserSession, ClienteLookupResult } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber, formatPhoneForWa } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
 import { ImportClientesModal } from './ImportClientesModal'
+import { EditModal } from '../shared/EditModal'
+import { getEditedTagInfo } from '../../lib/timeUtils'
 
 interface Props {
   clientes: Cliente[]
   userRole: UserRole
   userId: string
+  currentUser: UserSession
   companyId?: string
   onClienteAdded: (cliente: Cliente) => void
   onClienteUpdated: (id: string, partial: Partial<Cliente>) => void
@@ -46,10 +49,10 @@ interface LookupForm {
 
 const EMPTY_LOOKUP: LookupForm = { cui_dui: '', fecha_nacimiento: '', email: '' }
 
-export function ClientesSection({ clientes, userRole, userId, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
+export function ClientesSection({ clientes, userRole, userId, currentUser, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [showForm, setShowForm] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [showImportModal, setShowImportModal] = useState(false)
@@ -64,10 +67,10 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
   function startCreate() {
     setForm(EMPTY_FORM)
     setEditingId(null)
-    setShowForm(false)
     setLookupForm(EMPTY_LOOKUP)
     setLookupResult(null)
     setOnboardingStep('lookup')
+    setIsModalOpen(true)
   }
 
   function startEdit(c: Cliente) {
@@ -86,12 +89,12 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
       telefono_alterno: c.telefono_alterno ?? '',
     })
     setEditingId(c.id)
-    setOnboardingStep('idle')
-    setShowForm(true)
+    setOnboardingStep('full_form')
+    setIsModalOpen(true)
   }
 
   function cancelForm() {
-    setShowForm(false)
+    setIsModalOpen(false)
     setEditingId(null)
     setForm(EMPTY_FORM)
     setOnboardingStep('idle')
@@ -210,7 +213,6 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
     })
     setEditingId(null)
     setOnboardingStep('full_form')
-    setShowForm(true)
   }
 
   async function handleGuardar() {
@@ -254,7 +256,12 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
     if (editingId) {
       const { data, error } = await supabase
         .from('clientes')
-        .update(payload)
+        .update({
+          ...payload,
+          updated_at: new Date().toISOString(),
+          updated_by: currentUser.user_id,
+          updated_by_name: currentUser.name || currentUser.email,
+        })
         .eq('id', editingId)
         .select()
         .single()
@@ -352,6 +359,15 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
     email: 'Correo Electrónico',
   }
 
+  const modalTitle = (() => {
+    if (!isModalOpen) return ''
+    if (editingId) return 'Editar Cliente'
+    if (onboardingStep === 'lookup' || onboardingStep === 'lookup_loading') return 'Solicitar Cliente'
+    if (onboardingStep === 'result_match2') return 'Coincidencia parcial encontrada'
+    if (onboardingStep === 'result_no_match') return 'Cliente no encontrado'
+    return 'Nuevo Cliente'
+  })()
+
   return (
     <div>
       {/* Header */}
@@ -409,12 +425,13 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
         </div>
       </div>
 
+      {/* All client forms inside a single modal */}
+      {isModalOpen && canEdit && (
+        <EditModal title={modalTitle} onClose={cancelForm} maxWidth="700px">
+
       {/* Lookup Form - Step 1 */}
       {(onboardingStep === 'lookup' || onboardingStep === 'lookup_loading') && (
-        <div style={{ background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '6px', color: '#1e293b' }}>
-            Solicitar Cliente
-          </div>
+        <div>
           <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748b' }}>
             Ingrese los datos del cliente para verificar si ya se encuentra registrado en la plataforma.
           </p>
@@ -494,7 +511,7 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
 
       {/* Result: 2 of 3 match - Warning */}
       {onboardingStep === 'result_match2' && lookupResult && (
-        <div style={{ background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+        <div>
           <div style={{
             background: '#fffbeb',
             border: '2px solid #f59e0b',
@@ -560,7 +577,7 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
 
       {/* Result: No match - Proceed to register */}
       {onboardingStep === 'result_no_match' && (
-        <div style={{ background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+        <div>
           <div style={{
             background: '#f0f9ff',
             border: '2px solid #0ea5e9',
@@ -628,11 +645,8 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
       )}
 
       {/* Full Form (for new registration after no-match, or for editing) */}
-      {showForm && canEdit && (
-        <div style={{ background: 'white', borderRadius: '16px', padding: '28px', marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '20px', color: '#1e293b' }}>
-            {editingId ? 'Editar Cliente' : 'Nuevo Cliente'}
-          </div>
+      {onboardingStep === 'full_form' && (
+        <div>
 
           {/* Datos de Identificación */}
           <div style={{ marginBottom: '20px' }}>
@@ -826,6 +840,9 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
         </div>
       )}
 
+        </EditModal>
+      )}
+
       {/* Table */}
       <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
         {filtered.length === 0 ? (
@@ -872,6 +889,28 @@ export function ClientesSection({ clientes, userRole, userId, companyId, onClien
                           Nac: {c.fecha_nacimiento}
                         </div>
                       )}
+                      {(() => {
+                        const tag = getEditedTagInfo(c.updated_at, c.updated_by_name)
+                        if (!tag) return null
+                        return (
+                          <span
+                            title={tag.tooltip}
+                            style={{
+                              display: 'inline-block',
+                              marginTop: '4px',
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              color: tag.color,
+                              background: tag.bg,
+                              cursor: 'default',
+                            }}
+                          >
+                            {tag.label}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
                       {sanitizeHTML(c.codigo)}

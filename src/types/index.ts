@@ -17,6 +17,9 @@ export interface Cliente {
   numero_facturacion?: string | null;
   // Contacto adicional
   telefono_alterno?: string | null;
+  updated_at?: string;
+  updated_by?: string | null;
+  updated_by_name?: string | null;
 }
 
 export interface CompanyCliente {
@@ -146,6 +149,8 @@ export interface Tarifa {
   fecha_revision?: string | null;
   created_at?: string;
   updated_at?: string;
+  updated_by?: string | null;
+  updated_by_name?: string | null;
 }
 
 export interface Contador {
@@ -177,6 +182,8 @@ export interface Contador {
   garantia_instalacion_vence?: string | null;
   created_at?: string;
   updated_at?: string;
+  updated_by?: string | null;
+  updated_by_name?: string | null;
 }
 
 export type TipoUnidad =
@@ -238,6 +245,8 @@ export interface Unidad {
   fecha_firma_contrato?: string | null;
   numero_contrato_suministro?: string | null;
   fecha_vencimiento_contrato?: string | null;
+  updated_by?: string | null;
+  updated_by_name?: string | null;
 }
 
 export type EstadoProyecto = 'activo' | 'inactivo' | 'suspendido'
