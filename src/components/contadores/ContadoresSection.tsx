@@ -119,7 +119,7 @@ export function ContadoresSection({
   const [filterUnidad, setFilterUnidad] = useState<string>('')
   const [showImport, setShowImport] = useState(false)
 
-  const canEdit = userRole !== 'viewer' && userRole !== 'operator'
+  const canEdit = !['viewer', 'visor', 'cliente'].includes(userRole)
 
   function startCreate() {
     setForm(EMPTY_FORM)
