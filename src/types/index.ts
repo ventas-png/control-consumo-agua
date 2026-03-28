@@ -308,7 +308,18 @@ export type AppSection =
 
 export interface CostoCalculo {
   total: number;
-  tipo_cobro: string;
+  tipo_cobro: 'Canon Fijo' | 'Consumo Normal' | 'Consumo con Exceso';
+  desglose: {
+    tramo: 1 | 2 | 3;
+    canon_fijo?: number;
+    consumo_m3?: number;
+    precio_m3?: number;
+    derecho_m3?: number;
+    exceso_m3?: number;
+    precio_exceso?: number;
+    monto_base?: number;
+    monto_exceso?: number;
+  };
 }
 
 export interface Parametro {
