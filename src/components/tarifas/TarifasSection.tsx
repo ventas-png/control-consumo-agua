@@ -80,6 +80,7 @@ export function TarifasSection({
       descripcion: t.descripcion ?? '',
       activa: t.activa,
       fecha_revision: t.fecha_revision ?? '',
+      project_id: t.project_id ?? '',
     })
     setEditingId(t.id)
     setIsModalOpen(true)
