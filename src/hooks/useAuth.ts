@@ -52,8 +52,8 @@ async function buildSessionFromSupabase(
     .eq('id', userId)
     .single()
 
-  const timeout = new Promise<{ data: null; error: null }>(resolve =>
-    setTimeout(() => resolve({ data: null, error: null }), 5000)
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
   )
 
   const { data: profile } = await Promise.race([profileQuery, timeout])
@@ -101,7 +101,11 @@ export function useAuth() {
               session.user.email ?? '',
               session.expires_at
             )
-            if (fresh.role !== stored.role) {
+            if (
+              fresh.role !== stored.role ||
+              fresh.name !== stored.name ||
+              fresh.company_id !== stored.company_id
+            ) {
               storeSession(fresh)
               setCurrentUser(fresh)
             }
