@@ -125,7 +125,7 @@ export function LecturasSection({
   const consumo = !isNaN(lecturaNum) ? lecturaNum - ultimaLectura : null
   const calculo =
     consumo !== null && consumo >= 0 && tarifaDelContador
-      ? calcularTotalPagar(consumo, tarifaDelContador.precio_m3, tarifaDelContador.canon_fijo, tarifaDelContador.consumo_minimo ?? 0, tarifaDelContador.precio_m3_exceso ?? 0)
+      ? calcularTotalPagar(consumo, tarifaDelContador.precio_m3, tarifaDelContador.canon_fijo, tarifaDelContador.consumo_minimo ?? 0, tarifaDelContador.precio_m3_exceso ?? 0, contadorSeleccionado?.cantidad_derecho_servicio_m3 ?? null)
       : null
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
@@ -174,7 +174,7 @@ export function LecturasSection({
     if (consumo === null || isNaN(consumo)) return Swal.fire('Error', 'Datos de lectura inválidos', 'error')
     if (consumo < 0) return Swal.fire('Consumo Negativo', 'La lectura actual debe ser mayor o igual a la anterior.', 'error')
 
-    const resultadoCobro = calcularTotalPagar(consumo, tarifaDelContador!.precio_m3, tarifaDelContador!.canon_fijo, tarifaDelContador!.consumo_minimo ?? 0, tarifaDelContador!.precio_m3_exceso ?? 0)
+    const resultadoCobro = calcularTotalPagar(consumo, tarifaDelContador!.precio_m3, tarifaDelContador!.canon_fijo, tarifaDelContador!.consumo_minimo ?? 0, tarifaDelContador!.precio_m3_exceso ?? 0, contadorSeleccionado.cantidad_derecho_servicio_m3 ?? null)
     const mesNum = mes === 'auto' ? new Date().getMonth() + 1 : parseInt(mes)
 
     const registro = {
@@ -430,9 +430,33 @@ export function LecturasSection({
                     <label style={labelStyle}>Consumo Calculado (m³)</label>
                     <input type="text" readOnly value={consumo !== null ? (consumoInvalido ? consumo.toFixed(2) + ' (ERROR)' : consumo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? '#dc2626' : '#0ea5e9', background: '#f7fafc' }} />
                   </div>
-                  <div>
-                    <label style={labelStyle}>Monto Estimado ({moneda})</label>
-                    <input type="text" readOnly value={calculo ? `${moneda}${calculo.total.toFixed(2)} (${calculo.tipo_cobro})` : ''} style={{ ...inputStyle, fontWeight: 'bold', color: '#166534', background: '#f0fdf4' }} />
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={labelStyle}>Desglose de Cobro</label>
+                    {calculo ? (
+                      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', color: '#166534' }}>
+                        {calculo.desglose.tramo === 1 && (
+                          <>
+                            <div>Consumo <strong>{consumo?.toFixed(2)} m³</strong> ≤ mínimo <strong>{tarifaDelContador?.consumo_minimo ?? 0} m³</strong> → Solo canon fijo</div>
+                            <div style={{ marginTop: '6px', fontSize: '15px', fontWeight: 700 }}>Total: {moneda}{calculo.total.toFixed(2)} <span style={{ fontSize: '11px', fontWeight: 400, color: '#4ade80' }}>({calculo.tipo_cobro})</span></div>
+                          </>
+                        )}
+                        {calculo.desglose.tramo === 2 && (
+                          <>
+                            <div><strong>{calculo.desglose.consumo_m3?.toFixed(2)} m³</strong> × {moneda}{calculo.desglose.precio_m3?.toFixed(2)}/m³</div>
+                            <div style={{ marginTop: '6px', fontSize: '15px', fontWeight: 700 }}>Total: {moneda}{calculo.total.toFixed(2)} <span style={{ fontSize: '11px', fontWeight: 400, color: '#4ade80' }}>({calculo.tipo_cobro})</span></div>
+                          </>
+                        )}
+                        {calculo.desglose.tramo === 3 && (
+                          <>
+                            <div>Derecho: <strong>{calculo.desglose.derecho_m3?.toFixed(2)} m³</strong> × {moneda}{calculo.desglose.precio_m3?.toFixed(2)}/m³ = {moneda}{calculo.desglose.monto_base?.toFixed(2)}</div>
+                            <div>+ Exceso: <strong>{calculo.desglose.exceso_m3?.toFixed(2)} m³</strong> × {moneda}{calculo.desglose.precio_exceso?.toFixed(2)}/m³ = {moneda}{calculo.desglose.monto_exceso?.toFixed(2)}</div>
+                            <div style={{ marginTop: '6px', fontSize: '15px', fontWeight: 700 }}>Total: {moneda}{calculo.total.toFixed(2)} <span style={{ fontSize: '11px', fontWeight: 400, color: '#4ade80' }}>({calculo.tipo_cobro})</span></div>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ ...inputStyle, color: '#94a3b8', background: '#f7fafc' }}>—</div>
+                    )}
                   </div>
                   <div>
                     <label style={labelStyle}>Mes Facturación</label>
