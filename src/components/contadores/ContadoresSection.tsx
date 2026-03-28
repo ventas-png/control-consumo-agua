@@ -225,39 +225,12 @@ export function ContadoresSection({
         Swal.fire('Error', error?.message ?? 'No se pudo actualizar el contador.', 'error')
       }
     } else {
-      // Resolve project_id and company_id
-      const { data: userData } = await supabase
-        .from('app_users')
-        .select('project_id, company_id')
-        .eq('id', currentUser.user_id)
-        .single()
-
-      let projectId: string | null =
-        (userData as { project_id?: string } | null)?.project_id ?? null
-      let companyId: string | null =
-        (userData as { company_id?: string } | null)?.company_id ??
-        currentUser.company_id ??
-        null
-
-      if (!projectId) {
-        const { data: assignment } = await supabase
-          .from('user_project_assignments')
-          .select('project_id')
-          .eq('user_id', currentUser.user_id)
-          .limit(1)
-          .single()
-        if (assignment) projectId = (assignment as { project_id: string }).project_id
-      }
-
-      if (!projectId && companyId) {
-        const { data: proj } = await supabase
-          .from('projects')
-          .select('id')
-          .eq('company_id', companyId)
-          .limit(1)
-          .single()
-        if (proj) projectId = (proj as { id: string }).id
-      }
+      // Derive project_id and company_id from the selected unidad, not from the current user.
+      // This ensures the contador always belongs to the same project as its unit,
+      // regardless of which project the creator is primarily assigned to.
+      const selectedUnidad = unidades.find(u => u.id === form.unidad_id)
+      const projectId: string | null = selectedUnidad?.project_id ?? null
+      const companyId: string | null = selectedUnidad?.company_id ?? currentUser.company_id ?? null
 
       if (!projectId || !companyId) {
         Swal.fire('Error', 'No se pudo determinar el proyecto o empresa. Contacte al administrador.', 'error')
