@@ -60,3 +60,72 @@ button:focus:not(:focus-visible) {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ─── EmpresaSection ─────────────────────────────────────────────────────── */
+
+/* Gradient accent line on top of company card */
+.empresa-card {
+  position: relative;
+  overflow: hidden;
+}
+.empresa-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #0ea5e9, #0d9488, #8b5cf6);
+}
+
+/* Project card hover/active effects */
+.proyecto-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.proyecto-card:hover {
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.13) !important;
+}
+.proyecto-card:active {
+  transform: scale(0.99);
+}
+
+/* Side action buttons (desktop) */
+.proyecto-btn-side {
+  display: flex;
+}
+/* Footer action buttons (mobile) */
+.proyecto-btn-footer {
+  display: none;
+}
+
+/* ─── Mobile overrides (≤ 520px) ─────────────────────────────────────────── */
+@media (max-width: 520px) {
+  /* Company card: stack header vertically */
+  .empresa-header-inner {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 14px !important;
+  }
+
+  /* Stats box: horizontal full-width banner */
+  .empresa-stats-box {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    text-align: left !important;
+    padding: 12px 16px !important;
+  }
+
+  /* Contact info: stack items vertically */
+  .empresa-info-row {
+    flex-direction: column !important;
+    gap: 5px !important;
+  }
+
+  /* Hide side buttons, show footer buttons in project cards */
+  .proyecto-btn-side {
+    display: none !important;
+  }
+  .proyecto-btn-footer {
+    display: flex !important;
+  }
+}

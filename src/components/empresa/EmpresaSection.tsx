@@ -442,21 +442,23 @@ export function EmpresaSection({ currentUser }: Props) {
       />
 
       {/* Header empresa */}
-      <div style={{
+      <div className="empresa-card" style={{
         background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-        borderRadius: '16px', padding: '28px 32px', marginBottom: '28px',
+        borderRadius: '16px', padding: '24px 24px 20px', marginBottom: '24px',
         border: '1px solid rgba(255,255,255,0.06)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div className="empresa-header-inner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+          {/* Left: logo + info */}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '14px' }}>
             {/* Avatar logo */}
             <div
               onClick={() => document.getElementById('logo-upload')?.click()}
               title="Haz clic para cambiar el logo"
               style={{
-                width: 52, height: 52, borderRadius: 10, overflow: 'hidden',
+                width: 56, height: 56, borderRadius: 12, overflow: 'hidden',
                 cursor: 'pointer', flexShrink: 0,
-                border: '2px solid rgba(255,255,255,0.15)',
+                border: '2px solid rgba(255,255,255,0.18)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
               }}
             >
               {empresa?.logo_url
@@ -471,40 +473,60 @@ export function EmpresaSection({ currentUser }: Props) {
                   </div>
               }
             </div>
-            <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <h1 style={{ color: '#f1f5f9', fontSize: '22px', fontWeight: 700, margin: 0 }}>
-                {empresa?.nombre ?? 'Mi Empresa'}
-              </h1>
-              <button
-                onClick={() => void editarEmpresa()}
-                style={{
-                  padding: '6px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
-                  border: '1px solid rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.12)',
-                  color: '#cbd5e1', cursor: 'pointer',
-                }}
-              >
-                Editar información
-              </button>
-            </div>
-            <div style={{ display: 'flex', gap: '16px', marginTop: '6px', flexWrap: 'wrap' }}>
-              {empresa?.nit && <span style={{ color: '#64748b', fontSize: '13px' }}>NIT: {empresa.nit}</span>}
-              {empresa?.email && <span style={{ color: '#64748b', fontSize: '13px' }}>{empresa.email}</span>}
-              {empresa?.telefono && <span style={{ color: '#64748b', fontSize: '13px' }}>{empresa.telefono}</span>}
-              {!empresa?.nit && !empresa?.email && !empresa?.telefono && (
-                <span style={{ color: '#475569', fontSize: '13px' }}>Sin datos de contacto — haz clic en "Editar información"</span>
-              )}
-            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                <h1 style={{ color: '#f1f5f9', fontSize: '20px', fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
+                  {empresa?.nombre ?? 'Mi Empresa'}
+                </h1>
+              </div>
+              <div className="empresa-info-row" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '6px' }}>
+                {empresa?.nit && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '12px' }}>
+                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    NIT: {empresa.nit}
+                  </span>
+                )}
+                {empresa?.email && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '12px' }}>
+                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                    {empresa.email}
+                  </span>
+                )}
+                {empresa?.telefono && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#64748b', fontSize: '12px' }}>
+                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                    {empresa.telefono}
+                  </span>
+                )}
+                {!empresa?.nit && !empresa?.email && !empresa?.telefono && (
+                  <span style={{ color: '#475569', fontSize: '12px', fontStyle: 'italic' }}>Sin datos de contacto</span>
+                )}
+              </div>
             </div>
           </div>
-          <div style={{
-            background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.25)',
-            borderRadius: '10px', padding: '10px 18px', textAlign: 'center',
-          }}>
-            <div style={{ color: '#38bdf8', fontSize: '22px', fontWeight: 700 }}>
-              {proyectos.length}<span style={{ color: '#64748b', fontSize: '16px' }}>/{empresa?.max_projects ?? 5}</span>
+
+          {/* Right: stats + edit button */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px', flexShrink: 0 }}>
+            <div className="empresa-stats-box" style={{
+              background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.25)',
+              borderRadius: '10px', padding: '10px 16px', textAlign: 'center',
+            }}>
+              <div style={{ color: '#38bdf8', fontSize: '22px', fontWeight: 700, lineHeight: 1 }}>
+                {proyectos.length}<span style={{ color: '#64748b', fontSize: '15px' }}>/{empresa?.max_projects ?? 5}</span>
+              </div>
+              <div style={{ color: '#64748b', fontSize: '11px', marginTop: '3px' }}>proyectos</div>
             </div>
-            <div style={{ color: '#64748b', fontSize: '11px', marginTop: '2px' }}>proyectos</div>
+            <button
+              onClick={() => void editarEmpresa()}
+              style={{
+                padding: '7px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
+                border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)',
+                color: '#cbd5e1', cursor: 'pointer', whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+              }}
+            >
+              Editar información
+            </button>
           </div>
         </div>
       </div>
@@ -541,12 +563,15 @@ export function EmpresaSection({ currentUser }: Props) {
             <p style={{ color: '#475569', margin: 0 }}>No hay proyectos. Crea el primero.</p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '12px' }}>
-            {proyectos.map(p => (
-              <div key={p.id} style={{
-                background: '#1e293b', borderRadius: '12px',
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '14px' }}>
+            {proyectos.map(p => {
+              const estadoCfg = ESTADO_CONFIG[p.estado ?? 'activo']
+              return (
+              <div key={p.id} className="proyecto-card" style={{
+                background: '#1e293b', borderRadius: '14px',
                 border: '1px solid rgba(255,255,255,0.06)',
                 overflow: 'hidden',
+                borderTop: `3px solid ${estadoCfg.color}`,
               }}>
                 {/* Input oculto para logo de este proyecto */}
                 <input
@@ -557,15 +582,16 @@ export function EmpresaSection({ currentUser }: Props) {
                   onChange={e => { const f = e.target.files?.[0]; if (f) void subirLogoProyecto(p.id, f) }}
                 />
                 {/* Cabecera de la tarjeta */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 18px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px 12px' }}>
                   {/* Avatar/logo del proyecto */}
                   <div
                     onClick={() => document.getElementById(`proj-logo-${p.id}`)?.click()}
                     title="Clic para cambiar logo"
                     style={{
-                      width: 40, height: 40, borderRadius: 8, overflow: 'hidden',
+                      width: 42, height: 42, borderRadius: 10, overflow: 'hidden',
                       cursor: 'pointer', flexShrink: 0,
-                      border: '1px solid rgba(255,255,255,0.1)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                     }}
                   >
                     {p.logo_url
@@ -574,47 +600,47 @@ export function EmpresaSection({ currentUser }: Props) {
                           background: 'linear-gradient(135deg,#0ea5e9,#0d9488)',
                           width: '100%', height: '100%',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: 'white', fontSize: 15, fontWeight: 700,
+                          color: 'white', fontSize: 16, fontWeight: 700,
                         }}>
                           {p.nombre[0]?.toUpperCase()}
                         </div>
                     }
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '3px' }}>
                       <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.nombre}
                       </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
                       {/* Estado badge */}
-                      {(() => {
-                        const cfg = ESTADO_CONFIG[p.estado ?? 'activo']
-                        return (
-                          <span style={{
-                            fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px',
-                            background: cfg.bg, color: cfg.color, whiteSpace: 'nowrap',
-                          }}>
-                            {cfg.label}
-                          </span>
-                        )
-                      })()}
+                      <span style={{
+                        fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
+                        background: estadoCfg.bg, color: estadoCfg.color, whiteSpace: 'nowrap',
+                      }}>
+                        {estadoCfg.label}
+                      </span>
                       {/* Moneda badge */}
                       <span style={{
-                        fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px',
+                        fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
                         background: 'rgba(14,165,233,0.12)', color: '#38bdf8', whiteSpace: 'nowrap',
                       }}>
                         {p.moneda ?? 'Q'}
                       </span>
+                      <span style={{ color: '#334155', fontSize: '10px', fontFamily: 'monospace' }}>
+                        {p.id.slice(0, 6)}…
+                      </span>
                     </div>
-                    <span style={{ color: '#475569', fontSize: '11px' }}>ID: {p.id.slice(0, 8)}...</span>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
+                  {/* Side buttons (hidden on mobile) */}
+                  <div className="proyecto-btn-side" style={{ flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
                     <button
                       onClick={() => void editarProyecto(p)}
                       title="Editar proyecto"
                       style={{
-                        padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)',
+                        padding: '5px 12px', borderRadius: '7px', border: '1px solid rgba(255,255,255,0.15)',
                         background: 'rgba(255,255,255,0.06)', color: '#94a3b8',
-                        cursor: 'pointer', fontSize: '12px',
+                        cursor: 'pointer', fontSize: '12px', fontWeight: 500,
                       }}
                     >
                       Editar
@@ -623,10 +649,10 @@ export function EmpresaSection({ currentUser }: Props) {
                       onClick={() => void cambiarEstadoProyecto(p)}
                       title="Cambiar estado"
                       style={{
-                        padding: '4px 10px', borderRadius: '6px',
-                        border: `1px solid ${ESTADO_CONFIG[p.estado ?? 'activo'].color}44`,
-                        background: ESTADO_CONFIG[p.estado ?? 'activo'].bg,
-                        color: ESTADO_CONFIG[p.estado ?? 'activo'].color,
+                        padding: '4px 12px', borderRadius: '7px',
+                        border: `1px solid ${estadoCfg.color}44`,
+                        background: estadoCfg.bg,
+                        color: estadoCfg.color,
                         cursor: 'pointer', fontSize: '11px', fontWeight: 600,
                       }}
                     >
@@ -637,9 +663,8 @@ export function EmpresaSection({ currentUser }: Props) {
                 {/* Datos del proyecto */}
                 {(p.descripcion || p.direccion || (p.latitud && p.longitud)) && (
                   <div style={{
-                    padding: '0 18px 14px',
+                    padding: '10px 16px 12px',
                     borderTop: '1px solid rgba(255,255,255,0.05)',
-                    marginTop: '2px', paddingTop: '10px',
                   }}>
                     {p.descripcion && (
                       <p style={{ color: '#64748b', fontSize: '12px', margin: '0 0 6px', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -647,7 +672,7 @@ export function EmpresaSection({ currentUser }: Props) {
                       </p>
                     )}
                     {p.direccion && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#475569', fontSize: '11px', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#475569', fontSize: '11px', marginBottom: '3px' }}>
                         <span>📍</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.direccion}</span>
                       </div>
                     )}
@@ -658,8 +683,38 @@ export function EmpresaSection({ currentUser }: Props) {
                     )}
                   </div>
                 )}
+                {/* Footer buttons (shown on mobile only) */}
+                <div className="proyecto-btn-footer" style={{
+                  gap: '8px', padding: '10px 14px',
+                  borderTop: '1px solid rgba(255,255,255,0.06)',
+                  background: 'rgba(0,0,0,0.2)',
+                }}>
+                  <button
+                    onClick={() => void editarProyecto(p)}
+                    style={{
+                      flex: 1, padding: '9px 0', borderRadius: '8px',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      background: 'rgba(255,255,255,0.07)', color: '#cbd5e1',
+                      cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+                    }}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => void cambiarEstadoProyecto(p)}
+                    style={{
+                      flex: 1, padding: '9px 0', borderRadius: '8px',
+                      border: `1px solid ${estadoCfg.color}55`,
+                      background: estadoCfg.bg,
+                      color: estadoCfg.color,
+                      cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+                    }}
+                  >
+                    Estado
+                  </button>
+                </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>
