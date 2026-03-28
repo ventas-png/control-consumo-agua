@@ -334,6 +334,7 @@ export default function App() {
             <ErrorBoundary sectionName="tarifas">
               <TarifasSection
                 tarifas={tarifas}
+                proyectos={proyectos}
                 userRole={currentUser.role}
                 currentUser={currentUser}
                 moneda={moneda}

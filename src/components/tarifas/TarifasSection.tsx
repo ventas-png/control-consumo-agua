@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
-import type { Tarifa, UserRole, UserSession } from '../../types'
+import type { Tarifa, UserRole, UserSession, Proyecto } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, validateNumber } from '../../lib/validation'
 import { EditModal } from '../shared/EditModal'
@@ -8,6 +8,7 @@ import { getEditedTagInfo } from '../../lib/timeUtils'
 
 interface Props {
   tarifas: Tarifa[]
+  proyectos: Proyecto[]
   userRole: UserRole
   currentUser: UserSession
   moneda?: string
@@ -39,12 +40,14 @@ const EMPTY_FORM = {
   descripcion: '',
   activa: true,
   fecha_revision: '',
+  project_id: '',
 }
 
 type FormState = typeof EMPTY_FORM
 
 export function TarifasSection({
   tarifas,
+  proyectos,
   userRole,
   currentUser,
   moneda = 'Q',
@@ -138,44 +141,13 @@ export function TarifasSection({
         Swal.fire('Error', error?.message ?? 'No se pudo actualizar la tarifa.', 'error')
       }
     } else {
-      // Fetch project_id and company_id with explicit types to satisfy TS strict mode
-      const { data: userData } = await supabase
-        .from('app_users')
-        .select('project_id, company_id')
-        .eq('id', currentUser.user_id)
-        .single()
-
-      let projectId: string | null =
-        (userData as { project_id?: string } | null)?.project_id ?? null
-      let companyId: string | null =
-        (userData as { company_id?: string } | null)?.company_id ??
-        currentUser.company_id ??
-        null
-
-      // For admin: project_id lives in user_project_assignments, not app_users
-      if (!projectId) {
-        const { data: assignment } = await supabase
-          .from('user_project_assignments')
-          .select('project_id')
-          .eq('user_id', currentUser.user_id)
-          .limit(1)
-          .single()
-        if (assignment) projectId = (assignment as { project_id: string }).project_id
-      }
-
-      if (!projectId && companyId) {
-        // For company_owner: pick first project of the company
-        const { data: proj } = await supabase
-          .from('projects')
-          .select('id')
-          .eq('company_id', companyId)
-          .limit(1)
-          .single()
-        if (proj) projectId = (proj as { id: string }).id
-      }
+      // Derive project_id from the explicitly selected project in the form.
+      const selectedProyecto = proyectos.find(p => p.id === form.project_id)
+      const projectId: string | null = selectedProyecto?.id ?? null
+      const companyId: string | null = currentUser.company_id ?? null
 
       if (!projectId || !companyId) {
-        Swal.fire('Error', 'No se pudo determinar el proyecto o empresa. Contacte al administrador.', 'error')
+        Swal.fire('Error', 'Debes seleccionar un proyecto para la tarifa.', 'error')
         setLoading(false)
         return
       }
@@ -335,6 +307,21 @@ export function TarifasSection({
                 maxLength={100}
               />
             </div>
+            {!editingId && (
+              <div>
+                <label style={labelStyle}>Proyecto *</label>
+                <select
+                  style={inputStyle}
+                  value={form.project_id}
+                  onChange={e => setForm(f => ({ ...f, project_id: e.target.value }))}
+                >
+                  <option value="">-- Seleccionar proyecto --</option>
+                  {proyectos.map(p => (
+                    <option key={p.id} value={p.id}>{p.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label style={labelStyle}>Tipo de Agua *</label>
               <select
