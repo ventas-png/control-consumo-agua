@@ -89,9 +89,6 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [unidades, setUnidades] = useState<UnidadInfo[]>([])
   const [contadores, setContadores] = useState<ContadorInfo[]>([])
   const [lecturas, setLecturas] = useState<LecturaInfo[]>([])
-  const [contacto, setContacto] = useState<ClienteContacto>({
-    email: null, telefono: null, whatsapp: null, telefono_alterno: null,
-  })
   const [contactoEdit, setContactoEdit] = useState<ClienteContacto>({
     email: null, telefono: null, whatsapp: null, telefono_alterno: null,
   })
@@ -140,8 +137,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       // Build companies list from junction
       const companyMap: Record<string, CompanyInfo> = {}
       if (ccData) {
-        for (const row of ccData as { company_id: string; companies: { id: string; nombre: string } | null }[]) {
-          if (row.companies) companyMap[row.companies.id] = row.companies
+        type CCRow = { company_id: string; companies: unknown }
+        for (const row of ccData as CCRow[]) {
+          const co = row.companies as { id: string; nombre: string } | null
+          if (co?.id) companyMap[co.id] = co
         }
       }
       const companiesList = Object.values(companyMap)
@@ -177,9 +176,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       setLecturas((rData as LecturaInfo[]) ?? [])
 
       if (clData) {
-        const c = clData as ClienteContacto
-        setContacto(c)
-        setContactoEdit(c)
+        setContactoEdit(clData as ClienteContacto)
       }
     } finally {
       setLoading(false)
@@ -208,7 +205,6 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     if (error) {
       setContactoMsg({ type: 'error', text: 'No se pudo guardar. Intente nuevamente.' })
     } else {
-      setContacto(contactoEdit)
       setContactoMsg({ type: 'success', text: 'Información de contacto actualizada correctamente.' })
     }
   }

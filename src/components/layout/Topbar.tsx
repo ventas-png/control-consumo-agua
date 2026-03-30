@@ -41,6 +41,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Administrador',
   operator: 'Operador',
   viewer: 'Visualizador',
+  cliente: 'Cliente',
 }
 
 function getInitials(name: string): string {
