@@ -48,7 +48,7 @@ async function buildSessionFromSupabase(
 ): Promise<UserSession> {
   const profileQuery = supabase
     .from('app_users')
-    .select('full_name, role, company_id')
+    .select('full_name, role, company_id, cliente_id')
     .eq('id', userId)
     .single()
 
@@ -58,16 +58,20 @@ async function buildSessionFromSupabase(
 
   const { data: profile } = await Promise.race([profileQuery, timeout])
 
-  const dbRole: string = (profile as { full_name?: string; role?: string; company_id?: string } | null)?.role ?? ''
-  const companyId: string | undefined = (profile as { full_name?: string; role?: string; company_id?: string } | null)?.company_id ?? undefined
+  type ProfileRow = { full_name?: string; role?: string; company_id?: string; cliente_id?: string } | null
+  const prof = profile as ProfileRow
+  const dbRole: string = prof?.role ?? ''
+  const companyId: string | undefined = prof?.company_id ?? undefined
+  const clienteId: string | undefined = prof?.cliente_id ?? undefined
   let uiRole: UserRole = 'viewer'
   if (dbRole === 'super_admin' || dbRole === 'superadmin') uiRole = 'super_admin'
   else if (dbRole === 'company_owner') uiRole = 'company_owner'
   else if (dbRole === 'admin') uiRole = 'admin'
   else if (dbRole === 'operador' || dbRole === 'user' || dbRole === 'operator') uiRole = 'operator'
-  else if (dbRole === 'visor' || dbRole === 'cliente' || dbRole === 'viewer') uiRole = 'viewer'
+  else if (dbRole === 'cliente') uiRole = 'cliente'
+  else if (dbRole === 'visor' || dbRole === 'viewer') uiRole = 'viewer'
 
-  const displayName = (profile as { full_name?: string } | null)?.full_name ?? email
+  const displayName = prof?.full_name ?? email
 
   return {
     user_id: userId,
@@ -75,6 +79,7 @@ async function buildSessionFromSupabase(
     name: displayName,
     role: uiRole,
     company_id: companyId,
+    cliente_id: clienteId,
     login_time: new Date().toISOString(),
     expires_at: expiresAt
       ? new Date(expiresAt * 1000).toISOString()
@@ -104,7 +109,8 @@ export function useAuth() {
             if (
               fresh.role !== stored.role ||
               fresh.name !== stored.name ||
-              fresh.company_id !== stored.company_id
+              fresh.company_id !== stored.company_id ||
+              fresh.cliente_id !== stored.cliente_id
             ) {
               storeSession(fresh)
               setCurrentUser(fresh)

@@ -6,6 +6,7 @@ interface Props {
   onLogin: (email: string, password: string) => Promise<string | null>
   onLoginWithGoogle: () => Promise<string | null>
   onForgotPassword: () => void
+  onRegister: () => void
 }
 
 const ROLES = [
@@ -32,7 +33,7 @@ const ROLES = [
   },
 ]
 
-export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword }: Props) {
+export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRegister }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -420,6 +421,33 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword }: Pr
                 }}
               >
                 ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+
+            {/* Customer registration */}
+            <div style={{
+              marginTop: '14px',
+              padding: '14px 16px',
+              background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)',
+              border: '1px solid #bae6fd',
+              borderRadius: '12px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: '10px', flexWrap: 'wrap',
+            }}>
+              <span style={{ fontSize: '13px', color: '#0369a1' }}>
+                ¿Eres cliente y quieres consultar tu consumo?
+              </span>
+              <button
+                onClick={onRegister}
+                style={{
+                  background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                  color: 'white', border: 'none', borderRadius: '8px',
+                  padding: '7px 16px', fontSize: '13px', fontWeight: 600,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 8px rgba(14,165,233,0.3)',
+                }}
+              >
+                Registrarse →
               </button>
             </div>
 

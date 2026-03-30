@@ -7,6 +7,8 @@ import { initEmailJS } from './lib/email'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { PasswordResetModal } from './components/auth/PasswordResetModal'
 import { PasswordResetPage } from './components/auth/PasswordResetPage'
+import { RegisterScreen } from './components/auth/RegisterScreen'
+import { CustomerPortal } from './components/portal/CustomerPortal'
 import { Sidebar } from './components/layout/Sidebar'
 import { Topbar } from './components/layout/Topbar'
 import { ClientesSection } from './components/clientes/ClientesSection'
@@ -46,6 +48,7 @@ export default function App() {
 
   const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showRegister, setShowRegister] = useState(false)
 
   const defaultSection = (): AppSection => {
     // Will be resolved after login when currentUser is available
@@ -64,12 +67,13 @@ export default function App() {
       } else if (currentUser.role === 'super_admin') {
         setActiveSection('superadmin_empresas')
       }
+      // 'cliente' role is handled by its own portal render path — no section needed
     }
   }, [currentUser?.user_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load data after login
+  // Load data after login (skip for cliente — portal loads its own data)
   useEffect(() => {
-    if (currentUser && !dataLoaded) {
+    if (currentUser && !dataLoaded && currentUser.role !== 'cliente') {
       cargarDatos()
         .then(() => setDataLoaded(true))
         .catch((err: unknown) => {
@@ -113,14 +117,35 @@ export default function App() {
   }
 
   if (!currentUser) {
+    if (showRegister) {
+      return (
+        <RegisterScreen
+          onBack={() => setShowRegister(false)}
+          onRegistered={async (email, password) => {
+            setShowRegister(false)
+            await login(email, password)
+          }}
+        />
+      )
+    }
     return (
       <>
-        <LoginScreen onLogin={login} onLoginWithGoogle={loginWithGoogle} onForgotPassword={() => setShowPasswordReset(true)} />
+        <LoginScreen
+          onLogin={login}
+          onLoginWithGoogle={loginWithGoogle}
+          onForgotPassword={() => setShowPasswordReset(true)}
+          onRegister={() => setShowRegister(true)}
+        />
         {showPasswordReset && (
           <PasswordResetModal empresa={empresa} onClose={() => setShowPasswordReset(false)} />
         )}
       </>
     )
+  }
+
+  // Cliente users get their own portal — no admin data needed
+  if (currentUser.role === 'cliente') {
+    return <CustomerPortal currentUser={currentUser} onLogout={logout} />
   }
 
   function onEjecutarRuta(ruta: Ruta) {

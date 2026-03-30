@@ -108,7 +108,7 @@ export interface RegistroCalidad {
   };
 }
 
-export type UserRole = 'admin' | 'super_admin' | 'company_owner' | 'operator' | 'viewer';
+export type UserRole = 'admin' | 'super_admin' | 'company_owner' | 'operator' | 'viewer' | 'cliente';
 
 export interface UserSession {
   user_id: string;
@@ -116,6 +116,7 @@ export interface UserSession {
   name: string;
   role: UserRole;
   company_id?: string;
+  cliente_id?: string;
   login_time: string;
   expires_at: string;
 }
