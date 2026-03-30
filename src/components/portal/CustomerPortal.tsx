@@ -108,7 +108,6 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       const [
         { data: ccData },
         { data: uData },
-        { data: cData },
         { data: rData },
         { data: clData },
       ] = await Promise.all([
@@ -121,12 +120,6 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         supabase
           .from('unidades')
           .select('id, nombre, tipo, piso, area_m2, project_id, company_id, activo')
-          .eq('cliente_id', clienteId)
-          .eq('activo', true),
-        // Active meters
-        supabase
-          .from('contadores')
-          .select('id, numero_serie, tipo_agua, descripcion, activo, unidad_id, project_id, company_id')
           .eq('cliente_id', clienteId)
           .eq('activo', true),
         // Reading history (last 50)
@@ -152,6 +145,19 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         }
       }
       const companiesList = Object.values(companyMap)
+
+      // Load active units first, then fetch contadores by their unidad_id
+      const unidadesList = (uData as UnidadInfo[]) ?? []
+      const unidadIds = unidadesList.map(u => u.id)
+      let cData: ContadorInfo[] = []
+      if (unidadIds.length > 0) {
+        const { data: contData } = await supabase
+          .from('contadores')
+          .select('id, numero_serie, tipo_agua, descripcion, activo, unidad_id, project_id, company_id')
+          .in('unidad_id', unidadIds)
+          .eq('activo', true)
+        cData = (contData as ContadorInfo[]) ?? []
+      }
       setCompanies(companiesList)
 
       // Fetch projects for found companies
@@ -166,8 +172,8 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         setProjects([])
       }
 
-      setUnidades((uData as UnidadInfo[]) ?? [])
-      setContadores((cData as ContadorInfo[]) ?? [])
+      setUnidades(unidadesList)
+      setContadores(cData)
       setLecturas((rData as LecturaInfo[]) ?? [])
 
       if (clData) {

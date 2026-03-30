@@ -90,13 +90,18 @@ CREATE POLICY "cliente_select_own_unidades" ON public.unidades
 
 -- ============================================================
 -- contadores: cliente can see their active meters
+-- (contadores link to clients through unidades, not directly)
 -- ============================================================
 CREATE POLICY "cliente_select_own_contadores" ON public.contadores
   FOR SELECT TO authenticated
   USING (
     current_user_role() = 'cliente'
-    AND cliente_id = get_my_cliente_id()
     AND activo = true
+    AND EXISTS (
+      SELECT 1 FROM public.unidades u
+      WHERE u.id = contadores.unidad_id
+        AND u.cliente_id = get_my_cliente_id()
+    )
   );
 
 -- ============================================================
