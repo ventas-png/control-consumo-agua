@@ -275,21 +275,21 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
       }
     } else {
       await logSecurityEvent('client_creation_attempt', { client_code: codigo, user_role: userRole }, userId)
-      const { data, error } = await supabase.from('clientes').insert(payload).select()
+      const clienteId = crypto.randomUUID()
+      const { error } = await supabase.from('clientes').insert({ ...payload, id: clienteId })
 
-      if (!error && data) {
-        const newCliente = data[0] as Cliente
-        onClienteAdded(newCliente)
-
-        // Link new client to company if companyId is available
+      if (!error) {
+        // Link new client to company first so SELECT RLS policy passes
         if (companyId) {
           await supabase.from('company_clientes').insert({
             company_id: companyId,
-            cliente_id: newCliente.id,
+            cliente_id: clienteId,
             added_by: userId,
           })
         }
 
+        const newCliente = { ...payload, id: clienteId } as Cliente
+        onClienteAdded(newCliente)
         cancelForm()
         Swal.fire({ icon: 'success', title: 'Cliente guardado', timer: 2000, showConfirmButton: false })
       } else {

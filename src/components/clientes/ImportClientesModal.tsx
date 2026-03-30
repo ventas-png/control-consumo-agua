@@ -266,34 +266,36 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
 
     // Insert truly new clients
     for (let i = 0; i < analyzed.nuevos.length; i += BATCH_SIZE) {
-      const lote = analyzed.nuevos.slice(i, i + BATCH_SIZE).map(r => ({
-        nombre: r.data.nombre,
-        codigo: r.data.codigo,
-        email: r.data.email ?? null,
-        direccion: r.data.direccion ?? null,
-        telefono: r.data.telefono ?? null,
-        whatsapp: r.data.whatsapp ?? null,
-        nacionalidad: r.data.nacionalidad ?? null,
-        cui_dui: r.data.cui_dui ?? null,
-        fecha_nacimiento: r.data.fecha_nacimiento ?? null,
-        numero_facturacion: r.data.numero_facturacion ?? null,
-        telefono_alterno: r.data.telefono_alterno ?? null,
-        puede_crear_cuenta: false,
-      }))
-
-      const { data, error } = await supabase.from('clientes').insert(lote).select()
-      if (!error && data) {
-        insertados.push(...(data as Cliente[]))
-
-        // Link each new client to the company
-        if (companyId && data.length > 0) {
-          const links = (data as Cliente[]).map(c => ({
-            company_id: companyId,
-            cliente_id: c.id,
-            added_by: userId,
-          }))
-          await supabase.from('company_clientes').insert(links)
+      const lote = analyzed.nuevos.slice(i, i + BATCH_SIZE).map(r => {
+        const id = crypto.randomUUID()
+        return {
+          id,
+          nombre: r.data.nombre,
+          codigo: r.data.codigo,
+          email: r.data.email ?? null,
+          direccion: r.data.direccion ?? null,
+          telefono: r.data.telefono ?? null,
+          whatsapp: r.data.whatsapp ?? null,
+          nacionalidad: r.data.nacionalidad ?? null,
+          cui_dui: r.data.cui_dui ?? null,
+          fecha_nacimiento: r.data.fecha_nacimiento ?? null,
+          numero_facturacion: r.data.numero_facturacion ?? null,
+          telefono_alterno: r.data.telefono_alterno ?? null,
+          puede_crear_cuenta: false,
         }
+      })
+
+      // Insert without .select() to avoid RETURNING + SELECT RLS conflict
+      // (SELECT policy requires company_clientes link which doesn't exist yet)
+      const { error } = await supabase.from('clientes').insert(lote)
+      if (!error) {
+        // Link to company now that the clients exist
+        if (companyId) {
+          await supabase.from('company_clientes').insert(
+            lote.map(c => ({ company_id: companyId, cliente_id: c.id, added_by: userId }))
+          )
+        }
+        insertados.push(...lote.map(c => ({ ...c } as unknown as Cliente)))
       } else {
         Swal.fire('Error en inserción', error?.message ?? 'Error al guardar lote de clientes.', 'error')
         setStep('preview')
