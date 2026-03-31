@@ -135,22 +135,28 @@ export function useData() {
     // Auto-desactivar tarifas cuya fecha_revision ya pasó — fire-and-forget, no bloquea la carga
     supabase.rpc('deactivate_expired_tarifas').catch(() => { /* silencioso */ })
 
+    // Use cached data as base so partial query failures keep cached values for failed tables
+    const base = loadCache() ?? INITIAL_DATA
+
     let results = await fetchAllData()
-    const freshData = applyResults(INITIAL_DATA, results)
+    const freshData = applyResults(base, results)
     setData(freshData)
-    saveCache(freshData)
 
-    if (hasErrors(results)) {
-      // Retry once after 800 ms to handle cold-start timeouts on the DB connection pool
-      await new Promise(resolve => setTimeout(resolve, 800))
-      results = await fetchAllData()
-      const retryData = applyResults(INITIAL_DATA, results)
-      setData(retryData)
+    if (!hasErrors(results)) {
+      saveCache(freshData)
+      return
+    }
+
+    // Retry once after 800 ms to handle cold-start timeouts on the DB connection pool
+    await new Promise(resolve => setTimeout(resolve, 800))
+    results = await fetchAllData()
+    const retryData = applyResults(base, results)
+    setData(retryData)
+
+    if (!hasErrors(results)) {
       saveCache(retryData)
-
-      if (hasErrors(results)) {
-        Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
-      }
+    } else {
+      Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
     }
   }, [])
 
