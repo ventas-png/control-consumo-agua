@@ -3,6 +3,24 @@ import Swal from 'sweetalert2'
 import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo } from '../types'
 import { supabase } from '../lib/supabase'
 
+const CACHE_KEY = 'aquacontrol_data_v1'
+const CACHE_MAX_AGE = 30 * 60 * 1000 // 30 minutes
+
+function loadCache(): AppData | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    if (!raw) return null
+    const { ts, payload }: { ts: number; payload: AppData } = JSON.parse(raw)
+    if (Date.now() - ts > CACHE_MAX_AGE) { localStorage.removeItem(CACHE_KEY); return null }
+    return payload
+  } catch { return null }
+}
+
+function saveCache(payload: AppData): void {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), payload })) }
+  catch { /* storage full — ignore */ }
+}
+
 interface AppData {
   clientes: Cliente[]
   registros: Registro[]
@@ -34,7 +52,7 @@ const INITIAL_DATA: AppData = {
 }
 
 export function useData() {
-  const [data, setData] = useState<AppData>(INITIAL_DATA)
+  const [data, setData] = useState<AppData>(() => loadCache() ?? INITIAL_DATA)
 
   const fetchAllData = async () => {
     return Promise.allSettled([
@@ -114,21 +132,31 @@ export function useData() {
   }
 
   const cargarDatos = useCallback(async () => {
-    // Auto-desactivar tarifas cuya fecha_revision ya pasó
-    try { await supabase.rpc('deactivate_expired_tarifas') } catch { /* silencioso */ }
+    // Auto-desactivar tarifas cuya fecha_revision ya pasó — fire-and-forget, no bloquea la carga
+    supabase.rpc('deactivate_expired_tarifas').catch(() => { /* silencioso */ })
+
+    // Use cached data as base so partial query failures keep cached values for failed tables
+    const base = loadCache() ?? INITIAL_DATA
 
     let results = await fetchAllData()
-    setData(prev => applyResults(prev, results))
+    const freshData = applyResults(base, results)
+    setData(freshData)
 
-    if (hasErrors(results)) {
-      // Retry once after 3 s to handle cold-start timeouts on the DB connection pool
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      results = await fetchAllData()
-      setData(prev => applyResults(prev, results))
+    if (!hasErrors(results)) {
+      saveCache(freshData)
+      return
+    }
 
-      if (hasErrors(results)) {
-        Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
-      }
+    // Retry once after 800 ms to handle cold-start timeouts on the DB connection pool
+    await new Promise(resolve => setTimeout(resolve, 800))
+    results = await fetchAllData()
+    const retryData = applyResults(base, results)
+    setData(retryData)
+
+    if (!hasErrors(results)) {
+      saveCache(retryData)
+    } else {
+      Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
     }
   }, [])
 
