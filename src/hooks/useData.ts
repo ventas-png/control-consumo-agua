@@ -133,7 +133,7 @@ export function useData() {
 
   const cargarDatos = useCallback(async () => {
     // Auto-desactivar tarifas cuya fecha_revision ya pasó — fire-and-forget, no bloquea la carga
-    supabase.rpc('deactivate_expired_tarifas').catch(() => { /* silencioso */ })
+    void Promise.resolve(supabase.rpc('deactivate_expired_tarifas')).catch(() => { /* silencioso */ })
 
     // Use cached data as base so partial query failures keep cached values for failed tables
     const base = loadCache() ?? INITIAL_DATA
