@@ -36,11 +36,8 @@ const INITIAL_DATA: AppData = {
 export function useData() {
   const [data, setData] = useState<AppData>(INITIAL_DATA)
 
-  const cargarDatos = useCallback(async () => {
-    // Auto-desactivar tarifas cuya fecha_revision ya pasó
-    try { await supabase.rpc('deactivate_expired_tarifas') } catch { /* silencioso */ }
-
-    const [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes, contadoresRes, unidadesRes, proyectoRes] = await Promise.allSettled([
+  const fetchAllData = async () => {
+    return Promise.allSettled([
       supabase.from('clientes').select('*'),
       supabase.from('registros').select('*'),
       supabase.from('empresa').select('*').limit(1),
@@ -55,59 +52,83 @@ export function useData() {
       supabase.from('unidades').select('*').order('nombre', { ascending: true }),
       supabase.from('projects').select('*').order('nombre', { ascending: true }),
     ])
+  }
 
-    setData(prev => {
-      const next = { ...prev }
-      if (clRes.status === 'fulfilled' && clRes.value.data) {
-        next.clientes = clRes.value.data as Cliente[]
+  const applyResults = (
+    prev: AppData,
+    [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes, contadoresRes, unidadesRes, proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
+  ): AppData => {
+    const next = { ...prev }
+    if (clRes.status === 'fulfilled' && clRes.value.data) {
+      next.clientes = clRes.value.data as Cliente[]
+    }
+    if (regRes.status === 'fulfilled' && regRes.value.data) {
+      next.registros = regRes.value.data as Registro[]
+    }
+    if (empRes.status === 'fulfilled' && empRes.value.data?.length) {
+      next.empresa = empRes.value.data[0] as Empresa
+    }
+    if (fuaRes.status === 'fulfilled' && fuaRes.value.data) {
+      next.fuentesAgua = fuaRes.value.data as FuenteAgua[]
+    }
+    if (rcalRes.status === 'fulfilled' && rcalRes.value.data) {
+      next.registrosCalidad = rcalRes.value.data as RegistroCalidad[]
+    }
+    if (rutasRes.status === 'fulfilled' && rutasRes.value.data) {
+      next.rutas = rutasRes.value.data as Ruta[]
+    }
+    if (tarifasRes.status === 'fulfilled' && tarifasRes.value.data) {
+      next.tarifas = tarifasRes.value.data as Tarifa[]
+    }
+    if (contadoresRes.status === 'fulfilled' && contadoresRes.value.data) {
+      next.contadores = contadoresRes.value.data as Contador[]
+    }
+    if (unidadesRes.status === 'fulfilled' && unidadesRes.value.data) {
+      next.unidades = unidadesRes.value.data as Unidad[]
+    }
+    if (proyectoRes.status === 'fulfilled' && proyectoRes.value.data?.length) {
+      next.proyectos = proyectoRes.value.data as Proyecto[]
+      const p = proyectoRes.value.data[0]
+      next.moneda = p.moneda ?? 'Q'
+      next.maxUnidadesPorTipo = {
+        apartamento:     p.max_unidades_apartamento ?? null,
+        casa:            p.max_unidades_casa ?? null,
+        bodega:          p.max_unidades_bodega ?? null,
+        local_comercial: p.max_unidades_local_comercial ?? null,
+        oficina:         p.max_unidades_oficina ?? null,
+        parqueadero:     p.max_unidades_parqueadero ?? null,
+        otro:            p.max_unidades_otro ?? null,
       }
-      if (regRes.status === 'fulfilled' && regRes.value.data) {
-        next.registros = regRes.value.data as Registro[]
-      }
-      if (empRes.status === 'fulfilled' && empRes.value.data?.length) {
-        next.empresa = empRes.value.data[0] as Empresa
-      }
-      if (fuaRes.status === 'fulfilled' && fuaRes.value.data) {
-        next.fuentesAgua = fuaRes.value.data as FuenteAgua[]
-      }
-      if (rcalRes.status === 'fulfilled' && rcalRes.value.data) {
-        next.registrosCalidad = rcalRes.value.data as RegistroCalidad[]
-      }
-      if (rutasRes.status === 'fulfilled' && rutasRes.value.data) {
-        next.rutas = rutasRes.value.data as Ruta[]
-      }
-      if (tarifasRes.status === 'fulfilled' && tarifasRes.value.data) {
-        next.tarifas = tarifasRes.value.data as Tarifa[]
-      }
-      if (contadoresRes.status === 'fulfilled' && contadoresRes.value.data) {
-        next.contadores = contadoresRes.value.data as Contador[]
-      }
-      if (unidadesRes.status === 'fulfilled' && unidadesRes.value.data) {
-        next.unidades = unidadesRes.value.data as Unidad[]
-      }
-      if (proyectoRes.status === 'fulfilled' && proyectoRes.value.data?.length) {
-        next.proyectos = proyectoRes.value.data as Proyecto[]
-        const p = proyectoRes.value.data[0]
-        next.moneda = p.moneda ?? 'Q'
-        next.maxUnidadesPorTipo = {
-          apartamento:     p.max_unidades_apartamento ?? null,
-          casa:            p.max_unidades_casa ?? null,
-          bodega:          p.max_unidades_bodega ?? null,
-          local_comercial: p.max_unidades_local_comercial ?? null,
-          oficina:         p.max_unidades_oficina ?? null,
-          parqueadero:     p.max_unidades_parqueadero ?? null,
-          otro:            p.max_unidades_otro ?? null,
-        }
-      }
-      return next
-    })
+    }
+    return next
+  }
 
-    const anyError =
-      (clRes.status === 'fulfilled' && clRes.value.error) ||
-      (regRes.status === 'fulfilled' && regRes.value.error)
+  const hasErrors = (results: Awaited<ReturnType<typeof fetchAllData>>) => {
+    const [clRes, regRes, , , , , , contadoresRes, unidadesRes] = results
+    return (
+      (clRes.status === 'fulfilled' && !!clRes.value.error) ||
+      (regRes.status === 'fulfilled' && !!regRes.value.error) ||
+      (contadoresRes.status === 'fulfilled' && !!contadoresRes.value.error) ||
+      (unidadesRes.status === 'fulfilled' && !!unidadesRes.value.error)
+    )
+  }
 
-    if (anyError) {
-      Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
+  const cargarDatos = useCallback(async () => {
+    // Auto-desactivar tarifas cuya fecha_revision ya pasó
+    try { await supabase.rpc('deactivate_expired_tarifas') } catch { /* silencioso */ }
+
+    let results = await fetchAllData()
+    setData(prev => applyResults(prev, results))
+
+    if (hasErrors(results)) {
+      // Retry once after 3 s to handle cold-start timeouts on the DB connection pool
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      results = await fetchAllData()
+      setData(prev => applyResults(prev, results))
+
+      if (hasErrors(results)) {
+        Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
+      }
     }
   }, [])
 
