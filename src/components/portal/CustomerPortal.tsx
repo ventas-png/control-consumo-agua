@@ -365,6 +365,217 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
   const hasServices = contadores.length > 0 || unidades.length > 0
 
+  // ── Dashboard render ─────────────────────────────────────
+  function renderDashboard() {
+    const {
+      consumoMesActual, consumoPromedio, montoPendiente, contadoresActivos,
+      consumoPrevMes, consumoSameLastYear, vsAnterior, vsAnioAnterior,
+      tipoAguaMap, unidadBreakdown,
+    } = dashboardData
+
+    const moneda = selectedProjectId
+      ? (projects.find(p => p.id === selectedProjectId)?.moneda ?? projects[0]?.moneda ?? 'Q')
+      : (projects[0]?.moneda ?? 'Q')
+
+    const clienteProjects = projects.filter(p =>
+      unidades.some(u => u.project_id === p.id) || contadores.some(c => c.project_id === p.id)
+    )
+
+    function PctCard({ label, pct, base, baseLabel }: { label: string; pct: number | null; base: number; baseLabel: string }) {
+      const isNull = pct === null
+      const positive = !isNull && pct! >= 0
+      return (
+        <div style={{ background: 'white', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#64748b', marginBottom: '8px' }}>{label}</div>
+          {isNull ? (
+            <span style={{ fontSize: '14px', color: '#94a3b8' }}>Sin datos</span>
+          ) : (
+            <span style={{ fontSize: '20px', fontWeight: 700, color: positive ? '#ef4444' : '#10b981' }}>
+              {positive ? '▲' : '▼'} {Math.abs(pct!).toFixed(1)}%
+            </span>
+          )}
+          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '5px' }}>{baseLabel}: {base.toFixed(2)} m³</div>
+        </div>
+      )
+    }
+
+    return (
+      <div>
+        {/* Filtro de proyecto */}
+        {clienteProjects.length > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', background: 'white', borderRadius: '12px', padding: '12px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>🏗️ Proyecto:</span>
+            <select
+              value={selectedProjectId ?? ''}
+              onChange={e => setSelectedProjectId(e.target.value || null)}
+              style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc', color: '#0f172a', cursor: 'pointer' }}
+            >
+              <option value="">Todos los proyectos</option>
+              {clienteProjects.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* KPI Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '14px', marginBottom: '18px' }}>
+          {[
+            { label: 'Consumo Mes Actual', value: `${consumoMesActual.toFixed(2)} m³`, icon: '💧', bg: 'linear-gradient(135deg, #0ea5e9, #0284c7)' },
+            { label: 'Promedio Mensual', value: `${consumoPromedio.toFixed(2)} m³`, icon: '📊', bg: 'linear-gradient(135deg, #0d9488, #0f766e)' },
+            { label: 'Monto Pendiente', value: `${moneda} ${montoPendiente.toFixed(2)}`, icon: '💳', bg: montoPendiente > 0 ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)' },
+            { label: 'Contadores Activos', value: String(contadoresActivos), icon: '🔢', bg: 'linear-gradient(135deg, #6366f1, #4f46e5)' },
+          ].map(card => (
+            <div key={card.label} style={{ background: card.bg, borderRadius: '16px', padding: '20px', color: 'white', boxShadow: '0 6px 20px rgba(0,0,0,0.12)' }}>
+              <div style={{ fontSize: '22px', marginBottom: '10px' }}>{card.icon}</div>
+              <div style={{ fontSize: '22px', fontWeight: 700, lineHeight: 1, marginBottom: '4px' }}>{card.value}</div>
+              <div style={{ fontSize: '11.5px', opacity: 0.88 }}>{card.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Comparaciones */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px', marginBottom: '18px' }}>
+          <PctCard label="vs Mes Anterior" pct={vsAnterior} base={consumoPrevMes} baseLabel="Mes ant." />
+          <PctCard label="vs Mismo Mes Año Anterior" pct={vsAnioAnterior} base={consumoSameLastYear} baseLabel="Año ant." />
+        </div>
+
+        {/* Gráfica 24 meses */}
+        <div style={{ background: 'white', borderRadius: '16px', padding: '22px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Historial de Consumo</div>
+              <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px' }}>Últimos 24 meses (m³)</div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: '#64748b', alignItems: 'center' }}>
+              <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: '#0ea5e9', marginRight: '4px' }} />Mes actual</span>
+              <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: '#bae6fd', marginRight: '4px' }} />Anteriores</span>
+            </div>
+          </div>
+          <div style={{ height: '260px' }}><canvas ref={chartRef} /></div>
+        </div>
+
+        {/* Desglose por tipo de agua */}
+        {Object.keys(tipoAguaMap).length > 0 && (
+          <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '18px' }}>
+            <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '14px' }}>Desglose por Tipo de Agua</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc' }}>
+                    {['Tipo de Agua', 'Contadores', 'Consumo Mes (m³)', 'Consumo 12 meses (m³)'].map(h => (
+                      <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 600, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(tipoAguaMap).map(([tipo, info]) => (
+                    <tr key={tipo} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '10px 14px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '3px 10px', borderRadius: '20px', background: '#e0f2fe', color: '#0369a1', fontSize: '12px', fontWeight: 600 }}>
+                          💧 {info.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 14px', color: '#374151', textAlign: 'center' }}>{info.count}</td>
+                      <td style={{ padding: '10px 14px', fontWeight: 600, color: '#0ea5e9', textAlign: 'right' }}>{info.consumoMes.toFixed(2)}</td>
+                      <td style={{ padding: '10px 14px', color: '#374151', textAlign: 'right' }}>{info.consumo12m.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Desglose por unidad */}
+        {unidadBreakdown.length > 0 && (
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '12px' }}>Desglose por Unidad</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '14px' }}>
+              {unidadBreakdown.map(({ unidad, meters }) => {
+                const project = projects.find(p => p.id === unidad.project_id)
+                return (
+                  <div key={unidad.id} style={{ background: 'white', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    {/* Header unidad */}
+                    <div style={{ background: 'linear-gradient(135deg, #0d9488, #0ea5e9)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px' }}>🏠</div>
+                      <div>
+                        <div style={{ color: 'white', fontWeight: 700, fontSize: '14px' }}>{unidad.nombre}</div>
+                        <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '11px' }}>{unidad.tipo.replace(/_/g, ' ')}{project && ` · ${project.nombre}`}</div>
+                      </div>
+                    </div>
+                    {/* Contadores */}
+                    <div style={{ padding: '14px 16px' }}>
+                      {meters.length === 0 ? (
+                        <div style={{ color: '#94a3b8', fontSize: '12.5px', textAlign: 'center', padding: '8px 0' }}>Sin contadores asignados</div>
+                      ) : meters.map(({ contador, consumoMes, consumo12m, fotoActual, fotoAnterior }) => (
+                        <div key={contador.id} style={{ borderRadius: '10px', background: '#f8fafc', padding: '11px', border: '1px solid #e2e8f0', marginBottom: '10px' }}>
+                          {/* Info medidor */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                            <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: 'linear-gradient(135deg, #0ea5e9, #0d9488)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', flexShrink: 0 }}>💧</div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#0f172a' }}>#{contador.numero_serie}</div>
+                              <div style={{ fontSize: '11px', color: '#64748b' }}>{TIPO_AGUA_LABELS[contador.tipo_agua] ?? contador.tipo_agua}</div>
+                            </div>
+                          </div>
+                          {/* Stats */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', marginBottom: fotoActual || fotoAnterior ? '12px' : '0' }}>
+                            {[
+                              { lbl: 'Este mes', val: consumoMes.toFixed(2), color: '#0ea5e9' },
+                              { lbl: 'Últimos 12m', val: consumo12m.toFixed(2), color: '#0d9488' },
+                            ].map(s => (
+                              <div key={s.lbl} style={{ background: 'white', borderRadius: '7px', padding: '7px 9px', border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '2px' }}>{s.lbl}</div>
+                                <div style={{ fontSize: '15px', fontWeight: 700, color: s.color }}>{s.val}</div>
+                                <div style={{ fontSize: '9.5px', color: '#94a3b8' }}>m³</div>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Fotos */}
+                          {(fotoActual || fotoAnterior) && (
+                            <div>
+                              <div style={{ fontSize: '10.5px', fontWeight: 600, color: '#64748b', marginBottom: '7px' }}>📷 Fotografías del Medidor</div>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                {[
+                                  { lectura: fotoAnterior, label: 'Foto Anterior' },
+                                  { lectura: fotoActual, label: 'Foto Actual' },
+                                ].map(({ lectura, label }) => (
+                                  <div key={label} style={{ flex: 1 }}>
+                                    <div style={{ fontSize: '9.5px', color: '#94a3b8', marginBottom: '3px', textAlign: 'center' }}>{label}</div>
+                                    {lectura?.foto ? (
+                                      <img
+                                        src={lectura.foto}
+                                        alt={label}
+                                        onClick={() => setPhotoModal({ url: lectura.foto!, label: `${label} — #${contador.numero_serie} — ${new Date(lectura.fecha + 'T12:00:00').toLocaleDateString('es-GT')}` })}
+                                        style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '7px', border: '1.5px solid #e2e8f0', cursor: 'zoom-in' }}
+                                      />
+                                    ) : (
+                                      <div style={{ width: '100%', aspectRatio: '1', background: '#f1f5f9', borderRadius: '7px', border: '1.5px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '3px', color: '#94a3b8', fontSize: '10px' }}>
+                                        <span style={{ fontSize: '18px' }}>📷</span>
+                                        <span>Sin foto</span>
+                                      </div>
+                                    )}
+                                    {lectura && (
+                                      <div style={{ fontSize: '9px', color: '#94a3b8', textAlign: 'center', marginTop: '2px' }}>
+                                        {new Date(lectura.fecha + 'T12:00:00').toLocaleDateString('es-GT')}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ── Loading ──────────────────────────────────────────────
   if (loading) {
     return (
