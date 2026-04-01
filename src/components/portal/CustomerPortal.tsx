@@ -127,13 +127,17 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           .select('id, nombre, tipo, piso, area_m2, project_id, company_id, activo')
           .eq('cliente_id', clienteId)
           .eq('activo', true),
-        // Reading history (last 50)
-        supabase
-          .from('registros')
-          .select('id, fecha, lectura_anterior, lectura_actual, consumo, monto_calculado, estado, mes, tipo_cobro, contador_id')
-          .eq('cliente_id', clienteId)
-          .order('fecha', { ascending: false })
-          .limit(50),
+        // Reading history (last 24 months for dashboard analytics)
+        (() => {
+          const twoYearsAgo = new Date()
+          twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2)
+          return supabase
+            .from('registros')
+            .select('id, fecha, lectura_anterior, lectura_actual, consumo, monto_calculado, estado, mes, tipo_cobro, contador_id, foto')
+            .eq('cliente_id', clienteId)
+            .gte('fecha', twoYearsAgo.toISOString().split('T')[0])
+            .order('fecha', { ascending: false })
+        })(),
         // Own contact info
         supabase
           .from('clientes')
