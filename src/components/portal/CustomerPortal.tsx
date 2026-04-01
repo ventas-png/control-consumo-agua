@@ -1,6 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { UserSession } from '../../types'
+import { Chart, registerables } from 'chart.js'
+
+Chart.register(...registerables)
 
 interface Props {
   currentUser: UserSession
@@ -52,6 +55,7 @@ interface LecturaInfo {
   mes: string | null
   tipo_cobro: string
   contador_id: string | null
+  foto?: string | null
 }
 
 interface ClienteContacto {
@@ -79,10 +83,10 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string; label: string }
   mora: { bg: '#fee2e2', color: '#991b1b', label: 'Mora' },
 }
 
-type PortalTab = 'servicios' | 'perfil'
+type PortalTab = 'dashboard' | 'servicios' | 'perfil'
 
 export function CustomerPortal({ currentUser, onLogout }: Props) {
-  const [tab, setTab] = useState<PortalTab>('servicios')
+  const [tab, setTab] = useState<PortalTab>('dashboard')
   const [loading, setLoading] = useState(true)
   const [companies, setCompanies] = useState<CompanyInfo[]>([])
   const [projects, setProjects] = useState<ProjectInfo[]>([])
@@ -95,6 +99,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [savingContacto, setSavingContacto] = useState(false)
   const [contactoMsg, setContactoMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [expandedContador, setExpandedContador] = useState<string | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [photoModal, setPhotoModal] = useState<{ url: string; label: string } | null>(null)
+  const chartRef = useRef<HTMLCanvasElement>(null)
+  const chartInstance = useRef<Chart | null>(null)
 
   const clienteId = currentUser.cliente_id
 
