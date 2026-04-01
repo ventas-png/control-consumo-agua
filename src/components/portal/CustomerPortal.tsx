@@ -199,6 +199,148 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     cargarDatos()
   }, [cargarDatos])
 
+  // ── Dashboard analytics (useMemo) ────────────────────────
+  const MESES_LABELS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+
+  const dashboardData = useMemo(() => {
+    const now = new Date()
+    const curY = now.getFullYear()
+    const curM = now.getMonth()
+
+    // Filter lecturas by selected project
+    const filteredContadores = selectedProjectId
+      ? contadores.filter(c => c.project_id === selectedProjectId)
+      : contadores
+    const filteredContadorIds = new Set(filteredContadores.map(c => c.id))
+    const filteredLecturas = lecturas.filter(l =>
+      l.contador_id != null && filteredContadorIds.has(l.contador_id)
+    )
+
+    const sameYM = (fecha: string, y: number, m: number) => {
+      const d = new Date(fecha + 'T12:00:00')
+      return d.getFullYear() === y && d.getMonth() === m
+    }
+
+    // KPI 1: consumo mes actual
+    const consumoMesActual = filteredLecturas
+      .filter(l => sameYM(l.fecha, curY, curM))
+      .reduce((s, l) => s + (l.consumo || 0), 0)
+
+    // KPI 2: promedio mensual últimos 12 meses
+    const monthBuckets: Record<string, number> = {}
+    for (let i = 1; i <= 12; i++) {
+      const d = new Date(curY, curM - i, 1)
+      monthBuckets[`${d.getFullYear()}-${d.getMonth()}`] = 0
+    }
+    filteredLecturas.forEach(l => {
+      const d = new Date(l.fecha + 'T12:00:00')
+      const key = `${d.getFullYear()}-${d.getMonth()}`
+      if (key in monthBuckets) monthBuckets[key] += (l.consumo || 0)
+    })
+    const bucketVals = Object.values(monthBuckets)
+    const consumoPromedio = bucketVals.length > 0
+      ? bucketVals.reduce((a, b) => a + b, 0) / bucketVals.length
+      : 0
+
+    // KPI 3: monto pendiente
+    const montoPendiente = filteredLecturas
+      .filter(l => l.estado === 'pendiente' || l.estado === 'mora')
+      .reduce((s, l) => s + (l.monto_calculado || 0), 0)
+
+    // KPI 4: contadores activos
+    const contadoresActivos = filteredContadores.filter(c => c.activo).length
+
+    // Chart: 24 meses
+    const chartLabels: string[] = []
+    const chartConsumo: number[] = []
+    const chartMontos: number[] = []
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(curY, curM - i, 1)
+      const y = d.getFullYear(); const m = d.getMonth()
+      chartLabels.push(`${MESES_LABELS[m]} ${y}`)
+      const sliceLec = filteredLecturas.filter(l => sameYM(l.fecha, y, m))
+      chartConsumo.push(parseFloat(sliceLec.reduce((s, l) => s + (l.consumo || 0), 0).toFixed(2)))
+      chartMontos.push(parseFloat(sliceLec.reduce((s, l) => s + (l.monto_calculado || 0), 0).toFixed(2)))
+    }
+
+    // Comparaciones
+    const consumoPrevMes = chartConsumo[22] ?? 0
+    const consumoSameLastYear = chartConsumo[11] ?? 0
+    const vsAnterior = consumoPrevMes > 0
+      ? ((consumoMesActual - consumoPrevMes) / consumoPrevMes) * 100 : null
+    const vsAnioAnterior = consumoSameLastYear > 0
+      ? ((consumoMesActual - consumoSameLastYear) / consumoSameLastYear) * 100 : null
+
+    // Desglose por tipo de agua
+    const tipoAguaMap: Record<string, { label: string; count: number; consumoMes: number; consumo12m: number }> = {}
+    const twelveMonthsAgo = new Date(curY, curM - 11, 1)
+    filteredContadores.forEach(c => {
+      if (!tipoAguaMap[c.tipo_agua])
+        tipoAguaMap[c.tipo_agua] = { label: TIPO_AGUA_LABELS[c.tipo_agua] ?? c.tipo_agua, count: 0, consumoMes: 0, consumo12m: 0 }
+      tipoAguaMap[c.tipo_agua].count++
+      const cLec = filteredLecturas.filter(l => l.contador_id === c.id)
+      tipoAguaMap[c.tipo_agua].consumoMes += cLec.filter(l => sameYM(l.fecha, curY, curM)).reduce((s, l) => s + (l.consumo || 0), 0)
+      tipoAguaMap[c.tipo_agua].consumo12m += cLec.filter(l => new Date(l.fecha + 'T12:00:00') >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
+    })
+
+    // Desglose por unidad
+    const visibleUnidades = selectedProjectId
+      ? unidades.filter(u => u.project_id === selectedProjectId)
+      : unidades
+
+    const unidadBreakdown = visibleUnidades.map(unidad => {
+      const uContadores = filteredContadores.filter(c => c.unidad_id === unidad.id)
+      const meters = uContadores.map(contador => {
+        const cLec = filteredLecturas
+          .filter(l => l.contador_id === contador.id)
+          .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+        const consumoMes = cLec.filter(l => sameYM(l.fecha, curY, curM)).reduce((s, l) => s + (l.consumo || 0), 0)
+        const consumo12m = cLec.filter(l => new Date(l.fecha + 'T12:00:00') >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
+        // Fotos: última y penúltima lectura con foto
+        const withFoto = cLec.filter(l => l.foto)
+        return { contador, consumoMes, consumo12m, fotoActual: withFoto[0] ?? null, fotoAnterior: withFoto[1] ?? null }
+      })
+      return { unidad, meters }
+    })
+
+    return {
+      consumoMesActual, consumoPromedio, montoPendiente, contadoresActivos,
+      consumoPrevMes, consumoSameLastYear, vsAnterior, vsAnioAnterior,
+      chartLabels, chartConsumo, chartMontos,
+      tipoAguaMap, unidadBreakdown,
+    }
+  }, [lecturas, contadores, unidades, selectedProjectId])
+
+  // ── Chart.js 24-month bar chart ───────────────────────────
+  useEffect(() => {
+    if (tab !== 'dashboard') return
+    const timeout = setTimeout(() => {
+      if (!chartRef.current) return
+      if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null }
+      const { chartLabels, chartConsumo, chartMontos } = dashboardData
+      const colors = chartLabels.map((_, i) => i === chartLabels.length - 1 ? '#0ea5e9' : '#bae6fd')
+      chartInstance.current = new Chart(chartRef.current, {
+        type: 'bar',
+        data: {
+          labels: chartLabels,
+          datasets: [{ label: 'Consumo (m³)', data: chartConsumo, backgroundColor: colors, borderRadius: 4, borderSkipped: false }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => [`${ctx.parsed.y.toFixed(2)} m³`, `Monto: ${chartMontos[ctx.dataIndex].toFixed(2)}`] } },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
+            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 } } },
+          },
+        },
+      })
+    }, 50)
+    return () => { clearTimeout(timeout); chartInstance.current?.destroy(); chartInstance.current = null }
+  }, [tab, dashboardData])
+
   async function guardarContacto() {
     if (!clienteId) return
     setSavingContacto(true)
