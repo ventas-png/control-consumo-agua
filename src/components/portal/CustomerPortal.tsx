@@ -467,7 +467,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(tipoAguaMap).map(([tipo, info]) => (
+                  {(Object.entries(tipoAguaMap) as [string, { label: string; count: number; consumoMes: number; consumo12m: number }][]).map(([tipo, info]) => (
                     <tr key={tipo} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '10px 14px' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '3px 10px', borderRadius: '20px', background: '#e0f2fe', color: '#0369a1', fontSize: '12px', fontWeight: 600 }}>
@@ -490,7 +490,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           <div>
             <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '12px' }}>Desglose por Unidad</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '14px' }}>
-              {unidadBreakdown.map(({ unidad, meters }) => {
+              {(unidadBreakdown as { unidad: UnidadInfo; meters: { contador: ContadorInfo; consumoMes: number; consumo12m: number; fotoActual: LecturaInfo | null; fotoAnterior: LecturaInfo | null }[] }[]).map(({ unidad, meters }) => {
                 const project = projects.find(p => p.id === unidad.project_id)
                 return (
                   <div key={unidad.id} style={{ background: 'white', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -706,6 +706,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           display: 'flex', gap: '4px',
         }}>
           {([
+            { key: 'dashboard', label: 'Dashboard', icon: '📈' },
             { key: 'servicios', label: 'Mis Servicios', icon: '📊' },
             { key: 'perfil', label: 'Mi Perfil', icon: '👤' },
           ] as const).map(t => (
@@ -732,6 +733,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
       {/* Content */}
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '28px 24px' }}>
+
+        {/* ── TAB: DASHBOARD ── */}
+        {tab === 'dashboard' && renderDashboard()}
 
         {/* ── TAB: SERVICIOS ── */}
         {tab === 'servicios' && (
@@ -1065,6 +1069,28 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           </div>
         )}
       </div>
+
+      {/* ── Lightbox de fotos ── */}
+      {photoModal && (
+        <div
+          onClick={() => setPhotoModal(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, cursor: 'pointer', flexDirection: 'column', gap: '14px', padding: '24px',
+          }}
+        >
+          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12.5px', textAlign: 'center', maxWidth: '80vw' }}>
+            {photoModal.label}
+          </div>
+          <img
+            src={photoModal.url}
+            alt={photoModal.label}
+            style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', objectFit: 'contain' }}
+          />
+          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11.5px' }}>Toque o clic para cerrar</div>
+        </div>
+      )}
     </div>
   )
 }
