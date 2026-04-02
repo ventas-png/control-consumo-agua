@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import type { UserSession, Proyecto } from '../../types'
 import { MONEDAS } from '../../types'
 import { AsignacionModal } from './AsignacionModal'
+import { escAttr, escText } from '../../lib/validation'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: '#22c55e' },
@@ -75,10 +76,10 @@ export function EmpresaSection({ currentUser }: Props) {
     const { value: formValues } = await Swal.fire({
       title: 'Editar Información de Empresa',
       html: `
-        <input id="swal-nombre" class="swal2-input" placeholder="Nombre de la empresa *" value="${empresa.nombre}" />
-        <input id="swal-nit" class="swal2-input" placeholder="NIT" value="${empresa.nit ?? ''}" />
-        <input id="swal-email" class="swal2-input" placeholder="Email de contacto" type="email" value="${empresa.email ?? ''}" />
-        <input id="swal-telefono" class="swal2-input" placeholder="Teléfono" value="${empresa.telefono ?? ''}" />
+        <input id="swal-nombre" class="swal2-input" placeholder="Nombre de la empresa *" value="${escAttr(empresa.nombre)}" />
+        <input id="swal-nit" class="swal2-input" placeholder="NIT" value="${escAttr(empresa.nit)}" />
+        <input id="swal-email" class="swal2-input" placeholder="Email de contacto" type="email" value="${escAttr(empresa.email)}" />
+        <input id="swal-telefono" class="swal2-input" placeholder="Teléfono" value="${escAttr(empresa.telefono)}" />
       `,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
@@ -144,18 +145,18 @@ export function EmpresaSection({ currentUser }: Props) {
       html: `
         <div style="text-align:left;padding:0 4px;max-height:70vh;overflow-y:auto">
           <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Nombre *</label>
-          <input id="swal-nombre" class="swal2-input" value="${proyecto.nombre}" style="margin:4px 0 14px" />
+          <input id="swal-nombre" class="swal2-input" value="${escAttr(proyecto.nombre)}" style="margin:4px 0 14px" />
 
           <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Descripción</label>
-          <textarea id="swal-descripcion" class="swal2-textarea" style="margin:4px 0 14px;height:72px;resize:vertical">${proyecto.descripcion ?? ''}</textarea>
+          <textarea id="swal-descripcion" class="swal2-textarea" style="margin:4px 0 14px;height:72px;resize:vertical">${escText(proyecto.descripcion)}</textarea>
 
           <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Dirección</label>
-          <input id="swal-direccion" class="swal2-input" placeholder="Ej: Calle 123 #45-67" value="${proyecto.direccion ?? ''}" style="margin:4px 0 14px" />
+          <input id="swal-direccion" class="swal2-input" placeholder="Ej: Calle 123 #45-67" value="${escAttr(proyecto.direccion)}" style="margin:4px 0 14px" />
 
           <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Geolocalización</label>
           <div style="display:flex;gap:8px;margin:4px 0 6px">
-            <input id="swal-lat" class="swal2-input" placeholder="Latitud" value="${proyecto.latitud ?? ''}" style="margin:0" />
-            <input id="swal-lng" class="swal2-input" placeholder="Longitud" value="${proyecto.longitud ?? ''}" style="margin:0" />
+            <input id="swal-lat" class="swal2-input" placeholder="Latitud" value="${escAttr(proyecto.latitud)}" style="margin:0" />
+            <input id="swal-lng" class="swal2-input" placeholder="Longitud" value="${escAttr(proyecto.longitud)}" style="margin:0" />
           </div>
           <button id="swal-geolocate" type="button" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #0ea5e9;background:transparent;color:#0ea5e9;cursor:pointer;margin-top:4px;margin-bottom:16px">
             📍 Usar mi ubicación actual

@@ -60,6 +60,30 @@ export function validateNumber(
 }
 
 /**
+ * Escapes a value for safe interpolation into an HTML attribute (e.g. value="...").
+ * Prevents attribute-injection XSS in template-literal HTML strings.
+ */
+export function escAttr(value: string | number | null | undefined): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/**
+ * Escapes a value for safe interpolation as HTML text content (between tags).
+ * Prevents tag-injection XSS in template-literal HTML strings.
+ */
+export function escText(value: string | number | null | undefined): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/**
  * Validates password strength. Returns null if valid, error message otherwise.
  * Minimum 8 chars, at least one letter and one number.
  */

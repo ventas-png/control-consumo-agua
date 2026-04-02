@@ -43,17 +43,10 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
   const [showDiag, setShowDiag] = useState(false)
   const [diagContent, setDiagContent] = useState('')
   const [shake, setShake] = useState(false)
-  const [superAdminMode, setSuperAdminMode] = useState(
-    () => new URLSearchParams(window.location.search).get('superadmin') === '1'
-  )
+  const [superAdminMode, setSuperAdminMode] = useState(false)
 
   function toggleSuperAdminMode() {
-    const next = !superAdminMode
-    setSuperAdminMode(next)
-    const url = new URL(window.location.href)
-    if (next) url.searchParams.set('superadmin', '1')
-    else url.searchParams.delete('superadmin')
-    window.history.replaceState(null, '', url.toString())
+    setSuperAdminMode(prev => !prev)
   }
 
   async function handleLogin() {

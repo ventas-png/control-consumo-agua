@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
+import { escAttr } from '../../lib/validation'
 
 interface Empresa {
   id: string
@@ -119,10 +120,10 @@ export function SuperAdminSection() {
     const { value: formValues } = await Swal.fire({
       title: 'Editar Empresa',
       html: `
-        <input id="swal-nombre" class="swal2-input" placeholder="Nombre de la empresa *" value="${empresa.nombre}" />
-        <input id="swal-nit" class="swal2-input" placeholder="NIT" value="${empresa.nit ?? ''}" />
-        <input id="swal-email" class="swal2-input" placeholder="Email de contacto" type="email" value="${empresa.email ?? ''}" />
-        <input id="swal-telefono" class="swal2-input" placeholder="Teléfono" value="${empresa.telefono ?? ''}" />
+        <input id="swal-nombre" class="swal2-input" placeholder="Nombre de la empresa *" value="${escAttr(empresa.nombre)}" />
+        <input id="swal-nit" class="swal2-input" placeholder="NIT" value="${escAttr(empresa.nit)}" />
+        <input id="swal-email" class="swal2-input" placeholder="Email de contacto" type="email" value="${escAttr(empresa.email)}" />
+        <input id="swal-telefono" class="swal2-input" placeholder="Teléfono" value="${escAttr(empresa.telefono)}" />
         <select id="swal-plan" class="swal2-select">
           <option value="basico" ${empresa.plan === 'basico' ? 'selected' : ''}>Plan Básico</option>
           <option value="profesional" ${empresa.plan === 'profesional' ? 'selected' : ''}>Plan Profesional</option>
