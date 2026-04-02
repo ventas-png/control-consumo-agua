@@ -18,12 +18,32 @@ function getStoredSession(): UserSession | null {
   }
 }
 
+// Offline-only cache: stores a minimal subset of the session (no role, no IDs)
+// to allow the user to be identified without exposing privilege data at rest.
+interface OfflineSessionCache {
+  user_id: string
+  email: string
+  name: string
+  expires_at: string
+}
+
 function getCachedSession(): UserSession | null {
   try {
     const data = localStorage.getItem('cached_session')
     if (!data) return null
-    const session = JSON.parse(data) as UserSession
-    if (new Date() < new Date(session.expires_at)) return session
+    const cache = JSON.parse(data) as OfflineSessionCache
+    if (new Date() < new Date(cache.expires_at)) {
+      // Return a minimal session with 'viewer' role so the offline user can see
+      // read-only data. The real role is loaded from Supabase on reconnect.
+      return {
+        user_id: cache.user_id,
+        email: cache.email,
+        name: cache.name,
+        role: 'viewer',
+        login_time: new Date().toISOString(),
+        expires_at: cache.expires_at,
+      }
+    }
     localStorage.removeItem('cached_session')
     return null
   } catch {
@@ -32,8 +52,16 @@ function getCachedSession(): UserSession | null {
 }
 
 function storeSession(session: UserSession): void {
+  // Full session (including role) only in sessionStorage — cleared when tab closes
   sessionStorage.setItem('userSession', JSON.stringify(session))
-  localStorage.setItem('cached_session', JSON.stringify(session))
+  // localStorage only holds a minimal cache for offline UX, without role/company data
+  const offlineCache: OfflineSessionCache = {
+    user_id: session.user_id,
+    email: session.email,
+    name: session.name,
+    expires_at: session.expires_at,
+  }
+  localStorage.setItem('cached_session', JSON.stringify(offlineCache))
 }
 
 function clearSession(): void {

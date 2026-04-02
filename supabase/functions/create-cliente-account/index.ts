@@ -1,27 +1,55 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Restrict CORS to the configured allowed origin.
+// Set ALLOWED_ORIGIN in Supabase Edge Function secrets (e.g. https://your-app.vercel.app).
+const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') ?? ''
+
+function corsHeaders(requestOrigin: string | null): Record<string, string> {
+  const origin = (ALLOWED_ORIGIN && requestOrigin === ALLOWED_ORIGIN)
+    ? ALLOWED_ORIGIN
+    : (ALLOWED_ORIGIN || 'null') // deny unrecognised origins
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  }
 }
 
-function ok(data: Record<string, unknown>) {
+function ok(data: Record<string, unknown>, cors: Record<string, string>) {
   return new Response(JSON.stringify(data), {
-    status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status: 200, headers: { ...cors, 'Content-Type': 'application/json' },
   })
 }
 
-function err(message: string) {
-  // Always return 200 so the Supabase JS client surfaces the message in data.error
-  // instead of converting it to a FunctionsHttpError that loses the message
+function clientErr(message: string, cors: Record<string, string>, status = 400) {
   return new Response(JSON.stringify({ error: message }), {
-    status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status, headers: { ...cors, 'Content-Type': 'application/json' },
   })
 }
+
+function validatePassword(password: string): string | null {
+  if (!password || password.length < 8) return 'La contraseña debe tener al menos 8 caracteres.'
+  if (password.length > 128) return 'La contraseña es demasiado larga.'
+  if (!/[a-zA-Z]/.test(password)) return 'La contraseña debe contener al menos una letra.'
+  if (!/[0-9]/.test(password)) return 'La contraseña debe contener al menos un número.'
+  return null
+}
+
+const EMAIL_REGEX = /^[^\s@]{1,64}@[^\s@]{1,255}$/
 
 Deno.serve(async (req) => {
+  const requestOrigin = req.headers.get('Origin')
+  const cors = corsHeaders(requestOrigin)
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: cors })
+  }
+
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405, headers: { ...cors, 'Content-Type': 'application/json' },
+    })
   }
 
   try {
@@ -35,12 +63,36 @@ Deno.serve(async (req) => {
 
     const { full_name, email, cui_dui, fecha_nacimiento, password } = body
 
+    // Validate required fields
     if (!full_name || !email || !cui_dui || !fecha_nacimiento || !password) {
-      return err('Todos los campos son requeridos.')
+      return clientErr('Todos los campos son requeridos.', cors)
     }
 
-    if (password.length < 8) {
-      return err('La contraseña debe tener al menos 8 caracteres.')
+    // Validate input lengths to prevent DoS / injection via oversized payloads
+    if (full_name.length > 200) return clientErr('Nombre demasiado largo.', cors)
+    if (email.length > 254) return clientErr('Correo electrónico inválido.', cors)
+    if (cui_dui.length > 20) return clientErr('DPI/CUI inválido.', cors)
+    if (fecha_nacimiento.length > 10) return clientErr('Fecha de nacimiento inválida.', cors)
+
+    // Basic email format check
+    if (!EMAIL_REGEX.test(email)) {
+      return clientErr('Formato de correo electrónico inválido.', cors)
+    }
+
+    // Validate date format (YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha_nacimiento)) {
+      return clientErr('Formato de fecha inválido.', cors)
+    }
+
+    // Validate CUI/DUI: only digits and hyphens
+    if (!/^[\d\-]+$/.test(cui_dui)) {
+      return clientErr('DPI/CUI contiene caracteres inválidos.', cors)
+    }
+
+    // Validate password strength
+    const pwdError = validatePassword(password)
+    if (pwdError) {
+      return clientErr(pwdError, cors)
     }
 
     // Service-role client to bypass RLS
@@ -57,13 +109,13 @@ Deno.serve(async (req) => {
 
     if (lookupError) {
       console.error('Lookup error:', lookupError)
-      return err('Error al verificar su identidad. Intente nuevamente.')
+      return clientErr('Error al verificar su identidad. Intente nuevamente.', cors, 500)
     }
 
     const result = lookupResult as { match_count: number; cliente_id: string | null }
 
     if (result.match_count < 3 || !result.cliente_id) {
-      return err('No se encontró un cliente con los datos proporcionados. Verifique su DPI/CUI, fecha de nacimiento y correo electrónico.')
+      return clientErr('No se encontró un cliente con los datos proporcionados. Verifique su DPI/CUI, fecha de nacimiento y correo electrónico.', cors, 422)
     }
 
     const clienteId = result.cliente_id
@@ -76,11 +128,11 @@ Deno.serve(async (req) => {
       .single()
 
     if (clienteError || !clienteRecord) {
-      return err('No se pudo obtener la información del cliente.')
+      return clientErr('No se pudo obtener la información del cliente.', cors, 500)
     }
 
     if (!clienteRecord.puede_crear_cuenta) {
-      return err('Su cuenta no está habilitada para el portal de clientes. Comuníquese con su empresa de servicios.')
+      return clientErr('Su cuenta no está habilitada para el portal de clientes. Comuníquese con su empresa de servicios.', cors, 403)
     }
 
     // Step 3: Check that no account already exists for this cliente_id
@@ -91,7 +143,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (existingUser) {
-      return err('Ya existe una cuenta asociada a este cliente. Si olvidó su contraseña, use la opción "Olvidé mi contraseña".')
+      return clientErr('Ya existe una cuenta asociada a este cliente. Si olvidó su contraseña, use la opción "Olvidé mi contraseña".', cors, 409)
     }
 
     // Step 4: Create Supabase Auth user
@@ -107,7 +159,7 @@ Deno.serve(async (req) => {
       const message = createError?.message?.includes('already registered')
         ? 'El correo electrónico ya está registrado.'
         : 'No se pudo crear la cuenta. Intente nuevamente.'
-      return err(message)
+      return clientErr(message, cors, 409)
     }
 
     const newUserId = newAuthUser.user.id
@@ -126,13 +178,15 @@ Deno.serve(async (req) => {
     if (profileError) {
       console.error('Profile insert error:', profileError)
       await adminClient.auth.admin.deleteUser(newUserId)
-      return err('No se pudo completar el registro. Intente nuevamente.')
+      return clientErr('No se pudo completar el registro. Intente nuevamente.', cors, 500)
     }
 
-    return ok({ success: true, user_id: newUserId })
+    return ok({ success: true, user_id: newUserId }, cors)
 
   } catch (e) {
     console.error('Unexpected error:', e)
-    return err('Error inesperado. Intente nuevamente.')
+    return new Response(JSON.stringify({ error: 'Error inesperado. Intente nuevamente.' }), {
+      status: 500, headers: { ...corsHeaders(req.headers.get('Origin')), 'Content-Type': 'application/json' },
+    })
   }
 })
