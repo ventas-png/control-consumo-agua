@@ -17,7 +17,7 @@ interface Props {
   onRegistroUpdated?: (id: string, partial: Partial<Registro>) => void
 }
 
-type Tab = 'pendientes' | 'historial' | 'convenios'
+type Tab = 'pendientes' | 'verificaciones' | 'historial' | 'convenios'
 
 const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
   efectivo: '💵 Efectivo',
@@ -40,6 +40,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
   const [convenios, setConvenios] = useState<ConvenioPago[]>([])
   const [loadingPagos, setLoadingPagos] = useState(false)
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
+  const [verificando, setVerificando] = useState<string | null>(null)
 
   const canEdit = userRole !== 'viewer'
 
@@ -128,8 +129,117 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
     setConvenioModal(seleccionados)
   }
 
+  async function handleVerificarPago(pagoId: string, aprobar: boolean) {
+    setVerificando(pagoId)
+
+    const pago = pagos.find(p => p.id === pagoId)
+    if (!pago) {
+      setVerificando(null)
+      return
+    }
+
+    try {
+      if (aprobar) {
+        // Verify the payment
+        const { error } = await supabase
+          .from('pagos')
+          .update({
+            verification_status: 'verificado',
+            estado: 'verificado',
+            verified_by: currentUser.user_id,
+            verified_at: new Date().toISOString(),
+          })
+          .eq('id', pagoId)
+
+        if (error) throw error
+
+        // Update the registro monto_pagado if needed
+        if (pago.registro_id) {
+          const registro = registros.find(r => r.id === pago.registro_id)
+          if (registro) {
+            const nuevoMontoPagado = (registro.monto_pagado ?? 0) + pago.monto
+            const total = registro.monto_calculado ?? 0
+            const saldo = total - nuevoMontoPagado
+
+            // Update registro state and status
+            const { error: updateError } = await supabase
+              .from('registros')
+              .update({
+                monto_pagado: nuevoMontoPagado,
+                estado: saldo <= 0 ? 'pagado' : 'pendiente',
+              })
+              .eq('id', pago.registro_id)
+
+            if (updateError) throw updateError
+
+            if (onRegistroUpdated) {
+              onRegistroUpdated(pago.registro_id, {
+                monto_pagado: nuevoMontoPagado,
+                estado: saldo <= 0 ? 'pagado' : 'pendiente',
+              })
+            }
+          }
+        }
+
+        void Swal.fire({
+          icon: 'success',
+          title: '✅ Pago verificado',
+          text: `Pago de ${moneda} ${pago.monto.toFixed(2)} ha sido verificado correctamente`,
+          timer: 2000,
+          showConfirmButton: false,
+        })
+      } else {
+        // Ask for rejection reason
+        const { value: razon } = await Swal.fire({
+          icon: 'question',
+          title: '❌ Rechazar Pago',
+          input: 'textarea',
+          inputPlaceholder: 'Motivo del rechazo...',
+          inputAttributes: { required: 'true' },
+          showCancelButton: true,
+          confirmButtonText: 'Rechazar',
+          cancelButtonText: 'Cancelar',
+        })
+
+        if (razon) {
+          const { error } = await supabase
+            .from('pagos')
+            .update({
+              verification_status: 'rechazado',
+              estado: 'rechazado',
+              verified_by: currentUser.user_id,
+              verified_at: new Date().toISOString(),
+              verification_notes: razon,
+            })
+            .eq('id', pagoId)
+
+          if (error) throw error
+
+          void Swal.fire({
+            icon: 'success',
+            title: '❌ Pago rechazado',
+            text: 'El cliente será notificado del rechazo',
+            timer: 2000,
+            showConfirmButton: false,
+          })
+        }
+      }
+
+      void cargarPagosYConvenios()
+    } catch (err: any) {
+      void Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err.message || 'No se pudo procesar la verificación',
+      })
+    } finally {
+      setVerificando(null)
+    }
+  }
+
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'pendientes', label: 'Cargos Pendientes', icon: '⏳' },
+    { id: 'verificaciones', label: 'Verificaciones Pendientes', icon: '✔️' },
     { id: 'historial', label: 'Historial de Pagos', icon: '📋' },
     { id: 'convenios', label: 'Convenios', icon: '🤝' },
   ]
@@ -292,6 +402,155 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── TAB: Verificaciones Pendientes ── */}
+      {activeTab === 'verificaciones' && (
+        <div>
+          {(() => {
+            const pagosParaVerificar = pagos.filter(p => p.verification_status === 'pendiente')
+
+            if (pagosParaVerificar.length === 0) {
+              return (
+                <div style={{
+                  background: '#f8fafc',
+                  borderRadius: '12px',
+                  padding: '48px 24px',
+                  textAlign: 'center',
+                  border: '1px solid #e2e8f0',
+                }}>
+                  <div style={{ fontSize: '32px', marginBottom: '12px' }}>✅</div>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
+                    Sin verificaciones pendientes
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '14px' }}>
+                    Todos los pagos manuales han sido verificados
+                  </div>
+                </div>
+              )
+            }
+
+            return (
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {pagosParaVerificar.map(pago => {
+                  const cliente = clientes.find(c => c.id === pago.cliente_id)
+                  const registro = registros.find(r => r.id === pago.registro_id)
+
+                  return (
+                    <div
+                      key={pago.id}
+                      style={{
+                        background: 'white',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        border: '2px solid #fbbf24',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                      }}
+                    >
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '16px', alignItems: 'start' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                            <div>
+                              <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                                {cliente?.nombre ?? 'Cliente desconocido'}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#64748b' }}>
+                                Lectura: {registro ? new Date(registro.fecha).toLocaleDateString('es-GT') : 'N/A'}
+                              </div>
+                            </div>
+                            <span style={{
+                              padding: '4px 12px',
+                              borderRadius: '20px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              background: '#fef3c7',
+                              color: '#b45309',
+                            }}>
+                              ⏳ Pendiente de verificación
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', fontSize: '13px', marginTop: '12px' }}>
+                            <div>
+                              <div style={{ color: '#94a3b8', marginBottom: '2px' }}>Monto Pagado</div>
+                              <div style={{ fontWeight: 700, color: '#0f172a' }}>{moneda} {pago.monto.toFixed(2)}</div>
+                            </div>
+                            <div>
+                              <div style={{ color: '#94a3b8', marginBottom: '2px' }}>Forma de Pago</div>
+                              <div style={{ fontWeight: 700, color: '#0f172a' }}>{FORMA_PAGO_LABELS[pago.metodo] ?? pago.metodo}</div>
+                            </div>
+                            <div>
+                              <div style={{ color: '#94a3b8', marginBottom: '2px' }}>Comprobante</div>
+                              <div style={{ fontWeight: 700, color: pago.numero_documento ? '#0f172a' : '#94a3b8' }}>
+                                {pago.numero_documento ?? 'Sin número'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {pago.comprobante_url && (
+                            <div style={{ marginTop: '12px' }}>
+                              <a
+                                href={pago.comprobante_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: '13px',
+                                  color: '#0ea5e9',
+                                  textDecoration: 'none',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                📎 Ver comprobante ({pago.comprobante_tipo})
+                              </a>
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '160px' }}>
+                          <button
+                            onClick={() => void handleVerificarPago(pago.id, true)}
+                            disabled={verificando === pago.id}
+                            style={{
+                              padding: '10px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              background: verificando === pago.id ? '#cbd5e1' : '#10b981',
+                              color: 'white',
+                              fontWeight: 700,
+                              fontSize: '13px',
+                              cursor: verificando === pago.id ? 'not-allowed' : 'pointer',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {verificando === pago.id ? '⏳...' : '✅ Verificar'}
+                          </button>
+                          <button
+                            onClick={() => void handleVerificarPago(pago.id, false)}
+                            disabled={verificando === pago.id}
+                            style={{
+                              padding: '10px',
+                              borderRadius: '8px',
+                              border: '1.5px solid #ef4444',
+                              background: 'white',
+                              color: '#ef4444',
+                              fontWeight: 700,
+                              fontSize: '13px',
+                              cursor: verificando === pago.id ? 'not-allowed' : 'pointer',
+                              whiteSpace: 'nowrap',
+                              opacity: verificando === pago.id ? 0.5 : 1,
+                            }}
+                          >
+                            ❌ Rechazar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
         </div>
       )}
 
