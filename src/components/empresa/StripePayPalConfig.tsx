@@ -403,7 +403,6 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
     </div>
   )
 }
-}
 
 interface StripeFormProps {
   config: CompanyPaymentConfig

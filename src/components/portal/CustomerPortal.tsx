@@ -332,7 +332,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           responsive: true, maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: ctx => [`${ctx.parsed.y.toFixed(2)} m³`, `Monto: ${chartMontos[ctx.dataIndex].toFixed(2)}`] } },
+            tooltip: { callbacks: { label: ctx => [`${(ctx.parsed.y ?? 0).toFixed(2)} m³`, `Monto: ${chartMontos[ctx.dataIndex].toFixed(2)}`] } },
           },
           scales: {
             x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
