@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import type { UserSession, Proyecto } from '../../types'
 import { MONEDAS } from '../../types'
 import { AsignacionModal } from './AsignacionModal'
+import { StripePayPalConfig } from './StripePayPalConfig'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: '#22c55e' },
@@ -816,6 +817,21 @@ export function EmpresaSection({ currentUser }: Props) {
           </div>
         )}
       </div>
+
+      {/* Configuración de Pagos Online */}
+      {currentUser.company_id && (
+        <div style={{
+          background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+          borderRadius: '16px', padding: '24px',
+          border: '1px solid rgba(255,255,255,0.06)',
+          marginTop: '24px',
+        }}>
+          <StripePayPalConfig
+            companyId={currentUser.company_id}
+            onConfigUpdated={() => void cargar()}
+          />
+        </div>
+      )}
 
       {/* Modal de asignación */}
       {usuarioAsignar && (

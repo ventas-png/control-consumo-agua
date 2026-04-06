@@ -1,0 +1,124 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Import Stripe library
+const stripe = await import('https://esm.sh/stripe@13.10.0?target=deno')
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    // Validate caller using their JWT
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const callerClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    )
+
+    const { data: { user: caller }, error: callerError } = await callerClient.auth.getUser()
+    if (callerError || !caller) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const body = await req.json() as {
+      cliente_id: string
+      registro_id: string
+      company_id: string
+      monto: number
+    }
+
+    const { cliente_id, registro_id, company_id, monto } = body
+
+    if (!cliente_id || !registro_id || !company_id || !monto || monto <= 0) {
+      return new Response(JSON.stringify({ error: 'Invalid request parameters' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Get company Stripe configuration using admin client
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    const { data: company, error: companyError } = await adminClient
+      .from('companies')
+      .select('stripe_secret_key, stripe_configured')
+      .eq('id', company_id)
+      .single()
+
+    if (companyError || !company || !company.stripe_configured || !company.stripe_secret_key) {
+      return new Response(JSON.stringify({ error: 'Stripe not configured for this company' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Initialize Stripe with company's secret key
+    const Stripe = stripe.default || stripe
+    const stripeClient = new Stripe(company.stripe_secret_key)
+
+    // Get cliente info for payment description
+    const { data: cliente } = await adminClient
+      .from('clientes')
+      .select('nombre')
+      .eq('id', cliente_id)
+      .single()
+
+    // Create PaymentIntent
+    const paymentIntent = await stripeClient.paymentIntents.create({
+      amount: Math.round(monto * 100), // Convert to cents
+      currency: 'usd', // TODO: Make currency configurable per company
+      metadata: {
+        cliente_id,
+        registro_id,
+        company_id,
+      },
+      description: `Pago de agua - ${cliente?.nombre ?? 'Cliente'}`,
+    })
+
+    // Create payment_request record for tracking
+    const { error: paymentRequestError } = await adminClient
+      .from('payment_requests')
+      .insert({
+        cliente_id,
+        registro_id,
+        company_id,
+        monto,
+        provider: 'stripe',
+        estado: 'pending',
+        stripe_payment_intent: paymentIntent.id,
+      })
+
+    if (paymentRequestError) {
+      console.error('Error creating payment request record:', paymentRequestError)
+    }
+
+    return new Response(JSON.stringify({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+
+  } catch (err: any) {
+    console.error('Error creating payment intent:', err)
+    return new Response(JSON.stringify({ error: err.message || 'Failed to create payment intent' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+})
