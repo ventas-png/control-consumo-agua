@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad, UserSession, Ruta } from '../../types'
+import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad, UserSession, Ruta, AppSection } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { AdminDashboardStats } from './AdminDashboardStats'
 import { AdminDashboardCharts } from './AdminDashboardCharts'
 import { AdminClientsList } from './AdminClientsList'
 import { AdminNewReading } from './AdminNewReading'
 import { AdminHistoryTab } from './AdminHistoryTab'
+import { AdminQuickActions } from './AdminQuickActions'
 
 interface AdminDashboardData {
   clientes: Cliente[]
@@ -23,11 +24,12 @@ interface Props {
   data: AdminDashboardData
   moneda: string
   onDataRefresh: () => Promise<void>
+  onNavigateSection?: (section: AppSection) => void
 }
 
 type TabType = 'dashboard' | 'clientes' | 'nueva_lectura' | 'historial'
 
-export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh }: Props) {
+export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh, onNavigateSection }: Props) {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [loading, setLoading] = useState(false)
@@ -148,6 +150,11 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh 
               moneda={moneda}
               clientes={clientesEnProyecto}
             />
+            {onNavigateSection && (
+              <AdminQuickActions
+                onNavigate={(section) => onNavigateSection(section as AppSection)}
+              />
+            )}
             <div style={{ marginTop: '32px' }}>
               <AdminDashboardCharts
                 registros={registrosFiltrados}

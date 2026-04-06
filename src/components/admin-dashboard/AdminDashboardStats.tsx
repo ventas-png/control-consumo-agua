@@ -27,22 +27,25 @@ export function AdminDashboardStats({ registros, moneda, clientes }: Props) {
 
   const stats = [
     {
-      label: 'Consumo Total (mes)',
-      value: `${consumoTotal.toFixed(2)} m³`,
+      label: 'Consumo Este Mes',
+      value: `${consumoTotal.toFixed(2)}`,
+      unit: 'm³',
       icon: '💧',
       bg: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
       color: 'white',
     },
     {
-      label: `Recaudo (${moneda})`,
+      label: `Recaudo Estimado`,
       value: recaudoTotal.toFixed(2),
+      unit: moneda,
       icon: '💰',
       bg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
       color: 'white',
     },
     {
-      label: 'Pendientes de Pago',
+      label: 'Pendientes',
       value: `${pendientes}`,
+      unit: 'lecturas',
       icon: '⏳',
       bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
       color: 'white',
@@ -50,6 +53,7 @@ export function AdminDashboardStats({ registros, moneda, clientes }: Props) {
     {
       label: 'En Mora',
       value: `${enMora}`,
+      unit: 'pagos',
       icon: '⚠️',
       bg: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
       color: 'white',
@@ -57,13 +61,15 @@ export function AdminDashboardStats({ registros, moneda, clientes }: Props) {
     {
       label: 'Pagados',
       value: `${pagados}`,
+      unit: 'lecturas',
       icon: '✓',
       bg: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
       color: 'white',
     },
     {
       label: 'Clientes Activos',
-      value: `${clientesConLectura}/${totalClientes}`,
+      value: `${clientesConLectura}`,
+      unit: `de ${totalClientes}`,
       icon: '👥',
       bg: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
       color: 'white',
@@ -96,8 +102,13 @@ export function AdminDashboardStats({ registros, moneda, clientes }: Props) {
               <div style={{ fontSize: '13px', opacity: 0.9, fontWeight: '500', marginBottom: '8px' }}>
                 {stat.label}
               </div>
-              <div style={{ fontSize: '32px', fontWeight: '700', letterSpacing: '-1px' }}>
-                {stat.value}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                <div style={{ fontSize: '32px', fontWeight: '700', letterSpacing: '-1px' }}>
+                  {stat.value}
+                </div>
+                <div style={{ fontSize: '14px', opacity: 0.85, fontWeight: '500' }}>
+                  {stat.unit}
+                </div>
               </div>
             </div>
             <div style={{ fontSize: '32px', opacity: 0.8 }}>{stat.icon}</div>

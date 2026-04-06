@@ -23,7 +23,10 @@ export function AdminNewReading({ clientes, contadores, tarifas, onReadingAdded,
   const [preview, setPreview] = useState<{ image: File; preview: string } | null>(null)
 
   const selectedCliente = clientes.find(c => c.id === selectedClienteId)
-  const selectedTariff = tarifas.find(t => t.id === tariffId)
+  const proyectoTarifas = proyectoId
+    ? tarifas.filter(t => t.project_id === proyectoId)
+    : tarifas
+  const selectedTariff = proyectoTarifas.find(t => t.id === tariffId)
 
   // Calcular consumo y costo
   const consumo = Math.max(0, parseFloat(lecturaActual) - parseFloat(lecturaAnterior) || 0)

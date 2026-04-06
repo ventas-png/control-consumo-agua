@@ -327,6 +327,7 @@ export default function App() {
                 }}
                 moneda={moneda}
                 onDataRefresh={cargarDatos}
+                onNavigateSection={setActiveSection}
               />
             </ErrorBoundary>
           )}
