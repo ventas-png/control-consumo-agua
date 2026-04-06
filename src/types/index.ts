@@ -336,12 +336,45 @@ export interface Pago {
   numero_documento?: string | null;
   tipo_aplicacion?: TipoAplicacion;
   convenio_id?: string | null;
+  comprobante_url?: string | null;
+  comprobante_tipo?: 'imagen' | 'pdf' | null;
+  verification_status?: EstadoPago;
+  verification_notes?: string | null;
+  verified_by?: string | null;
+  verified_at?: string | null;
+  stripe_payment_intent_id?: string | null;
+  paypal_transaction_id?: string | null;
   estado: EstadoPago;
   notas?: string | null;
   created_by?: string | null;
   created_at: string;
-  // joins opcionales
   cliente_nombre?: string;
+}
+
+export interface CompanyPaymentConfig {
+  stripe_public_key?: string | null;
+  stripe_secret_key?: string | null;
+  stripe_configured: boolean;
+  stripe_webhook_secret?: string | null;
+  paypal_client_id?: string | null;
+  paypal_configured: boolean;
+}
+
+export interface PaymentRequest {
+  id: string;
+  cliente_id: string;
+  registro_id?: string | null;
+  company_id: string;
+  monto: number;
+  provider: 'stripe' | 'paypal' | 'manual';
+  estado: 'pending' | 'succeeded' | 'failed' | 'pending_verification';
+  stripe_payment_intent?: string | null;
+  paypal_order_id?: string | null;
+  numero_comprobante?: string | null;
+  referencia?: string | null;
+  notas?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ConvenioPago {
