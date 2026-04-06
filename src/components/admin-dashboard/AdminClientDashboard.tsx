@@ -17,6 +17,7 @@ interface AdminDashboardData {
   registrosCalidad: RegistroCalidad[]
   rutas: Ruta[]
   tarifas?: any[]
+  unidades?: any[]
 }
 
 interface Props {
@@ -41,20 +42,21 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
     }
   }, [data.proyectos, selectedProjectId])
 
+  // Obtener IDs de clientes que pertenecen al proyecto seleccionado (a través de unidades)
+  const clienteIdsEnProyecto = selectedProjectId
+    ? new Set((data.unidades || [])
+        .filter(u => u.project_id === selectedProjectId && u.cliente_id)
+        .map(u => u.cliente_id))
+    : new Set(data.clientes.map(c => c.id))
+
   // Filtrar clientes por proyecto
   const clientesEnProyecto = selectedProjectId
-    ? data.clientes.filter(c => {
-        // Buscar en company_clientes si el cliente está asignado a la empresa
-        return true // Los clientes ya están filtrados por empresa en el hook
-      })
+    ? data.clientes.filter(c => clienteIdsEnProyecto.has(c.id))
     : data.clientes
 
   // Filtrar registros por proyecto
   const registrosFiltrados = selectedProjectId
-    ? data.registros.filter(r => {
-        const cliente = data.clientes.find(c => c.id === r.cliente_id)
-        return cliente !== undefined
-      })
+    ? data.registros.filter(r => clienteIdsEnProyecto.has(r.cliente_id))
     : data.registros
 
   const handleReadingAdded = async () => {

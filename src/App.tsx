@@ -324,6 +324,7 @@ export default function App() {
                   registrosCalidad,
                   rutas,
                   tarifas,
+                  unidades,
                 }}
                 moneda={moneda}
                 onDataRefresh={cargarDatos}
