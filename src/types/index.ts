@@ -296,6 +296,7 @@ export type AppSection =
   | 'lecturas'
   | 'tabla'
   | 'dashboard'
+  | 'admin_dashboard'
   | 'mapa'
   | 'calidad'
   | 'rutas'

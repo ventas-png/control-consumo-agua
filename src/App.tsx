@@ -15,6 +15,7 @@ import { ClientesSection } from './components/clientes/ClientesSection'
 import { LecturasSection } from './components/lecturas/LecturasSection'
 import { HistorialSection } from './components/historial/HistorialSection'
 import { DashboardSection } from './components/dashboard/DashboardSection'
+import { AdminClientDashboard } from './components/admin-dashboard/AdminClientDashboard'
 import { MapaSection } from './components/mapa/MapaSection'
 import { CalidadSection } from './components/calidad/CalidadSection'
 import { RutasSection } from './components/rutas/RutasSection'
@@ -63,7 +64,7 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       if (currentUser.role === 'company_owner') {
-        setActiveSection('empresa_proyectos')
+        setActiveSection('admin_dashboard')
       } else if (currentUser.role === 'super_admin') {
         setActiveSection('superadmin_empresas')
       }
@@ -308,6 +309,25 @@ export default function App() {
           {activeSection === 'dashboard' && (
             <ErrorBoundary sectionName="dashboard">
               <DashboardSection registros={registros} moneda={moneda} />
+            </ErrorBoundary>
+          )}
+          {activeSection === 'admin_dashboard' && (
+            <ErrorBoundary sectionName="admin_dashboard">
+              <AdminClientDashboard
+                currentUser={currentUser}
+                data={{
+                  clientes,
+                  registros,
+                  proyectos,
+                  contadores,
+                  fuentesAgua,
+                  registrosCalidad,
+                  rutas,
+                  tarifas,
+                }}
+                moneda={moneda}
+                onDataRefresh={cargarDatos}
+              />
             </ErrorBoundary>
           )}
           {activeSection === 'mapa' && (
