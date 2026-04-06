@@ -14,7 +14,17 @@ interface Props {
 }
 
 export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
-  const [stripeConfig, setStripeConfig] = useState<{ stripe_configured: boolean }>({ stripe_configured: false })
+  const [paymentConfig, setPaymentConfig] = useState<{
+    stripe_configured: boolean
+    stripe_activo: boolean
+    paypal_configured: boolean
+    paypal_activo: boolean
+  }>({
+    stripe_configured: false,
+    stripe_activo: false,
+    paypal_configured: false,
+    paypal_activo: false,
+  })
   const [loading, setLoading] = useState(true)
   const [stripeModal, setStripeModal] = useState<Registro | null>(null)
   const [manualModal, setManualModal] = useState<Registro | null>(null)
@@ -27,10 +37,17 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
     if (!currentUser.company_id) return
     const { data } = await supabase
       .from('companies')
-      .select('stripe_configured')
+      .select('stripe_configured,stripe_activo,paypal_configured,paypal_activo')
       .eq('id', currentUser.company_id)
       .single()
-    if (data) setStripeConfig(data)
+    if (data) {
+      setPaymentConfig({
+        stripe_configured: data.stripe_configured || false,
+        stripe_activo: data.stripe_activo !== false,
+        paypal_configured: data.paypal_configured || false,
+        paypal_activo: data.paypal_activo !== false,
+      })
+    }
     setLoading(false)
   }
 
@@ -151,7 +168,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
 
                 {/* Botones de pago */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '140px' }}>
-                  {stripeConfig.stripe_configured && (
+                  {paymentConfig.stripe_activo && (
                     <button
                       onClick={() => setStripeModal(registro)}
                       style={{
@@ -166,7 +183,31 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      💳 Pagar Online
+                      💳 Pagar Stripe
+                    </button>
+                  )}
+                  {paymentConfig.paypal_activo && (
+                    <button
+                      onClick={() => {
+                        void Swal.fire({
+                          icon: 'info',
+                          title: 'PayPal',
+                          text: 'Integración de PayPal disponible próximamente',
+                        })
+                      }}
+                      style={{
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: 'linear-gradient(135deg, #0070ba, #003d7a)',
+                        color: 'white',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      🅿️ Pagar PayPal
                     </button>
                   )}
                   <button
@@ -183,7 +224,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    📄 Registrar Pago
+                    📄 Registrar Pago Manual
                   </button>
                 </div>
               </div>
