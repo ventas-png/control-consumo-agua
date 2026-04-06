@@ -351,7 +351,8 @@ export function EmpresaSection({ currentUser }: Props) {
         <input id="swal-password" class="swal2-input" placeholder="Contraseña temporal" type="password" />
         <select id="swal-rol" class="swal2-select" style="width:100%;margin-top:8px;padding:10px;border-radius:6px;border:1px solid #d0d3d4">
           <option value="admin">Administrador</option>
-          <option value="operator">Operador</option>
+          <option value="operator">Operador (Lecturas)</option>
+          <option value="collector">Gestor de Cobros</option>
           <option value="viewer">Visualizador</option>
         </select>
       `,

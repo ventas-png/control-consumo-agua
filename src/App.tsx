@@ -26,6 +26,7 @@ import { SuperAdminSection } from './components/superadmin/SuperAdminSection'
 import { TarifasSection } from './components/tarifas/TarifasSection'
 import { ContadoresSection } from './components/contadores/ContadoresSection'
 import { UnidadesSection } from './components/unidades/UnidadesSection'
+import { CobrosSection } from './components/cobros/CobrosSection'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 initEmailJS()
@@ -67,6 +68,8 @@ export default function App() {
         setActiveSection('admin_dashboard')
       } else if (currentUser.role === 'super_admin') {
         setActiveSection('superadmin_empresas')
+      } else if (currentUser.role === 'collector') {
+        setActiveSection('cobros')
       }
       // 'cliente' role is handled by its own portal render path — no section needed
     }
@@ -303,6 +306,23 @@ export default function App() {
                 userRole={currentUser.role}
                 moneda={moneda}
                 onEstadoUpdated={updateRegistroEstado}
+              />
+            </ErrorBoundary>
+          )}
+          {activeSection === 'cobros' && (
+            <ErrorBoundary sectionName="cobros">
+              <CobrosSection
+                registros={registros}
+                clientes={clientes}
+                userRole={currentUser.role}
+                currentUser={currentUser}
+                moneda={moneda}
+                onEstadoUpdated={updateRegistroEstado}
+                onRegistroUpdated={(id, partial) => {
+                  if (partial.monto_pagado !== undefined) {
+                    updateRegistroEstado(id, partial.estado ?? 'pendiente')
+                  }
+                }}
               />
             </ErrorBoundary>
           )}

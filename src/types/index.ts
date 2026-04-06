@@ -57,6 +57,8 @@ export interface Registro {
   monto_calculado: number;
   tipo_cobro: string;
   estado: 'pendiente' | 'pagado' | 'mora';
+  monto_pagado?: number;
+  fecha_pago?: string | null;
   mes?: string;
   notas?: string;
   gps?: GPS;
@@ -108,7 +110,7 @@ export interface RegistroCalidad {
   };
 }
 
-export type UserRole = 'admin' | 'super_admin' | 'company_owner' | 'operator' | 'viewer' | 'cliente';
+export type UserRole = 'admin' | 'super_admin' | 'company_owner' | 'operator' | 'viewer' | 'cliente' | 'collector';
 
 export interface UserSession {
   user_id: string;
@@ -297,6 +299,7 @@ export type AppSection =
   | 'tabla'
   | 'dashboard'
   | 'admin_dashboard'
+  | 'cobros'
   | 'mapa'
   | 'calidad'
   | 'rutas'
@@ -307,6 +310,60 @@ export type AppSection =
   | 'perfil'
   | 'empresa_proyectos'
   | 'superadmin_empresas';
+
+export type FormaPago =
+  | 'efectivo'
+  | 'transferencia'
+  | 'deposito'
+  | 'tarjeta_credito'
+  | 'tarjeta_debito'
+  | 'cheque'
+  | 'convenio_pago'
+  | 'otro';
+
+export type TipoAplicacion = 'pago_total' | 'abono' | 'convenio';
+export type EstadoPago = 'pendiente' | 'verificado' | 'rechazado' | 'aplicado';
+export type EstadoConvenio = 'activo' | 'completado' | 'incumplido' | 'cancelado';
+
+export interface Pago {
+  id: string;
+  registro_id?: string | null;
+  cliente_id: string;
+  project_id?: string | null;
+  monto: number;
+  metodo: FormaPago;
+  referencia?: string | null;
+  numero_documento?: string | null;
+  tipo_aplicacion?: TipoAplicacion;
+  convenio_id?: string | null;
+  estado: EstadoPago;
+  notas?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  // joins opcionales
+  cliente_nombre?: string;
+}
+
+export interface ConvenioPago {
+  id: string;
+  cliente_id: string;
+  project_id?: string | null;
+  company_id?: string | null;
+  numero_convenio: string;
+  descripcion?: string | null;
+  monto_total: number;
+  monto_pagado: number;
+  cuotas_pactadas?: number | null;
+  fecha_inicio: string;
+  fecha_vencimiento?: string | null;
+  estado: EstadoConvenio;
+  registro_ids: string[];
+  notas?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  // join opcional
+  cliente_nombre?: string;
+}
 
 export interface CostoCalculo {
   total: number;

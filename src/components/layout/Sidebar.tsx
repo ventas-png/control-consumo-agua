@@ -20,6 +20,16 @@ const TABS: Tab[] = [
     ),
   },
   {
+    id: 'cobros',
+    label: 'Cobros',
+    roles: ['collector', 'admin', 'super_admin', 'company_owner'],
+    icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+    ),
+  },
+  {
     id: 'admin_dashboard',
     label: 'Dashboard',
     roles: ['company_owner'],
@@ -187,6 +197,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   operator: 'Operador',
   viewer: 'Visualizador',
   cliente: 'Cliente',
+  collector: 'Gestor de Cobros',
 }
 
 export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogout, isOpen }: Props) {
