@@ -416,12 +416,14 @@ export function EmpresaSection({ currentUser }: Props) {
     admin: 'Administrador',
     operator: 'Operador', operador: 'Operador',
     viewer: 'Visualizador', visor: 'Visualizador',
+    collector: 'Gestor de Cobros',
   }
 
   const roleBadgeColor: Record<string, string> = {
     admin: '#0ea5e9',
     operator: '#10b981', operador: '#10b981',
     viewer: '#8b5cf6', visor: '#8b5cf6',
+    collector: '#f59e0b',
   }
 
   if (loading) {

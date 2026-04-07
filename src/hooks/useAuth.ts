@@ -97,6 +97,7 @@ async function buildSessionFromSupabase(
   else if (dbRole === 'operador' || dbRole === 'user' || dbRole === 'operator') uiRole = 'operator'
   else if (dbRole === 'cliente') uiRole = 'cliente'
   else if (dbRole === 'visor' || dbRole === 'viewer') uiRole = 'viewer'
+  else if (dbRole === 'collector') uiRole = 'collector'
 
   const displayName = prof?.full_name ?? email
 
