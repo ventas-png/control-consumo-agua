@@ -15,6 +15,7 @@ import { ClientesSection } from './components/clientes/ClientesSection'
 import { LecturasSection } from './components/lecturas/LecturasSection'
 import { HistorialSection } from './components/historial/HistorialSection'
 import { DashboardSection } from './components/dashboard/DashboardSection'
+import { AdminClientDashboard } from './components/admin-dashboard/AdminClientDashboard'
 import { MapaSection } from './components/mapa/MapaSection'
 import { CalidadSection } from './components/calidad/CalidadSection'
 import { RutasSection } from './components/rutas/RutasSection'
@@ -25,6 +26,7 @@ import { SuperAdminSection } from './components/superadmin/SuperAdminSection'
 import { TarifasSection } from './components/tarifas/TarifasSection'
 import { ContadoresSection } from './components/contadores/ContadoresSection'
 import { UnidadesSection } from './components/unidades/UnidadesSection'
+import { CobrosSection } from './components/cobros/CobrosSection'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 initEmailJS()
@@ -63,9 +65,11 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       if (currentUser.role === 'company_owner') {
-        setActiveSection('empresa_proyectos')
+        setActiveSection('admin_dashboard')
       } else if (currentUser.role === 'super_admin') {
         setActiveSection('superadmin_empresas')
+      } else if (currentUser.role === 'collector') {
+        setActiveSection('cobros')
       }
       // 'cliente' role is handled by its own portal render path — no section needed
     }
@@ -305,9 +309,47 @@ export default function App() {
               />
             </ErrorBoundary>
           )}
+          {activeSection === 'cobros' && (
+            <ErrorBoundary sectionName="cobros">
+              <CobrosSection
+                registros={registros}
+                clientes={clientes}
+                userRole={currentUser.role}
+                currentUser={currentUser}
+                moneda={moneda}
+                onEstadoUpdated={updateRegistroEstado}
+                onRegistroUpdated={(id, partial) => {
+                  if (partial.monto_pagado !== undefined) {
+                    updateRegistroEstado(id, partial.estado ?? 'pendiente')
+                  }
+                }}
+              />
+            </ErrorBoundary>
+          )}
           {activeSection === 'dashboard' && (
             <ErrorBoundary sectionName="dashboard">
               <DashboardSection registros={registros} moneda={moneda} />
+            </ErrorBoundary>
+          )}
+          {activeSection === 'admin_dashboard' && (
+            <ErrorBoundary sectionName="admin_dashboard">
+              <AdminClientDashboard
+                currentUser={currentUser}
+                data={{
+                  clientes,
+                  registros,
+                  proyectos,
+                  contadores,
+                  fuentesAgua,
+                  registrosCalidad,
+                  rutas,
+                  tarifas,
+                  unidades,
+                }}
+                moneda={moneda}
+                onDataRefresh={cargarDatos}
+                onNavigateSection={setActiveSection}
+              />
             </ErrorBoundary>
           )}
           {activeSection === 'mapa' && (
