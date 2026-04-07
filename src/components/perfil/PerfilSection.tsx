@@ -16,6 +16,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrador',
   operator: 'Operador',
   viewer: 'Visualizador',
+  collector: 'Gestor de Cobros',
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -23,6 +24,7 @@ const ROLE_COLORS: Record<string, string> = {
   admin: '#0ea5e9',
   operator: '#0d9488',
   viewer: '#64748b',
+  collector: '#f59e0b',
 }
 
 type FeedbackState = { type: 'success' | 'error'; msg: string } | null
