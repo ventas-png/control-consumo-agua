@@ -88,6 +88,14 @@ Deno.serve(async (req) => {
         .single()
 
       if (paymentRequest) {
+        // SECURITY: Validate company ownership to prevent cross-company pago creation
+        if (paymentRequest.company_id !== companyId) {
+          console.error('Company mismatch in webhook: payment_requests.company_id != verified webhook company_id')
+          return new Response(JSON.stringify({ error: 'Company validation failed' }), {
+            status: 400, headers: { 'Content-Type': 'application/json' },
+          })
+        }
+
         // Create pago record with 'verificado' status (auto-verified via webhook)
         const { error: pagoError } = await adminClient
           .from('pagos')

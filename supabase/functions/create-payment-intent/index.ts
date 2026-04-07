@@ -50,6 +50,19 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Validate that caller belongs to the requested company (CRITICAL SECURITY CHECK)
+    const { data: callerProfile } = await callerClient
+      .from('app_users')
+      .select('company_id')
+      .eq('id', caller.id)
+      .single()
+
+    if (callerProfile?.company_id !== company_id) {
+      return new Response(JSON.stringify({ error: 'Cannot create payment intent for other companies' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // Get company Stripe configuration using admin client
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
