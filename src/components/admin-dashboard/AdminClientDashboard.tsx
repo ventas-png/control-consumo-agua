@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad, UserSession, Ruta, AppSection } from '../../types'
-import { supabase } from '../../lib/supabase'
 import { AdminDashboardStats } from './AdminDashboardStats'
 import { AdminDashboardCharts } from './AdminDashboardCharts'
 import { AdminClientsList } from './AdminClientsList'
@@ -30,10 +29,9 @@ interface Props {
 
 type TabType = 'dashboard' | 'clientes' | 'nueva_lectura' | 'historial'
 
-export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh, onNavigateSection }: Props) {
+export function AdminClientDashboard({ data, moneda, onDataRefresh, onNavigateSection }: Props) {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
-  const [loading, setLoading] = useState(false)
 
   // Cargar datos específicos al montar
   useEffect(() => {
@@ -60,13 +58,8 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
     : data.registros
 
   const handleReadingAdded = async () => {
-    setLoading(true)
-    try {
-      await onDataRefresh()
-      setActiveTab('historial')
-    } finally {
-      setLoading(false)
-    }
+    await onDataRefresh()
+    setActiveTab('historial')
   }
 
   // Tabs de navegación

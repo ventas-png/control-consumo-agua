@@ -12,7 +12,7 @@ interface Props {
   proyectoId: string
 }
 
-export function AdminNewReading({ clientes, contadores, tarifas, onReadingAdded, proyectoId }: Props) {
+export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId }: Props) {
   const [selectedClienteId, setSelectedClienteId] = useState('')
   const [lecturaAnterior, setLecturaAnterior] = useState('')
   const [lecturaActual, setLecturaActual] = useState('')

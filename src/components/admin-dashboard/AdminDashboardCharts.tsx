@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Chart, registerables } from 'chart.js'
 import type { Registro, Cliente } from '../../types'
 
@@ -9,7 +9,7 @@ interface Props {
   clientes: Cliente[]
 }
 
-export function AdminDashboardCharts({ registros, clientes }: Props) {
+export function AdminDashboardCharts({ registros }: Props) {
   const chartRef = useRef<HTMLCanvasElement>(null)
   const chartRef2 = useRef<HTMLCanvasElement>(null)
   const chartInstance = useRef<Chart | null>(null)

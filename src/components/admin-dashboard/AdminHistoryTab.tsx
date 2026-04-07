@@ -284,7 +284,6 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
                       key={registro.id}
                       style={{
                         borderBottom: '1px solid #e2e8f0',
-                        '&:hover': { background: '#f8fafc' },
                       }}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLTableRowElement).style.background = '#f8fafc'

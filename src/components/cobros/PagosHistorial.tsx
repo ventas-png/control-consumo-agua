@@ -10,7 +10,7 @@ interface Props {
   formasPagoLabels: Record<FormaPago, string>
 }
 
-export function PagosHistorial({ pagos, clientes, registros, moneda, loading, formasPagoLabels }: Props) {
+export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLabels }: Props) {
   const [busqueda, setBusqueda] = useState('')
   const [filtroMetodo, setFiltroMetodo] = useState<string>('todos')
   const [filtroFecha, setFiltroFecha] = useState<'hoy' | 'semana' | 'mes' | 'todos'>('todos')
