@@ -208,6 +208,8 @@ export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogo
 
   return (
     <aside
+      role="navigation"
+      aria-label="Menu principal"
       className={`app-sidebar${isOpen ? ' open' : ''}`}
       style={{
         width: '256px',
@@ -273,6 +275,8 @@ export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogo
           return (
             <button
               key={tab.id}
+              aria-label={`Ir a ${tab.label}`}
+              aria-current={activeSection === tab.id ? 'page' : undefined}
               onClick={() => onSelect(tab.id)}
               onMouseEnter={() => setHoveredTab(tab.id)}
               onMouseLeave={() => setHoveredTab(null)}

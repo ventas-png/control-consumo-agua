@@ -395,7 +395,7 @@ export function ImportContadoresModal({ currentUser, onClose, onImportado }: Pro
                   <thead>
                     <tr style={{ background: '#f8fafc' }}>
                       {['Fila', 'N° Serie', 'Tipo', 'Lectura inicial', 'Marca', 'Estado'].map(h => (
-                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
+                        <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>

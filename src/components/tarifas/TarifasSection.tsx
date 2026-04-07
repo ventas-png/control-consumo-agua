@@ -495,16 +495,16 @@ export function TarifasSection({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Nombre</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tipo de Agua</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Precio/m³</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Precio Exceso/m³</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Canon Fijo</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Cons. Mínimo</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Revisión</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Nombre</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tipo de Agua</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Precio/m³</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Precio Exceso/m³</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Canon Fijo</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Cons. Mínimo</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Revisión</th>
                   {canEdit && (
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
+                    <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
                   )}
                 </tr>
               </thead>

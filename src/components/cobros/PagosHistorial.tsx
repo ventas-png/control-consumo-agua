@@ -101,7 +101,7 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
               <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                 <tr>
                   {['Fecha','Cliente','Monto','Forma de Pago','N° Documento','Referencia / Banco','Notas'].map(h => (
-                    <th key={h} style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th scope="col" key={h} style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>

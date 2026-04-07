@@ -465,7 +465,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 <thead>
                   <tr style={{ background: '#f8fafc' }}>
                     {['Tipo de Agua', 'Contadores', 'Consumo Mes (m³)', 'Consumo 12 meses (m³)'].map(h => (
-                      <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 600, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
+                      <th scope="col" key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 600, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -879,7 +879,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                   <thead>
                                     <tr style={{ background: '#f8fafc' }}>
                                       {['Fecha', 'Período', 'Lect. anterior', 'Lect. actual', 'Consumo (m³)', `Monto (${moneda})`, 'Estado'].map(h => (
-                                        <th key={h} style={{
+                                        <th scope="col" key={h} style={{
                                           padding: '10px 14px', textAlign: 'left',
                                           fontSize: '11.5px', fontWeight: 600,
                                           color: '#64748b', whiteSpace: 'nowrap',

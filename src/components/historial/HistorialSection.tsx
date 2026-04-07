@@ -99,7 +99,7 @@ export function HistorialSection({ registros, clientes, userRole, moneda = 'Q', 
           <thead style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white' }}>
             <tr>
               {['Fecha', 'Cliente', 'Lect. Ant.', 'Lect. Act.', 'Consumo', `Total (${moneda})`, 'Estado', 'Acciones'].map(h => (
-                <th key={h} style={{ padding: '14px 12px', textAlign: 'left' }}>{h}</th>
+                <th scope="col" key={h} style={{ padding: '14px 12px', textAlign: 'left' }}>{h}</th>
               ))}
             </tr>
           </thead>

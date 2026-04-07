@@ -328,13 +328,13 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                 <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                   <tr>
                     {canEdit && (
-                      <th style={{ padding: '14px 16px', textAlign: 'center', width: '44px' }}>
+                      <th scope="col" style={{ padding: '14px 16px', textAlign: 'center', width: '44px' }}>
                         <input type="checkbox" checked={selectedRows.size === registrosFiltrados.length && registrosFiltrados.length > 0}
                           onChange={toggleAll} style={{ cursor: 'pointer', width: '16px', height: '16px' }} />
                       </th>
                     )}
                     {['Cliente','Fecha','Cargo ('+moneda+')','Abonado','Saldo','Estado','Acciones'].map(h => (
-                      <th key={h} style={{ padding: '14px 16px', textAlign: h === 'Cargo ('+moneda+')' || h === 'Abonado' || h === 'Saldo' ? 'right' : 'left', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>{h}</th>
+                      <th scope="col" key={h} style={{ padding: '14px 16px', textAlign: h === 'Cargo ('+moneda+')' || h === 'Abonado' || h === 'Saldo' ? 'right' : 'left', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>

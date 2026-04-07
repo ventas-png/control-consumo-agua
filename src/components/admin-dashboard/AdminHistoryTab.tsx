@@ -195,7 +195,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
           }}>
             <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
               <tr>
-                <th
+                <th scope="col"
                   onClick={() => handleSort('fecha')}
                   style={{
                     padding: '16px',
@@ -209,7 +209,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
                 >
                   Fecha {sortField === 'fecha' && (sortOrder === 'asc' ? '↑' : '↓')}
                 </th>
-                <th
+                <th scope="col"
                   onClick={() => handleSort('cliente')}
                   style={{
                     padding: '16px',
@@ -222,7 +222,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
                 >
                   Cliente {sortField === 'cliente' && (sortOrder === 'asc' ? '↑' : '↓')}
                 </th>
-                <th
+                <th scope="col"
                   onClick={() => handleSort('consumo')}
                   style={{
                     padding: '16px',
@@ -235,7 +235,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
                 >
                   Consumo {sortField === 'consumo' && (sortOrder === 'asc' ? '↑' : '↓')}
                 </th>
-                <th
+                <th scope="col"
                   onClick={() => handleSort('monto')}
                   style={{
                     padding: '16px',
@@ -248,7 +248,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
                 >
                   Monto {sortField === 'monto' && (sortOrder === 'asc' ? '↑' : '↓')}
                 </th>
-                <th
+                <th scope="col"
                   onClick={() => handleSort('estado')}
                   style={{
                     padding: '16px',

@@ -223,11 +223,11 @@ export function CalidadSection({
       <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
           <thead><tr style="background:#f1f5f9;">
-            <th style="padding:8px;text-align:left;">Parámetro</th>
-            <th style="padding:8px;text-align:center;">Unidad</th>
-            <th style="padding:8px;text-align:center;">Valor</th>
-            <th style="padding:8px;text-align:center;">Rango</th>
-            <th style="padding:8px;text-align:center;">Estado</th>
+            <th scope="col" style="padding:8px;text-align:left;">Parámetro</th>
+            <th scope="col" style="padding:8px;text-align:center;">Unidad</th>
+            <th scope="col" style="padding:8px;text-align:center;">Valor</th>
+            <th scope="col" style="padding:8px;text-align:center;">Rango</th>
+            <th scope="col" style="padding:8px;text-align:center;">Estado</th>
           </tr></thead>
           <tbody>${filas}</tbody>
         </table>
@@ -319,7 +319,7 @@ export function CalidadSection({
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                 <thead><tr style={{ background: '#f1f5f9' }}>
-                  {['ID', 'Identificador', 'Nombre', 'Tipología', 'Estado', 'Acciones'].map(h => <th key={h} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e2e8f0' }}>{h}</th>)}
+                  {['ID', 'Identificador', 'Nombre', 'Tipología', 'Estado', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e2e8f0' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {fuentesAgua.map(f => {
@@ -484,7 +484,7 @@ export function CalidadSection({
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
               <thead><tr style={{ background: '#f1f5f9' }}>
-                {['Fecha', 'Fuente', 'Tipología', 'Resultado', 'Observaciones', 'Acciones'].map(h => <th key={h} style={{ padding: '10px', textAlign: h === 'Resultado' || h === 'Acciones' ? 'center' : 'left', borderBottom: '2px solid #e2e8f0' }}>{h}</th>)}
+                {['Fecha', 'Fuente', 'Tipología', 'Resultado', 'Observaciones', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: h === 'Resultado' || h === 'Acciones' ? 'center' : 'left', borderBottom: '2px solid #e2e8f0' }}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {historialFiltrado.map(r => {
