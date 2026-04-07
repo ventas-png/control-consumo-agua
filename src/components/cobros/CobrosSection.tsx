@@ -15,6 +15,9 @@ interface Props {
   moneda?: string
   onEstadoUpdated: (id: string, estado: Registro['estado']) => void
   onRegistroUpdated?: (id: string, partial: Partial<Registro>) => void
+  canCreate?: boolean
+  canEdit?: boolean
+  canChangeStatus?: boolean
 }
 
 type Tab = 'pendientes' | 'verificaciones' | 'historial' | 'convenios'
@@ -30,7 +33,7 @@ const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
   otro: '📎 Otro',
 }
 
-export function CobrosSection({ registros, clientes, userRole, currentUser, moneda = 'Q', onEstadoUpdated, onRegistroUpdated }: Props) {
+export function CobrosSection({ registros, clientes, userRole, currentUser, moneda = 'Q', onEstadoUpdated, onRegistroUpdated, canCreate: _canCreate = true, canEdit: _canEdit = true, canChangeStatus: _canChangeStatus = true }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('pendientes')
   const [filtroBusqueda, setFiltroBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'pendiente' | 'mora'>('todos')

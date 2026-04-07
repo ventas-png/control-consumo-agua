@@ -12,15 +12,17 @@ interface Props {
   userRole: UserRole
   moneda?: string
   onEstadoUpdated: (id: string, estado: Registro['estado']) => void
+  canEdit?: boolean
+  canChangeStatus?: boolean
 }
 
-export function HistorialSection({ registros, clientes, userRole, moneda = 'Q', onEstadoUpdated }: Props) {
+export function HistorialSection({ registros, clientes, userRole, moneda = 'Q', onEstadoUpdated, canEdit: canEditProp = true, canChangeStatus: canChangeStatusProp = true }: Props) {
   const [filtroTexto, setFiltroTexto] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [editModal, setEditModal] = useState<{ registroId: string; estado: Registro['estado'] } | null>(null)
   const [savingEstado, setSavingEstado] = useState(false)
 
-  const canEdit = userRole !== 'viewer'
+  const canEdit = canEditProp && canChangeStatusProp && userRole !== 'viewer'
 
   const filtrados = registros
     .filter(r => {

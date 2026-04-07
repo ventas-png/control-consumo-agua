@@ -176,6 +176,7 @@ interface Props {
   activeSection: AppSection
   userRole: UserRole
   currentUser: UserSession
+  canViewModule: (moduleKey: string) => boolean
   onSelect: (section: AppSection) => void
   onLogout: () => void
   isOpen: boolean
@@ -200,11 +201,21 @@ const ROLE_LABELS: Record<UserRole, string> = {
   collector: 'Gestor de Cobros',
 }
 
-export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogout, isOpen }: Props) {
+const NON_CONFIGURABLE = ['perfil', 'admin_dashboard', 'empresa_proyectos', 'superadmin_empresas']
+const BYPASS_ROLES: UserRole[] = ['super_admin', 'company_owner']
+
+export function Sidebar({ activeSection, userRole, currentUser, canViewModule, onSelect, onLogout, isOpen }: Props) {
   const [hoveredTab, setHoveredTab] = useState<AppSection | null>(null)
   const [hoveredLogout, setHoveredLogout] = useState(false)
   const [hoveredProfile, setHoveredProfile] = useState(false)
-  const visibleTabs = TABS.filter(t => t.roles.includes(userRole))
+  const visibleTabs = TABS.filter(t => {
+    // Módulos no-configurables: filtrar solo por rol
+    if (NON_CONFIGURABLE.includes(t.id)) return t.roles.includes(userRole)
+    // Roles exentos: filtrar solo por rol
+    if (BYPASS_ROLES.includes(userRole)) return t.roles.includes(userRole)
+    // Roles configurables: verificar permisos de módulo
+    return canViewModule(t.id)
+  })
 
   return (
     <aside

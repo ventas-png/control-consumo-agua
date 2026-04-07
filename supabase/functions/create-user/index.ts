@@ -118,6 +118,16 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Poblar permisos de módulos por defecto según el rol
+    const { error: permError } = await adminClient.rpc('populate_default_module_permissions', {
+      p_user_id: newUser.user.id,
+      p_role: role,
+    })
+    if (permError) {
+      console.error('Warning: could not populate default module permissions:', permError.message)
+      // No rollback — permisos se pueden configurar después manualmente
+    }
+
     return new Response(JSON.stringify({ user_id: newUser.user.id }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

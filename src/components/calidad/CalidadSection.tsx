@@ -16,6 +16,8 @@ interface Props {
   userId?: string
   onFuentesUpdated: (fuentes: FuenteAgua[]) => void
   onRegistrosCalidadUpdated: (registros: RegistroCalidad[]) => void
+  canCreate?: boolean
+  canEdit?: boolean
 }
 
 async function recargarFuentes(): Promise<FuenteAgua[]> {
@@ -34,6 +36,7 @@ async function recargarRegistrosCalidad(): Promise<RegistroCalidad[]> {
 export function CalidadSection({
   fuentesAgua, registrosCalidad, empresa, userId,
   onFuentesUpdated, onRegistrosCalidadUpdated,
+  canCreate: _canCreate = true, canEdit: _canEdit = true,
 }: Props) {
   const [subTab, setSubTab] = useState<SubTab>('fuentes')
 

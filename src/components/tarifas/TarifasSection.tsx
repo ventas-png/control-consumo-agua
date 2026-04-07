@@ -15,6 +15,8 @@ interface Props {
   onTarifaAdded: (tarifa: Tarifa) => void
   onTarifaUpdated: (id: string, partial: Partial<Tarifa>) => void
   onTarifaDeleted: (id: string) => void
+  canCreate?: boolean
+  canEdit?: boolean
 }
 
 const TIPOS_AGUA = [
@@ -54,6 +56,8 @@ export function TarifasSection({
   onTarifaAdded,
   onTarifaUpdated,
   onTarifaDeleted,
+  canCreate: _canCreate = true,
+  canEdit: _canEdit = true,
 }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)

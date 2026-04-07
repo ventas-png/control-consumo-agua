@@ -112,6 +112,16 @@ export interface RegistroCalidad {
 
 export type UserRole = 'admin' | 'super_admin' | 'company_owner' | 'operator' | 'viewer' | 'cliente' | 'collector';
 
+export interface ModulePermission {
+  module_key: string
+  can_view: boolean
+  can_create: boolean
+  can_edit: boolean
+  can_change_status: boolean
+}
+
+export type ModulePermissionsMap = Record<string, ModulePermission>
+
 export interface UserSession {
   user_id: string;
   email: string;
@@ -121,6 +131,7 @@ export interface UserSession {
   cliente_id?: string;
   login_time: string;
   expires_at: string;
+  module_permissions?: ModulePermissionsMap;
 }
 
 export interface Ruta {

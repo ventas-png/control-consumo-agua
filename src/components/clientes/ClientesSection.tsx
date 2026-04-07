@@ -17,6 +17,9 @@ interface Props {
   onClienteAdded: (cliente: Cliente) => void
   onClienteUpdated: (id: string, partial: Partial<Cliente>) => void
   onClienteDeleted: (id: string) => void
+  canCreate?: boolean
+  canEdit?: boolean
+  canChangeStatus?: boolean
 }
 
 const EMPTY_FORM = {
@@ -49,7 +52,7 @@ interface LookupForm {
 
 const EMPTY_LOOKUP: LookupForm = { cui_dui: '', fecha_nacimiento: '', email: '' }
 
-export function ClientesSection({ clientes, userRole, userId, currentUser, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
+export function ClientesSection({ clientes, userRole, userId, currentUser, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted, canCreate: canCreateProp = true, canEdit: canEditProp = true, canChangeStatus = true }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -62,7 +65,8 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
   const [lookupForm, setLookupForm] = useState<LookupForm>(EMPTY_LOOKUP)
   const [lookupResult, setLookupResult] = useState<ClienteLookupResult | null>(null)
 
-  const canEdit = userRole !== 'viewer'
+  const canEdit = canEditProp && userRole !== 'viewer'
+  const canCreate = canCreateProp && userRole !== 'viewer'
 
   function startCreate() {
     setForm(EMPTY_FORM)

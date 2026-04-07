@@ -29,6 +29,7 @@ import { UnidadesSection } from './components/unidades/UnidadesSection'
 import { CobrosSection } from './components/cobros/CobrosSection'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RoleGuard } from './components/shared/AccessDenied'
+import { usePermissions } from './hooks/usePermissions'
 
 initEmailJS()
 
@@ -48,6 +49,8 @@ export default function App() {
     addContador, updateContador, deleteContador,
     addUnidad, updateUnidad, deleteUnidad,
   } = useData(currentUser?.company_id)
+
+  const { canViewModule, canCreate, canEdit, canChangeStatus } = usePermissions(currentUser)
 
   const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -217,6 +220,7 @@ export default function App() {
         activeSection={activeSection}
         userRole={currentUser.role}
         currentUser={currentUser}
+        canViewModule={canViewModule}
         onSelect={(section) => { setActiveSection(section); setSidebarOpen(false) }}
         onLogout={logout}
         isOpen={sidebarOpen}
@@ -279,6 +283,9 @@ export default function App() {
                 onClienteAdded={addCliente}
                 onClienteUpdated={updateCliente}
                 onClienteDeleted={deleteCliente}
+                canCreate={canCreate('clientes')}
+                canEdit={canEdit('clientes')}
+                canChangeStatus={canChangeStatus('clientes')}
               />
             </ErrorBoundary>
           )}
@@ -296,6 +303,7 @@ export default function App() {
                 rutaActiva={rutaActivaParaLecturas}
                 onClearRuta={() => setRutaActivaParaLecturas(null)}
                 onRutaCompletada={id => updateRuta(id, { completada: true })}
+                canCreate={canCreate('lecturas')}
               />
             </ErrorBoundary>
           )}
@@ -307,6 +315,8 @@ export default function App() {
                 userRole={currentUser.role}
                 moneda={moneda}
                 onEstadoUpdated={updateRegistroEstado}
+                canEdit={canEdit('tabla')}
+                canChangeStatus={canChangeStatus('tabla')}
               />
             </ErrorBoundary>
           )}
@@ -325,6 +335,9 @@ export default function App() {
                     updateRegistroEstado(id, partial.estado ?? 'pendiente')
                   }
                 }}
+                canCreate={canCreate('cobros')}
+                canEdit={canEdit('cobros')}
+                canChangeStatus={canChangeStatus('cobros')}
               />
               </RoleGuard>
             </ErrorBoundary>
@@ -372,6 +385,8 @@ export default function App() {
                 onRutaUpdated={updateRuta}
                 onRutaDeleted={deleteRuta}
                 onEjecutarRuta={onEjecutarRuta}
+                canCreate={canCreate('rutas')}
+                canEdit={canEdit('rutas')}
               />
             </ErrorBoundary>
           )}
@@ -384,6 +399,8 @@ export default function App() {
                 userId={currentUser.user_id}
                 onFuentesUpdated={setFuentesAgua}
                 onRegistrosCalidadUpdated={setRegistrosCalidad}
+                canCreate={canCreate('calidad')}
+                canEdit={canEdit('calidad')}
               />
             </ErrorBoundary>
           )}
@@ -417,6 +434,8 @@ export default function App() {
                 onTarifaAdded={addTarifa}
                 onTarifaUpdated={updateTarifa}
                 onTarifaDeleted={deleteTarifa}
+                canCreate={canCreate('tarifas')}
+                canEdit={canEdit('tarifas')}
               />
             </ErrorBoundary>
           )}
@@ -434,6 +453,8 @@ export default function App() {
                 onUnidadUpdated={updateUnidad}
                 onUnidadDeleted={deleteUnidad}
                 onContadorUpdated={updateContador}
+                canCreate={canCreate('unidades')}
+                canEdit={canEdit('unidades')}
               />
             </ErrorBoundary>
           )}
@@ -449,6 +470,8 @@ export default function App() {
                 onContadorAdded={addContador}
                 onContadorUpdated={updateContador}
                 onContadorDeleted={deleteContador}
+                canCreate={canCreate('contadores')}
+                canEdit={canEdit('contadores')}
               />
             </ErrorBoundary>
           )}

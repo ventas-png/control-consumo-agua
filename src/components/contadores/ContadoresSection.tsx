@@ -17,6 +17,8 @@ interface Props {
   onContadorAdded: (contador: Contador) => void
   onContadorUpdated: (id: string, partial: Partial<Contador>) => void
   onContadorDeleted: (id: string) => void
+  canCreate?: boolean
+  canEdit?: boolean
 }
 
 const TIPOS_AGUA: { value: TipoAgua; label: string }[] = [
@@ -111,6 +113,8 @@ export function ContadoresSection({
   onContadorAdded,
   onContadorUpdated,
   onContadorDeleted,
+  canCreate: _canCreate = true,
+  canEdit: _canEdit = true,
 }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)

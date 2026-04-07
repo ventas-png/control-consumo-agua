@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { UserSession, UserRole } from '../types'
+import type { UserSession, UserRole, ModulePermissionsMap } from '../types'
 import { supabase } from '../lib/supabase'
 import { APP_CONFIG } from '../lib/config'
 import { sanitizeInput, validateEmail } from '../lib/validation'
 import { logSecurityEvent } from '../lib/security'
+import { EXEMPT_ROLES } from '../lib/moduleConfig'
 
 function getStoredSession(): UserSession | null {
   try {
@@ -101,6 +102,33 @@ async function buildSessionFromSupabase(
 
   const displayName = prof?.full_name ?? email
 
+  // Cargar permisos de módulos para roles configurables
+  let modulePermissions: ModulePermissionsMap | undefined
+  if (!EXEMPT_ROLES.includes(uiRole)) {
+    try {
+      const { data: perms } = await supabase
+        .from('user_module_permissions')
+        .select('module_key, can_view, can_create, can_edit, can_change_status')
+        .eq('user_id', userId)
+
+      if (perms && perms.length > 0) {
+        modulePermissions = {}
+        for (const p of perms) {
+          modulePermissions[p.module_key] = {
+            module_key: p.module_key,
+            can_view: p.can_view,
+            can_create: p.can_create,
+            can_edit: p.can_edit,
+            can_change_status: p.can_change_status,
+          }
+        }
+      }
+    } catch {
+      // Si falla la carga de permisos, continuar sin ellos
+      // (el hook usePermissions denegará acceso por defecto)
+    }
+  }
+
   return {
     user_id: userId,
     email,
@@ -112,6 +140,7 @@ async function buildSessionFromSupabase(
     expires_at: expiresAt
       ? new Date(expiresAt * 1000).toISOString()
       : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString(),
+    module_permissions: modulePermissions,
   }
 }
 
