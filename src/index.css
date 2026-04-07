@@ -129,3 +129,30 @@ button:focus:not(:focus-visible) {
     display: flex !important;
   }
 }
+
+/* ─── Responsive Tables: hide secondary columns on small screens ────────── */
+@media (max-width: 640px) {
+  .table-col-secondary {
+    display: none !important;
+  }
+}
+
+/* ─── Print Stylesheet ──────────────────────────────────────────────────── */
+@media print {
+  .app-sidebar,
+  .app-backdrop,
+  .app-hamburger,
+  .app-topbar,
+  .app-alert-banner {
+    display: none !important;
+  }
+  .app-main {
+    padding: 0 !important;
+  }
+  body {
+    background: white !important;
+  }
+  button, .no-print {
+    display: none !important;
+  }
+}

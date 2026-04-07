@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { validatePasswordStrength } from '../../lib/validation'
 
 interface Props {
   onBack: () => void
@@ -32,8 +33,9 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
       return
     }
 
-    if (password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres.')
+    const pwCheck = validatePasswordStrength(password)
+    if (!pwCheck.valid) {
+      setError(pwCheck.message)
       return
     }
 

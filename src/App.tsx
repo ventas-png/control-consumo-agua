@@ -28,6 +28,7 @@ import { ContadoresSection } from './components/contadores/ContadoresSection'
 import { UnidadesSection } from './components/unidades/UnidadesSection'
 import { CobrosSection } from './components/cobros/CobrosSection'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { RoleGuard } from './components/shared/AccessDenied'
 
 initEmailJS()
 
@@ -311,6 +312,7 @@ export default function App() {
           )}
           {activeSection === 'cobros' && (
             <ErrorBoundary sectionName="cobros">
+              <RoleGuard userRole={currentUser.role} allowedRoles={['collector', 'admin', 'super_admin', 'company_owner']}>
               <CobrosSection
                 registros={registros}
                 clientes={clientes}
@@ -324,6 +326,7 @@ export default function App() {
                   }
                 }}
               />
+              </RoleGuard>
             </ErrorBoundary>
           )}
           {activeSection === 'dashboard' && (
@@ -333,6 +336,7 @@ export default function App() {
           )}
           {activeSection === 'admin_dashboard' && (
             <ErrorBoundary sectionName="admin_dashboard">
+              <RoleGuard userRole={currentUser.role} allowedRoles={['company_owner']}>
               <AdminClientDashboard
                 currentUser={currentUser}
                 data={{
@@ -350,6 +354,7 @@ export default function App() {
                 onDataRefresh={cargarDatos}
                 onNavigateSection={setActiveSection}
               />
+              </RoleGuard>
             </ErrorBoundary>
           )}
           {activeSection === 'mapa' && (
@@ -384,7 +389,9 @@ export default function App() {
           )}
           {activeSection === 'configuracion' && (
             <ErrorBoundary sectionName="configuracion">
+              <RoleGuard userRole={currentUser.role} allowedRoles={['admin', 'super_admin', 'company_owner']}>
               <ConfiguracionSection onLogout={logout} />
+              </RoleGuard>
             </ErrorBoundary>
           )}
           {activeSection === 'perfil' && (
@@ -394,7 +401,9 @@ export default function App() {
           )}
           {activeSection === 'empresa_proyectos' && (
             <ErrorBoundary sectionName="empresa">
+              <RoleGuard userRole={currentUser.role} allowedRoles={['company_owner']}>
               <EmpresaSection currentUser={currentUser} />
+              </RoleGuard>
             </ErrorBoundary>
           )}
           {activeSection === 'tarifas' && (
@@ -445,7 +454,9 @@ export default function App() {
           )}
           {activeSection === 'superadmin_empresas' && (
             <ErrorBoundary sectionName="superadmin">
+              <RoleGuard userRole={currentUser.role} allowedRoles={['super_admin']}>
               <SuperAdminSection />
+              </RoleGuard>
             </ErrorBoundary>
           )}
         </main>

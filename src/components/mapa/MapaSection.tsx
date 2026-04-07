@@ -82,7 +82,7 @@ export function MapaSection({ clientes, registros }: Props) {
   }
 
   return (
-    <div style={{ background: 'white', borderRadius: '24px', height: '600px', overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: 'white', borderRadius: '24px', height: 'calc(100vh - 200px)', minHeight: '300px', maxHeight: '700px', overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '15px 20px', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ margin: 0, fontSize: '18px' }}>Geolocalización de Medidores</h3>
         <div style={{ display: 'flex', gap: '8px' }}>

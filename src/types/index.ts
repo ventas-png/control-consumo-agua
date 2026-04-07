@@ -353,12 +353,9 @@ export interface Pago {
 
 export interface CompanyPaymentConfig {
   stripe_public_key?: string | null;
-  stripe_secret_key?: string | null;
   stripe_configured: boolean;
   stripe_activo?: boolean;
-  stripe_webhook_secret?: string | null;
   paypal_client_id?: string | null;
-  paypal_client_secret?: string | null;
   paypal_configured: boolean;
   paypal_activo?: boolean;
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 import { logSecurityEvent } from '../../lib/security'
+import { validatePasswordStrength } from '../../lib/validation'
 
 interface Props {
   token: string
@@ -35,8 +36,9 @@ export function PasswordResetPage({ token, onBack }: Props) {
     setNewPassError('')
     setConfirmError('')
 
-    if (newPassword.length < 6) {
-      setNewPassError('La contraseña debe tener al menos 6 caracteres')
+    const pwCheck = validatePasswordStrength(newPassword)
+    if (!pwCheck.valid) {
+      setNewPassError(pwCheck.message)
       return
     }
     if (newPassword !== confirmPassword) {

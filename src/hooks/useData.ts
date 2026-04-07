@@ -3,11 +3,31 @@ import Swal from 'sweetalert2'
 import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo } from '../types'
 import { supabase } from '../lib/supabase'
 
-const CACHE_KEY = 'aquacontrol_data_v1'
-const CACHE_MAX_AGE = 30 * 60 * 1000 // 30 minutes
+const CACHE_KEY = 'aquacontrol_data_v2'
+const CACHE_MAX_AGE = 10 * 60 * 1000 // 10 minutes
+
+// Strip PII fields from clientes before caching to localStorage
+function sanitizeForCache(payload: AppData): AppData {
+  return {
+    ...payload,
+    clientes: payload.clientes.map(c => ({
+      ...c,
+      email: undefined,
+      telefono: undefined,
+      whatsapp: undefined,
+      telefono_alterno: undefined,
+      cui_dui: undefined,
+      numero_facturacion: undefined,
+      direccion: undefined,
+      fecha_nacimiento: undefined,
+    })),
+  }
+}
 
 function loadCache(): AppData | null {
   try {
+    // Clean up old cache key
+    localStorage.removeItem('aquacontrol_data_v1')
     const raw = localStorage.getItem(CACHE_KEY)
     if (!raw) return null
     const { ts, payload }: { ts: number; payload: AppData } = JSON.parse(raw)
@@ -17,7 +37,7 @@ function loadCache(): AppData | null {
 }
 
 function saveCache(payload: AppData): void {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), payload })) }
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), payload: sanitizeForCache(payload) })) }
   catch { /* storage full — ignore */ }
 }
 

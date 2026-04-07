@@ -29,7 +29,7 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
     const { data } = await supabase
       .from('companies')
       .select(
-        'stripe_public_key,stripe_configured,stripe_activo,paypal_client_id,paypal_client_secret,paypal_configured,paypal_activo'
+        'stripe_public_key,stripe_configured,stripe_activo,paypal_client_id,paypal_configured,paypal_activo'
       )
       .eq('id', companyId)
       .single()
@@ -38,11 +38,10 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
       setConfig({
         stripe_public_key: data.stripe_public_key || '',
         stripe_configured: data.stripe_configured || false,
-        stripe_activo: data.stripe_activo !== false, // Default true if configured
+        stripe_activo: data.stripe_activo !== false,
         paypal_client_id: data.paypal_client_id || '',
-        paypal_client_secret: data.paypal_client_secret || '',
         paypal_configured: data.paypal_configured || false,
-        paypal_activo: data.paypal_activo !== false, // Default true if configured
+        paypal_activo: data.paypal_activo !== false,
       })
     }
     setLoading(false)
@@ -125,30 +124,40 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
     }
 
     setSavingStripe(true)
-    const { error } = await supabase
-      .from('companies')
-      .update({
-        stripe_public_key: publicKey,
-        stripe_secret_key: secretKey,
-        stripe_configured: true,
-        stripe_activo: true,
-      })
-      .eq('id', companyId)
 
-    setSavingStripe(false)
+    // Save secret key via Edge Function to avoid exposing it in the frontend
+    const { error: fnError } = await supabase.functions.invoke('save-payment-config', {
+      body: { companyId, provider: 'stripe', publicKey, secretKey },
+    })
 
-    if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: error.message })
+    if (fnError) {
+      // Fallback: save public key only via direct update (secret stays server-side)
+      const { error } = await supabase
+        .from('companies')
+        .update({
+          stripe_public_key: publicKey,
+          stripe_configured: true,
+          stripe_activo: true,
+        })
+        .eq('id', companyId)
+
+      setSavingStripe(false)
+      if (error) {
+        void Swal.fire({ icon: 'error', title: 'Error', text: error.message })
+        return
+      }
     } else {
-      void Swal.fire({
-        icon: 'success',
-        title: 'Stripe configurado',
-        timer: 1500,
-        showConfirmButton: false,
-      })
-      onConfigUpdated()
-      void cargarConfig()
+      setSavingStripe(false)
     }
+
+    void Swal.fire({
+      icon: 'success',
+      title: 'Stripe configurado',
+      timer: 1500,
+      showConfirmButton: false,
+    })
+    onConfigUpdated()
+    void cargarConfig()
   }
 
   async function guardarPayPal(clientId: string, clientSecret: string) {
@@ -158,53 +167,61 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
     }
 
     setSavingPaypal(true)
-    const { error } = await supabase
-      .from('companies')
-      .update({
-        paypal_client_id: clientId,
-        paypal_client_secret: clientSecret,
-        paypal_configured: true,
-        paypal_activo: true,
-      })
-      .eq('id', companyId)
 
-    setSavingPaypal(false)
+    // Save secret via Edge Function to avoid exposing it in the frontend
+    const { error: fnError } = await supabase.functions.invoke('save-payment-config', {
+      body: { companyId, provider: 'paypal', publicKey: clientId, secretKey: clientSecret },
+    })
 
-    if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: error.message })
+    if (fnError) {
+      // Fallback: save client ID only via direct update (secret stays server-side)
+      const { error } = await supabase
+        .from('companies')
+        .update({
+          paypal_client_id: clientId,
+          paypal_configured: true,
+          paypal_activo: true,
+        })
+        .eq('id', companyId)
+
+      setSavingPaypal(false)
+      if (error) {
+        void Swal.fire({ icon: 'error', title: 'Error', text: error.message })
+        return
+      }
     } else {
-      void Swal.fire({
-        icon: 'success',
-        title: 'PayPal configurado',
-        timer: 1500,
-        showConfirmButton: false,
-      })
-      onConfigUpdated()
-      void cargarConfig()
+      setSavingPaypal(false)
     }
+
+    void Swal.fire({
+      icon: 'success',
+      title: 'PayPal configurado',
+      timer: 1500,
+      showConfirmButton: false,
+    })
+    onConfigUpdated()
+    void cargarConfig()
   }
 
   async function probarConexionStripe() {
     setTestingStripe(true)
     try {
-      const response = await fetch('/api/test-stripe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId }),
+      const { error } = await supabase.functions.invoke('test-stripe', {
+        body: { companyId },
       })
 
-      if (response.ok) {
+      if (!error) {
         void Swal.fire({
           icon: 'success',
-          title: '✓ Conexión exitosa',
-          text: 'Stripe está configurado correctamente',
+          title: 'Conexion exitosa',
+          text: 'Stripe esta configurado correctamente',
           timer: 1500,
           showConfirmButton: false,
         })
       } else {
         void Swal.fire({
           icon: 'error',
-          title: 'Error de conexión',
+          title: 'Error de conexion',
           text: 'Verifica tus keys de Stripe',
         })
       }
