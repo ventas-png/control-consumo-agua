@@ -105,8 +105,9 @@ export function PasswordResetPage({ token, onBack }: Props) {
         {!success ? (
           <>
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>Nueva Contraseña</label>
+              <label htmlFor="reset-new-password" style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>Nueva Contraseña</label>
               <input
+                id="reset-new-password"
                 type="password"
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
@@ -116,8 +117,9 @@ export function PasswordResetPage({ token, onBack }: Props) {
               {newPassError && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>{newPassError}</p>}
             </div>
             <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>Confirmar Contraseña</label>
+              <label htmlFor="reset-confirm-password" style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>Confirmar Contraseña</label>
               <input
+                id="reset-confirm-password"
                 type="password"
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}

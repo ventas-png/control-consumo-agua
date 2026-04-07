@@ -437,10 +437,11 @@ function StripeConfigForm({ config, saving, testing, onSave, onTest }: StripeFor
   return (
     <div>
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+        <label htmlFor="stripe-public-key" style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
           Public Key (pk_live_xxx) *
         </label>
         <input
+          id="stripe-public-key"
           type="text"
           value={publicKey}
           onChange={e => setPublicKey(e.target.value)}
@@ -463,11 +464,12 @@ function StripeConfigForm({ config, saving, testing, onSave, onTest }: StripeFor
       </div>
 
       <div style={{ marginBottom: '24px' }}>
-        <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+        <label htmlFor="stripe-secret-key" style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
           Secret Key (sk_live_xxx) *
         </label>
         <div style={{ position: 'relative' }}>
           <input
+            id="stripe-secret-key"
             type={showSecret ? 'text' : 'password'}
             value={secretKey}
             onChange={e => setSecretKey(e.target.value)}
@@ -560,10 +562,11 @@ function PayPalConfigForm({ config, saving, onSave }: PayPalFormProps) {
   return (
     <div>
       <div style={{ marginBottom: '20px' }}>
-        <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+        <label htmlFor="paypal-client-id" style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
           Client ID *
         </label>
         <input
+          id="paypal-client-id"
           type="text"
           value={clientId}
           onChange={e => setClientId(e.target.value)}
@@ -586,11 +589,12 @@ function PayPalConfigForm({ config, saving, onSave }: PayPalFormProps) {
       </div>
 
       <div style={{ marginBottom: '24px' }}>
-        <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+        <label htmlFor="paypal-client-secret" style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
           Client Secret *
         </label>
         <div style={{ position: 'relative' }}>
           <input
+            id="paypal-client-secret"
             type={showSecret ? 'text' : 'password'}
             value={clientSecret}
             onChange={e => setClientSecret(e.target.value)}

@@ -64,7 +64,7 @@ export function PasswordResetModal({ empresa, onClose }: Props) {
       <div style={{ background: 'white', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '480px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 700 }}>Recuperar Contraseña</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
+          <button onClick={onClose} aria-label="Cerrar modal" style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
         </div>
 
         {!sent ? (
@@ -73,10 +73,11 @@ export function PasswordResetModal({ empresa, onClose }: Props) {
               Ingresa tu correo electrónico para recibir instrucciones de recuperación.
             </p>
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>
+              <label htmlFor="reset-email" style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>
                 Correo Electrónico
               </label>
               <input
+                id="reset-email"
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
