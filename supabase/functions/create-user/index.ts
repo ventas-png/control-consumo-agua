@@ -68,11 +68,11 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Company owners can only create admins/operators/viewers in their own company
-    const allowedRolesForOwner = ['admin', 'operator', 'operador', 'viewer', 'visor']
+    // Company owners can only create admins/operators/viewers/collectors in their own company
+    const allowedRolesForOwner = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
     if (isCompanyOwner) {
       if (!allowedRolesForOwner.includes(role)) {
-        return new Response(JSON.stringify({ error: 'Company owners can only create admin/operator/viewer users' }), {
+        return new Response(JSON.stringify({ error: 'Company owners can only create admin/operator/viewer/collector users' }), {
           status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
