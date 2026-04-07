@@ -438,8 +438,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
             <div>
-              <label style={labelStyle}>CUI / DUI *</label>
+              <label htmlFor="lookup-cui" style={labelStyle}>CUI / DUI *</label>
               <input
+                id="lookup-cui"
                 style={inputStyle}
                 value={lookupForm.cui_dui}
                 onChange={e => setLookupForm(f => ({ ...f, cui_dui: e.target.value }))}
@@ -449,8 +450,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
               />
             </div>
             <div>
-              <label style={labelStyle}>Fecha de Nacimiento *</label>
+              <label htmlFor="lookup-birthdate" style={labelStyle}>Fecha de Nacimiento *</label>
               <input
+                id="lookup-birthdate"
                 style={inputStyle}
                 type="date"
                 value={lookupForm.fecha_nacimiento}
@@ -459,8 +461,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
               />
             </div>
             <div>
-              <label style={labelStyle}>Correo Electrónico *</label>
+              <label htmlFor="lookup-email" style={labelStyle}>Correo Electrónico *</label>
               <input
+                id="lookup-email"
                 style={inputStyle}
                 type="email"
                 value={lookupForm.email}
@@ -653,8 +656,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
             <div style={sectionHeaderStyle}>Datos de Identificación</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={labelStyle}>Nombre Completo *</label>
+                <label htmlFor="cli-nombre" style={labelStyle}>Nombre Completo *</label>
                 <input
+                  id="cli-nombre"
                   style={inputStyle}
                   value={form.nombre}
                   onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
@@ -663,8 +667,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 />
               </div>
               <div>
-                <label style={labelStyle}>CUI / DUI</label>
+                <label htmlFor="cli-cui" style={labelStyle}>CUI / DUI</label>
                 <input
+                  id="cli-cui"
                   style={inputStyle}
                   value={form.cui_dui}
                   onChange={e => setForm(f => ({ ...f, cui_dui: e.target.value }))}
@@ -673,8 +678,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 />
               </div>
               <div>
-                <label style={labelStyle}>Fecha de Nacimiento</label>
+                <label htmlFor="cli-birthdate" style={labelStyle}>Fecha de Nacimiento</label>
                 <input
+                  id="cli-birthdate"
                   style={inputStyle}
                   type="date"
                   value={form.fecha_nacimiento}
@@ -682,8 +688,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 />
               </div>
               <div>
-                <label style={labelStyle}>Nacionalidad</label>
+                <label htmlFor="cli-nacionalidad" style={labelStyle}>Nacionalidad</label>
                 <input
+                  id="cli-nacionalidad"
                   style={inputStyle}
                   value={form.nacionalidad}
                   onChange={e => setForm(f => ({ ...f, nacionalidad: e.target.value }))}
@@ -699,8 +706,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
             <div style={sectionHeaderStyle}>Datos de Contacto</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
               <div>
-                <label style={labelStyle}>Correo Electrónico</label>
+                <label htmlFor="cli-email" style={labelStyle}>Correo Electrónico</label>
                 <input
+                  id="cli-email"
                   style={inputStyle}
                   type="email"
                   value={form.email}
@@ -710,8 +718,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 />
               </div>
               <div>
-                <label style={labelStyle}>Teléfono Principal</label>
+                <label htmlFor="cli-telefono" style={labelStyle}>Teléfono Principal</label>
                 <input
+                  id="cli-telefono"
                   style={inputStyle}
                   type="tel"
                   value={form.telefono}
@@ -722,8 +731,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
               </div>
               <div>
-                <label style={labelStyle}>Teléfono Alterno</label>
+                <label htmlFor="cli-telefono-alt" style={labelStyle}>Teléfono Alterno</label>
                 <input
+                  id="cli-telefono-alt"
                   style={inputStyle}
                   type="tel"
                   value={form.telefono_alterno}
@@ -734,8 +744,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
               </div>
               <div>
-                <label style={labelStyle}>Número de WhatsApp</label>
+                <label htmlFor="cli-whatsapp" style={labelStyle}>Número de WhatsApp</label>
                 <input
+                  id="cli-whatsapp"
                   style={inputStyle}
                   type="tel"
                   value={form.whatsapp}
@@ -765,8 +776,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 </button>
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={labelStyle}>Dirección</label>
+                <label htmlFor="cli-direccion" style={labelStyle}>Dirección</label>
                 <input
+                  id="cli-direccion"
                   style={inputStyle}
                   value={form.direccion}
                   onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))}
@@ -782,8 +794,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
             <div style={sectionHeaderStyle}>Datos de Facturación</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
               <div>
-                <label style={labelStyle}>Código de Cliente *</label>
+                <label htmlFor="cli-codigo" style={labelStyle}>Código de Cliente *</label>
                 <input
+                  id="cli-codigo"
                   style={inputStyle}
                   value={form.codigo}
                   onChange={e => setForm(f => ({ ...f, codigo: e.target.value }))}
@@ -792,8 +805,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 />
               </div>
               <div>
-                <label style={labelStyle}>Número para Facturación (NIT)</label>
+                <label htmlFor="cli-nit" style={labelStyle}>Número para Facturación (NIT)</label>
                 <input
+                  id="cli-nit"
                   style={inputStyle}
                   value={form.numero_facturacion}
                   onChange={e => setForm(f => ({ ...f, numero_facturacion: e.target.value }))}
