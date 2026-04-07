@@ -136,7 +136,7 @@ export function AdminDashboardCharts({ registros }: Props) {
   }, [registros])
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '20px' }}>
       {/* Gráfico de Tendencias */}
       <div style={{
         background: 'white',

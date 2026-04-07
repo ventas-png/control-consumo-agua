@@ -47,7 +47,7 @@ export default function App() {
     addTarifa, updateTarifa, deleteTarifa,
     addContador, updateContador, deleteContador,
     addUnidad, updateUnidad, deleteUnidad,
-  } = useData()
+  } = useData(currentUser?.company_id)
 
   const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)

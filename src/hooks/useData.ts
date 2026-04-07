@@ -71,23 +71,36 @@ const INITIAL_DATA: AppData = {
   maxUnidadesPorTipo: null,
 }
 
-export function useData() {
+export function useData(companyId?: string) {
   const [data, setData] = useState<AppData>(() => loadCache() ?? INITIAL_DATA)
 
   const fetchAllData = async () => {
+    // Defense-in-depth: add company_id filters where columns exist.
+    // RLS is the primary enforcement, these are secondary safeguards.
+    const tarifasQ = supabase.from('tarifas').select('*').order('created_at', { ascending: false })
+    const contadoresQ = supabase.from('contadores').select('*').order('created_at', { ascending: false })
+    const unidadesQ = supabase.from('unidades').select('*').order('nombre', { ascending: true })
+    const fuentesQ = supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false })
+    const rcalQ = supabase.from('registros_calidad').select('*, fuentes_agua(identificador, nombre, tipo_agua)').order('fecha', { ascending: false })
+
+    if (companyId) {
+      tarifasQ.eq('company_id', companyId)
+      contadoresQ.eq('company_id', companyId)
+      unidadesQ.eq('company_id', companyId)
+      fuentesQ.eq('company_id', companyId)
+      rcalQ.eq('company_id', companyId)
+    }
+
     return Promise.allSettled([
-      supabase.from('clientes').select('*'),
-      supabase.from('registros').select('*'),
+      supabase.from('clientes').select('*'),          // filtered via RLS + company_clientes junction
+      supabase.from('registros').select('*'),          // filtered via RLS + project assignments
       supabase.from('empresa').select('*').limit(1),
-      supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false }),
-      supabase
-        .from('registros_calidad')
-        .select('*, fuentes_agua(identificador, nombre, tipo_agua)')
-        .order('fecha', { ascending: false }),
+      fuentesQ,
+      rcalQ,
       supabase.from('rutas').select('*').order('created_at', { ascending: false }),
-      supabase.from('tarifas').select('*').order('created_at', { ascending: false }),
-      supabase.from('contadores').select('*').order('created_at', { ascending: false }),
-      supabase.from('unidades').select('*').order('nombre', { ascending: true }),
+      tarifasQ,
+      contadoresQ,
+      unidadesQ,
       supabase.from('projects').select('*').order('nombre', { ascending: true }),
     ])
   }
