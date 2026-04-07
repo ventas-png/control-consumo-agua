@@ -63,9 +63,10 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 }
 
 function InputField({
-  label, type = 'text', value, onChange, placeholder, disabled, rightEl
+  label, id, type = 'text', value, onChange, placeholder, disabled, rightEl
 }: {
   label: string
+  id?: string
   type?: string
   value: string
   onChange?: (v: string) => void
@@ -75,11 +76,12 @@ function InputField({
 }) {
   return (
     <div style={{ marginBottom: '14px' }}>
-      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+      <label htmlFor={id} style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
         {label}
       </label>
       <div style={{ position: 'relative' }}>
         <input
+          id={id}
           type={type}
           value={value}
           onChange={e => onChange?.(e.target.value)}
@@ -256,8 +258,9 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
         {/* Card 1 — Nombre */}
         <Card title="Datos personales">
           <form onSubmit={handleNameSubmit}>
-            <InputField label="Correo electrónico" value={currentUser.email} disabled />
+            <InputField id="perfil-email" label="Correo electrónico" value={currentUser.email} disabled />
             <InputField
+              id="perfil-name"
               label="Nombre completo"
               value={name}
               onChange={setName}
@@ -279,6 +282,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
           <Card title="Cambiar contraseña">
             <form onSubmit={handlePasswordSubmit}>
               <InputField
+                id="perfil-pw-current"
                 label="Contraseña actual"
                 type={showPw.current ? 'text' : 'password'}
                 value={pwCurrent}
@@ -287,6 +291,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
                 rightEl={eyeBtn(showPw.current, () => setShowPw(s => ({ ...s, current: !s.current })))}
               />
               <InputField
+                id="perfil-pw-new"
                 label="Nueva contraseña"
                 type={showPw.new ? 'text' : 'password'}
                 value={pwNew}
@@ -295,6 +300,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
                 rightEl={eyeBtn(showPw.new, () => setShowPw(s => ({ ...s, new: !s.new })))}
               />
               <InputField
+                id="perfil-pw-confirm"
                 label="Confirmar nueva contraseña"
                 type={showPw.confirm ? 'text' : 'password'}
                 value={pwConfirm}
@@ -314,8 +320,9 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
             ℹ️ Se enviará un enlace de confirmación al nuevo correo. El cambio se aplicará solo al confirmar.
           </div>
           <form onSubmit={handleEmailSubmit}>
-            <InputField label="Correo actual" value={currentUser.email} disabled />
+            <InputField id="perfil-email-current" label="Correo actual" value={currentUser.email} disabled />
             <InputField
+              id="perfil-email-new"
               label="Nuevo correo electrónico"
               type="email"
               value={newEmail}
