@@ -147,14 +147,25 @@ export function useData() {
       return
     }
 
-    // Retry once after 800 ms to handle cold-start timeouts on the DB connection pool
-    await new Promise(resolve => setTimeout(resolve, 800))
+    // Retry 1: wait 1.5 s to handle cold-start timeouts on the DB connection pool
+    await new Promise(resolve => setTimeout(resolve, 1500))
     results = await fetchAllData()
     const retryData = applyResults(base, results)
     setData(retryData)
 
     if (!hasErrors(results)) {
       saveCache(retryData)
+      return
+    }
+
+    // Retry 2: wait an additional 3 s for slow Supabase cold starts
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    results = await fetchAllData()
+    const retryData2 = applyResults(base, results)
+    setData(retryData2)
+
+    if (!hasErrors(results)) {
+      saveCache(retryData2)
     } else {
       Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
     }
