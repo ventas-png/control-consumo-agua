@@ -125,10 +125,33 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
     body: string
     senderName: string
     isInternalNote?: boolean
+    attachment?: File
   }): Promise<void> => {
     if (!userId) return
     setSending(true)
     try {
+      // 1. Subir adjunto si existe
+      let attachmentUrl: string | null = null
+      let attachmentName: string | null = null
+      let attachmentType: string | null = null
+      let attachmentSize: number | null = null
+
+      if (params.attachment) {
+        const file = params.attachment
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `${params.conversationId}/${Date.now()}_${safeName}`
+        const { error: uploadError } = await supabase.storage
+          .from('conv-attachments')
+          .upload(path, file, { contentType: file.type })
+        if (uploadError) throw uploadError
+        const { data } = supabase.storage.from('conv-attachments').getPublicUrl(path)
+        attachmentUrl = data.publicUrl
+        attachmentName = file.name
+        attachmentType = file.type
+        attachmentSize = file.size
+      }
+
+      // 2. Insertar mensaje
       const { error } = await supabase.from('conversation_messages').insert({
         conversation_id: params.conversationId,
         sender_id: userId,
@@ -136,10 +159,16 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
         sender_name: params.senderName,
         body: params.body,
         is_internal_note: params.isInternalNote ?? false,
+        ...(attachmentUrl && {
+          attachment_url: attachmentUrl,
+          attachment_name: attachmentName,
+          attachment_type: attachmentType,
+          attachment_size: attachmentSize,
+        }),
       })
       if (error) throw error
 
-      // Actualizar updated_at de la conversación
+      // 3. Actualizar updated_at de la conversación
       await supabase
         .from('conversations')
         .update({ updated_at: new Date().toISOString() })

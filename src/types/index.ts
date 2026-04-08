@@ -365,6 +365,11 @@ export interface ConversationMessage {
   is_internal_note: boolean;
   read_at?: string | null;
   created_at: string;
+  // Adjuntos (imagen o documento)
+  attachment_url?: string | null;
+  attachment_name?: string | null;
+  attachment_type?: string | null;
+  attachment_size?: number | null;
 }
 
 export interface ConversationAccessRule {
