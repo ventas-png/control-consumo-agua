@@ -27,6 +27,7 @@ import { TarifasSection } from './components/tarifas/TarifasSection'
 import { ContadoresSection } from './components/contadores/ContadoresSection'
 import { UnidadesSection } from './components/unidades/UnidadesSection'
 import { CobrosSection } from './components/cobros/CobrosSection'
+import { ComunicacionSection } from './components/comunicacion/ComunicacionSection'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RoleGuard } from './components/shared/AccessDenied'
 import { usePermissions } from './hooks/usePermissions'
@@ -480,6 +481,15 @@ export default function App() {
               <RoleGuard userRole={currentUser.role} allowedRoles={['super_admin']}>
               <SuperAdminSection />
               </RoleGuard>
+            </ErrorBoundary>
+          )}
+          {activeSection === 'comunicacion' && (
+            <ErrorBoundary sectionName="comunicacion">
+              <ComunicacionSection
+                currentUser={currentUser}
+                canCreate={canCreate('comunicacion')}
+                canEdit={canEdit('comunicacion')}
+              />
             </ErrorBoundary>
           )}
         </main>

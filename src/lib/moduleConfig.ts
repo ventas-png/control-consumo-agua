@@ -26,6 +26,7 @@ export const CONFIGURABLE_MODULES: readonly ModuleDefinition[] = [
   { key: 'unidades',        label: 'Unidades',        actions: ['view', 'create', 'edit'] },
   { key: 'contadores',      label: 'Contadores',      actions: ['view', 'create', 'edit'] },
   { key: 'configuracion',   label: 'Configuración',   actions: ['view', 'edit'] },
+  { key: 'comunicacion',    label: 'Comunicación',    actions: ['view', 'create', 'edit'] },
 ] as const
 
 /** Módulos que no son configurables (siempre visibles para su rol). */
@@ -53,6 +54,7 @@ export const ROLE_DEFAULT_TEMPLATES: Record<string, ModulePermission[]> = {
     { module_key: 'unidades',        can_view: true,  can_create: true,  can_edit: true,  can_change_status: false },
     { module_key: 'contadores',      can_view: true,  can_create: true,  can_edit: true,  can_change_status: false },
     { module_key: 'configuracion',   can_view: true,  can_create: false, can_edit: true,  can_change_status: false },
+    { module_key: 'comunicacion',    can_view: true,  can_create: true,  can_edit: true,  can_change_status: false },
   ],
   operator: [
     { module_key: 'clientes',       can_view: true,  can_create: true,  can_edit: true,  can_change_status: true },
@@ -63,6 +65,7 @@ export const ROLE_DEFAULT_TEMPLATES: Record<string, ModulePermission[]> = {
     { module_key: 'calidad',         can_view: true,  can_create: true,  can_edit: true,  can_change_status: false },
     { module_key: 'rutas',           can_view: true,  can_create: false, can_edit: true,  can_change_status: false },
     { module_key: 'contadores',      can_view: true,  can_create: false, can_edit: true,  can_change_status: false },
+    { module_key: 'comunicacion',    can_view: true,  can_create: false, can_edit: true,  can_change_status: false },
   ],
   viewer: [
     { module_key: 'tabla',           can_view: true,  can_create: false, can_edit: false, can_change_status: false },
@@ -71,5 +74,6 @@ export const ROLE_DEFAULT_TEMPLATES: Record<string, ModulePermission[]> = {
   ],
   collector: [
     { module_key: 'cobros',          can_view: true,  can_create: true,  can_edit: true,  can_change_status: true },
+    { module_key: 'comunicacion',    can_view: true,  can_create: true,  can_edit: true,  can_change_status: false },
   ],
 }

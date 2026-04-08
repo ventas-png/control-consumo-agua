@@ -320,7 +320,64 @@ export type AppSection =
   | 'configuracion'
   | 'perfil'
   | 'empresa_proyectos'
-  | 'superadmin_empresas';
+  | 'superadmin_empresas'
+  | 'comunicacion';
+
+// ── Centro de Comunicación ─────────────────────────────────────────────────
+
+export type ConversationStatus =
+  | 'abierta'
+  | 'en_progreso'
+  | 'esperando_cliente'
+  | 'resuelta'
+  | 'cerrada';
+
+export type ConversationCategory = 'general' | 'pagos' | 'tecnico' | 'calidad';
+export type ConversationPriority = 'baja' | 'media' | 'alta' | 'urgente';
+
+export interface Conversation {
+  id: string;
+  company_id: string;
+  project_id?: string | null;
+  cliente_id: string;
+  cliente_nombre?: string | null;
+  subject: string;
+  category: ConversationCategory;
+  priority: ConversationPriority;
+  status: ConversationStatus;
+  assigned_to?: string | null;
+  assigned_name?: string | null;
+  closed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  // join opcional (último mensaje)
+  last_message?: string | null;
+  unread_count?: number;
+}
+
+export interface ConversationMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  sender_type: 'cliente' | 'agent';
+  sender_name?: string | null;
+  body: string;
+  is_internal_note: boolean;
+  read_at?: string | null;
+  created_at: string;
+}
+
+export interface ConversationAccessRule {
+  id: string;
+  company_id: string;
+  role: string;
+  can_view_all: boolean;
+  can_respond: boolean;
+  can_assign: boolean;
+  categories: string[] | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export type FormaPago =
   | 'efectivo'

@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import type { UserSession, Registro } from '../../types'
 import { Chart, registerables } from 'chart.js'
 import { CustomerPaymentsTab } from './CustomerPaymentsTab'
+import { CustomerComunicacion } from './CustomerComunicacion'
 
 Chart.register(...registerables)
 
@@ -84,7 +85,7 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string; label: string }
   mora: { bg: '#fee2e2', color: '#991b1b', label: 'Mora' },
 }
 
-type PortalTab = 'dashboard' | 'servicios' | 'pagos' | 'perfil'
+type PortalTab = 'dashboard' | 'servicios' | 'pagos' | 'perfil' | 'comunicacion'
 
 export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [tab, setTab] = useState<PortalTab>('dashboard')
@@ -712,6 +713,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             { key: 'dashboard', label: 'Dashboard', icon: '📈' },
             { key: 'servicios', label: 'Mis Servicios', icon: '📊' },
             { key: 'pagos', label: 'Mis Pagos', icon: '💳' },
+            { key: 'comunicacion', label: 'Contacto', icon: '💬' },
             { key: 'perfil', label: 'Mi Perfil', icon: '👤' },
           ] as const).map(t => (
             <button
@@ -978,6 +980,19 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             currentUser={currentUser}
             moneda={projects[0]?.moneda ?? 'Q'}
           />
+        )}
+
+        {/* ── TAB: COMUNICACION ── */}
+        {tab === 'comunicacion' && companies.length > 0 && (
+          <CustomerComunicacion
+            currentUser={currentUser}
+            companyId={companies[0].id}
+          />
+        )}
+        {tab === 'comunicacion' && companies.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '48px 24px', color: '#9ca3af', fontSize: '14px' }}>
+            No estás asociado a ninguna empresa todavía.
+          </div>
         )}
 
         {/* ── TAB: PERFIL ── */}
