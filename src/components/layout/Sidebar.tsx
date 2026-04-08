@@ -20,6 +20,26 @@ const TABS: Tab[] = [
     ),
   },
   {
+    id: 'cobros',
+    label: 'Cobros',
+    roles: ['collector', 'admin', 'super_admin', 'company_owner'],
+    icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'admin_dashboard',
+    label: 'Dashboard',
+    roles: ['company_owner'],
+    icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+  },
+  {
     id: 'empresa_proyectos',
     label: 'Mis Proyectos',
     roles: ['company_owner'],
@@ -32,7 +52,7 @@ const TABS: Tab[] = [
   {
     id: 'clientes',
     label: 'Clientes',
-    roles: ['admin', 'super_admin', 'operator'],
+    roles: ['admin', 'super_admin', 'operator', 'company_owner'],
     icon: (
       <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -42,7 +62,7 @@ const TABS: Tab[] = [
   {
     id: 'lecturas',
     label: 'Nueva Lectura',
-    roles: ['admin', 'super_admin', 'operator'],
+    roles: ['admin', 'super_admin', 'operator', 'company_owner'],
     icon: (
       <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
@@ -52,7 +72,7 @@ const TABS: Tab[] = [
   {
     id: 'tabla',
     label: 'Historial',
-    roles: ['admin', 'super_admin', 'operator', 'viewer'],
+    roles: ['admin', 'super_admin', 'operator', 'viewer', 'company_owner'],
     icon: (
       <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -72,7 +92,7 @@ const TABS: Tab[] = [
   {
     id: 'mapa',
     label: 'Mapa',
-    roles: ['admin', 'super_admin', 'operator', 'viewer'],
+    roles: ['admin', 'super_admin', 'operator', 'viewer', 'company_owner'],
     icon: (
       <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -82,7 +102,7 @@ const TABS: Tab[] = [
   {
     id: 'rutas',
     label: 'Rutas',
-    roles: ['admin', 'super_admin', 'operator'],
+    roles: ['admin', 'super_admin', 'operator', 'company_owner'],
     icon: (
       <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -122,10 +142,20 @@ const TABS: Tab[] = [
   {
     id: 'calidad',
     label: 'Calidad Agua',
-    roles: ['admin', 'super_admin', 'operator'],
+    roles: ['admin', 'super_admin', 'operator', 'company_owner'],
     icon: (
       <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'comunicacion',
+    label: 'Comunicación',
+    roles: ['admin', 'super_admin', 'company_owner', 'operator', 'collector', 'viewer'],
+    icon: (
+      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
       </svg>
     ),
   },
@@ -156,6 +186,7 @@ interface Props {
   activeSection: AppSection
   userRole: UserRole
   currentUser: UserSession
+  canViewModule: (moduleKey: string) => boolean
   onSelect: (section: AppSection) => void
   onLogout: () => void
   isOpen: boolean
@@ -177,16 +208,29 @@ const ROLE_LABELS: Record<UserRole, string> = {
   operator: 'Operador',
   viewer: 'Visualizador',
   cliente: 'Cliente',
+  collector: 'Gestor de Cobros',
 }
 
-export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogout, isOpen }: Props) {
+const NON_CONFIGURABLE = ['perfil', 'admin_dashboard', 'empresa_proyectos', 'superadmin_empresas']
+const BYPASS_ROLES: UserRole[] = ['super_admin', 'company_owner']
+
+export function Sidebar({ activeSection, userRole, currentUser, canViewModule, onSelect, onLogout, isOpen }: Props) {
   const [hoveredTab, setHoveredTab] = useState<AppSection | null>(null)
   const [hoveredLogout, setHoveredLogout] = useState(false)
   const [hoveredProfile, setHoveredProfile] = useState(false)
-  const visibleTabs = TABS.filter(t => t.roles.includes(userRole))
+  const visibleTabs = TABS.filter(t => {
+    // Módulos no-configurables: filtrar solo por rol
+    if (NON_CONFIGURABLE.includes(t.id)) return t.roles.includes(userRole)
+    // Roles exentos: filtrar solo por rol
+    if (BYPASS_ROLES.includes(userRole)) return t.roles.includes(userRole)
+    // Roles configurables: verificar permisos de módulo
+    return canViewModule(t.id)
+  })
 
   return (
     <aside
+      role="navigation"
+      aria-label="Menu principal"
       className={`app-sidebar${isOpen ? ' open' : ''}`}
       style={{
         width: '256px',
@@ -252,6 +296,8 @@ export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogo
           return (
             <button
               key={tab.id}
+              aria-label={`Ir a ${tab.label}`}
+              aria-current={activeSection === tab.id ? 'page' : undefined}
               onClick={() => onSelect(tab.id)}
               onMouseEnter={() => setHoveredTab(tab.id)}
               onMouseLeave={() => setHoveredTab(null)}
@@ -260,9 +306,10 @@ export function Sidebar({ activeSection, userRole, currentUser, onSelect, onLogo
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                padding: '9px 11px',
+                padding: '12px 14px',
+                minHeight: '44px',
                 border: 'none',
-                borderRadius: '9px',
+                borderRadius: '10px',
                 cursor: 'pointer',
                 textAlign: 'left',
                 marginBottom: '1px',

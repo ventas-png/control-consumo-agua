@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { UserSession, UserRole } from '../types'
+import type { UserSession, UserRole, ModulePermissionsMap } from '../types'
 import { supabase } from '../lib/supabase'
 import { APP_CONFIG } from '../lib/config'
 import { sanitizeInput, validateEmail } from '../lib/validation'
 import { logSecurityEvent } from '../lib/security'
+import { EXEMPT_ROLES } from '../lib/moduleConfig'
 
 function getStoredSession(): UserSession | null {
   try {
@@ -18,27 +19,54 @@ function getStoredSession(): UserSession | null {
   }
 }
 
-function getCachedSession(): UserSession | null {
-  try {
-    const data = localStorage.getItem('cached_session')
-    if (!data) return null
-    const session = JSON.parse(data) as UserSession
-    if (new Date() < new Date(session.expires_at)) return session
-    localStorage.removeItem('cached_session')
-    return null
-  } catch {
-    return null
-  }
-}
-
 function storeSession(session: UserSession): void {
   sessionStorage.setItem('userSession', JSON.stringify(session))
-  localStorage.setItem('cached_session', JSON.stringify(session))
+  // Security: no longer store session in localStorage to prevent theft via XSS
 }
 
 function clearSession(): void {
   sessionStorage.removeItem('userSession')
+  // Clean up legacy cached sessions from previous versions
   localStorage.removeItem('cached_session')
+}
+
+// --- Login rate limiting ---
+const MAX_LOGIN_ATTEMPTS = 5
+const LOCKOUT_DURATION_MS = 60_000 // 1 minute
+
+interface LoginFailures { count: number; lockedUntil: number }
+
+function getLoginFailures(): LoginFailures {
+  try {
+    const raw = sessionStorage.getItem('login_failures')
+    if (!raw) return { count: 0, lockedUntil: 0 }
+    return JSON.parse(raw) as LoginFailures
+  } catch { return { count: 0, lockedUntil: 0 } }
+}
+
+function recordLoginFailure(): void {
+  const f = getLoginFailures()
+  f.count += 1
+  if (f.count >= MAX_LOGIN_ATTEMPTS) {
+    f.lockedUntil = Date.now() + LOCKOUT_DURATION_MS
+  }
+  sessionStorage.setItem('login_failures', JSON.stringify(f))
+}
+
+function clearLoginFailures(): void {
+  sessionStorage.removeItem('login_failures')
+}
+
+function getLoginLockoutMessage(): string | null {
+  const f = getLoginFailures()
+  if (f.count >= MAX_LOGIN_ATTEMPTS && Date.now() < f.lockedUntil) {
+    const secsLeft = Math.ceil((f.lockedUntil - Date.now()) / 1000)
+    return `Demasiados intentos fallidos. Intente en ${secsLeft} segundos.`
+  }
+  if (f.count >= MAX_LOGIN_ATTEMPTS && Date.now() >= f.lockedUntil) {
+    clearLoginFailures()
+  }
+  return null
 }
 
 async function buildSessionFromSupabase(
@@ -70,8 +98,36 @@ async function buildSessionFromSupabase(
   else if (dbRole === 'operador' || dbRole === 'user' || dbRole === 'operator') uiRole = 'operator'
   else if (dbRole === 'cliente') uiRole = 'cliente'
   else if (dbRole === 'visor' || dbRole === 'viewer') uiRole = 'viewer'
+  else if (dbRole === 'collector') uiRole = 'collector'
 
   const displayName = prof?.full_name ?? email
+
+  // Cargar permisos de módulos para roles configurables
+  let modulePermissions: ModulePermissionsMap | undefined
+  if (!EXEMPT_ROLES.includes(uiRole)) {
+    try {
+      const { data: perms } = await supabase
+        .from('user_module_permissions')
+        .select('module_key, can_view, can_create, can_edit, can_change_status')
+        .eq('user_id', userId)
+
+      if (perms && perms.length > 0) {
+        modulePermissions = {}
+        for (const p of perms) {
+          modulePermissions[p.module_key] = {
+            module_key: p.module_key,
+            can_view: p.can_view,
+            can_create: p.can_create,
+            can_edit: p.can_edit,
+            can_change_status: p.can_change_status,
+          }
+        }
+      }
+    } catch {
+      // Si falla la carga de permisos, continuar sin ellos
+      // (el hook usePermissions denegará acceso por defecto)
+    }
+  }
 
   return {
     user_id: userId,
@@ -84,6 +140,7 @@ async function buildSessionFromSupabase(
     expires_at: expiresAt
       ? new Date(expiresAt * 1000).toISOString()
       : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString(),
+    module_permissions: modulePermissions,
   }
 }
 
@@ -125,8 +182,7 @@ export function useAuth() {
 
     const offline = !navigator.onLine || localStorage.getItem('offline_mode') === 'true'
     if (offline) {
-      const cached = getCachedSession()
-      if (cached) setCurrentUser(cached)
+      // In offline mode, rely on sessionStorage only (no localStorage session)
       setLoading(false)
       return
     }
@@ -207,6 +263,10 @@ export function useAuth() {
   }, [currentUser])
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
+    // Rate limiting check
+    const lockoutMsg = getLoginLockoutMessage()
+    if (lockoutMsg) return lockoutMsg
+
     const cleanEmail = sanitizeInput(email.trim())
 
     if (!cleanEmail || !password) return 'Email y contraseña son requeridos'
@@ -219,6 +279,7 @@ export function useAuth() {
       })
 
       if (error || !data?.session || !data?.user) {
+        recordLoginFailure()
         logSecurityEvent('failed_login_attempt', {
           email: cleanEmail,
           reason: error?.message ?? 'invalid_credentials',
@@ -235,7 +296,7 @@ export function useAuth() {
       const sessionData = await buildSessionFromSupabase(user.id, user.email ?? '', session.expires_at)
       storeSession(sessionData)
       setCurrentUser(sessionData)
-      localStorage.removeItem('login_failures')
+      clearLoginFailures()
 
       logSecurityEvent('login_success', { email: cleanEmail }, user.id).catch(console.error)
       return null

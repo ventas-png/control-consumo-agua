@@ -68,11 +68,11 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Company owners can only create admins/operators/viewers in their own company
-    const allowedRolesForOwner = ['admin', 'operator', 'operador', 'viewer', 'visor']
+    // Company owners can only create admins/operators/viewers/collectors in their own company
+    const allowedRolesForOwner = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
     if (isCompanyOwner) {
       if (!allowedRolesForOwner.includes(role)) {
-        return new Response(JSON.stringify({ error: 'Company owners can only create admin/operator/viewer users' }), {
+        return new Response(JSON.stringify({ error: 'Company owners can only create admin/operator/viewer/collector users' }), {
           status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
@@ -116,6 +116,16 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Failed to create user profile: ' + profileError.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }
+
+    // Poblar permisos de módulos por defecto según el rol
+    const { error: permError } = await adminClient.rpc('populate_default_module_permissions', {
+      p_user_id: newUser.user.id,
+      p_role: role,
+    })
+    if (permError) {
+      console.error('Warning: could not populate default module permissions:', permError.message)
+      // No rollback — permisos se pueden configurar después manualmente
     }
 
     return new Response(JSON.stringify({ user_id: newUser.user.id }), {

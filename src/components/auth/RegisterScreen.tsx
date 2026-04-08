@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { validatePasswordStrength } from '../../lib/validation'
 
 interface Props {
   onBack: () => void
@@ -32,8 +33,9 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
       return
     }
 
-    if (password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres.')
+    const pwCheck = validatePasswordStrength(password)
+    if (!pwCheck.valid) {
+      setError(pwCheck.message)
       return
     }
 
@@ -176,10 +178,11 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
             {/* Form fields */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+                <label htmlFor="reg-fullname" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
                   Nombre completo
                 </label>
                 <input
+                  id="reg-fullname"
                   className="reg-input"
                   type="text"
                   value={fullName}
@@ -197,10 +200,11 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+                <label htmlFor="reg-email" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
                   Correo electrónico
                 </label>
                 <input
+                  id="reg-email"
                   className="reg-input"
                   type="email"
                   value={email}
@@ -219,10 +223,11 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+                  <label htmlFor="reg-cui" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
                     DPI / CUI
                   </label>
                   <input
+                    id="reg-cui"
                     className="reg-input"
                     type="text"
                     value={cuiDui}
@@ -240,10 +245,11 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+                  <label htmlFor="reg-birthdate" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
                     Fecha de nacimiento
                   </label>
                   <input
+                    id="reg-birthdate"
                     className="reg-input"
                     type="date"
                     value={fechaNacimiento}
@@ -260,11 +266,12 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+                <label htmlFor="reg-password" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
                   Contraseña
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
+                    id="reg-password"
                     className="reg-input"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
@@ -294,10 +301,11 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+                <label htmlFor="reg-confirm-password" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
                   Confirmar contraseña
                 </label>
                 <input
+                  id="reg-confirm-password"
                   className="reg-input"
                   type={showPassword ? 'text' : 'password'}
                   value={confirmPassword}

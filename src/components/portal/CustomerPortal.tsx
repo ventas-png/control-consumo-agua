@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import type { UserSession } from '../../types'
+import type { UserSession, Registro } from '../../types'
 import { Chart, registerables } from 'chart.js'
+import { CustomerPaymentsTab } from './CustomerPaymentsTab'
+import { CustomerComunicacion } from './CustomerComunicacion'
 
 Chart.register(...registerables)
 
@@ -83,7 +85,7 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string; label: string }
   mora: { bg: '#fee2e2', color: '#991b1b', label: 'Mora' },
 }
 
-type PortalTab = 'dashboard' | 'servicios' | 'perfil'
+type PortalTab = 'dashboard' | 'servicios' | 'pagos' | 'perfil' | 'comunicacion'
 
 export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [tab, setTab] = useState<PortalTab>('dashboard')
@@ -93,6 +95,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [unidades, setUnidades] = useState<UnidadInfo[]>([])
   const [contadores, setContadores] = useState<ContadorInfo[]>([])
   const [lecturas, setLecturas] = useState<LecturaInfo[]>([])
+  const [registros, setRegistros] = useState<Registro[]>([])
   const [contactoEdit, setContactoEdit] = useState<ClienteContacto>({
     email: null, telefono: null, whatsapp: null, telefono_alterno: null,
   })
@@ -133,7 +136,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2)
           return supabase
             .from('registros')
-            .select('id, fecha, lectura_anterior, lectura_actual, consumo, monto_calculado, estado, mes, tipo_cobro, contador_id, foto')
+            .select('id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, notas, foto')
             .eq('cliente_id', clienteId)
             .gte('fecha', twoYearsAgo.toISOString().split('T')[0])
             .order('fecha', { ascending: false })
@@ -186,6 +189,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       setUnidades(unidadesList)
       setContadores(cData)
       setLecturas((rData as LecturaInfo[]) ?? [])
+      setRegistros((rData as Registro[]) ?? [])
 
       if (clData) {
         setContactoEdit(clData as ClienteContacto)
@@ -329,7 +333,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           responsive: true, maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: ctx => [`${ctx.parsed.y.toFixed(2)} m³`, `Monto: ${chartMontos[ctx.dataIndex].toFixed(2)}`] } },
+            tooltip: { callbacks: { label: ctx => [`${(ctx.parsed.y ?? 0).toFixed(2)} m³`, `Monto: ${chartMontos[ctx.dataIndex].toFixed(2)}`] } },
           },
           scales: {
             x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
@@ -462,7 +466,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 <thead>
                   <tr style={{ background: '#f8fafc' }}>
                     {['Tipo de Agua', 'Contadores', 'Consumo Mes (m³)', 'Consumo 12 meses (m³)'].map(h => (
-                      <th key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 600, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
+                      <th scope="col" key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 600, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -708,6 +712,8 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           {([
             { key: 'dashboard', label: 'Dashboard', icon: '📈' },
             { key: 'servicios', label: 'Mis Servicios', icon: '📊' },
+            { key: 'pagos', label: 'Mis Pagos', icon: '💳' },
+            { key: 'comunicacion', label: 'Contacto', icon: '💬' },
             { key: 'perfil', label: 'Mi Perfil', icon: '👤' },
           ] as const).map(t => (
             <button
@@ -875,7 +881,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                   <thead>
                                     <tr style={{ background: '#f8fafc' }}>
                                       {['Fecha', 'Período', 'Lect. anterior', 'Lect. actual', 'Consumo (m³)', `Monto (${moneda})`, 'Estado'].map(h => (
-                                        <th key={h} style={{
+                                        <th scope="col" key={h} style={{
                                           padding: '10px 14px', textAlign: 'left',
                                           fontSize: '11.5px', fontWeight: 600,
                                           color: '#64748b', whiteSpace: 'nowrap',
@@ -963,6 +969,29 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {/* ── TAB: PAGOS ── */}
+        {tab === 'pagos' && (
+          <CustomerPaymentsTab
+            registros={registros}
+            clientes={[]}
+            currentUser={currentUser}
+            moneda={projects[0]?.moneda ?? 'Q'}
+          />
+        )}
+
+        {/* ── TAB: COMUNICACION ── */}
+        {tab === 'comunicacion' && companies.length > 0 && (
+          <CustomerComunicacion
+            currentUser={currentUser}
+            companyId={companies[0].id}
+          />
+        )}
+        {tab === 'comunicacion' && companies.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '48px 24px', color: '#9ca3af', fontSize: '14px' }}>
+            No estás asociado a ninguna empresa todavía.
           </div>
         )}
 

@@ -539,7 +539,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                           <thead>
                             <tr style={{ background: '#f8fafc' }}>
                               {['Fila', 'Nombre', 'Código', 'Email', 'Teléfono'].map(h => (
-                                <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
+                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
@@ -578,7 +578,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                           <thead>
                             <tr style={{ background: '#f8fafc' }}>
                               {['Fila', 'Nombre', 'Código', 'Motivo'].map(h => (
-                                <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
+                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
@@ -616,7 +616,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                           <thead>
                             <tr style={{ background: '#f8fafc' }}>
                               {['Fila', 'Nombre', 'Código', 'Error'].map(h => (
-                                <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
+                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#475569', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
                               ))}
                             </tr>
                           </thead>

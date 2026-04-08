@@ -129,3 +129,79 @@ button:focus:not(:focus-visible) {
     display: flex !important;
   }
 }
+
+/* ─── Responsive Tables ─────────────────────────────────────────────────── */
+
+/* Wrapper for horizontal-scrollable tables on mobile */
+.table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Fade hint indicating more content to scroll */
+.table-scroll-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to left, rgba(255,255,255,0.9), transparent);
+  pointer-events: none;
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .table-col-secondary {
+    display: none !important;
+  }
+
+  /* Ensure tables don't overflow container */
+  .table-scroll-wrapper {
+    position: relative;
+  }
+  .table-scroll-wrapper::after {
+    display: block;
+  }
+
+  /* Reduce table padding on mobile */
+  table th, table td {
+    padding: 10px 8px !important;
+    font-size: 13px !important;
+  }
+}
+
+/* ─── Tablet Layout (768px - 1024px) ────────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .app-sidebar {
+    width: 210px !important;
+    min-width: 210px !important;
+  }
+}
+
+/* ─── Placeholder Contrast Fix ──────────────────────────────────────────── */
+::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+/* ─── Print Stylesheet ──────────────────────────────────────────────────── */
+@media print {
+  .app-sidebar,
+  .app-backdrop,
+  .app-hamburger,
+  .app-topbar,
+  .app-alert-banner {
+    display: none !important;
+  }
+  .app-main {
+    padding: 0 !important;
+  }
+  body {
+    background: white !important;
+  }
+  button, .no-print {
+    display: none !important;
+  }
+}

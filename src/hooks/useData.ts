@@ -3,11 +3,31 @@ import Swal from 'sweetalert2'
 import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo } from '../types'
 import { supabase } from '../lib/supabase'
 
-const CACHE_KEY = 'aquacontrol_data_v1'
-const CACHE_MAX_AGE = 30 * 60 * 1000 // 30 minutes
+const CACHE_KEY = 'aquacontrol_data_v2'
+const CACHE_MAX_AGE = 10 * 60 * 1000 // 10 minutes
+
+// Strip PII fields from clientes before caching to localStorage
+function sanitizeForCache(payload: AppData): AppData {
+  return {
+    ...payload,
+    clientes: payload.clientes.map(c => ({
+      ...c,
+      email: undefined,
+      telefono: undefined,
+      whatsapp: undefined,
+      telefono_alterno: undefined,
+      cui_dui: undefined,
+      numero_facturacion: undefined,
+      direccion: undefined,
+      fecha_nacimiento: undefined,
+    })),
+  }
+}
 
 function loadCache(): AppData | null {
   try {
+    // Clean up old cache key
+    localStorage.removeItem('aquacontrol_data_v1')
     const raw = localStorage.getItem(CACHE_KEY)
     if (!raw) return null
     const { ts, payload }: { ts: number; payload: AppData } = JSON.parse(raw)
@@ -17,7 +37,7 @@ function loadCache(): AppData | null {
 }
 
 function saveCache(payload: AppData): void {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), payload })) }
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), payload: sanitizeForCache(payload) })) }
   catch { /* storage full — ignore */ }
 }
 
@@ -51,23 +71,36 @@ const INITIAL_DATA: AppData = {
   maxUnidadesPorTipo: null,
 }
 
-export function useData() {
+export function useData(companyId?: string) {
   const [data, setData] = useState<AppData>(() => loadCache() ?? INITIAL_DATA)
 
   const fetchAllData = async () => {
+    // Defense-in-depth: add company_id filters where columns exist.
+    // RLS is the primary enforcement, these are secondary safeguards.
+    const tarifasQ = supabase.from('tarifas').select('*').order('created_at', { ascending: false })
+    const contadoresQ = supabase.from('contadores').select('*').order('created_at', { ascending: false })
+    const unidadesQ = supabase.from('unidades').select('*').order('nombre', { ascending: true })
+    const fuentesQ = supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false })
+    const rcalQ = supabase.from('registros_calidad').select('*, fuentes_agua(identificador, nombre, tipo_agua)').order('fecha', { ascending: false })
+
+    if (companyId) {
+      tarifasQ.eq('company_id', companyId)
+      contadoresQ.eq('company_id', companyId)
+      unidadesQ.eq('company_id', companyId)
+      fuentesQ.eq('company_id', companyId)
+      rcalQ.eq('company_id', companyId)
+    }
+
     return Promise.allSettled([
-      supabase.from('clientes').select('*'),
-      supabase.from('registros').select('*'),
+      supabase.from('clientes').select('*'),          // filtered via RLS + company_clientes junction
+      supabase.from('registros').select('*'),          // filtered via RLS + project assignments
       supabase.from('empresa').select('*').limit(1),
-      supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false }),
-      supabase
-        .from('registros_calidad')
-        .select('*, fuentes_agua(identificador, nombre, tipo_agua)')
-        .order('fecha', { ascending: false }),
+      fuentesQ,
+      rcalQ,
       supabase.from('rutas').select('*').order('created_at', { ascending: false }),
-      supabase.from('tarifas').select('*').order('created_at', { ascending: false }),
-      supabase.from('contadores').select('*').order('created_at', { ascending: false }),
-      supabase.from('unidades').select('*').order('nombre', { ascending: true }),
+      tarifasQ,
+      contadoresQ,
+      unidadesQ,
       supabase.from('projects').select('*').order('nombre', { ascending: true }),
     ])
   }
@@ -147,14 +180,25 @@ export function useData() {
       return
     }
 
-    // Retry once after 800 ms to handle cold-start timeouts on the DB connection pool
-    await new Promise(resolve => setTimeout(resolve, 800))
+    // Retry 1: wait 1.5 s to handle cold-start timeouts on the DB connection pool
+    await new Promise(resolve => setTimeout(resolve, 1500))
     results = await fetchAllData()
     const retryData = applyResults(base, results)
     setData(retryData)
 
     if (!hasErrors(results)) {
       saveCache(retryData)
+      return
+    }
+
+    // Retry 2: wait an additional 3 s for slow Supabase cold starts
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    results = await fetchAllData()
+    const retryData2 = applyResults(base, results)
+    setData(retryData2)
+
+    if (!hasErrors(results)) {
+      saveCache(retryData2)
     } else {
       Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
     }

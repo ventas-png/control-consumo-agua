@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, useCallback, type ReactNode } from 'react'
 
 interface EditModalProps {
   title: string
@@ -8,6 +8,8 @@ interface EditModalProps {
 }
 
 export function EditModal({ title, onClose, children, maxWidth = '760px' }: EditModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -16,17 +18,38 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
+  // Focus trap: keep Tab cycling within the modal
+  const handleFocusTrap = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab' || !dialogRef.current) return
+    const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus() }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
+  }, [])
+
   return (
     <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onKeyDown={handleFocusTrap}
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.45)',
+        background: 'rgba(0,0,0,0.5)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
-        padding: '16px',
+        padding: '12px',
       }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
@@ -35,7 +58,7 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
           background: 'white',
           borderRadius: '16px',
           width: '100%',
-          maxWidth,
+          maxWidth: `min(${maxWidth}, 95vw)`,
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
@@ -48,7 +71,7 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '20px 28px 16px',
+            padding: '16px 20px 14px',
             borderBottom: '1px solid #e2e8f0',
             flexShrink: 0,
           }}
@@ -58,17 +81,21 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
           </h2>
           <button
             onClick={onClose}
+            aria-label="Cerrar modal"
             style={{
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: '#94a3b8',
+              color: '#64748b',
               fontSize: '22px',
               lineHeight: 1,
-              padding: '2px 6px',
-              borderRadius: '6px',
+              padding: '8px',
+              minWidth: '44px',
+              minHeight: '44px',
+              borderRadius: '8px',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
             }}
             title="Cerrar (Esc)"
           >
@@ -77,7 +104,7 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
         </div>
 
         {/* Scrollable body */}
-        <div style={{ overflowY: 'auto', padding: '24px 28px 28px', flex: 1 }}>
+        <div style={{ overflowY: 'auto', padding: '20px', flex: 1 }}>
           {children}
         </div>
       </div>

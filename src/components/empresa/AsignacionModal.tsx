@@ -84,6 +84,7 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
     operador: 'Operador',
     viewer: 'Visualizador',
     visor: 'Visualizador',
+    collector: 'Gestor de Cobros',
   }
 
   return (

@@ -20,6 +20,8 @@ interface Props {
   onRutaUpdated: (id: string, partial: Partial<Ruta>) => void
   onRutaDeleted: (id: string) => void
   onEjecutarRuta: (ruta: Ruta) => void
+  canCreate?: boolean
+  canEdit?: boolean
 }
 
 const EMPTY_FORM = {
@@ -40,6 +42,8 @@ export function RutasSection({
   onRutaUpdated,
   onRutaDeleted,
   onEjecutarRuta,
+  canCreate: _canCreate = true,
+  canEdit: _canEdit = true,
 }: Props) {
   const [editando, setEditando] = useState<Ruta | null>(null)
   const [creando, setCreando] = useState(false)

@@ -57,6 +57,8 @@ export interface Registro {
   monto_calculado: number;
   tipo_cobro: string;
   estado: 'pendiente' | 'pagado' | 'mora';
+  monto_pagado?: number;
+  fecha_pago?: string | null;
   mes?: string;
   notas?: string;
   gps?: GPS;
@@ -108,7 +110,17 @@ export interface RegistroCalidad {
   };
 }
 
-export type UserRole = 'admin' | 'super_admin' | 'company_owner' | 'operator' | 'viewer' | 'cliente';
+export type UserRole = 'admin' | 'super_admin' | 'company_owner' | 'operator' | 'viewer' | 'cliente' | 'collector';
+
+export interface ModulePermission {
+  module_key: string
+  can_view: boolean
+  can_create: boolean
+  can_edit: boolean
+  can_change_status: boolean
+}
+
+export type ModulePermissionsMap = Record<string, ModulePermission>
 
 export interface UserSession {
   user_id: string;
@@ -119,6 +131,7 @@ export interface UserSession {
   cliente_id?: string;
   login_time: string;
   expires_at: string;
+  module_permissions?: ModulePermissionsMap;
 }
 
 export interface Ruta {
@@ -296,6 +309,8 @@ export type AppSection =
   | 'lecturas'
   | 'tabla'
   | 'dashboard'
+  | 'admin_dashboard'
+  | 'cobros'
   | 'mapa'
   | 'calidad'
   | 'rutas'
@@ -305,7 +320,151 @@ export type AppSection =
   | 'configuracion'
   | 'perfil'
   | 'empresa_proyectos'
-  | 'superadmin_empresas';
+  | 'superadmin_empresas'
+  | 'comunicacion';
+
+// ── Centro de Comunicación ─────────────────────────────────────────────────
+
+export type ConversationStatus =
+  | 'abierta'
+  | 'en_progreso'
+  | 'esperando_cliente'
+  | 'resuelta'
+  | 'cerrada';
+
+export type ConversationCategory = 'general' | 'pagos' | 'tecnico' | 'calidad';
+export type ConversationPriority = 'baja' | 'media' | 'alta' | 'urgente';
+
+export interface Conversation {
+  id: string;
+  company_id: string;
+  project_id?: string | null;
+  cliente_id: string;
+  cliente_nombre?: string | null;
+  subject: string;
+  category: ConversationCategory;
+  priority: ConversationPriority;
+  status: ConversationStatus;
+  assigned_to?: string | null;
+  assigned_name?: string | null;
+  closed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  // join opcional (último mensaje)
+  last_message?: string | null;
+  unread_count?: number;
+}
+
+export interface ConversationMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  sender_type: 'cliente' | 'agent';
+  sender_name?: string | null;
+  body: string;
+  is_internal_note: boolean;
+  read_at?: string | null;
+  created_at: string;
+}
+
+export interface ConversationAccessRule {
+  id: string;
+  company_id: string;
+  role: string;
+  can_view_all: boolean;
+  can_respond: boolean;
+  can_assign: boolean;
+  categories: string[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FormaPago =
+  | 'efectivo'
+  | 'transferencia'
+  | 'deposito'
+  | 'tarjeta_credito'
+  | 'tarjeta_debito'
+  | 'cheque'
+  | 'convenio_pago'
+  | 'otro';
+
+export type TipoAplicacion = 'pago_total' | 'abono' | 'convenio';
+export type EstadoPago = 'pendiente' | 'verificado' | 'rechazado' | 'aplicado';
+export type EstadoConvenio = 'activo' | 'completado' | 'incumplido' | 'cancelado';
+
+export interface Pago {
+  id: string;
+  registro_id?: string | null;
+  cliente_id: string;
+  project_id?: string | null;
+  monto: number;
+  metodo: FormaPago;
+  referencia?: string | null;
+  numero_documento?: string | null;
+  tipo_aplicacion?: TipoAplicacion;
+  convenio_id?: string | null;
+  comprobante_url?: string | null;
+  comprobante_tipo?: 'imagen' | 'pdf' | null;
+  verification_status?: EstadoPago;
+  verification_notes?: string | null;
+  verified_by?: string | null;
+  verified_at?: string | null;
+  stripe_payment_intent_id?: string | null;
+  paypal_transaction_id?: string | null;
+  estado: EstadoPago;
+  notas?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  cliente_nombre?: string;
+}
+
+export interface CompanyPaymentConfig {
+  stripe_public_key?: string | null;
+  stripe_configured: boolean;
+  stripe_activo?: boolean;
+  paypal_client_id?: string | null;
+  paypal_configured: boolean;
+  paypal_activo?: boolean;
+}
+
+export interface PaymentRequest {
+  id: string;
+  cliente_id: string;
+  registro_id?: string | null;
+  company_id: string;
+  monto: number;
+  provider: 'stripe' | 'paypal' | 'manual';
+  estado: 'pending' | 'succeeded' | 'failed' | 'pending_verification';
+  stripe_payment_intent?: string | null;
+  paypal_order_id?: string | null;
+  numero_comprobante?: string | null;
+  referencia?: string | null;
+  notas?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConvenioPago {
+  id: string;
+  cliente_id: string;
+  project_id?: string | null;
+  company_id?: string | null;
+  numero_convenio: string;
+  descripcion?: string | null;
+  monto_total: number;
+  monto_pagado: number;
+  cuotas_pactadas?: number | null;
+  fecha_inicio: string;
+  fecha_vencimiento?: string | null;
+  estado: EstadoConvenio;
+  registro_ids: string[];
+  notas?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  // join opcional
+  cliente_nombre?: string;
+}
 
 export interface CostoCalculo {
   total: number;
