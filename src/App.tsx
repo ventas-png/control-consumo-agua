@@ -487,6 +487,7 @@ export default function App() {
             <ErrorBoundary sectionName="comunicacion">
               <ComunicacionSection
                 currentUser={currentUser}
+                clientes={clientes}
                 canCreate={canCreate('comunicacion')}
                 canEdit={canEdit('comunicacion')}
               />

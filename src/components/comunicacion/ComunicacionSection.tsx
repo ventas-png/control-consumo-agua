@@ -4,6 +4,7 @@ import { useConversations } from '../../hooks/useConversations'
 import { sanitizeInput } from '../../lib/validation'
 import type {
   UserSession,
+  Cliente,
   Conversation,
   ConversationCategory,
   ConversationPriority,
@@ -13,8 +14,177 @@ import type {
 
 interface Props {
   currentUser: UserSession
+  clientes: Cliente[]
   canCreate: boolean
   canEdit: boolean
+}
+
+// ── Modal: Nueva Conversación (empresa → cliente) ────────────────────────────
+function NuevaConversacionModal({
+  clientes,
+  onClose,
+  onConfirm,
+  sending,
+}: {
+  clientes: Cliente[]
+  onClose: () => void
+  onConfirm: (data: {
+    clienteId: string
+    clienteNombre: string
+    subject: string
+    category: ConversationCategory
+    priority: ConversationPriority
+    firstMessage: string
+  }) => Promise<void>
+  sending: boolean
+}) {
+  const [clienteId, setClienteId] = useState('')
+  const [search, setSearch] = useState('')
+  const [subject, setSubject] = useState('')
+  const [category, setCategory] = useState<ConversationCategory>('general')
+  const [priority, setPriority] = useState<ConversationPriority>('media')
+  const [firstMessage, setFirstMessage] = useState('')
+
+  const filtered = clientes.filter(c => {
+    const q = search.toLowerCase()
+    return (
+      c.nombre.toLowerCase().includes(q) ||
+      c.codigo.toLowerCase().includes(q) ||
+      (c.email ?? '').toLowerCase().includes(q)
+    )
+  }).slice(0, 30)
+
+  const selectedCliente = clientes.find(c => c.id === clienteId)
+
+  async function handleSubmit() {
+    if (!clienteId || !subject.trim() || !firstMessage.trim()) {
+      Swal.fire({ icon: 'warning', title: 'Campos requeridos', text: 'Selecciona un cliente, escribe el asunto y el mensaje inicial.' })
+      return
+    }
+    await onConfirm({
+      clienteId,
+      clienteNombre: selectedCliente?.nombre ?? '',
+      subject: sanitizeInput(subject.trim()),
+      category,
+      priority,
+      firstMessage: sanitizeInput(firstMessage.trim()),
+    })
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+      zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+    }}>
+      <div style={{
+        background: 'white', borderRadius: '14px', width: '100%', maxWidth: '520px',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', maxHeight: '90vh',
+      }}>
+        {/* Header */}
+        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#111827' }}>Nueva Conversación</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '20px', lineHeight: 1, padding: '2px' }}>×</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '18px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Buscar cliente */}
+          <div>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+              Cliente *
+            </label>
+            <input
+              type="text"
+              placeholder="Buscar por nombre, código o email…"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setClienteId('') }}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+            />
+            {search && !selectedCliente && (
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', marginTop: '4px', maxHeight: '160px', overflowY: 'auto', background: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                {filtered.length === 0 ? (
+                  <div style={{ padding: '12px', fontSize: '12.5px', color: '#9ca3af', textAlign: 'center' }}>Sin resultados</div>
+                ) : filtered.map(c => (
+                  <button key={c.id} onClick={() => { setClienteId(c.id); setSearch(c.nombre) }}
+                    style={{ width: '100%', textAlign: 'left', padding: '9px 12px', border: 'none', borderBottom: '1px solid #f3f4f6', background: 'white', cursor: 'pointer', fontSize: '13px' }}>
+                    <span style={{ fontWeight: 600, color: '#111827' }}>{c.nombre}</span>
+                    <span style={{ color: '#9ca3af', fontSize: '11.5px', marginLeft: '8px' }}>#{c.codigo}</span>
+                    {c.email && <span style={{ color: '#9ca3af', fontSize: '11.5px', marginLeft: '6px' }}>· {c.email}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedCliente && (
+              <div style={{ marginTop: '5px', padding: '6px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '12.5px', color: '#166534', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>✓ {selectedCliente.nombre} <span style={{ opacity: 0.7 }}>#{selectedCliente.codigo}</span></span>
+                <button onClick={() => { setClienteId(''); setSearch('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '14px' }}>×</button>
+              </div>
+            )}
+          </div>
+
+          {/* Asunto */}
+          <div>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Asunto *</label>
+            <input
+              type="text"
+              placeholder="Ej: Revisión de medidor, Acuerdo de pago…"
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          {/* Categoría y Prioridad */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Categoría</label>
+              <select value={category} onChange={e => setCategory(e.target.value as ConversationCategory)}
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+                <option value="general">General</option>
+                <option value="pagos">Pagos</option>
+                <option value="tecnico">Técnico</option>
+                <option value="calidad">Calidad Agua</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Prioridad</label>
+              <select value={priority} onChange={e => setPriority(e.target.value as ConversationPriority)}
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+                <option value="baja">Baja</option>
+                <option value="media">Media</option>
+                <option value="alta">Alta</option>
+                <option value="urgente">Urgente</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Mensaje inicial */}
+          <div>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Mensaje inicial *</label>
+            <textarea
+              value={firstMessage}
+              onChange={e => setFirstMessage(e.target.value)}
+              placeholder="Escribe el primer mensaje para el cliente…"
+              rows={4}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '12px 20px 16px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          <button onClick={onClose} disabled={sending}
+            style={{ padding: '8px 16px', border: '1px solid #d1d5db', borderRadius: '8px', background: 'white', color: '#374151', fontSize: '13px', cursor: 'pointer', fontWeight: 500 }}>
+            Cancelar
+          </button>
+          <button onClick={handleSubmit} disabled={sending || !clienteId || !subject.trim() || !firstMessage.trim()}
+            style={{ padding: '8px 18px', border: 'none', borderRadius: '8px', background: (!clienteId || !subject.trim() || !firstMessage.trim()) ? '#9ca3af' : '#0ea5e9', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'background 0.14s' }}>
+            {sending ? 'Enviando…' : 'Iniciar conversación'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const CATEGORY_LABELS: Record<ConversationCategory, string> = {
@@ -338,7 +508,7 @@ function AccessRulesPanel({
 }
 
 // ── Componente principal ─────────────────────────────────────────────────────
-export function ComunicacionSection({ currentUser, canCreate, canEdit }: Props) {
+export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit }: Props) {
   const {
     conversations,
     messages,
@@ -349,6 +519,7 @@ export function ComunicacionSection({ currentUser, canCreate, canEdit }: Props) 
     loadConversations,
     loadMessages,
     loadAccessRules,
+    createConversation,
     sendMessage,
     updateConversation,
     saveAccessRule,
@@ -364,11 +535,36 @@ export function ComunicacionSection({ currentUser, canCreate, canEdit }: Props) 
   const [filterCategory, setFilterCategory] = useState<ConversationCategory | 'todas'>('todas')
   const [messageText, setMessageText] = useState('')
   const [isInternalNote, setIsInternalNote] = useState(false)
+  const [showNuevaModal, setShowNuevaModal] = useState(false)
 
   // isAdmin: puede VER el panel de configuración
   const isAdmin = ['super_admin', 'company_owner', 'admin'].includes(currentUser.role)
   // canEditRules: puede GUARDAR cambios en conversation_access_rules (coincide con RLS)
   const canEditRules = ['super_admin', 'company_owner'].includes(currentUser.role)
+
+  async function handleCrearConversacion(data: {
+    clienteId: string
+    clienteNombre: string
+    subject: string
+    category: ConversationCategory
+    priority: ConversationPriority
+    firstMessage: string
+  }) {
+    try {
+      const conv = await createConversation({
+        ...data,
+        companyId: currentUser.company_id!,
+        senderName: currentUser.name,
+      })
+      setShowNuevaModal(false)
+      if (conv) {
+        loadMessages(conv.id)
+        setView('detail')
+      }
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo crear la conversación.' })
+    }
+  }
 
   useEffect(() => {
     loadConversations()
@@ -448,6 +644,26 @@ export function ComunicacionSection({ currentUser, canCreate, canEdit }: Props) 
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          {canCreate && (
+            <button
+              onClick={() => setShowNuevaModal(true)}
+              style={{
+                padding: '8px 14px',
+                border: 'none',
+                borderRadius: '8px',
+                background: '#0ea5e9',
+                color: 'white',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              + Nueva conversación
+            </button>
+          )}
           {isAdmin && (
             <button
               onClick={() => setView(view === 'config' ? 'list' : 'config')}
@@ -792,6 +1008,16 @@ export function ComunicacionSection({ currentUser, canCreate, canEdit }: Props) 
             }} />
           )}
         </div>
+      )}
+
+      {/* ── Modal Nueva Conversación ── */}
+      {showNuevaModal && (
+        <NuevaConversacionModal
+          clientes={clientes}
+          sending={sending}
+          onClose={() => setShowNuevaModal(false)}
+          onConfirm={handleCrearConversacion}
+        />
       )}
     </div>
   )
