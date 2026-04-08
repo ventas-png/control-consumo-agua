@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { APP_CONFIG } from '../lib/config'
 import { sanitizeInput, validateEmail } from '../lib/validation'
 import { logSecurityEvent } from '../lib/security'
-import { EXEMPT_ROLES } from '../lib/moduleConfig'
+import { EXEMPT_ROLES, ROLE_DEFAULT_TEMPLATES } from '../lib/moduleConfig'
 
 function getStoredSession(): UserSession | null {
   try {
@@ -122,10 +122,26 @@ async function buildSessionFromSupabase(
             can_change_status: p.can_change_status,
           }
         }
+      } else {
+        // Sin filas en DB (usuario sin permisos configurados aún, o fallo de conexión)
+        // Usar template del rol como fallback para no dejar el sidebar vacío
+        const defaults = ROLE_DEFAULT_TEMPLATES[uiRole]
+        if (defaults && defaults.length > 0) {
+          modulePermissions = {}
+          for (const p of defaults) {
+            modulePermissions[p.module_key] = p
+          }
+        }
       }
     } catch {
-      // Si falla la carga de permisos, continuar sin ellos
-      // (el hook usePermissions denegará acceso por defecto)
+      // Si falla la carga de permisos, usar template del rol como fallback
+      const defaults = ROLE_DEFAULT_TEMPLATES[uiRole]
+      if (defaults && defaults.length > 0) {
+        modulePermissions = {}
+        for (const p of defaults) {
+          modulePermissions[p.module_key] = p
+        }
+      }
     }
   }
 
