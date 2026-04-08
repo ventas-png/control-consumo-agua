@@ -187,10 +187,12 @@ function AccessRulesPanel({
   companyId,
   accessRules,
   onSave,
+  canEdit,
 }: {
   companyId: string
   accessRules: ConversationAccessRule[]
   onSave: (rule: Omit<ConversationAccessRule, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
+  canEdit: boolean
 }) {
   const roles = ['admin', 'operator', 'collector', 'viewer'] as const
   const allCategories = ['general', 'pagos', 'tecnico', 'calidad']
@@ -212,6 +214,8 @@ function AccessRulesPanel({
         can_assign: field === 'can_assign' ? !current : (existing?.can_assign ?? false),
         categories: existing?.categories ?? null,
       })
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Error al guardar', text: 'No se pudo actualizar el permiso. Verifique sus permisos de acceso.' })
     } finally {
       setSaving(null)
     }
@@ -240,6 +244,8 @@ function AccessRulesPanel({
         can_assign: existing?.can_assign ?? false,
         categories: next,
       })
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Error al guardar', text: 'No se pudo actualizar la categoría. Verifique sus permisos de acceso.' })
     } finally {
       setSaving(null)
     }
@@ -250,11 +256,23 @@ function AccessRulesPanel({
       <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
         Configure qué roles pueden ver y responder conversaciones, y en qué categorías.
       </div>
+      {!canEdit && (
+        <div style={{
+          background: '#fffbeb', border: '1px solid #fde68a',
+          borderRadius: '8px', padding: '10px 14px',
+          color: '#92400e', fontSize: '12.5px', marginBottom: '14px',
+          display: 'flex', alignItems: 'center', gap: '8px',
+        }}>
+          <span>⚠️</span>
+          Solo el <strong>Admin Empresa (company_owner)</strong> puede modificar estas reglas. Vista de solo lectura.
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {roles.map(role => {
           const rule = getRuleForRole(role)
           const categories = rule?.categories ?? null
           const isBusy = saving?.startsWith(role)
+          const isDisabled = isBusy || !canEdit
           return (
             <div key={role} style={{
               border: '1px solid #e5e7eb',
@@ -271,12 +289,12 @@ function AccessRulesPanel({
                   const val = rule ? rule[field] : false
                   const label = field === 'can_view_all' ? 'Ver todas' : field === 'can_respond' ? 'Responder' : 'Asignar'
                   return (
-                    <label key={field} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12.5px', color: '#374151' }}>
+                    <label key={field} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: isDisabled ? 'not-allowed' : 'pointer', fontSize: '12.5px', color: '#374151', opacity: !canEdit ? 0.6 : 1 }}>
                       <input
                         type="checkbox"
                         checked={val}
-                        disabled={isBusy}
-                        onChange={() => handleToggle(role, field, val)}
+                        disabled={isDisabled}
+                        onChange={() => !isDisabled && handleToggle(role, field, val)}
                         style={{ width: '14px', height: '14px', accentColor: '#0ea5e9' }}
                       />
                       {label}
@@ -293,8 +311,8 @@ function AccessRulesPanel({
                   return (
                     <button
                       key={cat}
-                      disabled={isBusy}
-                      onClick={() => handleCategoryToggle(role, cat)}
+                      disabled={isDisabled}
+                      onClick={() => !isDisabled && handleCategoryToggle(role, cat)}
                       style={{
                         padding: '3px 10px',
                         borderRadius: '999px',
@@ -347,7 +365,10 @@ export function ComunicacionSection({ currentUser, canCreate, canEdit }: Props) 
   const [messageText, setMessageText] = useState('')
   const [isInternalNote, setIsInternalNote] = useState(false)
 
+  // isAdmin: puede VER el panel de configuración
   const isAdmin = ['super_admin', 'company_owner', 'admin'].includes(currentUser.role)
+  // canEditRules: puede GUARDAR cambios en conversation_access_rules (coincide con RLS)
+  const canEditRules = ['super_admin', 'company_owner'].includes(currentUser.role)
 
   useEffect(() => {
     loadConversations()
@@ -480,6 +501,7 @@ export function ComunicacionSection({ currentUser, canCreate, canEdit }: Props) 
             companyId={currentUser.company_id!}
             accessRules={accessRules}
             onSave={saveAccessRule}
+            canEdit={canEditRules}
           />
         </div>
       )}
