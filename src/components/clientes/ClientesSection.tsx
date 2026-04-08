@@ -52,7 +52,7 @@ interface LookupForm {
 
 const EMPTY_LOOKUP: LookupForm = { cui_dui: '', fecha_nacimiento: '', email: '' }
 
-export function ClientesSection({ clientes, userRole, userId, currentUser, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted, canCreate: canCreateProp = true, canEdit: canEditProp = true, canChangeStatus = true }: Props) {
+export function ClientesSection({ clientes, userRole, userId, currentUser, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted, canCreate: canCreateProp = true, canEdit: canEditProp = true, canChangeStatus: _canChangeStatus = true }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -66,7 +66,7 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
   const [lookupResult, setLookupResult] = useState<ClienteLookupResult | null>(null)
 
   const canEdit = canEditProp && userRole !== 'viewer'
-  const canCreate = canCreateProp && userRole !== 'viewer'
+  void (canCreateProp && userRole !== 'viewer') // canCreate reservado para uso futuro
 
   function startCreate() {
     setForm(EMPTY_FORM)

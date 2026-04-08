@@ -6,7 +6,6 @@ import type {
   ConversationAccessRule,
   ConversationCategory,
   ConversationPriority,
-  ConversationStatus,
 } from '../types'
 
 interface UseConversationsOptions {
