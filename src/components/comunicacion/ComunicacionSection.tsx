@@ -224,6 +224,22 @@ const STATUS_COLORS: Record<ConversationStatus, string> = {
   cerrada: '#6b7280',
 }
 
+function getFileIcon(mimeType?: string | null): string {
+  if (!mimeType) return '📎'
+  if (mimeType === 'application/pdf') return '📄'
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType.includes('csv')) return '📊'
+  if (mimeType.includes('word') || mimeType.includes('document')) return '📝'
+  if (mimeType.startsWith('image/')) return '🖼️'
+  return '📎'
+}
+
+function formatBytes(bytes?: number | null): string {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function formatDate(iso: string): string {
   const d = new Date(iso)
   const now = new Date()
@@ -536,6 +552,7 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
   const [messageText, setMessageText] = useState('')
   const [isInternalNote, setIsInternalNote] = useState(false)
   const [showNuevaModal, setShowNuevaModal] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
 
   // isAdmin: puede VER el panel de configuración
   const isAdmin = ['super_admin', 'company_owner', 'admin'].includes(currentUser.role)
@@ -580,9 +597,8 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
   }
 
   async function handleSendMessage() {
-    if (!activeConversationId || !messageText.trim()) return
+    if (!activeConversationId || (!messageText.trim() && !pendingFile)) return
     const clean = sanitizeInput(messageText.trim())
-    if (!clean) return
 
     try {
       await sendMessage({
@@ -590,8 +606,10 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
         body: clean,
         senderName: currentUser.name,
         isInternalNote,
+        attachment: pendingFile ?? undefined,
       })
       setMessageText('')
+      setPendingFile(null)
       // Si era del agente y estaba esperando cliente → en_progreso
       if (activeConversation?.status === 'esperando_cliente' && !isInternalNote) {
         await updateConversation(activeConversationId, { status: 'en_progreso' })
@@ -900,9 +918,43 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
                           <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '4px', opacity: 0.7 }}>
                             {isNote ? '📝 Nota interna · ' : ''}{msg.sender_name ?? 'Usuario'}
                           </div>
-                          <div style={{ fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                            {msg.body}
-                          </div>
+                          {msg.body && (
+                            <div style={{ fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                              {msg.body}
+                            </div>
+                          )}
+                          {msg.attachment_url && msg.attachment_type?.startsWith('image/') && (
+                            <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer">
+                              <img
+                                src={msg.attachment_url}
+                                alt={msg.attachment_name ?? 'imagen'}
+                                style={{ maxWidth: '220px', maxHeight: '200px', borderRadius: '8px', marginTop: msg.body ? '6px' : 0, display: 'block' }}
+                              />
+                            </a>
+                          )}
+                          {msg.attachment_url && !msg.attachment_type?.startsWith('image/') && (
+                            <a
+                              href={msg.attachment_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                marginTop: msg.body ? '6px' : 0,
+                                background: 'rgba(0,0,0,0.08)', borderRadius: '8px',
+                                padding: '8px 10px', color: 'inherit', textDecoration: 'none',
+                              }}
+                            >
+                              <span style={{ fontSize: '20px' }}>{getFileIcon(msg.attachment_type)}</span>
+                              <div style={{ overflow: 'hidden' }}>
+                                <div style={{ fontSize: '12px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {msg.attachment_name}
+                                </div>
+                                {msg.attachment_size && (
+                                  <div style={{ fontSize: '10px', opacity: 0.7 }}>{formatBytes(msg.attachment_size)}</div>
+                                )}
+                              </div>
+                            </a>
+                          )}
                           <div style={{ fontSize: '10px', opacity: 0.6, marginTop: '5px', textAlign: 'right' }}>
                             {new Date(msg.created_at).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' })}
                           </div>
@@ -935,6 +987,37 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
                     />
                     Nota interna (solo visible para el equipo)
                   </label>
+                  {/* Preview archivo pendiente */}
+                  {pendingFile && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '7px 10px', marginBottom: '7px',
+                      background: '#f0f9ff', border: '1px solid #bae6fd',
+                      borderRadius: '8px',
+                    }}>
+                      {pendingFile.type.startsWith('image/') ? (
+                        <img
+                          src={URL.createObjectURL(pendingFile)}
+                          alt="preview"
+                          style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: '22px', flexShrink: 0 }}>{getFileIcon(pendingFile.type)}</span>
+                      )}
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 500, color: '#0369a1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {pendingFile.name}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#6b7280' }}>{formatBytes(pendingFile.size)}</div>
+                      </div>
+                      <button
+                        onClick={() => setPendingFile(null)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '16px', lineHeight: 1, padding: '2px', flexShrink: 0 }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
                     <textarea
                       value={messageText}
@@ -956,27 +1039,47 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
                         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSendMessage()
                       }}
                     />
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={sending || !messageText.trim()}
-                      style={{
-                        padding: '10px 16px',
-                        background: sending || !messageText.trim() ? '#9ca3af' : '#0ea5e9',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '10px',
-                        fontWeight: 600,
-                        fontSize: '13px',
-                        cursor: sending || !messageText.trim() ? 'not-allowed' : 'pointer',
-                        whiteSpace: 'nowrap',
-                        transition: 'background 0.14s',
-                      }}
-                    >
-                      {sending ? '…' : 'Enviar'}
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label title="Adjuntar archivo" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', border: '1px solid #e5e7eb', borderRadius: '10px', background: 'white', fontSize: '18px' }}>
+                        📎
+                        <input
+                          type="file"
+                          accept="image/*,.pdf,.xlsx,.xls,.docx,.doc,.csv"
+                          style={{ display: 'none' }}
+                          onChange={e => {
+                            const file = e.target.files?.[0]
+                            e.target.value = ''
+                            if (!file) return
+                            if (file.size > 10 * 1024 * 1024) {
+                              Swal.fire({ icon: 'warning', title: 'Archivo muy grande', text: 'El archivo no puede superar los 10 MB.' })
+                              return
+                            }
+                            setPendingFile(file)
+                          }}
+                        />
+                      </label>
+                      <button
+                        onClick={handleSendMessage}
+                        disabled={sending || (!messageText.trim() && !pendingFile)}
+                        style={{
+                          padding: '10px 16px',
+                          background: (sending || (!messageText.trim() && !pendingFile)) ? '#9ca3af' : '#0ea5e9',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '10px',
+                          fontWeight: 600,
+                          fontSize: '13px',
+                          cursor: (sending || (!messageText.trim() && !pendingFile)) ? 'not-allowed' : 'pointer',
+                          whiteSpace: 'nowrap',
+                          transition: 'background 0.14s',
+                        }}
+                      >
+                        {sending ? '…' : 'Enviar'}
+                      </button>
+                    </div>
                   </div>
                   <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '5px' }}>
-                    Ctrl+Enter para enviar rápido
+                    Ctrl+Enter para enviar · Max 10 MB por adjunto
                   </div>
                 </div>
               )}
