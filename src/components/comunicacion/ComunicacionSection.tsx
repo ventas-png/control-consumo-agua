@@ -610,16 +610,42 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
       })
       setMessageText('')
       setPendingFile(null)
-      // Si era del agente y estaba esperando cliente → en_progreso
-      if (activeConversation?.status === 'esperando_cliente' && !isInternalNote) {
-        await updateConversation(activeConversationId, { status: 'en_progreso' })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'Error desconocido'
+      Swal.fire({ icon: 'error', title: 'Error al enviar', text: msg })
+      return
+    }
+
+    // Actualizar estado conversación — separado para no confundir con error de envío
+    if (!isInternalNote) {
+      const st = activeConversation?.status
+      if (st === 'esperando_cliente' || st === 'abierta') {
+        updateConversation(activeConversationId, { status: 'en_progreso' }).catch(() => {})
       }
-      // Si era del agente y estaba abierta → en_progreso
-      if (activeConversation?.status === 'abierta' && !isInternalNote) {
-        await updateConversation(activeConversationId, { status: 'en_progreso' })
-      }
+    }
+  }
+
+  async function handleAssignToMe() {
+    if (!activeConversationId) return
+    try {
+      await updateConversation(activeConversationId, {
+        assigned_to: currentUser.user_id,
+        assigned_name: currentUser.name,
+      })
     } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo enviar el mensaje.' })
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo asignar la conversación.' })
+    }
+  }
+
+  async function handleUnassign() {
+    if (!activeConversationId) return
+    try {
+      await updateConversation(activeConversationId, {
+        assigned_to: null,
+        assigned_name: null,
+      })
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo desasignar.' })
     }
   }
 
@@ -868,22 +894,53 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
                   </div>
                 </div>
                 {canEdit && (
-                  <select
-                    value={activeConversation.status}
-                    onChange={e => handleChangeStatus(e.target.value as ConversationStatus)}
-                    style={{
-                      padding: '6px 10px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                      outline: 'none',
-                    }}
-                  >
-                    {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
-                    ))}
-                  </select>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+                    <select
+                      value={activeConversation.status}
+                      onChange={e => handleChangeStatus(e.target.value as ConversationStatus)}
+                      style={{
+                        padding: '6px 10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        outline: 'none',
+                      }}
+                    >
+                      {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                      ))}
+                    </select>
+                    {/* Asignación */}
+                    {activeConversation.assigned_name ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '11.5px', color: '#6b7280' }}>
+                          👤 {activeConversation.assigned_name}
+                        </span>
+                        <button
+                          onClick={handleUnassign}
+                          style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '11px', color: '#6b7280', cursor: 'pointer', padding: '2px 8px' }}
+                        >
+                          Desasignar
+                        </button>
+                        {activeConversation.assigned_to !== currentUser.user_id && (
+                          <button
+                            onClick={handleAssignToMe}
+                            style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '11px', color: '#1d4ed8', cursor: 'pointer', padding: '2px 8px', fontWeight: 600 }}
+                          >
+                            Asignarme
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleAssignToMe}
+                        style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '11.5px', color: '#1d4ed8', cursor: 'pointer', padding: '4px 10px', fontWeight: 600 }}
+                      >
+                        + Asignarme
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
 
