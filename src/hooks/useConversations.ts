@@ -119,6 +119,49 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
     }
   }, [userId, isCliente])
 
+  // ── Crear conversación interna (equipo) ──────────────────────────────────
+  const createInternalConversation = useCallback(async (params: {
+    subject: string
+    category: ConversationCategory
+    firstMessage: string
+    senderName: string
+    companyId: string
+  }): Promise<Conversation | null> => {
+    setSending(true)
+    try {
+      const { data: conv, error: convErr } = await supabase
+        .from('conversations')
+        .insert({
+          company_id: params.companyId,
+          cliente_id: null,
+          cliente_nombre: null,
+          subject: params.subject,
+          category: params.category,
+          priority: 'media',
+          status: 'abierta',
+          is_internal: true,
+        })
+        .select()
+        .single()
+
+      if (convErr || !conv) throw convErr
+
+      await supabase.from('conversation_messages').insert({
+        conversation_id: conv.id,
+        sender_id: userId,
+        sender_type: 'agent',
+        sender_name: params.senderName,
+        body: params.firstMessage,
+        is_internal_note: false,
+      })
+
+      setConversations(prev => [conv, ...prev])
+      return conv
+    } finally {
+      setSending(false)
+    }
+  }, [userId])
+
   // ── Enviar mensaje ────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (params: {
     conversationId: string
@@ -265,6 +308,7 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
     loadMessages,
     loadAccessRules,
     createConversation,
+    createInternalConversation,
     sendMessage,
     updateConversation,
     saveAccessRule,

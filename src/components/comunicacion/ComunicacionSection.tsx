@@ -252,6 +252,81 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })
 }
 
+// ── Modal: Nueva Discusión Interna (equipo) ──────────────────────────────────
+function NuevaDiscusionInternaModal({
+  onClose,
+  onConfirm,
+  sending,
+}: {
+  onClose: () => void
+  onConfirm: (data: { subject: string; category: ConversationCategory; firstMessage: string }) => Promise<void>
+  sending: boolean
+}) {
+  const [subject, setSubject] = useState('')
+  const [category, setCategory] = useState<ConversationCategory>('general')
+  const [firstMessage, setFirstMessage] = useState('')
+
+  async function handleSubmit() {
+    if (!subject.trim() || !firstMessage.trim()) {
+      Swal.fire({ icon: 'warning', title: 'Campos requeridos', text: 'Escribe un asunto y el primer mensaje.' })
+      return
+    }
+    await onConfirm({
+      subject: sanitizeInput(subject.trim()),
+      category,
+      firstMessage: sanitizeInput(firstMessage.trim()),
+    })
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+      <div style={{ background: 'white', borderRadius: '14px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#111827' }}>Nueva discusión de equipo</h3>
+            <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6b7280' }}>Solo visible para el equipo interno</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '20px', lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Asunto *</label>
+            <input type="text" value={subject} onChange={e => setSubject(e.target.value)}
+              placeholder="Ej: Revisión de procedimientos, Aviso de mantenimiento…"
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Categoría</label>
+            <select value={category} onChange={e => setCategory(e.target.value as ConversationCategory)}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+              <option value="general">General</option>
+              <option value="pagos">Finanzas / Cobros</option>
+              <option value="tecnico">Técnico / Operaciones</option>
+              <option value="calidad">Calidad del Servicio</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Mensaje inicial *</label>
+            <textarea value={firstMessage} onChange={e => setFirstMessage(e.target.value)}
+              placeholder="Escribe el mensaje de apertura…" rows={4}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+          </div>
+        </div>
+        <div style={{ padding: '12px 20px 16px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          <button onClick={onClose} disabled={sending}
+            style={{ padding: '8px 16px', border: '1px solid #d1d5db', borderRadius: '8px', background: 'white', color: '#374151', fontSize: '13px', cursor: 'pointer' }}>
+            Cancelar
+          </button>
+          <button onClick={handleSubmit} disabled={sending || !subject.trim() || !firstMessage.trim()}
+            style={{ padding: '8px 18px', border: 'none', borderRadius: '8px', background: (!subject.trim() || !firstMessage.trim()) ? '#9ca3af' : '#7c3aed', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            {sending ? 'Creando…' : 'Crear discusión'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Sub-componente: Lista de conversaciones ──────────────────────────────────
 function ConversationList({
   conversations,
@@ -536,6 +611,7 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
     loadMessages,
     loadAccessRules,
     createConversation,
+    createInternalConversation,
     sendMessage,
     updateConversation,
     saveAccessRule,
@@ -546,12 +622,14 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
   })
 
   const [view, setView] = useState<'list' | 'detail' | 'config'>('list')
+  const [convTab, setConvTab] = useState<'clientes' | 'equipo'>('clientes')
   const [filterText, setFilterText] = useState('')
   const [filterStatus, setFilterStatus] = useState<ConversationStatus | 'todas'>('todas')
   const [filterCategory, setFilterCategory] = useState<ConversationCategory | 'todas'>('todas')
   const [messageText, setMessageText] = useState('')
   const [isInternalNote, setIsInternalNote] = useState(false)
   const [showNuevaModal, setShowNuevaModal] = useState(false)
+  const [showNuevaInternaModal, setShowNuevaInternaModal] = useState(false)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
 
   // isAdmin: puede VER el panel de configuración
@@ -580,6 +658,23 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
       }
     } catch {
       Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo crear la conversación.' })
+    }
+  }
+
+  async function handleCrearDiscusionInterna(data: { subject: string; category: ConversationCategory; firstMessage: string }) {
+    try {
+      const conv = await createInternalConversation({
+        ...data,
+        companyId: currentUser.company_id!,
+        senderName: currentUser.name,
+      })
+      setShowNuevaInternaModal(false)
+      if (conv) {
+        loadMessages(conv.id)
+        setView('detail')
+      }
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo crear la discusión.' })
     }
   }
 
@@ -664,17 +759,21 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
   }
 
   // Filtros aplicados
-  const visibleConversations = conversations.filter(c => {
+  const clientConvs = conversations.filter(c => !c.is_internal)
+  const teamConvs = conversations.filter(c => c.is_internal)
+  const tabConvs = convTab === 'clientes' ? clientConvs : teamConvs
+
+  const visibleConversations = tabConvs.filter(c => {
     if (filterStatus !== 'todas' && c.status !== filterStatus) return false
     if (filterCategory !== 'todas' && c.category !== filterCategory) return false
     return true
   })
 
   const stats = {
-    abiertas: conversations.filter(c => c.status === 'abierta').length,
-    en_progreso: conversations.filter(c => c.status === 'en_progreso').length,
-    esperando: conversations.filter(c => c.status === 'esperando_cliente').length,
-    resueltas: conversations.filter(c => c.status === 'resuelta').length,
+    abiertas: clientConvs.filter(c => c.status === 'abierta').length,
+    en_progreso: clientConvs.filter(c => c.status === 'en_progreso').length,
+    esperando: clientConvs.filter(c => c.status === 'esperando_cliente').length,
+    resueltas: clientConvs.filter(c => c.status === 'resuelta').length,
   }
 
   return (
@@ -688,24 +787,20 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          {canCreate && (
+          {canCreate && convTab === 'clientes' && (
             <button
               onClick={() => setShowNuevaModal(true)}
-              style={{
-                padding: '8px 14px',
-                border: 'none',
-                borderRadius: '8px',
-                background: '#0ea5e9',
-                color: 'white',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
+              style={{ padding: '8px 14px', border: 'none', borderRadius: '8px', background: '#0ea5e9', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               + Nueva conversación
+            </button>
+          )}
+          {canCreate && convTab === 'equipo' && (
+            <button
+              onClick={() => setShowNuevaInternaModal(true)}
+              style={{ padding: '8px 14px', border: 'none', borderRadius: '8px', background: '#7c3aed', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              + Nueva discusión
             </button>
           )}
           {isAdmin && (
@@ -784,6 +879,24 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
             display: 'flex',
             flexDirection: 'column',
           }}>
+            {/* Tabs: Clientes / Equipo */}
+            <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9' }}>
+              {([['clientes', '👥 Clientes', clientConvs.length], ['equipo', '🏢 Equipo', teamConvs.length]] as const).map(([tab, label, count]) => (
+                <button key={tab} onClick={() => { setConvTab(tab); setView('list') }}
+                  style={{
+                    flex: 1, padding: '10px 8px', border: 'none', borderBottom: `2px solid ${convTab === tab ? (tab === 'equipo' ? '#7c3aed' : '#0ea5e9') : 'transparent'}`,
+                    background: 'white', cursor: 'pointer', fontSize: '12.5px', fontWeight: convTab === tab ? 700 : 400,
+                    color: convTab === tab ? (tab === 'equipo' ? '#7c3aed' : '#0ea5e9') : '#6b7280',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                  }}>
+                  {label}
+                  <span style={{ background: convTab === tab ? (tab === 'equipo' ? '#ede9fe' : '#e0f2fe') : '#f3f4f6', color: convTab === tab ? (tab === 'equipo' ? '#7c3aed' : '#0369a1') : '#9ca3af', borderRadius: '999px', padding: '1px 6px', fontSize: '11px', fontWeight: 600 }}>
+                    {count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
             {/* Filtros */}
             <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #f1f5f9' }}>
               <input
@@ -888,9 +1001,16 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
                       {PRIORITY_LABELS[activeConversation.priority]}
                     </span>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginLeft: '26px' }}>
-                    {activeConversation.cliente_nombre} · {CATEGORY_LABELS[activeConversation.category]}
-                    {activeConversation.assigned_name && ` · Agente: ${activeConversation.assigned_name}`}
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginLeft: '26px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    {activeConversation.is_internal ? (
+                      <span style={{ background: '#ede9fe', color: '#7c3aed', borderRadius: '999px', padding: '1px 8px', fontSize: '11px', fontWeight: 600 }}>
+                        🏢 Discusión interna de equipo
+                      </span>
+                    ) : (
+                      <span>{activeConversation.cliente_nombre} ·</span>
+                    )}
+                    <span>{CATEGORY_LABELS[activeConversation.category]}</span>
+                    {activeConversation.assigned_name && <span>· Agente: {activeConversation.assigned_name}</span>}
                   </div>
                 </div>
                 {canEdit && (
@@ -1025,25 +1145,14 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
               {/* Compositor de mensaje */}
               {canCreate && activeConversation.status !== 'cerrada' && (
                 <div style={{ borderTop: '1px solid #f1f5f9', padding: '12px 14px' }}>
-                  {/* Toggle nota interna */}
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '12px',
-                    color: '#6b7280',
-                    cursor: 'pointer',
-                    marginBottom: '8px',
-                    userSelect: 'none',
-                  }}>
-                    <input
-                      type="checkbox"
-                      checked={isInternalNote}
-                      onChange={e => setIsInternalNote(e.target.checked)}
-                      style={{ width: '13px', height: '13px', accentColor: '#f59e0b' }}
-                    />
-                    Nota interna (solo visible para el equipo)
-                  </label>
+                  {/* Toggle nota interna — solo para conversaciones con clientes */}
+                  {!activeConversation.is_internal && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#6b7280', cursor: 'pointer', marginBottom: '8px', userSelect: 'none' }}>
+                      <input type="checkbox" checked={isInternalNote} onChange={e => setIsInternalNote(e.target.checked)}
+                        style={{ width: '13px', height: '13px', accentColor: '#f59e0b' }} />
+                      Nota interna (solo visible para el equipo)
+                    </label>
+                  )}
                   {/* Preview archivo pendiente */}
                   {pendingFile && (
                     <div style={{
@@ -1170,13 +1279,22 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
         </div>
       )}
 
-      {/* ── Modal Nueva Conversación ── */}
+      {/* ── Modal Nueva Conversación (cliente) ── */}
       {showNuevaModal && (
         <NuevaConversacionModal
           clientes={clientes}
           sending={sending}
           onClose={() => setShowNuevaModal(false)}
           onConfirm={handleCrearConversacion}
+        />
+      )}
+
+      {/* ── Modal Nueva Discusión Interna (equipo) ── */}
+      {showNuevaInternaModal && (
+        <NuevaDiscusionInternaModal
+          sending={sending}
+          onClose={() => setShowNuevaInternaModal(false)}
+          onConfirm={handleCrearDiscusionInterna}
         />
       )}
     </div>

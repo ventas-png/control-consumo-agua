@@ -339,8 +339,9 @@ export interface Conversation {
   id: string;
   company_id: string;
   project_id?: string | null;
-  cliente_id: string;
+  cliente_id?: string | null;
   cliente_nombre?: string | null;
+  is_internal?: boolean;
   subject: string;
   category: ConversationCategory;
   priority: ConversationPriority;
