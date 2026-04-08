@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
 
     const { data: company, error: companyError } = await adminClient
       .from('companies')
-      .select('stripe_secret_key, stripe_configured')
+      .select('stripe_configured')
       .eq('id', companyId)
       .single()
 
@@ -85,15 +85,28 @@ Deno.serve(async (req) => {
       })
     }
 
-    if (!company.stripe_configured || !company.stripe_secret_key) {
+    if (!company.stripe_configured) {
       return new Response(JSON.stringify({ error: 'Stripe not configured' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Read secret from isolated table (only service_role can access)
+    const { data: secrets, error: secretsError } = await adminClient
+      .from('company_payment_secrets')
+      .select('stripe_secret_key')
+      .eq('company_id', companyId)
+      .single()
+
+    if (secretsError || !secrets?.stripe_secret_key) {
+      return new Response(JSON.stringify({ error: 'Stripe secret key not found' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
     // Test Stripe connection by getting account info
     const Stripe = stripe.default || stripe
-    const stripeClient = new Stripe(company.stripe_secret_key)
+    const stripeClient = new Stripe(secrets.stripe_secret_key)
 
     try {
       const account = await stripeClient.account.retrieve()

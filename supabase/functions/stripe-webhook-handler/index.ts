@@ -32,13 +32,13 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Get all companies to find the one with matching webhook secret
-    const { data: companies } = await adminClient
-      .from('companies')
-      .select('id, stripe_webhook_secret, stripe_secret_key')
+    // Get all company secrets to find the one with matching webhook secret
+    const { data: secrets } = await adminClient
+      .from('company_payment_secrets')
+      .select('company_id, stripe_webhook_secret')
       .neq('stripe_webhook_secret', null)
 
-    if (!companies || companies.length === 0) {
+    if (!secrets || secrets.length === 0) {
       console.error('No companies with Stripe webhook secret configured')
       return new Response(JSON.stringify({ error: 'No companies configured' }), {
         status: 400, headers: { 'Content-Type': 'application/json' },
@@ -50,16 +50,16 @@ Deno.serve(async (req) => {
     const Stripe = stripe.default || stripe
 
     // Try to verify with each company's webhook secret
-    for (const company of companies) {
+    for (const secret of secrets) {
       try {
-        if (!company.stripe_webhook_secret) continue
+        if (!secret.stripe_webhook_secret) continue
 
         event = Stripe.webhooks.constructEvent(
           body,
           signature,
-          company.stripe_webhook_secret
+          secret.stripe_webhook_secret
         )
-        companyId = company.id
+        companyId = secret.company_id
         break
       } catch (err) {
         // Try next company

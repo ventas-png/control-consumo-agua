@@ -83,32 +83,60 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    let updateData: Record<string, unknown>
+    // 1. Update public config in companies table
+    let companyUpdate: Record<string, unknown>
+    let secretsUpdate: Record<string, unknown>
 
     if (provider === 'stripe') {
-      updateData = {
+      companyUpdate = {
         stripe_public_key: publicKey,
-        stripe_secret_key: secretKey,
         stripe_configured: true,
         stripe_activo: true,
       }
+      secretsUpdate = {
+        company_id: companyId,
+        stripe_secret_key: secretKey,
+        updated_at: new Date().toISOString(),
+      }
     } else {
-      updateData = {
+      companyUpdate = {
         paypal_client_id: publicKey,
-        paypal_client_secret: secretKey,
         paypal_configured: true,
         paypal_activo: true,
       }
+      secretsUpdate = {
+        company_id: companyId,
+        paypal_client_secret: secretKey,
+        updated_at: new Date().toISOString(),
+      }
     }
 
-    const { error: updateError } = await adminClient
+    const { error: companyError } = await adminClient
       .from('companies')
-      .update(updateData)
+      .update(companyUpdate)
       .eq('id', companyId)
 
-    if (updateError) {
-      console.error('Error saving payment config:', updateError)
+    if (companyError) {
+      console.error('Error saving company config:', companyError)
       return new Response(JSON.stringify({ error: 'Failed to save configuration' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // 2. Upsert secret in company_payment_secrets table (only service_role can access)
+    const { error: secretError } = await adminClient
+      .from('company_payment_secrets')
+      .upsert(secretsUpdate, { onConflict: 'company_id' })
+
+    if (secretError) {
+      console.error('Error saving payment secret:', secretError)
+      // Rollback: unmark as configured since secret wasn't saved
+      const rollback: Record<string, unknown> = provider === 'stripe'
+        ? { stripe_configured: false, stripe_activo: false }
+        : { paypal_configured: false, paypal_activo: false }
+      await adminClient.from('companies').update(rollback).eq('id', companyId)
+
+      return new Response(JSON.stringify({ error: 'Failed to save secret key' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
