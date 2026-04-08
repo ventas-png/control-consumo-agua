@@ -1,8 +1,14 @@
 export function sanitizeInput(input: string): string {
   return input
     .replace(/[<>]/g, '')
-    .replace(/javascript:/gi, '')
-    .replace(/on\w+=/gi, '')
+    .replace(/javascript\s*:/gi, '')
+    .replace(/data\s*:/gi, '')
+    .replace(/vbscript\s*:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .replace(/&#\d+;?/g, '')
+    .replace(/&#x[a-fA-F0-9]+;?/g, '')
+    .replace(/expression\s*\(/gi, '')
+    .replace(/url\s*\(/gi, '')
     .trim()
 }
 
@@ -34,6 +40,14 @@ export function formatPhoneForWa(phone: string, defaultCountryCode = '502'): str
   if (digits.length === 8) return defaultCountryCode + digits
   // Cualquier otro caso: devolver solo dígitos
   return digits
+}
+
+export function validatePasswordStrength(password: string): { valid: boolean; message: string } {
+  if (password.length < 8) return { valid: false, message: 'Debe tener al menos 8 caracteres' }
+  if (!/[A-Z]/.test(password)) return { valid: false, message: 'Debe incluir al menos una mayuscula' }
+  if (!/[a-z]/.test(password)) return { valid: false, message: 'Debe incluir al menos una minuscula' }
+  if (!/\d/.test(password)) return { valid: false, message: 'Debe incluir al menos un numero' }
+  return { valid: true, message: '' }
 }
 
 export function validateNumber(

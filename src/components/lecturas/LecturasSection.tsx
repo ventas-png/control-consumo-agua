@@ -17,6 +17,7 @@ interface Props {
   rutaActiva?: Ruta | null
   onClearRuta?: () => void
   onRutaCompletada?: (rutaId: string) => void
+  canCreate?: boolean
 }
 
 export function LecturasSection({
@@ -31,6 +32,7 @@ export function LecturasSection({
   rutaActiva,
   onClearRuta,
   onRutaCompletada,
+  canCreate: _canCreate = true,
 }: Props) {
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
   const [selectedContadorId, setSelectedContadorId] = useState('')

@@ -19,6 +19,8 @@ interface Props {
   onUnidadUpdated: (id: string, partial: Partial<Unidad>) => void
   onUnidadDeleted: (id: string) => void
   onContadorUpdated: (id: string, partial: Partial<Contador>) => void
+  canCreate?: boolean
+  canEdit?: boolean
 }
 
 const TIPOS_UNIDAD: { value: TipoUnidad; label: string; icon: string }[] = [
@@ -121,6 +123,8 @@ export function UnidadesSection({
   onUnidadUpdated,
   onUnidadDeleted,
   onContadorUpdated,
+  canCreate: _canCreate = true,
+  canEdit: _canEdit = true,
 }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [selectedContadorIds, setSelectedContadorIds] = useState<string[]>([])

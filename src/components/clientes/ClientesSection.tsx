@@ -17,6 +17,9 @@ interface Props {
   onClienteAdded: (cliente: Cliente) => void
   onClienteUpdated: (id: string, partial: Partial<Cliente>) => void
   onClienteDeleted: (id: string) => void
+  canCreate?: boolean
+  canEdit?: boolean
+  canChangeStatus?: boolean
 }
 
 const EMPTY_FORM = {
@@ -49,7 +52,7 @@ interface LookupForm {
 
 const EMPTY_LOOKUP: LookupForm = { cui_dui: '', fecha_nacimiento: '', email: '' }
 
-export function ClientesSection({ clientes, userRole, userId, currentUser, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted }: Props) {
+export function ClientesSection({ clientes, userRole, userId, currentUser, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted, canCreate: canCreateProp = true, canEdit: canEditProp = true, canChangeStatus: _canChangeStatus = true }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -62,7 +65,8 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
   const [lookupForm, setLookupForm] = useState<LookupForm>(EMPTY_LOOKUP)
   const [lookupResult, setLookupResult] = useState<ClienteLookupResult | null>(null)
 
-  const canEdit = userRole !== 'viewer'
+  const canEdit = canEditProp && userRole !== 'viewer'
+  void (canCreateProp && userRole !== 'viewer') // canCreate reservado para uso futuro
 
   function startCreate() {
     setForm(EMPTY_FORM)
@@ -438,8 +442,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
             <div>
-              <label style={labelStyle}>CUI / DUI *</label>
+              <label htmlFor="lookup-cui" style={labelStyle}>CUI / DUI *</label>
               <input
+                id="lookup-cui"
                 style={inputStyle}
                 value={lookupForm.cui_dui}
                 onChange={e => setLookupForm(f => ({ ...f, cui_dui: e.target.value }))}
@@ -449,8 +454,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
               />
             </div>
             <div>
-              <label style={labelStyle}>Fecha de Nacimiento *</label>
+              <label htmlFor="lookup-birthdate" style={labelStyle}>Fecha de Nacimiento *</label>
               <input
+                id="lookup-birthdate"
                 style={inputStyle}
                 type="date"
                 value={lookupForm.fecha_nacimiento}
@@ -459,8 +465,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
               />
             </div>
             <div>
-              <label style={labelStyle}>Correo Electrónico *</label>
+              <label htmlFor="lookup-email" style={labelStyle}>Correo Electrónico *</label>
               <input
+                id="lookup-email"
                 style={inputStyle}
                 type="email"
                 value={lookupForm.email}
@@ -653,8 +660,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
             <div style={sectionHeaderStyle}>Datos de Identificación</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={labelStyle}>Nombre Completo *</label>
+                <label htmlFor="cli-nombre" style={labelStyle}>Nombre Completo *</label>
                 <input
+                  id="cli-nombre"
                   style={inputStyle}
                   value={form.nombre}
                   onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
@@ -663,8 +671,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 />
               </div>
               <div>
-                <label style={labelStyle}>CUI / DUI</label>
+                <label htmlFor="cli-cui" style={labelStyle}>CUI / DUI</label>
                 <input
+                  id="cli-cui"
                   style={inputStyle}
                   value={form.cui_dui}
                   onChange={e => setForm(f => ({ ...f, cui_dui: e.target.value }))}
@@ -673,8 +682,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 />
               </div>
               <div>
-                <label style={labelStyle}>Fecha de Nacimiento</label>
+                <label htmlFor="cli-birthdate" style={labelStyle}>Fecha de Nacimiento</label>
                 <input
+                  id="cli-birthdate"
                   style={inputStyle}
                   type="date"
                   value={form.fecha_nacimiento}
@@ -682,8 +692,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 />
               </div>
               <div>
-                <label style={labelStyle}>Nacionalidad</label>
+                <label htmlFor="cli-nacionalidad" style={labelStyle}>Nacionalidad</label>
                 <input
+                  id="cli-nacionalidad"
                   style={inputStyle}
                   value={form.nacionalidad}
                   onChange={e => setForm(f => ({ ...f, nacionalidad: e.target.value }))}
@@ -699,8 +710,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
             <div style={sectionHeaderStyle}>Datos de Contacto</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
               <div>
-                <label style={labelStyle}>Correo Electrónico</label>
+                <label htmlFor="cli-email" style={labelStyle}>Correo Electrónico</label>
                 <input
+                  id="cli-email"
                   style={inputStyle}
                   type="email"
                   value={form.email}
@@ -710,8 +722,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 />
               </div>
               <div>
-                <label style={labelStyle}>Teléfono Principal</label>
+                <label htmlFor="cli-telefono" style={labelStyle}>Teléfono Principal</label>
                 <input
+                  id="cli-telefono"
                   style={inputStyle}
                   type="tel"
                   value={form.telefono}
@@ -722,8 +735,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
               </div>
               <div>
-                <label style={labelStyle}>Teléfono Alterno</label>
+                <label htmlFor="cli-telefono-alt" style={labelStyle}>Teléfono Alterno</label>
                 <input
+                  id="cli-telefono-alt"
                   style={inputStyle}
                   type="tel"
                   value={form.telefono_alterno}
@@ -734,8 +748,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
               </div>
               <div>
-                <label style={labelStyle}>Número de WhatsApp</label>
+                <label htmlFor="cli-whatsapp" style={labelStyle}>Número de WhatsApp</label>
                 <input
+                  id="cli-whatsapp"
                   style={inputStyle}
                   type="tel"
                   value={form.whatsapp}
@@ -765,8 +780,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 </button>
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={labelStyle}>Dirección</label>
+                <label htmlFor="cli-direccion" style={labelStyle}>Dirección</label>
                 <input
+                  id="cli-direccion"
                   style={inputStyle}
                   value={form.direccion}
                   onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))}
@@ -782,8 +798,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
             <div style={sectionHeaderStyle}>Datos de Facturación</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
               <div>
-                <label style={labelStyle}>Código de Cliente *</label>
+                <label htmlFor="cli-codigo" style={labelStyle}>Código de Cliente *</label>
                 <input
+                  id="cli-codigo"
                   style={inputStyle}
                   value={form.codigo}
                   onChange={e => setForm(f => ({ ...f, codigo: e.target.value }))}
@@ -792,8 +809,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 />
               </div>
               <div>
-                <label style={labelStyle}>Número para Facturación (NIT)</label>
+                <label htmlFor="cli-nit" style={labelStyle}>Número para Facturación (NIT)</label>
                 <input
+                  id="cli-nit"
                   style={inputStyle}
                   value={form.numero_facturacion}
                   onChange={e => setForm(f => ({ ...f, numero_facturacion: e.target.value }))}
@@ -860,14 +878,14 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Cliente</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Código</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Identificación</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Contacto</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Facturación</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Cuenta</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Cliente</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Código</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Identificación</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Contacto</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Facturación</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Cuenta</th>
                   {canEdit && (
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
+                    <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
                   )}
                 </tr>
               </thead>

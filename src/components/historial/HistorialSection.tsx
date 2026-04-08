@@ -12,15 +12,17 @@ interface Props {
   userRole: UserRole
   moneda?: string
   onEstadoUpdated: (id: string, estado: Registro['estado']) => void
+  canEdit?: boolean
+  canChangeStatus?: boolean
 }
 
-export function HistorialSection({ registros, clientes, userRole, moneda = 'Q', onEstadoUpdated }: Props) {
+export function HistorialSection({ registros, clientes, userRole, moneda = 'Q', onEstadoUpdated, canEdit: canEditProp = true, canChangeStatus: canChangeStatusProp = true }: Props) {
   const [filtroTexto, setFiltroTexto] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [editModal, setEditModal] = useState<{ registroId: string; estado: Registro['estado'] } | null>(null)
   const [savingEstado, setSavingEstado] = useState(false)
 
-  const canEdit = userRole !== 'viewer'
+  const canEdit = canEditProp && canChangeStatusProp && userRole !== 'viewer'
 
   const filtrados = registros
     .filter(r => {
@@ -99,7 +101,7 @@ export function HistorialSection({ registros, clientes, userRole, moneda = 'Q', 
           <thead style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white' }}>
             <tr>
               {['Fecha', 'Cliente', 'Lect. Ant.', 'Lect. Act.', 'Consumo', `Total (${moneda})`, 'Estado', 'Acciones'].map(h => (
-                <th key={h} style={{ padding: '14px 12px', textAlign: 'left' }}>{h}</th>
+                <th scope="col" key={h} style={{ padding: '14px 12px', textAlign: 'left' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -118,9 +120,9 @@ export function HistorialSection({ registros, clientes, userRole, moneda = 'Q', 
                   <td style={{ padding: '14px 12px' }}>
                     <div style={{ display: 'flex', gap: '5px' }}>
                       {canEdit && (
-                        <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado })} style={{ padding: '6px 10px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
+                        <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado })} aria-label="Editar estado" style={{ padding: '6px 10px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
                       )}
-                      <button onClick={() => enviarWhatsApp(r)} style={{ padding: '6px 10px', background: '#25D366', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>📱</button>
+                      <button onClick={() => enviarWhatsApp(r)} aria-label="Enviar por WhatsApp" style={{ padding: '6px 10px', background: '#25D366', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>📱</button>
                     </div>
                   </td>
                 </tr>
@@ -141,7 +143,7 @@ export function HistorialSection({ registros, clientes, userRole, moneda = 'Q', 
           <div style={{ background: 'white', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '480px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0 }}>Modificar Estado de Pago</h3>
-              <button onClick={() => setEditModal(null)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
+              <button onClick={() => setEditModal(null)} aria-label="Cerrar modal" style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
             </div>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px' }}>Nuevo Estado</label>

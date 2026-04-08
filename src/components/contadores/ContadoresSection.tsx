@@ -17,6 +17,8 @@ interface Props {
   onContadorAdded: (contador: Contador) => void
   onContadorUpdated: (id: string, partial: Partial<Contador>) => void
   onContadorDeleted: (id: string) => void
+  canCreate?: boolean
+  canEdit?: boolean
 }
 
 const TIPOS_AGUA: { value: TipoAgua; label: string }[] = [
@@ -111,6 +113,8 @@ export function ContadoresSection({
   onContadorAdded,
   onContadorUpdated,
   onContadorDeleted,
+  canCreate: _canCreate = true,
+  canEdit: _canEdit = true,
 }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -816,16 +820,16 @@ export function ContadoresSection({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>N° Serie</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tipología</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Marca / Modelo</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Características</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Lect. Inicial</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Unidad</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tarifa</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>N° Serie</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tipología</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Marca / Modelo</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Características</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Lect. Inicial</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Unidad</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tarifa</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
                   {canEdit && (
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
+                    <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
                   )}
                 </tr>
               </thead>

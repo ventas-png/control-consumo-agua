@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase'
 import type { UserSession, Proyecto } from '../../types'
 import { MONEDAS } from '../../types'
 import { AsignacionModal } from './AsignacionModal'
+import { PermisosModuloModal } from './PermisosModuloModal'
+import { StripePayPalConfig } from './StripePayPalConfig'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: '#22c55e' },
@@ -48,6 +50,7 @@ export function EmpresaSection({ currentUser }: Props) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [loading, setLoading] = useState(true)
   const [usuarioAsignar, setUsuarioAsignar] = useState<Usuario | null>(null)
+  const [usuarioPermisos, setUsuarioPermisos] = useState<Usuario | null>(null)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -351,7 +354,8 @@ export function EmpresaSection({ currentUser }: Props) {
         <input id="swal-password" class="swal2-input" placeholder="Contraseña temporal" type="password" />
         <select id="swal-rol" class="swal2-select" style="width:100%;margin-top:8px;padding:10px;border-radius:6px;border:1px solid #d0d3d4">
           <option value="admin">Administrador</option>
-          <option value="operator">Operador</option>
+          <option value="operator">Operador (Lecturas)</option>
+          <option value="collector">Gestor de Cobros</option>
           <option value="viewer">Visualizador</option>
         </select>
       `,
@@ -414,12 +418,14 @@ export function EmpresaSection({ currentUser }: Props) {
     admin: 'Administrador',
     operator: 'Operador', operador: 'Operador',
     viewer: 'Visualizador', visor: 'Visualizador',
+    collector: 'Gestor de Cobros',
   }
 
   const roleBadgeColor: Record<string, string> = {
     admin: '#0ea5e9',
     operator: '#10b981', operador: '#10b981',
     viewer: '#8b5cf6', visor: '#8b5cf6',
+    collector: '#f59e0b',
   }
 
   if (loading) {
@@ -797,6 +803,21 @@ export function EmpresaSection({ currentUser }: Props) {
                     Asignar Acceso
                   </button>
                   <button
+                    onClick={() => setUsuarioPermisos(u)}
+                    title="Configurar permisos de modulos"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      padding: '7px 12px', borderRadius: '7px', border: '1px solid rgba(168,85,247,0.3)',
+                      background: 'rgba(168,85,247,0.08)', color: '#c084fc',
+                      cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                    }}
+                  >
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Permisos
+                  </button>
+                  <button
                     onClick={() => void toggleActivoUsuario(u)}
                     title={u.activo ? 'Desactivar' : 'Activar'}
                     style={{
@@ -816,13 +837,37 @@ export function EmpresaSection({ currentUser }: Props) {
         )}
       </div>
 
-      {/* Modal de asignación */}
+      {/* Configuración de Pagos Online */}
+      {currentUser.company_id && (
+        <div style={{
+          background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+          borderRadius: '16px', padding: '24px',
+          border: '1px solid rgba(255,255,255,0.06)',
+          marginTop: '24px',
+        }}>
+          <StripePayPalConfig
+            companyId={currentUser.company_id}
+            onConfigUpdated={() => void cargar()}
+          />
+        </div>
+      )}
+
+      {/* Modal de asignación de proyectos */}
       {usuarioAsignar && (
         <AsignacionModal
           usuario={usuarioAsignar}
           proyectos={proyectos}
 
           onClose={() => setUsuarioAsignar(null)}
+          onSaved={() => void cargar()}
+        />
+      )}
+
+      {/* Modal de permisos de módulos */}
+      {usuarioPermisos && (
+        <PermisosModuloModal
+          usuario={usuarioPermisos}
+          onClose={() => setUsuarioPermisos(null)}
           onSaved={() => void cargar()}
         />
       )}

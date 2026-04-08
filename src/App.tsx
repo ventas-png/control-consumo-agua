@@ -15,6 +15,7 @@ import { ClientesSection } from './components/clientes/ClientesSection'
 import { LecturasSection } from './components/lecturas/LecturasSection'
 import { HistorialSection } from './components/historial/HistorialSection'
 import { DashboardSection } from './components/dashboard/DashboardSection'
+import { AdminClientDashboard } from './components/admin-dashboard/AdminClientDashboard'
 import { MapaSection } from './components/mapa/MapaSection'
 import { CalidadSection } from './components/calidad/CalidadSection'
 import { RutasSection } from './components/rutas/RutasSection'
@@ -25,7 +26,11 @@ import { SuperAdminSection } from './components/superadmin/SuperAdminSection'
 import { TarifasSection } from './components/tarifas/TarifasSection'
 import { ContadoresSection } from './components/contadores/ContadoresSection'
 import { UnidadesSection } from './components/unidades/UnidadesSection'
+import { CobrosSection } from './components/cobros/CobrosSection'
+import { ComunicacionSection } from './components/comunicacion/ComunicacionSection'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { RoleGuard } from './components/shared/AccessDenied'
+import { usePermissions } from './hooks/usePermissions'
 
 initEmailJS()
 
@@ -44,7 +49,9 @@ export default function App() {
     addTarifa, updateTarifa, deleteTarifa,
     addContador, updateContador, deleteContador,
     addUnidad, updateUnidad, deleteUnidad,
-  } = useData()
+  } = useData(currentUser?.company_id)
+
+  const { canViewModule, canCreate, canEdit, canChangeStatus } = usePermissions(currentUser)
 
   const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -63,9 +70,11 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       if (currentUser.role === 'company_owner') {
-        setActiveSection('empresa_proyectos')
+        setActiveSection('admin_dashboard')
       } else if (currentUser.role === 'super_admin') {
         setActiveSection('superadmin_empresas')
+      } else if (currentUser.role === 'collector') {
+        setActiveSection('cobros')
       }
       // 'cliente' role is handled by its own portal render path — no section needed
     }
@@ -212,6 +221,7 @@ export default function App() {
         activeSection={activeSection}
         userRole={currentUser.role}
         currentUser={currentUser}
+        canViewModule={canViewModule}
         onSelect={(section) => { setActiveSection(section); setSidebarOpen(false) }}
         onLogout={logout}
         isOpen={sidebarOpen}
@@ -274,6 +284,9 @@ export default function App() {
                 onClienteAdded={addCliente}
                 onClienteUpdated={updateCliente}
                 onClienteDeleted={deleteCliente}
+                canCreate={canCreate('clientes')}
+                canEdit={canEdit('clientes')}
+                canChangeStatus={canChangeStatus('clientes')}
               />
             </ErrorBoundary>
           )}
@@ -291,6 +304,7 @@ export default function App() {
                 rutaActiva={rutaActivaParaLecturas}
                 onClearRuta={() => setRutaActivaParaLecturas(null)}
                 onRutaCompletada={id => updateRuta(id, { completada: true })}
+                canCreate={canCreate('lecturas')}
               />
             </ErrorBoundary>
           )}
@@ -302,12 +316,59 @@ export default function App() {
                 userRole={currentUser.role}
                 moneda={moneda}
                 onEstadoUpdated={updateRegistroEstado}
+                canEdit={canEdit('tabla')}
+                canChangeStatus={canChangeStatus('tabla')}
               />
+            </ErrorBoundary>
+          )}
+          {activeSection === 'cobros' && (
+            <ErrorBoundary sectionName="cobros">
+              <RoleGuard userRole={currentUser.role} allowedRoles={['collector', 'admin', 'super_admin', 'company_owner']}>
+              <CobrosSection
+                registros={registros}
+                clientes={clientes}
+                userRole={currentUser.role}
+                currentUser={currentUser}
+                moneda={moneda}
+                onEstadoUpdated={updateRegistroEstado}
+                onRegistroUpdated={(id, partial) => {
+                  if (partial.monto_pagado !== undefined) {
+                    updateRegistroEstado(id, partial.estado ?? 'pendiente')
+                  }
+                }}
+                canCreate={canCreate('cobros')}
+                canEdit={canEdit('cobros')}
+                canChangeStatus={canChangeStatus('cobros')}
+              />
+              </RoleGuard>
             </ErrorBoundary>
           )}
           {activeSection === 'dashboard' && (
             <ErrorBoundary sectionName="dashboard">
               <DashboardSection registros={registros} moneda={moneda} />
+            </ErrorBoundary>
+          )}
+          {activeSection === 'admin_dashboard' && (
+            <ErrorBoundary sectionName="admin_dashboard">
+              <RoleGuard userRole={currentUser.role} allowedRoles={['company_owner']}>
+              <AdminClientDashboard
+                currentUser={currentUser}
+                data={{
+                  clientes,
+                  registros,
+                  proyectos,
+                  contadores,
+                  fuentesAgua,
+                  registrosCalidad,
+                  rutas,
+                  tarifas,
+                  unidades,
+                }}
+                moneda={moneda}
+                onDataRefresh={cargarDatos}
+                onNavigateSection={setActiveSection}
+              />
+              </RoleGuard>
             </ErrorBoundary>
           )}
           {activeSection === 'mapa' && (
@@ -325,6 +386,8 @@ export default function App() {
                 onRutaUpdated={updateRuta}
                 onRutaDeleted={deleteRuta}
                 onEjecutarRuta={onEjecutarRuta}
+                canCreate={canCreate('rutas')}
+                canEdit={canEdit('rutas')}
               />
             </ErrorBoundary>
           )}
@@ -337,12 +400,16 @@ export default function App() {
                 userId={currentUser.user_id}
                 onFuentesUpdated={setFuentesAgua}
                 onRegistrosCalidadUpdated={setRegistrosCalidad}
+                canCreate={canCreate('calidad')}
+                canEdit={canEdit('calidad')}
               />
             </ErrorBoundary>
           )}
           {activeSection === 'configuracion' && (
             <ErrorBoundary sectionName="configuracion">
+              <RoleGuard userRole={currentUser.role} allowedRoles={['admin', 'super_admin', 'company_owner']}>
               <ConfiguracionSection onLogout={logout} />
+              </RoleGuard>
             </ErrorBoundary>
           )}
           {activeSection === 'perfil' && (
@@ -352,7 +419,9 @@ export default function App() {
           )}
           {activeSection === 'empresa_proyectos' && (
             <ErrorBoundary sectionName="empresa">
+              <RoleGuard userRole={currentUser.role} allowedRoles={['company_owner']}>
               <EmpresaSection currentUser={currentUser} />
+              </RoleGuard>
             </ErrorBoundary>
           )}
           {activeSection === 'tarifas' && (
@@ -366,6 +435,8 @@ export default function App() {
                 onTarifaAdded={addTarifa}
                 onTarifaUpdated={updateTarifa}
                 onTarifaDeleted={deleteTarifa}
+                canCreate={canCreate('tarifas')}
+                canEdit={canEdit('tarifas')}
               />
             </ErrorBoundary>
           )}
@@ -383,6 +454,8 @@ export default function App() {
                 onUnidadUpdated={updateUnidad}
                 onUnidadDeleted={deleteUnidad}
                 onContadorUpdated={updateContador}
+                canCreate={canCreate('unidades')}
+                canEdit={canEdit('unidades')}
               />
             </ErrorBoundary>
           )}
@@ -398,12 +471,26 @@ export default function App() {
                 onContadorAdded={addContador}
                 onContadorUpdated={updateContador}
                 onContadorDeleted={deleteContador}
+                canCreate={canCreate('contadores')}
+                canEdit={canEdit('contadores')}
               />
             </ErrorBoundary>
           )}
           {activeSection === 'superadmin_empresas' && (
             <ErrorBoundary sectionName="superadmin">
+              <RoleGuard userRole={currentUser.role} allowedRoles={['super_admin']}>
               <SuperAdminSection />
+              </RoleGuard>
+            </ErrorBoundary>
+          )}
+          {activeSection === 'comunicacion' && (
+            <ErrorBoundary sectionName="comunicacion">
+              <ComunicacionSection
+                currentUser={currentUser}
+                clientes={clientes}
+                canCreate={canCreate('comunicacion')}
+                canEdit={canEdit('comunicacion')}
+              />
             </ErrorBoundary>
           )}
         </main>
