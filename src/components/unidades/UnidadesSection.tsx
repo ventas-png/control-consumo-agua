@@ -133,6 +133,7 @@ export function UnidadesSection({
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [filterTipo, setFilterTipo] = useState<TipoUnidad | ''>('')
+  const [filterProyecto, setFilterProyecto] = useState<string>('')
   const [showImportModal, setShowImportModal] = useState(false)
 
   const canEdit = !['viewer', 'visor', 'cliente'].includes(userRole)
@@ -411,13 +412,15 @@ export function UnidadesSection({
       (u.propietario_nombre ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (u.descripcion ?? '').toLowerCase().includes(search.toLowerCase())
     const matchTipo = filterTipo === '' || u.tipo === filterTipo
-    return matchSearch && matchTipo
+    const matchProyecto = filterProyecto === '' || u.project_id === filterProyecto
+    return matchSearch && matchTipo && matchProyecto
   })
 
   // Summary by tipo
+  const baseUnidades = filterProyecto === '' ? unidades : unidades.filter(u => u.project_id === filterProyecto)
   const resumen = TIPOS_UNIDAD.map(t => ({
     ...t,
-    total: unidades.filter(u => u.tipo === t.value).length,
+    total: baseUnidades.filter(u => u.tipo === t.value).length,
     max: maxUnidadesPorTipo?.[t.value as TipoUnidad] ?? null,
   })).filter(t => t.total > 0 || (t.max !== null))
 
@@ -449,6 +452,18 @@ export function UnidadesSection({
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {proyectos.length > 1 && (
+            <select
+              value={filterProyecto}
+              onChange={e => setFilterProyecto(e.target.value)}
+              style={{ ...inputStyle, width: '180px' }}
+            >
+              <option value="">Todos los proyectos</option>
+              {proyectos.map(p => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+          )}
           <select
             value={filterTipo}
             onChange={e => setFilterTipo(e.target.value as TipoUnidad | '')}
