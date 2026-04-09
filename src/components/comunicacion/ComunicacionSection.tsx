@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Swal from 'sweetalert2'
 import { useConversations } from '../../hooks/useConversations'
 import { sanitizeInput } from '../../lib/validation'
+import { supabase } from '../../lib/supabase'
 import type {
   UserSession,
   Cliente,
   Conversation,
+  ConversationAssignment,
   ConversationCategory,
   ConversationPriority,
   ConversationStatus,
@@ -327,17 +329,143 @@ function NuevaDiscusionInternaModal({
   )
 }
 
+// ── Sub-componente: Modal de asignación a usuarios ───────────────────────────
+function AssignToUsersModal({
+  teamUsers,
+  currentAssignments,
+  onClose,
+  onAssign,
+  onRemove,
+}: {
+  teamUsers: { id: string; full_name: string; role: string }[]
+  currentAssignments: ConversationAssignment[]
+  onClose: () => void
+  onAssign: (selectedIds: string[]) => Promise<void>
+  onRemove: (assignmentId: string) => Promise<void>
+}) {
+  const assignedIds = new Set(currentAssignments.map(a => a.user_id))
+  const [selected, setSelected] = useState<Set<string>>(new Set(assignedIds))
+  const [saving, setSaving] = useState(false)
+
+  function toggleUser(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    // Quitar los que fueron deseleccionados
+    const toRemove = currentAssignments.filter(a => !selected.has(a.user_id))
+    for (const a of toRemove) {
+      await onRemove(a.id)
+    }
+    // Agregar los que fueron seleccionados y no estaban
+    const toAdd = [...selected].filter(id => !assignedIds.has(id))
+    if (toAdd.length > 0) {
+      await onAssign(toAdd)
+    } else {
+      onClose()
+    }
+    setSaving(false)
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+      zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+    }}>
+      <div style={{
+        background: 'white', borderRadius: '14px', width: '100%', maxWidth: '420px',
+        padding: '24px', boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+      }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 700, color: '#111827' }}>
+          Asignar conversación
+        </h3>
+        <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#6b7280' }}>
+          Selecciona los miembros del equipo que deben atender esta conversación.
+        </p>
+
+        {teamUsers.length === 0 ? (
+          <p style={{ fontSize: '13px', color: '#9ca3af', textAlign: 'center', padding: '20px 0' }}>
+            No hay usuarios del equipo disponibles.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '280px', overflowY: 'auto', marginBottom: '16px' }}>
+            {teamUsers.map(u => {
+              const isSelected = selected.has(u.id)
+              return (
+                <button
+                  key={u.id}
+                  onClick={() => toggleUser(u.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '10px 12px', border: `1px solid ${isSelected ? '#a78bfa' : '#e5e7eb'}`,
+                    borderRadius: '8px', background: isSelected ? '#ede9fe' : 'white',
+                    cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <span style={{
+                    width: '20px', height: '20px', borderRadius: '4px',
+                    border: `2px solid ${isSelected ? '#7c3aed' : '#d1d5db'}`,
+                    background: isSelected ? '#7c3aed' : 'white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, fontSize: '12px', color: 'white',
+                  }}>
+                    {isSelected ? '✓' : ''}
+                  </span>
+                  <span style={{ flex: 1, fontSize: '13px', fontWeight: 500, color: '#111827' }}>
+                    {u.full_name}
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'capitalize' }}>
+                    {u.role}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          <button
+            onClick={onClose}
+            style={{ padding: '8px 16px', border: '1px solid #d1d5db', borderRadius: '8px', background: 'white', fontSize: '13px', cursor: 'pointer', color: '#374151' }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              padding: '8px 16px', border: 'none', borderRadius: '8px',
+              background: '#7c3aed', color: 'white', fontSize: '13px', fontWeight: 600,
+              cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
+            }}
+          >
+            {saving ? 'Guardando…' : 'Guardar asignaciones'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Sub-componente: Lista de conversaciones ──────────────────────────────────
 function ConversationList({
   conversations,
   activeId,
   onSelect,
   filter,
+  unseenConvIds,
 }: {
   conversations: Conversation[]
   activeId: string | null
   onSelect: (id: string) => void
   filter: string
+  unseenConvIds: Set<string>
 }) {
   const filtered = conversations.filter(c => {
     if (!filter) return true
@@ -361,6 +489,7 @@ function ConversationList({
     <div>
       {filtered.map(conv => {
         const isActive = conv.id === activeId
+        const isUnseen = unseenConvIds.has(conv.id)
         return (
           <button
             key={conv.id}
@@ -371,7 +500,7 @@ function ConversationList({
               padding: '12px 14px',
               border: 'none',
               borderBottom: '1px solid #f1f5f9',
-              background: isActive ? '#eff6ff' : 'white',
+              background: isActive ? '#eff6ff' : isUnseen ? '#fffbeb' : 'white',
               cursor: 'pointer',
               transition: 'background 0.12s',
               display: 'flex',
@@ -382,14 +511,29 @@ function ConversationList({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
               <span style={{
                 fontSize: '13px',
-                fontWeight: 600,
+                fontWeight: isUnseen ? 700 : 600,
                 color: isActive ? '#1d4ed8' : '#111827',
                 lineHeight: '1.3',
                 flex: 1,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
               }}>
+                {isUnseen && (
+                  <span
+                    className="new-assignment-dot"
+                    style={{
+                      display: 'inline-block',
+                      width: '8px', height: '8px',
+                      borderRadius: '50%',
+                      background: '#f97316',
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
                 {conv.subject}
               </span>
               <span style={{ fontSize: '11px', color: '#9ca3af', flexShrink: 0 }}>
@@ -604,17 +748,22 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
     conversations,
     messages,
     accessRules,
+    assignments,
     activeConversationId,
     loading,
     sending,
     loadConversations,
     loadMessages,
     loadAccessRules,
+    loadAssignments,
     createConversation,
     createInternalConversation,
     sendMessage,
     updateConversation,
     saveAccessRule,
+    assignToUsers,
+    removeAssignment,
+    markAssignmentSeen,
   } = useConversations({
     companyId: currentUser.company_id,
     userId: currentUser.user_id,
@@ -631,6 +780,9 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
   const [showNuevaModal, setShowNuevaModal] = useState(false)
   const [showNuevaInternaModal, setShowNuevaInternaModal] = useState(false)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const [teamUsers, setTeamUsers] = useState<{ id: string; full_name: string; role: string }[]>([])
+  const teamUsersLoadedRef = useRef(false)
 
   // isAdmin: puede VER el panel de configuración
   const isAdmin = ['super_admin', 'company_owner', 'admin'].includes(currentUser.role)
@@ -680,8 +832,24 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
 
   useEffect(() => {
     loadConversations()
+    loadAssignments()
     if (isAdmin) loadAccessRules()
-  }, [loadConversations, loadAccessRules, isAdmin])
+  }, [loadConversations, loadAssignments, loadAccessRules, isAdmin])
+
+  async function loadTeamUsers() {
+    if (teamUsersLoadedRef.current || !currentUser.company_id) return
+    const { data } = await supabase
+      .from('app_users')
+      .select('id, full_name, role')
+      .eq('company_id', currentUser.company_id)
+      .eq('activo', true)
+      .neq('role', 'cliente')
+      .order('full_name')
+    if (data) {
+      setTeamUsers(data)
+      teamUsersLoadedRef.current = true
+    }
+  }
 
   const activeConversation = conversations.find(c => c.id === activeConversationId) ?? null
 
@@ -689,6 +857,13 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
     loadMessages(id)
     setView('detail')
     setMessageText('')
+    // Si hay una asignación no vista para el usuario actual, marcarla como vista
+    const hasUnseen = assignments.some(
+      a => a.conversation_id === id && a.user_id === currentUser.user_id && !a.seen_at
+    )
+    if (hasUnseen) {
+      markAssignmentSeen(id, currentUser.user_id)
+    }
   }
 
   async function handleSendMessage() {
@@ -744,6 +919,36 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
     }
   }
 
+  async function handleOpenAssignModal() {
+    await loadTeamUsers()
+    setShowAssignModal(true)
+  }
+
+  async function handleAssignToUsers(selectedIds: string[]) {
+    if (!activeConversationId) return
+    const users = selectedIds.map(id => {
+      const u = teamUsers.find(u => u.id === id)
+      return { userId: id, userName: u?.full_name ?? id }
+    })
+    try {
+      await assignToUsers(activeConversationId, users, {
+        id: currentUser.user_id,
+        name: currentUser.name,
+      })
+      setShowAssignModal(false)
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo asignar la conversación.' })
+    }
+  }
+
+  async function handleRemoveAssignment(assignmentId: string) {
+    try {
+      await removeAssignment(assignmentId)
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo quitar la asignación.' })
+    }
+  }
+
   async function handleChangeStatus(status: ConversationStatus) {
     if (!activeConversationId) return
     try {
@@ -775,6 +980,18 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
     esperando: clientConvs.filter(c => c.status === 'esperando_cliente').length,
     resueltas: clientConvs.filter(c => c.status === 'resuelta').length,
   }
+
+  // Conversaciones asignadas al usuario actual que aún no ha visto
+  const unseenConvIds = new Set(
+    assignments
+      .filter(a => a.user_id === currentUser.user_id && !a.seen_at)
+      .map(a => a.conversation_id)
+  )
+
+  // Asignaciones de la conversación activa
+  const activeAssignments = assignments.filter(
+    a => a.conversation_id === activeConversationId
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -951,6 +1168,7 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
                   activeId={activeConversationId}
                   onSelect={handleSelectConversation}
                   filter={filterText}
+                  unseenConvIds={unseenConvIds}
                 />
               )}
             </div>
@@ -1031,7 +1249,7 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
                         <option key={k} value={k}>{v}</option>
                       ))}
                     </select>
-                    {/* Asignación */}
+                    {/* Asignación principal */}
                     {activeConversation.assigned_name ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '11.5px', color: '#6b7280' }}>
@@ -1060,6 +1278,40 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
                         + Asignarme
                       </button>
                     )}
+                    {/* Asignación a equipo */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                      <button
+                        onClick={handleOpenAssignModal}
+                        style={{
+                          background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px',
+                          fontSize: '11.5px', color: '#15803d', cursor: 'pointer', padding: '4px 10px', fontWeight: 600,
+                        }}
+                      >
+                        👥 Asignar a...
+                      </button>
+                      {activeAssignments.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'flex-end' }}>
+                          {activeAssignments.map(a => (
+                            <span
+                              key={a.id}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                background: '#ede9fe', color: '#6d28d9',
+                                fontSize: '11px', padding: '2px 6px', borderRadius: '999px', fontWeight: 500,
+                              }}
+                            >
+                              {a.user_name}
+                              <button
+                                onClick={() => handleRemoveAssignment(a.id)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7c3aed', padding: '0', lineHeight: 1, fontSize: '12px' }}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1295,6 +1547,17 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
           sending={sending}
           onClose={() => setShowNuevaInternaModal(false)}
           onConfirm={handleCrearDiscusionInterna}
+        />
+      )}
+
+      {/* ── Modal Asignar a usuarios ── */}
+      {showAssignModal && activeConversationId && (
+        <AssignToUsersModal
+          teamUsers={teamUsers}
+          currentAssignments={activeAssignments}
+          onClose={() => setShowAssignModal(false)}
+          onAssign={handleAssignToUsers}
+          onRemove={handleRemoveAssignment}
         />
       )}
     </div>

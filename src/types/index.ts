@@ -385,6 +385,17 @@ export interface ConversationAccessRule {
   updated_at: string;
 }
 
+export interface ConversationAssignment {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  user_name: string;
+  assigned_by_id: string;
+  assigned_by_name: string;
+  seen_at: string | null;
+  created_at: string;
+}
+
 export type FormaPago =
   | 'efectivo'
   | 'transferencia'

@@ -4,6 +4,7 @@ import type {
   Conversation,
   ConversationMessage,
   ConversationAccessRule,
+  ConversationAssignment,
   ConversationCategory,
   ConversationPriority,
 } from '../types'
@@ -19,6 +20,7 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [accessRules, setAccessRules] = useState<ConversationAccessRule[]>([])
+  const [assignments, setAssignments] = useState<ConversationAssignment[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
@@ -234,6 +236,66 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
     setConversations(prev => prev.map(c => c.id === id ? { ...c, ...patch } : c))
   }, [])
 
+  // ── Cargar asignaciones de la empresa ────────────────────────────────────
+  const loadAssignments = useCallback(async () => {
+    if (!companyId) return
+    const { data, error } = await supabase
+      .from('conversation_assignments')
+      .select('*')
+      .order('created_at', { ascending: true })
+    if (error) return
+    setAssignments(data ?? [])
+  }, [companyId])
+
+  // ── Asignar conversación a uno o varios usuarios ──────────────────────────
+  const assignToUsers = useCallback(async (
+    conversationId: string,
+    users: { userId: string; userName: string }[],
+    assignedBy: { id: string; name: string }
+  ): Promise<void> => {
+    const rows = users.map(u => ({
+      conversation_id: conversationId,
+      user_id: u.userId,
+      user_name: u.userName,
+      assigned_by_id: assignedBy.id,
+      assigned_by_name: assignedBy.name,
+      seen_at: null,
+    }))
+    const { error } = await supabase
+      .from('conversation_assignments')
+      .upsert(rows, { onConflict: 'conversation_id,user_id' })
+    if (error) throw error
+    await loadAssignments()
+  }, [loadAssignments])
+
+  // ── Eliminar una asignación ───────────────────────────────────────────────
+  const removeAssignment = useCallback(async (assignmentId: string): Promise<void> => {
+    const { error } = await supabase
+      .from('conversation_assignments')
+      .delete()
+      .eq('id', assignmentId)
+    if (error) throw error
+    setAssignments(prev => prev.filter(a => a.id !== assignmentId))
+  }, [])
+
+  // ── Marcar asignación como vista ──────────────────────────────────────────
+  const markAssignmentSeen = useCallback(async (conversationId: string, userId: string): Promise<void> => {
+    const { error } = await supabase
+      .from('conversation_assignments')
+      .update({ seen_at: new Date().toISOString() })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId)
+      .is('seen_at', null)
+    if (error) return
+    setAssignments(prev =>
+      prev.map(a =>
+        a.conversation_id === conversationId && a.user_id === userId && !a.seen_at
+          ? { ...a, seen_at: new Date().toISOString() }
+          : a
+      )
+    )
+  }, [])
+
   // ── Guardar/actualizar regla de acceso ────────────────────────────────────
   const saveAccessRule = useCallback(async (rule: Omit<ConversationAccessRule, 'id' | 'created_at' | 'updated_at'>): Promise<void> => {
     const { error } = await supabase
@@ -297,20 +359,45 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
     return () => { supabase.removeChannel(channel) }
   }, [companyId, clienteId, loadConversations])
 
+  // ── Realtime: cambios en asignaciones ────────────────────────────────────
+  useEffect(() => {
+    if (!companyId) return
+
+    const channel = supabase
+      .channel(`conv-assignments-${companyId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversation_assignments',
+        },
+        () => { loadAssignments() }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [companyId, loadAssignments])
+
   return {
     conversations,
     messages,
     accessRules,
+    assignments,
     activeConversationId,
     loading,
     sending,
     loadConversations,
     loadMessages,
     loadAccessRules,
+    loadAssignments,
     createConversation,
     createInternalConversation,
     sendMessage,
     updateConversation,
     saveAccessRule,
+    assignToUsers,
+    removeAssignment,
+    markAssignmentSeen,
   }
 }

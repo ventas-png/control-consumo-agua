@@ -52,6 +52,15 @@ button:focus:not(:focus-visible) {
   animation: pulse-dot 2.2s ease-in-out infinite;
 }
 
+/* ─── Nueva asignación — punto naranja pulsante ──────────────────────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.75); }
+}
+.new-assignment-dot {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
 /* ─── Smooth page transitions ────────────────────────────────────────────── */
 .app-main > * {
   animation: fade-in 0.18s ease-out;
