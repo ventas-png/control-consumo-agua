@@ -1,7 +1,40 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 
-// Import Stripe library
+// CORS utilities
+function getAllowedOrigins(): string[] {
+  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
+  if (envOrigins) {
+    return envOrigins.split(',').map(origin => origin.trim())
+  }
+  return [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+  ]
+}
+
+function getCorsHeaders(origin: string | null) {
+  const allowedOrigins = getAllowedOrigins()
+  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  }
+}
+
+function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof getCorsHeaders>) {
+  const allowedOrigins = getAllowedOrigins()
+  if (!origin || !allowedOrigins.includes(origin)) {
+    return new Response(
+      JSON.stringify({ error: 'Origin not allowed', origin }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+  return null
+}
+
 const stripe = await import('https://esm.sh/stripe@13.10.0?target=deno')
 
 // Supported currencies for Stripe
