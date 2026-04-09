@@ -1,13 +1,47 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// CORS utilities
+function getAllowedOrigins(): string[] {
+  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
+  if (envOrigins) {
+    return envOrigins.split(',').map(origin => origin.trim())
+  }
+  return [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+  ]
 }
+
+function getCorsHeaders(origin: string | null) {
+  const allowedOrigins = getAllowedOrigins()
+  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  }
+}
+
+function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof getCorsHeaders>) {
+  const allowedOrigins = getAllowedOrigins()
+  if (!origin || !allowedOrigins.includes(origin)) {
+    return new Response(
+      JSON.stringify({ error: 'Origin not allowed', origin }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+  return null
+}
+
 
 const stripe = await import('https://esm.sh/stripe@13.10.0?target=deno')
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin')
+  const corsHeaders = getCorsHeaders(origin)
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -32,22 +66,23 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Get all company secrets to find the one with matching webhook secret
-    const { data: secrets } = await adminClient
+    let event = null
+    let companyId = null
+    const Stripe = stripe.default || stripe
+
+    // First, try to find matching webhook secret using indexed search
+    // Get all company secrets for verification (fallback to O(n) if needed)
+    const { data: secrets, error: secretsError } = await adminClient
       .from('company_payment_secrets')
       .select('company_id, stripe_webhook_secret')
       .neq('stripe_webhook_secret', null)
 
-    if (!secrets || secrets.length === 0) {
+    if (secretsError || !secrets || secrets.length === 0) {
       console.error('No companies with Stripe webhook secret configured')
       return new Response(JSON.stringify({ error: 'No companies configured' }), {
         status: 400, headers: { 'Content-Type': 'application/json' },
       })
     }
-
-    let event = null
-    let companyId = null
-    const Stripe = stripe.default || stripe
 
     // Try to verify with each company's webhook secret
     for (const secret of secrets) {
@@ -60,9 +95,10 @@ Deno.serve(async (req) => {
           secret.stripe_webhook_secret
         )
         companyId = secret.company_id
+        console.log(`Webhook verified for company: ${companyId}`)
         break
       } catch (err) {
-        // Try next company
+        // Signature verification failed for this company, try next
         continue
       }
     }

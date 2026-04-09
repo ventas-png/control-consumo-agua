@@ -1,14 +1,52 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// CORS utilities
+function getAllowedOrigins(): string[] {
+  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
+  if (envOrigins) {
+    return envOrigins.split(',').map(origin => origin.trim())
+  }
+  return [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+  ]
 }
 
+function getCorsHeaders(origin: string | null) {
+  const allowedOrigins = getAllowedOrigins()
+  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  }
+}
+
+function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof getCorsHeaders>) {
+  const allowedOrigins = getAllowedOrigins()
+  if (!origin || !allowedOrigins.includes(origin)) {
+    return new Response(
+      JSON.stringify({ error: 'Origin not allowed', origin }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+  return null
+}
+
+
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin')
+  const corsHeaders = getCorsHeaders(origin)
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  // Validate origin
+  const originError = validateOrigin(origin, corsHeaders)
+  if (originError) return originError
 
   try {
     // Validate caller using their JWT
