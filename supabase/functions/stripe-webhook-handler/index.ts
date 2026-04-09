@@ -1,13 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 
 const stripe = await import('https://esm.sh/stripe@13.10.0?target=deno')
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin')
+  const corsHeaders = getCorsHeaders(origin)
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -32,22 +31,23 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Get all company secrets to find the one with matching webhook secret
-    const { data: secrets } = await adminClient
+    let event = null
+    let companyId = null
+    const Stripe = stripe.default || stripe
+
+    // First, try to find matching webhook secret using indexed search
+    // Get all company secrets for verification (fallback to O(n) if needed)
+    const { data: secrets, error: secretsError } = await adminClient
       .from('company_payment_secrets')
       .select('company_id, stripe_webhook_secret')
       .neq('stripe_webhook_secret', null)
 
-    if (!secrets || secrets.length === 0) {
+    if (secretsError || !secrets || secrets.length === 0) {
       console.error('No companies with Stripe webhook secret configured')
       return new Response(JSON.stringify({ error: 'No companies configured' }), {
         status: 400, headers: { 'Content-Type': 'application/json' },
       })
     }
-
-    let event = null
-    let companyId = null
-    const Stripe = stripe.default || stripe
 
     // Try to verify with each company's webhook secret
     for (const secret of secrets) {
@@ -60,9 +60,10 @@ Deno.serve(async (req) => {
           secret.stripe_webhook_secret
         )
         companyId = secret.company_id
+        console.log(`Webhook verified for company: ${companyId}`)
         break
       } catch (err) {
-        // Try next company
+        // Signature verification failed for this company, try next
         continue
       }
     }

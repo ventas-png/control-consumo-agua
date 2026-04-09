@@ -1,28 +1,31 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-function ok(data: Record<string, unknown>) {
-  return new Response(JSON.stringify(data), {
-    status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
-
-function err(message: string) {
-  // Always return 200 so the Supabase JS client surfaces the message in data.error
-  // instead of converting it to a FunctionsHttpError that loses the message
-  return new Response(JSON.stringify({ error: message }), {
-    status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
+import { getCorsHeaders, validateOrigin } from '../_shared/cors.ts'
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin')
+  const corsHeaders = getCorsHeaders(origin)
+
+  function ok(data: Record<string, unknown>) {
+    return new Response(JSON.stringify(data), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  function err(message: string) {
+    // Always return 200 so the Supabase JS client surfaces the message in data.error
+    // instead of converting it to a FunctionsHttpError that loses the message
+    return new Response(JSON.stringify({ error: message }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  // Validate origin
+  const originError = validateOrigin(origin, corsHeaders)
+  if (originError) return originError
 
   try {
     const body = await req.json() as {
