@@ -7,9 +7,8 @@ DROP VIEW IF EXISTS public.companies_safe CASCADE;
 CREATE VIEW public.companies_safe WITH (security_invoker) AS
 SELECT
   id,
-  name,
-  created_at,
-  updated_at
+  nombre,
+  created_at
 FROM public.companies;
 
 COMMENT ON VIEW companies_safe IS 'Safe public view of companies (SECURITY INVOKER for privilege boundary)';
