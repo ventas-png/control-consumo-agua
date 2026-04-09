@@ -4,7 +4,7 @@
 -- Zero functional impact - pure performance optimization
 
 -- ============================================================
--- Tabla: fuentes_agua (4 policies)
+-- Tabla: fuentes_agua (4 policies) - Uses company_id not project_id
 -- ============================================================
 
 DROP POLICY IF EXISTS "fuentes_agua_staff_insert" ON public.fuentes_agua;
@@ -12,11 +12,7 @@ CREATE POLICY "fuentes_agua_staff_insert" ON public.fuentes_agua
   FOR INSERT TO authenticated
   WITH CHECK (
     (SELECT current_user_role()) IN ('admin', 'operator', 'operador', 'super_admin', 'superadmin')
-    AND EXISTS (
-      SELECT 1 FROM public.user_project_assignments upa
-      WHERE upa.user_id = (SELECT auth.uid())
-        AND upa.project_id = fuentes_agua.project_id
-    )
+    AND fuentes_agua.company_id = (SELECT get_my_company_id())
   );
 
 DROP POLICY IF EXISTS "fuentes_agua_staff_select" ON public.fuentes_agua;
@@ -24,11 +20,7 @@ CREATE POLICY "fuentes_agua_staff_select" ON public.fuentes_agua
   FOR SELECT TO authenticated
   USING (
     (SELECT current_user_role()) IN ('admin', 'operator', 'operador', 'super_admin', 'superadmin', 'viewer', 'visor')
-    AND EXISTS (
-      SELECT 1 FROM public.user_project_assignments upa
-      WHERE upa.user_id = (SELECT auth.uid())
-        AND upa.project_id = fuentes_agua.project_id
-    )
+    AND fuentes_agua.company_id = (SELECT get_my_company_id())
   );
 
 DROP POLICY IF EXISTS "fuentes_agua_staff_update" ON public.fuentes_agua;
@@ -36,19 +28,11 @@ CREATE POLICY "fuentes_agua_staff_update" ON public.fuentes_agua
   FOR UPDATE TO authenticated
   USING (
     (SELECT current_user_role()) IN ('admin', 'operator', 'operador', 'super_admin', 'superadmin')
-    AND EXISTS (
-      SELECT 1 FROM public.user_project_assignments upa
-      WHERE upa.user_id = (SELECT auth.uid())
-        AND upa.project_id = fuentes_agua.project_id
-    )
+    AND fuentes_agua.company_id = (SELECT get_my_company_id())
   )
   WITH CHECK (
     (SELECT current_user_role()) IN ('admin', 'operator', 'operador', 'super_admin', 'superadmin')
-    AND EXISTS (
-      SELECT 1 FROM public.user_project_assignments upa
-      WHERE upa.user_id = (SELECT auth.uid())
-        AND upa.project_id = fuentes_agua.project_id
-    )
+    AND fuentes_agua.company_id = (SELECT get_my_company_id())
   );
 
 DROP POLICY IF EXISTS "fuentes_agua_super_admin" ON public.fuentes_agua;
@@ -58,7 +42,7 @@ CREATE POLICY "fuentes_agua_super_admin" ON public.fuentes_agua
   WITH CHECK ((SELECT current_user_role()) IN ('super_admin', 'superadmin'));
 
 -- ============================================================
--- Tabla: registros_calidad (6 policies)
+-- Tabla: registros_calidad (6 policies) - Uses company_id not project_id
 -- ============================================================
 
 DROP POLICY IF EXISTS "registros_calidad_company_owner" ON public.registros_calidad;
@@ -66,11 +50,11 @@ CREATE POLICY "registros_calidad_company_owner" ON public.registros_calidad
   FOR ALL TO authenticated
   USING (
     (SELECT current_user_role()) = 'company_owner'
-    AND company_id = (SELECT get_my_company_id())
+    AND registros_calidad.company_id = (SELECT get_my_company_id())
   )
   WITH CHECK (
     (SELECT current_user_role()) = 'company_owner'
-    AND company_id = (SELECT get_my_company_id())
+    AND registros_calidad.company_id = (SELECT get_my_company_id())
   );
 
 DROP POLICY IF EXISTS "registros_calidad_staff_delete" ON public.registros_calidad;
@@ -78,11 +62,7 @@ CREATE POLICY "registros_calidad_staff_delete" ON public.registros_calidad
   FOR DELETE TO authenticated
   USING (
     (SELECT current_user_role()) IN ('admin', 'operator', 'operador', 'super_admin', 'superadmin')
-    AND EXISTS (
-      SELECT 1 FROM public.user_project_assignments upa
-      WHERE upa.user_id = (SELECT auth.uid())
-        AND upa.project_id = registros_calidad.project_id
-    )
+    AND registros_calidad.company_id = (SELECT get_my_company_id())
   );
 
 DROP POLICY IF EXISTS "registros_calidad_staff_insert" ON public.registros_calidad;
@@ -90,11 +70,7 @@ CREATE POLICY "registros_calidad_staff_insert" ON public.registros_calidad
   FOR INSERT TO authenticated
   WITH CHECK (
     (SELECT current_user_role()) IN ('admin', 'operator', 'operador', 'super_admin', 'superadmin')
-    AND EXISTS (
-      SELECT 1 FROM public.user_project_assignments upa
-      WHERE upa.user_id = (SELECT auth.uid())
-        AND upa.project_id = registros_calidad.project_id
-    )
+    AND registros_calidad.company_id = (SELECT get_my_company_id())
   );
 
 DROP POLICY IF EXISTS "registros_calidad_staff_select" ON public.registros_calidad;
@@ -102,11 +78,7 @@ CREATE POLICY "registros_calidad_staff_select" ON public.registros_calidad
   FOR SELECT TO authenticated
   USING (
     (SELECT current_user_role()) IN ('admin', 'operator', 'operador', 'super_admin', 'superadmin', 'viewer', 'visor')
-    AND EXISTS (
-      SELECT 1 FROM public.user_project_assignments upa
-      WHERE upa.user_id = (SELECT auth.uid())
-        AND upa.project_id = registros_calidad.project_id
-    )
+    AND registros_calidad.company_id = (SELECT get_my_company_id())
   );
 
 DROP POLICY IF EXISTS "registros_calidad_staff_update" ON public.registros_calidad;
@@ -114,19 +86,11 @@ CREATE POLICY "registros_calidad_staff_update" ON public.registros_calidad
   FOR UPDATE TO authenticated
   USING (
     (SELECT current_user_role()) IN ('admin', 'operator', 'operador', 'super_admin', 'superadmin')
-    AND EXISTS (
-      SELECT 1 FROM public.user_project_assignments upa
-      WHERE upa.user_id = (SELECT auth.uid())
-        AND upa.project_id = registros_calidad.project_id
-    )
+    AND registros_calidad.company_id = (SELECT get_my_company_id())
   )
   WITH CHECK (
     (SELECT current_user_role()) IN ('admin', 'operator', 'operador', 'super_admin', 'superadmin')
-    AND EXISTS (
-      SELECT 1 FROM public.user_project_assignments upa
-      WHERE upa.user_id = (SELECT auth.uid())
-        AND upa.project_id = registros_calidad.project_id
-    )
+    AND registros_calidad.company_id = (SELECT get_my_company_id())
   );
 
 DROP POLICY IF EXISTS "registros_calidad_super_admin" ON public.registros_calidad;
@@ -167,11 +131,6 @@ CREATE POLICY "rutas_delete" ON public.rutas
   FOR DELETE TO authenticated
   USING (
     (SELECT current_user_role()) IN ('admin', 'super_admin', 'superadmin')
-    AND EXISTS (
-      SELECT 1 FROM public.user_project_assignments upa
-      WHERE upa.user_id = (SELECT auth.uid())
-        AND upa.project_id = rutas.project_id
-    )
   );
 
 -- ============================================================
