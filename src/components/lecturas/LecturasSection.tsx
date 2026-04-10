@@ -114,20 +114,24 @@ export function LecturasSection({
   const tarifaExpirada = tarifaDelContador !== null && !tarifaDelContador.activa
   const sinTarifa = contadorSeleccionado !== null && !tarifaDelContador
 
-  function getUltimaLectura(contadorId: string): { lectura: number; fecha: string | null } {
+  function getUltimaLectura(contadorId: string): { lectura: number; fecha: string | null; esPrimera: boolean } {
     const contador = contadores.find(c => c.id === contadorId)
     const historial = registros
       .filter(r => r.contador_id === contadorId)
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
     if (historial.length > 0) {
-      return { lectura: historial[0].lectura_actual, fecha: historial[0].fecha }
+      return { lectura: historial[0].lectura_actual, fecha: historial[0].fecha, esPrimera: false }
     }
-    return { lectura: contador?.lectura_inicial ?? 0, fecha: contador?.fecha_instalacion ?? null }
+    return { lectura: contador?.lectura_inicial ?? 0, fecha: contador?.fecha_instalacion ?? null, esPrimera: true }
   }
 
-  const ultimaLecturaInfo = contadorSeleccionado ? getUltimaLectura(contadorSeleccionado.id) : { lectura: 0, fecha: null }
+  const ultimaLecturaInfo = contadorSeleccionado ? getUltimaLectura(contadorSeleccionado.id) : { lectura: 0, fecha: null, esPrimera: true }
   const ultimaLectura = ultimaLecturaInfo.lectura
-  const fechaLecturaAnterior = ultimaLecturaInfo.fecha
+  const esPrimeraLectura = ultimaLecturaInfo.esPrimera
+  const [fechaAnteriorManual, setFechaAnteriorManual] = useState('')
+  const fechaLecturaAnterior = esPrimeraLectura && fechaAnteriorManual
+    ? fechaAnteriorManual + 'T12:00:00'
+    : ultimaLecturaInfo.fecha
   const diasServicio = fechaLecturaAnterior && fechaLecturaActual
     ? Math.max(0, Math.round((new Date(fechaLecturaActual + 'T12:00:00').getTime() - new Date(fechaLecturaAnterior).getTime()) / 86400000))
     : null
@@ -165,6 +169,7 @@ export function LecturasSection({
     setLecturaActual('')
     setEstado('pendiente')
     setFechaLecturaActual(new Date().toISOString().split('T')[0])
+    setFechaAnteriorManual('')
     setNotas('')
     setFoto(null)
   }
@@ -474,8 +479,14 @@ export function LecturasSection({
                   </div>
                   <div>
                     <label style={labelStyle}>Fecha Lectura Anterior</label>
-                    <input type="date" readOnly value={fechaLecturaAnterior ? fechaLecturaAnterior.split('T')[0] : ''} placeholder="Primera lectura" style={{ ...inputStyle, background: '#f7fafc', color: fechaLecturaAnterior ? '#1e293b' : '#94a3b8' }} />
-                    {!fechaLecturaAnterior && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Primera lectura de este contador</div>}
+                    {esPrimeraLectura ? (
+                      <>
+                        <input type="date" value={fechaAnteriorManual || (ultimaLecturaInfo.fecha ? ultimaLecturaInfo.fecha.split('T')[0] : '')} onChange={e => setFechaAnteriorManual(e.target.value)} style={{ ...inputStyle, borderColor: '#f59e0b' }} />
+                        <div style={{ fontSize: '11px', color: '#b45309', marginTop: '4px' }}>Primera lectura — puede establecer la fecha de inicio del servicio</div>
+                      </>
+                    ) : (
+                      <input type="date" readOnly value={fechaLecturaAnterior ? fechaLecturaAnterior.split('T')[0] : ''} style={{ ...inputStyle, background: '#f7fafc', color: '#1e293b' }} />
+                    )}
                   </div>
                   <div>
                     <label style={labelStyle}>Fecha Lectura Actual</label>
