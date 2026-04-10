@@ -3,7 +3,7 @@ import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad
 import { AdminDashboardStats } from './AdminDashboardStats'
 import { AdminDashboardCharts } from './AdminDashboardCharts'
 import { AdminClientsList } from './AdminClientsList'
-import { AdminNewReading } from './AdminNewReading'
+import { LecturasSection } from '../lecturas/LecturasSection'
 import { AdminHistoryTab } from './AdminHistoryTab'
 import { AdminQuickActions } from './AdminQuickActions'
 
@@ -29,7 +29,7 @@ interface Props {
 
 type TabType = 'dashboard' | 'clientes' | 'nueva_lectura' | 'historial'
 
-export function AdminClientDashboard({ data, moneda, onDataRefresh, onNavigateSection }: Props) {
+export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh, onNavigateSection }: Props) {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
 
@@ -56,6 +56,19 @@ export function AdminClientDashboard({ data, moneda, onDataRefresh, onNavigateSe
   const registrosFiltrados = selectedProjectId
     ? data.registros.filter(r => clienteIdsEnProyecto.has(r.cliente_id))
     : data.registros
+
+  // Filtrar unidades y contadores por proyecto
+  const unidadesFiltradas = selectedProjectId
+    ? (data.unidades || []).filter((u: any) => u.project_id === selectedProjectId)
+    : (data.unidades || [])
+
+  const contadoresFiltrados = selectedProjectId
+    ? data.contadores.filter(c => c.project_id === selectedProjectId)
+    : data.contadores
+
+  const tarifasFiltradas = selectedProjectId
+    ? (data.tarifas || []).filter((t: any) => t.project_id === selectedProjectId)
+    : (data.tarifas || [])
 
   const handleReadingAdded = async () => {
     await onDataRefresh()
@@ -169,12 +182,15 @@ export function AdminClientDashboard({ data, moneda, onDataRefresh, onNavigateSe
         )}
 
         {activeTab === 'nueva_lectura' && (
-          <AdminNewReading
+          <LecturasSection
             clientes={clientesEnProyecto}
-            contadores={data.contadores}
-            tarifas={data.tarifas || []}
-            onReadingAdded={handleReadingAdded}
-            proyectoId={selectedProjectId}
+            unidades={unidadesFiltradas}
+            contadores={contadoresFiltrados}
+            registros={registrosFiltrados}
+            tarifas={tarifasFiltradas}
+            userRole={currentUser.role}
+            moneda={moneda}
+            onRegistroAdded={() => { void handleReadingAdded() }}
           />
         )}
 
