@@ -44,7 +44,10 @@ export function HistorialSection({ registros, clientes, userRole, moneda = 'Q', 
     if (telefono.startsWith('+')) telefono = telefono.slice(1)
     else { telefono = telefono.replace(/\D/g, ''); if (telefono.length === 8) telefono = APP_CONFIG.COUNTRY_CODE + telefono }
     const total = getTotal(registro)
-    const msg = `Hola ${registro.cliente_nombre}, su recibo de agua potable:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: ${moneda}${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
+    const periodoStr = registro.fecha_lectura_anterior
+      ? `\n📆 Período: ${new Date(registro.fecha_lectura_anterior).toLocaleDateString()} al ${new Date(registro.fecha).toLocaleDateString()} (${registro.dias_servicio ?? '—'} días)`
+      : ''
+    const msg = `Hola ${registro.cliente_nombre}, su recibo de agua potable:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}${periodoStr}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: ${moneda}${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 

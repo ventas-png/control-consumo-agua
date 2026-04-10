@@ -38,7 +38,7 @@ export function LecturasSection({
   const [selectedContadorId, setSelectedContadorId] = useState('')
   const [lecturaActual, setLecturaActual] = useState('')
   const [estado, setEstado] = useState<Registro['estado']>('pendiente')
-  const [mes, setMes] = useState('auto')
+  const [fechaLecturaActual, setFechaLecturaActual] = useState(() => new Date().toISOString().split('T')[0])
   const [notas, setNotas] = useState('')
   const [gps, setGps] = useState<GPS | null>(null)
   const [gpsLoading, setGpsLoading] = useState(false)
@@ -114,15 +114,23 @@ export function LecturasSection({
   const tarifaExpirada = tarifaDelContador !== null && !tarifaDelContador.activa
   const sinTarifa = contadorSeleccionado !== null && !tarifaDelContador
 
-  function getUltimaLectura(contadorId: string): number {
+  function getUltimaLectura(contadorId: string): { lectura: number; fecha: string | null } {
     const contador = contadores.find(c => c.id === contadorId)
     const historial = registros
       .filter(r => r.contador_id === contadorId)
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-    return historial.length > 0 ? historial[0].lectura_actual : (contador?.lectura_inicial ?? 0)
+    if (historial.length > 0) {
+      return { lectura: historial[0].lectura_actual, fecha: historial[0].fecha }
+    }
+    return { lectura: contador?.lectura_inicial ?? 0, fecha: contador?.fecha_instalacion ?? null }
   }
 
-  const ultimaLectura = contadorSeleccionado ? getUltimaLectura(contadorSeleccionado.id) : 0
+  const ultimaLecturaInfo = contadorSeleccionado ? getUltimaLectura(contadorSeleccionado.id) : { lectura: 0, fecha: null }
+  const ultimaLectura = ultimaLecturaInfo.lectura
+  const fechaLecturaAnterior = ultimaLecturaInfo.fecha
+  const diasServicio = fechaLecturaAnterior && fechaLecturaActual
+    ? Math.max(0, Math.round((new Date(fechaLecturaActual + 'T12:00:00').getTime() - new Date(fechaLecturaAnterior).getTime()) / 86400000))
+    : null
   const lecturaNum = parseFloat(lecturaActual)
   const consumo = !isNaN(lecturaNum) ? lecturaNum - ultimaLectura : null
   const calculo =
@@ -145,7 +153,10 @@ export function LecturasSection({
     if (telefono.startsWith('+')) telefono = telefono.slice(1)
     else { telefono = telefono.replace(/\D/g, ''); if (telefono.length === 8) telefono = APP_CONFIG.COUNTRY_CODE + telefono }
     const total = registro.monto_calculado
-    const msg = `Hola ${registro.cliente_nombre}, su recibo de agua:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}\n🔧 Contador: ${contadorSeleccionado?.numero_serie ?? ''}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: ${moneda}${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
+    const periodoStr = registro.fecha_lectura_anterior
+      ? `\n📆 Período: ${new Date(registro.fecha_lectura_anterior).toLocaleDateString()} al ${new Date(registro.fecha).toLocaleDateString()} (${registro.dias_servicio ?? '—'} días)`
+      : ''
+    const msg = `Hola ${registro.cliente_nombre}, su recibo de agua:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}${periodoStr}\n🔧 Contador: ${contadorSeleccionado?.numero_serie ?? ''}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: ${moneda}${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
@@ -153,6 +164,7 @@ export function LecturasSection({
     setSelectedContadorId('')
     setLecturaActual('')
     setEstado('pendiente')
+    setFechaLecturaActual(new Date().toISOString().split('T')[0])
     setNotas('')
     setFoto(null)
   }
@@ -177,13 +189,12 @@ export function LecturasSection({
     if (consumo < 0) return Swal.fire('Consumo Negativo', 'La lectura actual debe ser mayor o igual a la anterior.', 'error')
 
     const resultadoCobro = calcularTotalPagar(consumo, tarifaDelContador!.precio_m3, tarifaDelContador!.canon_fijo, tarifaDelContador!.consumo_minimo ?? 0, tarifaDelContador!.precio_m3_exceso ?? 0, contadorSeleccionado.cantidad_derecho_servicio_m3 ?? null)
-    const mesNum = mes === 'auto' ? new Date().getMonth() + 1 : parseInt(mes)
 
     const registro = {
       cliente_id: clienteDeUnidad?.id ?? null,
       cliente_nombre: clienteDeUnidad?.nombre ?? unidadSeleccionada.nombre,
       contador_id: contadorSeleccionado.id,
-      fecha: new Date().toISOString(),
+      fecha: new Date(fechaLecturaActual + 'T12:00:00').toISOString(),
       lectura_anterior: ultimaLectura,
       lectura_actual: lecturaNum,
       consumo,
@@ -193,7 +204,8 @@ export function LecturasSection({
       monto_calculado: resultadoCobro.total,
       tipo_cobro: resultadoCobro.tipo_cobro,
       estado,
-      mes: String(mesNum),
+      fecha_lectura_anterior: fechaLecturaAnterior,
+      dias_servicio: diasServicio,
       notas,
       gps,
       foto,
@@ -399,7 +411,7 @@ export function LecturasSection({
                 <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', fontSize: '13px' }}>
                   <div><small style={{ color: '#64748b' }}>N° Serie</small><div style={{ fontWeight: 700, fontFamily: 'monospace' }}>{contadorSeleccionado.numero_serie}</div></div>
                   <div><small style={{ color: '#64748b' }}>Tipo Agua</small><div style={{ fontWeight: 600 }}>{contadorSeleccionado.tipo_agua}</div></div>
-                  <div><small style={{ color: '#64748b' }}>Última Lectura</small><div style={{ fontWeight: 700 }}>{ultimaLectura}</div></div>
+                  <div><small style={{ color: '#64748b' }}>Última Lectura</small><div style={{ fontWeight: 700 }}>{ultimaLectura}</div>{fechaLecturaAnterior && <div style={{ fontSize: '11px', color: '#94a3b8' }}>{new Date(fechaLecturaAnterior).toLocaleDateString('es-GT')}</div>}</div>
                   {tarifaDelContador && (
                     <>
                       <div><small style={{ color: '#64748b' }}>Tarifa</small><div style={{ fontWeight: 600 }}>{tarifaDelContador.nombre}</div></div>
@@ -461,13 +473,17 @@ export function LecturasSection({
                     )}
                   </div>
                   <div>
-                    <label style={labelStyle}>Mes Facturación</label>
-                    <select value={mes} onChange={e => setMes(e.target.value)} style={inputStyle}>
-                      <option value="auto">Mes Actual</option>
-                      {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
-                        <option key={i+1} value={String(i+1)}>{m}</option>
-                      ))}
-                    </select>
+                    <label style={labelStyle}>Fecha Lectura Anterior</label>
+                    <input type="date" readOnly value={fechaLecturaAnterior ? fechaLecturaAnterior.split('T')[0] : ''} placeholder="Primera lectura" style={{ ...inputStyle, background: '#f7fafc', color: fechaLecturaAnterior ? '#1e293b' : '#94a3b8' }} />
+                    {!fechaLecturaAnterior && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Primera lectura de este contador</div>}
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Fecha Lectura Actual</label>
+                    <input type="date" value={fechaLecturaActual} onChange={e => setFechaLecturaActual(e.target.value)} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Días de Servicio</label>
+                    <input type="text" readOnly value={diasServicio !== null ? `${diasServicio} días` : '—'} style={{ ...inputStyle, fontWeight: 'bold', color: diasServicio !== null ? '#0ea5e9' : '#94a3b8', background: '#f7fafc' }} />
                   </div>
                   <div>
                     <label style={labelStyle}>Estado Pago</label>

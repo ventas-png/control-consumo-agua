@@ -60,6 +60,8 @@ export interface Registro {
   monto_pagado?: number;
   fecha_pago?: string | null;
   mes?: string;
+  fecha_lectura_anterior?: string;
+  dias_servicio?: number;
   notas?: string;
   gps?: GPS;
   foto?: string;

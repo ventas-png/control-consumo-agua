@@ -55,6 +55,8 @@ interface LecturaInfo {
   monto_calculado: number
   estado: string
   mes: string | null
+  fecha_lectura_anterior: string | null
+  dias_servicio: number | null
   tipo_cobro: string
   contador_id: string | null
   foto?: string | null
@@ -136,7 +138,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2)
           return supabase
             .from('registros')
-            .select('id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, notas, foto')
+            .select('id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
             .eq('cliente_id', clienteId)
             .gte('fecha', twoYearsAgo.toISOString().split('T')[0])
             .order('fecha', { ascending: false })
@@ -899,7 +901,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                             {new Date(lectura.fecha + 'T12:00:00').toLocaleDateString('es-GT')}
                                           </td>
                                           <td style={{ padding: '10px 14px', color: '#64748b' }}>
-                                            {lectura.mes ?? '—'}
+                                            {lectura.dias_servicio != null ? `${lectura.dias_servicio} días` : lectura.mes ? `Mes ${lectura.mes}` : '—'}
                                           </td>
                                           <td style={{ padding: '10px 14px', color: '#374151', textAlign: 'right' }}>
                                             {lectura.lectura_anterior.toFixed(2)}

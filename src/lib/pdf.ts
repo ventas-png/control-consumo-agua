@@ -16,7 +16,13 @@ export function generarReciboPDFBase64(registro: Registro, empresa: Empresa): st
   doc.setFontSize(10)
   doc.text(`Cliente: ${registro.cliente_nombre}`, 14, 32)
   doc.text(`Fecha de Lectura: ${fecha}`, 14, 37)
-  doc.text(`Tipo de Cobro: ${registro.tipo_cobro}`, 14, 42)
+  let yPos = 42
+  if (registro.fecha_lectura_anterior) {
+    const fechaAnt = new Date(registro.fecha_lectura_anterior).toLocaleDateString()
+    doc.text(`Período de Servicio: ${fechaAnt} al ${fecha} (${registro.dias_servicio ?? '—'} días)`, 14, yPos)
+    yPos += 5
+  }
+  doc.text(`Tipo de Cobro: ${registro.tipo_cobro}`, 14, yPos)
 
   const head = [['Concepto', 'Lectura/Tarifa', 'Detalle']]
   const body = [
@@ -32,7 +38,7 @@ export function generarReciboPDFBase64(registro: Registro, empresa: Empresa): st
   ]
 
   autoTable(doc, {
-    startY: 48,
+    startY: yPos + 6,
     head,
     body,
     theme: 'striped',
