@@ -56,8 +56,8 @@ export function TarifasSection({
   onTarifaAdded,
   onTarifaUpdated,
   onTarifaDeleted,
-  canCreate: _canCreate = true,
-  canEdit: _canEdit = true,
+  canCreate: canCreateProp = true,
+  canEdit: canEditProp = true,
 }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -65,7 +65,8 @@ export function TarifasSection({
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
 
-  const canEdit = userRole !== 'viewer' && userRole !== 'operator'
+  const canCreate = canCreateProp && userRole !== 'viewer'
+  const canEdit = canEditProp && userRole !== 'viewer'
 
   function startCreate() {
     setForm(EMPTY_FORM)
@@ -277,7 +278,7 @@ export function TarifasSection({
             onChange={e => setSearch(e.target.value)}
             style={{ ...inputStyle, width: '220px' }}
           />
-          {canEdit && (
+          {canCreate && (
             <button
               onClick={startCreate}
               style={{
@@ -491,7 +492,7 @@ export function TarifasSection({
               {search ? 'Sin resultados' : 'No hay tarifas registradas'}
             </div>
             <div style={{ fontSize: '14px' }}>
-              {search ? 'Intenta con otro término de búsqueda' : canEdit ? 'Crea la primera tarifa con el botón "+  Nueva Tarifa"' : 'No hay tarifas configuradas aún'}
+              {search ? 'Intenta con otro término de búsqueda' : canCreate ? 'Crea la primera tarifa con el botón "+  Nueva Tarifa"' : 'No hay tarifas configuradas aún'}
             </div>
           </div>
         ) : (
