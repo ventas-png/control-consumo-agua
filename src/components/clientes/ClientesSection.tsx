@@ -306,23 +306,33 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
 
   async function handleEliminar(c: Cliente) {
     const result = await Swal.fire({
-      title: '¿Eliminar cliente?',
-      html: `<b>${c.nombre}</b> y todos sus datos asociados serán eliminados permanentemente.`,
+      title: '¿Quitar cliente de la empresa?',
+      html: `<b>${c.nombre}</b> será removido de esta empresa. El registro del cliente se mantendrá en la plataforma y podrá ser re-vinculado posteriormente.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
       cancelButtonColor: '#64748b',
-      confirmButtonText: 'Sí, eliminar',
+      confirmButtonText: 'Sí, quitar',
       cancelButtonText: 'Cancelar',
     })
     if (!result.isConfirmed) return
 
-    const { error } = await supabase.from('clientes').delete().eq('id', c.id)
+    if (!companyId) {
+      Swal.fire('Error', 'No se pudo determinar la empresa actual.', 'error')
+      return
+    }
+
+    const { error } = await supabase
+      .from('company_clientes')
+      .delete()
+      .eq('cliente_id', c.id)
+      .eq('company_id', companyId)
+
     if (!error) {
       onClienteDeleted(c.id)
-      Swal.fire({ icon: 'success', title: 'Cliente eliminado', timer: 1500, showConfirmButton: false })
+      Swal.fire({ icon: 'success', title: 'Cliente removido de la empresa', timer: 1500, showConfirmButton: false })
     } else {
-      Swal.fire('Error', error.message ?? 'No se pudo eliminar el cliente.', 'error')
+      Swal.fire('Error', error.message ?? 'No se pudo quitar el cliente.', 'error')
     }
   }
 
