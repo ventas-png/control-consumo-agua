@@ -124,6 +124,10 @@ function analyzeRows(parsedRows: ParsedRow[], existingClientes: Cliente[]): Anal
     existingClientes.filter(c => c.cui_dui).map(c => c.cui_dui!.toLowerCase())
   )
 
+  // Track duplicates WITHIN the imported file
+  const seenCodigosInFile = new Set<string>()
+  const seenCuiDuisInFile = new Set<string>()
+
   const yaExisten: ParsedRow[] = []
   const nuevos: ParsedRow[] = []
   const conErrores: ParsedRow[] = []
@@ -133,17 +137,31 @@ function analyzeRows(parsedRows: ParsedRow[], existingClientes: Cliente[]): Anal
       conErrores.push(row)
       continue
     }
-    const codigoMatch = existingCodigos.has(row.data.codigo!.toLowerCase())
-    const cuiMatch = row.data.cui_dui
-      ? existingCuiDuis.has(row.data.cui_dui.toLowerCase())
-      : false
 
-    if (codigoMatch || cuiMatch) {
+    const codigoNorm = row.data.codigo!.toLowerCase()
+    const cuiNorm = row.data.cui_dui?.toLowerCase()
+
+    // Check against existing clients in database
+    const codigoMatch = existingCodigos.has(codigoNorm)
+    const cuiMatch = cuiNorm ? existingCuiDuis.has(cuiNorm) : false
+
+    // Check for duplicates WITHIN this import file
+    const codigoDuplicateInFile = seenCodigosInFile.has(codigoNorm)
+    const cuiDuplicateInFile = cuiNorm && seenCuiDuisInFile.has(cuiNorm)
+
+    if (codigoMatch || cuiMatch || codigoDuplicateInFile || cuiDuplicateInFile) {
       const reasons: string[] = []
-      if (codigoMatch) reasons.push(`código "${row.data.codigo}" ya existe`)
-      if (cuiMatch) reasons.push(`CUI/DUI "${row.data.cui_dui}" ya existe`)
+      if (codigoMatch || codigoDuplicateInFile) {
+        reasons.push(`código "${row.data.codigo}" ${codigoMatch ? 'ya existe en la BD' : 'está duplicado en este archivo'}`)
+      }
+      if (cuiMatch || cuiDuplicateInFile) {
+        reasons.push(`CUI/DUI "${row.data.cui_dui}" ${cuiMatch ? 'ya existe en la BD' : 'está duplicado en este archivo'}`)
+      }
       yaExisten.push({ ...row, duplicateReason: reasons.join(', ') })
     } else {
+      // Mark as seen for future iterations
+      seenCodigosInFile.add(codigoNorm)
+      if (cuiNorm) seenCuiDuisInFile.add(cuiNorm)
       nuevos.push(row)
     }
   }
@@ -214,13 +232,13 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
     XLSX.writeFile(wb, 'clientes_con_errores.xlsx')
   }
 
-  function processFile(file: File) {
+  async function processFile(file: File) {
     if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
       Swal.fire('Formato inválido', 'Solo se aceptan archivos .xlsx, .xls o .csv', 'error')
       return
     }
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const wb = XLSX.read(e.target!.result as ArrayBuffer, { type: 'array' })
         const ws = wb.Sheets[wb.SheetNames[0]]
@@ -229,8 +247,24 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
           Swal.fire('Archivo vacío', 'El archivo no contiene filas de datos.', 'warning')
           return
         }
+
+        // Load ALL global clients (not just filtered ones) for accurate duplicate detection
+        const { data: allClientes, error } = await supabase
+          .from('clientes')
+          .select('id, codigo, cui_dui')
+          .order('codigo')
+
+        if (error) {
+          Swal.fire('Error', 'No se pudieron cargar los clientes globales.', 'error')
+          console.error('Error loading global clients:', error)
+          return
+        }
+
+        // Use all clients + existing clients for comprehensive duplicate detection
+        const globalClientes = allClientes || []
+
         const parsed = raw.map((row, i) => validateRow(row, i + 2))
-        const result = analyzeRows(parsed, existingClientes)
+        const result = analyzeRows(parsed, globalClientes)
         setAnalyzed(result)
         // Default to most relevant tab
         if (result.nuevos.length > 0) setActiveTab('nuevos')
