@@ -47,6 +47,7 @@ export function LecturasSection({
   const [saving, setSaving] = useState(false)
   const [rutaModoManual, setRutaModoManual] = useState(false)
   const [rutaIndex, setRutaIndex] = useState(0)
+  const [contadoresLeidos, setContadoresLeidos] = useState<Set<string>>(new Set())
 
   // En modo ruta, derivar unidades según el tipo de ruta
   const unidadesOrdenadas: Unidad[] = rutaActiva
@@ -69,6 +70,7 @@ export function LecturasSection({
   useEffect(() => {
     if (rutaActiva && unidadesOrdenadas.length > 0) {
       setRutaIndex(0)
+      setContadoresLeidos(new Set())
       setSelectedUnidadId(unidadesOrdenadas[0].id)
       // En modo contadores, pre-seleccionar el contador específico de la ruta
       if (rutaActiva.tipo_ruta === 'contadores' && rutaActiva.contador_ids?.length) {
@@ -266,6 +268,57 @@ export function LecturasSection({
     if (result.isConfirmed) enviarWhatsApp(nuevoRegistro)
 
     if (enModoRuta) {
+      // Marcar este contador como leído en la sesión actual
+      const nuevosLeidos = new Set(contadoresLeidos).add(contadorSeleccionado.id)
+      setContadoresLeidos(nuevosLeidos)
+
+      // Contadores activos de la unidad actual que aún no se han leído
+      const pendientes = contadoresDeUnidad.filter(c => !nuevosLeidos.has(c.id))
+
+      if (pendientes.length > 0) {
+        // Hay contadores pendientes en esta misma unidad — preguntar al operador
+        const listaHtml = pendientes
+          .map(c => `<li style="text-align:left;margin:4px 0"><b>${c.numero_serie}</b>${c.descripcion ? ` — ${c.descripcion}` : ''} <span style="color:#64748b;font-size:12px">(${c.tipo_agua})</span></li>`)
+          .join('')
+
+        const pregunta = await Swal.fire({
+          icon: 'question',
+          title: 'Contadores pendientes',
+          html: `<div style="font-size:14px;margin-bottom:8px">Esta unidad tiene <b>${pendientes.length}</b> contador${pendientes.length > 1 ? 'es' : ''} sin leer:</div><ul style="list-style:none;padding:0">${listaHtml}</ul><div style="margin-top:10px;font-size:13px;color:#475569">¿Desea registrarlos antes de continuar?</div>`,
+          showCancelButton: true,
+          confirmButtonColor: '#0ea5e9',
+          cancelButtonColor: '#64748b',
+          confirmButtonText: 'Sí, registrar',
+          cancelButtonText: 'No, siguiente parada',
+        })
+
+        if (pregunta.isConfirmed) {
+          // Seleccionar el contador pendiente (auto si solo hay uno, selector si hay varios)
+          let contadorElegidoId = pendientes[0].id
+          if (pendientes.length > 1) {
+            const opciones = Object.fromEntries(
+              pendientes.map(c => [c.id, `${c.numero_serie}${c.descripcion ? ` — ${c.descripcion}` : ''}`])
+            )
+            const seleccion = await Swal.fire({
+              title: 'Seleccione el contador',
+              input: 'select',
+              inputOptions: opciones,
+              inputValue: pendientes[0].id,
+              confirmButtonText: 'Seleccionar',
+              showCancelButton: false,
+            })
+            if (seleccion.value) contadorElegidoId = seleccion.value
+          }
+          // Quedarse en la misma unidad con el contador elegido
+          setSelectedContadorId(contadorElegidoId)
+          setLecturaActual('')
+          setNotas('')
+          setFoto(null)
+          return
+        }
+      }
+
+      // Sin pendientes (o el operador eligió saltar) → avanzar al siguiente en la ruta
       const nextIndex = rutaIndex + 1
       if (nextIndex < unidadesOrdenadas.length) {
         setRutaIndex(nextIndex)
@@ -286,6 +339,7 @@ export function LecturasSection({
         limpiarFormulario()
         setSelectedUnidadId('')
         setRutaIndex(0)
+        setContadoresLeidos(new Set())
       }
     } else {
       limpiarFormulario()
@@ -298,9 +352,11 @@ export function LecturasSection({
       setSelectedUnidadId('')
       limpiarFormulario()
       setRutaIndex(0)
+      setContadoresLeidos(new Set())
     } else {
       setRutaModoManual(true)
       setRutaIndex(0)
+      setContadoresLeidos(new Set())
       if (unidadesOrdenadas.length > 0) setSelectedUnidadId(unidadesOrdenadas[0].id)
     }
   }
@@ -314,6 +370,7 @@ export function LecturasSection({
     setSelectedUnidadId('')
     limpiarFormulario()
     setRutaIndex(0)
+    setContadoresLeidos(new Set())
   }
 
   const inputStyle: React.CSSProperties = { padding: '12px 16px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
