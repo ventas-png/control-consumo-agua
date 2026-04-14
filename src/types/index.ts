@@ -140,7 +140,10 @@ export interface Ruta {
   id: string;
   nombre: string;
   descripcion?: string;
+  tipo_ruta: 'clientes' | 'contadores' | 'unidades';
   cliente_ids: string[];
+  contador_ids: string[];
+  unidad_ids: string[];
   asignado_a?: string;
   asignado_nombre?: string;
   asignado_email?: string;

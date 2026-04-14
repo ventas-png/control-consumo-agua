@@ -48,10 +48,20 @@ export function LecturasSection({
   const [rutaModoManual, setRutaModoManual] = useState(false)
   const [rutaIndex, setRutaIndex] = useState(0)
 
-  // En modo ruta, derivar unidades de los cliente_ids de la ruta
+  // En modo ruta, derivar unidades según el tipo de ruta
   const unidadesOrdenadas: Unidad[] = rutaActiva
-    ? rutaActiva.cliente_ids
-        .flatMap(cid => unidades.filter(u => u.cliente_id === cid))
+    ? rutaActiva.tipo_ruta === 'contadores'
+      ? (rutaActiva.contador_ids ?? [])
+          .map(cid => contadores.find(c => c.id === cid))
+          .filter((c): c is Contador => !!c && !!c.unidad_id)
+          .map(c => unidades.find(u => u.id === c.unidad_id!))
+          .filter((u): u is Unidad => !!u)
+      : rutaActiva.tipo_ruta === 'unidades'
+      ? (rutaActiva.unidad_ids ?? [])
+          .map(uid => unidades.find(u => u.id === uid))
+          .filter((u): u is Unidad => !!u)
+      : (rutaActiva.cliente_ids ?? [])
+          .flatMap(cid => unidades.filter(u => u.cliente_id === cid))
     : unidades.filter(u => u.activo)
 
   const enModoRuta = !!rutaActiva || rutaModoManual
@@ -60,11 +70,25 @@ export function LecturasSection({
     if (rutaActiva && unidadesOrdenadas.length > 0) {
       setRutaIndex(0)
       setSelectedUnidadId(unidadesOrdenadas[0].id)
-      setSelectedContadorId('')
+      // En modo contadores, pre-seleccionar el contador específico de la ruta
+      if (rutaActiva.tipo_ruta === 'contadores' && rutaActiva.contador_ids?.length) {
+        setSelectedContadorId(rutaActiva.contador_ids[0])
+      } else {
+        setSelectedContadorId('')
+      }
       setLecturaActual('')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rutaActiva?.id])
+
+  // Al navegar por la ruta en modo contadores, pre-seleccionar el contador del paso actual
+  useEffect(() => {
+    if (rutaActiva?.tipo_ruta === 'contadores' && rutaActiva.contador_ids?.length) {
+      const cid = rutaActiva.contador_ids[rutaIndex]
+      if (cid) setSelectedContadorId(cid)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rutaIndex])
 
   // Al cambiar de unidad, limpiar contador seleccionado
   useEffect(() => {

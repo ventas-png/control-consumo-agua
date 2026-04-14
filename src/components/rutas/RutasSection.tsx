@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Ruta, UserRole } from '../../types'
+import type { Cliente, Contador, Unidad, Proyecto, Ruta, UserRole } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { enviarNotificacionRuta } from '../../lib/email'
 import { APP_CONFIG } from '../../lib/config'
@@ -14,6 +14,9 @@ interface AppUser {
 
 interface Props {
   clientes: Cliente[]
+  contadores: Contador[]
+  unidades: Unidad[]
+  proyectos: Proyecto[]
   rutas: Ruta[]
   userRole: UserRole
   onRutaAdded: (ruta: Ruta) => void
@@ -36,6 +39,9 @@ const EMPTY_FORM = {
 
 export function RutasSection({
   clientes,
+  contadores,
+  unidades,
+  proyectos,
   rutas,
   userRole,
   onRutaAdded,
@@ -48,7 +54,11 @@ export function RutasSection({
   const [editando, setEditando] = useState<Ruta | null>(null)
   const [creando, setCreando] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [tipoRuta, setTipoRuta] = useState<'clientes' | 'contadores' | 'unidades'>('clientes')
+  const [proyectoFiltro, setProyectoFiltro] = useState('')
   const [clientesEnRuta, setClientesEnRuta] = useState<Cliente[]>([])
+  const [contadoresEnRuta, setContadoresEnRuta] = useState<Contador[]>([])
+  const [unidadesEnRuta, setUnidadesEnRuta] = useState<Unidad[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [saving, setSaving] = useState(false)
   const [usuarios, setUsuarios] = useState<AppUser[]>([])
@@ -85,7 +95,11 @@ export function RutasSection({
 
   function abrirCrear() {
     setForm(EMPTY_FORM)
+    setTipoRuta('clientes')
+    setProyectoFiltro('')
     setClientesEnRuta([])
+    setContadoresEnRuta([])
+    setUnidadesEnRuta([])
     setBusqueda('')
     setEditando(null)
     setCreando(true)
@@ -101,10 +115,34 @@ export function RutasSection({
       asignado_email: ruta.asignado_email ?? '',
       asignado_telefono: ruta.asignado_telefono ?? '',
     })
-    const ordenados = ruta.cliente_ids
-      .map(id => clientes.find(c => c.id === id))
-      .filter((c): c is Cliente => !!c)
-    setClientesEnRuta(ordenados)
+    const tipo = ruta.tipo_ruta ?? 'clientes'
+    setTipoRuta(tipo)
+    setProyectoFiltro('')
+    if (tipo === 'contadores') {
+      setClientesEnRuta([])
+      setUnidadesEnRuta([])
+      setContadoresEnRuta(
+        (ruta.contador_ids ?? [])
+          .map(id => contadores.find(c => c.id === id))
+          .filter((c): c is Contador => !!c)
+      )
+    } else if (tipo === 'unidades') {
+      setClientesEnRuta([])
+      setContadoresEnRuta([])
+      setUnidadesEnRuta(
+        (ruta.unidad_ids ?? [])
+          .map(id => unidades.find(u => u.id === id))
+          .filter((u): u is Unidad => !!u)
+      )
+    } else {
+      setContadoresEnRuta([])
+      setUnidadesEnRuta([])
+      setClientesEnRuta(
+        (ruta.cliente_ids ?? [])
+          .map(id => clientes.find(c => c.id === id))
+          .filter((c): c is Cliente => !!c)
+      )
+    }
     setBusqueda('')
     setEditando(ruta)
     setCreando(true)
@@ -114,7 +152,11 @@ export function RutasSection({
     setCreando(false)
     setEditando(null)
     setForm(EMPTY_FORM)
+    setTipoRuta('clientes')
+    setProyectoFiltro('')
     setClientesEnRuta([])
+    setContadoresEnRuta([])
+    setUnidadesEnRuta([])
   }
 
   function handleUsuarioChange(userId: string) {
@@ -133,6 +175,24 @@ export function RutasSection({
 
   function quitarCliente(idx: number) {
     setClientesEnRuta(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function agregarContador(contador: Contador) {
+    if (contadoresEnRuta.find(c => c.id === contador.id)) return
+    setContadoresEnRuta(prev => [...prev, contador])
+  }
+
+  function quitarContador(idx: number) {
+    setContadoresEnRuta(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function agregarUnidad(unidad: Unidad) {
+    if (unidadesEnRuta.find(u => u.id === unidad.id)) return
+    setUnidadesEnRuta(prev => [...prev, unidad])
+  }
+
+  function quitarUnidad(idx: number) {
+    setUnidadesEnRuta(prev => prev.filter((_, i) => i !== idx))
   }
 
   // Drag & drop nativo para reordenar clientes en la ruta
@@ -163,8 +223,16 @@ export function RutasSection({
       Swal.fire('Atención', 'El nombre de la ruta es obligatorio', 'warning')
       return
     }
-    if (clientesEnRuta.length === 0) {
+    if (tipoRuta === 'clientes' && clientesEnRuta.length === 0) {
       Swal.fire('Atención', 'Agrega al menos un cliente a la ruta', 'warning')
+      return
+    }
+    if (tipoRuta === 'contadores' && contadoresEnRuta.length === 0) {
+      Swal.fire('Atención', 'Agrega al menos un contador a la ruta', 'warning')
+      return
+    }
+    if (tipoRuta === 'unidades' && unidadesEnRuta.length === 0) {
+      Swal.fire('Atención', 'Agrega al menos una unidad a la ruta', 'warning')
       return
     }
 
@@ -172,7 +240,10 @@ export function RutasSection({
     const payload = {
       nombre: form.nombre.trim(),
       descripcion: form.descripcion.trim() || null,
-      cliente_ids: clientesEnRuta.map(c => c.id),
+      tipo_ruta: tipoRuta,
+      cliente_ids: tipoRuta === 'clientes' ? clientesEnRuta.map(c => c.id) : [],
+      contador_ids: tipoRuta === 'contadores' ? contadoresEnRuta.map(c => c.id) : [],
+      unidad_ids: tipoRuta === 'unidades' ? unidadesEnRuta.map(u => u.id) : [],
       asignado_a: form.asignado_a || null,
       asignado_nombre: form.asignado_nombre || null,
       asignado_email: form.asignado_email || null,
@@ -240,11 +311,21 @@ export function RutasSection({
       const fecha = ruta.fecha_programada
         ? new Date(ruta.fecha_programada + 'T12:00:00').toLocaleDateString('es-GT')
         : 'Por confirmar'
+      const totalItems = ruta.tipo_ruta === 'contadores'
+        ? ruta.contador_ids.length
+        : ruta.tipo_ruta === 'unidades'
+        ? ruta.unidad_ids.length
+        : ruta.cliente_ids.length
+      const labelItems = ruta.tipo_ruta === 'contadores'
+        ? 'contadores'
+        : ruta.tipo_ruta === 'unidades'
+        ? 'unidades'
+        : 'clientes'
       const msg =
         `Hola ${ruta.asignado_nombre ?? ''}, se te ha asignado una ruta de lecturas:\n` +
         `📋 *${ruta.nombre}*\n` +
         `📅 Fecha programada: ${fecha}\n` +
-        `👥 Total de clientes: ${ruta.cliente_ids.length}\n` +
+        `📍 Total de ${labelItems}: ${totalItems}\n` +
         (ruta.descripcion ? `📝 ${ruta.descripcion}\n` : '') +
         `\nPor favor asegúrate de completarla el día indicado.`
       window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank')
@@ -276,6 +357,30 @@ export function RutasSection({
       (c.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
         c.codigo.toLowerCase().includes(busqueda.toLowerCase()))
   )
+
+  const contadoresDisponibles = contadores.filter(c => {
+    if (!c.activo) return false
+    if (contadoresEnRuta.find(r => r.id === c.id)) return false
+    if (proyectoFiltro && c.project_id !== proyectoFiltro) return false
+    const texto = busqueda.toLowerCase()
+    if (!texto) return true
+    return (
+      c.numero_serie.toLowerCase().includes(texto) ||
+      (c.descripcion ?? '').toLowerCase().includes(texto)
+    )
+  })
+
+  const unidadesDisponibles = unidades.filter(u => {
+    if (!u.activo) return false
+    if (unidadesEnRuta.find(r => r.id === u.id)) return false
+    if (proyectoFiltro && u.project_id !== proyectoFiltro) return false
+    const texto = busqueda.toLowerCase()
+    if (!texto) return true
+    return (
+      u.nombre.toLowerCase().includes(texto) ||
+      u.tipo.toLowerCase().includes(texto)
+    )
+  })
 
   const hoy = new Date().toISOString().split('T')[0]
 
@@ -368,94 +473,270 @@ export function RutasSection({
           </div>
         </div>
 
-        {/* Selector de clientes */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
-          {/* Panel izquierdo: disponibles */}
-          <div>
-            <div style={{ fontWeight: 700, marginBottom: '10px', color: '#374151' }}>
-              Clientes disponibles ({clientesDisponibles.length})
-            </div>
-            <input
-              style={{ ...inputStyle, marginBottom: '10px' }}
-              placeholder="Buscar cliente..."
-              value={busqueda}
-              onChange={e => setBusqueda(e.target.value)}
-            />
-            <div style={{ maxHeight: '320px', overflowY: 'auto', border: '2px solid #e2e8f0', borderRadius: '10px' }}>
-              {clientesDisponibles.length === 0 && (
-                <div style={{ padding: '16px', color: '#94a3b8', textAlign: 'center', fontSize: '13px' }}>
-                  {busqueda ? 'Sin resultados' : 'Todos los clientes ya están en la ruta'}
-                </div>
-              )}
-              {clientesDisponibles.map(c => (
-                <div
-                  key={c.id}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid #f1f5f9' }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '13px' }}>{c.nombre}</div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{c.codigo}</div>
-                  </div>
-                  <button
-                    onClick={() => agregarCliente(c)}
-                    style={{ padding: '4px 10px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}
-                  >
-                    +
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Panel derecho: en la ruta (drag & drop) */}
-          <div>
-            <div style={{ fontWeight: 700, marginBottom: '10px', color: '#374151' }}>
-              En esta ruta ({clientesEnRuta.length}) — arrastra para reordenar
-            </div>
-            <div style={{ maxHeight: '370px', overflowY: 'auto', border: '2px solid #e2e8f0', borderRadius: '10px', minHeight: '60px' }}>
-              {clientesEnRuta.length === 0 && (
-                <div style={{ padding: '20px', color: '#94a3b8', textAlign: 'center', fontSize: '13px' }}>
-                  Agrega clientes desde el panel izquierdo
-                </div>
-              )}
-              {clientesEnRuta.map((c, idx) => (
-                <div
-                  key={c.id}
-                  draggable
-                  onDragStart={() => handleDragStart(idx)}
-                  onDragOver={e => handleDragOver(e, idx)}
-                  onDrop={handleDrop}
+        {/* Selector de tipo de ruta */}
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ fontWeight: 700, marginBottom: '10px', color: '#374151', fontSize: '14px' }}>Tipo de Ruta</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {(['clientes', 'contadores', 'unidades'] as const).map(tipo => {
+              const labels = { clientes: 'Por cliente', contadores: 'Por contador', unidades: 'Por unidad' }
+              const active = tipoRuta === tipo
+              return (
+                <button
+                  key={tipo}
+                  onClick={() => { setTipoRuta(tipo); setBusqueda(''); setProyectoFiltro('') }}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '10px 14px',
-                    borderBottom: '1px solid #f1f5f9',
-                    background: draggingIdx === idx ? '#f0f9ff' : 'white',
-                    cursor: 'grab',
-                    userSelect: 'none',
+                    padding: '8px 18px',
+                    border: active ? 'none' : '2px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    background: active ? 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)' : '#f8fafc',
+                    color: active ? 'white' : '#475569',
+                    transition: 'all 0.15s',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '16px' }}>⠿</span>
-                    <div>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#0ea5e9', marginRight: '6px' }}>
-                        #{idx + 1}
-                      </span>
-                      <span style={{ fontWeight: 600, fontSize: '13px' }}>{c.nombre}</span>
-                      <div style={{ fontSize: '11px', color: '#94a3b8' }}>{c.codigo}</div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => quitarCliente(idx)}
-                    style={{ padding: '2px 8px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
+                  {labels[tipo]}
+                </button>
+              )
+            })}
           </div>
+        </div>
+
+        {/* Panel de selección de elementos */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+
+          {/* ── MODO CLIENTES ── */}
+          {tipoRuta === 'clientes' && (
+            <>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: '10px', color: '#374151' }}>
+                  Clientes disponibles ({clientesDisponibles.length})
+                </div>
+                <input
+                  style={{ ...inputStyle, marginBottom: '10px' }}
+                  placeholder="Buscar cliente..."
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                />
+                <div style={{ maxHeight: '320px', overflowY: 'auto', border: '2px solid #e2e8f0', borderRadius: '10px' }}>
+                  {clientesDisponibles.length === 0 && (
+                    <div style={{ padding: '16px', color: '#94a3b8', textAlign: 'center', fontSize: '13px' }}>
+                      {busqueda ? 'Sin resultados' : 'Todos los clientes ya están en la ruta'}
+                    </div>
+                  )}
+                  {clientesDisponibles.map(c => (
+                    <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid #f1f5f9' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '13px' }}>{c.nombre}</div>
+                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>{c.codigo}</div>
+                      </div>
+                      <button onClick={() => agregarCliente(c)} style={{ padding: '4px 10px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>+</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: '10px', color: '#374151' }}>
+                  En esta ruta ({clientesEnRuta.length}) — arrastra para reordenar
+                </div>
+                <div style={{ maxHeight: '370px', overflowY: 'auto', border: '2px solid #e2e8f0', borderRadius: '10px', minHeight: '60px' }}>
+                  {clientesEnRuta.length === 0 && (
+                    <div style={{ padding: '20px', color: '#94a3b8', textAlign: 'center', fontSize: '13px' }}>Agrega clientes desde el panel izquierdo</div>
+                  )}
+                  {clientesEnRuta.map((c, idx) => (
+                    <div
+                      key={c.id}
+                      draggable
+                      onDragStart={() => handleDragStart(idx)}
+                      onDragOver={e => handleDragOver(e, idx)}
+                      onDrop={handleDrop}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid #f1f5f9', background: draggingIdx === idx ? '#f0f9ff' : 'white', cursor: 'grab', userSelect: 'none' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ color: '#94a3b8', fontSize: '16px' }}>⠿</span>
+                        <div>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#0ea5e9', marginRight: '6px' }}>#{idx + 1}</span>
+                          <span style={{ fontWeight: 600, fontSize: '13px' }}>{c.nombre}</span>
+                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>{c.codigo}</div>
+                        </div>
+                      </div>
+                      <button onClick={() => quitarCliente(idx)} style={{ padding: '2px 8px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── MODO CONTADORES ── */}
+          {tipoRuta === 'contadores' && (
+            <>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: '10px', color: '#374151' }}>
+                  Contadores disponibles ({contadoresDisponibles.length})
+                </div>
+                <select
+                  style={{ ...inputStyle, marginBottom: '8px' }}
+                  value={proyectoFiltro}
+                  onChange={e => setProyectoFiltro(e.target.value)}
+                >
+                  <option value="">-- Todos los proyectos --</option>
+                  {proyectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                </select>
+                <input
+                  style={{ ...inputStyle, marginBottom: '10px' }}
+                  placeholder="Buscar contador..."
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                />
+                <div style={{ maxHeight: '280px', overflowY: 'auto', border: '2px solid #e2e8f0', borderRadius: '10px' }}>
+                  {contadoresDisponibles.length === 0 && (
+                    <div style={{ padding: '16px', color: '#94a3b8', textAlign: 'center', fontSize: '13px' }}>
+                      {busqueda || proyectoFiltro ? 'Sin resultados' : 'Todos los contadores ya están en la ruta'}
+                    </div>
+                  )}
+                  {contadoresDisponibles.map(c => {
+                    const proyecto = proyectos.find(p => p.id === c.project_id)
+                    return (
+                      <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid #f1f5f9' }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '13px' }}>{c.numero_serie}</div>
+                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>{proyecto?.nombre ?? ''}{c.descripcion ? ` · ${c.descripcion}` : ''} · {c.tipo_agua}</div>
+                        </div>
+                        <button onClick={() => agregarContador(c)} style={{ padding: '4px 10px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>+</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: '10px', color: '#374151' }}>
+                  En esta ruta ({contadoresEnRuta.length}) — arrastra para reordenar
+                </div>
+                <div style={{ maxHeight: '370px', overflowY: 'auto', border: '2px solid #e2e8f0', borderRadius: '10px', minHeight: '60px' }}>
+                  {contadoresEnRuta.length === 0 && (
+                    <div style={{ padding: '20px', color: '#94a3b8', textAlign: 'center', fontSize: '13px' }}>Agrega contadores desde el panel izquierdo</div>
+                  )}
+                  {contadoresEnRuta.map((c, idx) => (
+                    <div
+                      key={c.id}
+                      draggable
+                      onDragStart={() => handleDragStart(idx)}
+                      onDragOver={e => handleDragOver(e, idx)}
+                      onDrop={() => {
+                        if (draggingIdx === null || dragOver.current === null || draggingIdx === dragOver.current) { setDraggingIdx(null); return }
+                        setContadoresEnRuta(prev => {
+                          const arr = [...prev]
+                          const [moved] = arr.splice(draggingIdx, 1)
+                          arr.splice(dragOver.current!, 0, moved)
+                          return arr
+                        })
+                        setDraggingIdx(null)
+                        dragOver.current = null
+                      }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid #f1f5f9', background: draggingIdx === idx ? '#f0f9ff' : 'white', cursor: 'grab', userSelect: 'none' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ color: '#94a3b8', fontSize: '16px' }}>⠿</span>
+                        <div>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#0ea5e9', marginRight: '6px' }}>#{idx + 1}</span>
+                          <span style={{ fontWeight: 600, fontSize: '13px' }}>{c.numero_serie}</span>
+                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>{c.tipo_agua}{c.descripcion ? ` · ${c.descripcion}` : ''}</div>
+                        </div>
+                      </div>
+                      <button onClick={() => quitarContador(idx)} style={{ padding: '2px 8px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── MODO UNIDADES ── */}
+          {tipoRuta === 'unidades' && (
+            <>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: '10px', color: '#374151' }}>
+                  Unidades disponibles ({unidadesDisponibles.length})
+                </div>
+                <select
+                  style={{ ...inputStyle, marginBottom: '8px' }}
+                  value={proyectoFiltro}
+                  onChange={e => setProyectoFiltro(e.target.value)}
+                >
+                  <option value="">-- Todos los proyectos --</option>
+                  {proyectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                </select>
+                <input
+                  style={{ ...inputStyle, marginBottom: '10px' }}
+                  placeholder="Buscar unidad..."
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                />
+                <div style={{ maxHeight: '280px', overflowY: 'auto', border: '2px solid #e2e8f0', borderRadius: '10px' }}>
+                  {unidadesDisponibles.length === 0 && (
+                    <div style={{ padding: '16px', color: '#94a3b8', textAlign: 'center', fontSize: '13px' }}>
+                      {busqueda || proyectoFiltro ? 'Sin resultados' : 'Todas las unidades ya están en la ruta'}
+                    </div>
+                  )}
+                  {unidadesDisponibles.map(u => {
+                    const proyecto = proyectos.find(p => p.id === u.project_id)
+                    return (
+                      <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid #f1f5f9' }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '13px' }}>{u.nombre}</div>
+                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>{proyecto?.nombre ?? ''} · {u.tipo}{u.piso != null ? ` · Piso ${u.piso}` : ''}</div>
+                        </div>
+                        <button onClick={() => agregarUnidad(u)} style={{ padding: '4px 10px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>+</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: '10px', color: '#374151' }}>
+                  En esta ruta ({unidadesEnRuta.length}) — arrastra para reordenar
+                </div>
+                <div style={{ maxHeight: '370px', overflowY: 'auto', border: '2px solid #e2e8f0', borderRadius: '10px', minHeight: '60px' }}>
+                  {unidadesEnRuta.length === 0 && (
+                    <div style={{ padding: '20px', color: '#94a3b8', textAlign: 'center', fontSize: '13px' }}>Agrega unidades desde el panel izquierdo</div>
+                  )}
+                  {unidadesEnRuta.map((u, idx) => (
+                    <div
+                      key={u.id}
+                      draggable
+                      onDragStart={() => handleDragStart(idx)}
+                      onDragOver={e => handleDragOver(e, idx)}
+                      onDrop={() => {
+                        if (draggingIdx === null || dragOver.current === null || draggingIdx === dragOver.current) { setDraggingIdx(null); return }
+                        setUnidadesEnRuta(prev => {
+                          const arr = [...prev]
+                          const [moved] = arr.splice(draggingIdx, 1)
+                          arr.splice(dragOver.current!, 0, moved)
+                          return arr
+                        })
+                        setDraggingIdx(null)
+                        dragOver.current = null
+                      }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid #f1f5f9', background: draggingIdx === idx ? '#f0f9ff' : 'white', cursor: 'grab', userSelect: 'none' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ color: '#94a3b8', fontSize: '16px' }}>⠿</span>
+                        <div>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#0ea5e9', marginRight: '6px' }}>#{idx + 1}</span>
+                          <span style={{ fontWeight: 600, fontSize: '13px' }}>{u.nombre}</span>
+                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>{u.tipo}{u.piso != null ? ` · Piso ${u.piso}` : ''}</div>
+                        </div>
+                      </div>
+                      <button onClick={() => quitarUnidad(idx)} style={{ padding: '2px 8px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
         </div>
 
         {/* Botones */}
@@ -513,8 +794,19 @@ export function RutasSection({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
         {rutas.map(ruta => {
           const estado = estadoRuta(ruta)
-          const clientesRuta = ruta.cliente_ids
-            .map(id => clientes.find(c => c.id === id)?.nombre ?? '?')
+          const tipo = ruta.tipo_ruta ?? 'clientes'
+          const tipoLabel = tipo === 'contadores' ? 'Por contador' : tipo === 'unidades' ? 'Por unidad' : 'Por cliente'
+          const itemCount = tipo === 'contadores'
+            ? (ruta.contador_ids ?? []).length
+            : tipo === 'unidades'
+            ? (ruta.unidad_ids ?? []).length
+            : (ruta.cliente_ids ?? []).length
+          const itemLabel = tipo === 'contadores' ? 'contador' : tipo === 'unidades' ? 'unidad' : 'cliente'
+          const preview = tipo === 'contadores'
+            ? (ruta.contador_ids ?? []).slice(0, 4).map(id => contadores.find(c => c.id === id)?.numero_serie ?? '?')
+            : tipo === 'unidades'
+            ? (ruta.unidad_ids ?? []).slice(0, 4).map(id => unidades.find(u => u.id === id)?.nombre ?? '?')
+            : (ruta.cliente_ids ?? []).slice(0, 4).map(id => clientes.find(c => c.id === id)?.nombre ?? '?')
           return (
             <div
               key={ruta.id}
@@ -522,7 +814,8 @@ export function RutasSection({
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '16px', marginBottom: '4px' }}>{ruta.nombre}</div>
+                  <div style={{ fontWeight: 700, fontSize: '16px', marginBottom: '2px' }}>{ruta.nombre}</div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '2px' }}>{tipoLabel}</div>
                   {ruta.descripcion && (
                     <div style={{ fontSize: '12px', color: '#64748b' }}>{ruta.descripcion}</div>
                   )}
@@ -535,13 +828,13 @@ export function RutasSection({
               <div style={{ fontSize: '13px', color: '#475569', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div>📅 {ruta.fecha_programada ? new Date(ruta.fecha_programada + 'T12:00:00').toLocaleDateString('es-GT') : 'Sin fecha'}</div>
                 <div>👤 {ruta.asignado_nombre ?? 'Sin asignar'}</div>
-                <div>👥 {ruta.cliente_ids.length} cliente{ruta.cliente_ids.length !== 1 ? 's' : ''}</div>
+                <div>📍 {itemCount} {itemLabel}{itemCount !== 1 ? 's' : ''}</div>
               </div>
 
-              {clientesRuta.length > 0 && (
+              {preview.length > 0 && (
                 <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '14px', lineHeight: '1.6' }}>
-                  {clientesRuta.slice(0, 4).join(' → ')}
-                  {clientesRuta.length > 4 && ` → +${clientesRuta.length - 4} más`}
+                  {preview.join(' → ')}
+                  {itemCount > 4 && ` → +${itemCount - 4} más`}
                 </div>
               )}
 

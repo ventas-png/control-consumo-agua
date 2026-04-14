@@ -380,6 +380,9 @@ export default function App() {
             <ErrorBoundary sectionName="rutas">
               <RutasSection
                 clientes={clientes}
+                contadores={contadores}
+                unidades={unidades}
+                proyectos={proyectos}
                 rutas={rutas}
                 userRole={currentUser.role}
                 onRutaAdded={addRuta}
