@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo } from '../types'
+import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../types'
 import { supabase } from '../lib/supabase'
 
 const CACHE_KEY = 'aquacontrol_data_v2'
@@ -54,6 +54,10 @@ interface AppData {
   proyectos: Proyecto[]
   moneda: string
   maxUnidadesPorTipo: MaxUnidadesPorTipo | null
+  proveedoresEnergia: ProveedorEnergia[]
+  tarifasEnergia: TarifaEnergia[]
+  fuentesEnergia: FuenteEnergia[]
+  facturasEnergia: FacturaEnergia[]
 }
 
 const INITIAL_DATA: AppData = {
@@ -69,6 +73,10 @@ const INITIAL_DATA: AppData = {
   proyectos: [],
   moneda: 'Q',
   maxUnidadesPorTipo: null,
+  proveedoresEnergia: [],
+  tarifasEnergia: [],
+  fuentesEnergia: [],
+  facturasEnergia: [],
 }
 
 export function useData(companyId?: string) {
@@ -82,6 +90,10 @@ export function useData(companyId?: string) {
     const unidadesQ = supabase.from('unidades').select('*').order('nombre', { ascending: true })
     const fuentesQ = supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false })
     const rcalQ = supabase.from('registros_calidad').select('*, fuentes_agua(identificador, nombre, tipo_agua)').order('fecha', { ascending: false })
+    const proveedoresEnergiaQ = supabase.from('proveedores_energia').select('*').order('created_at', { ascending: false })
+    const tarifasEnergiaQ = supabase.from('tarifas_energia').select('*').order('created_at', { ascending: false })
+    const fuentesEnergiaQ = supabase.from('fuentes_energia').select('*').order('created_at', { ascending: false })
+    const facturasEnergiaQ = supabase.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
 
     if (companyId) {
       tarifasQ.eq('company_id', companyId)
@@ -89,6 +101,10 @@ export function useData(companyId?: string) {
       unidadesQ.eq('company_id', companyId)
       fuentesQ.eq('company_id', companyId)
       rcalQ.eq('company_id', companyId)
+      proveedoresEnergiaQ.eq('company_id', companyId)
+      tarifasEnergiaQ.eq('company_id', companyId)
+      fuentesEnergiaQ.eq('company_id', companyId)
+      facturasEnergiaQ.eq('company_id', companyId)
     }
 
     return Promise.allSettled([
@@ -102,12 +118,16 @@ export function useData(companyId?: string) {
       contadoresQ,
       unidadesQ,
       supabase.from('projects').select('*').order('nombre', { ascending: true }),
+      proveedoresEnergiaQ,
+      tarifasEnergiaQ,
+      fuentesEnergiaQ,
+      facturasEnergiaQ,
     ])
   }
 
   const applyResults = (
     prev: AppData,
-    [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes, contadoresRes, unidadesRes, proyectoRes]: Awaited<ReturnType<typeof fetchAllData>>
+    [clRes, regRes, empRes, fuaRes, rcalRes, rutasRes, tarifasRes, contadoresRes, unidadesRes, proyectoRes, proveedoresEnergiaRes, tarifasEnergiaRes, fuentesEnergiaRes, facturasEnergiaRes]: Awaited<ReturnType<typeof fetchAllData>>
   ): AppData => {
     const next = { ...prev }
     if (clRes.status === 'fulfilled' && clRes.value.data) {
@@ -150,6 +170,18 @@ export function useData(companyId?: string) {
         parqueadero:     p.max_unidades_parqueadero ?? null,
         otro:            p.max_unidades_otro ?? null,
       }
+    }
+    if (proveedoresEnergiaRes.status === 'fulfilled' && proveedoresEnergiaRes.value.data) {
+      next.proveedoresEnergia = proveedoresEnergiaRes.value.data as ProveedorEnergia[]
+    }
+    if (tarifasEnergiaRes.status === 'fulfilled' && tarifasEnergiaRes.value.data) {
+      next.tarifasEnergia = tarifasEnergiaRes.value.data as TarifaEnergia[]
+    }
+    if (fuentesEnergiaRes.status === 'fulfilled' && fuentesEnergiaRes.value.data) {
+      next.fuentesEnergia = fuentesEnergiaRes.value.data as FuenteEnergia[]
+    }
+    if (facturasEnergiaRes.status === 'fulfilled' && facturasEnergiaRes.value.data) {
+      next.facturasEnergia = facturasEnergiaRes.value.data as FacturaEnergia[]
     }
     return next
   }
@@ -314,6 +346,70 @@ export function useData(companyId?: string) {
     setData(prev => ({ ...prev, unidades: prev.unidades.filter(u => u.id !== id) }))
   }, [])
 
+  // ─ Proveedores Energía ──────────────────────────────────────────
+  const addProveedorEnergia = useCallback((proveedor: ProveedorEnergia) => {
+    setData(prev => ({ ...prev, proveedoresEnergia: [proveedor, ...prev.proveedoresEnergia] }))
+  }, [])
+
+  const updateProveedorEnergia = useCallback((id: string, partial: Partial<ProveedorEnergia>) => {
+    setData(prev => ({
+      ...prev,
+      proveedoresEnergia: prev.proveedoresEnergia.map(p => (p.id === id ? { ...p, ...partial } : p)),
+    }))
+  }, [])
+
+  const deleteProveedorEnergia = useCallback((id: string) => {
+    setData(prev => ({ ...prev, proveedoresEnergia: prev.proveedoresEnergia.filter(p => p.id !== id) }))
+  }, [])
+
+  // ─ Tarifas Energía ──────────────────────────────────────────────
+  const addTarifaEnergia = useCallback((tarifa: TarifaEnergia) => {
+    setData(prev => ({ ...prev, tarifasEnergia: [tarifa, ...prev.tarifasEnergia] }))
+  }, [])
+
+  const updateTarifaEnergia = useCallback((id: string, partial: Partial<TarifaEnergia>) => {
+    setData(prev => ({
+      ...prev,
+      tarifasEnergia: prev.tarifasEnergia.map(t => (t.id === id ? { ...t, ...partial } : t)),
+    }))
+  }, [])
+
+  const deleteTarifaEnergia = useCallback((id: string) => {
+    setData(prev => ({ ...prev, tarifasEnergia: prev.tarifasEnergia.filter(t => t.id !== id) }))
+  }, [])
+
+  // ─ Fuentes Energía ──────────────────────────────────────────────
+  const addFuenteEnergia = useCallback((fuente: FuenteEnergia) => {
+    setData(prev => ({ ...prev, fuentesEnergia: [fuente, ...prev.fuentesEnergia] }))
+  }, [])
+
+  const updateFuenteEnergia = useCallback((id: string, partial: Partial<FuenteEnergia>) => {
+    setData(prev => ({
+      ...prev,
+      fuentesEnergia: prev.fuentesEnergia.map(f => (f.id === id ? { ...f, ...partial } : f)),
+    }))
+  }, [])
+
+  const deleteFuenteEnergia = useCallback((id: string) => {
+    setData(prev => ({ ...prev, fuentesEnergia: prev.fuentesEnergia.filter(f => f.id !== id) }))
+  }, [])
+
+  // ─ Facturas Energía ────────────────────────────────────────────
+  const addFacturaEnergia = useCallback((factura: FacturaEnergia) => {
+    setData(prev => ({ ...prev, facturasEnergia: [factura, ...prev.facturasEnergia] }))
+  }, [])
+
+  const updateFacturaEnergia = useCallback((id: string, partial: Partial<FacturaEnergia>) => {
+    setData(prev => ({
+      ...prev,
+      facturasEnergia: prev.facturasEnergia.map(f => (f.id === id ? { ...f, ...partial } : f)),
+    }))
+  }, [])
+
+  const deleteFacturaEnergia = useCallback((id: string) => {
+    setData(prev => ({ ...prev, facturasEnergia: prev.facturasEnergia.filter(f => f.id !== id) }))
+  }, [])
+
   return {
     ...data,
     cargarDatos,
@@ -338,5 +434,17 @@ export function useData(companyId?: string) {
     addUnidad,
     updateUnidad,
     deleteUnidad,
+    addProveedorEnergia,
+    updateProveedorEnergia,
+    deleteProveedorEnergia,
+    addTarifaEnergia,
+    updateTarifaEnergia,
+    deleteTarifaEnergia,
+    addFuenteEnergia,
+    updateFuenteEnergia,
+    deleteFuenteEnergia,
+    addFacturaEnergia,
+    updateFacturaEnergia,
+    deleteFacturaEnergia,
   }
 }

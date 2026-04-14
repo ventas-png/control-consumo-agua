@@ -28,6 +28,7 @@ import { ContadoresSection } from './components/contadores/ContadoresSection'
 import { UnidadesSection } from './components/unidades/UnidadesSection'
 import { CobrosSection } from './components/cobros/CobrosSection'
 import { ComunicacionSection } from './components/comunicacion/ComunicacionSection'
+import ServiciosEnergiaSection from './components/servicios-energia/ServiciosEnergiaSection'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RoleGuard } from './components/shared/AccessDenied'
 import { usePermissions } from './hooks/usePermissions'
@@ -44,11 +45,16 @@ export default function App() {
   const {
     clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores, unidades, proyectos,
     moneda, maxUnidadesPorTipo,
+    proveedoresEnergia, tarifasEnergia, fuentesEnergia, facturasEnergia,
     cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado,
     setFuentesAgua, setRegistrosCalidad, addRuta, updateRuta, deleteRuta,
     addTarifa, updateTarifa, deleteTarifa,
     addContador, updateContador, deleteContador,
     addUnidad, updateUnidad, deleteUnidad,
+    addProveedorEnergia, updateProveedorEnergia, deleteProveedorEnergia,
+    addTarifaEnergia, updateTarifaEnergia, deleteTarifaEnergia,
+    addFuenteEnergia, updateFuenteEnergia, deleteFuenteEnergia,
+    addFacturaEnergia, updateFacturaEnergia, deleteFacturaEnergia,
   } = useData(currentUser?.company_id)
 
   const { canViewModule, canCreate, canEdit, canChangeStatus } = usePermissions(currentUser)
@@ -493,6 +499,34 @@ export default function App() {
                 clientes={clientes}
                 canCreate={canCreate('comunicacion')}
                 canEdit={canEdit('comunicacion')}
+              />
+            </ErrorBoundary>
+          )}
+          {activeSection === 'servicios_energia' && (
+            <ErrorBoundary sectionName="servicios_energia">
+              <ServiciosEnergiaSection
+                fuentesAgua={fuentesAgua}
+                proveedoresEnergia={proveedoresEnergia}
+                tarifasEnergia={tarifasEnergia}
+                fuentesEnergia={fuentesEnergia}
+                facturasEnergia={facturasEnergia}
+                proyectos={proyectos}
+                currentUser={currentUser}
+                moneda={moneda}
+                canCreate={canCreate('servicios_energia')}
+                canEdit={canEdit('servicios_energia')}
+                onProveedorAdded={addProveedorEnergia}
+                onProveedorUpdated={updateProveedorEnergia}
+                onProveedorDeleted={deleteProveedorEnergia}
+                onTarifaAdded={addTarifaEnergia}
+                onTarifaUpdated={updateTarifaEnergia}
+                onTarifaDeleted={deleteTarifaEnergia}
+                onFuenteAdded={addFuenteEnergia}
+                onFuenteUpdated={updateFuenteEnergia}
+                onFuenteDeleted={deleteFuenteEnergia}
+                onFacturaAdded={addFacturaEnergia}
+                onFacturaUpdated={updateFacturaEnergia}
+                onFacturaDeleted={deleteFacturaEnergia}
               />
             </ErrorBoundary>
           )}
