@@ -25,6 +25,7 @@ export const CONFIGURABLE_MODULES: readonly ModuleDefinition[] = [
   { key: 'tarifas',         label: 'Tarifas',         actions: ['view', 'create', 'edit'] },
   { key: 'unidades',        label: 'Unidades',        actions: ['view', 'create', 'edit'] },
   { key: 'contadores',      label: 'Contadores',      actions: ['view', 'create', 'edit'] },
+  { key: 'servicios_energia', label: 'Servicio Energético', actions: ['view', 'create', 'edit', 'change_status'] },
   { key: 'configuracion',   label: 'Configuración',   actions: ['view', 'edit'] },
   { key: 'comunicacion',    label: 'Comunicación',    actions: ['view', 'create', 'edit'] },
 ] as const
@@ -53,6 +54,7 @@ export const ROLE_DEFAULT_TEMPLATES: Record<string, ModulePermission[]> = {
     { module_key: 'tarifas',         can_view: true,  can_create: true,  can_edit: true,  can_change_status: false },
     { module_key: 'unidades',        can_view: true,  can_create: true,  can_edit: true,  can_change_status: false },
     { module_key: 'contadores',      can_view: true,  can_create: true,  can_edit: true,  can_change_status: false },
+    { module_key: 'servicios_energia', can_view: true, can_create: true, can_edit: true, can_change_status: true },
     { module_key: 'configuracion',   can_view: true,  can_create: false, can_edit: true,  can_change_status: false },
     { module_key: 'comunicacion',    can_view: true,  can_create: true,  can_edit: true,  can_change_status: false },
   ],
@@ -65,12 +67,14 @@ export const ROLE_DEFAULT_TEMPLATES: Record<string, ModulePermission[]> = {
     { module_key: 'calidad',         can_view: true,  can_create: true,  can_edit: true,  can_change_status: false },
     { module_key: 'rutas',           can_view: true,  can_create: false, can_edit: true,  can_change_status: false },
     { module_key: 'contadores',      can_view: true,  can_create: false, can_edit: true,  can_change_status: false },
+    { module_key: 'servicios_energia', can_view: true, can_create: true, can_edit: true, can_change_status: false },
     { module_key: 'comunicacion',    can_view: true,  can_create: false, can_edit: true,  can_change_status: false },
   ],
   viewer: [
     { module_key: 'tabla',           can_view: true,  can_create: false, can_edit: false, can_change_status: false },
     { module_key: 'dashboard',       can_view: true,  can_create: false, can_edit: false, can_change_status: false },
     { module_key: 'mapa',            can_view: true,  can_create: false, can_edit: false, can_change_status: false },
+    { module_key: 'servicios_energia', can_view: true, can_create: false, can_edit: false, can_change_status: false },
   ],
   collector: [
     { module_key: 'cobros',          can_view: true,  can_create: true,  can_edit: true,  can_change_status: true },
