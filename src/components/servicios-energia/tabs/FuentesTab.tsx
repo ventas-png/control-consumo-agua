@@ -43,6 +43,12 @@ export default function FuentesTab({
       Swal.fire('Error', 'No se pudo identificar la empresa del usuario', 'error')
       return
     }
+
+    if (proyectos.length === 0) {
+      Swal.fire('Error', 'Debe crear al menos un proyecto antes de crear una fuente de energía', 'error')
+      return
+    }
+
     if (fuentesAgua.length === 0) {
       Swal.fire('Error', 'Debe crear al menos una fuente de agua antes de crear una fuente de energía', 'error')
       return
@@ -66,7 +72,7 @@ export default function FuentesTab({
             <option value="">Seleccionar proyecto</option>
             ${proyectoOptions}
           </select>
-          ` : `<input type="hidden" id="fe_project" value="${defaultProjectId}" />`}
+          ` : `<input type="hidden" id="fe_project" value="${defaultProjectId ?? ''}" />`}
 
           <label style="display:block;margin:0.75rem 0 0.2rem;font-weight:bold;">Fuente de agua *</label>
           <select id="fe_agua" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;">
@@ -127,7 +133,7 @@ export default function FuentesTab({
         const modo = (document.getElementById('fe_modo') as HTMLSelectElement)?.value ?? 'red'
 
         if (!nombre) { Swal.showValidationMessage('El nombre es requerido'); return null }
-        if (!projectId) { Swal.showValidationMessage('Debe seleccionar un proyecto'); return null }
+        if (!projectId || projectId === 'null') { Swal.showValidationMessage('Debe seleccionar un proyecto'); return null }
         if (!fuenteAguaId) { Swal.showValidationMessage('Debe seleccionar una fuente de agua'); return null }
 
         const payload: any = {

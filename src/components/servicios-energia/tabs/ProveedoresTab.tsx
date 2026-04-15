@@ -38,6 +38,11 @@ export default function ProveedoresTab({
       return
     }
 
+    if (proyectos.length === 0) {
+      Swal.fire('Error', 'Debe crear al menos un proyecto antes de crear un proveedor', 'error')
+      return
+    }
+
     const proyectoOptions = proyectos.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('')
 
     const { value: formValues } = await Swal.fire({
@@ -53,7 +58,7 @@ export default function ProveedoresTab({
             <option value="">Seleccionar proyecto</option>
             ${proyectoOptions}
           </select>
-          ` : `<input type="hidden" id="prov_project" value="${defaultProjectId}" />`}
+          ` : `<input type="hidden" id="prov_project" value="${defaultProjectId ?? ''}" />`}
 
           <label style="display:block;margin:0.75rem 0 0.25rem;">NIT</label>
           <input id="prov_nit" placeholder="9999999-9" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;" />
@@ -80,7 +85,7 @@ export default function ProveedoresTab({
         const tipo = (document.getElementById('prov_tipo') as HTMLSelectElement)?.value ?? 'distribuidora'
 
         if (!nombre) { Swal.showValidationMessage('El nombre es requerido'); return null }
-        if (!projectId) { Swal.showValidationMessage('Debe seleccionar un proyecto'); return null }
+        if (!projectId || projectId === 'null') { Swal.showValidationMessage('Debe seleccionar un proyecto'); return null }
 
         return {
           nombre: sanitizeInput(nombre),

@@ -41,6 +41,12 @@ export default function TarifasTab({
       Swal.fire('Error', 'No se pudo identificar la empresa del usuario', 'error')
       return
     }
+
+    if (proyectos.length === 0) {
+      Swal.fire('Error', 'Debe crear al menos un proyecto antes de crear una tarifa', 'error')
+      return
+    }
+
     if (proveedoresEnergia.length === 0) {
       Swal.fire('Error', 'Debe crear al menos un proveedor antes de crear una tarifa', 'error')
       return
@@ -62,7 +68,7 @@ export default function TarifasTab({
             <option value="">Seleccionar proyecto</option>
             ${proyectoOptions}
           </select>
-          ` : `<input type="hidden" id="t_project" value="${defaultProjectId}" />`}
+          ` : `<input type="hidden" id="t_project" value="${defaultProjectId ?? ''}" />`}
 
           <label style="display:block;margin:0.75rem 0 0.2rem;font-weight:bold;">Proveedor *</label>
           <select id="t_proveedor" style="width:100%;padding:0.45rem;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;">
@@ -116,7 +122,7 @@ export default function TarifasTab({
         const proveedorId = (document.getElementById('t_proveedor') as HTMLSelectElement)?.value ?? ''
 
         if (!nombre) { Swal.showValidationMessage('El nombre es requerido'); return null }
-        if (!projectId) { Swal.showValidationMessage('Debe seleccionar un proyecto'); return null }
+        if (!projectId || projectId === 'null') { Swal.showValidationMessage('Debe seleccionar un proyecto'); return null }
         if (!proveedorId) { Swal.showValidationMessage('Debe seleccionar un proveedor'); return null }
 
         return {
