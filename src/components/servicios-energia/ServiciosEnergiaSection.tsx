@@ -6,9 +6,8 @@ import type {
   FuenteEnergia,
   FacturaEnergia,
   Proyecto,
-  AppUser,
+  UserSession,
 } from '../../types'
-import Swal from 'sweetalert2'
 import ProveedoresTab from './tabs/ProveedoresTab'
 import TarifasTab from './tabs/TarifasTab'
 import FuentesTab from './tabs/FuentesTab'
@@ -22,7 +21,7 @@ interface ServiciosEnergiaSectionProps {
   fuentesEnergia: FuenteEnergia[]
   facturasEnergia: FacturaEnergia[]
   proyectos: Proyecto[]
-  currentUser: AppUser | null
+  currentUser: UserSession | null
   moneda: string
   canCreate: boolean
   canEdit: boolean
@@ -69,7 +68,7 @@ export default function ServiciosEnergiaSection({
 }: ServiciosEnergiaSectionProps) {
   const [activeTab, setActiveTab] = useState<EnergyTab>('proveedores')
 
-  const tabs: { id: EnergyTab; label: string; icon: React.ReactNode }[] = [
+  const tabs: { id: EnergyTab; label: string; icon: string }[] = [
     { id: 'proveedores', label: 'Proveedores', icon: '🏢' },
     { id: 'tarifas', label: 'Tarifas', icon: '💰' },
     { id: 'fuentes', label: 'Fuentes', icon: '⚡' },
@@ -103,7 +102,6 @@ export default function ServiciosEnergiaSection({
               cursor: 'pointer',
               borderRadius: '4px 4px 0 0',
               fontWeight: activeTab === tab.id ? 'bold' : 'normal',
-              transition: 'all 0.3s ease',
             }}
           >
             {tab.icon} {tab.label}
@@ -116,6 +114,8 @@ export default function ServiciosEnergiaSection({
         {activeTab === 'proveedores' && (
           <ProveedoresTab
             proveedoresEnergia={proveedoresEnergia}
+            proyectos={proyectos}
+            currentUser={currentUser}
             canCreate={canCreate}
             canEdit={canEdit}
             onProveedorAdded={onProveedorAdded}
@@ -128,6 +128,8 @@ export default function ServiciosEnergiaSection({
           <TarifasTab
             tarifasEnergia={tarifasEnergia}
             proveedoresEnergia={proveedoresEnergia}
+            proyectos={proyectos}
+            currentUser={currentUser}
             moneda={moneda}
             canCreate={canCreate}
             canEdit={canEdit}
@@ -143,6 +145,8 @@ export default function ServiciosEnergiaSection({
             fuentesAgua={fuentesAgua}
             proveedoresEnergia={proveedoresEnergia}
             tarifasEnergia={tarifasEnergia}
+            proyectos={proyectos}
+            currentUser={currentUser}
             canCreate={canCreate}
             canEdit={canEdit}
             onFuenteAdded={onFuenteAdded}
@@ -157,6 +161,8 @@ export default function ServiciosEnergiaSection({
             fuentesEnergia={fuentesEnergia}
             tarifasEnergia={tarifasEnergia}
             proveedoresEnergia={proveedoresEnergia}
+            proyectos={proyectos}
+            currentUser={currentUser}
             moneda={moneda}
             canCreate={canCreate}
             canEdit={canEdit}
