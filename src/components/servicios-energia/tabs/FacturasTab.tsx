@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia } from '../../../types'
+import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia, Proyecto, UserSession } from '../../../types'
 import Swal from 'sweetalert2'
 import FacturaEnergiaModal from '../FacturaEnergiaModal'
 import { supabase } from '../../../lib/supabase'
@@ -9,6 +9,8 @@ interface FacturasTabProps {
   fuentesEnergia: FuenteEnergia[]
   tarifasEnergia: TarifaEnergia[]
   proveedoresEnergia: ProveedorEnergia[]
+  proyectos: Proyecto[]
+  currentUser: UserSession | null
   moneda: string
   canCreate: boolean
   canEdit: boolean
@@ -22,6 +24,8 @@ export default function FacturasTab({
   fuentesEnergia,
   tarifasEnergia,
   proveedoresEnergia,
+  proyectos,
+  currentUser,
   moneda,
   canCreate,
   canEdit,
@@ -33,6 +37,9 @@ export default function FacturasTab({
   const [editingFactura, setEditingFactura] = useState<FacturaEnergia | null>(null)
   const [filterFuente, setFilterFuente] = useState<string>('')
   const [filterEstado, setFilterEstado] = useState<string>('')
+
+  const companyId = currentUser?.company_id ?? null
+  const defaultProjectId = proyectos.length === 1 ? proyectos[0].id : null
 
   const filteredFacturas = facturasEnergia.filter(f => {
     if (filterFuente && f.fuente_energia_id !== filterFuente) return false
@@ -55,21 +62,27 @@ export default function FacturasTab({
       if (editingFactura?.id) {
         const { error } = await supabase
           .from('facturas_energia')
-          .update(formData)
+          .update({ ...formData, updated_at: new Date().toISOString() })
           .eq('id', editingFactura.id)
 
         if (error) throw error
         onFacturaUpdated(editingFactura.id, formData)
-        Swal.fire('Éxito', 'Factura actualizada', 'success')
+        Swal.fire({ icon: 'success', title: 'Factura actualizada', timer: 1500, showConfirmButton: false })
       } else {
+        // Derive project_id from the selected fuente_energia if possible
+        const fuente = fuentesEnergia.find(f => f.id === formData.fuente_energia_id)
+        const projectId = fuente?.project_id ?? defaultProjectId
+        if (!projectId || !companyId) {
+          throw new Error('No se pudo determinar el proyecto o la empresa')
+        }
         const { data, error } = await supabase
           .from('facturas_energia')
-          .insert([formData])
+          .insert([{ ...formData, project_id: projectId, company_id: companyId }])
           .select()
 
         if (error) throw error
         if (data) onFacturaAdded(data[0] as FacturaEnergia)
-        Swal.fire('Éxito', 'Factura creada', 'success')
+        Swal.fire({ icon: 'success', title: 'Factura creada', timer: 1500, showConfirmButton: false })
       }
     } catch (err: any) {
       Swal.fire('Error', err.message || 'No se pudo guardar la factura', 'error')
