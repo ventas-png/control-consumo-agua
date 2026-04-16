@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import type { TarifaEnergia, ProveedorEnergia, Proyecto, UserSession } from '../../../types'
 import Swal from 'sweetalert2'
 import { EditModal } from '../../shared/EditModal'
@@ -210,27 +210,59 @@ export default function TarifasTab({
       </div>
 
       {editingId && (
-        <EditModal
-          title="Editar Tarifa"
-          fields={[
-            { key: 'nombre', label: 'Nombre', type: 'text', required: true },
-            { key: 'descripcion', label: 'Descripción', type: 'textarea' },
-            { key: 'precio_kwh_energia', label: 'Precio kWh (energía)', type: 'number', step: 0.000001 },
-            { key: 'precio_kw_potencia', label: 'Precio kW (potencia)', type: 'number', step: 0.0001 },
-            { key: 'cargo_fijo', label: `Cargo fijo (${moneda})`, type: 'number', step: 0.01 },
-            { key: 'alumbrado_publico', label: 'Alumbrado público', type: 'number', step: 0.0001 },
-            { key: 'alumbrado_tipo', label: 'Tipo alumbrado', type: 'select', options: [
-              { value: 'fijo', label: 'Fijo' },
-              { value: 'porcentual', label: 'Porcentual (%)' },
-            ]},
-            { key: 'iva_porcentaje', label: 'IVA (%)', type: 'number', step: 0.01 },
-            { key: 'precio_kwh_exportado', label: 'Precio kWh exportado', type: 'number', step: 0.000001 },
-            { key: 'activa', label: 'Activa', type: 'checkbox' },
-          ]}
-          data={editFormData}
-          onClose={() => setEditingId(null)}
-          onSave={handleSaveEdit}
-        />
+        <EditModal title="Editar Tarifa" onClose={() => setEditingId(null)} maxWidth="520px">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Nombre *</label>
+              <input type="text" value={editFormData.nombre ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nombre: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Descripción</label>
+              <textarea value={editFormData.descripcion ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, descripcion: e.target.value }))} rows={2} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Precio kWh (energía)</label>
+                <input type="number" step="0.000001" value={editFormData.precio_kwh_energia ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, precio_kwh_energia: parseFloat(e.target.value) || 0 }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Precio kW (potencia)</label>
+                <input type="number" step="0.0001" value={editFormData.precio_kw_potencia ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, precio_kw_potencia: parseFloat(e.target.value) || 0 }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Cargo fijo ({moneda})</label>
+                <input type="number" step="0.01" value={editFormData.cargo_fijo ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, cargo_fijo: parseFloat(e.target.value) || 0 }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Alumbrado público</label>
+                <input type="number" step="0.0001" value={editFormData.alumbrado_publico ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, alumbrado_publico: parseFloat(e.target.value) || 0 }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Tipo alumbrado</label>
+                <select value={editFormData.alumbrado_tipo ?? 'fijo'} onChange={e => setEditFormData(prev => ({ ...prev, alumbrado_tipo: e.target.value as TarifaEnergia['alumbrado_tipo'] }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }}>
+                  <option value="fijo">Fijo</option>
+                  <option value="porcentual">Porcentual (%)</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>IVA (%)</label>
+                <input type="number" step="0.01" value={editFormData.iva_porcentaje ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, iva_porcentaje: parseFloat(e.target.value) || 0 }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Precio kWh exportado</label>
+                <input type="number" step="0.000001" value={editFormData.precio_kwh_exportado ?? 0} onChange={e => setEditFormData(prev => ({ ...prev, precio_kwh_exportado: parseFloat(e.target.value) || 0 }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input type="checkbox" id="tarifa-activa" checked={editFormData.activa ?? false} onChange={e => setEditFormData(prev => ({ ...prev, activa: e.target.checked }))} />
+              <label htmlFor="tarifa-activa">Activa</label>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+              <button onClick={() => setEditingId(null)} style={{ padding: '0.5rem 1rem', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', background: 'white' }}>Cancelar</button>
+              <button onClick={handleSaveEdit} style={{ padding: '0.5rem 1rem', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Guardar</button>
+            </div>
+          </div>
+        </EditModal>
       )}
 
       {tarifasEnergia.length === 0 ? (

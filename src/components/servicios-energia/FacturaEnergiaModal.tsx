@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react'
 import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia } from '../../types'
 import Swal from 'sweetalert2'
 import { calcularFacturaEnergia } from '../../lib/businessEnergia'
-import { sanitizeInput, validateNumber } from '../../lib/validation'
-import { supabase } from '../../lib/supabase'
+import { sanitizeInput } from '../../lib/validation'
 
 interface FacturaEnergiaModalProps {
   factura: Partial<FacturaEnergia> | null
@@ -20,7 +19,7 @@ export default function FacturaEnergiaModal({
   factura,
   fuentesEnergia,
   tarifasEnergia,
-  proveedoresEnergia,
+  proveedoresEnergia: _proveedoresEnergia,
   moneda,
   onClose,
   onSave,
@@ -312,7 +311,7 @@ export default function FacturaEnergiaModal({
               <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem' }}>Estado</label>
               <select
                 value={formData.estado || 'pendiente'}
-                onChange={e => setFormData(prev => ({ ...prev, estado: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, estado: e.target.value as FacturaEnergia['estado'] }))}
                 style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box' }}
               >
                 <option value="pendiente">Pendiente</option>
