@@ -1,4 +1,3 @@
-import React, { useState } from 'react'
 import type { FacturaEnergia, FuenteEnergia } from '../../../types'
 
 interface DashboardTabProps {
@@ -8,8 +7,6 @@ interface DashboardTabProps {
 }
 
 export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }: DashboardTabProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState<'mes' | 'trimestre' | 'ano'>('mes')
-
   // Calcular totales por fuente
   const totalsPorFuente = fuentesEnergia.map(fuente => {
     const facturasDelFuente = facturasEnergia.filter(f => f.fuente_energia_id === fuente.id)

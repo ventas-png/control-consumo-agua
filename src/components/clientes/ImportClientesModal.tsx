@@ -261,7 +261,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
         }
 
         // Use all clients + existing clients for comprehensive duplicate detection
-        const globalClientes = allClientes || []
+        const globalClientes = (allClientes || []) as Cliente[]
 
         const parsed = raw.map((row, i) => validateRow(row, i + 2))
         const result = analyzeRows(parsed, globalClientes)

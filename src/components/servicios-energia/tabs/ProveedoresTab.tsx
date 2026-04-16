@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import type { ProveedorEnergia, Proyecto, UserSession } from '../../../types'
 import Swal from 'sweetalert2'
 import { EditModal } from '../../shared/EditModal'
@@ -165,23 +165,38 @@ export default function ProveedoresTab({
       </div>
 
       {editingId && (
-        <EditModal
-          title="Editar Proveedor"
-          fields={[
-            { key: 'nombre', label: 'Nombre', type: 'text', required: true },
-            { key: 'nit', label: 'NIT', type: 'text' },
-            { key: 'contacto', label: 'Contacto', type: 'text' },
-            { key: 'tipo', label: 'Tipo', type: 'select', options: [
-              { value: 'distribuidora', label: 'Distribuidora' },
-              { value: 'comercializadora', label: 'Comercializadora' },
-              { value: 'autogeneracion', label: 'Autogeneración' },
-            ]},
-            { key: 'activo', label: 'Activo', type: 'checkbox' },
-          ]}
-          data={editFormData}
-          onClose={() => setEditingId(null)}
-          onSave={handleSaveEdit}
-        />
+        <EditModal title="Editar Proveedor" onClose={() => setEditingId(null)} maxWidth="480px">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Nombre *</label>
+              <input type="text" value={editFormData.nombre ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nombre: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>NIT</label>
+              <input type="text" value={editFormData.nit ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nit: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Contacto</label>
+              <input type="text" value={editFormData.contacto ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, contacto: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Tipo</label>
+              <select value={editFormData.tipo ?? 'distribuidora'} onChange={e => setEditFormData(prev => ({ ...prev, tipo: e.target.value as ProveedorEnergia['tipo'] }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }}>
+                <option value="distribuidora">Distribuidora</option>
+                <option value="comercializadora">Comercializadora</option>
+                <option value="autogeneracion">Autogeneración</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input type="checkbox" id="prov-activo" checked={editFormData.activo ?? false} onChange={e => setEditFormData(prev => ({ ...prev, activo: e.target.checked }))} />
+              <label htmlFor="prov-activo">Activo</label>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+              <button onClick={() => setEditingId(null)} style={{ padding: '0.5rem 1rem', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', background: 'white' }}>Cancelar</button>
+              <button onClick={handleSaveEdit} style={{ padding: '0.5rem 1rem', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Guardar</button>
+            </div>
+          </div>
+        </EditModal>
       )}
 
       {proveedoresEnergia.length === 0 ? (
