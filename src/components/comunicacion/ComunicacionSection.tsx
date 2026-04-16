@@ -3,9 +3,12 @@ import Swal from 'sweetalert2'
 import { useConversations } from '../../hooks/useConversations'
 import { sanitizeInput } from '../../lib/validation'
 import { supabase } from '../../lib/supabase'
+import DifusionTab from './DifusionTab'
 import type {
   UserSession,
   Cliente,
+  Proyecto,
+  Unidad,
   Conversation,
   ConversationAssignment,
   ConversationCategory,
@@ -17,6 +20,8 @@ import type {
 interface Props {
   currentUser: UserSession
   clientes: Cliente[]
+  proyectos: Proyecto[]
+  unidades: Unidad[]
   canCreate: boolean
   canEdit: boolean
 }
@@ -743,7 +748,7 @@ function AccessRulesPanel({
 }
 
 // ── Componente principal ─────────────────────────────────────────────────────
-export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit }: Props) {
+export function ComunicacionSection({ currentUser, clientes, proyectos, unidades, canCreate, canEdit }: Props) {
   const {
     conversations,
     messages,
@@ -770,6 +775,7 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
     isCliente: false,
   })
 
+  const [mainTab, setMainTab] = useState<'conversaciones' | 'difusion'>('conversaciones')
   const [view, setView] = useState<'list' | 'detail' | 'config'>('list')
   const [convTab, setConvTab] = useState<'clientes' | 'equipo'>('clientes')
   const [filterText, setFilterText] = useState('')
@@ -995,6 +1001,57 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* ── Main tabs: Conversaciones / Difusión ── */}
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #e2e8f0', paddingBottom: '0' }}>
+        {(['conversaciones', 'difusion'] as const).map(tab => {
+          const active = mainTab === tab
+          return (
+            <button
+              key={tab}
+              onClick={() => setMainTab(tab)}
+              style={{
+                padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer',
+                fontSize: '14px', fontWeight: active ? 700 : 500,
+                color: active ? '#0ea5e9' : '#6b7280',
+                borderBottom: active ? '2px solid #0ea5e9' : '2px solid transparent',
+                marginBottom: '-2px', transition: 'all 0.13s ease',
+                display: 'flex', alignItems: 'center', gap: '8px',
+              }}
+            >
+              {tab === 'conversaciones' ? (
+                <>
+                  <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  Conversaciones
+                </>
+              ) : (
+                <>
+                  <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                  </svg>
+                  Difusión
+                </>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── Difusión tab ── */}
+      {mainTab === 'difusion' && (
+        <DifusionTab
+          currentUser={currentUser}
+          clientes={clientes}
+          proyectos={proyectos}
+          unidades={unidades}
+          canCreate={canCreate}
+        />
+      )}
+
+      {/* ── Conversaciones tab ── */}
+      {mainTab === 'conversaciones' && <>
+
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
         <div>
@@ -1560,6 +1617,7 @@ export function ComunicacionSection({ currentUser, clientes, canCreate, canEdit 
           onRemove={handleRemoveAssignment}
         />
       )}
+      </>}
     </div>
   )
 }

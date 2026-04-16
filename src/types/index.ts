@@ -604,3 +604,35 @@ export interface FacturaEnergia {
   created_at: string;
   updated_at: string;
 }
+
+// ── Difusión (mensajes masivos) ───────────────────────────────────────────────
+
+export type BroadcastTargetType = 'todos' | 'proyecto' | 'unidades' | 'clientes'
+
+export interface Broadcast {
+  id: string
+  company_id: string
+  title: string
+  body: string
+  sent_by_id: string
+  sent_by_name: string
+  target_type: BroadcastTargetType
+  target_ids: string[]
+  recipient_count: number
+  send_email: boolean
+  created_at: string
+  // join optional — calculado en query
+  read_count?: number
+}
+
+export interface BroadcastRecipient {
+  id: string
+  broadcast_id: string
+  cliente_id: string
+  read_at: string | null
+  email_sent: boolean
+  email_error: string | null
+  created_at: string
+  // join opcional
+  broadcast?: Broadcast
+}

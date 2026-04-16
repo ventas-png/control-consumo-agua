@@ -69,6 +69,38 @@ export async function enviarNotificacionRuta(ruta: Ruta): Promise<void> {
   await emailjs.send(APP_CONFIG.EMAILJS_SERVICE_ID, APP_CONFIG.EMAILJS_TEMPLATE_RUTA_ASIGNADA, params)
 }
 
+export interface BroadcastEmailResult {
+  sent: string[]
+  failed: { email: string; error: string }[]
+}
+
+export async function enviarComunicadoBroadcast(
+  clientes: { id: string; email: string; nombre: string }[],
+  broadcast: { title: string; body: string; sent_by_name: string }
+): Promise<BroadcastEmailResult> {
+  const sent: string[] = []
+  const failed: { email: string; error: string }[] = []
+
+  for (const cliente of clientes) {
+    if (!cliente.email) continue
+    try {
+      await emailjs.send(APP_CONFIG.EMAILJS_SERVICE_ID, APP_CONFIG.EMAILJS_TEMPLATE_DIFUSION, {
+        to_email: cliente.email,
+        to_name: cliente.nombre,
+        subject: broadcast.title,
+        message: broadcast.body,
+        from_name: broadcast.sent_by_name,
+      })
+      sent.push(cliente.email)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      failed.push({ email: cliente.email, error: msg })
+    }
+  }
+
+  return { sent, failed }
+}
+
 export async function sendPasswordResetEmail(
   email: string,
   token: string,

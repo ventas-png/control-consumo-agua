@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import { useConversations } from '../../hooks/useConversations'
+import { useBroadcasts } from '../../hooks/useBroadcasts'
 import { sanitizeInput } from '../../lib/validation'
 import type {
   UserSession,
@@ -102,6 +103,17 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
   const [creating, setCreating] = useState(false)
   const [formError, setFormError] = useState('')
 
+  const [mainTab, setMainTab] = useState<'conversaciones' | 'comunicados'>('conversaciones')
+  const [expandedBroadcast, setExpandedBroadcast] = useState<string | null>(null)
+
+  const { clienteBroadcasts, loadClienteBroadcasts, markAsRead } = useBroadcasts()
+
+  useEffect(() => {
+    if (currentUser.cliente_id) {
+      loadClienteBroadcasts(currentUser.cliente_id)
+    }
+  }, [currentUser.cliente_id, loadClienteBroadcasts])
+
   useEffect(() => {
     loadConversations()
   }, [loadConversations])
@@ -169,6 +181,64 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* ── Main tabs ── */}
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #e5e7eb', marginBottom: '-4px' }}>
+        {(['conversaciones', 'comunicados'] as const).map(tab => {
+          const active = mainTab === tab
+          const unreadCount = tab === 'comunicados'
+            ? clienteBroadcasts.filter(r => !r.read_at).length
+            : 0
+          return (
+            <button
+              key={tab}
+              onClick={() => setMainTab(tab)}
+              style={{
+                padding: '8px 16px',
+                background: 'none',
+                border: 'none',
+                borderBottom: active ? '2px solid #0ea5e9' : '2px solid transparent',
+                marginBottom: '-2px',
+                color: active ? '#0ea5e9' : '#6b7280',
+                fontWeight: active ? 700 : 500,
+                fontSize: '13.5px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              {tab === 'conversaciones' ? (
+                <>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                  </svg>
+                  Conversaciones
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                  </svg>
+                  Comunicados
+                  {unreadCount > 0 && (
+                    <span style={{
+                      minWidth: '18px', height: '18px', borderRadius: '999px',
+                      background: '#ef4444', color: 'white',
+                      fontSize: '10px', fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '0 4px',
+                    }}>
+                      {unreadCount}
+                    </span>
+                  )}
+                </>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {mainTab === 'conversaciones' && <>
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
@@ -734,6 +804,108 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                 ? '✅ Esta consulta fue marcada como resuelta.'
                 : '🔒 Esta conversación está cerrada.'}
             </div>
+          )}
+        </div>
+      )}
+      </>}
+
+      {mainTab === 'comunicados' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#111827' }}>Comunicados</h3>
+            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#6b7280' }}>
+              Mensajes informativos de la empresa
+            </p>
+          </div>
+          {clienteBroadcasts.length === 0 ? (
+            <div style={{
+              padding: '48px 24px', textAlign: 'center',
+              background: 'white', borderRadius: '14px',
+              border: '1px solid #e5e7eb',
+              boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>📢</div>
+              <div style={{ fontSize: '15px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                Sin comunicados
+              </div>
+              <div style={{ fontSize: '13px', color: '#9ca3af' }}>
+                Aquí aparecerán los mensajes informativos de la empresa.
+              </div>
+            </div>
+          ) : (
+            clienteBroadcasts.map(recipient => {
+              const bc = recipient.broadcast!
+              const isExpanded = expandedBroadcast === recipient.id
+              const isUnread = !recipient.read_at
+              return (
+                <div
+                  key={recipient.id}
+                  style={{
+                    background: 'white',
+                    border: `1px solid ${isUnread ? '#bfdbfe' : '#e5e7eb'}`,
+                    borderRadius: '14px',
+                    overflow: 'hidden',
+                    boxShadow: isUnread ? '0 1px 8px rgba(59,130,246,0.12)' : '0 1px 4px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      if (!isExpanded) {
+                        setExpandedBroadcast(recipient.id)
+                        if (isUnread) markAsRead(recipient.id)
+                      } else {
+                        setExpandedBroadcast(null)
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '14px 18px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}
+                  >
+                    {isUnread && (
+                      <span style={{
+                        width: '8px', height: '8px', borderRadius: '50%',
+                        background: '#3b82f6', flexShrink: 0,
+                      }} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: isUnread ? 700 : 600, fontSize: '13.5px', color: '#111827' }}>
+                        {bc.title}
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#9ca3af', marginTop: '2px' }}>
+                        {bc.sent_by_name} · {new Date(bc.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                    </div>
+                    <svg
+                      width="14" height="14"
+                      fill="none" stroke="#9ca3af" strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      style={{ flexShrink: 0, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                  </button>
+                  {isExpanded && (
+                    <div style={{ padding: '0 18px 18px', borderTop: '1px solid #f1f5f9' }}>
+                      <div style={{
+                        paddingTop: '14px',
+                        fontSize: '14px', color: '#374151',
+                        lineHeight: '1.65', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                      }}>
+                        {bc.body}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })
           )}
         </div>
       )}

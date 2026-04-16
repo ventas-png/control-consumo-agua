@@ -497,6 +497,8 @@ export default function App() {
               <ComunicacionSection
                 currentUser={currentUser}
                 clientes={clientes}
+                proyectos={proyectos}
+                unidades={unidades}
                 canCreate={canCreate('comunicacion')}
                 canEdit={canEdit('comunicacion')}
               />
