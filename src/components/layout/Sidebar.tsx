@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { AppSection, UserRole, UserSession } from '../../types'
 
 interface Tab {
@@ -8,187 +8,240 @@ interface Tab {
   icon: React.ReactNode
 }
 
-const TABS: Tab[] = [
+type NavEntry =
+  | { kind: 'tab'; tab: Tab }
+  | { kind: 'group'; id: string; label: string; tabs: Tab[] }
+
+const STORAGE_KEY = 'aquacontrol:sidebar:groups'
+
+const NAV: NavEntry[] = [
   {
-    id: 'superadmin_empresas',
-    label: 'Empresas',
-    roles: ['super_admin'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    ),
+    kind: 'tab',
+    tab: {
+      id: 'admin_dashboard',
+      label: 'Dashboard',
+      roles: ['company_owner'],
+      icon: (
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ),
+    },
   },
   {
-    id: 'cobros',
-    label: 'Cobros',
-    roles: ['collector', 'admin', 'super_admin', 'company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-      </svg>
-    ),
+    kind: 'tab',
+    tab: {
+      id: 'dashboard',
+      label: 'Dashboard',
+      roles: ['admin', 'super_admin', 'operator', 'viewer'],
+      icon: (
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ),
+    },
   },
   {
-    id: 'admin_dashboard',
-    label: 'Dashboard',
-    roles: ['company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    ),
+    kind: 'tab',
+    tab: {
+      id: 'superadmin_empresas',
+      label: 'Empresas',
+      roles: ['super_admin'],
+      icon: (
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      ),
+    },
   },
   {
-    id: 'empresa_proyectos',
-    label: 'Mis Proyectos',
-    roles: ['company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-      </svg>
-    ),
+    kind: 'group',
+    id: 'administracion',
+    label: 'Administración',
+    tabs: [
+      {
+        id: 'clientes',
+        label: 'Clientes',
+        roles: ['admin', 'super_admin', 'operator', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        ),
+      },
+      {
+        id: 'unidades',
+        label: 'Unidades',
+        roles: ['admin', 'super_admin', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+        ),
+      },
+      {
+        id: 'contadores',
+        label: 'Contadores',
+        roles: ['admin', 'super_admin', 'operator', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+          </svg>
+        ),
+      },
+      {
+        id: 'tarifas',
+        label: 'Tarifas',
+        roles: ['admin', 'super_admin', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    id: 'clientes',
-    label: 'Clientes',
-    roles: ['admin', 'super_admin', 'operator', 'company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
+    kind: 'group',
+    id: 'gestion',
+    label: 'Gestión',
+    tabs: [
+      {
+        id: 'cobros',
+        label: 'Cobros',
+        roles: ['collector', 'admin', 'super_admin', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        ),
+      },
+      {
+        id: 'lecturas',
+        label: 'Nueva Lectura',
+        roles: ['admin', 'super_admin', 'operator', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          </svg>
+        ),
+      },
+      {
+        id: 'rutas',
+        label: 'Rutas',
+        roles: ['admin', 'super_admin', 'operator', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    id: 'lecturas',
-    label: 'Nueva Lectura',
-    roles: ['admin', 'super_admin', 'operator', 'company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-      </svg>
-    ),
+    kind: 'group',
+    id: 'control',
+    label: 'Control',
+    tabs: [
+      {
+        id: 'calidad',
+        label: 'Calidad Agua',
+        roles: ['admin', 'super_admin', 'operator', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          </svg>
+        ),
+      },
+      {
+        id: 'servicios_energia',
+        label: 'Energía',
+        roles: ['admin', 'super_admin', 'operator', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        ),
+      },
+      {
+        id: 'mapa',
+        label: 'Mapa',
+        roles: ['admin', 'super_admin', 'operator', 'viewer', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+          </svg>
+        ),
+      },
+      {
+        id: 'tabla',
+        label: 'Historial',
+        roles: ['admin', 'super_admin', 'operator', 'viewer', 'company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    id: 'tabla',
-    label: 'Historial',
-    roles: ['admin', 'super_admin', 'operator', 'viewer', 'company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-      </svg>
-    ),
-  },
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    roles: ['admin', 'super_admin', 'operator', 'viewer'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'mapa',
-    label: 'Mapa',
-    roles: ['admin', 'super_admin', 'operator', 'viewer', 'company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-      </svg>
-    ),
-  },
-  {
-    id: 'rutas',
-    label: 'Rutas',
-    roles: ['admin', 'super_admin', 'operator', 'company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-      </svg>
-    ),
-  },
-  {
-    id: 'tarifas',
-    label: 'Tarifas',
-    roles: ['admin', 'super_admin', 'company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'unidades',
-    label: 'Unidades',
-    roles: ['admin', 'super_admin', 'company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-      </svg>
-    ),
-  },
-  {
-    id: 'contadores',
-    label: 'Contadores',
-    roles: ['admin', 'super_admin', 'operator', 'company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'calidad',
-    label: 'Calidad Agua',
-    roles: ['admin', 'super_admin', 'operator', 'company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'servicios_energia',
-    label: 'Energía',
-    roles: ['admin', 'super_admin', 'operator', 'company_owner'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    ),
-  },
-  {
+    kind: 'group',
     id: 'comunicacion',
     label: 'Comunicación',
-    roles: ['admin', 'super_admin', 'company_owner', 'operator', 'collector', 'viewer'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-      </svg>
-    ),
+    tabs: [
+      {
+        id: 'comunicacion',
+        label: 'Comunicación',
+        roles: ['admin', 'super_admin', 'company_owner', 'operator', 'collector', 'viewer'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    id: 'configuracion',
+    kind: 'group',
+    id: 'config',
     label: 'Configuración',
-    roles: ['admin', 'super_admin'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
+    tabs: [
+      {
+        id: 'empresa_proyectos',
+        label: 'Mis Proyectos',
+        roles: ['company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+          </svg>
+        ),
+      },
+      {
+        id: 'perfil',
+        label: 'Mi Cuenta',
+        roles: ['admin', 'super_admin', 'operator', 'viewer'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    id: 'perfil',
-    label: 'Mi Cuenta',
-    roles: ['admin', 'super_admin', 'operator', 'viewer'],
-    icon: (
-      <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-      </svg>
-    ),
+    kind: 'tab',
+    tab: {
+      id: 'configuracion',
+      label: 'Config. del sistema',
+      roles: ['admin', 'super_admin'],
+      icon: (
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+    },
   },
 ]
 
@@ -224,18 +277,140 @@ const ROLE_LABELS: Record<UserRole, string> = {
 const NON_CONFIGURABLE = ['perfil', 'admin_dashboard', 'empresa_proyectos', 'superadmin_empresas']
 const BYPASS_ROLES: UserRole[] = ['super_admin', 'company_owner']
 
+function isTabVisible(tab: Tab, userRole: UserRole, canViewModule: (key: string) => boolean): boolean {
+  if (NON_CONFIGURABLE.includes(tab.id)) return tab.roles.includes(userRole)
+  if (BYPASS_ROLES.includes(userRole)) return tab.roles.includes(userRole)
+  return canViewModule(tab.id)
+}
+
+function findActiveGroupId(activeSection: AppSection): string | null {
+  for (const entry of NAV) {
+    if (entry.kind === 'group' && entry.tabs.some(t => t.id === activeSection)) {
+      return entry.id
+    }
+  }
+  return null
+}
+
 export function Sidebar({ activeSection, userRole, currentUser, canViewModule, onSelect, onLogout, isOpen }: Props) {
   const [hoveredTab, setHoveredTab] = useState<AppSection | null>(null)
   const [hoveredLogout, setHoveredLogout] = useState(false)
   const [hoveredProfile, setHoveredProfile] = useState(false)
-  const visibleTabs = TABS.filter(t => {
-    // Módulos no-configurables: filtrar solo por rol
-    if (NON_CONFIGURABLE.includes(t.id)) return t.roles.includes(userRole)
-    // Roles exentos: filtrar solo por rol
-    if (BYPASS_ROLES.includes(userRole)) return t.roles.includes(userRole)
-    // Roles configurables: verificar permisos de módulo
-    return canViewModule(t.id)
+  const [hoveredGroup, setHoveredGroup] = useState<string | null>(null)
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    const initialActiveGroupId = findActiveGroupId(activeSection)
+    try {
+      const stored: Record<string, boolean> = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+      const hasStoredData = Object.keys(stored).length > 0
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+      const defaults: Record<string, boolean> = {}
+      for (const entry of NAV) {
+        if (entry.kind === 'group') {
+          defaults[entry.id] = hasStoredData
+            ? (stored[entry.id] !== undefined ? stored[entry.id] : !isMobile)
+            : !isMobile
+        }
+      }
+      if (initialActiveGroupId) defaults[initialActiveGroupId] = true
+      return defaults
+    } catch {
+      const defaults: Record<string, boolean> = {}
+      for (const entry of NAV) {
+        if (entry.kind === 'group') defaults[entry.id] = true
+      }
+      if (initialActiveGroupId) defaults[initialActiveGroupId] = true
+      return defaults
+    }
   })
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(expanded))
+  }, [expanded])
+
+  // Auto-expand group when active section is inside a collapsed group
+  useEffect(() => {
+    const gid = findActiveGroupId(activeSection)
+    if (gid) {
+      setExpanded(prev => prev[gid] ? prev : { ...prev, [gid]: true })
+    }
+  }, [activeSection])
+
+  const toggleGroup = (groupId: string) => {
+    setExpanded(prev => ({ ...prev, [groupId]: !prev[groupId] }))
+  }
+
+  const renderTabButton = (tab: Tab) => {
+    const isActive = activeSection === tab.id
+    const isHovered = hoveredTab === tab.id
+    return (
+      <button
+        key={tab.id}
+        aria-label={`Ir a ${tab.label}`}
+        aria-current={isActive ? 'page' : undefined}
+        onClick={() => onSelect(tab.id)}
+        onMouseEnter={() => setHoveredTab(tab.id)}
+        onMouseLeave={() => setHoveredTab(null)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '12px 14px',
+          minHeight: '44px',
+          border: 'none',
+          borderRadius: '10px',
+          cursor: 'pointer',
+          textAlign: 'left',
+          marginBottom: '1px',
+          transition: 'all 0.14s ease',
+          background: isActive
+            ? 'rgba(14,165,233,0.14)'
+            : isHovered
+            ? 'rgba(255,255,255,0.05)'
+            : 'transparent',
+          color: isActive ? '#7dd3fc' : isHovered ? '#cbd5e1' : '#9ca3af',
+          fontWeight: isActive ? 600 : 400,
+          fontSize: '13.5px',
+          letterSpacing: isActive ? '-0.1px' : '0',
+          outline: 'none',
+        }}
+      >
+        <span
+          style={{
+            flexShrink: 0,
+            width: '28px',
+            height: '28px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '7px',
+            background: isActive
+              ? 'rgba(14,165,233,0.2)'
+              : isHovered
+              ? 'rgba(255,255,255,0.07)'
+              : 'transparent',
+            color: isActive ? '#38bdf8' : isHovered ? '#94a3b8' : '#4b5563',
+            transition: 'all 0.14s ease',
+          }}
+        >
+          {tab.icon}
+        </span>
+        {tab.label}
+        {isActive && (
+          <span style={{
+            marginLeft: 'auto',
+            width: '5px',
+            height: '5px',
+            borderRadius: '50%',
+            background: '#0ea5e9',
+            boxShadow: '0 0 6px rgba(14,165,233,0.7)',
+            flexShrink: 0,
+          }} />
+        )}
+      </button>
+    )
+  }
 
   return (
     <aside
@@ -289,89 +464,74 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
 
       {/* ── Navigation ──────────────────────────────────────── */}
       <nav style={{ flex: 1, padding: '10px 10px', overflowY: 'auto' }}>
-        <div style={{
-          color: '#374151',
-          fontSize: '10px',
-          fontWeight: 700,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          padding: '10px 10px 6px',
-        }}>
-          Módulos
-        </div>
+        {NAV.map(entry => {
+          if (entry.kind === 'tab') {
+            if (!isTabVisible(entry.tab, userRole, canViewModule)) return null
+            return renderTabButton(entry.tab)
+          }
 
-        {visibleTabs.map(tab => {
-          const isActive = activeSection === tab.id
-          const isHovered = hoveredTab === tab.id
+          // Group entry
+          const visibleTabs = entry.tabs.filter(t => isTabVisible(t, userRole, canViewModule))
+          if (visibleTabs.length === 0) return null
+
+          const isExpanded = expanded[entry.id] ?? true
+          const isHG = hoveredGroup === entry.id
+
           return (
-            <button
-              key={tab.id}
-              aria-label={`Ir a ${tab.label}`}
-              aria-current={activeSection === tab.id ? 'page' : undefined}
-              onClick={() => onSelect(tab.id)}
-              onMouseEnter={() => setHoveredTab(tab.id)}
-              onMouseLeave={() => setHoveredTab(null)}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '12px 14px',
-                minHeight: '44px',
-                border: 'none',
-                borderRadius: '10px',
-                cursor: 'pointer',
-                textAlign: 'left',
-                marginBottom: '1px',
-                transition: 'all 0.14s ease',
-                background: isActive
-                  ? 'rgba(14,165,233,0.14)'
-                  : isHovered
-                  ? 'rgba(255,255,255,0.05)'
-                  : 'transparent',
-                color: isActive ? '#7dd3fc' : isHovered ? '#cbd5e1' : '#9ca3af',
-                fontWeight: isActive ? 600 : 400,
-                fontSize: '13.5px',
-                letterSpacing: isActive ? '-0.1px' : '0',
-                outline: 'none',
-              }}
-            >
-              {/* Icon wrapper */}
-              <span
+            <div key={entry.id} style={{ marginTop: '12px' }}>
+              <button
+                aria-expanded={isExpanded}
+                aria-controls={`group-${entry.id}`}
+                onClick={() => toggleGroup(entry.id)}
+                onMouseEnter={() => setHoveredGroup(entry.id)}
+                onMouseLeave={() => setHoveredGroup(null)}
                 style={{
-                  flexShrink: 0,
-                  width: '28px',
-                  height: '28px',
+                  width: '100%',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '7px',
-                  background: isActive
-                    ? 'rgba(14,165,233,0.2)'
-                    : isHovered
-                    ? 'rgba(255,255,255,0.07)'
-                    : 'transparent',
-                  color: isActive ? '#38bdf8' : isHovered ? '#94a3b8' : '#4b5563',
-                  transition: 'all 0.14s ease',
+                  justifyContent: 'space-between',
+                  padding: '6px 10px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: isHG ? '#9ca3af' : '#6b7280',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  outline: 'none',
+                  borderRadius: '6px',
+                  marginBottom: '2px',
                 }}
               >
-                {tab.icon}
-              </span>
-              {tab.label}
-
-              {/* Active indicator dot */}
-              {isActive && (
-                <span style={{
-                  marginLeft: 'auto',
-                  width: '5px',
-                  height: '5px',
-                  borderRadius: '50%',
-                  background: '#0ea5e9',
-                  boxShadow: '0 0 6px rgba(14,165,233,0.7)',
-                  flexShrink: 0,
-                }} />
-              )}
-            </button>
+                {entry.label}
+                <svg
+                  width="12"
+                  height="12"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  style={{
+                    transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.22s ease',
+                    flexShrink: 0,
+                  }}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <div
+                id={`group-${entry.id}`}
+                style={{
+                  maxHeight: isExpanded ? '600px' : '0',
+                  overflow: 'hidden',
+                  opacity: isExpanded ? 1 : 0,
+                  transition: 'max-height 0.22s ease, opacity 0.18s ease',
+                }}
+              >
+                {visibleTabs.map(tab => renderTabButton(tab))}
+              </div>
+            </div>
           )
         })}
       </nav>
