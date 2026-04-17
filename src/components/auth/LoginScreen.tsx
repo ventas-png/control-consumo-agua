@@ -7,24 +7,21 @@ interface Props {
   onRegister: () => void
 }
 
-const ROLES = [
+const FEATURES = [
   {
-    icon: '🛡️',
-    label: 'Administrador',
-    color: '#7c3aed',
-    perms: ['Gestión de clientes', 'Lecturas y facturación', 'Calidad del agua', 'Configuración del sistema'],
+    icon: '📊',
+    title: 'Lecturas en tiempo real',
+    desc: 'Monitorea el consumo de cada contador al instante.',
   },
   {
-    icon: '⚙️',
-    label: 'Operador',
-    color: '#0ea5e9',
-    perms: ['Gestión de clientes', 'Lecturas y facturación', 'Calidad del agua', 'Solo lectura config.'],
+    icon: '💧',
+    title: 'Calidad del agua',
+    desc: 'Registra y analiza parámetros de calidad por fuente.',
   },
   {
-    icon: '👁️',
-    label: 'Visor',
-    color: '#14b8a6',
-    perms: ['Ver historial', 'Dashboard analítico', 'Mapa de clientes', 'Solo consulta'],
+    icon: '📄',
+    title: 'Facturación automática',
+    desc: 'Genera y gestiona cobros con un solo clic.',
   },
 ]
 
@@ -64,9 +61,9 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
     <>
       <style>{`
         @keyframes floatBubble {
-          0%   { transform: translateY(0) scale(1); opacity: 0.18; }
-          50%  { transform: translateY(-60px) scale(1.1); opacity: 0.28; }
-          100% { transform: translateY(0) scale(1); opacity: 0.18; }
+          0%   { transform: translateY(0) scale(1); opacity: 0.15; }
+          50%  { transform: translateY(-50px) scale(1.08); opacity: 0.25; }
+          100% { transform: translateY(0) scale(1); opacity: 0.15; }
         }
         @keyframes shake {
           0%,100% { transform: translateX(0); }
@@ -76,11 +73,15 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
           80%     { transform: translateX(6px); }
         }
         @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(16px); }
+          from { opacity: 0; transform: translateY(20px); }
           to   { opacity: 1; transform: translateY(0); }
         }
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50%      { transform: scale(1.06); }
         }
         .login-input:focus {
           outline: none;
@@ -91,42 +92,44 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
         .login-btn-main:hover:not(:disabled) {
           filter: brightness(1.08);
           transform: translateY(-1px);
-          box-shadow: 0 8px 24px rgba(14,165,233,0.4);
+          box-shadow: 0 8px 24px rgba(14,165,233,0.45);
         }
         .login-btn-main:active:not(:disabled) { transform: translateY(0); }
         .login-btn-google:hover:not(:disabled) {
           background: #f8fafc !important;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.12) !important;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
         }
-        .role-card:hover { transform: translateY(-2px); }
+        .feat-card:hover {
+          background: rgba(255,255,255,0.18) !important;
+          transform: translateX(4px);
+        }
         @media (max-width: 640px) {
           .login-left-panel { display: none !important; }
         }
       `}</style>
 
-      {/* Full-screen background */}
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'linear-gradient(135deg, #0369a1 0%, #0891b2 40%, #0d9488 100%)',
+        background: 'linear-gradient(135deg, #0369a1 0%, #0891b2 45%, #0d9488 100%)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 2000, overflow: 'hidden',
       }}>
         {/* Floating bubbles */}
         {[
-          { size: 120, left: '8%',  top: '15%', delay: '0s',   dur: '7s'  },
-          { size: 80,  left: '75%', top: '60%', delay: '1.5s', dur: '9s'  },
-          { size: 60,  left: '55%', top: '10%', delay: '3s',   dur: '6s'  },
-          { size: 160, left: '85%', top: '5%',  delay: '0.5s', dur: '11s' },
-          { size: 50,  left: '20%', top: '75%', delay: '2s',   dur: '8s'  },
-          { size: 100, left: '40%', top: '80%', delay: '4s',   dur: '10s' },
+          { size: 140, left: '6%',  top: '12%', delay: '0s',   dur: '8s'  },
+          { size: 70,  left: '78%', top: '58%', delay: '1.5s', dur: '10s' },
+          { size: 55,  left: '52%', top: '8%',  delay: '3s',   dur: '6s'  },
+          { size: 180, left: '82%', top: '4%',  delay: '0.5s', dur: '12s' },
+          { size: 45,  left: '18%', top: '78%', delay: '2s',   dur: '9s'  },
+          { size: 90,  left: '38%', top: '82%', delay: '4s',   dur: '11s' },
         ].map((b, i) => (
           <div key={i} style={{
             position: 'absolute',
             width: b.size, height: b.size,
             left: b.left, top: b.top,
             borderRadius: '50%',
-            background: 'rgba(255,255,255,0.15)',
-            border: '1px solid rgba(255,255,255,0.25)',
+            background: 'rgba(255,255,255,0.12)',
+            border: '1px solid rgba(255,255,255,0.22)',
             animation: `floatBubble ${b.dur} ${b.delay} ease-in-out infinite`,
             pointerEvents: 'none',
           }} />
@@ -135,84 +138,104 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
         {/* Main card */}
         <div style={{
           display: 'flex',
-          maxWidth: '860px',
+          maxWidth: '880px',
           width: '95%',
           maxHeight: '95vh',
-          borderRadius: '24px',
-          boxShadow: '0 32px 80px rgba(0,0,0,0.35)',
+          borderRadius: '28px',
+          boxShadow: '0 40px 100px rgba(0,0,0,0.4)',
           overflow: 'auto',
-          animation: 'fadeIn 0.5s ease both',
+          animation: 'fadeIn 0.45s ease both',
         }}>
 
-          {/* LEFT PANEL — Roles info */}
+          {/* LEFT PANEL — Brand hero */}
           <div className="login-left-panel" style={{
-            flex: '0 0 320px',
-            background: 'linear-gradient(160deg, rgba(3,105,161,0.95) 0%, rgba(13,148,136,0.95) 100%)',
-            backdropFilter: 'blur(12px)',
-            padding: '40px 28px',
+            flex: '0 0 340px',
+            background: 'linear-gradient(160deg, rgba(2,90,140,0.97) 0%, rgba(7,130,120,0.97) 100%)',
+            backdropFilter: 'blur(16px)',
+            padding: '48px 32px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px',
+            justifyContent: 'space-between',
             color: 'white',
             minWidth: 0,
+            position: 'relative',
+            overflow: 'hidden',
           }}>
-            {/* Logo / brand */}
-            <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+            {/* Decorative circle behind logo */}
+            <div style={{
+              position: 'absolute', top: '-60px', right: '-60px',
+              width: 200, height: 200, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.06)',
+              pointerEvents: 'none',
+            }} />
+            <div style={{
+              position: 'absolute', bottom: '-40px', left: '-40px',
+              width: 160, height: 160, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.05)',
+              pointerEvents: 'none',
+            }} />
+
+            {/* Brand */}
+            <div>
               <div style={{
-                width: 72, height: 72, borderRadius: '20px',
+                width: 80, height: 80, borderRadius: '24px',
                 background: 'rgba(255,255,255,0.15)',
-                border: '2px solid rgba(255,255,255,0.3)',
+                border: '2px solid rgba(255,255,255,0.28)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '36px', margin: '0 auto 12px',
+                fontSize: '40px', marginBottom: '20px',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+                animation: 'pulse 4s ease-in-out infinite',
               }}>💧</div>
-              <h1 style={{ fontSize: '20px', fontWeight: 800, margin: 0, letterSpacing: '-0.3px' }}>
-                Control de Consumo
+
+              <h1 style={{ fontSize: '26px', fontWeight: 900, margin: '0 0 6px', lineHeight: 1.2, letterSpacing: '-0.5px' }}>
+                Control de<br />Consumo
               </h1>
-              <p style={{ fontSize: '13px', opacity: 0.8, margin: '4px 0 0' }}>
-                Sistema de Gestión de Agua
+              <p style={{ fontSize: '14px', opacity: 0.75, margin: '0 0 36px', fontWeight: 400 }}>
+                Sistema inteligente de gestión de agua
               </p>
+
+              {/* Feature list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {FEATURES.map(f => (
+                  <div key={f.title} className="feat-card" style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '14px',
+                    background: 'rgba(255,255,255,0.1)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: '14px',
+                    padding: '14px 16px',
+                    transition: 'all 0.2s',
+                    cursor: 'default',
+                  }}>
+                    <span style={{ fontSize: '26px', lineHeight: 1, flexShrink: 0 }}>{f.icon}</span>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: '14px', lineHeight: 1.3 }}>{f.title}</p>
+                      <p style={{ margin: '3px 0 0', fontSize: '12px', opacity: 0.72, lineHeight: 1.5 }}>{f.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Role divider */}
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '20px' }}>
-              <p style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '1px', opacity: 0.7, textTransform: 'uppercase', margin: '0 0 14px' }}>
-                Niveles de acceso
-              </p>
-              {ROLES.map(r => (
-                <div key={r.label} className="role-card" style={{
-                  background: 'rgba(255,255,255,0.1)',
-                  border: '1px solid rgba(255,255,255,0.18)',
-                  borderRadius: '12px',
-                  padding: '12px 14px',
-                  marginBottom: '10px',
-                  transition: 'transform 0.2s',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '18px' }}>{r.icon}</span>
-                    <span style={{ fontWeight: 700, fontSize: '14px' }}>{r.label}</span>
-                  </div>
-                  <ul style={{ margin: 0, paddingLeft: '18px', opacity: 0.8, fontSize: '12px', lineHeight: '1.7' }}>
-                    {r.perms.map(p => <li key={p}>{p}</li>)}
-                  </ul>
-                </div>
-              ))}
-            </div>
+            {/* Footer tagline */}
+            <p style={{ margin: 0, fontSize: '12px', opacity: 0.5, fontStyle: 'italic', marginTop: '32px' }}>
+              Gestión eficiente · Datos confiables
+            </p>
           </div>
 
           {/* RIGHT PANEL — Login form */}
           <div style={{
             flex: 1,
-            background: 'rgba(255,255,255,0.97)',
-            padding: '44px 36px',
+            background: 'rgba(255,255,255,0.98)',
+            padding: '48px 40px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
             minWidth: '300px',
           }}>
-            <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', margin: '0 0 4px', letterSpacing: '-0.5px' }}>
+            <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', margin: '0 0 4px', letterSpacing: '-0.6px' }}>
               Bienvenido
             </h2>
-            <p style={{ color: '#64748b', fontSize: '14px', margin: '0 0 28px' }}>
+            <p style={{ color: '#64748b', fontSize: '14.5px', margin: '0 0 32px' }}>
               Inicia sesión para acceder al sistema
             </p>
 
@@ -222,13 +245,13 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               onClick={handleGoogle}
               disabled={googleLoading || loading}
               style={{
-                width: '100%', padding: '12px', fontSize: '15px', fontWeight: 600,
+                width: '100%', padding: '13px', fontSize: '15px', fontWeight: 600,
                 background: 'white', color: '#374151',
-                border: '1.5px solid #e2e8f0', borderRadius: '12px',
+                border: '1.5px solid #e2e8f0', borderRadius: '14px',
                 cursor: 'pointer', display: 'flex', alignItems: 'center',
                 justifyContent: 'center', gap: '10px',
-                transition: 'all 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-                marginBottom: '20px',
+                transition: 'all 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
+                marginBottom: '22px',
               }}
             >
               {googleLoading ? (
@@ -249,7 +272,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
             </button>
 
             {/* Divider */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
               <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
               <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500 }}>o con tu correo</span>
               <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
@@ -259,7 +282,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
             <div style={{ position: 'relative', marginBottom: '12px' }}>
               <span style={{
                 position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)',
-                fontSize: '17px', pointerEvents: 'none', userSelect: 'none',
+                fontSize: '16px', pointerEvents: 'none', userSelect: 'none', opacity: 0.6,
               }}>✉️</span>
               <input
                 className="login-input"
@@ -279,10 +302,10 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
             </div>
 
             {/* Password input */}
-            <div style={{ position: 'relative', marginBottom: '20px' }}>
+            <div style={{ position: 'relative', marginBottom: '22px' }}>
               <span style={{
                 position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)',
-                fontSize: '17px', pointerEvents: 'none', userSelect: 'none',
+                fontSize: '16px', pointerEvents: 'none', userSelect: 'none', opacity: 0.6,
               }}>🔒</span>
               <input
                 className="login-input"
@@ -303,8 +326,8 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
                 onClick={() => setShowPassword(v => !v)}
                 style={{
                   position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', cursor: 'pointer', fontSize: '17px',
-                  padding: 0, lineHeight: 1,
+                  background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px',
+                  padding: 0, lineHeight: 1, opacity: 0.55,
                 }}
                 tabIndex={-1}
                 title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
@@ -334,11 +357,12 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               style={{
                 width: '100%', padding: '14px', fontSize: '16px', fontWeight: 700,
                 background: 'linear-gradient(135deg, #0ea5e9 0%, #0891b2 50%, #0d9488 100%)',
-                color: 'white', border: 'none', borderRadius: '12px',
+                color: 'white', border: 'none', borderRadius: '14px',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.8 : 1,
                 transition: 'all 0.2s',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                boxShadow: '0 4px 16px rgba(14,165,233,0.35)',
               }}
             >
               {loading ? (
@@ -350,7 +374,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
                   }} />
                   Autenticando...
                 </>
-              ) : '🔑 Iniciar Sesión'}
+              ) : 'Iniciar Sesión'}
             </button>
 
             {/* Forgot password */}
@@ -369,25 +393,31 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
 
             {/* Customer registration */}
             <div style={{
-              marginTop: '14px',
-              padding: '14px 16px',
+              marginTop: '16px',
+              padding: '14px 18px',
               background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)',
               border: '1px solid #bae6fd',
-              borderRadius: '12px',
+              borderRadius: '14px',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               gap: '10px', flexWrap: 'wrap',
             }}>
-              <span style={{ fontSize: '13px', color: '#0369a1' }}>
-                ¿Eres cliente y quieres consultar tu consumo?
-              </span>
+              <div>
+                <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#0369a1' }}>
+                  ¿Eres cliente?
+                </p>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#0284c7' }}>
+                  Consulta tu consumo en el portal
+                </p>
+              </div>
               <button
                 onClick={onRegister}
                 style={{
                   background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
-                  color: 'white', border: 'none', borderRadius: '8px',
-                  padding: '7px 16px', fontSize: '13px', fontWeight: 600,
+                  color: 'white', border: 'none', borderRadius: '10px',
+                  padding: '8px 18px', fontSize: '13px', fontWeight: 700,
                   cursor: 'pointer', whiteSpace: 'nowrap',
-                  boxShadow: '0 2px 8px rgba(14,165,233,0.3)',
+                  boxShadow: '0 3px 10px rgba(14,165,233,0.35)',
+                  transition: 'all 0.2s',
                 }}
               >
                 Registrarse →
