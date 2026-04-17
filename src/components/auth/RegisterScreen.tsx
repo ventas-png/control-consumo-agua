@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { supabase } from '../../lib/supabase'
 import { validatePasswordStrength } from '../../lib/validation'
 
 interface Props {
@@ -46,22 +45,24 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
 
     setLoading(true)
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('create-cliente-account', {
-        body: {
+      const response = await fetch('/api/register-cliente', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           full_name: fullName.trim(),
           email: email.trim().toLowerCase(),
           cui_dui: cuiDui.trim(),
           fecha_nacimiento: fechaNacimiento,
           password,
-        },
+        }),
       })
 
-      if (fnError) {
+      if (!response.ok) {
         setError('Error de conexión. Intente nuevamente.')
         return
       }
 
-      const result = data as { success?: boolean; error?: string }
+      const result = await response.json() as { success?: boolean; error?: string }
       if (result.error) {
         setError(result.error)
         return
