@@ -139,6 +139,7 @@ export function useBroadcasts() {
         const batch = clienteIds.slice(i, i + batchSize).map(cid => ({
           broadcast_id: broadcastData.id,
           cliente_id: cid,
+          company_id: currentUser.company_id,
         }))
         const { error: recError } = await supabase.from('broadcast_recipients').insert(batch)
         if (recError) {
