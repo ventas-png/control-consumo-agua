@@ -94,13 +94,30 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
 
     // Health check via fetch (bypasses Supabase client)
     if (supabaseUrl) {
+      // Test 1: no-cors mode – tells us if the server is reachable at all (ignores CORS)
+      let serverReachable = false
+      try {
+        await fetch(`${supabaseUrl}/auth/v1/health`, { method: 'GET', mode: 'no-cors' })
+        serverReachable = true
+      } catch {
+        serverReachable = false
+      }
+
+      // Test 2: normal cors mode – tells us if CORS headers are correct
       try {
         const start = performance.now()
         const res = await fetch(`${supabaseUrl}/auth/v1/health`, { method: 'GET' })
         const ms = (performance.now() - start).toFixed(0)
         lines.push(`🏥 Auth health: ${res.ok ? `✅ ${ms}ms` : `❌ HTTP ${res.status}`}`)
       } catch (e) {
-        lines.push(`🏥 Auth health: ❌ ${e instanceof Error ? e.message : 'Error de red'}`)
+        const msg = e instanceof Error ? e.message : 'Error de red'
+        if (serverReachable) {
+          lines.push(`🏥 Auth health: ❌ CORS bloqueado — servidor responde pero rechaza el origen`)
+          lines.push(`   → Solución: Supabase Dashboard → Settings → API → Allowed origins`)
+        } else {
+          lines.push(`🏥 Auth health: ❌ Servidor inalcanzable — ${msg}`)
+          lines.push(`   → Posible bloqueo de red, proxy o firewall`)
+        }
       }
     }
 
