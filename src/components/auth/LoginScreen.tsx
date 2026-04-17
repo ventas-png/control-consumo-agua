@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
-import { supabase } from '../../lib/supabase'
 
 interface Props {
   onLogin: (email: string, password: string) => Promise<string | null>
@@ -14,21 +12,18 @@ const ROLES = [
     icon: '🛡️',
     label: 'Administrador',
     color: '#7c3aed',
-    bg: 'rgba(124,58,237,0.12)',
     perms: ['Gestión de clientes', 'Lecturas y facturación', 'Calidad del agua', 'Configuración del sistema'],
   },
   {
     icon: '⚙️',
     label: 'Operador',
     color: '#0ea5e9',
-    bg: 'rgba(14,165,233,0.12)',
     perms: ['Gestión de clientes', 'Lecturas y facturación', 'Calidad del agua', 'Solo lectura config.'],
   },
   {
     icon: '👁️',
     label: 'Visor',
     color: '#14b8a6',
-    bg: 'rgba(20,184,166,0.12)',
     perms: ['Ver historial', 'Dashboard analítico', 'Mapa de clientes', 'Solo consulta'],
   },
 ]
@@ -40,21 +35,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
-  const [showDiag, setShowDiag] = useState(false)
-  const [diagContent, setDiagContent] = useState('')
   const [shake, setShake] = useState(false)
-  const [superAdminMode, setSuperAdminMode] = useState(
-    () => new URLSearchParams(window.location.search).get('superadmin') === '1'
-  )
-
-  function toggleSuperAdminMode() {
-    const next = !superAdminMode
-    setSuperAdminMode(next)
-    const url = new URL(window.location.href)
-    if (next) url.searchParams.set('superadmin', '1')
-    else url.searchParams.delete('superadmin')
-    window.history.replaceState(null, '', url.toString())
-  }
 
   async function handleLogin() {
     setError('')
@@ -77,74 +58,6 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
       setTimeout(() => setShake(false), 500)
     }
     setGoogleLoading(false)
-  }
-
-  async function runDiagnostics() {
-    setDiagContent('🔍 Ejecutando diagnósticos...')
-    const lines: string[] = []
-
-    // Network status
-    lines.push(`🌐 Red: ${navigator.onLine ? '✅ Online' : '❌ Offline'}`)
-
-    // Show actual env vars baked into the bundle
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
-    lines.push(`🔗 URL: ${supabaseUrl ? supabaseUrl.slice(0, 45) : '❌ NO DEFINIDA'}`)
-    lines.push(`🔑 Key: ${anonKey ? anonKey.slice(0, 30) + '...' : '❌ NO DEFINIDA'}`)
-
-    // Health check via fetch (bypasses Supabase client)
-    if (supabaseUrl) {
-      // Test 1: no-cors mode – tells us if the server is reachable at all (ignores CORS)
-      let serverReachable = false
-      try {
-        await fetch(`${supabaseUrl}/auth/v1/health`, { method: 'GET', mode: 'no-cors' })
-        serverReachable = true
-      } catch {
-        serverReachable = false
-      }
-
-      // Test 2: normal cors mode – tells us if CORS headers are correct
-      try {
-        const start = performance.now()
-        const res = await fetch(`${supabaseUrl}/auth/v1/health`, { method: 'GET' })
-        const ms = (performance.now() - start).toFixed(0)
-        lines.push(`🏥 Auth health: ${res.ok ? `✅ ${ms}ms` : `❌ HTTP ${res.status}`}`)
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : 'Error de red'
-        if (serverReachable) {
-          lines.push(`🏥 Auth health: ❌ CORS bloqueado — servidor responde pero rechaza el origen`)
-          lines.push(`   → Solución: Supabase Dashboard → Settings → API → Allowed origins`)
-        } else {
-          lines.push(`🏥 Auth health: ❌ Servidor inalcanzable — ${msg}`)
-          lines.push(`   → Posible bloqueo de red, proxy o firewall`)
-        }
-      }
-    }
-
-    // Supabase client query
-    try {
-      const start = performance.now()
-      const { error: e } = await supabase.from('clientes').select('count', { count: 'exact', head: true })
-      const ms = (performance.now() - start).toFixed(0)
-      lines.push(`🗄️ PostgREST: ${e ? '❌ ' + e.message : `✅ ${ms}ms`}`)
-    } catch (e) {
-      lines.push(`🗄️ PostgREST: ❌ ${e instanceof Error ? e.message : 'Error'}`)
-    }
-
-    // localStorage
-    try {
-      localStorage.setItem('_t', '1'); localStorage.removeItem('_t')
-      lines.push('💾 localStorage: ✅')
-    } catch { lines.push('💾 localStorage: ❌') }
-
-    setDiagContent(lines.join('\n'))
-  }
-
-  function clearData() {
-    sessionStorage.removeItem('userSession')
-    localStorage.clear()
-    setEmail(''); setPassword(''); setError(''); setShowDiag(false)
-    Swal.fire({ icon: 'success', title: 'Datos limpiados', timer: 1500, showConfirmButton: false })
   }
 
   return (
@@ -186,6 +99,9 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
           box-shadow: 0 4px 12px rgba(0,0,0,0.12) !important;
         }
         .role-card:hover { transform: translateY(-2px); }
+        @media (max-width: 640px) {
+          .login-left-panel { display: none !important; }
+        }
       `}</style>
 
       {/* Full-screen background */}
@@ -228,8 +144,8 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
           animation: 'fadeIn 0.5s ease both',
         }}>
 
-          {/* LEFT PANEL — Roles info (hidden on small screens via width trick) */}
-          <div style={{
+          {/* LEFT PANEL — Roles info */}
+          <div className="login-left-panel" style={{
             flex: '0 0 320px',
             background: 'linear-gradient(160deg, rgba(3,105,161,0.95) 0%, rgba(13,148,136,0.95) 100%)',
             backdropFilter: 'blur(12px)',
@@ -239,7 +155,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
             gap: '20px',
             color: 'white',
             minWidth: 0,
-          }} className="login-left-panel">
+          }}>
             {/* Logo / brand */}
             <div style={{ textAlign: 'center', marginBottom: '8px' }}>
               <div style={{
@@ -293,24 +209,11 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
             justifyContent: 'center',
             minWidth: '300px',
           }}>
-            {superAdminMode && (
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-                color: 'white', borderRadius: '20px', padding: '4px 12px',
-                fontSize: '12px', fontWeight: 700, letterSpacing: '0.5px',
-                marginBottom: '12px',
-              }}>
-                🛡️ MODO SUPER ADMINISTRADOR
-              </div>
-            )}
-            <h2 style={{ fontSize: '26px', fontWeight: 800, color: superAdminMode ? '#6d28d9' : '#0f172a', margin: '0 0 4px', letterSpacing: '-0.5px' }}>
-              {superAdminMode ? 'Acceso Privilegiado' : 'Bienvenido'}
+            <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', margin: '0 0 4px', letterSpacing: '-0.5px' }}>
+              Bienvenido
             </h2>
             <p style={{ color: '#64748b', fontSize: '14px', margin: '0 0 28px' }}>
-              {superAdminMode
-                ? 'Área restringida — Solo personal autorizado'
-                : 'Inicia sesión para acceder al sistema'}
+              Inicia sesión para acceder al sistema
             </p>
 
             {/* Google button */}
@@ -430,9 +333,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               disabled={loading || googleLoading}
               style={{
                 width: '100%', padding: '14px', fontSize: '16px', fontWeight: 700,
-                background: superAdminMode
-                  ? 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)'
-                  : 'linear-gradient(135deg, #0ea5e9 0%, #0891b2 50%, #0d9488 100%)',
+                background: 'linear-gradient(135deg, #0ea5e9 0%, #0891b2 50%, #0d9488 100%)',
                 color: 'white', border: 'none', borderRadius: '12px',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.8 : 1,
@@ -492,69 +393,8 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
                 Registrarse →
               </button>
             </div>
-
-            {/* Diagnostics toggle */}
-            <div style={{ marginTop: '24px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
-              <button
-                onClick={() => { setShowDiag(v => !v); if (!showDiag) runDiagnostics() }}
-                style={{
-                  background: 'none', border: '1px solid #e2e8f0', borderRadius: '8px',
-                  color: '#64748b', cursor: 'pointer', fontSize: '12px',
-                  padding: '6px 12px', width: '100%', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}
-              >
-                {showDiag ? '▲' : '▼'} Diagnóstico del sistema
-              </button>
-              {showDiag && (
-                <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <div style={{
-                    flex: 1, background: '#f8fafc', padding: '10px 12px',
-                    borderRadius: '8px', border: '1px solid #e2e8f0',
-                    fontSize: '12px', fontFamily: 'monospace', whiteSpace: 'pre-line',
-                    color: '#334155', lineHeight: '1.8', minWidth: '180px',
-                  }}>
-                    {diagContent || '...'}
-                  </div>
-                  <button
-                    onClick={clearData}
-                    style={{
-                      padding: '8px 14px', background: '#fef3c7',
-                      border: '1px solid #fde68a', borderRadius: '8px',
-                      cursor: 'pointer', fontSize: '12px', color: '#92400e',
-                      alignSelf: 'flex-start', whiteSpace: 'nowrap',
-                    }}
-                  >
-                    🧹 Limpiar datos
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Super Admin link */}
-            <div style={{ marginTop: '20px', textAlign: 'center' }}>
-              <button
-                onClick={toggleSuperAdminMode}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: '12px', color: superAdminMode ? '#6d28d9' : '#94a3b8',
-                  fontWeight: superAdminMode ? 700 : 400,
-                  textDecoration: 'underline', textUnderlineOffset: '3px',
-                  transition: 'color 0.2s',
-                }}
-              >
-                {superAdminMode ? '← Volver al acceso estándar' : '¿Super Administrador? Ingresar aquí'}
-              </button>
-            </div>
           </div>
         </div>
-
-        {/* Responsive: hide left panel on small screens */}
-        <style>{`
-          @media (max-width: 640px) {
-            .login-left-panel { display: none !important; }
-          }
-        `}</style>
       </div>
     </>
   )
