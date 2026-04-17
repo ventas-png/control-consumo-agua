@@ -57,7 +57,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
       })
 
       if (fnError) {
-        setError('Error de conexión. Intente nuevamente.')
+        setError(`Error: ${fnError.message || fnError.context?.statusCode || JSON.stringify(fnError)}`)
         return
       }
 
