@@ -306,9 +306,11 @@ export function useAuth() {
         }).catch(console.error)
 
         const msg = (error?.message ?? '').toLowerCase()
-        if (msg.includes('invalid login credentials')) return 'Email o contraseña incorrectos'
+        if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) return 'Email o contraseña incorrectos'
         if (msg.includes('email not confirmed')) return 'Email no confirmado'
-        return 'Login fallido'
+        if (msg.includes('password') && msg.includes('compromised')) return 'Contraseña comprometida. Debe cambiar su contraseña antes de ingresar.'
+        if (msg.includes('too many')) return 'Demasiados intentos. Espere unos minutos.'
+        return error?.message ? `Error: ${error.message}` : 'Login fallido'
       }
 
       const { user, session } = data
