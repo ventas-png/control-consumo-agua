@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import type { Cliente, UserRole, UserSession, ClienteLookupResult } from '../../types'
 import { supabase } from '../../lib/supabase'
@@ -65,7 +65,54 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
   const [lookupForm, setLookupForm] = useState<LookupForm>(EMPTY_LOOKUP)
   const [lookupResult, setLookupResult] = useState<ClienteLookupResult | null>(null)
 
+  // Portal account status per cliente
+  const [accountMap, setAccountMap] = useState<Record<string, boolean>>({})
+  // company_clientes activo per cliente
+  const [activoMap, setActivoMap] = useState<Record<string, { ccId: string; activo: boolean }>>({})
+
   const canEdit = canEditProp && userRole !== 'viewer'
+
+  // Load account status and company_clientes.activo whenever clientes list changes
+  useEffect(() => {
+    if (!companyId || clientes.length === 0) return
+    const ids = clientes.map(c => c.id)
+
+    supabase
+      .from('app_users')
+      .select('cliente_id')
+      .in('cliente_id', ids)
+      .then(({ data }) => {
+        const map: Record<string, boolean> = {}
+        data?.forEach(u => { if (u.cliente_id) map[u.cliente_id] = true })
+        setAccountMap(map)
+      })
+
+    supabase
+      .from('company_clientes')
+      .select('id, cliente_id, activo')
+      .eq('company_id', companyId)
+      .in('cliente_id', ids)
+      .then(({ data }) => {
+        const map: Record<string, { ccId: string; activo: boolean }> = {}
+        data?.forEach(row => { map[row.cliente_id] = { ccId: row.id, activo: row.activo ?? true } })
+        setActivoMap(map)
+      })
+  }, [companyId, clientes])
+
+  async function handleToggleActivo(clienteId: string) {
+    const current = activoMap[clienteId]
+    if (!current) return
+    const newActivo = !current.activo
+    setActivoMap(prev => ({ ...prev, [clienteId]: { ...current, activo: newActivo } }))
+    const { error } = await supabase
+      .from('company_clientes')
+      .update({ activo: newActivo })
+      .eq('id', current.ccId)
+    if (error) {
+      setActivoMap(prev => ({ ...prev, [clienteId]: current }))
+      Swal.fire('Error', 'No se pudo actualizar la visibilidad del cliente.', 'error')
+    }
+  }
   void (canCreateProp && userRole !== 'viewer') // canCreate reservado para uso futuro
 
   function startCreate() {
@@ -989,16 +1036,40 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                       ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <span style={{
-                        padding: '3px 12px',
-                        borderRadius: '20px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        background: c.puede_crear_cuenta ? '#dcfce7' : '#f1f5f9',
-                        color: c.puede_crear_cuenta ? '#166534' : '#94a3b8',
-                      }}>
-                        {c.puede_crear_cuenta ? 'Sí' : 'No'}
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                        <span style={{
+                          padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                          background: c.puede_crear_cuenta ? '#dcfce7' : '#f1f5f9',
+                          color: c.puede_crear_cuenta ? '#166534' : '#94a3b8',
+                        }}>
+                          {c.puede_crear_cuenta ? 'Habilitado' : 'Deshabilitado'}
+                        </span>
+                        {accountMap[c.id] ? (
+                          <>
+                            <span style={{ padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: '#dbeafe', color: '#1d4ed8' }}>
+                              Cuenta activa
+                            </span>
+                            {canEdit && activoMap[c.id] && (
+                              <button
+                                onClick={() => handleToggleActivo(c.id)}
+                                title={activoMap[c.id].activo ? 'Clic para ocultar datos al cliente' : 'Clic para mostrar datos al cliente'}
+                                style={{
+                                  padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                                  border: 'none', cursor: 'pointer',
+                                  background: activoMap[c.id].activo ? '#f0fdf4' : '#fff7ed',
+                                  color: activoMap[c.id].activo ? '#15803d' : '#c2410c',
+                                }}
+                              >
+                                {activoMap[c.id].activo ? '● Datos visibles' : '○ Datos ocultos'}
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <span style={{ padding: '2px 10px', borderRadius: '20px', fontSize: '11px', color: '#94a3b8', background: '#f8fafc' }}>
+                            Sin cuenta
+                          </span>
+                        )}
+                      </div>
                     </td>
                     {canEdit && (
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>

@@ -76,7 +76,7 @@ async function buildSessionFromSupabase(
 ): Promise<UserSession> {
   const profileQuery = supabase
     .from('app_users')
-    .select('full_name, role, company_id, cliente_id')
+    .select('full_name, role, company_id, cliente_id, activo')
     .eq('id', userId)
     .single()
 
@@ -86,8 +86,12 @@ async function buildSessionFromSupabase(
 
   const { data: profile } = await Promise.race([profileQuery, timeout])
 
-  type ProfileRow = { full_name?: string; role?: string; company_id?: string; cliente_id?: string } | null
+  type ProfileRow = { full_name?: string; role?: string; company_id?: string; cliente_id?: string; activo?: boolean } | null
   const prof = profile as ProfileRow
+
+  if (prof?.activo === false) {
+    throw new Error('Cuenta desactivada. Comuníquese con su empresa de servicios.')
+  }
   const dbRole: string = prof?.role ?? ''
   const companyId: string | undefined = prof?.company_id ?? undefined
   const clienteId: string | undefined = prof?.cliente_id ?? undefined
@@ -321,6 +325,7 @@ export function useAuth() {
       logSecurityEvent('login_error', { email: cleanEmail, error: msg }).catch(console.error)
 
       if (msg.includes('fetch') || msg.includes('network')) return 'Error de red. Verifique su conexión.'
+      if (msg.includes('desactivada')) return msg
       return 'Error de conexión. Intente de nuevo.'
     }
   }, [])

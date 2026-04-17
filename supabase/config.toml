@@ -1,0 +1,5 @@
+[project]
+id = "nnsqmeigtgewatameexo"
+
+[functions.create-cliente-account]
+verify_jwt = false

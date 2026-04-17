@@ -93,6 +93,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [tab, setTab] = useState<PortalTab>('dashboard')
   const [loading, setLoading] = useState(true)
   const [companies, setCompanies] = useState<CompanyInfo[]>([])
+  const [companyActivoMap, setCompanyActivoMap] = useState<Record<string, boolean>>({})
   const [projects, setProjects] = useState<ProjectInfo[]>([])
   const [unidades, setUnidades] = useState<UnidadInfo[]>([])
   const [contadores, setContadores] = useState<ContadorInfo[]>([])
@@ -121,10 +122,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         { data: rData },
         { data: clData },
       ] = await Promise.all([
-        // Companies the client belongs to
+        // Companies the client belongs to (with visibility flag)
         supabase
           .from('company_clientes')
-          .select('company_id, companies(id, nombre)')
+          .select('company_id, activo, companies(id, nombre)')
           .eq('cliente_id', clienteId),
         // Active units
         supabase
@@ -151,16 +152,21 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           .single(),
       ])
 
-      // Build companies list from junction
+      // Build companies list and activo map from junction
       const companyMap: Record<string, CompanyInfo> = {}
+      const activoMap: Record<string, boolean> = {}
       if (ccData) {
-        type CCRow = { company_id: string; companies: unknown }
+        type CCRow = { company_id: string; activo: boolean | null; companies: unknown }
         for (const row of ccData as CCRow[]) {
           const co = row.companies as { id: string; nombre: string } | null
-          if (co?.id) companyMap[co.id] = co
+          if (co?.id) {
+            companyMap[co.id] = co
+            activoMap[co.id] = row.activo !== false
+          }
         }
       }
       const companiesList = Object.values(companyMap)
+      setCompanyActivoMap(activoMap)
 
       // Load active units first, then fetch contadores by their unidad_id
       const unidadesList = (uData as UnidadInfo[]) ?? []
@@ -790,6 +796,47 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               const companyProjects = projects.filter(p => p.company_id === company.id)
               const companyContadores = contadores.filter(c => c.company_id === company.id)
               const companyUnidades = unidades.filter(u => u.company_id === company.id)
+              const isActivo = companyActivoMap[company.id] !== false
+
+              // Company header (shared between active and inactive views)
+              const companyHeader = (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                  <div style={{
+                    width: '32px', height: '32px', borderRadius: '8px',
+                    background: isActivo ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#e2e8f0',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '15px', color: 'white',
+                  }}>🏢</div>
+                  <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: isActivo ? '#1e293b' : '#94a3b8' }}>
+                    {company.nombre}
+                  </h2>
+                </div>
+              )
+
+              if (!isActivo) {
+                return (
+                  <div key={company.id} style={{ marginBottom: '24px' }}>
+                    {companyHeader}
+                    <div style={{
+                      padding: '20px 24px',
+                      background: '#f8fafc',
+                      border: '1.5px dashed #cbd5e1',
+                      borderRadius: '12px',
+                      color: '#64748b',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}>
+                      <span style={{ fontSize: '20px' }}>ℹ️</span>
+                      <span>
+                        Sin datos disponibles de <strong>{company.nombre}</strong>. Si desea más información, contáctenos directamente con la empresa.
+                      </span>
+                    </div>
+                  </div>
+                )
+              }
+
               if (companyContadores.length === 0 && companyUnidades.length === 0) return null
               return (
                 <div key={company.id} style={{ marginBottom: '24px' }}>
