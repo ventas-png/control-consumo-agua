@@ -1,0 +1,32 @@
+name: Apply SQL Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      migration_file:
+        description: 'Migration file name (in supabase/migrations/)'
+        required: true
+        default: '20260417000003_add_activo_to_company_clientes.sql'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run migration via Supabase Management API
+        run: |
+          SQL=$(cat "supabase/migrations/${{ github.event.inputs.migration_file }}")
+          curl -s -X POST \
+            "https://api.supabase.com/v1/projects/${{ secrets.SUPABASE_PROJECT_ID }}/database/query" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\": $(echo "$SQL" | jq -Rs .)}" \
+            | tee /tmp/result.json
+          cat /tmp/result.json
+          # Fail if response contains error
+          if cat /tmp/result.json | jq -e '.error' > /dev/null 2>&1; then
+            echo "Migration failed"
+            exit 1
+          fi
+          echo "Migration applied successfully"
