@@ -326,9 +326,15 @@ export function useAuth() {
       const msg = error instanceof Error ? error.message : 'unknown'
       logSecurityEvent('login_error', { email: cleanEmail, error: msg }).catch(console.error)
 
-      if (msg.includes('fetch') || msg.includes('network')) return 'Error de red. Verifique su conexión.'
+      const isNetworkError = msg.toLowerCase().includes('fetch') ||
+        msg.toLowerCase().includes('network') ||
+        msg.toLowerCase().includes('failed to fetch') ||
+        msg.toLowerCase().includes('load failed')
+      if (isNetworkError) {
+        return 'Sin conexión con el servidor. Use "Diagnóstico del sistema" para verificar la URL activa.'
+      }
       if (msg.includes('desactivada')) return msg
-      return 'Error de conexión. Intente de nuevo.'
+      return `Error de conexión: ${msg}`
     }
   }, [])
 

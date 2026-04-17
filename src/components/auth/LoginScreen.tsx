@@ -82,19 +82,44 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
   async function runDiagnostics() {
     setDiagContent('🔍 Ejecutando diagnósticos...')
     const lines: string[] = []
+
+    // Network status
     lines.push(`🌐 Red: ${navigator.onLine ? '✅ Online' : '❌ Offline'}`)
+
+    // Show actual env vars baked into the bundle
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+    lines.push(`🔗 URL: ${supabaseUrl ? supabaseUrl.slice(0, 45) : '❌ NO DEFINIDA'}`)
+    lines.push(`🔑 Key: ${anonKey ? anonKey.slice(0, 30) + '...' : '❌ NO DEFINIDA'}`)
+
+    // Health check via fetch (bypasses Supabase client)
+    if (supabaseUrl) {
+      try {
+        const start = performance.now()
+        const res = await fetch(`${supabaseUrl}/auth/v1/health`, { method: 'GET' })
+        const ms = (performance.now() - start).toFixed(0)
+        lines.push(`🏥 Auth health: ${res.ok ? `✅ ${ms}ms` : `❌ HTTP ${res.status}`}`)
+      } catch (e) {
+        lines.push(`🏥 Auth health: ❌ ${e instanceof Error ? e.message : 'Error de red'}`)
+      }
+    }
+
+    // Supabase client query
     try {
       const start = performance.now()
       const { error: e } = await supabase.from('clientes').select('count', { count: 'exact', head: true })
       const ms = (performance.now() - start).toFixed(0)
-      lines.push(`🗄️ Supabase: ${e ? '❌ ' + e.message : `✅ ${ms}ms`}`)
+      lines.push(`🗄️ PostgREST: ${e ? '❌ ' + e.message : `✅ ${ms}ms`}`)
     } catch (e) {
-      lines.push(`🗄️ Supabase: ❌ ${e instanceof Error ? e.message : 'Error'}`)
+      lines.push(`🗄️ PostgREST: ❌ ${e instanceof Error ? e.message : 'Error'}`)
     }
+
+    // localStorage
     try {
       localStorage.setItem('_t', '1'); localStorage.removeItem('_t')
       lines.push('💾 localStorage: ✅')
     } catch { lines.push('💾 localStorage: ❌') }
+
     setDiagContent(lines.join('\n'))
   }
 
