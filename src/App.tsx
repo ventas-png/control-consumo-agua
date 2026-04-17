@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
 import type { AppSection, Ruta } from './types'
+import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { initEmailJS } from './lib/email'
@@ -62,6 +63,23 @@ export default function App() {
   const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
+  const [unreadComunicacion, setUnreadComunicacion] = useState(0)
+
+  const fetchUnreadComunicacion = useCallback(async () => {
+    if (!currentUser?.company_id) return
+    const { count } = await supabase
+      .from('conversations')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', currentUser.company_id)
+      .eq('status', 'abierta')
+    setUnreadComunicacion(count ?? 0)
+  }, [currentUser?.company_id])
+
+  useEffect(() => {
+    fetchUnreadComunicacion()
+    const interval = setInterval(fetchUnreadComunicacion, 60_000)
+    return () => clearInterval(interval)
+  }, [fetchUnreadComunicacion])
 
   const defaultSection = (): AppSection => {
     // Will be resolved after login when currentUser is available
@@ -231,6 +249,7 @@ export default function App() {
         onSelect={(section) => { setActiveSection(section); setSidebarOpen(false) }}
         onLogout={logout}
         isOpen={sidebarOpen}
+        unreadComunicacion={unreadComunicacion}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {proximaRuta && (

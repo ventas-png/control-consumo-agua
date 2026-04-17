@@ -253,6 +253,7 @@ interface Props {
   onSelect: (section: AppSection) => void
   onLogout: () => void
   isOpen: boolean
+  unreadComunicacion?: number
 }
 
 function getInitials(name: string): string {
@@ -292,7 +293,7 @@ function findActiveGroupId(activeSection: AppSection): string | null {
   return null
 }
 
-export function Sidebar({ activeSection, userRole, currentUser, canViewModule, onSelect, onLogout, isOpen }: Props) {
+export function Sidebar({ activeSection, userRole, currentUser, canViewModule, onSelect, onLogout, isOpen, unreadComunicacion = 0 }: Props) {
   const [hoveredTab, setHoveredTab] = useState<AppSection | null>(null)
   const [hoveredLogout, setHoveredLogout] = useState(false)
   const [hoveredProfile, setHoveredProfile] = useState(false)
@@ -504,7 +505,17 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
                   marginBottom: '2px',
                 }}
               >
-                {entry.label}
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {entry.label}
+                  {entry.id === 'comunicacion' && unreadComunicacion > 0 && (
+                    <span style={{
+                      width: '7px', height: '7px', borderRadius: '50%',
+                      background: '#ef4444',
+                      boxShadow: '0 0 6px rgba(239,68,68,0.7)',
+                      flexShrink: 0,
+                    }} />
+                  )}
+                </span>
                 <svg
                   width="12"
                   height="12"
