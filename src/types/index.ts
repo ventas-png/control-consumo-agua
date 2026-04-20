@@ -1763,3 +1763,98 @@ export interface SeguimientoAcuerdo {
   notas_seguimiento?: string | null
   created_at: string
 }
+
+export type TipoVehiculo = 'auto' | 'moto' | 'camion' | 'otro'
+export interface VehiculoResidente {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  placa: string
+  marca?: string | null
+  modelo?: string | null
+  color?: string | null
+  anio?: number | null
+  tipo: TipoVehiculo
+  activo: boolean
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoEventoComunidad = 'cultural' | 'deportivo' | 'social' | 'informativo' | 'otro'
+export type EstadoEventoComunidad = 'programado' | 'en_curso' | 'realizado' | 'cancelado'
+export interface EventoComunidad {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  tipo: TipoEventoComunidad
+  fecha: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  lugar?: string | null
+  capacidad_max?: number | null
+  estado: EstadoEventoComunidad
+  asistentes_real?: number | null
+  costo_estimado?: number | null
+  created_at: string
+}
+
+export interface RegistroAsistenteEvento {
+  id: string
+  company_id: string
+  evento_id: string
+  unidad_id: string
+  nombre: string
+  num_personas: number
+  confirmado: boolean
+  asistio?: boolean | null
+  created_at: string
+}
+
+export interface CajaChica {
+  id: string
+  company_id: string
+  project_id: string
+  fecha_apertura: string
+  monto_inicial: number
+  responsable: string
+  estado: 'abierta' | 'cerrada'
+  fecha_cierre?: string | null
+  cerrado_por?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface MovimientoCaja {
+  id: string
+  company_id: string
+  caja_id: string
+  tipo: 'ingreso' | 'egreso'
+  concepto: string
+  monto: number
+  comprobante?: string | null
+  fecha: string
+  registrado_por?: string | null
+  created_at: string
+}
+
+export type EstadoObra = 'planificada' | 'en_ejecucion' | 'completada' | 'pausada' | 'cancelada'
+export interface ObraMejora {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  area?: string | null
+  contratista?: string | null
+  monto_contrato?: number | null
+  fecha_inicio?: string | null
+  fecha_fin_estimada?: string | null
+  fecha_fin_real?: string | null
+  estado: EstadoObra
+  progreso: number
+  notas?: string | null
+  created_at: string
+}
