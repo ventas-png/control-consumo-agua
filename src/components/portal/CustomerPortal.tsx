@@ -200,8 +200,26 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
       setUnidades(unidadesList)
       setContadores(cData)
-      setLecturas((rData as LecturaInfo[]) ?? [])
-      setRegistros((rData as Registro[]) ?? [])
+
+      // Fetch readings by contador_id to catch registros where cliente_id is missing/mismatched
+      let mergedLecturas: LecturaInfo[] = (rData as LecturaInfo[]) ?? []
+      if (cData.length > 0) {
+        const twoYearsAgo2 = new Date()
+        twoYearsAgo2.setFullYear(twoYearsAgo2.getFullYear() - 2)
+        const { data: contReadings } = await supabase
+          .from('registros')
+          .select('id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
+          .in('contador_id', cData.map(c => c.id))
+          .gte('fecha', twoYearsAgo2.toISOString().split('T')[0])
+          .order('fecha', { ascending: false })
+        if (contReadings?.length) {
+          const existingIds = new Set(mergedLecturas.map(l => l.id))
+          const extra = (contReadings as LecturaInfo[]).filter(l => !existingIds.has(l.id))
+          if (extra.length > 0) mergedLecturas = [...mergedLecturas, ...extra]
+        }
+      }
+      setLecturas(mergedLecturas)
+      setRegistros(mergedLecturas as Registro[])
 
       if (clData) {
         setContactoEdit(clData as ClienteContacto)
