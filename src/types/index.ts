@@ -1319,3 +1319,89 @@ export interface ServicioHousekeeping {
   created_at: string
   unidad_nombre?: string
 }
+
+// ── Fase 8: Firma Digital, Concierge, Llaves, Encuestas ───────────────────────
+export type TipoDocumentoFirma = 'contrato' | 'reglamento' | 'acta' | 'aviso' | 'otro'
+export type EstadoFirma = 'pendiente' | 'firmado' | 'rechazado' | 'expirado'
+export interface FirmaDigital {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  documento_titulo: string
+  documento_tipo: TipoDocumentoFirma
+  firmante_nombre?: string | null
+  firmante_email?: string | null
+  estado: EstadoFirma
+  fecha_vencimiento?: string | null
+  fecha_firma?: string | null
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type TipoConcierge = 'taxi' | 'restaurante' | 'tour' | 'compras' | 'mensajeria' | 'limpieza_extra' | 'otro'
+export type EstadoConcierge = 'pendiente' | 'en_proceso' | 'completado' | 'cancelado'
+export interface SolicitudConcierge {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  tipo: TipoConcierge
+  descripcion: string
+  fecha_solicitud: string
+  hora_solicitud?: string | null
+  estado: EstadoConcierge
+  atendido_por?: string | null
+  costo?: number | null
+  notas_staff?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type TipoLlave = 'fisica' | 'tarjeta' | 'codigo' | 'app'
+export type EstadoLlave = 'activa' | 'devuelta' | 'perdida' | 'bloqueada'
+export interface LlaveCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  tipo: TipoLlave
+  descripcion: string
+  codigo?: string | null
+  cantidad: number
+  fecha_entrega?: string | null
+  fecha_devolucion?: string | null
+  estado: EstadoLlave
+  deposito_pagado: boolean
+  monto_deposito?: number | null
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type EstadoEncuesta = 'borrador' | 'activa' | 'cerrada'
+export interface Encuesta {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  preguntas: unknown[]
+  fecha_inicio?: string | null
+  fecha_fin?: string | null
+  estado: EstadoEncuesta
+  created_at: string
+}
+
+export interface RespuestaEncuesta {
+  id: string
+  company_id: string
+  project_id: string
+  encuesta_id: string
+  unidad_id?: string | null
+  nombre_respondente?: string | null
+  respuestas: unknown
+  created_at: string
+  unidad_nombre?: string
+}
