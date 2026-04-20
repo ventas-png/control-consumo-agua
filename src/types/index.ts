@@ -1093,3 +1093,82 @@ export interface PersonalCondominio {
   notas?: string | null
   created_at: string
 }
+
+// ── Condominios Fase 5 ────────────────────────────────────────────────────────
+
+export type TipoContactoEmergencia = 'bomberos' | 'policia' | 'ambulancia' | 'hospital' | 'electricidad' | 'agua' | 'gas' | 'administracion' | 'general'
+export type TipoMudanza = 'ingreso' | 'salida'
+export type EstadoMudanza = 'programada' | 'en_curso' | 'completada' | 'cancelada'
+export type CategoriaDocumento = 'reglamento' | 'circular' | 'manual' | 'acta' | 'contrato' | 'formulario' | 'otro'
+export type VisibilidadDocumento = 'admin' | 'residentes' | 'todos'
+export type TipoResiduo = 'general' | 'reciclable' | 'organico' | 'electronico' | 'peligroso' | 'escombros'
+export type EstadoResiduo = 'pendiente' | 'recolectado' | 'procesado'
+
+export interface ContactoEmergencia {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  tipo: TipoContactoEmergencia
+  telefono: string
+  telefono_alternativo?: string | null
+  descripcion?: string | null
+  disponible_24h: boolean
+  orden: number
+  activo: boolean
+  created_at: string
+}
+
+export interface Mudanza {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  tipo: TipoMudanza
+  fecha: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  nombre_residente: string
+  telefono?: string | null
+  empresa_mudanza?: string | null
+  estado: EstadoMudanza
+  deposito_requerido: boolean
+  deposito_pagado: boolean
+  monto_deposito?: number | null
+  ascensor_reservado: boolean
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export interface DocumentoCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  categoria: CategoriaDocumento
+  descripcion?: string | null
+  url: string
+  version?: string | null
+  vigente: boolean
+  visibilidad: VisibilidadDocumento
+  subido_por?: string | null
+  created_at: string
+}
+
+export interface RegistroResiduo {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  tipo_residuo: TipoResiduo
+  cantidad_kg?: number | null
+  punto_acopio?: string | null
+  empresa_recolectora?: string | null
+  estado: EstadoResiduo
+  incidencia: boolean
+  descripcion_incidencia?: string | null
+  registrado_por?: string | null
+  notas?: string | null
+  created_at: string
+}
