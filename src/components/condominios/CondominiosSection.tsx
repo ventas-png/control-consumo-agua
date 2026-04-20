@@ -19,6 +19,7 @@ import type {
   CorrespondenciaCondominio, LibroNovedad, SeguimientoAcuerdo,
   VehiculoResidente, EventoComunidad, RegistroAsistenteEvento, CajaChica, MovimientoCaja, ObraMejora,
   PlanPagoCond, AccesoResidente, GarantiaEquipo, EntregaUnidad,
+  AvisoCobro, BitacoraManto as BitacoraMantoType, EvaluacionProveedor, ReclamoCondominio,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -88,6 +89,10 @@ import { PlanPagoCondTab } from './tabs/PlanPagoCondTab'
 import { AccesosResTab } from './tabs/AccesosResTab'
 import { GarantiasEquipoTab } from './tabs/GarantiasEquipoTab'
 import { EntregaUnidadTab } from './tabs/EntregaUnidadTab'
+import { AvisosCobroTab } from './tabs/AvisosCobroTab'
+import { BitacoraManto as BitacoraMantoTab } from './tabs/BitacoraManto'
+import { EvaluacionProveedorTab } from './tabs/EvaluacionProveedorTab'
+import { ReclamosTab } from './tabs/ReclamosTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -106,6 +111,7 @@ type CondominioTab =
   | 'correspondencia' | 'libro_novedades' | 'acuerdos' | 'dashboard_ejecutivo'
   | 'vehiculos' | 'eventos_comunidad' | 'caja_chica' | 'obras'
   | 'plan_pago' | 'accesos_res' | 'garantias' | 'entrega_unidad'
+  | 'avisos_cobro' | 'bitacora_manto' | 'eval_proveedor' | 'reclamos'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -176,6 +182,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'accesos_res',       label: 'Accesos',        icon: '🔐' },
   { id: 'garantias',         label: 'Garantías',      icon: '🛡️' },
   { id: 'entrega_unidad',    label: 'Entregas',       icon: '🔑' },
+  { id: 'avisos_cobro',      label: 'Avisos Cobro',   icon: '📬' },
+  { id: 'bitacora_manto',    label: 'Bitácora Manto', icon: '🛠️' },
+  { id: 'eval_proveedor',    label: 'Eval. Proveedor',icon: '⭐' },
+  { id: 'reclamos',          label: 'Reclamos',       icon: '📝' },
 ]
 
 interface Props {
@@ -273,6 +283,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [accesosRes, setAccesosRes] = useState<AccesoResidente[]>([])
   const [garantias, setGarantias] = useState<GarantiaEquipo[]>([])
   const [entregas, setEntregas] = useState<EntregaUnidad[]>([])
+  // Fase 17
+  const [avisosCobro, setAvisosCobro] = useState<AvisoCobro[]>([])
+  const [bitacoraRegistros, setBitacoraRegistros] = useState<BitacoraMantoType[]>([])
+  const [evaluacionesProv, setEvaluacionesProv] = useState<EvaluacionProveedor[]>([])
+  const [reclamos, setReclamos] = useState<ReclamoCondominio[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -306,6 +321,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       correspondenciaRes, libroRes, acuerdosRes,
       vehiculosRes, eventosComRes, asistentesRes, cajasRes, movimientosRes, obrasRes,
       planesPagoRes, cuotasPlanRes, accesosResRes, garantiasRes, entregasRes,
+      avisosCobroRes, bitacoraMantoRes, evalProvRes, reclamosCondRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -374,6 +390,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('accesos_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('titular'),
       supabase.from('garantias_equipo').select('*').eq('project_id', pid).eq('company_id', cid).order('equipo'),
       supabase.from('entrega_unidades').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('avisos_cobro').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_emision', { ascending: false }),
+      supabase.from('bitacora_manto').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('evaluaciones_proveedor').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('reclamos_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -455,6 +475,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setAccesosRes((accesosResRes.data ?? []) as AccesoResidente[])
     setGarantias((garantiasRes.data ?? []) as GarantiaEquipo[])
     setEntregas((entregasRes.data ?? []) as EntregaUnidad[])
+    setAvisosCobro((avisosCobroRes.data ?? []) as AvisoCobro[])
+    setBitacoraRegistros((bitacoraMantoRes.data ?? []) as BitacoraMantoType[])
+    setEvaluacionesProv((evalProvRes.data ?? []) as EvaluacionProveedor[])
+    setReclamos((reclamosCondRes.data ?? []) as ReclamoCondominio[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -621,6 +645,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'accesos_res' && <AccesosResTab accesos={accesosRes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'garantias' && <GarantiasEquipoTab garantias={garantias} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'entrega_unidad' && <EntregaUnidadTab entregas={entregas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'avisos_cobro' && <AvisosCobroTab avisos={avisosCobro} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'bitacora_manto' && <BitacoraMantoTab registros={bitacoraRegistros} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'eval_proveedor' && <EvaluacionProveedorTab evaluaciones={evaluacionesProv} proveedores={contratosProveedores} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'reclamos' && <ReclamosTab reclamos={reclamos} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )
