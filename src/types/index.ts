@@ -2003,3 +2003,82 @@ export interface ReclamoCondominio {
   anonimo: boolean
   created_at: string
 }
+
+// ── Fase 18 ───────────────────────────────────────────────────────────────────
+
+export type TipoMovimientoFondo = 'aporte' | 'retiro' | 'ajuste'
+export type EstadoMovimientoFondo = 'pendiente' | 'aprobado' | 'rechazado'
+
+export interface FondoReserva {
+  id: string
+  company_id: string
+  project_id: string
+  tipo: TipoMovimientoFondo
+  concepto: string
+  monto: number
+  fecha: string
+  justificacion?: string | null
+  aprobado_por?: string | null
+  estado: EstadoMovimientoFondo
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoObra = 'remodelacion' | 'ampliacion' | 'reparacion' | 'pintura' | 'otro'
+export type EstadoPermisoObra = 'solicitado' | 'aprobado' | 'en_ejecucion' | 'completado' | 'rechazado'
+
+export interface PermisoObraUnidad {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  tipo_obra: TipoObra
+  descripcion: string
+  fecha_inicio?: string | null
+  fecha_fin_estimada?: string | null
+  horario_permitido?: string | null
+  fianza?: number | null
+  estado: EstadoPermisoObra
+  aprobado_por?: string | null
+  observaciones?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type TipoUnidadTarifa = 'todas' | 'residencial' | 'comercial' | 'bodega' | 'parqueo'
+export type PeriodicidadTarifa = 'mensual' | 'trimestral' | 'semestral' | 'anual' | 'unica_vez'
+
+export interface TarifaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  concepto: string
+  descripcion?: string | null
+  monto: number
+  tipo_unidad: TipoUnidadTarifa
+  periodicidad: PeriodicidadTarifa
+  activo: boolean
+  vigente_desde?: string | null
+  vigente_hasta?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoIncidente = 'robo' | 'vandalismo' | 'accidente' | 'incendio' | 'pelea' | 'otro'
+export type EstadoIncidente = 'reportado' | 'investigando' | 'resuelto' | 'cerrado'
+
+export interface IncidenteSeguridad {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  hora?: string | null
+  tipo: TipoIncidente
+  descripcion: string
+  area?: string | null
+  reportado_por?: string | null
+  estado: EstadoIncidente
+  involucrados?: string | null
+  seguimiento?: string | null
+  created_at: string
+}
