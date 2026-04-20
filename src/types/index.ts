@@ -2158,3 +2158,88 @@ export interface HistorialResidente {
   created_at: string
   unidad_nombre?: string
 }
+
+// ── Fase 20 ───────────────────────────────────────────────────────────────────
+
+export type TipoVehiculoVisita = 'auto' | 'moto' | 'camion' | 'otro'
+
+export interface EstacionamientoVisita {
+  id: string
+  company_id: string
+  project_id: string
+  espacio: string
+  unidad_visitada?: string | null
+  placa: string
+  tipo_vehiculo: TipoVehiculoVisita
+  visitante_nombre?: string | null
+  hora_entrada: string
+  hora_salida?: string | null
+  autorizado_por?: string | null
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type TurnoGuardia = 'mañana' | 'tarde' | 'noche'
+export type EstadoBitacoraGuardia = 'abierto' | 'cerrado'
+export type TipoNovedadGuardia = 'normal' | 'urgente' | 'informativo'
+
+export interface NovedadGuardia {
+  hora: string
+  descripcion: string
+  tipo: TipoNovedadGuardia
+}
+
+export interface BitacoraGuardia {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  turno: TurnoGuardia
+  guardia_nombre: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  novedades: NovedadGuardia[]
+  observaciones?: string | null
+  estado: EstadoBitacoraGuardia
+  created_at: string
+}
+
+export type CategoriaEquipo = 'bomba' | 'ascensor' | 'generador' | 'camara' | 'extintor' | 'planta_electrica' | 'otro'
+export type EstadoEquipo = 'operativo' | 'mantenimiento' | 'fuera_servicio' | 'baja'
+
+export interface EquipoComun {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  categoria: CategoriaEquipo
+  marca?: string | null
+  modelo?: string | null
+  serial?: string | null
+  ubicacion?: string | null
+  fecha_compra?: string | null
+  valor_compra?: number | null
+  vida_util_anios?: number | null
+  estado: EstadoEquipo
+  ultimo_mantenimiento?: string | null
+  proximo_mantenimiento?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export type EstadoPresencia = 'presente' | 'ausente' | 'tardanza' | 'permiso' | 'vacaciones'
+
+export interface PresenciaPersonal {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  cargo?: string | null
+  fecha: string
+  hora_entrada?: string | null
+  hora_salida?: string | null
+  estado: EstadoPresencia
+  observaciones?: string | null
+  created_at: string
+}
