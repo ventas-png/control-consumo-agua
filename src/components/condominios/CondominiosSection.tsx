@@ -21,6 +21,7 @@ import type {
   PlanPagoCond, AccesoResidente, GarantiaEquipo, EntregaUnidad,
   AvisoCobro, BitacoraManto as BitacoraMantoType, EvaluacionProveedor, ReclamoCondominio,
   FondoReserva, PermisoObraUnidad, TarifaCondominio, IncidenteSeguridad,
+  ChecklistArea, ProgramacionLimpieza, ConsumoEnergiaArea, HistorialResidente,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -98,6 +99,10 @@ import { FondoReservaTab } from './tabs/FondoReservaTab'
 import { PermisosObraTab } from './tabs/PermisosObraTab'
 import { TarifasTab } from './tabs/TarifasTab'
 import { IncidentesTab } from './tabs/IncidentesTab'
+import { ChecklistAreasTab } from './tabs/ChecklistAreasTab'
+import { ProgramacionLimpiezaTab } from './tabs/ProgramacionLimpiezaTab'
+import { ConsumoEnergiaAreasTab } from './tabs/ConsumoEnergiaAreasTab'
+import { HistorialResidentesTab } from './tabs/HistorialResidentesTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -118,6 +123,7 @@ type CondominioTab =
   | 'plan_pago' | 'accesos_res' | 'garantias' | 'entrega_unidad'
   | 'avisos_cobro' | 'bitacora_manto' | 'eval_proveedor' | 'reclamos'
   | 'fondo_reserva' | 'permisos_obra' | 'tarifas' | 'incidentes'
+  | 'checklist_areas' | 'prog_limpieza' | 'consumo_energia' | 'historial_res'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -196,6 +202,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'permisos_obra',    label: 'Permisos Obra',  icon: '🔨' },
   { id: 'tarifas',          label: 'Tarifas',        icon: '💰' },
   { id: 'incidentes',       label: 'Incidentes',     icon: '🚨' },
+  { id: 'checklist_areas',  label: 'Checklist',      icon: '🗒️' },
+  { id: 'prog_limpieza',    label: 'Limpieza',       icon: '🧹' },
+  { id: 'consumo_energia',  label: 'Consumo Energía',icon: '⚡' },
+  { id: 'historial_res',    label: 'Historial Res.', icon: '👥' },
 ]
 
 interface Props {
@@ -303,6 +313,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [permisosObra, setPermisosObra] = useState<PermisoObraUnidad[]>([])
   const [tarifas, setTarifas] = useState<TarifaCondominio[]>([])
   const [incidentes, setIncidentes] = useState<IncidenteSeguridad[]>([])
+  // Fase 19
+  const [checklistAreas, setChecklistAreas] = useState<ChecklistArea[]>([])
+  const [progLimpieza, setProgLimpieza] = useState<ProgramacionLimpieza[]>([])
+  const [consumoEnergia, setConsumoEnergia] = useState<ConsumoEnergiaArea[]>([])
+  const [historialRes, setHistorialRes] = useState<HistorialResidente[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -338,6 +353,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       planesPagoRes, cuotasPlanRes, accesosResRes, garantiasRes, entregasRes,
       avisosCobroRes, bitacoraMantoRes, evalProvRes, reclamosCondRes,
       fondoReservaRes, permisosObraRes, tarifasRes, incidentesRes,
+      checklistAreasRes, progLimpiezaRes, consumoEnergiaRes, historialResRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -414,6 +430,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('permisos_obra_unidad').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('tarifas_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('concepto'),
       supabase.from('incidentes_seguridad').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('checklist_areas').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('programacion_limpieza').select('*').eq('project_id', pid).eq('company_id', cid).order('area'),
+      supabase.from('consumo_energia_areas').select('*').eq('project_id', pid).eq('company_id', cid).order('periodo', { ascending: false }).order('area'),
+      supabase.from('historial_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_desde', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -503,6 +523,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setPermisosObra((permisosObraRes.data ?? []) as PermisoObraUnidad[])
     setTarifas((tarifasRes.data ?? []) as TarifaCondominio[])
     setIncidentes((incidentesRes.data ?? []) as IncidenteSeguridad[])
+    setChecklistAreas((checklistAreasRes.data ?? []) as ChecklistArea[])
+    setProgLimpieza((progLimpiezaRes.data ?? []) as ProgramacionLimpieza[])
+    setConsumoEnergia((consumoEnergiaRes.data ?? []) as ConsumoEnergiaArea[])
+    setHistorialRes((historialResRes.data ?? []) as HistorialResidente[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -677,6 +701,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'permisos_obra' && <PermisosObraTab permisos={permisosObra} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'tarifas' && <TarifasTab tarifas={tarifas} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'incidentes' && <IncidentesTab incidentes={incidentes} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'checklist_areas' && <ChecklistAreasTab checklists={checklistAreas} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'prog_limpieza' && <ProgramacionLimpiezaTab programaciones={progLimpieza} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'consumo_energia' && <ConsumoEnergiaAreasTab consumos={consumoEnergia} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'historial_res' && <HistorialResidentesTab historial={historialRes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )

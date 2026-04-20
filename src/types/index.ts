@@ -2082,3 +2082,79 @@ export interface IncidenteSeguridad {
   seguimiento?: string | null
   created_at: string
 }
+
+// ── Fase 19 ───────────────────────────────────────────────────────────────────
+
+export type EstadoChecklist = 'completo' | 'con_observaciones' | 'pendiente'
+
+export interface ChecklistItem { item: string; ok: boolean; observacion: string }
+
+export interface ChecklistArea {
+  id: string
+  company_id: string
+  project_id: string
+  area: string
+  fecha: string
+  inspector?: string | null
+  items: ChecklistItem[]
+  estado: EstadoChecklist
+  notas?: string | null
+  created_at: string
+}
+
+export type FrecuenciaLimpieza = 'diaria' | 'semanal' | 'quincenal' | 'mensual'
+export type EstadoLimpieza = 'pendiente' | 'en_curso' | 'completado'
+
+export interface ProgramacionLimpieza {
+  id: string
+  company_id: string
+  project_id: string
+  area: string
+  frecuencia: FrecuenciaLimpieza
+  responsable?: string | null
+  ultima_ejecucion?: string | null
+  proxima_ejecucion?: string | null
+  estado: EstadoLimpieza
+  activo: boolean
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoConsumoEnergia = 'electricidad' | 'agua' | 'gas' | 'otro'
+
+export interface ConsumoEnergiaArea {
+  id: string
+  company_id: string
+  project_id: string
+  area: string
+  tipo: TipoConsumoEnergia
+  periodo: string
+  lectura_anterior?: number | null
+  lectura_actual: number
+  unidad: string
+  costo_unitario?: number | null
+  total_costo?: number | null
+  fecha_lectura: string
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoResidente = 'propietario' | 'arrendatario' | 'familiar' | 'otro'
+export type EstadoResidente = 'activo' | 'anterior'
+
+export interface HistorialResidente {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  nombre_completo: string
+  tipo: TipoResidente
+  fecha_desde: string
+  fecha_hasta?: string | null
+  email?: string | null
+  telefono?: string | null
+  estado: EstadoResidente
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
