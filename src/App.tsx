@@ -30,6 +30,7 @@ import { UnidadesSection } from './components/unidades/UnidadesSection'
 import { CobrosSection } from './components/cobros/CobrosSection'
 import { ComunicacionSection } from './components/comunicacion/ComunicacionSection'
 import ServiciosEnergiaSection from './components/servicios-energia/ServiciosEnergiaSection'
+import { CondominiosSection } from './components/condominios/CondominiosSection'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RoleGuard } from './components/shared/AccessDenied'
 import { usePermissions } from './hooks/usePermissions'
@@ -548,6 +549,17 @@ export default function App() {
                 onFacturaAdded={addFacturaEnergia}
                 onFacturaUpdated={updateFacturaEnergia}
                 onFacturaDeleted={deleteFacturaEnergia}
+              />
+            </ErrorBoundary>
+          )}
+          {activeSection === 'condominios' && (
+            <ErrorBoundary sectionName="condominios">
+              <CondominiosSection
+                proyectos={proyectos}
+                unidades={unidades}
+                currentUser={currentUser}
+                canCreate={canCreate}
+                canEdit={canEdit}
               />
             </ErrorBoundary>
           )}

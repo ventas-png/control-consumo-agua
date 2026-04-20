@@ -327,7 +327,271 @@ export type AppSection =
   | 'empresa_proyectos'
   | 'superadmin_empresas'
   | 'comunicacion'
-  | 'servicios_energia';
+  | 'servicios_energia'
+  | 'condominios';
+
+// ── Módulo Condominios ────────────────────────────────────────────────────────
+
+export type ConceptoCuota = 'mantenimiento' | 'extraordinaria' | 'CAM' | 'otro'
+export type EstadoCuota = 'pendiente' | 'pagado' | 'moroso'
+
+export interface CuotaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  concepto: ConceptoCuota
+  monto: number
+  periodo: string           // 'YYYY-MM'
+  fecha_vencimiento?: string | null
+  estado: EstadoCuota
+  pago_id?: string | null
+  notas?: string | null
+  created_by?: string | null
+  created_at: string
+  // joins opcionales
+  unidad_nombre?: string
+}
+
+export interface Visitante {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  nombre: string
+  identificacion?: string | null
+  placa_vehiculo?: string | null
+  motivo?: string | null
+  pre_autorizado_por?: string | null
+  hora_entrada: string
+  hora_salida?: string | null
+  foto_url?: string | null
+  registrado_por?: string | null
+  notas?: string | null
+  created_at: string
+  // joins opcionales
+  unidad_nombre?: string
+}
+
+export interface Amenidad {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  descripcion?: string | null
+  capacidad_max?: number | null
+  horario_inicio?: string | null   // 'HH:MM'
+  horario_fin?: string | null      // 'HH:MM'
+  requiere_deposito: boolean
+  monto_deposito?: number | null
+  activo: boolean
+  foto_url?: string | null
+  created_at: string
+}
+
+export type EstadoReserva = 'confirmada' | 'cancelada' | 'pendiente'
+
+export interface ReservaAmenidad {
+  id: string
+  company_id: string
+  amenidad_id: string
+  unidad_id: string
+  cliente_id?: string | null
+  fecha: string
+  hora_inicio: string
+  hora_fin: string
+  num_invitados: number
+  estado: EstadoReserva
+  deposito_pagado: boolean
+  notas?: string | null
+  created_by?: string | null
+  created_at: string
+  // joins opcionales
+  amenidad_nombre?: string
+  unidad_nombre?: string
+}
+
+export type TipoTicket = 'preventivo' | 'correctivo'
+export type PrioridadTicket = 'baja' | 'media' | 'alta' | 'urgente'
+export type EstadoTicket = 'abierto' | 'en_proceso' | 'resuelto' | 'cerrado'
+
+export interface TicketMantenimiento {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  tipo: TipoTicket
+  titulo: string
+  descripcion?: string | null
+  prioridad: PrioridadTicket
+  estado: EstadoTicket
+  asignado_a?: string | null
+  reportado_por?: string | null
+  cliente_id?: string | null
+  foto_urls: string[]
+  costo_estimado?: number | null
+  costo_real?: number | null
+  fecha_limite?: string | null
+  fecha_cierre?: string | null
+  notas_cierre?: string | null
+  created_at: string
+  updated_at: string
+  // joins opcionales
+  unidad_nombre?: string
+  asignado_nombre?: string
+}
+
+export type TipoAnuncio = 'aviso' | 'urgente' | 'evento' | 'mantenimiento'
+
+export interface AnuncioComunidad {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  contenido: string
+  tipo: TipoAnuncio
+  publicado_por: string
+  fecha_evento?: string | null
+  activo: boolean
+  foto_url?: string | null
+  created_at: string
+  // joins opcionales
+  publicado_por_nombre?: string
+}
+
+// ── Módulo Condominios Fase 2 ─────────────────────────────────────────────────
+
+export type TipoParqueo = 'asignado' | 'visita' | 'discapacitado'
+export type EspecieMascota = 'perro' | 'gato' | 'ave' | 'otro'
+export type EstadoPaquete = 'pendiente' | 'entregado' | 'devuelto'
+export type TipoInfraccion = 'ruido' | 'basura' | 'estacionamiento' | 'mascota' | 'daños' | 'otro'
+export type EstadoInfraccion = 'emitida' | 'notificada' | 'en_descargo' | 'resuelta' | 'anulada'
+export type EstadoRonda = 'en_curso' | 'completada' | 'incompleta'
+export type TipoNovedad = 'incidente' | 'observacion' | 'alarma' | 'acceso' | 'otro'
+export type PrioridadNovedad = 'normal' | 'alta' | 'critica'
+export type EstadoContrato = 'activo' | 'vencido' | 'terminado'
+
+export interface ParqueoCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  numero: string
+  tipo: TipoParqueo
+  unidad_id?: string | null
+  placa_vehiculo?: string | null
+  marca_vehiculo?: string | null
+  color_vehiculo?: string | null
+  activo: boolean
+  notas?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export interface Mascota {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  nombre: string
+  especie: EspecieMascota
+  raza?: string | null
+  color?: string | null
+  fecha_nacimiento?: string | null
+  fecha_ultima_vacuna?: string | null
+  activo: boolean
+  foto_url?: string | null
+  notas?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export interface PaqueteRecibido {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  remitente?: string | null
+  descripcion: string
+  num_guia?: string | null
+  empresa_mensajeria?: string | null
+  estado: EstadoPaquete
+  hora_recepcion: string
+  hora_entrega?: string | null
+  recibido_por?: string | null
+  entregado_por?: string | null
+  notas?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export interface InfraccionCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  tipo: TipoInfraccion
+  descripcion: string
+  monto_multa?: number | null
+  estado: EstadoInfraccion
+  reportado_por?: string | null
+  fecha_infraccion: string
+  fecha_limite_descargo?: string | null
+  descargo?: string | null
+  resolucion?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export interface RondaSeguridad {
+  id: string
+  company_id: string
+  project_id: string
+  guardia_id?: string | null
+  inicio: string
+  fin?: string | null
+  estado: EstadoRonda
+  notas?: string | null
+  created_at: string
+}
+
+export interface NovedadSeguridad {
+  id: string
+  company_id: string
+  project_id: string
+  ronda_id?: string | null
+  tipo: TipoNovedad
+  descripcion: string
+  ubicacion?: string | null
+  prioridad: PrioridadNovedad
+  reportado_por?: string | null
+  foto_url?: string | null
+  created_at: string
+}
+
+export interface ContratoArrendamiento {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  arrendatario_nombre: string
+  arrendatario_identificacion?: string | null
+  arrendatario_telefono?: string | null
+  arrendatario_email?: string | null
+  monto_renta: number
+  dia_pago: number
+  fecha_inicio: string
+  fecha_fin?: string | null
+  deposito?: number | null
+  estado: EstadoContrato
+  notas?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
 
 // ── Centro de Comunicación ─────────────────────────────────────────────────
 
@@ -635,4 +899,107 @@ export interface BroadcastRecipient {
   created_at: string
   // join opcional
   broadcast?: Broadcast
+}
+
+// ── Condominios Fase 3 ────────────────────────────────────────────────────────
+
+export type TipoAsamblea = 'ordinaria' | 'extraordinaria'
+export type EstadoAsamblea = 'programada' | 'en_curso' | 'finalizada' | 'cancelada'
+export type TipoPunto = 'informativo' | 'votacion' | 'debate'
+export type TipoVoto = 'a_favor' | 'en_contra' | 'abstencion'
+export type ServicioProveedor = 'limpieza' | 'jardineria' | 'seguridad' | 'mantenimiento' | 'elevadores' | 'piscina' | 'otro'
+export type EstadoObjeto = 'en_custodia' | 'reclamado' | 'donado' | 'descartado'
+export type TipoAgenda = 'tarea' | 'evento' | 'mantenimiento' | 'reunion' | 'otro'
+export type EstadoAgenda = 'pendiente' | 'en_curso' | 'completado' | 'cancelado'
+
+export interface Asamblea {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  tipo: TipoAsamblea
+  fecha: string
+  hora_inicio: string
+  hora_fin?: string
+  lugar?: string
+  estado: EstadoAsamblea
+  quorum_requerido: number
+  quorum_alcanzado?: number
+  acta?: string
+  convocado_por?: string
+  created_at: string
+}
+
+export interface PuntoAsamblea {
+  id: string
+  asamblea_id: string
+  orden: number
+  titulo: string
+  descripcion?: string
+  tipo: TipoPunto
+  resultado?: string
+  created_at: string
+  votos?: VotoAsamblea[]
+}
+
+export interface VotoAsamblea {
+  id: string
+  punto_id: string
+  unidad_id: string
+  voto: TipoVoto
+  registrado_por?: string
+  created_at: string
+  unidad_nombre?: string
+}
+
+export interface ContratoProveedor {
+  id: string
+  company_id: string
+  project_id: string
+  proveedor_nombre: string
+  proveedor_contacto?: string | null
+  proveedor_telefono?: string | null
+  proveedor_email?: string | null
+  servicio: ServicioProveedor
+  descripcion?: string | null
+  monto_mensual?: number | null
+  fecha_inicio: string
+  fecha_fin?: string | null
+  estado: EstadoContrato
+  documento_url?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface ObjetoPerdido {
+  id: string
+  company_id: string
+  project_id: string
+  descripcion: string
+  lugar_encontrado?: string | null
+  fecha_encontrado: string
+  estado: EstadoObjeto
+  reclamado_por?: string | null
+  fecha_reclamo?: string | null
+  foto_url?: string | null
+  registrado_por?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface AgendaItem {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  tipo: TipoAgenda
+  fecha: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  estado: EstadoAgenda
+  asignado_a?: string | null
+  recurrente: boolean
+  notas?: string | null
+  created_at: string
 }
