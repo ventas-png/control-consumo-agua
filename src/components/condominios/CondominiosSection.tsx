@@ -10,6 +10,7 @@ import type {
   ContactoEmergencia, Mudanza, DocumentoCondominio, RegistroResiduo,
   BodegaCondominio, OnboardingResidente, PropuestaInversion, MemoriaLabores,
   ReservaSTR, LocalComercial, ServicioHousekeeping,
+  FirmaDigital, SolicitudConcierge, LlaveCondominio, Encuesta, RespuestaEncuesta,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -43,6 +44,10 @@ import { STRTab } from './tabs/STRTab'
 import { LocalesTab } from './tabs/LocalesTab'
 import { SostenibilidadTab } from './tabs/SostenibilidadTab'
 import { HousekeepingTab } from './tabs/HousekeepingTab'
+import { FirmaDigitalTab } from './tabs/FirmaDigitalTab'
+import { ConciergeTab } from './tabs/ConciergeTab'
+import { LlavesTab } from './tabs/LlavesTab'
+import { EncuestasTab } from './tabs/EncuestasTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -52,6 +57,7 @@ type CondominioTab =
   | 'emergencias' | 'mudanzas' | 'documentos' | 'residuos'
   | 'bodegas' | 'onboarding' | 'propuestas' | 'memoria'
   | 'str' | 'locales' | 'sostenibilidad' | 'housekeeping'
+  | 'firmas' | 'concierge' | 'llaves' | 'encuestas'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -86,6 +92,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'locales',       label: 'Locales',        icon: '🏪' },
   { id: 'sostenibilidad',label: 'Sostenibilidad', icon: '🌱' },
   { id: 'housekeeping',  label: 'Housekeeping',   icon: '🧹' },
+  { id: 'firmas',        label: 'Firmas',         icon: '✍️' },
+  { id: 'concierge',     label: 'Concierge',      icon: '🛎️' },
+  { id: 'llaves',        label: 'Llaves',         icon: '🔑' },
+  { id: 'encuestas',     label: 'Encuestas',      icon: '📊' },
 ]
 
 interface Props {
@@ -140,6 +150,12 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [reservasSTR, setReservasSTR] = useState<ReservaSTR[]>([])
   const [locales, setLocales] = useState<LocalComercial[]>([])
   const [serviciosHK, setServiciosHK] = useState<ServicioHousekeeping[]>([])
+  // Fase 8
+  const [firmas, setFirmas] = useState<FirmaDigital[]>([])
+  const [solicitudesConcierge, setSolicitudesConcierge] = useState<SolicitudConcierge[]>([])
+  const [llaves, setLlaves] = useState<LlaveCondominio[]>([])
+  const [encuestas, setEncuestas] = useState<Encuesta[]>([])
+  const [respuestasEncuesta, setRespuestasEncuesta] = useState<RespuestaEncuesta[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -164,6 +180,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       contactosEmergRes, mudanzasRes, documentosRes, residuosRes,
       bodegasRes, onboardingsRes, propuestasRes, memoriasRes,
       strRes, localesRes, hkRes,
+      firmasRes, conciergeRes, llavesRes, encuestasRes, respuestasRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -197,6 +214,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('reservas_str').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_entrada', { ascending: false }),
       supabase.from('locales_comerciales').select('*').eq('project_id', pid).eq('company_id', cid).order('numero_local'),
       supabase.from('servicios_housekeeping').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('firmas_digitales').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('solicitudes_concierge').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_solicitud', { ascending: false }),
+      supabase.from('llaves_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('encuestas').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('respuestas_encuesta').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -243,6 +265,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setReservasSTR(mapUnidad<ReservaSTR>(strRes.data ?? []))
     setLocales((localesRes.data ?? []) as LocalComercial[])
     setServiciosHK(mapUnidad<ServicioHousekeeping>(hkRes.data ?? []))
+    setFirmas(mapUnidad<FirmaDigital>(firmasRes.data ?? []))
+    setSolicitudesConcierge(mapUnidad<SolicitudConcierge>(conciergeRes.data ?? []))
+    setLlaves(mapUnidad<LlaveCondominio>(llavesRes.data ?? []))
+    setEncuestas((encuestasRes.data ?? []) as Encuesta[])
+    setRespuestasEncuesta(mapUnidad<RespuestaEncuesta>(respuestasRes.data ?? []))
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -369,6 +396,14 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'sostenibilidad' && <SostenibilidadTab residuos={residuos} proyectoId={selectedProyectoId} companyId={cid} />}
 
         {activeTab === 'housekeeping' && <HousekeepingTab servicios={serviciosHK} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'firmas' && <FirmaDigitalTab firmas={firmas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'concierge' && <ConciergeTab solicitudes={solicitudesConcierge} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'llaves' && <LlavesTab llaves={llaves} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'encuestas' && <EncuestasTab encuestas={encuestas} respuestas={respuestasEncuesta} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )
