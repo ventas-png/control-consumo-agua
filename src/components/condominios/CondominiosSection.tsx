@@ -1,22 +1,41 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
-import type { UserSession, Proyecto, Unidad, CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, TicketMantenimiento, AnuncioComunidad } from '../../types'
+import type {
+  UserSession, Proyecto, Unidad,
+  CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, TicketMantenimiento, AnuncioComunidad,
+  ParqueoCondominio, Mascota, PaqueteRecibido, InfraccionCondominio,
+  RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
+} from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
 import { VisitantesTab } from './tabs/VisitantesTab'
 import { AmenidadesTab } from './tabs/AmenidadesTab'
 import { MantenimientoTab } from './tabs/MantenimientoTab'
 import { ComunidadTab } from './tabs/ComunidadTab'
+import { ParqueosTab } from './tabs/ParqueosTab'
+import { MascotasTab } from './tabs/MascotasTab'
+import { PaqueteriaTab } from './tabs/PaqueteriaTab'
+import { InfraccionesTab } from './tabs/InfraccionesTab'
+import { SeguridadTab } from './tabs/SeguridadTab'
+import { ArrendamientosTab } from './tabs/ArrendamientosTab'
 
-type CondominioTab = 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
+type CondominioTab =
+  | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
+  | 'parqueos' | 'mascotas' | 'paqueteria' | 'infracciones' | 'seguridad' | 'arrendamientos'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
-  { id: 'panel',        label: 'Panel General', icon: '📊' },
-  { id: 'cuotas',       label: 'Cuotas',        icon: '💳' },
-  { id: 'visitantes',   label: 'Visitantes',    icon: '🚪' },
-  { id: 'amenidades',   label: 'Amenidades',    icon: '🏊' },
-  { id: 'mantenimiento',label: 'Mantenimiento', icon: '🔧' },
-  { id: 'comunidad',    label: 'Comunidad',     icon: '📢' },
+  { id: 'panel',          label: 'Panel',          icon: '📊' },
+  { id: 'cuotas',         label: 'Cuotas',         icon: '💳' },
+  { id: 'visitantes',     label: 'Visitantes',     icon: '🚪' },
+  { id: 'amenidades',     label: 'Amenidades',     icon: '🏊' },
+  { id: 'mantenimiento',  label: 'Mantenimiento',  icon: '🔧' },
+  { id: 'comunidad',      label: 'Comunidad',      icon: '📢' },
+  { id: 'parqueos',       label: 'Parqueos',       icon: '🅿️' },
+  { id: 'mascotas',       label: 'Mascotas',       icon: '🐾' },
+  { id: 'paqueteria',     label: 'Paquetería',     icon: '📦' },
+  { id: 'infracciones',   label: 'Infracciones',   icon: '⚖️' },
+  { id: 'seguridad',      label: 'Seguridad',      icon: '🛡️' },
+  { id: 'arrendamientos', label: 'Arrendamientos', icon: '📄' },
 ]
 
 interface Props {
@@ -32,12 +51,21 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [selectedProyectoId, setSelectedProyectoId] = useState<string>('')
   const [loading, setLoading] = useState(false)
 
+  // Fase 1
   const [cuotas, setCuotas] = useState<CuotaCondominio[]>([])
   const [visitantes, setVisitantes] = useState<Visitante[]>([])
   const [amenidades, setAmenidades] = useState<Amenidad[]>([])
   const [reservas, setReservas] = useState<ReservaAmenidad[]>([])
   const [tickets, setTickets] = useState<TicketMantenimiento[]>([])
   const [anuncios, setAnuncios] = useState<AnuncioComunidad[]>([])
+  // Fase 2
+  const [parqueos, setParqueos] = useState<ParqueoCondominio[]>([])
+  const [mascotas, setMascotas] = useState<Mascota[]>([])
+  const [paquetes, setPaquetes] = useState<PaqueteRecibido[]>([])
+  const [infracciones, setInfracciones] = useState<InfraccionCondominio[]>([])
+  const [rondas, setRondas] = useState<RondaSeguridad[]>([])
+  const [novedades, setNovedades] = useState<NovedadSeguridad[]>([])
+  const [contratos, setContratos] = useState<ContratoArrendamiento[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -52,86 +80,61 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setLoading(true)
 
     const pid = selectedProyectoId
-    const cid = currentUser.company_id ?? ''
+    const cid = currentUser.company_id
 
-    const [cuotasRes, visitantesRes, amenidadesRes, reservasRes, ticketsRes, anunciosRes] = await Promise.all([
-      supabase
-        .from('cuotas_condominio')
-        .select('*, unidades(nombre)')
-        .eq('project_id', pid)
-        .eq('company_id', cid)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('visitantes')
-        .select('*, unidades(nombre)')
-        .eq('project_id', pid)
-        .eq('company_id', cid)
-        .order('hora_entrada', { ascending: false })
-        .limit(200),
-      supabase
-        .from('amenidades')
-        .select('*')
-        .eq('project_id', pid)
-        .eq('company_id', cid)
-        .order('nombre'),
-      supabase
-        .from('reservas_amenidades')
-        .select('*, amenidades(nombre), unidades(nombre)')
-        .eq('company_id', cid)
-        .order('fecha', { ascending: false })
-        .limit(200),
-      supabase
-        .from('tickets_mantenimiento')
-        .select('*, unidades(nombre)')
-        .eq('project_id', pid)
-        .eq('company_id', cid)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('anuncios_comunidad')
-        .select('*, app_users(nombre_completo)')
-        .eq('project_id', pid)
-        .eq('company_id', cid)
-        .order('created_at', { ascending: false }),
+    const [
+      cuotasRes, visitantesRes, amenidadesRes, reservasRes, ticketsRes, anunciosRes,
+      parqueosRes, mascotasRes, paquetesRes, infraccionesRes, rondasRes, novedadesRes, contratosRes,
+    ] = await Promise.all([
+      supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
+      supabase.from('amenidades').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
+      supabase.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('company_id', cid).order('fecha', { ascending: false }).limit(200),
+      supabase.from('tickets_mantenimiento').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('anuncios_comunidad').select('*, app_users(nombre_completo)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('parqueos_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('numero'),
+      supabase.from('mascotas').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('nombre'),
+      supabase.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_recepcion', { ascending: false }).limit(200),
+      supabase.from('infracciones_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('rondas_seguridad').select('*').eq('project_id', pid).eq('company_id', cid).order('inicio', { ascending: false }).limit(100),
+      supabase.from('novedades_seguridad').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(200),
+      supabase.from('contratos_arrendamiento').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     ])
 
-    setCuotas((cuotasRes.data ?? []).map((r: Record<string, unknown>) => ({
-      ...r,
-      unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre,
-    } as CuotaCondominio)))
+    const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
+      data.map(r => ({ ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre } as T))
 
-    setVisitantes((visitantesRes.data ?? []).map((r: Record<string, unknown>) => ({
-      ...r,
-      unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre,
-    } as Visitante)))
-
+    setCuotas(mapUnidad<CuotaCondominio>(cuotasRes.data ?? []))
+    setVisitantes(mapUnidad<Visitante>(visitantesRes.data ?? []))
     setAmenidades((amenidadesRes.data ?? []) as Amenidad[])
-
     setReservas((reservasRes.data ?? []).map((r: Record<string, unknown>) => ({
       ...r,
       amenidad_nombre: (r.amenidades as { nombre: string } | null)?.nombre,
       unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre,
     } as ReservaAmenidad)))
-
-    setTickets((ticketsRes.data ?? []).map((r: Record<string, unknown>) => ({
-      ...r,
-      unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre,
-    } as TicketMantenimiento)))
-
+    setTickets(mapUnidad<TicketMantenimiento>(ticketsRes.data ?? []))
     setAnuncios((anunciosRes.data ?? []).map((r: Record<string, unknown>) => ({
       ...r,
       publicado_por_nombre: (r.app_users as { nombre_completo: string } | null)?.nombre_completo,
     } as AnuncioComunidad)))
+    setParqueos(mapUnidad<ParqueoCondominio>(parqueosRes.data ?? []))
+    setMascotas(mapUnidad<Mascota>(mascotasRes.data ?? []))
+    setPaquetes(mapUnidad<PaqueteRecibido>(paquetesRes.data ?? []))
+    setInfracciones(mapUnidad<InfraccionCondominio>(infraccionesRes.data ?? []))
+    setRondas((rondasRes.data ?? []) as RondaSeguridad[])
+    setNovedades((novedadesRes.data ?? []) as NovedadSeguridad[])
+    setContratos(mapUnidad<ContratoArrendamiento>(contratosRes.data ?? []))
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
 
-  useEffect(() => {
-    cargarDatos()
-  }, [cargarDatos])
+  useEffect(() => { cargarDatos() }, [cargarDatos])
 
   const unidadesProyecto = unidades.filter(u => u.project_id === selectedProyectoId)
   const proyectoActual = proyectos.find(p => p.id === selectedProyectoId)
   const moneda = proyectoActual?.moneda ?? 'Q'
+  const cid = currentUser.company_id ?? ''
+  const uid = currentUser.user_id
 
   if (proyectosActivos.length === 0) {
     return (
@@ -145,7 +148,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      {/* Header con selector de proyecto */}
+      {/* Header */}
       <div style={{ padding: '16px 24px 0', borderBottom: '1px solid #e2e8f0', background: 'white', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -153,14 +156,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
             <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>Condominios</h1>
           </div>
           {proyectosActivos.length > 1 && (
-            <select
-              value={selectedProyectoId}
-              onChange={e => setSelectedProyectoId(e.target.value)}
-              style={{ padding: '6px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc', color: '#374151', fontWeight: 500 }}
-            >
-              {proyectosActivos.map(p => (
-                <option key={p.id} value={p.id}>{p.nombre}</option>
-              ))}
+            <select value={selectedProyectoId} onChange={e => setSelectedProyectoId(e.target.value)}
+              style={{ padding: '6px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc', color: '#374151', fontWeight: 500 }}>
+              {proyectosActivos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           )}
           {proyectosActivos.length === 1 && (
@@ -169,26 +167,18 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
           {loading && <span style={{ fontSize: '12px', color: '#94a3b8' }}>Cargando...</span>}
         </div>
 
-        {/* Sub-tabs */}
-        <div style={{ display: 'flex', gap: '2px', overflowX: 'auto' }}>
+        {/* Sub-tabs scrollable */}
+        <div style={{ display: 'flex', gap: '2px', overflowX: 'auto', paddingBottom: '1px' }}>
           {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: '8px 16px',
-                borderRadius: '8px 8px 0 0',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '13.5px',
-                fontWeight: activeTab === tab.id ? 700 : 500,
+                padding: '8px 14px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer',
+                fontSize: '13px', fontWeight: activeTab === tab.id ? 700 : 500,
                 background: activeTab === tab.id ? '#f8fafc' : 'transparent',
                 color: activeTab === tab.id ? '#0ea5e9' : '#64748b',
                 borderBottom: activeTab === tab.id ? '2px solid #0ea5e9' : '2px solid transparent',
                 whiteSpace: 'nowrap',
-                transition: 'color 0.15s, border-color 0.15s',
-              }}
-            >
+              }}>
               {tab.icon} {tab.label}
             </button>
           ))}
@@ -197,75 +187,29 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
       {/* Tab content */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {activeTab === 'panel' && (
-          <PanelGeneralTab
-            cuotas={cuotas}
-            tickets={tickets}
-            visitantes={visitantes}
-            amenidades={amenidades}
-            moneda={moneda}
-          />
-        )}
-        {activeTab === 'cuotas' && (
-          <CuotasTab
-            cuotas={cuotas}
-            unidades={unidadesProyecto}
-            proyectos={proyectosActivos}
-            proyectoId={selectedProyectoId}
-            companyId={currentUser.company_id ?? ''}
-            moneda={moneda}
-            canCreate={canCreate('condominios')}
-            canEdit={canEdit('condominios')}
-            onRefresh={cargarDatos}
-          />
-        )}
-        {activeTab === 'visitantes' && (
-          <VisitantesTab
-            visitantes={visitantes}
-            unidades={unidadesProyecto}
-            proyectoId={selectedProyectoId}
-            companyId={currentUser.company_id ?? ''}
-            userId={currentUser.user_id}
-            canCreate={canCreate('condominios')}
-            onRefresh={cargarDatos}
-          />
-        )}
-        {activeTab === 'amenidades' && (
-          <AmenidadesTab
-            amenidades={amenidades}
-            reservas={reservas}
-            unidades={unidadesProyecto}
-            proyectoId={selectedProyectoId}
-            companyId={currentUser.company_id ?? ''}
-            userId={currentUser.user_id}
-            moneda={moneda}
-            canCreate={canCreate('condominios')}
-            canEdit={canEdit('condominios')}
-            onRefresh={cargarDatos}
-          />
-        )}
-        {activeTab === 'mantenimiento' && (
-          <MantenimientoTab
-            tickets={tickets}
-            unidades={unidadesProyecto}
-            proyectoId={selectedProyectoId}
-            companyId={currentUser.company_id ?? ''}
-            userId={currentUser.user_id}
-            canCreate={canCreate('condominios')}
-            canEdit={canEdit('condominios')}
-            onRefresh={cargarDatos}
-          />
-        )}
-        {activeTab === 'comunidad' && (
-          <ComunidadTab
-            anuncios={anuncios}
-            proyectoId={selectedProyectoId}
-            companyId={currentUser.company_id ?? ''}
-            userId={currentUser.user_id}
-            canCreate={canCreate('condominios')}
-            onRefresh={cargarDatos}
-          />
-        )}
+        {activeTab === 'panel' && <PanelGeneralTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} amenidades={amenidades} moneda={moneda} />}
+
+        {activeTab === 'cuotas' && <CuotasTab cuotas={cuotas} unidades={unidadesProyecto} proyectos={proyectosActivos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'visitantes' && <VisitantesTab visitantes={visitantes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'amenidades' && <AmenidadesTab amenidades={amenidades} reservas={reservas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'mantenimiento' && <MantenimientoTab tickets={tickets} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'comunidad' && <ComunidadTab anuncios={anuncios} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'parqueos' && <ParqueosTab parqueos={parqueos} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'mascotas' && <MascotasTab mascotas={mascotas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'paqueteria' && <PaqueteriaTab paquetes={paquetes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'infracciones' && <InfraccionesTab infracciones={infracciones} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'seguridad' && <SeguridadTab rondas={rondas} novedades={novedades} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'arrendamientos' && <ArrendamientosTab contratos={contratos} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )

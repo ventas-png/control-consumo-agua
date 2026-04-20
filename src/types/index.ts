@@ -459,6 +459,140 @@ export interface AnuncioComunidad {
   publicado_por_nombre?: string
 }
 
+// ── Módulo Condominios Fase 2 ─────────────────────────────────────────────────
+
+export type TipoParqueo = 'asignado' | 'visita' | 'discapacitado'
+export type EspecieMascota = 'perro' | 'gato' | 'ave' | 'otro'
+export type EstadoPaquete = 'pendiente' | 'entregado' | 'devuelto'
+export type TipoInfraccion = 'ruido' | 'basura' | 'estacionamiento' | 'mascota' | 'daños' | 'otro'
+export type EstadoInfraccion = 'emitida' | 'notificada' | 'en_descargo' | 'resuelta' | 'anulada'
+export type EstadoRonda = 'en_curso' | 'completada' | 'incompleta'
+export type TipoNovedad = 'incidente' | 'observacion' | 'alarma' | 'acceso' | 'otro'
+export type PrioridadNovedad = 'normal' | 'alta' | 'critica'
+export type EstadoContrato = 'activo' | 'vencido' | 'terminado'
+
+export interface ParqueoCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  numero: string
+  tipo: TipoParqueo
+  unidad_id?: string | null
+  placa_vehiculo?: string | null
+  marca_vehiculo?: string | null
+  color_vehiculo?: string | null
+  activo: boolean
+  notas?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export interface Mascota {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  nombre: string
+  especie: EspecieMascota
+  raza?: string | null
+  color?: string | null
+  fecha_nacimiento?: string | null
+  fecha_ultima_vacuna?: string | null
+  activo: boolean
+  foto_url?: string | null
+  notas?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export interface PaqueteRecibido {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  remitente?: string | null
+  descripcion: string
+  num_guia?: string | null
+  empresa_mensajeria?: string | null
+  estado: EstadoPaquete
+  hora_recepcion: string
+  hora_entrega?: string | null
+  recibido_por?: string | null
+  entregado_por?: string | null
+  notas?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export interface InfraccionCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  tipo: TipoInfraccion
+  descripcion: string
+  monto_multa?: number | null
+  estado: EstadoInfraccion
+  reportado_por?: string | null
+  fecha_infraccion: string
+  fecha_limite_descargo?: string | null
+  descargo?: string | null
+  resolucion?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export interface RondaSeguridad {
+  id: string
+  company_id: string
+  project_id: string
+  guardia_id?: string | null
+  inicio: string
+  fin?: string | null
+  estado: EstadoRonda
+  notas?: string | null
+  created_at: string
+}
+
+export interface NovedadSeguridad {
+  id: string
+  company_id: string
+  project_id: string
+  ronda_id?: string | null
+  tipo: TipoNovedad
+  descripcion: string
+  ubicacion?: string | null
+  prioridad: PrioridadNovedad
+  reportado_por?: string | null
+  foto_url?: string | null
+  created_at: string
+}
+
+export interface ContratoArrendamiento {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  arrendatario_nombre: string
+  arrendatario_identificacion?: string | null
+  arrendatario_telefono?: string | null
+  arrendatario_email?: string | null
+  monto_renta: number
+  dia_pago: number
+  fecha_inicio: string
+  fecha_fin?: string | null
+  deposito?: number | null
+  estado: EstadoContrato
+  notas?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
 // ── Centro de Comunicación ─────────────────────────────────────────────────
 
 export type ConversationStatus =
