@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { UserSession, Registro } from '../../types'
 import { Chart, registerables } from 'chart.js'
@@ -137,17 +137,12 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           .select('id, nombre, tipo, piso, area_m2, project_id, company_id, activo')
           .eq('cliente_id', clienteId)
           .eq('activo', true),
-        // Reading history (last 24 months for dashboard analytics)
-        (() => {
-          const twoYearsAgo = new Date()
-          twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2)
-          return supabase
-            .from('registros')
-            .select('id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
-            .eq('cliente_id', clienteId)
-            .gte('fecha', twoYearsAgo.toISOString().split('T')[0])
-            .order('fecha', { ascending: false })
-        })(),
+        // Reading history — all historical records (no date cap)
+        supabase
+          .from('registros')
+          .select('id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
+          .eq('cliente_id', clienteId)
+          .order('fecha', { ascending: false }),
         // Own contact info
         supabase
           .from('clientes')
@@ -204,13 +199,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       // Fetch readings by contador_id to catch registros where cliente_id is missing/mismatched
       let mergedLecturas: LecturaInfo[] = (rData as LecturaInfo[]) ?? []
       if (cData.length > 0) {
-        const twoYearsAgo2 = new Date()
-        twoYearsAgo2.setFullYear(twoYearsAgo2.getFullYear() - 2)
         const { data: contReadings } = await supabase
           .from('registros')
           .select('id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
           .in('contador_id', cData.map(c => c.id))
-          .gte('fecha', twoYearsAgo2.toISOString().split('T')[0])
           .order('fecha', { ascending: false })
         if (contReadings?.length) {
           const existingIds = new Set(mergedLecturas.map(l => l.id))
@@ -567,8 +559,11 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                   if (!chartCustomStart || !chartCustomEnd) {
                     const now = new Date()
                     const endStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-                    const s = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-                    const startStr = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}`
+                    // Default range: from earliest available data year or 2 years back
+                    const startYear = lecturas.length > 0
+                      ? new Date(lecturas[lecturas.length - 1].fecha + 'T12:00:00').getFullYear()
+                      : now.getFullYear() - 2
+                    const startStr = `${startYear}-01`
                     setChartCustomStart(startStr)
                     setChartCustomEnd(endStr)
                   }
@@ -586,29 +581,50 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(14,165,233,0.45)', marginRight: '4px' }} />Anteriores</span>
             </div>
           </div>
-          {/* Inputs de rango personalizado */}
-          {chartRangeMode === 'custom' && (
-            <div style={{ display: 'flex', gap: '14px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap', background: '#f0f9ff', borderRadius: '10px', padding: '10px 14px', border: '1px solid #bae6fd' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
-                <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Desde:</span>
-                <input
-                  type="month"
-                  value={chartCustomStart}
-                  onChange={e => setChartCustomStart(e.target.value)}
-                  style={{ padding: '5px 10px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }}
-                />
+          {/* Inputs de rango personalizado — selectores Mes/Año */}
+          {chartRangeMode === 'custom' && (() => {
+            const now = new Date()
+            const curYear = now.getFullYear()
+            const years = Array.from({ length: curYear - 2018 + 2 }, (_, i) => 2018 + i)
+            const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+            const selStyle: React.CSSProperties = { padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }
+
+            function parseParts(val: string) {
+              const [y, m] = (val || '').split('-')
+              return { y: y || '', m: m || '' }
+            }
+            function buildVal(y: string, m: string) { return y && m ? `${y}-${m}` : '' }
+
+            const startParts = parseParts(chartCustomStart)
+            const endParts = parseParts(chartCustomEnd)
+
+            return (
+              <div style={{ display: 'flex', gap: '20px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap', background: '#f0f9ff', borderRadius: '10px', padding: '10px 14px', border: '1px solid #bae6fd' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
+                  <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Desde:</span>
+                  <select value={startParts.m} onChange={e => setChartCustomStart(buildVal(startParts.y, e.target.value))} style={selStyle}>
+                    <option value="">Mes</option>
+                    {meses.map((m, i) => <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>)}
+                  </select>
+                  <select value={startParts.y} onChange={e => setChartCustomStart(buildVal(e.target.value, startParts.m))} style={selStyle}>
+                    <option value="">Año</option>
+                    {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
+                  <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Hasta:</span>
+                  <select value={endParts.m} onChange={e => setChartCustomEnd(buildVal(endParts.y, e.target.value))} style={selStyle}>
+                    <option value="">Mes</option>
+                    {meses.map((m, i) => <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>)}
+                  </select>
+                  <select value={endParts.y} onChange={e => setChartCustomEnd(buildVal(e.target.value, endParts.m))} style={selStyle}>
+                    <option value="">Año</option>
+                    {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
+                  </select>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
-                <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Hasta:</span>
-                <input
-                  type="month"
-                  value={chartCustomEnd}
-                  onChange={e => setChartCustomEnd(e.target.value)}
-                  style={{ padding: '5px 10px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }}
-                />
-              </div>
-            </div>
-          )}
+            )
+          })()}
           {/* Gráfico o estado vacío */}
           {lecturasTotal === 0 ? (
             <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '8px', background: '#f8fafc', borderRadius: '10px' }}>
