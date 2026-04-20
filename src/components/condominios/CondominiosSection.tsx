@@ -22,6 +22,7 @@ import type {
   AvisoCobro, BitacoraManto as BitacoraMantoType, EvaluacionProveedor, ReclamoCondominio,
   FondoReserva, PermisoObraUnidad, TarifaCondominio, IncidenteSeguridad,
   ChecklistArea, ProgramacionLimpieza, ConsumoEnergiaArea, HistorialResidente,
+  EstacionamientoVisita, BitacoraGuardia, EquipoComun, PresenciaPersonal,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -103,6 +104,10 @@ import { ChecklistAreasTab } from './tabs/ChecklistAreasTab'
 import { ProgramacionLimpiezaTab } from './tabs/ProgramacionLimpiezaTab'
 import { ConsumoEnergiaAreasTab } from './tabs/ConsumoEnergiaAreasTab'
 import { HistorialResidentesTab } from './tabs/HistorialResidentesTab'
+import EstacionamientoVisitaTab from './tabs/EstacionamientoVisitaTab'
+import BitacoraGuardiaTab from './tabs/BitacoraGuardiaTab'
+import EquiposComunesTab from './tabs/EquiposComunesTab'
+import PresenciaPersonalTab from './tabs/PresenciaPersonalTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -124,6 +129,7 @@ type CondominioTab =
   | 'avisos_cobro' | 'bitacora_manto' | 'eval_proveedor' | 'reclamos'
   | 'fondo_reserva' | 'permisos_obra' | 'tarifas' | 'incidentes'
   | 'checklist_areas' | 'prog_limpieza' | 'consumo_energia' | 'historial_res'
+  | 'estac_visita' | 'bitacora_guardia' | 'equipos' | 'presencia'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -206,6 +212,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'prog_limpieza',    label: 'Limpieza',       icon: '🧹' },
   { id: 'consumo_energia',  label: 'Consumo Energía',icon: '⚡' },
   { id: 'historial_res',    label: 'Historial Res.', icon: '👥' },
+  { id: 'estac_visita',     label: 'Estac. Visita',  icon: '🅿️' },
+  { id: 'bitacora_guardia', label: 'Bitácora Guardia',icon: '👮' },
+  { id: 'equipos',          label: 'Equipos',        icon: '⚙️' },
+  { id: 'presencia',        label: 'Presencia',      icon: '📋' },
 ]
 
 interface Props {
@@ -318,6 +328,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [progLimpieza, setProgLimpieza] = useState<ProgramacionLimpieza[]>([])
   const [consumoEnergia, setConsumoEnergia] = useState<ConsumoEnergiaArea[]>([])
   const [historialRes, setHistorialRes] = useState<HistorialResidente[]>([])
+  // Fase 20
+  const [estacVisita, setEstacVisita] = useState<EstacionamientoVisita[]>([])
+  const [bitacoraGuardia, setBitacoraGuardia] = useState<BitacoraGuardia[]>([])
+  const [equiposComunes, setEquiposComunes] = useState<EquipoComun[]>([])
+  const [presenciaPersonal, setPresenciaPersonal] = useState<PresenciaPersonal[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -354,6 +369,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       avisosCobroRes, bitacoraMantoRes, evalProvRes, reclamosCondRes,
       fondoReservaRes, permisosObraRes, tarifasRes, incidentesRes,
       checklistAreasRes, progLimpiezaRes, consumoEnergiaRes, historialResRes,
+      estacVisitaRes, bitacoraGuardiaRes, equiposComunesRes, presenciaPersonalRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -434,6 +450,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('programacion_limpieza').select('*').eq('project_id', pid).eq('company_id', cid).order('area'),
       supabase.from('consumo_energia_areas').select('*').eq('project_id', pid).eq('company_id', cid).order('periodo', { ascending: false }).order('area'),
       supabase.from('historial_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_desde', { ascending: false }),
+      supabase.from('estacionamiento_visita').select('*').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(500),
+      supabase.from('bitacora_guardia').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).order('turno'),
+      supabase.from('equipos_comunes').select('*').eq('project_id', pid).eq('company_id', cid).order('categoria').order('nombre'),
+      supabase.from('presencia_personal').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).order('nombre'),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -527,6 +547,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setProgLimpieza((progLimpiezaRes.data ?? []) as ProgramacionLimpieza[])
     setConsumoEnergia((consumoEnergiaRes.data ?? []) as ConsumoEnergiaArea[])
     setHistorialRes((historialResRes.data ?? []) as HistorialResidente[])
+    setEstacVisita((estacVisitaRes.data ?? []) as EstacionamientoVisita[])
+    setBitacoraGuardia((bitacoraGuardiaRes.data ?? []) as BitacoraGuardia[])
+    setEquiposComunes((equiposComunesRes.data ?? []) as EquipoComun[])
+    setPresenciaPersonal((presenciaPersonalRes.data ?? []) as PresenciaPersonal[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -705,6 +729,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'prog_limpieza' && <ProgramacionLimpiezaTab programaciones={progLimpieza} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'consumo_energia' && <ConsumoEnergiaAreasTab consumos={consumoEnergia} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'historial_res' && <HistorialResidentesTab historial={historialRes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'estac_visita' && <EstacionamientoVisitaTab registros={estacVisita} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'bitacora_guardia' && <BitacoraGuardiaTab registros={bitacoraGuardia} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'equipos' && <EquiposComunesTab equipos={equiposComunes} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'presencia' && <PresenciaPersonalTab registros={presenciaPersonal} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )
