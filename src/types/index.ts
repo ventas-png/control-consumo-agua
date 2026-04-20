@@ -900,3 +900,357 @@ export interface BroadcastRecipient {
   // join opcional
   broadcast?: Broadcast
 }
+
+// ── Condominios Fase 3 ────────────────────────────────────────────────────────
+
+export type TipoAsamblea = 'ordinaria' | 'extraordinaria'
+export type EstadoAsamblea = 'programada' | 'en_curso' | 'finalizada' | 'cancelada'
+export type TipoPunto = 'informativo' | 'votacion' | 'debate'
+export type TipoVoto = 'a_favor' | 'en_contra' | 'abstencion'
+export type ServicioProveedor = 'limpieza' | 'jardineria' | 'seguridad' | 'mantenimiento' | 'elevadores' | 'piscina' | 'otro'
+export type EstadoObjeto = 'en_custodia' | 'reclamado' | 'donado' | 'descartado'
+export type TipoAgenda = 'tarea' | 'evento' | 'mantenimiento' | 'reunion' | 'otro'
+export type EstadoAgenda = 'pendiente' | 'en_curso' | 'completado' | 'cancelado'
+
+export interface Asamblea {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  tipo: TipoAsamblea
+  fecha: string
+  hora_inicio: string
+  hora_fin?: string
+  lugar?: string
+  estado: EstadoAsamblea
+  quorum_requerido: number
+  quorum_alcanzado?: number
+  acta?: string
+  convocado_por?: string
+  created_at: string
+}
+
+export interface PuntoAsamblea {
+  id: string
+  asamblea_id: string
+  orden: number
+  titulo: string
+  descripcion?: string
+  tipo: TipoPunto
+  resultado?: string
+  created_at: string
+  votos?: VotoAsamblea[]
+}
+
+export interface VotoAsamblea {
+  id: string
+  punto_id: string
+  unidad_id: string
+  voto: TipoVoto
+  registrado_por?: string
+  created_at: string
+  unidad_nombre?: string
+}
+
+export interface ContratoProveedor {
+  id: string
+  company_id: string
+  project_id: string
+  proveedor_nombre: string
+  proveedor_contacto?: string | null
+  proveedor_telefono?: string | null
+  proveedor_email?: string | null
+  servicio: ServicioProveedor
+  descripcion?: string | null
+  monto_mensual?: number | null
+  fecha_inicio: string
+  fecha_fin?: string | null
+  estado: EstadoContrato
+  documento_url?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface ObjetoPerdido {
+  id: string
+  company_id: string
+  project_id: string
+  descripcion: string
+  lugar_encontrado?: string | null
+  fecha_encontrado: string
+  estado: EstadoObjeto
+  reclamado_por?: string | null
+  fecha_reclamo?: string | null
+  foto_url?: string | null
+  registrado_por?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface AgendaItem {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  tipo: TipoAgenda
+  fecha: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  estado: EstadoAgenda
+  asignado_a?: string | null
+  recurrente: boolean
+  notas?: string | null
+  created_at: string
+}
+
+// ── Condominios Fase 4 ────────────────────────────────────────────────────────
+
+export type CategoriaInventario = 'herramienta' | 'equipo' | 'material' | 'mobiliario' | 'vehiculo' | 'otro'
+export type EstadoInventario = 'disponible' | 'en_uso' | 'en_reparacion' | 'dado_de_baja'
+export type TipoPoliza = 'incendio' | 'responsabilidad_civil' | 'terremoto' | 'inundacion' | 'robo' | 'vida' | 'otro'
+export type EstadoPoliza = 'vigente' | 'vencida' | 'cancelada'
+export type TipoInspeccion = 'bomberos' | 'igss' | 'municipalidad' | 'electrica' | 'sanitaria' | 'elevadores' | 'otro'
+export type ResultadoInspeccion = 'aprobado' | 'aprobado_con_observaciones' | 'reprobado' | 'pendiente'
+export type CargoPersonal = 'conserje' | 'guardia' | 'jardinero' | 'mantenimiento' | 'administrador' | 'otro'
+export type TurnoPersonal = 'diurno' | 'nocturno' | 'rotativo'
+export type EstadoPersonal = 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad'
+
+export interface ItemInventario {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  categoria: CategoriaInventario
+  descripcion?: string | null
+  numero_serie?: string | null
+  ubicacion?: string | null
+  estado: EstadoInventario
+  cantidad: number
+  cantidad_minima: number
+  unidad_medida: string
+  costo_unitario?: number | null
+  proveedor?: string | null
+  fecha_adquisicion?: string | null
+  fecha_vencimiento?: string | null
+  foto_url?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface PolizaSeguro {
+  id: string
+  company_id: string
+  project_id: string
+  numero_poliza: string
+  aseguradora: string
+  tipo: TipoPoliza
+  descripcion?: string | null
+  suma_asegurada?: number | null
+  prima_anual?: number | null
+  fecha_inicio: string
+  fecha_vencimiento: string
+  estado: EstadoPoliza
+  agente_nombre?: string | null
+  agente_telefono?: string | null
+  agente_email?: string | null
+  documento_url?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface InspeccionNormativa {
+  id: string
+  company_id: string
+  project_id: string
+  tipo: TipoInspeccion
+  entidad_inspectora?: string | null
+  fecha: string
+  resultado: ResultadoInspeccion
+  hallazgos?: string | null
+  acciones_correctivas?: string | null
+  fecha_proxima?: string | null
+  inspector_nombre?: string | null
+  certificado_url?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface PersonalCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  cargo: CargoPersonal
+  telefono?: string | null
+  email?: string | null
+  fecha_ingreso?: string | null
+  turno: TurnoPersonal
+  estado: EstadoPersonal
+  salario?: number | null
+  dpi?: string | null
+  foto_url?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+// ── Condominios Fase 5 ────────────────────────────────────────────────────────
+
+export type TipoContactoEmergencia = 'bomberos' | 'policia' | 'ambulancia' | 'hospital' | 'electricidad' | 'agua' | 'gas' | 'administracion' | 'general'
+export type TipoMudanza = 'ingreso' | 'salida'
+export type EstadoMudanza = 'programada' | 'en_curso' | 'completada' | 'cancelada'
+export type CategoriaDocumento = 'reglamento' | 'circular' | 'manual' | 'acta' | 'contrato' | 'formulario' | 'otro'
+export type VisibilidadDocumento = 'admin' | 'residentes' | 'todos'
+export type TipoResiduo = 'general' | 'reciclable' | 'organico' | 'electronico' | 'peligroso' | 'escombros'
+export type EstadoResiduo = 'pendiente' | 'recolectado' | 'procesado'
+
+export interface ContactoEmergencia {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  tipo: TipoContactoEmergencia
+  telefono: string
+  telefono_alternativo?: string | null
+  descripcion?: string | null
+  disponible_24h: boolean
+  orden: number
+  activo: boolean
+  created_at: string
+}
+
+export interface Mudanza {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  tipo: TipoMudanza
+  fecha: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  nombre_residente: string
+  telefono?: string | null
+  empresa_mudanza?: string | null
+  estado: EstadoMudanza
+  deposito_requerido: boolean
+  deposito_pagado: boolean
+  monto_deposito?: number | null
+  ascensor_reservado: boolean
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export interface DocumentoCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  categoria: CategoriaDocumento
+  descripcion?: string | null
+  url: string
+  version?: string | null
+  vigente: boolean
+  visibilidad: VisibilidadDocumento
+  subido_por?: string | null
+  created_at: string
+}
+
+export interface RegistroResiduo {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  tipo_residuo: TipoResiduo
+  cantidad_kg?: number | null
+  punto_acopio?: string | null
+  empresa_recolectora?: string | null
+  estado: EstadoResiduo
+  incidencia: boolean
+  descripcion_incidencia?: string | null
+  registrado_por?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+// ── Fase 6: Bodegas, Onboarding, Propuestas, Memoria ──────────────────────────
+export type EstadoBodega = 'disponible' | 'asignada' | 'bloqueada'
+export interface BodegaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  numero: string
+  piso?: string | null
+  area_m2?: number | null
+  unidad_id?: string | null
+  estado: EstadoBodega
+  monto_renta?: number | null
+  fecha_asignacion?: string | null
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type EstadoOnboarding = 'en_proceso' | 'completado' | 'cancelado'
+export interface OnboardingResidente {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  nombre_residente: string
+  fecha_ingreso: string
+  tipo: 'propietario' | 'arrendatario'
+  estado: EstadoOnboarding
+  llaves_entregadas: boolean
+  reglamento_firmado: boolean
+  deposito_pagado: boolean
+  datos_registrados: boolean
+  accesos_configurados: boolean
+  inspeccion_unidad: boolean
+  bienvenida_enviada: boolean
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type CategoriaPropuesta = 'mejora' | 'reparacion' | 'expansion' | 'tecnologia' | 'seguridad' | 'otro'
+export type EstadoPropuesta = 'propuesta' | 'en_evaluacion' | 'aprobada' | 'rechazada' | 'en_ejecucion' | 'completada'
+export type PrioridadPropuesta = 'baja' | 'media' | 'alta'
+export interface PropuestaInversion {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  categoria: CategoriaPropuesta
+  monto_estimado?: number | null
+  prioridad: PrioridadPropuesta
+  estado: EstadoPropuesta
+  votos_favor: number
+  votos_contra: number
+  fecha_propuesta: string
+  fecha_aprobacion?: string | null
+  fecha_ejecucion?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoPeriodo = 'mensual' | 'trimestral' | 'anual'
+export type EstadoMemoria = 'borrador' | 'publicado'
+export interface MemoriaLabores {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  periodo: string
+  tipo_periodo: TipoPeriodo
+  resumen?: string | null
+  logros?: string | null
+  pendientes?: string | null
+  tickets_resueltos?: number | null
+  visitantes_registrados?: number | null
+  cuotas_cobradas?: number | null
+  incidencias_atendidas?: number | null
+  estado: EstadoMemoria
+  created_at: string
+}
