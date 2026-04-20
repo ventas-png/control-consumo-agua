@@ -1405,3 +1405,50 @@ export interface RespuestaEncuesta {
   created_at: string
   unidad_nombre?: string
 }
+
+// ── Phase 9: Contabilidad, Presupuesto, Alertas ───────────────────────────────
+
+export type CategoriaGasto = 'mantenimiento' | 'servicios' | 'administrativo' | 'seguridad' | 'limpieza' | 'obras' | 'otros'
+export type EstadoGasto = 'pendiente' | 'pagado' | 'anulado'
+export interface GastoCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  concepto: string
+  categoria: CategoriaGasto
+  monto: number
+  fecha: string
+  proveedor_nombre?: string | null
+  estado: EstadoGasto
+  metodo_pago?: string | null
+  comprobante_num?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface PresupuestoCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  anio: number
+  categoria: string
+  monto_presupuestado: number
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoAlerta = 'vencimiento' | 'recordatorio' | 'aviso' | 'urgente'
+export type EstadoAlerta = 'activa' | 'resuelta' | 'ignorada'
+export interface AlertaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  tipo: TipoAlerta
+  titulo: string
+  descripcion?: string | null
+  fecha_alerta: string
+  estado: EstadoAlerta
+  referencia_tabla?: string | null
+  referencia_id?: string | null
+  created_at: string
+}
