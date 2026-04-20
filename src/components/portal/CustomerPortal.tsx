@@ -347,11 +347,15 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       return { unidad, meters }
     })
 
+    const lecturasTotal = lecturas.length
+    const filteredLecturasCount = filteredLecturas.length
+
     return {
       consumoMesActual, consumoPromedio, montoPendiente, contadoresActivos,
       consumoPrevMes, consumoSameLastYear, vsAnterior, vsAnioAnterior,
       chartLabels, chartConsumo, chartMontos, chartCurrentMonthIdx,
       tipoAguaMap, unidadBreakdown,
+      lecturasTotal, filteredLecturasCount,
     }
   }, [lecturas, contadores, unidades, selectedProjectId, chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode])
 
@@ -444,6 +448,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       consumoMesActual, consumoPromedio, montoPendiente, contadoresActivos,
       consumoPrevMes, consumoSameLastYear, vsAnterior, vsAnioAnterior,
       tipoAguaMap, unidadBreakdown,
+      lecturasTotal, filteredLecturasCount,
     } = dashboardData
 
     const moneda = selectedProjectId
@@ -513,82 +518,97 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
         {/* Historial de Consumo */}
         <div style={{ background: 'white', borderRadius: '16px', padding: '22px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '18px' }}>
-          {/* Header row */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Historial de Consumo</div>
-              <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px' }}>
-                {chartRangeMode === 'custom' && chartCustomStart && chartCustomEnd
-                  ? `${chartCustomStart.slice(0,7)} — ${chartCustomEnd.slice(0,7)} (m³)`
-                  : `Últimos ${chartMonthsBack} meses (m³)`}
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              {/* Preset + Rango buttons */}
-              <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid #e2e8f0', overflow: 'hidden' }}>
-                {([6, 12, 24] as const).map(n => (
-                  <button
-                    key={n}
-                    onClick={() => { setChartMonthsBack(n); setChartRangeMode('preset') }}
-                    style={{
-                      padding: '5px 11px', fontSize: '12px', fontWeight: 600, border: 'none',
-                      borderRight: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.15s',
-                      background: chartRangeMode === 'preset' && chartMonthsBack === n ? '#0ea5e9' : 'transparent',
-                      color: chartRangeMode === 'preset' && chartMonthsBack === n ? 'white' : '#64748b',
-                    }}
-                  >{n}M</button>
-                ))}
-                <button
-                  onClick={() => {
-                    setChartRangeMode('custom')
-                    if (!chartCustomStart || !chartCustomEnd) {
-                      const now = new Date()
-                      const endStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-                      const s = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-                      const startStr = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}`
-                      setChartCustomStart(startStr)
-                      setChartCustomEnd(endStr)
-                    }
-                  }}
-                  style={{
-                    padding: '5px 11px', fontSize: '12px', fontWeight: 600, border: 'none',
-                    cursor: 'pointer', transition: 'all 0.15s',
-                    background: chartRangeMode === 'custom' ? '#0ea5e9' : 'transparent',
-                    color: chartRangeMode === 'custom' ? 'white' : '#64748b',
-                  }}
-                >Rango</button>
-              </div>
-              {/* Legend */}
-              <div style={{ display: 'flex', gap: '10px', fontSize: '11px', color: '#64748b', alignItems: 'center' }}>
-                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: '#0ea5e9', marginRight: '4px' }} />Mes actual</span>
-                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(14,165,233,0.45)', marginRight: '4px' }} />Anteriores</span>
-              </div>
+          {/* Título */}
+          <div style={{ marginBottom: '14px' }}>
+            <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Historial de Consumo</div>
+            <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px' }}>
+              {chartRangeMode === 'custom' && chartCustomStart && chartCustomEnd
+                ? `${chartCustomStart} — ${chartCustomEnd} (m³)`
+                : `Últimos ${chartMonthsBack} meses (m³)`}
             </div>
           </div>
-          {/* Custom date range inputs */}
+          {/* Controles de rango — fila separada siempre visible */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap' }}>Período:</span>
+            <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid #e2e8f0', overflow: 'hidden' }}>
+              {([6, 12, 24] as const).map(n => (
+                <button
+                  key={n}
+                  onClick={() => { setChartMonthsBack(n); setChartRangeMode('preset') }}
+                  style={{
+                    padding: '6px 14px', fontSize: '12.5px', fontWeight: 600,
+                    border: 'none', borderRight: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.15s',
+                    background: chartRangeMode === 'preset' && chartMonthsBack === n ? '#0ea5e9' : '#f8fafc',
+                    color: chartRangeMode === 'preset' && chartMonthsBack === n ? 'white' : '#475569',
+                  }}
+                >{n}M</button>
+              ))}
+              <button
+                onClick={() => {
+                  setChartRangeMode('custom')
+                  if (!chartCustomStart || !chartCustomEnd) {
+                    const now = new Date()
+                    const endStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+                    const s = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+                    const startStr = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}`
+                    setChartCustomStart(startStr)
+                    setChartCustomEnd(endStr)
+                  }
+                }}
+                style={{
+                  padding: '6px 14px', fontSize: '12.5px', fontWeight: 600,
+                  border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                  background: chartRangeMode === 'custom' ? '#0ea5e9' : '#f8fafc',
+                  color: chartRangeMode === 'custom' ? 'white' : '#475569',
+                }}
+              >📅 Rango</button>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', fontSize: '11px', color: '#64748b', alignItems: 'center', marginLeft: 'auto' }}>
+              <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: '#0ea5e9', marginRight: '4px' }} />Mes actual</span>
+              <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(14,165,233,0.45)', marginRight: '4px' }} />Anteriores</span>
+            </div>
+          </div>
+          {/* Inputs de rango personalizado */}
           {chartRangeMode === 'custom' && (
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '14px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap', background: '#f0f9ff', borderRadius: '10px', padding: '10px 14px', border: '1px solid #bae6fd' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
-                <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>Desde:</span>
+                <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Desde:</span>
                 <input
                   type="month"
                   value={chartCustomStart}
                   onChange={e => setChartCustomStart(e.target.value)}
-                  style={{ padding: '5px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '12.5px', color: '#0f172a', background: '#f8fafc', cursor: 'pointer' }}
+                  style={{ padding: '5px 10px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }}
                 />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
-                <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>Hasta:</span>
+                <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Hasta:</span>
                 <input
                   type="month"
                   value={chartCustomEnd}
                   onChange={e => setChartCustomEnd(e.target.value)}
-                  style={{ padding: '5px 10px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '12.5px', color: '#0f172a', background: '#f8fafc', cursor: 'pointer' }}
+                  style={{ padding: '5px 10px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }}
                 />
               </div>
             </div>
           )}
-          <div style={{ height: '260px' }}><canvas ref={chartRef} /></div>
+          {/* Gráfico o estado vacío */}
+          {lecturasTotal === 0 ? (
+            <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '8px', background: '#f8fafc', borderRadius: '10px' }}>
+              <span style={{ fontSize: '32px' }}>📊</span>
+              <span style={{ fontSize: '13px', fontWeight: 500 }}>Sin lecturas registradas aún</span>
+              <span style={{ fontSize: '11.5px', textAlign: 'center', maxWidth: '280px' }}>Los datos aparecerán cuando se ingresen lecturas de consumo</span>
+            </div>
+          ) : filteredLecturasCount === 0 ? (
+            <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '8px', background: '#f8fafc', borderRadius: '10px' }}>
+              <span style={{ fontSize: '32px' }}>🔍</span>
+              <span style={{ fontSize: '13px', fontWeight: 500 }}>Sin lecturas para los contadores activos</span>
+              <span style={{ fontSize: '11.5px', textAlign: 'center', maxWidth: '320px' }}>
+                Hay {lecturasTotal} lectura{lecturasTotal !== 1 ? 's' : ''} en el sistema pero no coinciden con los contadores vinculados
+              </span>
+            </div>
+          ) : (
+            <div style={{ height: '260px' }}><canvas ref={chartRef} /></div>
+          )}
         </div>
 
         {/* Desglose por tipo de agua */}
