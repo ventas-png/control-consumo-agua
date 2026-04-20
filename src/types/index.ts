@@ -1486,3 +1486,82 @@ export interface ConfiguracionCondominio {
   descripcion?: string | null
   updated_at: string
 }
+
+// ── Phase 11: Solicitudes, Junta, Préstamos, Comunicados ─────────────────────
+
+export type TipoSolicitud = 'solvencia' | 'permiso_mudanza' | 'permiso_obra' | 'reclamo' | 'sugerencia' | 'certificado' | 'otro'
+export type EstadoSolicitud = 'pendiente' | 'en_proceso' | 'resuelto' | 'rechazado'
+export type PrioridadSolicitud = 'baja' | 'normal' | 'alta' | 'urgente'
+export interface SolicitudResidente {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  tipo: TipoSolicitud
+  descripcion: string
+  estado: EstadoSolicitud
+  respuesta?: string | null
+  prioridad: PrioridadSolicitud
+  atendido_por?: string | null
+  fecha_limite?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type CargoJunta = 'presidente' | 'vicepresidente' | 'tesorero' | 'secretario' | 'vocal' | 'fiscal' | 'otro'
+export interface MiembroJunta {
+  id: string
+  company_id: string
+  project_id: string
+  cargo: CargoJunta
+  nombre: string
+  unidad_id?: string | null
+  telefono?: string | null
+  email?: string | null
+  periodo_inicio: string
+  periodo_fin?: string | null
+  activo: boolean
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type EstadoPrestamo = 'prestado' | 'devuelto' | 'dañado' | 'perdido'
+export interface PrestamoEquipo {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  equipo_nombre: string
+  cantidad: number
+  fecha_prestamo: string
+  hora_prestamo?: string | null
+  fecha_devolucion?: string | null
+  hora_devolucion?: string | null
+  estado: EstadoPrestamo
+  deposito?: number | null
+  deposito_pagado: boolean
+  observaciones?: string | null
+  entregado_por?: string | null
+  recibido_por?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type TipoComunicado = 'carta' | 'circular' | 'aviso' | 'certificado' | 'acta'
+export type DestinatarioComunicado = 'todos' | 'propietarios' | 'arrendatarios' | 'junta' | 'especifico'
+export interface ComunicadoCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  contenido: string
+  tipo: TipoComunicado
+  destinatario: DestinatarioComunicado
+  unidad_id?: string | null
+  enviado_por?: string | null
+  fecha_envio: string
+  firmado: boolean
+  created_at: string
+  unidad_nombre?: string
+}
