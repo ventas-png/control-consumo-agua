@@ -1565,3 +1565,70 @@ export interface ComunicadoCondominio {
   created_at: string
   unidad_nombre?: string
 }
+
+export type TipoActa = 'ordinaria' | 'extraordinaria' | 'junta' | 'comite' | 'otro'
+export interface ActaReunion {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  tipo: TipoActa
+  fecha: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  lugar?: string | null
+  quorum?: number | null
+  quorum_requerido?: number | null
+  asistentes: { nombre: string; unidad?: string; rol?: string }[]
+  orden_del_dia: { punto: string; descripcion?: string; acuerdo?: string }[]
+  acuerdos?: string | null
+  observaciones?: string | null
+  redactada_por?: string | null
+  aprobada: boolean
+  created_at: string
+}
+
+export interface CierreMensual {
+  id: string
+  company_id: string
+  project_id: string
+  periodo: string
+  total_cuotas_emitidas: number
+  total_cuotas_cobradas: number
+  total_gastos: number
+  saldo_periodo: number
+  unidades_morosas: number
+  notas?: string | null
+  cerrado_por?: string | null
+  estado: 'borrador' | 'cerrado'
+  created_at: string
+}
+
+export type EventoNotificacion = 'cuota_pendiente' | 'cuota_morosa' | 'visita_registrada' | 'ticket_abierto' | 'ticket_resuelto' | 'reserva_confirmada' | 'alerta_activa' | 'solicitud_nueva'
+export type CanalNotificacion = 'email' | 'whatsapp' | 'push' | 'sms'
+export type DestinatarioNotificacion = 'admin' | 'residente' | 'ambos'
+export interface ReglaNotificacion {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  evento: EventoNotificacion
+  canal: CanalNotificacion
+  destinatario: DestinatarioNotificacion
+  dias_anticipacion: number
+  activo: boolean
+  mensaje_template?: string | null
+  created_at: string
+}
+
+export interface MedidorUnidad {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  contador_id: string
+  activo: boolean
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
