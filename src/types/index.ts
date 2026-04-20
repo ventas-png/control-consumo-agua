@@ -2243,3 +2243,94 @@ export interface PresenciaPersonal {
   observaciones?: string | null
   created_at: string
 }
+
+// ── Fase 21 ──────────────────────────────────────────────────────────────────
+export type CategoriaSupministro = 'limpieza' | 'herramienta' | 'material' | 'oficina' | 'seguridad' | 'otro'
+export type UnidadMedidaSum = 'unidad' | 'litro' | 'kg' | 'metro' | 'caja' | 'rollo' | 'otro'
+export interface SuministroCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  categoria: CategoriaSupministro
+  unidad_medida: UnidadMedidaSum
+  stock_actual: number
+  stock_minimo: number
+  ubicacion?: string | null
+  proveedor?: string | null
+  costo_unitario?: number | null
+  notas?: string | null
+  activo: boolean
+  created_at: string
+}
+
+export type TipoMovimientoSum = 'entrada' | 'salida' | 'ajuste'
+export interface MovimientoSuministro {
+  id: string
+  company_id: string
+  suministro_id: string
+  tipo: TipoMovimientoSum
+  cantidad: number
+  motivo?: string | null
+  area_destino?: string | null
+  realizado_por?: string | null
+  fecha: string
+  notas?: string | null
+  created_at: string
+  // join
+  suministro_nombre?: string
+}
+
+export type CategoriaTareaCondominio = 'operativa' | 'mantenimiento' | 'administrativa' | 'seguridad' | 'limpieza' | 'otro'
+export type PrioridadTarea = 'baja' | 'media' | 'alta' | 'urgente'
+export type EstadoTarea = 'pendiente' | 'en_proceso' | 'completada' | 'cancelada'
+export interface ComentarioTarea { fecha: string; autor: string; texto: string }
+export interface TareaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  categoria: CategoriaTareaCondominio
+  prioridad: PrioridadTarea
+  estado: EstadoTarea
+  asignado_a?: string | null
+  reportado_por?: string | null
+  area?: string | null
+  fecha_limite?: string | null
+  fecha_inicio?: string | null
+  fecha_cierre?: string | null
+  costo_estimado?: number | null
+  costo_real?: number | null
+  comentarios: ComentarioTarea[]
+  notas?: string | null
+  created_at: string
+}
+
+export type EtapaCobranza = 'aviso_amistoso' | 'recordatorio' | 'carta_formal' | 'suspension_servicios' | 'cobro_juridico' | 'acuerdo_pago' | 'resuelto'
+export type EstadoCobranza = 'activo' | 'resuelto' | 'cancelado'
+export type TipoContactoCobranza = 'llamada' | 'email' | 'visita' | 'mensaje'
+export interface ContactoCobranza {
+  fecha: string
+  tipo: TipoContactoCobranza
+  resultado: string
+  siguiente_accion?: string
+}
+export interface GestionCobranza {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  responsable: string
+  monto_adeudado: number
+  monto_pagado: number
+  etapa: EtapaCobranza
+  fecha_inicio: string
+  fecha_resolucion?: string | null
+  contactos: ContactoCobranza[]
+  observaciones?: string | null
+  estado: EstadoCobranza
+  created_at: string
+  // join
+  unidad_nombre?: string
+}
