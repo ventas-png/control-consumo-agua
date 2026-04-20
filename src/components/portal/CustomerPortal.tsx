@@ -59,6 +59,8 @@ interface LecturaInfo {
   dias_servicio: number | null
   tipo_cobro: string
   contador_id: string | null
+  cliente_id?: string | null
+  project_id?: string | null
   foto?: string | null
 }
 
@@ -140,7 +142,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         // Reading history — all historical records (no date cap)
         supabase
           .from('registros')
-          .select('id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
+          .select('id, cliente_id, cliente_nombre, contador_id, project_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
           .eq('cliente_id', clienteId)
           .order('fecha', { ascending: false }),
         // Own contact info
@@ -196,20 +198,41 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       setUnidades(unidadesList)
       setContadores(cData)
 
-      // Fetch readings by contador_id to catch registros where cliente_id is missing/mismatched
+      const REGISTROS_SELECT = 'id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto'
+
       let mergedLecturas: LecturaInfo[] = (rData as LecturaInfo[]) ?? []
+      const mergeIn = (rows: unknown[] | null) => {
+        if (!rows?.length) return
+        const seen = new Set(mergedLecturas.map(l => l.id))
+        const extra = (rows as LecturaInfo[]).filter(l => !seen.has(l.id))
+        if (extra.length > 0) mergedLecturas = [...mergedLecturas, ...extra]
+      }
+
+      // Fallback 1: by contador_id — catches registros where cliente_id is wrong/null
       if (cData.length > 0) {
-        const { data: contReadings } = await supabase
-          .from('registros')
-          .select('id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
+        const { data: byContador } = await supabase
+          .from('registros').select(REGISTROS_SELECT)
           .in('contador_id', cData.map(c => c.id))
           .order('fecha', { ascending: false })
-        if (contReadings?.length) {
-          const existingIds = new Set(mergedLecturas.map(l => l.id))
-          const extra = (contReadings as LecturaInfo[]).filter(l => !existingIds.has(l.id))
-          if (extra.length > 0) mergedLecturas = [...mergedLecturas, ...extra]
-        }
+        mergeIn(byContador)
       }
+
+      // Fallback 2: by project_id — catches registros where contador_id is also null
+      // Only safe because RLS (after migration 20260420000023) restricts clients to their own data
+      const unidadProjectIds = [...new Set(unidadesList.map(u => u.project_id).filter(Boolean))]
+      if (unidadProjectIds.length > 0 && clienteId) {
+        const { data: byProject } = await supabase
+          .from('registros').select(REGISTROS_SELECT)
+          .in('project_id', unidadProjectIds)
+          .order('fecha', { ascending: false })
+        // Extra safety: only keep rows for this client or for our counters
+        const knownCounterIds = new Set(cData.map(c => c.id))
+        const safe = (byProject as LecturaInfo[] | null)?.filter(l =>
+          l.cliente_id === clienteId || (l.contador_id != null && knownCounterIds.has(l.contador_id))
+        ) ?? []
+        mergeIn(safe)
+      }
+
       setLecturas(mergedLecturas)
       setRegistros(mergedLecturas as Registro[])
 
