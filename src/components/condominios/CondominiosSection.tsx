@@ -24,6 +24,7 @@ import type {
   ChecklistArea, ProgramacionLimpieza, ConsumoEnergiaArea, HistorialResidente,
   EstacionamientoVisita, BitacoraGuardia, EquipoComun, PresenciaPersonal,
   SuministroCondominio, MovimientoSuministro, TareaCondominio, GestionCobranza,
+  SolicitudCertificado, VisitaFrecuente, ArticuloReglamento, ControlPlagas,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -112,6 +113,10 @@ import PresenciaPersonalTab from './tabs/PresenciaPersonalTab'
 import SuministrosTab from './tabs/SuministrosTab'
 import TareasCondominioTab from './tabs/TareasCondominioTab'
 import GestionCobranzaTab from './tabs/GestionCobranzaTab'
+import SolicitudCertificadoTab from './tabs/SolicitudCertificadoTab'
+import VisitasFrecuentesTab from './tabs/VisitasFrecuentesTab'
+import ReglamentoTab from './tabs/ReglamentoTab'
+import ControlPlagasTab from './tabs/ControlPlagasTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -135,6 +140,7 @@ type CondominioTab =
   | 'checklist_areas' | 'prog_limpieza' | 'consumo_energia' | 'historial_res'
   | 'estac_visita' | 'bitacora_guardia' | 'equipos' | 'presencia'
   | 'suministros' | 'tareas_cond' | 'cobranza'
+  | 'certificados' | 'vis_frecuentes' | 'reglamento' | 'control_plagas'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -224,6 +230,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'suministros',      label: 'Suministros',      icon: '🗃️' },
   { id: 'tareas_cond',      label: 'Tareas',           icon: '✅' },
   { id: 'cobranza',         label: 'Cobranza',         icon: '💰' },
+  { id: 'certificados',     label: 'Certificados',     icon: '📜' },
+  { id: 'vis_frecuentes',   label: 'Vis. Frecuentes',  icon: '👨‍👩‍👧' },
+  { id: 'reglamento',       label: 'Reglamento',       icon: '📖' },
+  { id: 'control_plagas',   label: 'Control Plagas',   icon: '🧪' },
 ]
 
 interface Props {
@@ -346,6 +356,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [movimientosSuministro, setMovimientosSuministro] = useState<MovimientoSuministro[]>([])
   const [tareasCond, setTareasCond] = useState<TareaCondominio[]>([])
   const [cobranzas, setCobranzas] = useState<GestionCobranza[]>([])
+  // Fase 22
+  const [certificados, setCertificados] = useState<SolicitudCertificado[]>([])
+  const [visitasFrecuentes, setVisitasFrecuentes] = useState<VisitaFrecuente[]>([])
+  const [reglamento, setReglamento] = useState<ArticuloReglamento[]>([])
+  const [controlPlagas, setControlPlagas] = useState<ControlPlagas[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -384,6 +399,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       checklistAreasRes, progLimpiezaRes, consumoEnergiaRes, historialResRes,
       estacVisitaRes, bitacoraGuardiaRes, equiposComunesRes, presenciaPersonalRes,
       suministrosRes, movsumRes, tareasCondRes, cobranzasRes,
+      certificadosRes, visFrecRes, reglamentoRes, plagasRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -472,6 +488,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('movimientos_suministro').select('*').eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
       supabase.from('tareas_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_limite').order('created_at', { ascending: false }),
       supabase.from('gestion_cobranza').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('solicitudes_certificado').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_solicitud', { ascending: false }),
+      supabase.from('visitas_frecuentes').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
+      supabase.from('reglamento_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('capitulo').order('numero_articulo'),
+      supabase.from('control_plagas').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -575,6 +595,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setCobranzas((cobranzasRes.data ?? []).map((r: Record<string, unknown>) => ({
       ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre,
     } as GestionCobranza)))
+    setCertificados((certificadosRes.data ?? []) as SolicitudCertificado[])
+    setVisitasFrecuentes((visFrecRes.data ?? []) as VisitaFrecuente[])
+    setReglamento((reglamentoRes.data ?? []) as ArticuloReglamento[])
+    setControlPlagas((plagasRes.data ?? []) as ControlPlagas[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -760,6 +784,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'suministros' && <SuministrosTab suministros={suministros} movimientos={movimientosSuministro} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'tareas_cond' && <TareasCondominioTab tareas={tareasCond} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'cobranza' && <GestionCobranzaTab cobranzas={cobranzas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'certificados' && <SolicitudCertificadoTab solicitudes={certificados} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'vis_frecuentes' && <VisitasFrecuentesTab visitas={visitasFrecuentes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'reglamento' && <ReglamentoTab articulos={reglamento} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'control_plagas' && <ControlPlagasTab registros={controlPlagas} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )
