@@ -2334,3 +2334,85 @@ export interface GestionCobranza {
   // join
   unidad_nombre?: string
 }
+
+// ── Fase 22 ──────────────────────────────────────────────────────────────────
+export type TipoCertificado = 'solvencia' | 'residencia' | 'historial_pagos' | 'paz_y_salvo' | 'otro'
+export type EstadoCertificado = 'pendiente' | 'en_proceso' | 'aprobado' | 'rechazado' | 'entregado'
+export interface SolicitudCertificado {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  solicitante: string
+  tipo: TipoCertificado
+  motivo?: string | null
+  estado: EstadoCertificado
+  fecha_solicitud: string
+  fecha_aprobacion?: string | null
+  fecha_entrega?: string | null
+  aprobado_por?: string | null
+  observaciones?: string | null
+  created_at: string
+  // join
+  unidad_nombre?: string
+}
+
+export type RelacionVisitaFrecuente = 'familiar' | 'empleado' | 'proveedor' | 'amigo' | 'otro'
+export interface VisitaFrecuente {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  nombre: string
+  identificacion?: string | null
+  relacion: RelacionVisitaFrecuente
+  telefono?: string | null
+  placa_vehiculo?: string | null
+  foto_url?: string | null
+  dias_permitidos?: string[] | null
+  hora_desde?: string | null
+  hora_hasta?: string | null
+  activo: boolean
+  notas?: string | null
+  created_at: string
+  // join
+  unidad_nombre?: string
+}
+
+export type CategoriaReglamento = 'convivencia' | 'pagos' | 'seguridad' | 'areas_comunes' | 'mascotas' | 'mudanzas' | 'otro'
+export interface ArticuloReglamento {
+  id: string
+  company_id: string
+  project_id: string
+  capitulo: string
+  numero_articulo: string
+  titulo: string
+  contenido: string
+  categoria: CategoriaReglamento
+  vigente: boolean
+  version: string
+  fecha_vigencia?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoControlPlagas = 'fumigacion' | 'inspeccion' | 'tratamiento' | 'preventivo'
+export type ResultadoControlPlagas = 'satisfactorio' | 'con_observaciones' | 'requiere_seguimiento' | 'no_realizado'
+export interface ControlPlagas {
+  id: string
+  company_id: string
+  project_id: string
+  tipo: TipoControlPlagas
+  empresa?: string | null
+  tecnico?: string | null
+  areas: string[]
+  productos?: string | null
+  fecha: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  resultado: ResultadoControlPlagas
+  proxima_visita?: string | null
+  costo?: number | null
+  observaciones?: string | null
+  created_at: string
+}
