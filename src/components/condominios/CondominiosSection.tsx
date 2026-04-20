@@ -11,6 +11,7 @@ import type {
   BodegaCondominio, OnboardingResidente, PropuestaInversion, MemoriaLabores,
   ReservaSTR, LocalComercial, ServicioHousekeeping,
   FirmaDigital, SolicitudConcierge, LlaveCondominio, Encuesta, RespuestaEncuesta,
+  GastoCondominio, PresupuestoCondominio, AlertaCondominio,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -48,6 +49,10 @@ import { FirmaDigitalTab } from './tabs/FirmaDigitalTab'
 import { ConciergeTab } from './tabs/ConciergeTab'
 import { LlavesTab } from './tabs/LlavesTab'
 import { EncuestasTab } from './tabs/EncuestasTab'
+import { ContabilidadTab } from './tabs/ContabilidadTab'
+import { PresupuestoTab } from './tabs/PresupuestoTab'
+import { AlertasTab } from './tabs/AlertasTab'
+import { ReportesTab } from './tabs/ReportesTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -58,6 +63,7 @@ type CondominioTab =
   | 'bodegas' | 'onboarding' | 'propuestas' | 'memoria'
   | 'str' | 'locales' | 'sostenibilidad' | 'housekeeping'
   | 'firmas' | 'concierge' | 'llaves' | 'encuestas'
+  | 'contabilidad' | 'presupuesto' | 'alertas' | 'reportes'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -96,6 +102,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'concierge',     label: 'Concierge',      icon: '🛎️' },
   { id: 'llaves',        label: 'Llaves',         icon: '🔑' },
   { id: 'encuestas',     label: 'Encuestas',      icon: '📊' },
+  { id: 'contabilidad',  label: 'Contabilidad',   icon: '🧾' },
+  { id: 'presupuesto',   label: 'Presupuesto',    icon: '📋' },
+  { id: 'alertas',       label: 'Alertas',        icon: '🔔' },
+  { id: 'reportes',      label: 'Reportes',       icon: '📑' },
 ]
 
 interface Props {
@@ -156,6 +166,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [llaves, setLlaves] = useState<LlaveCondominio[]>([])
   const [encuestas, setEncuestas] = useState<Encuesta[]>([])
   const [respuestasEncuesta, setRespuestasEncuesta] = useState<RespuestaEncuesta[]>([])
+  // Fase 9
+  const [gastos, setGastos] = useState<GastoCondominio[]>([])
+  const [presupuestos, setPresupuestos] = useState<PresupuestoCondominio[]>([])
+  const [alertasCondominio, setAlertasCondominio] = useState<AlertaCondominio[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -181,6 +195,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       bodegasRes, onboardingsRes, propuestasRes, memoriasRes,
       strRes, localesRes, hkRes,
       firmasRes, conciergeRes, llavesRes, encuestasRes, respuestasRes,
+      gastosRes, presupuestosRes, alertasRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -219,6 +234,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('llaves_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('encuestas').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('respuestas_encuesta').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('gastos_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('presupuesto_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('anio', { ascending: false }),
+      supabase.from('alertas_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_alerta'),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -270,6 +288,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setLlaves(mapUnidad<LlaveCondominio>(llavesRes.data ?? []))
     setEncuestas((encuestasRes.data ?? []) as Encuesta[])
     setRespuestasEncuesta(mapUnidad<RespuestaEncuesta>(respuestasRes.data ?? []))
+    setGastos((gastosRes.data ?? []) as GastoCondominio[])
+    setPresupuestos((presupuestosRes.data ?? []) as PresupuestoCondominio[])
+    setAlertasCondominio((alertasRes.data ?? []) as AlertaCondominio[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -404,6 +425,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'llaves' && <LlavesTab llaves={llaves} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
         {activeTab === 'encuestas' && <EncuestasTab encuestas={encuestas} respuestas={respuestasEncuesta} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'contabilidad' && <ContabilidadTab gastos={gastos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'presupuesto' && <PresupuestoTab presupuestos={presupuestos} gastos={gastos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'alertas' && <AlertasTab alertas={alertasCondominio} polizas={polizas} contratos={contratosProveedores} inspecciones={inspecciones} llaves={llaves} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'reportes' && <ReportesTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} contratos={contratosProveedores} gastos={gastos} presupuestos={presupuestos} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
       </div>
     </div>
   )
