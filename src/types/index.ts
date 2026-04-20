@@ -327,7 +327,137 @@ export type AppSection =
   | 'empresa_proyectos'
   | 'superadmin_empresas'
   | 'comunicacion'
-  | 'servicios_energia';
+  | 'servicios_energia'
+  | 'condominios';
+
+// ── Módulo Condominios ────────────────────────────────────────────────────────
+
+export type ConceptoCuota = 'mantenimiento' | 'extraordinaria' | 'CAM' | 'otro'
+export type EstadoCuota = 'pendiente' | 'pagado' | 'moroso'
+
+export interface CuotaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  concepto: ConceptoCuota
+  monto: number
+  periodo: string           // 'YYYY-MM'
+  fecha_vencimiento?: string | null
+  estado: EstadoCuota
+  pago_id?: string | null
+  notas?: string | null
+  created_by?: string | null
+  created_at: string
+  // joins opcionales
+  unidad_nombre?: string
+}
+
+export interface Visitante {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  nombre: string
+  identificacion?: string | null
+  placa_vehiculo?: string | null
+  motivo?: string | null
+  pre_autorizado_por?: string | null
+  hora_entrada: string
+  hora_salida?: string | null
+  foto_url?: string | null
+  registrado_por?: string | null
+  notas?: string | null
+  created_at: string
+  // joins opcionales
+  unidad_nombre?: string
+}
+
+export interface Amenidad {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  descripcion?: string | null
+  capacidad_max?: number | null
+  horario_inicio?: string | null   // 'HH:MM'
+  horario_fin?: string | null      // 'HH:MM'
+  requiere_deposito: boolean
+  monto_deposito?: number | null
+  activo: boolean
+  foto_url?: string | null
+  created_at: string
+}
+
+export type EstadoReserva = 'confirmada' | 'cancelada' | 'pendiente'
+
+export interface ReservaAmenidad {
+  id: string
+  company_id: string
+  amenidad_id: string
+  unidad_id: string
+  cliente_id?: string | null
+  fecha: string
+  hora_inicio: string
+  hora_fin: string
+  num_invitados: number
+  estado: EstadoReserva
+  deposito_pagado: boolean
+  notas?: string | null
+  created_by?: string | null
+  created_at: string
+  // joins opcionales
+  amenidad_nombre?: string
+  unidad_nombre?: string
+}
+
+export type TipoTicket = 'preventivo' | 'correctivo'
+export type PrioridadTicket = 'baja' | 'media' | 'alta' | 'urgente'
+export type EstadoTicket = 'abierto' | 'en_proceso' | 'resuelto' | 'cerrado'
+
+export interface TicketMantenimiento {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  tipo: TipoTicket
+  titulo: string
+  descripcion?: string | null
+  prioridad: PrioridadTicket
+  estado: EstadoTicket
+  asignado_a?: string | null
+  reportado_por?: string | null
+  cliente_id?: string | null
+  foto_urls: string[]
+  costo_estimado?: number | null
+  costo_real?: number | null
+  fecha_limite?: string | null
+  fecha_cierre?: string | null
+  notas_cierre?: string | null
+  created_at: string
+  updated_at: string
+  // joins opcionales
+  unidad_nombre?: string
+  asignado_nombre?: string
+}
+
+export type TipoAnuncio = 'aviso' | 'urgente' | 'evento' | 'mantenimiento'
+
+export interface AnuncioComunidad {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  contenido: string
+  tipo: TipoAnuncio
+  publicado_por: string
+  fecha_evento?: string | null
+  activo: boolean
+  foto_url?: string | null
+  created_at: string
+  // joins opcionales
+  publicado_por_nombre?: string
+}
 
 // ── Centro de Comunicación ─────────────────────────────────────────────────
 
