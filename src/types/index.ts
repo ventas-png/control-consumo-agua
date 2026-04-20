@@ -1939,3 +1939,67 @@ export interface EntregaUnidad {
   firmado_inquilino: boolean
   created_at: string
 }
+
+export interface AvisoCobro {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  tipo: 'primer_aviso' | 'segundo_aviso' | 'ultimo_aviso' | 'notificacion_legal'
+  monto_total: number
+  detalle: unknown[]
+  fecha_emision: string
+  fecha_limite?: string | null
+  estado: 'emitido' | 'entregado' | 'pagado' | 'anulado'
+  enviado_por?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface BitacoraManto {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  turno: 'mañana' | 'tarde' | 'noche'
+  responsable: string
+  area?: string | null
+  tareas: unknown[]
+  observaciones?: string | null
+  firmado: boolean
+  created_at: string
+}
+
+export interface EvaluacionProveedor {
+  id: string
+  company_id: string
+  project_id: string
+  proveedor_id?: string | null
+  nombre_proveedor: string
+  calificacion: number
+  puntualidad?: number | null
+  calidad?: number | null
+  precio?: number | null
+  comentarios?: string | null
+  evaluado_por?: string | null
+  fecha: string
+  created_at: string
+}
+
+export interface ReclamoCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  tipo: 'queja' | 'sugerencia' | 'reclamo_formal' | 'apelacion'
+  asunto: string
+  descripcion?: string | null
+  prioridad: 'baja' | 'normal' | 'alta' | 'urgente'
+  estado: 'recibido' | 'en_revision' | 'respondido' | 'cerrado' | 'escalado'
+  respuesta_admin?: string | null
+  respondido_por?: string | null
+  fecha_respuesta?: string | null
+  plazo_respuesta?: string | null
+  anonimo: boolean
+  created_at: string
+}
