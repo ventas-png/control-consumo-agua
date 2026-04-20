@@ -6,6 +6,7 @@ import type {
   ParqueoCondominio, Mascota, PaqueteRecibido, InfraccionCondominio,
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
   Asamblea, ContratoProveedor, ObjetoPerdido, AgendaItem,
+  ItemInventario, PolizaSeguro, InspeccionNormativa, PersonalCondominio,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -23,11 +24,16 @@ import { AsambleasTab } from './tabs/AsambleasTab'
 import { ProveedoresTab } from './tabs/ProveedoresTab'
 import { ObjetosTab } from './tabs/ObjetosTab'
 import { AgendaTab } from './tabs/AgendaTab'
+import { InventarioTab } from './tabs/InventarioTab'
+import { PolizasTab } from './tabs/PolizasTab'
+import { InspeccionesTab } from './tabs/InspeccionesTab'
+import { PersonalTab } from './tabs/PersonalTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
   | 'parqueos' | 'mascotas' | 'paqueteria' | 'infracciones' | 'seguridad' | 'arrendamientos'
   | 'asambleas' | 'proveedores' | 'objetos' | 'agenda'
+  | 'inventario' | 'polizas' | 'inspecciones' | 'personal'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -46,6 +52,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'proveedores',    label: 'Proveedores',    icon: '🤝' },
   { id: 'objetos',        label: 'Obj. Perdidos',  icon: '🔍' },
   { id: 'agenda',         label: 'Agenda',         icon: '📅' },
+  { id: 'inventario',    label: 'Inventario',     icon: '🗃️' },
+  { id: 'polizas',       label: 'Pólizas',        icon: '🛡️' },
+  { id: 'inspecciones',  label: 'Inspecciones',   icon: '🏛️' },
+  { id: 'personal',      label: 'Personal',       icon: '👥' },
 ]
 
 interface Props {
@@ -81,6 +91,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [contratosProveedores, setContratosProveedores] = useState<ContratoProveedor[]>([])
   const [objetos, setObjetos] = useState<ObjetoPerdido[]>([])
   const [agenda, setAgenda] = useState<AgendaItem[]>([])
+  // Fase 4
+  const [inventario, setInventario] = useState<ItemInventario[]>([])
+  const [polizas, setPolizas] = useState<PolizaSeguro[]>([])
+  const [inspecciones, setInspecciones] = useState<InspeccionNormativa[]>([])
+  const [personal, setPersonal] = useState<PersonalCondominio[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -101,6 +116,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       cuotasRes, visitantesRes, amenidadesRes, reservasRes, ticketsRes, anunciosRes,
       parqueosRes, mascotasRes, paquetesRes, infraccionesRes, rondasRes, novedadesRes, contratosRes,
       asambleasRes, contratosProvRes, objetosRes, agendaRes,
+      inventarioRes, polizasRes, inspeccionesRes, personalRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -119,6 +135,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('contratos_proveedores').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('objetos_perdidos').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_encontrado', { ascending: false }),
       supabase.from('agenda_operativa').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha').order('hora_inicio'),
+      supabase.from('inventario_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('categoria').order('nombre'),
+      supabase.from('polizas_seguro').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_vencimiento'),
+      supabase.from('inspecciones_normativas').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('personal_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('cargo').order('nombre'),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -148,6 +168,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setContratosProveedores((contratosProvRes.data ?? []) as ContratoProveedor[])
     setObjetos((objetosRes.data ?? []) as ObjetoPerdido[])
     setAgenda((agendaRes.data ?? []) as AgendaItem[])
+    setInventario((inventarioRes.data ?? []) as ItemInventario[])
+    setPolizas((polizasRes.data ?? []) as PolizaSeguro[])
+    setInspecciones((inspeccionesRes.data ?? []) as InspeccionNormativa[])
+    setPersonal((personalRes.data ?? []) as PersonalCondominio[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -242,6 +266,14 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'objetos' && <ObjetosTab objetos={objetos} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
         {activeTab === 'agenda' && <AgendaTab agenda={agenda} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'inventario' && <InventarioTab inventario={inventario} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'polizas' && <PolizasTab polizas={polizas} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'inspecciones' && <InspeccionesTab inspecciones={inspecciones} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'personal' && <PersonalTab personal={personal} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )

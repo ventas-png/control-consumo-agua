@@ -1003,3 +1003,93 @@ export interface AgendaItem {
   notas?: string | null
   created_at: string
 }
+
+// ── Condominios Fase 4 ────────────────────────────────────────────────────────
+
+export type CategoriaInventario = 'herramienta' | 'equipo' | 'material' | 'mobiliario' | 'vehiculo' | 'otro'
+export type EstadoInventario = 'disponible' | 'en_uso' | 'en_reparacion' | 'dado_de_baja'
+export type TipoPoliza = 'incendio' | 'responsabilidad_civil' | 'terremoto' | 'inundacion' | 'robo' | 'vida' | 'otro'
+export type EstadoPoliza = 'vigente' | 'vencida' | 'cancelada'
+export type TipoInspeccion = 'bomberos' | 'igss' | 'municipalidad' | 'electrica' | 'sanitaria' | 'elevadores' | 'otro'
+export type ResultadoInspeccion = 'aprobado' | 'aprobado_con_observaciones' | 'reprobado' | 'pendiente'
+export type CargoPersonal = 'conserje' | 'guardia' | 'jardinero' | 'mantenimiento' | 'administrador' | 'otro'
+export type TurnoPersonal = 'diurno' | 'nocturno' | 'rotativo'
+export type EstadoPersonal = 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad'
+
+export interface ItemInventario {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  categoria: CategoriaInventario
+  descripcion?: string | null
+  numero_serie?: string | null
+  ubicacion?: string | null
+  estado: EstadoInventario
+  cantidad: number
+  cantidad_minima: number
+  unidad_medida: string
+  costo_unitario?: number | null
+  proveedor?: string | null
+  fecha_adquisicion?: string | null
+  fecha_vencimiento?: string | null
+  foto_url?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface PolizaSeguro {
+  id: string
+  company_id: string
+  project_id: string
+  numero_poliza: string
+  aseguradora: string
+  tipo: TipoPoliza
+  descripcion?: string | null
+  suma_asegurada?: number | null
+  prima_anual?: number | null
+  fecha_inicio: string
+  fecha_vencimiento: string
+  estado: EstadoPoliza
+  agente_nombre?: string | null
+  agente_telefono?: string | null
+  agente_email?: string | null
+  documento_url?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface InspeccionNormativa {
+  id: string
+  company_id: string
+  project_id: string
+  tipo: TipoInspeccion
+  entidad_inspectora?: string | null
+  fecha: string
+  resultado: ResultadoInspeccion
+  hallazgos?: string | null
+  acciones_correctivas?: string | null
+  fecha_proxima?: string | null
+  inspector_nombre?: string | null
+  certificado_url?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface PersonalCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  cargo: CargoPersonal
+  telefono?: string | null
+  email?: string | null
+  fecha_ingreso?: string | null
+  turno: TurnoPersonal
+  estado: EstadoPersonal
+  salario?: number | null
+  dpi?: string | null
+  foto_url?: string | null
+  notas?: string | null
+  created_at: string
+}
