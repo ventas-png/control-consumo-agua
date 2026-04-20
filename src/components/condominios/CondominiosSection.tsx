@@ -18,6 +18,7 @@ import type {
   Votacion, SancionCondominio, PlanMantenimiento,
   CorrespondenciaCondominio, LibroNovedad, SeguimientoAcuerdo,
   VehiculoResidente, EventoComunidad, RegistroAsistenteEvento, CajaChica, MovimientoCaja, ObraMejora,
+  PlanPagoCond, AccesoResidente, GarantiaEquipo, EntregaUnidad,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -83,6 +84,10 @@ import { VehiculosTab } from './tabs/VehiculosTab'
 import { EventosComunidadTab } from './tabs/EventosComunidadTab'
 import { CajaChicaTab } from './tabs/CajaChicaTab'
 import { ObrasTab } from './tabs/ObrasTab'
+import { PlanPagoCondTab } from './tabs/PlanPagoCondTab'
+import { AccesosResTab } from './tabs/AccesosResTab'
+import { GarantiasEquipoTab } from './tabs/GarantiasEquipoTab'
+import { EntregaUnidadTab } from './tabs/EntregaUnidadTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -100,6 +105,7 @@ type CondominioTab =
   | 'votaciones' | 'sanciones' | 'mant_preventivo' | 'portal'
   | 'correspondencia' | 'libro_novedades' | 'acuerdos' | 'dashboard_ejecutivo'
   | 'vehiculos' | 'eventos_comunidad' | 'caja_chica' | 'obras'
+  | 'plan_pago' | 'accesos_res' | 'garantias' | 'entrega_unidad'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -166,6 +172,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'eventos_comunidad',  label: 'Eventos',        icon: '🎉' },
   { id: 'caja_chica',         label: 'Caja Chica',     icon: '💵' },
   { id: 'obras',              label: 'Obras',          icon: '🏗️' },
+  { id: 'plan_pago',         label: 'Planes Pago',    icon: '📆' },
+  { id: 'accesos_res',       label: 'Accesos',        icon: '🔐' },
+  { id: 'garantias',         label: 'Garantías',      icon: '🛡️' },
+  { id: 'entrega_unidad',    label: 'Entregas',       icon: '🔑' },
 ]
 
 interface Props {
@@ -258,6 +268,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [cajasChicas, setCajasChicas] = useState<CajaChica[]>([])
   const [movimientosCaja, setMovimientosCaja] = useState<MovimientoCaja[]>([])
   const [obras, setObras] = useState<ObraMejora[]>([])
+  // Fase 16
+  const [planesPage, setPlanesPage] = useState<PlanPagoCond[]>([])
+  const [accesosRes, setAccesosRes] = useState<AccesoResidente[]>([])
+  const [garantias, setGarantias] = useState<GarantiaEquipo[]>([])
+  const [entregas, setEntregas] = useState<EntregaUnidad[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -290,6 +305,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       votacionesRes, sancionesRes, planesRes,
       correspondenciaRes, libroRes, acuerdosRes,
       vehiculosRes, eventosComRes, asistentesRes, cajasRes, movimientosRes, obrasRes,
+      planesPagoRes, cuotasPlanRes, accesosResRes, garantiasRes, entregasRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -353,6 +369,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('caja_chica').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_apertura', { ascending: false }),
       supabase.from('movimientos_caja').select('*').eq('company_id', cid).order('fecha', { ascending: false }),
       supabase.from('obras_mejoras').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('planes_pago_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('cuotas_plan_pago').select('*').eq('company_id', cid).order('numero'),
+      supabase.from('accesos_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('titular'),
+      supabase.from('garantias_equipo').select('*').eq('project_id', pid).eq('company_id', cid).order('equipo'),
+      supabase.from('entrega_unidades').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -429,6 +450,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setCajasChicas((cajasRes.data ?? []) as CajaChica[])
     setMovimientosCaja((movimientosRes.data ?? []) as MovimientoCaja[])
     setObras((obrasRes.data ?? []) as ObraMejora[])
+    setPlanesPage((planesPagoRes.data ?? []) as PlanPagoCond[])
+    void cuotasPlanRes // fetched per-plan inside PlanPagoCondTab
+    setAccesosRes((accesosResRes.data ?? []) as AccesoResidente[])
+    setGarantias((garantiasRes.data ?? []) as GarantiaEquipo[])
+    setEntregas((entregasRes.data ?? []) as EntregaUnidad[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -591,6 +617,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'eventos_comunidad' && <EventosComunidadTab eventos={eventosComunidad} asistentes={asistentesEvento} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'caja_chica' && <CajaChicaTab cajas={cajasChicas} movimientos={movimientosCaja} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'obras' && <ObrasTab obras={obras} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'plan_pago' && <PlanPagoCondTab planes={planesPage} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'accesos_res' && <AccesosResTab accesos={accesosRes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'garantias' && <GarantiasEquipoTab garantias={garantias} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'entrega_unidad' && <EntregaUnidadTab entregas={entregas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )
