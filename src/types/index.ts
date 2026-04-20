@@ -1711,3 +1711,55 @@ export interface EjecucionMantenimiento {
   estado: EstadoEjecucion
   created_at: string
 }
+
+export type TipoCorrespondencia = 'entrada' | 'salida'
+export type CategoriaCorrespondencia = 'carta' | 'notificacion_legal' | 'factura' | 'circular' | 'otro'
+export type EstadoCorrespondencia = 'pendiente' | 'atendido' | 'archivado'
+export interface CorrespondenciaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  tipo: TipoCorrespondencia
+  categoria: CategoriaCorrespondencia
+  asunto: string
+  remitente?: string | null
+  destinatario?: string | null
+  fecha: string
+  numero_guia?: string | null
+  prioridad: 'normal' | 'urgente'
+  estado: EstadoCorrespondencia
+  observaciones?: string | null
+  unidad_id?: string | null
+  created_at: string
+}
+
+export type TurnoNovedad = 'mañana' | 'tarde' | 'noche'
+export interface LibroNovedad {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  turno: TurnoNovedad
+  responsable: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  novedades: string
+  incidentes: unknown[]
+  firmado: boolean
+  created_at: string
+}
+
+export type EstadoAcuerdo = 'pendiente' | 'en_proceso' | 'cumplido' | 'vencido' | 'cancelado'
+export interface SeguimientoAcuerdo {
+  id: string
+  company_id: string
+  project_id: string
+  acta_id?: string | null
+  titulo: string
+  descripcion?: string | null
+  responsable?: string | null
+  fecha_limite?: string | null
+  estado: EstadoAcuerdo
+  notas_seguimiento?: string | null
+  created_at: string
+}

@@ -1,0 +1,280 @@
+import { useState } from 'react'
+import { supabase } from '../../../lib/supabase'
+import type { LibroNovedad } from '../../../types'
+import Swal from 'sweetalert2'
+
+interface Props {
+  novedades: LibroNovedad[]
+  proyectoId: string
+  companyId: string
+  canCreate: boolean
+  canEdit: boolean
+  onRefresh: () => void
+}
+
+interface Incidente { hora: string; descripcion: string; tipo: string }
+
+const BLANK_INCIDENTE: Incidente = { hora: '', descripcion: '', tipo: 'observacion' }
+
+const BLANK = {
+  fecha: new Date().toISOString().slice(0, 10),
+  turno: 'mañana', responsable: '', hora_inicio: '', hora_fin: '',
+  novedades: '', incidentes: [] as Incidente[], firmado: false,
+}
+
+const TURNO_COLORS: Record<string, { bg: string; color: string; icon: string }> = {
+  'mañana': { bg: '#fef9c3', color: '#92400e', icon: '🌅' },
+  tarde:    { bg: '#fff7ed', color: '#c2410c', icon: '☀️' },
+  noche:    { bg: '#ede9fe', color: '#5b21b6', icon: '🌙' },
+}
+const TIPO_INCIDENTE = ['observacion', 'incidente', 'emergencia', 'visita', 'reparacion', 'otro']
+
+export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ ...BLANK })
+  const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [filtroTurno, setFiltroTurno] = useState<'todos' | 'mañana' | 'tarde' | 'noche'>('todos')
+
+  function setF<K extends keyof typeof form>(k: K, v: typeof form[K]) { setForm(p => ({ ...p, [k]: v })) }
+
+  function addIncidente() { setForm(f => ({ ...f, incidentes: [...f.incidentes, { ...BLANK_INCIDENTE }] })) }
+  function removeIncidente(i: number) { setForm(f => ({ ...f, incidentes: f.incidentes.filter((_, j) => j !== i) })) }
+  function setIncidente(i: number, field: keyof Incidente, val: string) {
+    setForm(f => ({ ...f, incidentes: f.incidentes.map((inc, j) => j === i ? { ...inc, [field]: val } : inc) }))
+  }
+
+  async function handleSave() {
+    if (!form.responsable.trim() || !form.novedades.trim())
+      return Swal.fire('Requerido', 'Responsable y novedades son obligatorios.', 'warning')
+    setSaving(true)
+    const { error } = await supabase.from('libro_novedades').insert({
+      company_id: companyId, project_id: proyectoId,
+      fecha: form.fecha, turno: form.turno, responsable: form.responsable.trim(),
+      hora_inicio: form.hora_inicio || null, hora_fin: form.hora_fin || null,
+      novedades: form.novedades.trim(),
+      incidentes: form.incidentes.filter(i => i.descripcion.trim()),
+      firmado: form.firmado,
+    })
+    setSaving(false)
+    if (error) return Swal.fire('Error', error.message, 'error')
+    setShowForm(false); setForm({ ...BLANK }); onRefresh()
+  }
+
+  async function toggleFirmado(id: string, firmado: boolean) {
+    await supabase.from('libro_novedades').update({ firmado: !firmado }).eq('id', id)
+    onRefresh()
+  }
+
+  async function handleDelete(id: string) {
+    const r = await Swal.fire({ title: '¿Eliminar entrada?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    if (!r.isConfirmed) return
+    await supabase.from('libro_novedades').delete().eq('id', id)
+    onRefresh()
+  }
+
+  function handlePrint(n: LibroNovedad) {
+    const tc = TURNO_COLORS[n.turno] ?? { icon: '📋' }
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Novedad ${n.fecha}</title>
+    <style>body{font-family:sans-serif;padding:32px;color:#0f172a}h1{font-size:18px}p{font-size:13px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid #e2e8f0}th{background:#f8fafc}</style>
+    </head><body>
+    <h1>${tc.icon} Libro de Novedades — ${n.fecha} (${n.turno})</h1>
+    <p><b>Responsable:</b> ${n.responsable} &nbsp; <b>Horario:</b> ${n.hora_inicio ?? '—'} – ${n.hora_fin ?? '—'}</p>
+    <h2 style="font-size:14px">Novedades del turno</h2><p>${n.novedades.replace(/\n/g, '<br>')}</p>
+    ${(n.incidentes as Incidente[]).length > 0 ? `<h2 style="font-size:14px">Incidentes</h2><table><tr><th>Hora</th><th>Tipo</th><th>Descripción</th></tr>${(n.incidentes as Incidente[]).map(i => `<tr><td>${i.hora}</td><td>${i.tipo}</td><td>${i.descripcion}</td></tr>`).join('')}</table>` : ''}
+    <p style="margin-top:40px;font-size:12px;color:#64748b">Firmado: ${n.firmado ? 'Sí' : 'No'}</p>
+    </body></html>`
+    const w = window.open('', '_blank')
+    if (w) { w.document.write(html); w.document.close(); w.print() }
+  }
+
+  const filtered = filtroTurno === 'todos' ? novedades : novedades.filter(n => n.turno === filtroTurno)
+  const detail = selected ? novedades.find(n => n.id === selected) : null
+
+  const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+
+  return (
+    <div style={{ padding: '20px 24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Libro de Novedades</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>Bitácora de turnos de seguridad y administración</p>
+        </div>
+        {canCreate && !showForm && (
+          <button onClick={() => setShowForm(true)}
+            style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            + Nueva entrada
+          </button>
+        )}
+      </div>
+
+      {/* Form */}
+      {showForm && (
+        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nueva entrada</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Fecha</label>
+              <input style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Turno</label>
+              <select style={inputStyle} value={form.turno} onChange={e => setF('turno', e.target.value)}>
+                <option value="mañana">🌅 Mañana</option>
+                <option value="tarde">☀️ Tarde</option>
+                <option value="noche">🌙 Noche</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Responsable *</label>
+              <input style={inputStyle} value={form.responsable} onChange={e => setF('responsable', e.target.value)} placeholder="Nombre del encargado" autoFocus />
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Hora inicio</label>
+              <input style={inputStyle} type="time" value={form.hora_inicio} onChange={e => setF('hora_inicio', e.target.value)} />
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Hora fin</label>
+              <input style={inputStyle} type="time" value={form.hora_fin} onChange={e => setF('hora_fin', e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
+              <input type="checkbox" id="firmado_form" checked={form.firmado} onChange={e => setF('firmado', e.target.checked)} />
+              <label htmlFor="firmado_form" style={{ fontSize: '12px', color: '#64748b', cursor: 'pointer' }}>Turno firmado</label>
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Novedades del turno *</label>
+              <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical', fontFamily: 'inherit' }}
+                value={form.novedades} onChange={e => setF('novedades', e.target.value)}
+                placeholder="Describe las novedades generales del turno…" />
+            </div>
+          </div>
+
+          {/* Incidentes */}
+          <div style={{ marginTop: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Incidentes del turno</label>
+              <button onClick={addIncidente}
+                style={{ padding: '3px 10px', background: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer' }}>
+                + Agregar
+              </button>
+            </div>
+            {form.incidentes.map((inc, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '90px 120px 1fr auto', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
+                <input style={inputStyle} type="time" value={inc.hora} onChange={e => setIncidente(i, 'hora', e.target.value)} placeholder="Hora" />
+                <select style={inputStyle} value={inc.tipo} onChange={e => setIncidente(i, 'tipo', e.target.value)}>
+                  {TIPO_INCIDENTE.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <input style={inputStyle} value={inc.descripcion} onChange={e => setIncidente(i, 'descripcion', e.target.value)} placeholder="Descripción del incidente" />
+                <button onClick={() => removeIncidente(i)} style={{ padding: '6px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>✕</button>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+            <button onClick={handleSave} disabled={saving}
+              style={{ padding: '7px 18px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+            <button onClick={() => setShowForm(false)}
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Filter */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+        {(['todos', 'mañana', 'tarde', 'noche'] as const).map(f => {
+          const tc = TURNO_COLORS[f]
+          return (
+            <button key={f} onClick={() => setFiltroTurno(f)}
+              style={{ padding: '5px 12px', border: '1.5px solid', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', fontWeight: filtroTurno === f ? 700 : 500,
+                borderColor: filtroTurno === f ? '#0ea5e9' : '#e2e8f0',
+                background: filtroTurno === f ? '#e0f2fe' : 'white',
+                color: filtroTurno === f ? '#0369a1' : '#64748b' }}>
+              {f === 'todos' ? 'Todos' : `${tc?.icon} ${f}`}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Split view */}
+      <div style={{ display: 'grid', gridTemplateColumns: detail ? '1fr 340px' : '1fr', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay entradas.</div>
+          ) : (
+            filtered.map(n => {
+              const tc = TURNO_COLORS[n.turno] ?? { bg: '#f1f5f9', color: '#64748b', icon: '📋' }
+              const incs = n.incidentes as Incidente[]
+              return (
+                <div key={n.id} onClick={() => setSelected(selected === n.id ? null : n.id)}
+                  style={{ background: selected === n.id ? '#f0f9ff' : 'white', border: `1.5px solid ${selected === n.id ? '#0ea5e9' : '#e2e8f0'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '3px' }}>
+                        <span style={{ fontSize: '16px' }}>{tc.icon}</span>
+                        <span style={{ fontWeight: 700, fontSize: '13px' }}>{n.fecha}</span>
+                        <span style={{ fontSize: '11px', fontWeight: 600, padding: '1px 7px', borderRadius: '10px', background: tc.bg, color: tc.color }}>{n.turno}</span>
+                        {n.firmado && <span style={{ fontSize: '10px', color: '#16a34a', fontWeight: 700 }}>✓ Firmado</span>}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>
+                        {n.responsable}{n.hora_inicio ? ` · ${n.hora_inicio}–${n.hora_fin ?? '?'}` : ''}
+                        {incs.length > 0 && <span style={{ marginLeft: '8px', color: '#ef4444', fontWeight: 600 }}>{incs.length} incidente(s)</span>}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#374151', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '500px' }}>
+                        {n.novedades}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                      <button onClick={e => { e.stopPropagation(); handlePrint(n) }}
+                        style={{ padding: '3px 7px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
+                      {canEdit && !n.firmado && (
+                        <button onClick={e => { e.stopPropagation(); toggleFirmado(n.id, n.firmado) }}
+                          style={{ padding: '3px 7px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Firmar</button>
+                      )}
+                      {canEdit && (
+                        <button onClick={e => { e.stopPropagation(); handleDelete(n.id) }}
+                          style={{ padding: '3px 7px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* Detail */}
+        {detail && (
+          <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', alignSelf: 'flex-start' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>
+                {TURNO_COLORS[detail.turno]?.icon} {detail.fecha} — {detail.turno}
+              </h3>
+              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+            </div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
+              {detail.responsable}{detail.hora_inicio ? ` · ${detail.hora_inicio} – ${detail.hora_fin}` : ''}
+              {detail.firmado && ' · ✓ Firmado'}
+            </div>
+            <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5, marginBottom: '12px', whiteSpace: 'pre-wrap' }}>{detail.novedades}</div>
+            {(detail.incidentes as Incidente[]).length > 0 && (
+              <>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>Incidentes</div>
+                {(detail.incidentes as Incidente[]).map((inc, i) => (
+                  <div key={i} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '6px 8px', marginBottom: '4px', fontSize: '12px' }}>
+                    <span style={{ fontWeight: 700, color: '#ef4444' }}>{inc.hora}</span>
+                    <span style={{ color: '#64748b', marginLeft: '6px', fontSize: '11px' }}>[{inc.tipo}]</span>
+                    <span style={{ marginLeft: '6px', color: '#374151' }}>{inc.descripcion}</span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

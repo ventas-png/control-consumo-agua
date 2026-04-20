@@ -16,6 +16,7 @@ import type {
   SolicitudResidente, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
   ActaReunion, CierreMensual, ReglaNotificacion, MedidorUnidad,
   Votacion, SancionCondominio, PlanMantenimiento,
+  CorrespondenciaCondominio, LibroNovedad, SeguimientoAcuerdo,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -73,6 +74,10 @@ import { VotacionesTab } from './tabs/VotacionesTab'
 import { SancionesTab } from './tabs/SancionesTab'
 import { MantenimientoPrevTab } from './tabs/MantenimientoPrevTab'
 import { PortalResidenteTab } from './tabs/PortalResidenteTab'
+import { CorrespondenciaCondTab } from './tabs/CorrespondenciaCondTab'
+import { LibroNovedadesTab } from './tabs/LibroNovedadesTab'
+import { SeguimientoAcuerdosTab } from './tabs/SeguimientoAcuerdosTab'
+import { DashboardEjecutivoTab } from './tabs/DashboardEjecutivoTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -88,6 +93,7 @@ type CondominioTab =
   | 'solicitudes' | 'junta' | 'prestamos' | 'comunicados'
   | 'actas' | 'cierres' | 'notificaciones' | 'medidores_unidad'
   | 'votaciones' | 'sanciones' | 'mant_preventivo' | 'portal'
+  | 'correspondencia' | 'libro_novedades' | 'acuerdos' | 'dashboard_ejecutivo'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -145,7 +151,11 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'votaciones',       label: 'Votaciones',   icon: '🗳️' },
   { id: 'sanciones',        label: 'Sanciones',    icon: '⚖️' },
   { id: 'mant_preventivo',  label: 'Mant. Prev.',  icon: '🔩' },
-  { id: 'portal',           label: 'Portal Resid.',icon: '👤' },
+  { id: 'portal',             label: 'Portal Resid.',  icon: '👤' },
+  { id: 'correspondencia',    label: 'Correspondencia',icon: '📬' },
+  { id: 'libro_novedades',    label: 'Libro Novedades',icon: '📖' },
+  { id: 'acuerdos',           label: 'Acuerdos',       icon: '✅' },
+  { id: 'dashboard_ejecutivo',label: 'Dashboard Ejec.',icon: '📈' },
 ]
 
 interface Props {
@@ -227,6 +237,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [votaciones, setVotaciones] = useState<Votacion[]>([])
   const [sanciones, setSanciones] = useState<SancionCondominio[]>([])
   const [planesMantenimiento, setPlanesMantenimiento] = useState<PlanMantenimiento[]>([])
+  // Fase 14
+  const [correspondencia, setCorrespondencia] = useState<CorrespondenciaCondominio[]>([])
+  const [libroNovedades, setLibroNovedades] = useState<LibroNovedad[]>([])
+  const [acuerdos, setAcuerdos] = useState<SeguimientoAcuerdo[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -257,6 +271,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       solicitudesRes, juntaRes, prestamosRes, comunicadosRes,
       actasRes, cierresRes, reglasRes, medidoresRes,
       votacionesRes, sancionesRes, planesRes,
+      correspondenciaRes, libroRes, acuerdosRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -311,6 +326,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('votaciones').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }),
       supabase.from('sanciones_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_emision', { ascending: false }),
       supabase.from('planes_mantenimiento').select('*').eq('project_id', pid).eq('company_id', cid).order('proxima_ejecucion'),
+      supabase.from('correspondencia_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('libro_novedades').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).order('turno'),
+      supabase.from('seguimiento_acuerdos').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_limite'),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -378,6 +396,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setVotaciones((votacionesRes.data ?? []) as Votacion[])
     setSanciones(mapUnidad<SancionCondominio>(sancionesRes.data ?? []))
     setPlanesMantenimiento((planesRes.data ?? []) as PlanMantenimiento[])
+    setCorrespondencia(mapUnidad<CorrespondenciaCondominio>(correspondenciaRes.data ?? []))
+    setLibroNovedades((libroRes.data ?? []) as LibroNovedad[])
+    setAcuerdos((acuerdosRes.data ?? []) as SeguimientoAcuerdo[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -532,6 +553,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'sanciones' && <SancionesTab sanciones={sanciones} unidades={unidadesProyecto} infracciones={infracciones} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'mant_preventivo' && <MantenimientoPrevTab planes={planesMantenimiento} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'portal' && <PortalResidenteTab cuotas={cuotas} tickets={tickets} reservas={reservas} comunicados={comunicados} sanciones={sanciones} unidades={unidadesProyecto} moneda={moneda} />}
+        {activeTab === 'correspondencia' && <CorrespondenciaCondTab correspondencia={correspondencia} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'libro_novedades' && <LibroNovedadesTab novedades={libroNovedades} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'acuerdos' && <SeguimientoAcuerdosTab acuerdos={acuerdos} actas={actas} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'dashboard_ejecutivo' && <DashboardEjecutivoTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} gastos={gastos} presupuestos={presupuestos} sanciones={sanciones} planesMantenimiento={planesMantenimiento} infracciones={infracciones} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
       </div>
     </div>
   )
