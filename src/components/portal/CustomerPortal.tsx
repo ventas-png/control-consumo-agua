@@ -109,6 +109,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [photoModal, setPhotoModal] = useState<{ url: string; label: string } | null>(null)
   const chartRef = useRef<HTMLCanvasElement>(null)
   const chartInstance = useRef<Chart | null>(null)
+  const [chartMonthsBack, setChartMonthsBack] = useState(12)
+  const [chartCustomStart, setChartCustomStart] = useState('')
+  const [chartCustomEnd, setChartCustomEnd] = useState('')
+  const [chartRangeMode, setChartRangeMode] = useState<'preset' | 'custom'>('preset')
 
   const clienteId = currentUser.cliente_id
 
@@ -196,8 +200,26 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
       setUnidades(unidadesList)
       setContadores(cData)
-      setLecturas((rData as LecturaInfo[]) ?? [])
-      setRegistros((rData as Registro[]) ?? [])
+
+      // Fetch readings by contador_id to catch registros where cliente_id is missing/mismatched
+      let mergedLecturas: LecturaInfo[] = (rData as LecturaInfo[]) ?? []
+      if (cData.length > 0) {
+        const twoYearsAgo2 = new Date()
+        twoYearsAgo2.setFullYear(twoYearsAgo2.getFullYear() - 2)
+        const { data: contReadings } = await supabase
+          .from('registros')
+          .select('id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
+          .in('contador_id', cData.map(c => c.id))
+          .gte('fecha', twoYearsAgo2.toISOString().split('T')[0])
+          .order('fecha', { ascending: false })
+        if (contReadings?.length) {
+          const existingIds = new Set(mergedLecturas.map(l => l.id))
+          const extra = (contReadings as LecturaInfo[]).filter(l => !existingIds.has(l.id))
+          if (extra.length > 0) mergedLecturas = [...mergedLecturas, ...extra]
+        }
+      }
+      setLecturas(mergedLecturas)
+      setRegistros(mergedLecturas as Registro[])
 
       if (clData) {
         setContactoEdit(clData as ClienteContacto)
@@ -262,22 +284,50 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     // KPI 4: contadores activos
     const contadoresActivos = filteredContadores.filter(c => c.activo).length
 
-    // Chart: 24 meses
-    const chartLabels: string[] = []
-    const chartConsumo: number[] = []
-    const chartMontos: number[] = []
+    // Fixed 24 months for comparison baseline (independent of display range)
+    const all24Consumo: number[] = []
     for (let i = 23; i >= 0; i--) {
       const d = new Date(curY, curM - i, 1)
       const y = d.getFullYear(); const m = d.getMonth()
-      chartLabels.push(`${MESES_LABELS[m]} ${y}`)
       const sliceLec = filteredLecturas.filter(l => sameYM(l.fecha, y, m))
-      chartConsumo.push(parseFloat(sliceLec.reduce((s, l) => s + (l.consumo || 0), 0).toFixed(2)))
-      chartMontos.push(parseFloat(sliceLec.reduce((s, l) => s + (l.monto_calculado || 0), 0).toFixed(2)))
+      all24Consumo.push(parseFloat(sliceLec.reduce((s, l) => s + (l.consumo || 0), 0).toFixed(2)))
     }
 
-    // Comparaciones
-    const consumoPrevMes = chartConsumo[22] ?? 0
-    const consumoSameLastYear = chartConsumo[11] ?? 0
+    // Chart display range (default: last 12 months; supports custom date range)
+    const chartLabels: string[] = []
+    const chartConsumo: number[] = []
+    const chartMontos: number[] = []
+    let chartCurrentMonthIdx = -1
+
+    if (chartRangeMode === 'custom' && chartCustomStart && chartCustomEnd) {
+      const [sy, sm] = chartCustomStart.split('-').map(Number)
+      const [ey, em] = chartCustomEnd.split('-').map(Number)
+      const iter = new Date(sy, sm - 1, 1)
+      const end = new Date(ey, em - 1, 1)
+      while (iter <= end) {
+        const y = iter.getFullYear(); const m = iter.getMonth()
+        chartLabels.push(`${MESES_LABELS[m]} ${y}`)
+        const sliceLec = filteredLecturas.filter(l => sameYM(l.fecha, y, m))
+        chartConsumo.push(parseFloat(sliceLec.reduce((s, l) => s + (l.consumo || 0), 0).toFixed(2)))
+        chartMontos.push(parseFloat(sliceLec.reduce((s, l) => s + (l.monto_calculado || 0), 0).toFixed(2)))
+        if (y === curY && m === curM) chartCurrentMonthIdx = chartLabels.length - 1
+        iter.setMonth(iter.getMonth() + 1)
+      }
+    } else {
+      for (let i = chartMonthsBack - 1; i >= 0; i--) {
+        const d = new Date(curY, curM - i, 1)
+        const y = d.getFullYear(); const m = d.getMonth()
+        chartLabels.push(`${MESES_LABELS[m]} ${y}`)
+        const sliceLec = filteredLecturas.filter(l => sameYM(l.fecha, y, m))
+        chartConsumo.push(parseFloat(sliceLec.reduce((s, l) => s + (l.consumo || 0), 0).toFixed(2)))
+        chartMontos.push(parseFloat(sliceLec.reduce((s, l) => s + (l.monto_calculado || 0), 0).toFixed(2)))
+        if (i === 0) chartCurrentMonthIdx = chartLabels.length - 1
+      }
+    }
+
+    // Comparaciones (always based on fixed 24m baseline)
+    const consumoPrevMes = all24Consumo[22] ?? 0
+    const consumoSameLastYear = all24Consumo[11] ?? 0
     const vsAnterior = consumoPrevMes > 0
       ? ((consumoMesActual - consumoPrevMes) / consumoPrevMes) * 100 : null
     const vsAnioAnterior = consumoSameLastYear > 0
@@ -315,37 +365,70 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       return { unidad, meters }
     })
 
+    const lecturasTotal = lecturas.length
+    const filteredLecturasCount = filteredLecturas.length
+
     return {
       consumoMesActual, consumoPromedio, montoPendiente, contadoresActivos,
       consumoPrevMes, consumoSameLastYear, vsAnterior, vsAnioAnterior,
-      chartLabels, chartConsumo, chartMontos,
+      chartLabels, chartConsumo, chartMontos, chartCurrentMonthIdx,
       tipoAguaMap, unidadBreakdown,
+      lecturasTotal, filteredLecturasCount,
     }
-  }, [lecturas, contadores, unidades, selectedProjectId])
+  }, [lecturas, contadores, unidades, selectedProjectId, chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode])
 
-  // ── Chart.js 24-month bar chart ───────────────────────────
+  // ── Chart.js bar chart (configurable range) ──────────────
   useEffect(() => {
     if (tab !== 'dashboard') return
     const timeout = setTimeout(() => {
       if (!chartRef.current) return
       if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null }
-      const { chartLabels, chartConsumo, chartMontos } = dashboardData
-      const colors = chartLabels.map((_, i) => i === chartLabels.length - 1 ? '#0ea5e9' : '#bae6fd')
+      const { chartLabels, chartConsumo, chartMontos, chartCurrentMonthIdx } = dashboardData
+      const n = chartConsumo.length
+      const colors = chartLabels.map((_, i) => {
+        if (i === chartCurrentMonthIdx) return '#0ea5e9'
+        const progress = n > 1 ? i / (n - 1) : 1
+        return `rgba(14, 165, 233, ${(0.18 + progress * 0.42).toFixed(2)})`
+      })
       chartInstance.current = new Chart(chartRef.current, {
         type: 'bar',
         data: {
           labels: chartLabels,
-          datasets: [{ label: 'Consumo (m³)', data: chartConsumo, backgroundColor: colors, borderRadius: 4, borderSkipped: false }],
+          datasets: [{
+            label: 'Consumo (m³)',
+            data: chartConsumo,
+            backgroundColor: colors,
+            borderRadius: 6,
+            borderSkipped: false,
+          }],
         },
         options: {
-          responsive: true, maintainAspectRatio: false,
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 400 },
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: ctx => [`${(ctx.parsed.y ?? 0).toFixed(2)} m³`, `Monto: ${chartMontos[ctx.dataIndex].toFixed(2)}`] } },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              padding: 10,
+              cornerRadius: 8,
+              callbacks: {
+                label: ctx => [`  ${(ctx.parsed.y ?? 0).toFixed(2)} m³`, `  Monto: ${chartMontos[ctx.dataIndex].toFixed(2)}`],
+              },
+            },
           },
           scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } },
-            y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 } } },
+            x: {
+              grid: { display: false },
+              ticks: { font: { size: 10 }, maxRotation: 45, color: '#94a3b8' },
+              border: { display: false },
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: '#f1f5f9' },
+              ticks: { font: { size: 11 }, color: '#94a3b8' },
+              border: { display: false },
+            },
           },
         },
       })
@@ -383,6 +466,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       consumoMesActual, consumoPromedio, montoPendiente, contadoresActivos,
       consumoPrevMes, consumoSameLastYear, vsAnterior, vsAnioAnterior,
       tipoAguaMap, unidadBreakdown,
+      lecturasTotal, filteredLecturasCount,
     } = dashboardData
 
     const moneda = selectedProjectId
@@ -450,19 +534,99 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           <PctCard label="vs Mismo Mes Año Anterior" pct={vsAnioAnterior} base={consumoSameLastYear} baseLabel="Año ant." />
         </div>
 
-        {/* Gráfica 24 meses */}
+        {/* Historial de Consumo */}
         <div style={{ background: 'white', borderRadius: '16px', padding: '22px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Historial de Consumo</div>
-              <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px' }}>Últimos 24 meses (m³)</div>
-            </div>
-            <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: '#64748b', alignItems: 'center' }}>
-              <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: '#0ea5e9', marginRight: '4px' }} />Mes actual</span>
-              <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: '#bae6fd', marginRight: '4px' }} />Anteriores</span>
+          {/* Título */}
+          <div style={{ marginBottom: '14px' }}>
+            <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Historial de Consumo</div>
+            <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px' }}>
+              {chartRangeMode === 'custom' && chartCustomStart && chartCustomEnd
+                ? `${chartCustomStart} — ${chartCustomEnd} (m³)`
+                : `Últimos ${chartMonthsBack} meses (m³)`}
             </div>
           </div>
-          <div style={{ height: '260px' }}><canvas ref={chartRef} /></div>
+          {/* Controles de rango — fila separada siempre visible */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap' }}>Período:</span>
+            <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid #e2e8f0', overflow: 'hidden' }}>
+              {([6, 12, 24] as const).map(n => (
+                <button
+                  key={n}
+                  onClick={() => { setChartMonthsBack(n); setChartRangeMode('preset') }}
+                  style={{
+                    padding: '6px 14px', fontSize: '12.5px', fontWeight: 600,
+                    border: 'none', borderRight: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.15s',
+                    background: chartRangeMode === 'preset' && chartMonthsBack === n ? '#0ea5e9' : '#f8fafc',
+                    color: chartRangeMode === 'preset' && chartMonthsBack === n ? 'white' : '#475569',
+                  }}
+                >{n}M</button>
+              ))}
+              <button
+                onClick={() => {
+                  setChartRangeMode('custom')
+                  if (!chartCustomStart || !chartCustomEnd) {
+                    const now = new Date()
+                    const endStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+                    const s = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+                    const startStr = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}`
+                    setChartCustomStart(startStr)
+                    setChartCustomEnd(endStr)
+                  }
+                }}
+                style={{
+                  padding: '6px 14px', fontSize: '12.5px', fontWeight: 600,
+                  border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                  background: chartRangeMode === 'custom' ? '#0ea5e9' : '#f8fafc',
+                  color: chartRangeMode === 'custom' ? 'white' : '#475569',
+                }}
+              >📅 Rango</button>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', fontSize: '11px', color: '#64748b', alignItems: 'center', marginLeft: 'auto' }}>
+              <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: '#0ea5e9', marginRight: '4px' }} />Mes actual</span>
+              <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(14,165,233,0.45)', marginRight: '4px' }} />Anteriores</span>
+            </div>
+          </div>
+          {/* Inputs de rango personalizado */}
+          {chartRangeMode === 'custom' && (
+            <div style={{ display: 'flex', gap: '14px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap', background: '#f0f9ff', borderRadius: '10px', padding: '10px 14px', border: '1px solid #bae6fd' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
+                <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Desde:</span>
+                <input
+                  type="month"
+                  value={chartCustomStart}
+                  onChange={e => setChartCustomStart(e.target.value)}
+                  style={{ padding: '5px 10px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
+                <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Hasta:</span>
+                <input
+                  type="month"
+                  value={chartCustomEnd}
+                  onChange={e => setChartCustomEnd(e.target.value)}
+                  style={{ padding: '5px 10px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }}
+                />
+              </div>
+            </div>
+          )}
+          {/* Gráfico o estado vacío */}
+          {lecturasTotal === 0 ? (
+            <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '8px', background: '#f8fafc', borderRadius: '10px' }}>
+              <span style={{ fontSize: '32px' }}>📊</span>
+              <span style={{ fontSize: '13px', fontWeight: 500 }}>Sin lecturas registradas aún</span>
+              <span style={{ fontSize: '11.5px', textAlign: 'center', maxWidth: '280px' }}>Los datos aparecerán cuando se ingresen lecturas de consumo</span>
+            </div>
+          ) : filteredLecturasCount === 0 ? (
+            <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '8px', background: '#f8fafc', borderRadius: '10px' }}>
+              <span style={{ fontSize: '32px' }}>🔍</span>
+              <span style={{ fontSize: '13px', fontWeight: 500 }}>Sin lecturas para los contadores activos</span>
+              <span style={{ fontSize: '11.5px', textAlign: 'center', maxWidth: '320px' }}>
+                Hay {lecturasTotal} lectura{lecturasTotal !== 1 ? 's' : ''} en el sistema pero no coinciden con los contadores vinculados
+              </span>
+            </div>
+          ) : (
+            <div style={{ height: '260px' }}><canvas ref={chartRef} /></div>
+          )}
         </div>
 
         {/* Desglose por tipo de agua */}
