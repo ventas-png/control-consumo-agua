@@ -1632,3 +1632,82 @@ export interface MedidorUnidad {
   created_at: string
   unidad_nombre?: string
 }
+
+export type TipoVotacion = 'simple' | 'multiple' | 'ponderada'
+export type EstadoVotacion = 'abierta' | 'cerrada' | 'anulada'
+export interface OpcionVoto { id: string; texto: string }
+export interface Votacion {
+  id: string
+  company_id: string
+  project_id: string
+  asamblea_id?: string | null
+  titulo: string
+  descripcion?: string | null
+  tipo: TipoVotacion
+  opciones: OpcionVoto[]
+  estado: EstadoVotacion
+  quorum_requerido?: number | null
+  total_unidades?: number | null
+  fecha_inicio: string
+  fecha_cierre?: string | null
+  resultado?: string | null
+  created_at: string
+}
+
+export interface Voto {
+  id: string
+  company_id: string
+  votacion_id: string
+  unidad_id: string
+  opcion_id: string
+  comentario?: string | null
+  registrado_por?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type EstadoSancion = 'pendiente' | 'pagado' | 'anulado' | 'apelado'
+export interface SancionCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  infraccion_id?: string | null
+  concepto: string
+  monto: number
+  fecha_emision: string
+  fecha_vencimiento?: string | null
+  estado: EstadoSancion
+  observaciones?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type FrecuenciaMantenimiento = 'semanal' | 'quincenal' | 'mensual' | 'trimestral' | 'semestral' | 'anual'
+export type EstadoEjecucion = 'completado' | 'parcial' | 'omitido'
+export interface PlanMantenimiento {
+  id: string
+  company_id: string
+  project_id: string
+  equipo: string
+  descripcion?: string | null
+  frecuencia: FrecuenciaMantenimiento
+  responsable?: string | null
+  ultima_ejecucion?: string | null
+  proxima_ejecucion?: string | null
+  costo_estimado?: number | null
+  activo: boolean
+  created_at: string
+}
+
+export interface EjecucionMantenimiento {
+  id: string
+  company_id: string
+  plan_id: string
+  fecha: string
+  realizado_por?: string | null
+  costo_real?: number | null
+  observaciones?: string | null
+  estado: EstadoEjecucion
+  created_at: string
+}

@@ -15,6 +15,7 @@ import type {
   EventoCalendario, ConfiguracionCondominio,
   SolicitudResidente, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
   ActaReunion, CierreMensual, ReglaNotificacion, MedidorUnidad,
+  Votacion, SancionCondominio, PlanMantenimiento,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -68,6 +69,10 @@ import { ActasTab } from './tabs/ActasTab'
 import { CierresMensualesTab } from './tabs/CierresMensualesTab'
 import { NotificacionesTab } from './tabs/NotificacionesTab'
 import { MedidoresUnidadTab } from './tabs/MedidoresUnidadTab'
+import { VotacionesTab } from './tabs/VotacionesTab'
+import { SancionesTab } from './tabs/SancionesTab'
+import { MantenimientoPrevTab } from './tabs/MantenimientoPrevTab'
+import { PortalResidenteTab } from './tabs/PortalResidenteTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -82,6 +87,7 @@ type CondominioTab =
   | 'estadocuenta' | 'calendario' | 'directorio' | 'configuracion'
   | 'solicitudes' | 'junta' | 'prestamos' | 'comunicados'
   | 'actas' | 'cierres' | 'notificaciones' | 'medidores_unidad'
+  | 'votaciones' | 'sanciones' | 'mant_preventivo' | 'portal'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -135,7 +141,11 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'actas',         label: 'Actas',          icon: '📝' },
   { id: 'cierres',       label: 'Cierres',        icon: '🔒' },
   { id: 'notificaciones',label: 'Notificaciones', icon: '🔔' },
-  { id: 'medidores_unidad', label: 'Medidores',   icon: '💧' },
+  { id: 'medidores_unidad', label: 'Medidores',    icon: '💧' },
+  { id: 'votaciones',       label: 'Votaciones',   icon: '🗳️' },
+  { id: 'sanciones',        label: 'Sanciones',    icon: '⚖️' },
+  { id: 'mant_preventivo',  label: 'Mant. Prev.',  icon: '🔩' },
+  { id: 'portal',           label: 'Portal Resid.',icon: '👤' },
 ]
 
 interface Props {
@@ -213,6 +223,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [cierres, setCierres] = useState<CierreMensual[]>([])
   const [reglas, setReglas] = useState<ReglaNotificacion[]>([])
   const [medidores, setMedidores] = useState<MedidorUnidad[]>([])
+  // Fase 13
+  const [votaciones, setVotaciones] = useState<Votacion[]>([])
+  const [sanciones, setSanciones] = useState<SancionCondominio[]>([])
+  const [planesMantenimiento, setPlanesMantenimiento] = useState<PlanMantenimiento[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -242,6 +256,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       eventosCalRes, configuracionRes,
       solicitudesRes, juntaRes, prestamosRes, comunicadosRes,
       actasRes, cierresRes, reglasRes, medidoresRes,
+      votacionesRes, sancionesRes, planesRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -293,6 +308,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('cierres_mensuales').select('*').eq('project_id', pid).eq('company_id', cid).order('periodo', { ascending: false }),
       supabase.from('reglas_notificacion').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('medidores_unidad').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('votaciones').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }),
+      supabase.from('sanciones_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_emision', { ascending: false }),
+      supabase.from('planes_mantenimiento').select('*').eq('project_id', pid).eq('company_id', cid).order('proxima_ejecucion'),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -357,6 +375,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setCierres((cierresRes.data ?? []) as CierreMensual[])
     setReglas((reglasRes.data ?? []) as ReglaNotificacion[])
     setMedidores(mapUnidad<MedidorUnidad>(medidoresRes.data ?? []))
+    setVotaciones((votacionesRes.data ?? []) as Votacion[])
+    setSanciones(mapUnidad<SancionCondominio>(sancionesRes.data ?? []))
+    setPlanesMantenimiento((planesRes.data ?? []) as PlanMantenimiento[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -507,6 +528,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'cierres' && <CierresMensualesTab cierres={cierres} cuotas={cuotas} gastos={gastos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'notificaciones' && <NotificacionesTab reglas={reglas} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'medidores_unidad' && <MedidoresUnidadTab medidores={medidores} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'votaciones' && <VotacionesTab votaciones={votaciones} unidades={unidadesProyecto} asambleas={asambleas} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'sanciones' && <SancionesTab sanciones={sanciones} unidades={unidadesProyecto} infracciones={infracciones} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'mant_preventivo' && <MantenimientoPrevTab planes={planesMantenimiento} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'portal' && <PortalResidenteTab cuotas={cuotas} tickets={tickets} reservas={reservas} comunicados={comunicados} sanciones={sanciones} unidades={unidadesProyecto} moneda={moneda} />}
       </div>
     </div>
   )
