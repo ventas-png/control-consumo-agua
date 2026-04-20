@@ -1711,3 +1711,626 @@ export interface EjecucionMantenimiento {
   estado: EstadoEjecucion
   created_at: string
 }
+
+export type TipoCorrespondencia = 'entrada' | 'salida'
+export type CategoriaCorrespondencia = 'carta' | 'notificacion_legal' | 'factura' | 'circular' | 'otro'
+export type EstadoCorrespondencia = 'pendiente' | 'atendido' | 'archivado'
+export interface CorrespondenciaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  tipo: TipoCorrespondencia
+  categoria: CategoriaCorrespondencia
+  asunto: string
+  remitente?: string | null
+  destinatario?: string | null
+  fecha: string
+  numero_guia?: string | null
+  prioridad: 'normal' | 'urgente'
+  estado: EstadoCorrespondencia
+  observaciones?: string | null
+  unidad_id?: string | null
+  created_at: string
+}
+
+export type TurnoNovedad = 'mañana' | 'tarde' | 'noche'
+export interface LibroNovedad {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  turno: TurnoNovedad
+  responsable: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  novedades: string
+  incidentes: unknown[]
+  firmado: boolean
+  created_at: string
+}
+
+export type EstadoAcuerdo = 'pendiente' | 'en_proceso' | 'cumplido' | 'vencido' | 'cancelado'
+export interface SeguimientoAcuerdo {
+  id: string
+  company_id: string
+  project_id: string
+  acta_id?: string | null
+  titulo: string
+  descripcion?: string | null
+  responsable?: string | null
+  fecha_limite?: string | null
+  estado: EstadoAcuerdo
+  notas_seguimiento?: string | null
+  created_at: string
+}
+
+export type TipoVehiculo = 'auto' | 'moto' | 'camion' | 'otro'
+export interface VehiculoResidente {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  placa: string
+  marca?: string | null
+  modelo?: string | null
+  color?: string | null
+  anio?: number | null
+  tipo: TipoVehiculo
+  activo: boolean
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoEventoComunidad = 'cultural' | 'deportivo' | 'social' | 'informativo' | 'otro'
+export type EstadoEventoComunidad = 'programado' | 'en_curso' | 'realizado' | 'cancelado'
+export interface EventoComunidad {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  tipo: TipoEventoComunidad
+  fecha: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  lugar?: string | null
+  capacidad_max?: number | null
+  estado: EstadoEventoComunidad
+  asistentes_real?: number | null
+  costo_estimado?: number | null
+  created_at: string
+}
+
+export interface RegistroAsistenteEvento {
+  id: string
+  company_id: string
+  evento_id: string
+  unidad_id: string
+  nombre: string
+  num_personas: number
+  confirmado: boolean
+  asistio?: boolean | null
+  created_at: string
+}
+
+export interface CajaChica {
+  id: string
+  company_id: string
+  project_id: string
+  fecha_apertura: string
+  monto_inicial: number
+  responsable: string
+  estado: 'abierta' | 'cerrada'
+  fecha_cierre?: string | null
+  cerrado_por?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface MovimientoCaja {
+  id: string
+  company_id: string
+  caja_id: string
+  tipo: 'ingreso' | 'egreso'
+  concepto: string
+  monto: number
+  comprobante?: string | null
+  fecha: string
+  registrado_por?: string | null
+  created_at: string
+}
+
+export type EstadoObra = 'planificada' | 'en_ejecucion' | 'completada' | 'pausada' | 'cancelada'
+export interface ObraMejora {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  area?: string | null
+  contratista?: string | null
+  monto_contrato?: number | null
+  fecha_inicio?: string | null
+  fecha_fin_estimada?: string | null
+  fecha_fin_real?: string | null
+  estado: EstadoObra
+  progreso: number
+  notas?: string | null
+  created_at: string
+}
+
+export interface PlanPagoCond {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  concepto: string
+  monto_total: number
+  num_cuotas: number
+  monto_cuota: number
+  fecha_inicio: string
+  estado: 'activo' | 'completado' | 'incumplido' | 'cancelado'
+  notas?: string | null
+  aprobado_por?: string | null
+  created_at: string
+}
+
+export interface CuotaPlanPago {
+  id: string
+  company_id: string
+  plan_id: string
+  numero: number
+  monto: number
+  fecha_vencimiento: string
+  pagado: boolean
+  fecha_pago?: string | null
+  comprobante?: string | null
+  created_at: string
+}
+
+export type TipoAcceso = 'tarjeta' | 'codigo' | 'llave_digital' | 'biometrico'
+export interface AccesoResidente {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  tipo: TipoAcceso
+  identificador: string
+  titular: string
+  activo: boolean
+  fecha_emision: string
+  fecha_vencimiento?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export type EstadoGarantia = 'vigente' | 'vencida' | 'reclamada' | 'sin_garantia'
+export interface GarantiaEquipo {
+  id: string
+  company_id: string
+  project_id: string
+  equipo: string
+  area?: string | null
+  numero_serie?: string | null
+  proveedor?: string | null
+  contacto_soporte?: string | null
+  fecha_compra?: string | null
+  fecha_vencimiento?: string | null
+  monto_compra?: number | null
+  estado: EstadoGarantia
+  notas?: string | null
+  created_at: string
+}
+
+export interface EntregaUnidad {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  tipo: 'entrega' | 'devolucion'
+  fecha: string
+  condicion_general: 'excelente' | 'buena' | 'regular' | 'deteriorada'
+  inquilino?: string | null
+  propietario?: string | null
+  representante_admin?: string | null
+  observaciones?: string | null
+  inventario_items: unknown[]
+  firmado_propietario: boolean
+  firmado_inquilino: boolean
+  created_at: string
+}
+
+export interface AvisoCobro {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  tipo: 'primer_aviso' | 'segundo_aviso' | 'ultimo_aviso' | 'notificacion_legal'
+  monto_total: number
+  detalle: unknown[]
+  fecha_emision: string
+  fecha_limite?: string | null
+  estado: 'emitido' | 'entregado' | 'pagado' | 'anulado'
+  enviado_por?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface BitacoraManto {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  turno: 'mañana' | 'tarde' | 'noche'
+  responsable: string
+  area?: string | null
+  tareas: unknown[]
+  observaciones?: string | null
+  firmado: boolean
+  created_at: string
+}
+
+export interface EvaluacionProveedor {
+  id: string
+  company_id: string
+  project_id: string
+  proveedor_id?: string | null
+  nombre_proveedor: string
+  calificacion: number
+  puntualidad?: number | null
+  calidad?: number | null
+  precio?: number | null
+  comentarios?: string | null
+  evaluado_por?: string | null
+  fecha: string
+  created_at: string
+}
+
+export interface ReclamoCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  tipo: 'queja' | 'sugerencia' | 'reclamo_formal' | 'apelacion'
+  asunto: string
+  descripcion?: string | null
+  prioridad: 'baja' | 'normal' | 'alta' | 'urgente'
+  estado: 'recibido' | 'en_revision' | 'respondido' | 'cerrado' | 'escalado'
+  respuesta_admin?: string | null
+  respondido_por?: string | null
+  fecha_respuesta?: string | null
+  plazo_respuesta?: string | null
+  anonimo: boolean
+  created_at: string
+}
+
+// ── Fase 18 ───────────────────────────────────────────────────────────────────
+
+export type TipoMovimientoFondo = 'aporte' | 'retiro' | 'ajuste'
+export type EstadoMovimientoFondo = 'pendiente' | 'aprobado' | 'rechazado'
+
+export interface FondoReserva {
+  id: string
+  company_id: string
+  project_id: string
+  tipo: TipoMovimientoFondo
+  concepto: string
+  monto: number
+  fecha: string
+  justificacion?: string | null
+  aprobado_por?: string | null
+  estado: EstadoMovimientoFondo
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoObra = 'remodelacion' | 'ampliacion' | 'reparacion' | 'pintura' | 'otro'
+export type EstadoPermisoObra = 'solicitado' | 'aprobado' | 'en_ejecucion' | 'completado' | 'rechazado'
+
+export interface PermisoObraUnidad {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  tipo_obra: TipoObra
+  descripcion: string
+  fecha_inicio?: string | null
+  fecha_fin_estimada?: string | null
+  horario_permitido?: string | null
+  fianza?: number | null
+  estado: EstadoPermisoObra
+  aprobado_por?: string | null
+  observaciones?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type TipoUnidadTarifa = 'todas' | 'residencial' | 'comercial' | 'bodega' | 'parqueo'
+export type PeriodicidadTarifa = 'mensual' | 'trimestral' | 'semestral' | 'anual' | 'unica_vez'
+
+export interface TarifaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  concepto: string
+  descripcion?: string | null
+  monto: number
+  tipo_unidad: TipoUnidadTarifa
+  periodicidad: PeriodicidadTarifa
+  activo: boolean
+  vigente_desde?: string | null
+  vigente_hasta?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoIncidente = 'robo' | 'vandalismo' | 'accidente' | 'incendio' | 'pelea' | 'otro'
+export type EstadoIncidente = 'reportado' | 'investigando' | 'resuelto' | 'cerrado'
+
+export interface IncidenteSeguridad {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  hora?: string | null
+  tipo: TipoIncidente
+  descripcion: string
+  area?: string | null
+  reportado_por?: string | null
+  estado: EstadoIncidente
+  involucrados?: string | null
+  seguimiento?: string | null
+  created_at: string
+}
+
+// ── Fase 19 ───────────────────────────────────────────────────────────────────
+
+export type EstadoChecklist = 'completo' | 'con_observaciones' | 'pendiente'
+
+export interface ChecklistItem { item: string; ok: boolean; observacion: string }
+
+export interface ChecklistArea {
+  id: string
+  company_id: string
+  project_id: string
+  area: string
+  fecha: string
+  inspector?: string | null
+  items: ChecklistItem[]
+  estado: EstadoChecklist
+  notas?: string | null
+  created_at: string
+}
+
+export type FrecuenciaLimpieza = 'diaria' | 'semanal' | 'quincenal' | 'mensual'
+export type EstadoLimpieza = 'pendiente' | 'en_curso' | 'completado'
+
+export interface ProgramacionLimpieza {
+  id: string
+  company_id: string
+  project_id: string
+  area: string
+  frecuencia: FrecuenciaLimpieza
+  responsable?: string | null
+  ultima_ejecucion?: string | null
+  proxima_ejecucion?: string | null
+  estado: EstadoLimpieza
+  activo: boolean
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoConsumoEnergia = 'electricidad' | 'agua' | 'gas' | 'otro'
+
+export interface ConsumoEnergiaArea {
+  id: string
+  company_id: string
+  project_id: string
+  area: string
+  tipo: TipoConsumoEnergia
+  periodo: string
+  lectura_anterior?: number | null
+  lectura_actual: number
+  unidad: string
+  costo_unitario?: number | null
+  total_costo?: number | null
+  fecha_lectura: string
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoResidente = 'propietario' | 'arrendatario' | 'familiar' | 'otro'
+export type EstadoResidente = 'activo' | 'anterior'
+
+export interface HistorialResidente {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  nombre_completo: string
+  tipo: TipoResidente
+  fecha_desde: string
+  fecha_hasta?: string | null
+  email?: string | null
+  telefono?: string | null
+  estado: EstadoResidente
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+// ── Fase 20 ───────────────────────────────────────────────────────────────────
+
+export type TipoVehiculoVisita = 'auto' | 'moto' | 'camion' | 'otro'
+
+export interface EstacionamientoVisita {
+  id: string
+  company_id: string
+  project_id: string
+  espacio: string
+  unidad_visitada?: string | null
+  placa: string
+  tipo_vehiculo: TipoVehiculoVisita
+  visitante_nombre?: string | null
+  hora_entrada: string
+  hora_salida?: string | null
+  autorizado_por?: string | null
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type TurnoGuardia = 'mañana' | 'tarde' | 'noche'
+export type EstadoBitacoraGuardia = 'abierto' | 'cerrado'
+export type TipoNovedadGuardia = 'normal' | 'urgente' | 'informativo'
+
+export interface NovedadGuardia {
+  hora: string
+  descripcion: string
+  tipo: TipoNovedadGuardia
+}
+
+export interface BitacoraGuardia {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  turno: TurnoGuardia
+  guardia_nombre: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  novedades: NovedadGuardia[]
+  observaciones?: string | null
+  estado: EstadoBitacoraGuardia
+  created_at: string
+}
+
+export type CategoriaEquipo = 'bomba' | 'ascensor' | 'generador' | 'camara' | 'extintor' | 'planta_electrica' | 'otro'
+export type EstadoEquipo = 'operativo' | 'mantenimiento' | 'fuera_servicio' | 'baja'
+
+export interface EquipoComun {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  categoria: CategoriaEquipo
+  marca?: string | null
+  modelo?: string | null
+  serial?: string | null
+  ubicacion?: string | null
+  fecha_compra?: string | null
+  valor_compra?: number | null
+  vida_util_anios?: number | null
+  estado: EstadoEquipo
+  ultimo_mantenimiento?: string | null
+  proximo_mantenimiento?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export type EstadoPresencia = 'presente' | 'ausente' | 'tardanza' | 'permiso' | 'vacaciones'
+
+export interface PresenciaPersonal {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  cargo?: string | null
+  fecha: string
+  hora_entrada?: string | null
+  hora_salida?: string | null
+  estado: EstadoPresencia
+  observaciones?: string | null
+  created_at: string
+}
+
+// ── Fase 21 ──────────────────────────────────────────────────────────────────
+export type CategoriaSupministro = 'limpieza' | 'herramienta' | 'material' | 'oficina' | 'seguridad' | 'otro'
+export type UnidadMedidaSum = 'unidad' | 'litro' | 'kg' | 'metro' | 'caja' | 'rollo' | 'otro'
+export interface SuministroCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  categoria: CategoriaSupministro
+  unidad_medida: UnidadMedidaSum
+  stock_actual: number
+  stock_minimo: number
+  ubicacion?: string | null
+  proveedor?: string | null
+  costo_unitario?: number | null
+  notas?: string | null
+  activo: boolean
+  created_at: string
+}
+
+export type TipoMovimientoSum = 'entrada' | 'salida' | 'ajuste'
+export interface MovimientoSuministro {
+  id: string
+  company_id: string
+  suministro_id: string
+  tipo: TipoMovimientoSum
+  cantidad: number
+  motivo?: string | null
+  area_destino?: string | null
+  realizado_por?: string | null
+  fecha: string
+  notas?: string | null
+  created_at: string
+  // join
+  suministro_nombre?: string
+}
+
+export type CategoriaTareaCondominio = 'operativa' | 'mantenimiento' | 'administrativa' | 'seguridad' | 'limpieza' | 'otro'
+export type PrioridadTarea = 'baja' | 'media' | 'alta' | 'urgente'
+export type EstadoTarea = 'pendiente' | 'en_proceso' | 'completada' | 'cancelada'
+export interface ComentarioTarea { fecha: string; autor: string; texto: string }
+export interface TareaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  categoria: CategoriaTareaCondominio
+  prioridad: PrioridadTarea
+  estado: EstadoTarea
+  asignado_a?: string | null
+  reportado_por?: string | null
+  area?: string | null
+  fecha_limite?: string | null
+  fecha_inicio?: string | null
+  fecha_cierre?: string | null
+  costo_estimado?: number | null
+  costo_real?: number | null
+  comentarios: ComentarioTarea[]
+  notas?: string | null
+  created_at: string
+}
+
+export type EtapaCobranza = 'aviso_amistoso' | 'recordatorio' | 'carta_formal' | 'suspension_servicios' | 'cobro_juridico' | 'acuerdo_pago' | 'resuelto'
+export type EstadoCobranza = 'activo' | 'resuelto' | 'cancelado'
+export type TipoContactoCobranza = 'llamada' | 'email' | 'visita' | 'mensaje'
+export interface ContactoCobranza {
+  fecha: string
+  tipo: TipoContactoCobranza
+  resultado: string
+  siguiente_accion?: string
+}
+export interface GestionCobranza {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  responsable: string
+  monto_adeudado: number
+  monto_pagado: number
+  etapa: EtapaCobranza
+  fecha_inicio: string
+  fecha_resolucion?: string | null
+  contactos: ContactoCobranza[]
+  observaciones?: string | null
+  estado: EstadoCobranza
+  created_at: string
+  // join
+  unidad_nombre?: string
+}

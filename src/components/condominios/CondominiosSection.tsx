@@ -16,6 +16,14 @@ import type {
   SolicitudResidente, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
   ActaReunion, CierreMensual, ReglaNotificacion, MedidorUnidad,
   Votacion, SancionCondominio, PlanMantenimiento,
+  CorrespondenciaCondominio, LibroNovedad, SeguimientoAcuerdo,
+  VehiculoResidente, EventoComunidad, RegistroAsistenteEvento, CajaChica, MovimientoCaja, ObraMejora,
+  PlanPagoCond, AccesoResidente, GarantiaEquipo, EntregaUnidad,
+  AvisoCobro, BitacoraManto as BitacoraMantoType, EvaluacionProveedor, ReclamoCondominio,
+  FondoReserva, PermisoObraUnidad, TarifaCondominio, IncidenteSeguridad,
+  ChecklistArea, ProgramacionLimpieza, ConsumoEnergiaArea, HistorialResidente,
+  EstacionamientoVisita, BitacoraGuardia, EquipoComun, PresenciaPersonal,
+  SuministroCondominio, MovimientoSuministro, TareaCondominio, GestionCobranza,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -73,6 +81,37 @@ import { VotacionesTab } from './tabs/VotacionesTab'
 import { SancionesTab } from './tabs/SancionesTab'
 import { MantenimientoPrevTab } from './tabs/MantenimientoPrevTab'
 import { PortalResidenteTab } from './tabs/PortalResidenteTab'
+import { CorrespondenciaCondTab } from './tabs/CorrespondenciaCondTab'
+import { LibroNovedadesTab } from './tabs/LibroNovedadesTab'
+import { SeguimientoAcuerdosTab } from './tabs/SeguimientoAcuerdosTab'
+import { DashboardEjecutivoTab } from './tabs/DashboardEjecutivoTab'
+import { VehiculosTab } from './tabs/VehiculosTab'
+import { EventosComunidadTab } from './tabs/EventosComunidadTab'
+import { CajaChicaTab } from './tabs/CajaChicaTab'
+import { ObrasTab } from './tabs/ObrasTab'
+import { PlanPagoCondTab } from './tabs/PlanPagoCondTab'
+import { AccesosResTab } from './tabs/AccesosResTab'
+import { GarantiasEquipoTab } from './tabs/GarantiasEquipoTab'
+import { EntregaUnidadTab } from './tabs/EntregaUnidadTab'
+import { AvisosCobroTab } from './tabs/AvisosCobroTab'
+import { BitacoraManto as BitacoraMantoTab } from './tabs/BitacoraManto'
+import { EvaluacionProveedorTab } from './tabs/EvaluacionProveedorTab'
+import { ReclamosTab } from './tabs/ReclamosTab'
+import { FondoReservaTab } from './tabs/FondoReservaTab'
+import { PermisosObraTab } from './tabs/PermisosObraTab'
+import { TarifasTab } from './tabs/TarifasTab'
+import { IncidentesTab } from './tabs/IncidentesTab'
+import { ChecklistAreasTab } from './tabs/ChecklistAreasTab'
+import { ProgramacionLimpiezaTab } from './tabs/ProgramacionLimpiezaTab'
+import { ConsumoEnergiaAreasTab } from './tabs/ConsumoEnergiaAreasTab'
+import { HistorialResidentesTab } from './tabs/HistorialResidentesTab'
+import EstacionamientoVisitaTab from './tabs/EstacionamientoVisitaTab'
+import BitacoraGuardiaTab from './tabs/BitacoraGuardiaTab'
+import EquiposComunesTab from './tabs/EquiposComunesTab'
+import PresenciaPersonalTab from './tabs/PresenciaPersonalTab'
+import SuministrosTab from './tabs/SuministrosTab'
+import TareasCondominioTab from './tabs/TareasCondominioTab'
+import GestionCobranzaTab from './tabs/GestionCobranzaTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -88,6 +127,14 @@ type CondominioTab =
   | 'solicitudes' | 'junta' | 'prestamos' | 'comunicados'
   | 'actas' | 'cierres' | 'notificaciones' | 'medidores_unidad'
   | 'votaciones' | 'sanciones' | 'mant_preventivo' | 'portal'
+  | 'correspondencia' | 'libro_novedades' | 'acuerdos' | 'dashboard_ejecutivo'
+  | 'vehiculos' | 'eventos_comunidad' | 'caja_chica' | 'obras'
+  | 'plan_pago' | 'accesos_res' | 'garantias' | 'entrega_unidad'
+  | 'avisos_cobro' | 'bitacora_manto' | 'eval_proveedor' | 'reclamos'
+  | 'fondo_reserva' | 'permisos_obra' | 'tarifas' | 'incidentes'
+  | 'checklist_areas' | 'prog_limpieza' | 'consumo_energia' | 'historial_res'
+  | 'estac_visita' | 'bitacora_guardia' | 'equipos' | 'presencia'
+  | 'suministros' | 'tareas_cond' | 'cobranza'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -145,7 +192,38 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'votaciones',       label: 'Votaciones',   icon: '🗳️' },
   { id: 'sanciones',        label: 'Sanciones',    icon: '⚖️' },
   { id: 'mant_preventivo',  label: 'Mant. Prev.',  icon: '🔩' },
-  { id: 'portal',           label: 'Portal Resid.',icon: '👤' },
+  { id: 'portal',             label: 'Portal Resid.',  icon: '👤' },
+  { id: 'correspondencia',    label: 'Correspondencia',icon: '📬' },
+  { id: 'libro_novedades',    label: 'Libro Novedades',icon: '📖' },
+  { id: 'acuerdos',           label: 'Acuerdos',       icon: '✅' },
+  { id: 'dashboard_ejecutivo',label: 'Dashboard Ejec.',icon: '📈' },
+  { id: 'vehiculos',          label: 'Vehículos',      icon: '🚗' },
+  { id: 'eventos_comunidad',  label: 'Eventos',        icon: '🎉' },
+  { id: 'caja_chica',         label: 'Caja Chica',     icon: '💵' },
+  { id: 'obras',              label: 'Obras',          icon: '🏗️' },
+  { id: 'plan_pago',         label: 'Planes Pago',    icon: '📆' },
+  { id: 'accesos_res',       label: 'Accesos',        icon: '🔐' },
+  { id: 'garantias',         label: 'Garantías',      icon: '🛡️' },
+  { id: 'entrega_unidad',    label: 'Entregas',       icon: '🔑' },
+  { id: 'avisos_cobro',      label: 'Avisos Cobro',   icon: '📬' },
+  { id: 'bitacora_manto',    label: 'Bitácora Manto', icon: '🛠️' },
+  { id: 'eval_proveedor',    label: 'Eval. Proveedor',icon: '⭐' },
+  { id: 'reclamos',          label: 'Reclamos',       icon: '📝' },
+  { id: 'fondo_reserva',    label: 'Fondo Reserva',  icon: '🏦' },
+  { id: 'permisos_obra',    label: 'Permisos Obra',  icon: '🔨' },
+  { id: 'tarifas',          label: 'Tarifas',        icon: '💰' },
+  { id: 'incidentes',       label: 'Incidentes',     icon: '🚨' },
+  { id: 'checklist_areas',  label: 'Checklist',      icon: '🗒️' },
+  { id: 'prog_limpieza',    label: 'Limpieza',       icon: '🧹' },
+  { id: 'consumo_energia',  label: 'Consumo Energía',icon: '⚡' },
+  { id: 'historial_res',    label: 'Historial Res.', icon: '👥' },
+  { id: 'estac_visita',     label: 'Estac. Visita',   icon: '🅿️' },
+  { id: 'bitacora_guardia', label: 'Bitácora Guardia', icon: '👮' },
+  { id: 'equipos',          label: 'Equipos',          icon: '⚙️' },
+  { id: 'presencia',        label: 'Presencia',        icon: '📋' },
+  { id: 'suministros',      label: 'Suministros',      icon: '🗃️' },
+  { id: 'tareas_cond',      label: 'Tareas',           icon: '✅' },
+  { id: 'cobranza',         label: 'Cobranza',         icon: '💰' },
 ]
 
 interface Props {
@@ -227,6 +305,47 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [votaciones, setVotaciones] = useState<Votacion[]>([])
   const [sanciones, setSanciones] = useState<SancionCondominio[]>([])
   const [planesMantenimiento, setPlanesMantenimiento] = useState<PlanMantenimiento[]>([])
+  // Fase 14
+  const [correspondencia, setCorrespondencia] = useState<CorrespondenciaCondominio[]>([])
+  const [libroNovedades, setLibroNovedades] = useState<LibroNovedad[]>([])
+  const [acuerdos, setAcuerdos] = useState<SeguimientoAcuerdo[]>([])
+  // Fase 15
+  const [vehiculos, setVehiculos] = useState<VehiculoResidente[]>([])
+  const [eventosComunidad, setEventosComunidad] = useState<EventoComunidad[]>([])
+  const [asistentesEvento, setAsistentesEvento] = useState<RegistroAsistenteEvento[]>([])
+  const [cajasChicas, setCajasChicas] = useState<CajaChica[]>([])
+  const [movimientosCaja, setMovimientosCaja] = useState<MovimientoCaja[]>([])
+  const [obras, setObras] = useState<ObraMejora[]>([])
+  // Fase 16
+  const [planesPage, setPlanesPage] = useState<PlanPagoCond[]>([])
+  const [accesosRes, setAccesosRes] = useState<AccesoResidente[]>([])
+  const [garantias, setGarantias] = useState<GarantiaEquipo[]>([])
+  const [entregas, setEntregas] = useState<EntregaUnidad[]>([])
+  // Fase 17
+  const [avisosCobro, setAvisosCobro] = useState<AvisoCobro[]>([])
+  const [bitacoraRegistros, setBitacoraRegistros] = useState<BitacoraMantoType[]>([])
+  const [evaluacionesProv, setEvaluacionesProv] = useState<EvaluacionProveedor[]>([])
+  const [reclamos, setReclamos] = useState<ReclamoCondominio[]>([])
+  // Fase 18
+  const [fondoReserva, setFondoReserva] = useState<FondoReserva[]>([])
+  const [permisosObra, setPermisosObra] = useState<PermisoObraUnidad[]>([])
+  const [tarifas, setTarifas] = useState<TarifaCondominio[]>([])
+  const [incidentes, setIncidentes] = useState<IncidenteSeguridad[]>([])
+  // Fase 19
+  const [checklistAreas, setChecklistAreas] = useState<ChecklistArea[]>([])
+  const [progLimpieza, setProgLimpieza] = useState<ProgramacionLimpieza[]>([])
+  const [consumoEnergia, setConsumoEnergia] = useState<ConsumoEnergiaArea[]>([])
+  const [historialRes, setHistorialRes] = useState<HistorialResidente[]>([])
+  // Fase 20
+  const [estacVisita, setEstacVisita] = useState<EstacionamientoVisita[]>([])
+  const [bitacoraGuardia, setBitacoraGuardia] = useState<BitacoraGuardia[]>([])
+  const [equiposComunes, setEquiposComunes] = useState<EquipoComun[]>([])
+  const [presenciaPersonal, setPresenciaPersonal] = useState<PresenciaPersonal[]>([])
+  // Fase 21
+  const [suministros, setSuministros] = useState<SuministroCondominio[]>([])
+  const [movimientosSuministro, setMovimientosSuministro] = useState<MovimientoSuministro[]>([])
+  const [tareasCond, setTareasCond] = useState<TareaCondominio[]>([])
+  const [cobranzas, setCobranzas] = useState<GestionCobranza[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -257,6 +376,14 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       solicitudesRes, juntaRes, prestamosRes, comunicadosRes,
       actasRes, cierresRes, reglasRes, medidoresRes,
       votacionesRes, sancionesRes, planesRes,
+      correspondenciaRes, libroRes, acuerdosRes,
+      vehiculosRes, eventosComRes, asistentesRes, cajasRes, movimientosRes, obrasRes,
+      planesPagoRes, cuotasPlanRes, accesosResRes, garantiasRes, entregasRes,
+      avisosCobroRes, bitacoraMantoRes, evalProvRes, reclamosCondRes,
+      fondoReservaRes, permisosObraRes, tarifasRes, incidentesRes,
+      checklistAreasRes, progLimpiezaRes, consumoEnergiaRes, historialResRes,
+      estacVisitaRes, bitacoraGuardiaRes, equiposComunesRes, presenciaPersonalRes,
+      suministrosRes, movsumRes, tareasCondRes, cobranzasRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -311,6 +438,40 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('votaciones').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }),
       supabase.from('sanciones_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_emision', { ascending: false }),
       supabase.from('planes_mantenimiento').select('*').eq('project_id', pid).eq('company_id', cid).order('proxima_ejecucion'),
+      supabase.from('correspondencia_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('libro_novedades').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).order('turno'),
+      supabase.from('seguimiento_acuerdos').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_limite'),
+      supabase.from('vehiculos_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('placa'),
+      supabase.from('eventos_comunidad').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('registro_asistentes_evento').select('*').eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('caja_chica').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_apertura', { ascending: false }),
+      supabase.from('movimientos_caja').select('*').eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('obras_mejoras').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('planes_pago_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('cuotas_plan_pago').select('*').eq('company_id', cid).order('numero'),
+      supabase.from('accesos_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('titular'),
+      supabase.from('garantias_equipo').select('*').eq('project_id', pid).eq('company_id', cid).order('equipo'),
+      supabase.from('entrega_unidades').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('avisos_cobro').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_emision', { ascending: false }),
+      supabase.from('bitacora_manto').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('evaluaciones_proveedor').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('reclamos_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('fondo_reserva_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('permisos_obra_unidad').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('tarifas_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('concepto'),
+      supabase.from('incidentes_seguridad').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('checklist_areas').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('programacion_limpieza').select('*').eq('project_id', pid).eq('company_id', cid).order('area'),
+      supabase.from('consumo_energia_areas').select('*').eq('project_id', pid).eq('company_id', cid).order('periodo', { ascending: false }).order('area'),
+      supabase.from('historial_residentes').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_desde', { ascending: false }),
+      supabase.from('estacionamiento_visita').select('*').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(500),
+      supabase.from('bitacora_guardia').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).order('turno'),
+      supabase.from('equipos_comunes').select('*').eq('project_id', pid).eq('company_id', cid).order('categoria').order('nombre'),
+      supabase.from('presencia_personal').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).order('nombre'),
+      supabase.from('suministros_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('categoria').order('nombre'),
+      supabase.from('movimientos_suministro').select('*').eq('company_id', cid).order('fecha', { ascending: false }).limit(500),
+      supabase.from('tareas_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_limite').order('created_at', { ascending: false }),
+      supabase.from('gestion_cobranza').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -378,6 +539,42 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setVotaciones((votacionesRes.data ?? []) as Votacion[])
     setSanciones(mapUnidad<SancionCondominio>(sancionesRes.data ?? []))
     setPlanesMantenimiento((planesRes.data ?? []) as PlanMantenimiento[])
+    setCorrespondencia(mapUnidad<CorrespondenciaCondominio>(correspondenciaRes.data ?? []))
+    setLibroNovedades((libroRes.data ?? []) as LibroNovedad[])
+    setAcuerdos((acuerdosRes.data ?? []) as SeguimientoAcuerdo[])
+    setVehiculos((vehiculosRes.data ?? []) as VehiculoResidente[])
+    setEventosComunidad((eventosComRes.data ?? []) as EventoComunidad[])
+    setAsistentesEvento((asistentesRes.data ?? []) as RegistroAsistenteEvento[])
+    setCajasChicas((cajasRes.data ?? []) as CajaChica[])
+    setMovimientosCaja((movimientosRes.data ?? []) as MovimientoCaja[])
+    setObras((obrasRes.data ?? []) as ObraMejora[])
+    setPlanesPage((planesPagoRes.data ?? []) as PlanPagoCond[])
+    void cuotasPlanRes // fetched per-plan inside PlanPagoCondTab
+    setAccesosRes((accesosResRes.data ?? []) as AccesoResidente[])
+    setGarantias((garantiasRes.data ?? []) as GarantiaEquipo[])
+    setEntregas((entregasRes.data ?? []) as EntregaUnidad[])
+    setAvisosCobro((avisosCobroRes.data ?? []) as AvisoCobro[])
+    setBitacoraRegistros((bitacoraMantoRes.data ?? []) as BitacoraMantoType[])
+    setEvaluacionesProv((evalProvRes.data ?? []) as EvaluacionProveedor[])
+    setReclamos((reclamosCondRes.data ?? []) as ReclamoCondominio[])
+    setFondoReserva((fondoReservaRes.data ?? []) as FondoReserva[])
+    setPermisosObra((permisosObraRes.data ?? []) as PermisoObraUnidad[])
+    setTarifas((tarifasRes.data ?? []) as TarifaCondominio[])
+    setIncidentes((incidentesRes.data ?? []) as IncidenteSeguridad[])
+    setChecklistAreas((checklistAreasRes.data ?? []) as ChecklistArea[])
+    setProgLimpieza((progLimpiezaRes.data ?? []) as ProgramacionLimpieza[])
+    setConsumoEnergia((consumoEnergiaRes.data ?? []) as ConsumoEnergiaArea[])
+    setHistorialRes((historialResRes.data ?? []) as HistorialResidente[])
+    setEstacVisita((estacVisitaRes.data ?? []) as EstacionamientoVisita[])
+    setBitacoraGuardia((bitacoraGuardiaRes.data ?? []) as BitacoraGuardia[])
+    setEquiposComunes((equiposComunesRes.data ?? []) as EquipoComun[])
+    setPresenciaPersonal((presenciaPersonalRes.data ?? []) as PresenciaPersonal[])
+    setSuministros((suministrosRes.data ?? []) as SuministroCondominio[])
+    setMovimientosSuministro((movsumRes.data ?? []) as MovimientoSuministro[])
+    setTareasCond((tareasCondRes.data ?? []) as TareaCondominio[])
+    setCobranzas((cobranzasRes.data ?? []).map((r: Record<string, unknown>) => ({
+      ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre,
+    } as GestionCobranza)))
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -532,6 +729,37 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'sanciones' && <SancionesTab sanciones={sanciones} unidades={unidadesProyecto} infracciones={infracciones} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'mant_preventivo' && <MantenimientoPrevTab planes={planesMantenimiento} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'portal' && <PortalResidenteTab cuotas={cuotas} tickets={tickets} reservas={reservas} comunicados={comunicados} sanciones={sanciones} unidades={unidadesProyecto} moneda={moneda} />}
+        {activeTab === 'correspondencia' && <CorrespondenciaCondTab correspondencia={correspondencia} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'libro_novedades' && <LibroNovedadesTab novedades={libroNovedades} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'acuerdos' && <SeguimientoAcuerdosTab acuerdos={acuerdos} actas={actas} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'dashboard_ejecutivo' && <DashboardEjecutivoTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} gastos={gastos} presupuestos={presupuestos} sanciones={sanciones} planesMantenimiento={planesMantenimiento} infracciones={infracciones} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
+        {activeTab === 'vehiculos' && <VehiculosTab vehiculos={vehiculos} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'eventos_comunidad' && <EventosComunidadTab eventos={eventosComunidad} asistentes={asistentesEvento} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'caja_chica' && <CajaChicaTab cajas={cajasChicas} movimientos={movimientosCaja} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'obras' && <ObrasTab obras={obras} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'plan_pago' && <PlanPagoCondTab planes={planesPage} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'accesos_res' && <AccesosResTab accesos={accesosRes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'garantias' && <GarantiasEquipoTab garantias={garantias} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'entrega_unidad' && <EntregaUnidadTab entregas={entregas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'avisos_cobro' && <AvisosCobroTab avisos={avisosCobro} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'bitacora_manto' && <BitacoraMantoTab registros={bitacoraRegistros} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'eval_proveedor' && <EvaluacionProveedorTab evaluaciones={evaluacionesProv} proveedores={contratosProveedores} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'reclamos' && <ReclamosTab reclamos={reclamos} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'fondo_reserva' && <FondoReservaTab movimientos={fondoReserva} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'permisos_obra' && <PermisosObraTab permisos={permisosObra} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'tarifas' && <TarifasTab tarifas={tarifas} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'incidentes' && <IncidentesTab incidentes={incidentes} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'checklist_areas' && <ChecklistAreasTab checklists={checklistAreas} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'prog_limpieza' && <ProgramacionLimpiezaTab programaciones={progLimpieza} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'consumo_energia' && <ConsumoEnergiaAreasTab consumos={consumoEnergia} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'historial_res' && <HistorialResidentesTab historial={historialRes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'estac_visita' && <EstacionamientoVisitaTab registros={estacVisita} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'bitacora_guardia' && <BitacoraGuardiaTab registros={bitacoraGuardia} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'equipos' && <EquiposComunesTab equipos={equiposComunes} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'presencia' && <PresenciaPersonalTab registros={presenciaPersonal} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'suministros' && <SuministrosTab suministros={suministros} movimientos={movimientosSuministro} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'tareas_cond' && <TareasCondominioTab tareas={tareasCond} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'cobranza' && <GestionCobranzaTab cobranzas={cobranzas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )
