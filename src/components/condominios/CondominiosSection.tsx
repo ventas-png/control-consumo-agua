@@ -8,6 +8,7 @@ import type {
   Asamblea, ContratoProveedor, ObjetoPerdido, AgendaItem,
   ItemInventario, PolizaSeguro, InspeccionNormativa, PersonalCondominio,
   ContactoEmergencia, Mudanza, DocumentoCondominio, RegistroResiduo,
+  BodegaCondominio, OnboardingResidente, PropuestaInversion, MemoriaLabores,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -33,6 +34,10 @@ import { EmergenciasTab } from './tabs/EmergenciasTab'
 import { MudanzasTab } from './tabs/MudanzasTab'
 import { DocumentosTab } from './tabs/DocumentosTab'
 import { ResiduosTab } from './tabs/ResiduosTab'
+import { BodegasTab } from './tabs/BodegasTab'
+import { OnboardingTab } from './tabs/OnboardingTab'
+import { PropuestasTab } from './tabs/PropuestasTab'
+import { MemoriaTab } from './tabs/MemoriaTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -40,6 +45,7 @@ type CondominioTab =
   | 'asambleas' | 'proveedores' | 'objetos' | 'agenda'
   | 'inventario' | 'polizas' | 'inspecciones' | 'personal'
   | 'emergencias' | 'mudanzas' | 'documentos' | 'residuos'
+  | 'bodegas' | 'onboarding' | 'propuestas' | 'memoria'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -66,6 +72,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'mudanzas',      label: 'Mudanzas',       icon: '🚚' },
   { id: 'documentos',    label: 'Documentos',     icon: '📁' },
   { id: 'residuos',      label: 'Residuos',       icon: '♻️' },
+  { id: 'bodegas',       label: 'Bodegas',        icon: '🗄️' },
+  { id: 'onboarding',    label: 'Onboarding',     icon: '🎯' },
+  { id: 'propuestas',    label: 'Propuestas',     icon: '💡' },
+  { id: 'memoria',       label: 'Memoria',        icon: '📋' },
 ]
 
 interface Props {
@@ -111,6 +121,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [mudanzas, setMudanzas] = useState<Mudanza[]>([])
   const [documentos, setDocumentos] = useState<DocumentoCondominio[]>([])
   const [residuos, setResiduos] = useState<RegistroResiduo[]>([])
+  // Fase 6
+  const [bodegas, setBodegas] = useState<BodegaCondominio[]>([])
+  const [onboardings, setOnboardings] = useState<OnboardingResidente[]>([])
+  const [propuestas, setPropuestas] = useState<PropuestaInversion[]>([])
+  const [memorias, setMemorias] = useState<MemoriaLabores[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -133,6 +148,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       asambleasRes, contratosProvRes, objetosRes, agendaRes,
       inventarioRes, polizasRes, inspeccionesRes, personalRes,
       contactosEmergRes, mudanzasRes, documentosRes, residuosRes,
+      bodegasRes, onboardingsRes, propuestasRes, memoriasRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -159,6 +175,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('mudanzas').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
       supabase.from('documentos_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('categoria').order('titulo'),
       supabase.from('registros_residuos').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('bodegas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('numero'),
+      supabase.from('onboarding_residentes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_ingreso', { ascending: false }),
+      supabase.from('propuestas_inversion').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('memoria_labores').select('*').eq('project_id', pid).eq('company_id', cid).order('periodo', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -198,6 +218,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     } as Mudanza)))
     setDocumentos((documentosRes.data ?? []) as DocumentoCondominio[])
     setResiduos((residuosRes.data ?? []) as RegistroResiduo[])
+    setBodegas(mapUnidad<BodegaCondominio>(bodegasRes.data ?? []))
+    setOnboardings(mapUnidad<OnboardingResidente>(onboardingsRes.data ?? []))
+    setPropuestas((propuestasRes.data ?? []) as PropuestaInversion[])
+    setMemorias((memoriasRes.data ?? []) as MemoriaLabores[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -308,6 +332,14 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'documentos' && <DocumentosTab documentos={documentos} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
         {activeTab === 'residuos' && <ResiduosTab residuos={residuos} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'bodegas' && <BodegasTab bodegas={bodegas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'onboarding' && <OnboardingTab onboardings={onboardings} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'propuestas' && <PropuestasTab propuestas={propuestas} proyectoId={selectedProyectoId} companyId={cid} userId={uid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'memoria' && <MemoriaTab memorias={memorias} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )

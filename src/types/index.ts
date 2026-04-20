@@ -1172,3 +1172,85 @@ export interface RegistroResiduo {
   notas?: string | null
   created_at: string
 }
+
+// ── Fase 6: Bodegas, Onboarding, Propuestas, Memoria ──────────────────────────
+export type EstadoBodega = 'disponible' | 'asignada' | 'bloqueada'
+export interface BodegaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  numero: string
+  piso?: string | null
+  area_m2?: number | null
+  unidad_id?: string | null
+  estado: EstadoBodega
+  monto_renta?: number | null
+  fecha_asignacion?: string | null
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type EstadoOnboarding = 'en_proceso' | 'completado' | 'cancelado'
+export interface OnboardingResidente {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  nombre_residente: string
+  fecha_ingreso: string
+  tipo: 'propietario' | 'arrendatario'
+  estado: EstadoOnboarding
+  llaves_entregadas: boolean
+  reglamento_firmado: boolean
+  deposito_pagado: boolean
+  datos_registrados: boolean
+  accesos_configurados: boolean
+  inspeccion_unidad: boolean
+  bienvenida_enviada: boolean
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type CategoriaPropuesta = 'mejora' | 'reparacion' | 'expansion' | 'tecnologia' | 'seguridad' | 'otro'
+export type EstadoPropuesta = 'propuesta' | 'en_evaluacion' | 'aprobada' | 'rechazada' | 'en_ejecucion' | 'completada'
+export type PrioridadPropuesta = 'baja' | 'media' | 'alta'
+export interface PropuestaInversion {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  categoria: CategoriaPropuesta
+  monto_estimado?: number | null
+  prioridad: PrioridadPropuesta
+  estado: EstadoPropuesta
+  votos_favor: number
+  votos_contra: number
+  fecha_propuesta: string
+  fecha_aprobacion?: string | null
+  fecha_ejecucion?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoPeriodo = 'mensual' | 'trimestral' | 'anual'
+export type EstadoMemoria = 'borrador' | 'publicado'
+export interface MemoriaLabores {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  periodo: string
+  tipo_periodo: TipoPeriodo
+  resumen?: string | null
+  logros?: string | null
+  pendientes?: string | null
+  tickets_resueltos?: number | null
+  visitantes_registrados?: number | null
+  cuotas_cobradas?: number | null
+  incidencias_atendidas?: number | null
+  estado: EstadoMemoria
+  created_at: string
+}
