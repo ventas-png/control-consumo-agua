@@ -1452,3 +1452,37 @@ export interface AlertaCondominio {
   referencia_id?: string | null
   created_at: string
 }
+
+// ── Phase 10: Calendario, Configuración ──────────────────────────────────────
+
+export type TipoEvento = 'evento' | 'mantenimiento' | 'asamblea' | 'vencimiento' | 'recordatorio'
+export interface EventoCalendario {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  tipo: TipoEvento
+  fecha_inicio: string
+  hora_inicio?: string | null
+  fecha_fin?: string | null
+  hora_fin?: string | null
+  recurrente: boolean
+  frecuencia?: string | null
+  color: string
+  todo_el_dia: boolean
+  created_by?: string | null
+  created_at: string
+}
+
+export type TipoConfiguracion = 'texto' | 'numero' | 'booleano' | 'json' | 'texto_largo'
+export interface ConfiguracionCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  clave: string
+  valor?: string | null
+  tipo: TipoConfiguracion
+  descripcion?: string | null
+  updated_at: string
+}

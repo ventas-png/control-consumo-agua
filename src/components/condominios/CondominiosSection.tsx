@@ -12,6 +12,7 @@ import type {
   ReservaSTR, LocalComercial, ServicioHousekeeping,
   FirmaDigital, SolicitudConcierge, LlaveCondominio, Encuesta, RespuestaEncuesta,
   GastoCondominio, PresupuestoCondominio, AlertaCondominio,
+  EventoCalendario, ConfiguracionCondominio,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -53,6 +54,10 @@ import { ContabilidadTab } from './tabs/ContabilidadTab'
 import { PresupuestoTab } from './tabs/PresupuestoTab'
 import { AlertasTab } from './tabs/AlertasTab'
 import { ReportesTab } from './tabs/ReportesTab'
+import { EstadoCuentaTab } from './tabs/EstadoCuentaTab'
+import { CalendarioTab } from './tabs/CalendarioTab'
+import { DirectorioTab } from './tabs/DirectorioTab'
+import { ConfiguracionTab } from './tabs/ConfiguracionTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -64,6 +69,7 @@ type CondominioTab =
   | 'str' | 'locales' | 'sostenibilidad' | 'housekeeping'
   | 'firmas' | 'concierge' | 'llaves' | 'encuestas'
   | 'contabilidad' | 'presupuesto' | 'alertas' | 'reportes'
+  | 'estadocuenta' | 'calendario' | 'directorio' | 'configuracion'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -106,6 +112,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'presupuesto',   label: 'Presupuesto',    icon: '📋' },
   { id: 'alertas',       label: 'Alertas',        icon: '🔔' },
   { id: 'reportes',      label: 'Reportes',       icon: '📑' },
+  { id: 'estadocuenta',  label: 'Estado Cuenta',  icon: '🧾' },
+  { id: 'calendario',    label: 'Calendario',     icon: '📅' },
+  { id: 'directorio',    label: 'Directorio',     icon: '📒' },
+  { id: 'configuracion', label: 'Configuración',  icon: '⚙️' },
 ]
 
 interface Props {
@@ -170,6 +180,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [gastos, setGastos] = useState<GastoCondominio[]>([])
   const [presupuestos, setPresupuestos] = useState<PresupuestoCondominio[]>([])
   const [alertasCondominio, setAlertasCondominio] = useState<AlertaCondominio[]>([])
+  // Fase 10
+  const [eventosCalendario, setEventosCalendario] = useState<EventoCalendario[]>([])
+  const [configuracion, setConfiguracion] = useState<ConfiguracionCondominio[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -196,6 +209,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       strRes, localesRes, hkRes,
       firmasRes, conciergeRes, llavesRes, encuestasRes, respuestasRes,
       gastosRes, presupuestosRes, alertasRes,
+      eventosCalRes, configuracionRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -237,6 +251,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('gastos_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
       supabase.from('presupuesto_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('anio', { ascending: false }),
       supabase.from('alertas_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_alerta'),
+      supabase.from('eventos_calendario').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio'),
+      supabase.from('configuracion_condominio').select('*').eq('project_id', pid).eq('company_id', cid),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -291,6 +307,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setGastos((gastosRes.data ?? []) as GastoCondominio[])
     setPresupuestos((presupuestosRes.data ?? []) as PresupuestoCondominio[])
     setAlertasCondominio((alertasRes.data ?? []) as AlertaCondominio[])
+    setEventosCalendario((eventosCalRes.data ?? []) as EventoCalendario[])
+    setConfiguracion((configuracionRes.data ?? []) as ConfiguracionCondominio[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -429,6 +447,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'presupuesto' && <PresupuestoTab presupuestos={presupuestos} gastos={gastos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'alertas' && <AlertasTab alertas={alertasCondominio} polizas={polizas} contratos={contratosProveedores} inspecciones={inspecciones} llaves={llaves} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'reportes' && <ReportesTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} contratos={contratosProveedores} gastos={gastos} presupuestos={presupuestos} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
+        {activeTab === 'estadocuenta' && <EstadoCuentaTab cuotas={cuotas} unidades={unidadesProyecto} moneda={moneda} proyectoId={selectedProyectoId} companyId={cid} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'calendario' && <CalendarioTab eventos={eventosCalendario} asambleas={asambleas} agenda={agenda} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'directorio' && <DirectorioTab personal={personal} contactosEmergencia={contactosEmergencia} proyectoId={selectedProyectoId} companyId={cid} />}
+        {activeTab === 'configuracion' && <ConfiguracionTab configuracion={configuracion} proyectoId={selectedProyectoId} companyId={cid} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )
