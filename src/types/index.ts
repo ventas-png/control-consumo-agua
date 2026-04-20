@@ -1858,3 +1858,84 @@ export interface ObraMejora {
   notas?: string | null
   created_at: string
 }
+
+export interface PlanPagoCond {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  concepto: string
+  monto_total: number
+  num_cuotas: number
+  monto_cuota: number
+  fecha_inicio: string
+  estado: 'activo' | 'completado' | 'incumplido' | 'cancelado'
+  notas?: string | null
+  aprobado_por?: string | null
+  created_at: string
+}
+
+export interface CuotaPlanPago {
+  id: string
+  company_id: string
+  plan_id: string
+  numero: number
+  monto: number
+  fecha_vencimiento: string
+  pagado: boolean
+  fecha_pago?: string | null
+  comprobante?: string | null
+  created_at: string
+}
+
+export type TipoAcceso = 'tarjeta' | 'codigo' | 'llave_digital' | 'biometrico'
+export interface AccesoResidente {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  tipo: TipoAcceso
+  identificador: string
+  titular: string
+  activo: boolean
+  fecha_emision: string
+  fecha_vencimiento?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export type EstadoGarantia = 'vigente' | 'vencida' | 'reclamada' | 'sin_garantia'
+export interface GarantiaEquipo {
+  id: string
+  company_id: string
+  project_id: string
+  equipo: string
+  area?: string | null
+  numero_serie?: string | null
+  proveedor?: string | null
+  contacto_soporte?: string | null
+  fecha_compra?: string | null
+  fecha_vencimiento?: string | null
+  monto_compra?: number | null
+  estado: EstadoGarantia
+  notas?: string | null
+  created_at: string
+}
+
+export interface EntregaUnidad {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  tipo: 'entrega' | 'devolucion'
+  fecha: string
+  condicion_general: 'excelente' | 'buena' | 'regular' | 'deteriorada'
+  inquilino?: string | null
+  propietario?: string | null
+  representante_admin?: string | null
+  observaciones?: string | null
+  inventario_items: unknown[]
+  firmado_propietario: boolean
+  firmado_inquilino: boolean
+  created_at: string
+}
