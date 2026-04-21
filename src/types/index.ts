@@ -2891,3 +2891,83 @@ export interface CierreAnual {
   estado: EstadoCierreAnual
   created_at: string
 }
+
+// ── Fase 31 ────────────────────────────────────────────────────────────────────
+export type EtapaCobranzaJudicial = 'carta_notarial' | 'juzgado' | 'sentencia' | 'ejecutado' | 'archivado'
+export type EstadoCobranzaJudicial = 'activo' | 'resuelto' | 'archivado'
+export interface CobranzaJudicial {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  etapa: EtapaCobranzaJudicial
+  monto_adeudado: number
+  fecha_inicio: string
+  fecha_actualizacion?: string | null
+  abogado?: string | null
+  expediente?: string | null
+  notas?: string | null
+  estado: EstadoCobranzaJudicial
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type EstadoReciboDigital = 'generado' | 'enviado' | 'anulado'
+export interface ReciboDigital {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  cuota_id?: string | null
+  numero_recibo: string
+  monto: number
+  concepto: string
+  fecha_emision: string
+  enviado_por?: string | null
+  destinatario_email?: string | null
+  destinatario_nombre?: string | null
+  estado: EstadoReciboDigital
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type EstadoInformeMensual = 'borrador' | 'publicado'
+export interface InformeMensual {
+  id: string
+  company_id: string
+  project_id: string
+  periodo: string
+  total_cuotas: number
+  cuotas_pagadas: number
+  cuotas_morosas: number
+  total_recaudado: number
+  total_gastos: number
+  num_tickets: number
+  tickets_resueltos: number
+  num_visitantes: number
+  num_incidentes: number
+  notas?: string | null
+  firmado_por?: string | null
+  estado: EstadoInformeMensual
+  created_at: string
+}
+
+export type CategoriaSugerencia = 'instalaciones' | 'seguridad' | 'servicios' | 'convivencia' | 'otro'
+export type EstadoSugerencia = 'pendiente' | 'en_revision' | 'respondida' | 'archivada'
+export interface SugerenciaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  categoria: CategoriaSugerencia
+  titulo: string
+  descripcion: string
+  estado: EstadoSugerencia
+  respuesta?: string | null
+  respondido_por?: string | null
+  fecha_respuesta?: string | null
+  anonima: boolean
+  created_at: string
+  unidad_nombre?: string
+}

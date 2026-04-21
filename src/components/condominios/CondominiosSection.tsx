@@ -31,6 +31,7 @@ import type {
   ComentarioTicket, RecordatorioCondominio, PlantillaCuota, BitacoraAccion,
   RecargoMora, ConvenioCuotaCond, HistorialSaldoUnidad, NotificacionEnviada,
   ReglaMoraConfig, CampanaCobro, CierreAnual,
+  CobranzaJudicial, ReciboDigital, InformeMensual, SugerenciaCondominio,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -147,6 +148,10 @@ import ReglasMoraTab from './tabs/ReglasMoraTab'
 import CampanasCobroTab from './tabs/CampanasCobroTab'
 import CierreAnualTab from './tabs/CierreAnualTab'
 import KpisFinancierosTab from './tabs/KpisFinancierosTab'
+import CobranzaJudicialTab from './tabs/CobranzaJudicialTab'
+import RecibosDigitalesTab from './tabs/RecibosDigitalesTab'
+import InformeMensualTab from './tabs/InformeMensualTab'
+import BuzonSugerenciasTab from './tabs/BuzonSugerenciasTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -177,6 +182,7 @@ type CondominioTab =
   | 'recordatorios' | 'plantillas_cuota' | 'bitacora_acciones'
   | 'recargos_mora' | 'convenios_cuota' | 'historial_saldos' | 'notificaciones_enviadas'
   | 'reglas_mora' | 'campanas_cobro' | 'cierre_anual' | 'kpis_financieros'
+  | 'cobranza_judicial' | 'recibos_digitales' | 'informe_mensual' | 'buzon_sugerencias'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -292,7 +298,11 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'reglas_mora',            label: 'Reglas mora',     icon: '📏' },
   { id: 'campanas_cobro',         label: 'Campañas cobro',  icon: '📣' },
   { id: 'cierre_anual',           label: 'Cierre anual',    icon: '📆' },
-  { id: 'kpis_financieros',       label: 'KPIs financieros',icon: '📉' },
+  { id: 'kpis_financieros',       label: 'KPIs financieros', icon: '📉' },
+  { id: 'cobranza_judicial',      label: 'Cobr. judicial',   icon: '⚖️' },
+  { id: 'recibos_digitales',      label: 'Recibos',          icon: '🧾' },
+  { id: 'informe_mensual',        label: 'Informe mensual',  icon: '📄' },
+  { id: 'buzon_sugerencias',      label: 'Sugerencias',      icon: '💬' },
 ]
 
 interface Props {
@@ -450,6 +460,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [reglasMora, setReglasMora] = useState<ReglaMoraConfig[]>([])
   const [campanasCobro, setCampanasCobro] = useState<CampanaCobro[]>([])
   const [cierresAnuales, setCierresAnuales] = useState<CierreAnual[]>([])
+  // Fase 31
+  const [cobranzaJudicial, setCobranzaJudicial] = useState<CobranzaJudicial[]>([])
+  const [recibosDigitales, setRecibosDigitales] = useState<ReciboDigital[]>([])
+  const [informesMensuales, setInformesMensuales] = useState<InformeMensual[]>([])
+  const [sugerencias, setSugerencias] = useState<SugerenciaCondominio[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -495,6 +510,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       recordatoriosRes, plantillasRes, bitacoraRes,
       recargosRes, conveniosRes, histSaldosRes, notifEnviadasRes,
       reglasMoraRes, campanasRes, cierresAnualesRes,
+      cobranzaJudicialRes, recibosDigitalesRes, informesMensualesRes, sugerenciasRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -612,6 +628,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('reglas_mora_config').select('*').eq('project_id', pid).eq('company_id', cid).order('dias_vencimiento'),
       supabase.from('campanas_cobro').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('cierres_anuales').select('*').eq('project_id', pid).eq('company_id', cid).order('anio', { ascending: false }),
+      // Fase 31
+      supabase.from('cobranza_judicial').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('recibos_digitales').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_emision', { ascending: false }),
+      supabase.from('informes_mensuales').select('*').eq('project_id', pid).eq('company_id', cid).order('periodo', { ascending: false }),
+      supabase.from('sugerencias_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -741,6 +762,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setReglasMora((reglasMoraRes.data ?? []) as ReglaMoraConfig[])
     setCampanasCobro((campanasRes.data ?? []) as CampanaCobro[])
     setCierresAnuales((cierresAnualesRes.data ?? []) as CierreAnual[])
+    setCobranzaJudicial(mapUnidad<CobranzaJudicial>(cobranzaJudicialRes.data ?? []))
+    setRecibosDigitales(mapUnidad<ReciboDigital>(recibosDigitalesRes.data ?? []))
+    setInformesMensuales((informesMensualesRes.data ?? []) as InformeMensual[])
+    setSugerencias(mapUnidad<SugerenciaCondominio>(sugerenciasRes.data ?? []))
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -953,6 +978,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'campanas_cobro' && <CampanasCobroTab campanas={campanasCobro} cuotas={cuotas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'cierre_anual' && <CierreAnualTab cierres={cierresAnuales} cuotas={cuotas} gastos={gastos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'kpis_financieros' && <KpisFinancierosTab cuotas={cuotas} gastos={gastos} historialSaldos={historialSaldos} recargosMora={recargosMora} unidades={unidadesProyecto} moneda={moneda} />}
+        {activeTab === 'cobranza_judicial' && <CobranzaJudicialTab cobranzas={cobranzaJudicial} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'recibos_digitales' && <RecibosDigitalesTab recibos={recibosDigitales} cuotas={cuotas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'informe_mensual' && <InformeMensualTab informes={informesMensuales} cuotas={cuotas} gastos={gastos} tickets={tickets} visitantes={visitantes} incidentes={incidentes} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'buzon_sugerencias' && <BuzonSugerenciasTab sugerencias={sugerencias} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}
