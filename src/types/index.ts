@@ -2748,3 +2748,87 @@ export interface BitacoraAccion {
   ip_address?: string | null
   created_at: string
 }
+
+// ── Fase 29: Recargos mora, Convenios cuota, Historial saldos, Notificaciones ─
+
+export type EstadoRecargo = 'pendiente' | 'aplicado' | 'anulado'
+export type TipoRecargo = 'porcentaje' | 'monto_fijo'
+
+export interface RecargoMora {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  cuota_id?: string | null
+  tipo: TipoRecargo
+  valor: number
+  monto_calculado: number
+  fecha_aplicacion: string
+  estado: EstadoRecargo
+  motivo?: string | null
+  anulado_por?: string | null
+  fecha_anulacion?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export type EstadoConvenioCuota = 'activo' | 'cumplido' | 'incumplido' | 'anulado'
+
+export interface ConvenioCuotaCond {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  descripcion: string
+  monto_total: number
+  num_cuotas: number
+  monto_cuota: number
+  dia_pago: number
+  fecha_inicio: string
+  fecha_fin?: string | null
+  cuotas_pagadas: number
+  estado: EstadoConvenioCuota
+  aprobado_por?: string | null
+  notas?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export interface HistorialSaldoUnidad {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  periodo: string
+  saldo_anterior: number
+  cargos_periodo: number
+  pagos_periodo: number
+  saldo_final: number
+  num_cuotas_vencidas: number
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export type EstadoNotificacion = 'enviado' | 'fallido' | 'pendiente' | 'leido'
+
+export interface NotificacionEnviada {
+  id: string
+  company_id: string
+  project_id?: string | null
+  unidad_id?: string | null
+  cliente_id?: string | null
+  canal: CanalNotificacion
+  destinatario: string
+  asunto?: string | null
+  contenido: string
+  estado: EstadoNotificacion
+  error_detalle?: string | null
+  enviado_por?: string | null
+  fecha_envio: string
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
