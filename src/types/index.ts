@@ -2416,3 +2416,86 @@ export interface ControlPlagas {
   observaciones?: string | null
   created_at: string
 }
+
+// ── Fase 23 ──────────────────────────────────────────────────────────────────
+export type CategoriaCargoAdicional = 'reparacion' | 'exceso_consumo' | 'dano' | 'servicio' | 'multa' | 'otro'
+export type EstadoCargoAdicional = 'pendiente' | 'pagado' | 'anulado'
+export interface CargoAdicionalUnidad {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  concepto: string
+  categoria: CategoriaCargoAdicional
+  monto: number
+  fecha_cargo: string
+  fecha_vencimiento?: string | null
+  estado: EstadoCargoAdicional
+  referencia?: string | null
+  observaciones?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type CategoriaActividad = 'recreativa' | 'deportiva' | 'cultural' | 'educativa' | 'salud' | 'otro'
+export type EstadoActividad = 'programada' | 'activa' | 'completada' | 'cancelada'
+export interface ProgramaActividad {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  descripcion?: string | null
+  categoria: CategoriaActividad
+  instructor?: string | null
+  lugar?: string | null
+  fecha_inicio: string
+  fecha_fin?: string | null
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  dias_semana?: string[] | null
+  cupo_maximo?: number | null
+  inscritos: number
+  costo: number
+  estado: EstadoActividad
+  activo: boolean
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoAutoridad = 'policia' | 'bomberos' | 'salud' | 'municipalidad' | 'electricidad' | 'agua' | 'otro'
+export type ResultadoAutoridad = 'sin_novedad' | 'acta_levantada' | 'sancion' | 'recomendacion' | 'otro'
+export interface RegistroAutoridad {
+  id: string
+  company_id: string
+  project_id: string
+  tipo_autoridad: TipoAutoridad
+  nombre_institucion?: string | null
+  nombre_funcionario?: string | null
+  motivo: string
+  fecha: string
+  hora_llegada?: string | null
+  hora_salida?: string | null
+  resultado?: ResultadoAutoridad | null
+  documento_referencia?: string | null
+  requiere_seguimiento: boolean
+  fecha_seguimiento?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+export type CategoriaNota = 'general' | 'urgente' | 'recordatorio' | 'seguimiento' | 'reunion' | 'otro'
+export type PrioridadNota = 'normal' | 'alta' | 'urgente'
+export interface NotaAdmin {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  contenido: string
+  categoria: CategoriaNota
+  prioridad: PrioridadNota
+  fijada: boolean
+  resuelta: boolean
+  fecha_recordatorio?: string | null
+  autor?: string | null
+  created_at: string
+}
