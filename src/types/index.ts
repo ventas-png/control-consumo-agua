@@ -2971,3 +2971,61 @@ export interface SugerenciaCondominio {
   created_at: string
   unidad_nombre?: string
 }
+
+// ── Fase 32 ────────────────────────────────────────────────────────────────────
+export type CategoriaVencimiento = 'contrato' | 'permiso' | 'certificacion' | 'seguro' | 'otro'
+export interface VencimientoExtra {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  categoria: CategoriaVencimiento
+  fecha_vencimiento: string
+  entidad?: string | null
+  monto?: number | null
+  alerta_dias: number
+  renovado: boolean
+  notas?: string | null
+  created_at: string
+}
+
+export type EstadoCapacitacion = 'planificado' | 'en_progreso' | 'completado' | 'vencido'
+export interface CapacitacionPersonal {
+  id: string
+  company_id: string
+  project_id: string
+  personal_id?: string | null
+  nombre_empleado: string
+  cargo?: string | null
+  curso: string
+  proveedor?: string | null
+  fecha_inicio: string
+  fecha_fin?: string | null
+  fecha_vencimiento_cert?: string | null
+  costo?: number | null
+  estado: EstadoCapacitacion
+  notas?: string | null
+  created_at: string
+}
+
+export type CategoriaProyectoCond = 'mejora' | 'mantenimiento' | 'seguridad' | 'tecnologia' | 'otro'
+export type EstadoProyectoCond = 'planificado' | 'en_progreso' | 'pausado' | 'completado' | 'cancelado'
+export interface ProyectoCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  descripcion?: string | null
+  categoria: CategoriaProyectoCond
+  estado: EstadoProyectoCond
+  responsable?: string | null
+  fecha_inicio?: string | null
+  fecha_fin_estimada?: string | null
+  fecha_fin_real?: string | null
+  porcentaje_avance: number
+  presupuesto?: number | null
+  costo_real?: number | null
+  notas?: string | null
+  created_at: string
+}

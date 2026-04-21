@@ -32,6 +32,7 @@ import type {
   RecargoMora, ConvenioCuotaCond, HistorialSaldoUnidad, NotificacionEnviada,
   ReglaMoraConfig, CampanaCobro, CierreAnual,
   CobranzaJudicial, ReciboDigital, InformeMensual, SugerenciaCondominio,
+  VencimientoExtra, CapacitacionPersonal, ProyectoCondominio,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -152,6 +153,10 @@ import CobranzaJudicialTab from './tabs/CobranzaJudicialTab'
 import RecibosDigitalesTab from './tabs/RecibosDigitalesTab'
 import InformeMensualTab from './tabs/InformeMensualTab'
 import BuzonSugerenciasTab from './tabs/BuzonSugerenciasTab'
+import VencimientosCriticosTab from './tabs/VencimientosCriticosTab'
+import CapacitacionPersonalTab from './tabs/CapacitacionPersonalTab'
+import ProyectosCondominioTab from './tabs/ProyectosCondominioTab'
+import MetricasServicioTab from './tabs/MetricasServicioTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -183,6 +188,7 @@ type CondominioTab =
   | 'recargos_mora' | 'convenios_cuota' | 'historial_saldos' | 'notificaciones_enviadas'
   | 'reglas_mora' | 'campanas_cobro' | 'cierre_anual' | 'kpis_financieros'
   | 'cobranza_judicial' | 'recibos_digitales' | 'informe_mensual' | 'buzon_sugerencias'
+  | 'vencimientos_criticos' | 'capacitacion_personal' | 'proyectos_cond' | 'metricas_servicio'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -303,6 +309,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'recibos_digitales',      label: 'Recibos',          icon: '🧾' },
   { id: 'informe_mensual',        label: 'Informe mensual',  icon: '📄' },
   { id: 'buzon_sugerencias',      label: 'Sugerencias',      icon: '💬' },
+  { id: 'vencimientos_criticos',  label: 'Vencimientos',     icon: '⏳' },
+  { id: 'capacitacion_personal',  label: 'Capacitación',     icon: '🎓' },
+  { id: 'proyectos_cond',         label: 'Proyectos',        icon: '🏗️' },
+  { id: 'metricas_servicio',      label: 'Métricas servicio',icon: '📊' },
 ]
 
 interface Props {
@@ -465,6 +475,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [recibosDigitales, setRecibosDigitales] = useState<ReciboDigital[]>([])
   const [informesMensuales, setInformesMensuales] = useState<InformeMensual[]>([])
   const [sugerencias, setSugerencias] = useState<SugerenciaCondominio[]>([])
+  // Fase 32
+  const [vencimientosExtra, setVencimientosExtra] = useState<VencimientoExtra[]>([])
+  const [capacitaciones, setCapacitaciones] = useState<CapacitacionPersonal[]>([])
+  const [proyectosCond, setProyectosCond] = useState<ProyectoCondominio[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -511,6 +525,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       recargosRes, conveniosRes, histSaldosRes, notifEnviadasRes,
       reglasMoraRes, campanasRes, cierresAnualesRes,
       cobranzaJudicialRes, recibosDigitalesRes, informesMensualesRes, sugerenciasRes,
+      vencimientosExtraRes, capacitacionesRes, proyectosCondRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -633,6 +648,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('recibos_digitales').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_emision', { ascending: false }),
       supabase.from('informes_mensuales').select('*').eq('project_id', pid).eq('company_id', cid).order('periodo', { ascending: false }),
       supabase.from('sugerencias_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      // Fase 32
+      supabase.from('vencimientos_extra').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_vencimiento'),
+      supabase.from('capacitacion_personal_cond').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }),
+      supabase.from('proyectos_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -766,6 +785,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setRecibosDigitales(mapUnidad<ReciboDigital>(recibosDigitalesRes.data ?? []))
     setInformesMensuales((informesMensualesRes.data ?? []) as InformeMensual[])
     setSugerencias(mapUnidad<SugerenciaCondominio>(sugerenciasRes.data ?? []))
+    setVencimientosExtra((vencimientosExtraRes.data ?? []) as VencimientoExtra[])
+    setCapacitaciones((capacitacionesRes.data ?? []) as CapacitacionPersonal[])
+    setProyectosCond((proyectosCondRes.data ?? []) as ProyectoCondominio[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -982,6 +1004,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'recibos_digitales' && <RecibosDigitalesTab recibos={recibosDigitales} cuotas={cuotas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'informe_mensual' && <InformeMensualTab informes={informesMensuales} cuotas={cuotas} gastos={gastos} tickets={tickets} visitantes={visitantes} incidentes={incidentes} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'buzon_sugerencias' && <BuzonSugerenciasTab sugerencias={sugerencias} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'vencimientos_criticos' && <VencimientosCriticosTab vencimientosExtra={vencimientosExtra} polizas={polizas} contratosProveedores={contratosProveedores} inspecciones={inspecciones} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'capacitacion_personal' && <CapacitacionPersonalTab capacitaciones={capacitaciones} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'proyectos_cond' && <ProyectosCondominioTab proyectos={proyectosCond} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'metricas_servicio' && <MetricasServicioTab tickets={tickets} sugerencias={sugerencias} visitantes={visitantes} cuotas={cuotas} moneda={moneda} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}
