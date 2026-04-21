@@ -2587,3 +2587,96 @@ export interface MantenimientoCisterna {
   observaciones?: string | null
   created_at: string
 }
+
+// ── Fase 25 ───────────────────────────────────────────────────────────────────
+
+export type TipoRegistroGenerador = 'lectura' | 'mantenimiento' | 'prueba' | 'falla' | 'arranque_emergencia'
+export type EstadoGenerador = 'standby' | 'operando' | 'mantenimiento' | 'falla' | 'apagado'
+
+export interface ControlGenerador {
+  id: string
+  company_id: string
+  project_id: string
+  generador: string
+  fecha: string
+  tipo: TipoRegistroGenerador
+  nivel_combustible_pct?: number | null
+  horas_operacion?: number | null
+  horas_acumuladas?: number | null
+  estado: EstadoGenerador
+  voltaje?: number | null
+  frecuencia?: number | null
+  operador?: string | null
+  empresa_servicio?: string | null
+  costo?: number | null
+  proximo_mantenimiento?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+export type TipoSistemaIncendio = 'extintor' | 'rociador' | 'alarma' | 'hidrant' | 'detector_humo' | 'gabinete' | 'otro'
+export type TipoInspeccionIncendio = 'revision_visual' | 'prueba_funcional' | 'recarga' | 'reemplazo' | 'inspeccion_legal'
+export type ResultadoInspeccionIncendio = 'aprobado' | 'observacion' | 'requiere_mantenimiento' | 'fuera_servicio'
+
+export interface ControlSistemaIncendio {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  tipo_sistema: TipoSistemaIncendio
+  identificador: string
+  ubicacion: string
+  tipo_inspeccion: TipoInspeccionIncendio
+  resultado: ResultadoInspeccionIncendio
+  fecha_vencimiento?: string | null
+  empresa_servicio?: string | null
+  tecnico?: string | null
+  costo?: number | null
+  proxima_inspeccion?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+export type TipoCamara = 'domo' | 'bullet' | 'ptz' | 'fisheye' | 'otro'
+export type EstadoCamara = 'activa' | 'falla' | 'mantenimiento' | 'sin_señal' | 'inactiva'
+
+export interface ControlCamaraSeguridad {
+  id: string
+  company_id: string
+  project_id: string
+  codigo: string
+  nombre: string
+  ubicacion: string
+  tipo: TipoCamara
+  resolucion?: string | null
+  ip_address?: string | null
+  grabacion: boolean
+  dias_retencion?: number | null
+  estado: EstadoCamara
+  ultimo_mantenimiento?: string | null
+  proximo_mantenimiento?: string | null
+  observaciones?: string | null
+  activo: boolean
+  created_at: string
+}
+
+export interface LecturaMedidorGas {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  area?: string | null
+  fecha: string
+  lectura_anterior?: number | null
+  lectura_actual: number
+  consumo?: number | null
+  alerta_fuga: boolean
+  costo_unitario?: number | null
+  costo_total?: number | null
+  periodo?: string | null
+  leido_por?: string | null
+  observaciones?: string | null
+  created_at: string
+  // join
+  unidad_nombre?: string
+}

@@ -27,6 +27,7 @@ import type {
   SolicitudCertificado, VisitaFrecuente, ArticuloReglamento, ControlPlagas,
   CargoAdicionalUnidad, ProgramaActividad, RegistroAutoridad, NotaAdmin,
   ControlPiscina, MantenimientoJardineria, IncidenciaElevador, MantenimientoCisterna,
+  ControlGenerador, ControlSistemaIncendio, ControlCamaraSeguridad, LecturaMedidorGas,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -127,6 +128,10 @@ import ControlPiscinaTab from './tabs/ControlPiscinaTab'
 import MantenimientoJardineriaTab from './tabs/MantenimientoJardineriaTab'
 import IncidenciasElevadorTab from './tabs/IncidenciasElevadorTab'
 import MantenimientoCisternaTab from './tabs/MantenimientoCisternaTab'
+import ControlGeneradorTab from './tabs/ControlGeneradorTab'
+import ControlSistemaIncendioTab from './tabs/ControlSistemaIncendioTab'
+import ControlCamarasTab from './tabs/ControlCamarasTab'
+import LecturasMedidorGasTab from './tabs/LecturasMedidorGasTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -153,6 +158,7 @@ type CondominioTab =
   | 'certificados' | 'vis_frecuentes' | 'reglamento' | 'control_plagas'
   | 'cargos_adicionales' | 'programa_actividades' | 'reg_autoridades' | 'notas_admin'
   | 'control_piscina' | 'jardineria' | 'elevadores' | 'cisternas'
+  | 'generador' | 'incendio' | 'camaras' | 'gas'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -254,6 +260,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'jardineria',          label: 'Jardinería',      icon: '🌿' },
   { id: 'elevadores',          label: 'Elevadores',      icon: '🛗' },
   { id: 'cisternas',           label: 'Cisternas',       icon: '🏗️' },
+  { id: 'generador',           label: 'Generador',       icon: '⚡' },
+  { id: 'incendio',            label: 'Contra incendio', icon: '🧯' },
+  { id: 'camaras',             label: 'Cámaras',         icon: '📷' },
+  { id: 'gas',                 label: 'Medidores gas',   icon: '🔥' },
 ]
 
 interface Props {
@@ -391,6 +401,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [mantenimientoJardineria, setMantenimientoJardineria] = useState<MantenimientoJardineria[]>([])
   const [incidenciasElevador, setIncidenciasElevador] = useState<IncidenciaElevador[]>([])
   const [mantenimientoCisterna, setMantenimientoCisterna] = useState<MantenimientoCisterna[]>([])
+  // Fase 25
+  const [controlGenerador, setControlGenerador] = useState<ControlGenerador[]>([])
+  const [controlIncendio, setControlIncendio] = useState<ControlSistemaIncendio[]>([])
+  const [camarasSeguridad, setCamarasSeguridad] = useState<ControlCamaraSeguridad[]>([])
+  const [lecturasGas, setLecturasGas] = useState<LecturaMedidorGas[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -432,6 +447,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       certificadosRes, visFrecRes, reglamentoRes, plagasRes,
       cargosAdRes, progActRes, regAutoRes, notasAdminRes,
       piscinaRes, jardineriaRes, elevadorRes, cisternaRes,
+      generadorRes, incendioRes, camarasRes, gasRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -532,6 +548,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('mantenimiento_jardineria').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
       supabase.from('incidencias_elevador').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
       supabase.from('mantenimiento_cisterna').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('control_generador').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('control_sistema_incendio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('control_camaras_seguridad').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
+      supabase.from('lecturas_medidor_gas').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -647,6 +667,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setMantenimientoJardineria((jardineriaRes.data ?? []) as MantenimientoJardineria[])
     setIncidenciasElevador((elevadorRes.data ?? []) as IncidenciaElevador[])
     setMantenimientoCisterna((cisternaRes.data ?? []) as MantenimientoCisterna[])
+    setControlGenerador((generadorRes.data ?? []) as ControlGenerador[])
+    setControlIncendio((incendioRes.data ?? []) as ControlSistemaIncendio[])
+    setCamarasSeguridad((camarasRes.data ?? []) as ControlCamaraSeguridad[])
+    setLecturasGas(mapUnidad<LecturaMedidorGas>(gasRes.data ?? []))
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -844,6 +868,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'jardineria' && <MantenimientoJardineriaTab registros={mantenimientoJardineria} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'elevadores' && <IncidenciasElevadorTab registros={incidenciasElevador} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'cisternas' && <MantenimientoCisternaTab registros={mantenimientoCisterna} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'generador' && <ControlGeneradorTab registros={controlGenerador} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'incendio' && <ControlSistemaIncendioTab registros={controlIncendio} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'camaras' && <ControlCamarasTab camaras={camarasSeguridad} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'gas' && <LecturasMedidorGasTab lecturas={lecturasGas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )
