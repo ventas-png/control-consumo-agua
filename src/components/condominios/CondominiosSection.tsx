@@ -33,6 +33,7 @@ import type {
   ReglaMoraConfig, CampanaCobro, CierreAnual,
   CobranzaJudicial, ReciboDigital, InformeMensual, SugerenciaCondominio,
   VencimientoExtra, CapacitacionPersonal, ProyectoCondominio,
+  ArticuloManual,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -157,6 +158,10 @@ import VencimientosCriticosTab from './tabs/VencimientosCriticosTab'
 import CapacitacionPersonalTab from './tabs/CapacitacionPersonalTab'
 import ProyectosCondominioTab from './tabs/ProyectosCondominioTab'
 import MetricasServicioTab from './tabs/MetricasServicioTab'
+import AnalisisCarteraTab from './tabs/AnalisisCarteraTab'
+import IntegracionAguaTab from './tabs/IntegracionAguaTab'
+import CentroCostosTab from './tabs/CentroCostosTab'
+import ManualResidenteTab from './tabs/ManualResidenteTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -189,6 +194,7 @@ type CondominioTab =
   | 'reglas_mora' | 'campanas_cobro' | 'cierre_anual' | 'kpis_financieros'
   | 'cobranza_judicial' | 'recibos_digitales' | 'informe_mensual' | 'buzon_sugerencias'
   | 'vencimientos_criticos' | 'capacitacion_personal' | 'proyectos_cond' | 'metricas_servicio'
+  | 'analisis_cartera' | 'integracion_agua' | 'centro_costos' | 'manual_residente'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -313,6 +319,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'capacitacion_personal',  label: 'Capacitación',     icon: '🎓' },
   { id: 'proyectos_cond',         label: 'Proyectos',        icon: '🏗️' },
   { id: 'metricas_servicio',      label: 'Métricas servicio',icon: '📊' },
+  { id: 'analisis_cartera',       label: 'Cartera',          icon: '📉' },
+  { id: 'integracion_agua',       label: 'Integración agua', icon: '💧' },
+  { id: 'centro_costos',          label: 'Centro costos',    icon: '💰' },
+  { id: 'manual_residente',       label: 'Manual residente', icon: '📚' },
 ]
 
 interface Props {
@@ -479,6 +489,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [vencimientosExtra, setVencimientosExtra] = useState<VencimientoExtra[]>([])
   const [capacitaciones, setCapacitaciones] = useState<CapacitacionPersonal[]>([])
   const [proyectosCond, setProyectosCond] = useState<ProyectoCondominio[]>([])
+  // Fase 33
+  const [articulosManual, setArticulosManual] = useState<ArticuloManual[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -526,6 +538,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       reglasMoraRes, campanasRes, cierresAnualesRes,
       cobranzaJudicialRes, recibosDigitalesRes, informesMensualesRes, sugerenciasRes,
       vencimientosExtraRes, capacitacionesRes, proyectosCondRes,
+      articulosManualRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -652,6 +665,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('vencimientos_extra').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_vencimiento'),
       supabase.from('capacitacion_personal_cond').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }),
       supabase.from('proyectos_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      // Fase 33
+      supabase.from('manual_residente_cond').select('*').eq('project_id', pid).eq('company_id', cid).order('orden').order('titulo'),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -788,6 +803,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setVencimientosExtra((vencimientosExtraRes.data ?? []) as VencimientoExtra[])
     setCapacitaciones((capacitacionesRes.data ?? []) as CapacitacionPersonal[])
     setProyectosCond((proyectosCondRes.data ?? []) as ProyectoCondominio[])
+    setArticulosManual((articulosManualRes.data ?? []) as ArticuloManual[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -1008,6 +1024,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'capacitacion_personal' && <CapacitacionPersonalTab capacitaciones={capacitaciones} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'proyectos_cond' && <ProyectosCondominioTab proyectos={proyectosCond} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'metricas_servicio' && <MetricasServicioTab tickets={tickets} sugerencias={sugerencias} visitantes={visitantes} cuotas={cuotas} moneda={moneda} />}
+        {activeTab === 'analisis_cartera' && <AnalisisCarteraTab cuotas={cuotas} unidades={unidadesProyecto} moneda={moneda} />}
+        {activeTab === 'integracion_agua' && <IntegracionAguaTab unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} />}
+        {activeTab === 'centro_costos' && <CentroCostosTab gastos={gastos} cuotas={cuotas} moneda={moneda} />}
+        {activeTab === 'manual_residente' && <ManualResidenteTab articulos={articulosManual} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}

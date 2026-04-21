@@ -3029,3 +3029,16 @@ export interface ProyectoCondominio {
   notas?: string | null
   created_at: string
 }
+
+export type SeccionManual = 'amenidades' | 'normas' | 'faq' | 'contactos' | 'otro'
+export interface ArticuloManual {
+  id: string
+  company_id: string
+  project_id: string
+  seccion: SeccionManual
+  titulo: string
+  contenido: string
+  orden: number
+  activo: boolean
+  created_at: string
+}

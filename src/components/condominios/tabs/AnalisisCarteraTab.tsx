@@ -1,0 +1,132 @@
+import { useMemo } from 'react'
+import { CuotaCondominio, Unidad } from '../../../types'
+
+interface Props {
+  cuotas: CuotaCondominio[]
+  unidades: Unidad[]
+  moneda: string
+}
+
+function diasVencido(fechaVenc: string): number {
+  return Math.floor((Date.now() - new Date(fechaVenc).getTime()) / 86400000)
+}
+
+export default function AnalisisCarteraTab({ cuotas, unidades, moneda }: Props) {
+  const hoy = new Date().toISOString().slice(0, 10)
+
+  const vencidas = cuotas.filter(c =>
+    (c.estado === 'pendiente' || c.estado === 'moroso') &&
+    c.fecha_vencimiento && c.fecha_vencimiento < hoy
+  )
+
+  const buckets = useMemo(() => {
+    const b: Record<string, CuotaCondominio[]> = { '1-30': [], '31-60': [], '61-90': [], '+90': [] }
+    vencidas.forEach(c => {
+      const d = diasVencido(c.fecha_vencimiento!)
+      if (d <= 30) b['1-30'].push(c)
+      else if (d <= 60) b['31-60'].push(c)
+      else if (d <= 90) b['61-90'].push(c)
+      else b['+90'].push(c)
+    })
+    return b
+  }, [vencidas])
+
+  const porUnidad = useMemo(() => {
+    const map: Record<string, { unidad_nombre: string; monto: number; cuotas: number; maxDias: number }> = {}
+    vencidas.forEach(c => {
+      const uid = c.unidad_id ?? 'sin_unidad'
+      const nombre = c.unidad_nombre ?? unidades.find(u => u.id === uid)?.nombre ?? 'Sin unidad'
+      if (!map[uid]) map[uid] = { unidad_nombre: nombre, monto: 0, cuotas: 0, maxDias: 0 }
+      map[uid].monto += c.monto ?? 0
+      map[uid].cuotas += 1
+      map[uid].maxDias = Math.max(map[uid].maxDias, diasVencido(c.fecha_vencimiento!))
+    })
+    return Object.values(map).sort((a, b) => b.monto - a.monto).slice(0, 15)
+  }, [vencidas, unidades])
+
+  const totalVencido = vencidas.reduce((s, c) => s + (c.monto ?? 0), 0)
+
+  const BUCKET_CFG = [
+    { key: '1-30',  label: '1 – 30 días',      color: '#f97316', bg: '#fff7ed' },
+    { key: '31-60', label: '31 – 60 días',     color: '#ef4444', bg: '#fef2f2' },
+    { key: '61-90', label: '61 – 90 días',     color: '#dc2626', bg: '#fee2e2' },
+    { key: '+90',   label: 'Más de 90 días',   color: '#991b1b', bg: '#fecaca' },
+  ] as const
+
+  const maxBucket = Math.max(...BUCKET_CFG.map(b => buckets[b.key].reduce((s, c) => s + (c.monto ?? 0), 0)), 1)
+
+  return (
+    <div style={{ padding: 16 }}>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
+        <div style={{ background: '#fef2f2', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#ef4444' }}>{moneda} {totalVencido.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>Cartera vencida total</div>
+        </div>
+        <div style={{ background: '#fff7ed', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#f97316' }}>{vencidas.length}</div>
+          <div style={{ fontSize: 11, color: '#f97316', fontWeight: 600 }}>Cuotas sin cobrar</div>
+        </div>
+        <div style={{ background: '#fef3c7', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#d97706' }}>{porUnidad.length}</div>
+          <div style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>Unidades con mora</div>
+        </div>
+        <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>
+            {cuotas.length > 0 ? Math.round((vencidas.length / cuotas.length) * 100) : 0}%
+          </div>
+          <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>% de cuotas vencidas</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {/* Aging buckets */}
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14 }}>Antigüedad de la cartera vencida</div>
+          {vencidas.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#9ca3af', padding: '30px 0', fontSize: 13 }}>Sin cartera vencida</div>
+          ) : BUCKET_CFG.map(b => {
+            const monto = buckets[b.key].reduce((s, c) => s + (c.monto ?? 0), 0)
+            return (
+              <div key={b.key} style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ padding: '2px 8px', background: b.bg, color: b.color, borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{b.label}</span>
+                    <span style={{ color: '#9ca3af' }}>{buckets[b.key].length} cuotas</span>
+                  </span>
+                  <span style={{ fontWeight: 700, color: b.color }}>{moneda} {monto.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div style={{ background: '#f3f4f6', borderRadius: 4, height: 8 }}>
+                  <div style={{ height: '100%', background: b.color, width: `${(monto / maxBucket) * 100}%`, borderRadius: 4 }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Top deudores */}
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Principales unidades morosas</div>
+          {porUnidad.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#9ca3af', padding: '30px 0', fontSize: 13 }}>Sin morosidad registrada</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {porUnidad.map((u, i) => (
+                <div key={u.unidad_nombre} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#f9fafb', borderRadius: 8 }}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: i < 3 ? '#fef2f2' : '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: i < 3 ? '#ef4444' : '#6b7280', flexShrink: 0 }}>
+                    {i + 1}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.unidad_nombre}</div>
+                    <div style={{ fontSize: 10, color: '#9ca3af' }}>{u.cuotas} cuotas · {u.maxDias}d máx.</div>
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: '#ef4444', flexShrink: 0 }}>{moneda} {u.monto.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
