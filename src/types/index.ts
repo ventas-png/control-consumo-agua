@@ -2832,3 +2832,62 @@ export interface NotificacionEnviada {
   // joins
   unidad_nombre?: string
 }
+
+// ── Fase 30 ────────────────────────────────────────────────────────────────────
+export type TipoReglaRecargo = 'porcentaje' | 'monto_fijo'
+export type AplicarSobreRecargo = 'saldo_vencido' | 'monto_cuota'
+export interface ReglaMoraConfig {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  dias_vencimiento: number
+  tipo: TipoReglaRecargo
+  valor: number
+  aplicar_sobre: AplicarSobreRecargo
+  periodo_gracia: number
+  activa: boolean
+  notas?: string | null
+  created_at: string
+}
+
+export type CanalCampana = 'whatsapp' | 'email' | 'sms'
+export type EstadoCampana = 'borrador' | 'enviada' | 'completada'
+export interface CampanaCobro {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  mensaje: string
+  canal: CanalCampana
+  estado: EstadoCampana
+  total_destinatarios: number
+  enviadas: number
+  fallidas: number
+  criterio_dias_mora?: number | null
+  criterio_monto_min?: number | null
+  enviada_por?: string | null
+  fecha_envio?: string | null
+  created_at: string
+}
+
+export type EstadoCierreAnual = 'borrador' | 'cerrado'
+export interface CierreAnual {
+  id: string
+  company_id: string
+  project_id: string
+  anio: number
+  total_ingresos: number
+  total_egresos: number
+  saldo: number
+  total_cuotas_generadas: number
+  total_cuotas_cobradas: number
+  tasa_recaudacion?: number | null
+  unidades_morosas: number
+  monto_mora_total: number
+  notas?: string | null
+  firmado_por?: string | null
+  fecha_cierre?: string | null
+  estado: EstadoCierreAnual
+  created_at: string
+}
