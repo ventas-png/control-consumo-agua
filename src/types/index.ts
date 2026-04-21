@@ -2680,3 +2680,71 @@ export interface LecturaMedidorGas {
   // join
   unidad_nombre?: string
 }
+
+// ── Fase 28: Comentarios Ticket, Recordatorios, Plantillas Cuota, Bitácora ──
+
+export interface ComentarioTicket {
+  id: string
+  company_id: string
+  ticket_id: string
+  autor_id?: string | null
+  autor_nombre: string
+  contenido: string
+  estado_nuevo?: string | null
+  created_at: string
+}
+
+export type PrioridadRecordatorio = 'normal' | 'alta' | 'critica'
+export type TipoEntidadRecordatorio = 'cuota' | 'contrato' | 'inspeccion' | 'mantenimiento' | 'general'
+
+export interface RecordatorioCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  fecha_limite: string
+  tipo_entidad?: TipoEntidadRecordatorio | null
+  entidad_id?: string | null
+  asignado_a?: string | null
+  asignado_nombre?: string | null
+  prioridad: PrioridadRecordatorio
+  completado: boolean
+  fecha_completado?: string | null
+  created_by?: string | null
+  created_at: string
+}
+
+export type PeriodicidadPlantilla = 'mensual' | 'bimestral' | 'trimestral' | 'semestral' | 'anual' | 'única'
+
+export interface PlantillaCuota {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  concepto: string
+  monto: number
+  dia_vencimiento: number
+  periodicidad: PeriodicidadPlantilla
+  aplica_a: string
+  activa: boolean
+  notas?: string | null
+  created_at: string
+}
+
+export type AccionBitacora = 'crear' | 'editar' | 'eliminar' | 'aprobar' | 'rechazar' | 'pagar' | 'cerrar'
+
+export interface BitacoraAccion {
+  id: string
+  company_id: string
+  project_id?: string | null
+  usuario_id?: string | null
+  usuario_nombre: string
+  accion: AccionBitacora
+  modulo: string
+  entidad_id?: string | null
+  entidad_desc?: string | null
+  detalles?: Record<string, unknown> | null
+  ip_address?: string | null
+  created_at: string
+}

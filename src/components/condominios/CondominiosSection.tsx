@@ -28,6 +28,7 @@ import type {
   CargoAdicionalUnidad, ProgramaActividad, RegistroAutoridad, NotaAdmin,
   ControlPiscina, MantenimientoJardineria, IncidenciaElevador, MantenimientoCisterna,
   ControlGenerador, ControlSistemaIncendio, ControlCamaraSeguridad, LecturaMedidorGas,
+  ComentarioTicket, RecordatorioCondominio, PlantillaCuota, BitacoraAccion,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -132,6 +133,10 @@ import ControlGeneradorTab from './tabs/ControlGeneradorTab'
 import ControlSistemaIncendioTab from './tabs/ControlSistemaIncendioTab'
 import ControlCamarasTab from './tabs/ControlCamarasTab'
 import LecturasMedidorGasTab from './tabs/LecturasMedidorGasTab'
+import ComentariosTicketTab from './tabs/ComentariosTicketTab'
+import RecordatoriosTab from './tabs/RecordatoriosTab'
+import PlantillasCuotaTab from './tabs/PlantillasCuotaTab'
+import BitacoraAccionesTab from './tabs/BitacoraAccionesTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -159,6 +164,7 @@ type CondominioTab =
   | 'cargos_adicionales' | 'programa_actividades' | 'reg_autoridades' | 'notas_admin'
   | 'control_piscina' | 'jardineria' | 'elevadores' | 'cisternas'
   | 'generador' | 'incendio' | 'camaras' | 'gas'
+  | 'recordatorios' | 'plantillas_cuota' | 'bitacora_acciones'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -264,6 +270,9 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'incendio',            label: 'Contra incendio', icon: '🧯' },
   { id: 'camaras',             label: 'Cámaras',         icon: '📷' },
   { id: 'gas',                 label: 'Medidores gas',   icon: '🔥' },
+  { id: 'recordatorios',       label: 'Recordatorios',   icon: '⏰' },
+  { id: 'plantillas_cuota',    label: 'Plantillas cuota', icon: '📋' },
+  { id: 'bitacora_acciones',   label: 'Bitácora',        icon: '🔎' },
 ]
 
 interface Props {
@@ -406,6 +415,12 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [controlIncendio, setControlIncendio] = useState<ControlSistemaIncendio[]>([])
   const [camarasSeguridad, setCamarasSeguridad] = useState<ControlCamaraSeguridad[]>([])
   const [lecturasGas, setLecturasGas] = useState<LecturaMedidorGas[]>([])
+  // Fase 28
+  const [recordatorios, setRecordatorios] = useState<RecordatorioCondominio[]>([])
+  const [plantillasCuota, setPlantillasCuota] = useState<PlantillaCuota[]>([])
+  const [bitacoraAcciones, setBitacoraAcciones] = useState<BitacoraAccion[]>([])
+  const [comentariosTicket] = useState<ComentarioTicket[]>([])
+  const [ticketSeleccionado, setTicketSeleccionado] = useState<import('../../types').TicketMantenimiento | null>(null)
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -448,6 +463,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       cargosAdRes, progActRes, regAutoRes, notasAdminRes,
       piscinaRes, jardineriaRes, elevadorRes, cisternaRes,
       generadorRes, incendioRes, camarasRes, gasRes,
+      recordatoriosRes, plantillasRes, bitacoraRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -552,6 +568,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('control_sistema_incendio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
       supabase.from('control_camaras_seguridad').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
       supabase.from('lecturas_medidor_gas').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      // Fase 28
+      supabase.from('recordatorios_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_limite'),
+      supabase.from('plantillas_cuota').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
+      supabase.from('bitacora_acciones').select('*').eq('company_id', cid).order('created_at', { ascending: false }).limit(500),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -671,6 +691,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setControlIncendio((incendioRes.data ?? []) as ControlSistemaIncendio[])
     setCamarasSeguridad((camarasRes.data ?? []) as ControlCamaraSeguridad[])
     setLecturasGas(mapUnidad<LecturaMedidorGas>(gasRes.data ?? []))
+    setRecordatorios((recordatoriosRes.data ?? []) as RecordatorioCondominio[])
+    setPlantillasCuota((plantillasRes.data ?? []) as PlantillaCuota[])
+    setBitacoraAcciones((bitacoraRes.data ?? []) as BitacoraAccion[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -872,6 +895,20 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'incendio' && <ControlSistemaIncendioTab registros={controlIncendio} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'camaras' && <ControlCamarasTab camaras={camarasSeguridad} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'gas' && <LecturasMedidorGasTab lecturas={lecturasGas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'recordatorios' && <RecordatoriosTab recordatorios={recordatorios} proyectoId={selectedProyectoId} companyId={cid} userId={uid} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'plantillas_cuota' && <PlantillasCuotaTab plantillas={plantillasCuota} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'bitacora_acciones' && <BitacoraAccionesTab bitacora={bitacoraAcciones} />}
+        {ticketSeleccionado && (
+          <ComentariosTicketTab
+            ticket={ticketSeleccionado}
+            comentarios={comentariosTicket}
+            companyId={cid}
+            autorNombre={currentUser.name ?? ''}
+            canCreate={canCreate('condominios')}
+            onRefresh={cargarDatos}
+            onClose={() => setTicketSeleccionado(null)}
+          />
+        )}
       </div>
     </div>
   )
