@@ -2499,3 +2499,91 @@ export interface NotaAdmin {
   autor?: string | null
   created_at: string
 }
+
+// ── Fase 24 ───────────────────────────────────────────────────────────────────
+
+export type TurbiededadPiscina = 'cristalina' | 'ligeramente_turbia' | 'turbia'
+export type EstadoPiscina = 'abierta' | 'cerrada_mantenimiento' | 'cerrada_quimica' | 'cerrada_incidente'
+
+export interface ControlPiscina {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  hora?: string | null
+  piscina: string
+  ph?: number | null
+  cloro?: number | null
+  temperatura?: number | null
+  turbiedad: TurbiededadPiscina
+  estado: EstadoPiscina
+  num_usuarios?: number | null
+  registrado_por?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+export type TipoJardineria = 'mantenimiento_general' | 'poda' | 'fumigacion' | 'siembra' | 'riego' | 'limpieza' | 'otro'
+export type EstadoJardineria = 'programado' | 'en_proceso' | 'completado' | 'cancelado'
+
+export interface MantenimientoJardineria {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  tipo: TipoJardineria
+  areas: string[]
+  proveedor?: string | null
+  trabajadores?: number | null
+  horas_trabajo?: number | null
+  insumos?: string | null
+  costo?: number | null
+  estado: EstadoJardineria
+  proxima_visita?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+export type TipoIncidenciaElevador = 'falla' | 'mantenimiento_preventivo' | 'mantenimiento_correctivo' | 'inspeccion_legal' | 'otro'
+export type EstadoIncidenciaElevador = 'reportado' | 'en_atencion' | 'resuelto' | 'requiere_seguimiento'
+
+export interface IncidenciaElevador {
+  id: string
+  company_id: string
+  project_id: string
+  elevador: string
+  tipo: TipoIncidenciaElevador
+  descripcion: string
+  fecha: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  empresa_servicio?: string | null
+  tecnico?: string | null
+  estado: EstadoIncidenciaElevador
+  costo?: number | null
+  proxima_inspeccion?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+export type TipoMantenimientoCisterna = 'lectura' | 'limpieza' | 'cloracion' | 'inspeccion' | 'reparacion'
+export type EstadoCisterna = 'normal' | 'bajo_nivel' | 'mantenimiento' | 'fuera_servicio'
+
+export interface MantenimientoCisterna {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  cisterna: string
+  tipo: TipoMantenimientoCisterna
+  nivel_agua_pct?: number | null
+  cloro_residual?: number | null
+  ph?: number | null
+  estado: EstadoCisterna
+  empresa_servicio?: string | null
+  tecnico?: string | null
+  costo?: number | null
+  proxima_revision?: string | null
+  observaciones?: string | null
+  created_at: string
+}
