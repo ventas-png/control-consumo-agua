@@ -123,6 +123,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [chartRangeMode, setChartRangeMode] = useState<'preset' | 'custom'>('preset')
   const [chartMetric, setChartMetric] = useState<'m3' | 'moneda'>('m3')
   const [selectedUnidadId, setSelectedUnidadId] = useState<string | null>(null)
+  const [selectedTipoAgua, setSelectedTipoAgua] = useState<string | null>(null)
 
   const clienteId = currentUser.cliente_id
 
@@ -264,13 +265,18 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     const curY = now.getFullYear()
     const curM = now.getMonth()
 
-    // Filter contadores by project then by unidad (two-level drill-down)
+    // Three-level drill-down: project → unidad → tipo de agua
     const filteredContadoresByProject = selectedProjectId
       ? contadores.filter(c => c.project_id === selectedProjectId)
       : contadores
-    const filteredContadores = selectedUnidadId
+    const filteredContadoresByUnidad = selectedUnidadId
       ? filteredContadoresByProject.filter(c => c.unidad_id === selectedUnidadId)
       : filteredContadoresByProject
+    // Collect available water types before applying tipo_agua filter (for UI pills)
+    const availableTiposAgua = [...new Set(filteredContadoresByUnidad.map(c => c.tipo_agua))]
+    const filteredContadores = selectedTipoAgua
+      ? filteredContadoresByUnidad.filter(c => c.tipo_agua === selectedTipoAgua)
+      : filteredContadoresByUnidad
     const filteredContadorIds = new Set(filteredContadores.map(c => c.id))
     const filteredLecturas = lecturas.filter(l =>
       l.contador_id != null && filteredContadorIds.has(l.contador_id)
@@ -361,6 +367,19 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       return { label, data, colorSet }
     })
 
+    // Linear regression trend line across aggregated monthly totals
+    const monthTotals = chartMonths.map((_, mi) =>
+      chartDatasets.reduce((sum, ds) => sum + (ds.data[mi] ?? 0), 0)
+    )
+    const n = monthTotals.length
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+    monthTotals.forEach((y, x) => { sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x })
+    const slope = n > 1 ? (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX) : 0
+    const intercept = n > 0 ? (sumY - slope * sumX) / n : 0
+    const trendData = monthTotals.map((_, x) =>
+      parseFloat(Math.max(0, slope * x + intercept).toFixed(2))
+    )
+
     // Comparaciones (always based on fixed 24m baseline)
     const consumoPrevMes = all24Consumo[22] ?? 0
     const consumoSameLastYear = all24Consumo[11] ?? 0
@@ -407,11 +426,11 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     return {
       consumoMesActual, consumoPromedio, montoPendiente, contadoresActivos,
       consumoPrevMes, consumoSameLastYear, vsAnterior, vsAnioAnterior,
-      chartLabels, chartDatasets, chartCurrentMonthIdx,
-      tipoAguaMap, unidadBreakdown,
+      chartLabels, chartDatasets, chartCurrentMonthIdx, trendData,
+      availableTiposAgua, tipoAguaMap, unidadBreakdown,
       lecturasTotal, filteredLecturasCount,
     }
-  }, [lecturas, contadores, unidades, selectedProjectId, selectedUnidadId, chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode, chartMetric])
+  }, [lecturas, contadores, unidades, selectedProjectId, selectedUnidadId, selectedTipoAgua, chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode, chartMetric])
 
   // ── Chart.js bar chart (per-counter, configurable range & metric) ──
   useEffect(() => {
@@ -419,24 +438,41 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     const timeout = setTimeout(() => {
       if (!chartRef.current) return
       if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null }
-      const { chartLabels, chartDatasets, chartCurrentMonthIdx } = dashboardData
+      const { chartLabels, chartDatasets, chartCurrentMonthIdx, trendData } = dashboardData
       const moneda = selectedProjectId
         ? (projects.find(p => p.id === selectedProjectId)?.moneda ?? projects[0]?.moneda ?? 'Q')
         : (projects[0]?.moneda ?? 'Q')
       const metricLabel = chartMetric === 'm3' ? 'm³' : moneda
+      const hasTrend = trendData.some(v => v > 0)
       chartInstance.current = new Chart(chartRef.current, {
         type: 'bar',
         data: {
           labels: chartLabels,
-          datasets: chartDatasets.map(({ label, data, colorSet }) => ({
-            label,
-            data,
-            backgroundColor: chartLabels.map((_, i) =>
-              i === chartCurrentMonthIdx ? colorSet.full : colorSet.soft
-            ),
-            borderRadius: 6,
-            borderSkipped: false,
-          })),
+          datasets: [
+            ...chartDatasets.map(({ label, data, colorSet }) => ({
+              type: 'bar' as const,
+              label,
+              data,
+              backgroundColor: chartLabels.map((_, i) =>
+                i === chartCurrentMonthIdx ? colorSet.full : colorSet.soft
+              ),
+              borderRadius: 6,
+              borderSkipped: false,
+            })),
+            ...(hasTrend ? [{
+              type: 'line' as const,
+              label: 'Tendencia',
+              data: trendData,
+              borderColor: '#f59e0b',
+              borderWidth: 2,
+              borderDash: [6, 4],
+              pointRadius: 0,
+              fill: false,
+              tension: 0.4,
+              backgroundColor: 'transparent',
+              order: -1,
+            }] : []),
+          ],
         },
         options: {
           responsive: true,
@@ -444,8 +480,11 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           animation: { duration: 400 },
           plugins: {
             legend: {
-              display: chartDatasets.length > 1,
-              labels: { font: { size: 11 }, color: '#475569', boxWidth: 12, padding: 14 },
+              display: chartDatasets.length > 1 || hasTrend,
+              labels: {
+                font: { size: 11 }, color: '#475569', boxWidth: 12, padding: 14,
+                filter: item => item.text !== 'Tendencia' || hasTrend,
+              },
             },
             tooltip: {
               backgroundColor: '#0f172a',
@@ -504,7 +543,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     const {
       consumoMesActual, consumoPromedio, montoPendiente, contadoresActivos,
       consumoPrevMes, consumoSameLastYear, vsAnterior, vsAnioAnterior,
-      chartDatasets, tipoAguaMap, unidadBreakdown,
+      chartDatasets, availableTiposAgua, tipoAguaMap, unidadBreakdown,
       lecturasTotal, filteredLecturasCount,
     } = dashboardData
 
@@ -542,7 +581,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>🏗️ Proyecto:</span>
             <select
               value={selectedProjectId ?? ''}
-              onChange={e => { setSelectedProjectId(e.target.value || null); setSelectedUnidadId(null) }}
+              onChange={e => { setSelectedProjectId(e.target.value || null); setSelectedUnidadId(null); setSelectedTipoAgua(null) }}
               style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc', color: '#0f172a', cursor: 'pointer' }}
             >
               <option value="">Todos los proyectos</option>
@@ -563,7 +602,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>🏠 Unidad:</span>
               <select
                 value={selectedUnidadId ?? ''}
-                onChange={e => setSelectedUnidadId(e.target.value || null)}
+                onChange={e => { setSelectedUnidadId(e.target.value || null); setSelectedTipoAgua(null) }}
                 style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc', color: '#0f172a', cursor: 'pointer' }}
               >
                 <option value="">Todas las unidades</option>
@@ -597,14 +636,43 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
         {/* Historial de Consumo */}
         <div style={{ background: 'white', borderRadius: '16px', padding: '22px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '18px' }}>
-          {/* Título */}
-          <div style={{ marginBottom: '14px' }}>
-            <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Historial de Consumo</div>
+          {/* Título + filtro tipo de agua */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Historial de Consumo</div>
             <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px' }}>
               {chartRangeMode === 'custom' && chartCustomStart && chartCustomEnd
                 ? `${chartCustomStart} — ${chartCustomEnd} · ${chartMetric === 'm3' ? 'm³' : moneda}`
                 : `Últimos ${chartMonthsBack} meses · ${chartMetric === 'm3' ? 'm³' : moneda}`}
             </div>
+            </div>
+            {availableTiposAgua.length > 1 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setSelectedTipoAgua(null)}
+                  style={{
+                    padding: '4px 12px', fontSize: '11.5px', fontWeight: 600, borderRadius: '20px', cursor: 'pointer',
+                    border: '1.5px solid', transition: 'all 0.15s',
+                    background: selectedTipoAgua === null ? '#0ea5e9' : 'transparent',
+                    borderColor: selectedTipoAgua === null ? '#0ea5e9' : '#cbd5e1',
+                    color: selectedTipoAgua === null ? 'white' : '#475569',
+                  }}
+                >Todos</button>
+                {availableTiposAgua.map(tipo => (
+                  <button
+                    key={tipo}
+                    onClick={() => setSelectedTipoAgua(tipo)}
+                    style={{
+                      padding: '4px 12px', fontSize: '11.5px', fontWeight: 600, borderRadius: '20px', cursor: 'pointer',
+                      border: '1.5px solid', transition: 'all 0.15s',
+                      background: selectedTipoAgua === tipo ? '#0ea5e9' : 'transparent',
+                      borderColor: selectedTipoAgua === tipo ? '#0ea5e9' : '#cbd5e1',
+                      color: selectedTipoAgua === tipo ? 'white' : '#475569',
+                    }}
+                  >{TIPO_AGUA_LABELS[tipo] ?? tipo}</button>
+                ))}
+              </div>
+            )}
           </div>
           {/* Controles: Período y Métrica */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
@@ -665,10 +733,11 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 }}
               >{moneda}</button>
             </div>
-            {chartDatasets.length <= 1 && (
+            {chartDatasets.length === 1 && (
               <div style={{ display: 'flex', gap: '10px', fontSize: '11px', color: '#64748b', alignItems: 'center', marginLeft: 'auto' }}>
                 <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: '#0ea5e9', marginRight: '4px' }} />Mes actual</span>
                 <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(14,165,233,0.45)', marginRight: '4px' }} />Anteriores</span>
+                <span><span style={{ display: 'inline-block', width: '18px', height: '0px', borderTop: '2px dashed #f59e0b', marginRight: '4px', verticalAlign: 'middle' }} />Tendencia</span>
               </div>
             )}
           </div>
