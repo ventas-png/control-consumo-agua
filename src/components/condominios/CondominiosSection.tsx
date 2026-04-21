@@ -34,6 +34,7 @@ import type {
   CobranzaJudicial, ReciboDigital, InformeMensual, SugerenciaCondominio,
   VencimientoExtra, CapacitacionPersonal, ProyectoCondominio,
   ArticuloManual,
+  AutomatizacionCond,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -162,6 +163,10 @@ import AnalisisCarteraTab from './tabs/AnalisisCarteraTab'
 import IntegracionAguaTab from './tabs/IntegracionAguaTab'
 import CentroCostosTab from './tabs/CentroCostosTab'
 import ManualResidenteTab from './tabs/ManualResidenteTab'
+import ExportacionTab from './tabs/ExportacionTab'
+import MultiCondominioTab from './tabs/MultiCondominioTab'
+import AutomatizacionesTab from './tabs/AutomatizacionesTab'
+import ScoringUnidadesTab from './tabs/ScoringUnidadesTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -195,6 +200,7 @@ type CondominioTab =
   | 'cobranza_judicial' | 'recibos_digitales' | 'informe_mensual' | 'buzon_sugerencias'
   | 'vencimientos_criticos' | 'capacitacion_personal' | 'proyectos_cond' | 'metricas_servicio'
   | 'analisis_cartera' | 'integracion_agua' | 'centro_costos' | 'manual_residente'
+  | 'exportacion' | 'multi_condominio' | 'automatizaciones' | 'scoring_unidades'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -323,6 +329,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'integracion_agua',       label: 'Integración agua', icon: '💧' },
   { id: 'centro_costos',          label: 'Centro costos',    icon: '💰' },
   { id: 'manual_residente',       label: 'Manual residente', icon: '📚' },
+  { id: 'exportacion',            label: 'Exportar',         icon: '📥' },
+  { id: 'multi_condominio',       label: 'Multi-condominio', icon: '🏘️' },
+  { id: 'automatizaciones',       label: 'Automatizaciones', icon: '⚙️' },
+  { id: 'scoring_unidades',       label: 'Scoring',          icon: '🎯' },
 ]
 
 interface Props {
@@ -491,6 +501,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [proyectosCond, setProyectosCond] = useState<ProyectoCondominio[]>([])
   // Fase 33
   const [articulosManual, setArticulosManual] = useState<ArticuloManual[]>([])
+  // Fase 34
+  const [automatizaciones, setAutomatizaciones] = useState<AutomatizacionCond[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -539,6 +551,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       cobranzaJudicialRes, recibosDigitalesRes, informesMensualesRes, sugerenciasRes,
       vencimientosExtraRes, capacitacionesRes, proyectosCondRes,
       articulosManualRes,
+      automatizacionesRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -667,6 +680,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('proyectos_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       // Fase 33
       supabase.from('manual_residente_cond').select('*').eq('project_id', pid).eq('company_id', cid).order('orden').order('titulo'),
+      // Fase 34
+      supabase.from('automatizaciones_cond').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -804,6 +819,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setCapacitaciones((capacitacionesRes.data ?? []) as CapacitacionPersonal[])
     setProyectosCond((proyectosCondRes.data ?? []) as ProyectoCondominio[])
     setArticulosManual((articulosManualRes.data ?? []) as ArticuloManual[])
+    setAutomatizaciones((automatizacionesRes.data ?? []) as AutomatizacionCond[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -1028,6 +1044,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'integracion_agua' && <IntegracionAguaTab unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} />}
         {activeTab === 'centro_costos' && <CentroCostosTab gastos={gastos} cuotas={cuotas} moneda={moneda} />}
         {activeTab === 'manual_residente' && <ManualResidenteTab articulos={articulosManual} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'exportacion' && <ExportacionTab cuotas={cuotas} gastos={gastos} tickets={tickets} visitantes={visitantes} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
+        {activeTab === 'multi_condominio' && <MultiCondominioTab proyectos={proyectosActivos} companyId={cid} moneda={moneda} />}
+        {activeTab === 'automatizaciones' && <AutomatizacionesTab automatizaciones={automatizaciones} cuotas={cuotas} tickets={tickets} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'scoring_unidades' && <ScoringUnidadesTab cuotas={cuotas} infracciones={infracciones} sanciones={sanciones} unidades={unidadesProyecto} moneda={moneda} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}

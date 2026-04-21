@@ -3042,3 +3042,20 @@ export interface ArticuloManual {
   activo: boolean
   created_at: string
 }
+
+export type TriggerTipoAuto = 'cuota_vencida_dias' | 'ticket_sin_resolver_dias' | 'vencimiento_critico_dias' | 'cert_personal_vence_dias'
+export type AccionTipoAuto = 'notificacion_interna' | 'crear_alerta' | 'marcar_moroso'
+export interface AutomatizacionCond {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  trigger_tipo: TriggerTipoAuto
+  trigger_valor: number
+  accion_tipo: AccionTipoAuto
+  accion_config: Record<string, unknown>
+  activa: boolean
+  ultima_ejecucion?: string | null
+  notas?: string | null
+  created_at: string
+}
