@@ -25,6 +25,7 @@ import type {
   EstacionamientoVisita, BitacoraGuardia, EquipoComun, PresenciaPersonal,
   SuministroCondominio, MovimientoSuministro, TareaCondominio, GestionCobranza,
   SolicitudCertificado, VisitaFrecuente, ArticuloReglamento, ControlPlagas,
+  CargoAdicionalUnidad, ProgramaActividad, RegistroAutoridad, NotaAdmin,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -117,6 +118,10 @@ import SolicitudCertificadoTab from './tabs/SolicitudCertificadoTab'
 import VisitasFrecuentesTab from './tabs/VisitasFrecuentesTab'
 import ReglamentoTab from './tabs/ReglamentoTab'
 import ControlPlagasTab from './tabs/ControlPlagasTab'
+import CargosAdicionalesTab from './tabs/CargosAdicionalesTab'
+import ProgramaActividadesTab from './tabs/ProgramaActividadesTab'
+import RegistroAutoridadesTab from './tabs/RegistroAutoridadesTab'
+import NotasAdminTab from './tabs/NotasAdminTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -141,6 +146,7 @@ type CondominioTab =
   | 'estac_visita' | 'bitacora_guardia' | 'equipos' | 'presencia'
   | 'suministros' | 'tareas_cond' | 'cobranza'
   | 'certificados' | 'vis_frecuentes' | 'reglamento' | 'control_plagas'
+  | 'cargos_adicionales' | 'programa_actividades' | 'reg_autoridades' | 'notas_admin'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -233,7 +239,11 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'certificados',     label: 'Certificados',     icon: '📜' },
   { id: 'vis_frecuentes',   label: 'Vis. Frecuentes',  icon: '👨‍👩‍👧' },
   { id: 'reglamento',       label: 'Reglamento',       icon: '📖' },
-  { id: 'control_plagas',   label: 'Control Plagas',   icon: '🧪' },
+  { id: 'control_plagas',        label: 'Control Plagas',  icon: '🧪' },
+  { id: 'cargos_adicionales',   label: 'Cargos Adic.',    icon: '💸' },
+  { id: 'programa_actividades', label: 'Actividades',     icon: '🎽' },
+  { id: 'reg_autoridades',      label: 'Autoridades',     icon: '🏛️' },
+  { id: 'notas_admin',          label: 'Notas Admin',     icon: '🗒️' },
 ]
 
 interface Props {
@@ -361,6 +371,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [visitasFrecuentes, setVisitasFrecuentes] = useState<VisitaFrecuente[]>([])
   const [reglamento, setReglamento] = useState<ArticuloReglamento[]>([])
   const [controlPlagas, setControlPlagas] = useState<ControlPlagas[]>([])
+  // Fase 23
+  const [cargosAdicionales, setCargosAdicionales] = useState<CargoAdicionalUnidad[]>([])
+  const [programaActividades, setProgramaActividades] = useState<ProgramaActividad[]>([])
+  const [registroAutoridades, setRegistroAutoridades] = useState<RegistroAutoridad[]>([])
+  const [notasAdmin, setNotasAdmin] = useState<NotaAdmin[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -400,6 +415,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       estacVisitaRes, bitacoraGuardiaRes, equiposComunesRes, presenciaPersonalRes,
       suministrosRes, movsumRes, tareasCondRes, cobranzasRes,
       certificadosRes, visFrecRes, reglamentoRes, plagasRes,
+      cargosAdRes, progActRes, regAutoRes, notasAdminRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -492,6 +508,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('visitas_frecuentes').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
       supabase.from('reglamento_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('capitulo').order('numero_articulo'),
       supabase.from('control_plagas').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('cargos_adicionales_unidad').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_cargo', { ascending: false }),
+      supabase.from('programa_actividades').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }),
+      supabase.from('registro_autoridades').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('notas_admin').select('*').eq('project_id', pid).eq('company_id', cid).order('fijada', { ascending: false }).order('created_at', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -599,6 +619,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setVisitasFrecuentes((visFrecRes.data ?? []) as VisitaFrecuente[])
     setReglamento((reglamentoRes.data ?? []) as ArticuloReglamento[])
     setControlPlagas((plagasRes.data ?? []) as ControlPlagas[])
+    setCargosAdicionales((cargosAdRes.data ?? []) as CargoAdicionalUnidad[])
+    setProgramaActividades((progActRes.data ?? []) as ProgramaActividad[])
+    setRegistroAutoridades((regAutoRes.data ?? []) as RegistroAutoridad[])
+    setNotasAdmin((notasAdminRes.data ?? []) as NotaAdmin[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -788,6 +812,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'vis_frecuentes' && <VisitasFrecuentesTab visitas={visitasFrecuentes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'reglamento' && <ReglamentoTab articulos={reglamento} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'control_plagas' && <ControlPlagasTab registros={controlPlagas} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'cargos_adicionales' && <CargosAdicionalesTab cargos={cargosAdicionales} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'programa_actividades' && <ProgramaActividadesTab actividades={programaActividades} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'reg_autoridades' && <RegistroAutoridadesTab registros={registroAutoridades} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'notas_admin' && <NotasAdminTab notas={notasAdmin} proyectoId={selectedProyectoId} companyId={cid} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
       </div>
     </div>
   )
