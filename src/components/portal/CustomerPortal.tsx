@@ -89,6 +89,12 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string; label: string }
   mora: { bg: '#fee2e2', color: '#991b1b', label: 'Mora' },
 }
 
+// Handles both 'YYYY-MM-DD' and full ISO timestamps ('YYYY-MM-DDTHH:mm:ssZ')
+function parseFecha(fecha: string | null | undefined): Date {
+  if (!fecha) return new Date(NaN)
+  return new Date(fecha.includes('T') ? fecha : fecha + 'T12:00:00')
+}
+
 type PortalTab = 'dashboard' | 'servicios' | 'pagos' | 'perfil' | 'comunicacion'
 
 export function CustomerPortal({ currentUser, onLogout }: Props) {
@@ -271,7 +277,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     )
 
     const sameYM = (fecha: string, y: number, m: number) => {
-      const d = new Date(fecha + 'T12:00:00')
+      const d = parseFecha(fecha)
       return d.getFullYear() === y && d.getMonth() === m
     }
 
@@ -287,7 +293,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       monthBuckets[`${d.getFullYear()}-${d.getMonth()}`] = 0
     }
     filteredLecturas.forEach(l => {
-      const d = new Date(l.fecha + 'T12:00:00')
+      const d = parseFecha(l.fecha)
       const key = `${d.getFullYear()}-${d.getMonth()}`
       if (key in monthBuckets) monthBuckets[key] += (l.consumo || 0)
     })
@@ -372,7 +378,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       tipoAguaMap[c.tipo_agua].count++
       const cLec = filteredLecturas.filter(l => l.contador_id === c.id)
       tipoAguaMap[c.tipo_agua].consumoMes += cLec.filter(l => sameYM(l.fecha, curY, curM)).reduce((s, l) => s + (l.consumo || 0), 0)
-      tipoAguaMap[c.tipo_agua].consumo12m += cLec.filter(l => new Date(l.fecha + 'T12:00:00') >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
+      tipoAguaMap[c.tipo_agua].consumo12m += cLec.filter(l => parseFecha(l.fecha) >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
     })
 
     // Desglose por unidad
@@ -385,9 +391,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       const meters = uContadores.map(contador => {
         const cLec = filteredLecturas
           .filter(l => l.contador_id === contador.id)
-          .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+          .sort((a, b) => parseFecha(b.fecha).getTime() - parseFecha(a.fecha).getTime())
         const consumoMes = cLec.filter(l => sameYM(l.fecha, curY, curM)).reduce((s, l) => s + (l.consumo || 0), 0)
-        const consumo12m = cLec.filter(l => new Date(l.fecha + 'T12:00:00') >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
+        const consumo12m = cLec.filter(l => parseFecha(l.fecha) >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
         // Fotos: última y penúltima lectura con foto
         const withFoto = cLec.filter(l => l.foto)
         return { contador, consumoMes, consumo12m, fotoActual: withFoto[0] ?? null, fotoAnterior: withFoto[1] ?? null }
@@ -623,7 +629,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                     const now = new Date()
                     const endStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
                     const startYear = lecturas.length > 0
-                      ? new Date(lecturas[lecturas.length - 1].fecha + 'T12:00:00').getFullYear()
+                      ? parseFecha(lecturas[lecturas.length - 1].fecha).getFullYear()
                       : now.getFullYear() - 2
                     const startStr = `${startYear}-01`
                     setChartCustomStart(startStr)
@@ -821,7 +827,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                       <img
                                         src={lectura.foto}
                                         alt={label}
-                                        onClick={() => setPhotoModal({ url: lectura.foto!, label: `${label} — #${contador.numero_serie} — ${new Date(lectura.fecha + 'T12:00:00').toLocaleDateString('es-GT')}` })}
+                                        onClick={() => setPhotoModal({ url: lectura.foto!, label: `${label} — #${contador.numero_serie} — ${parseFecha(lectura.fecha).toLocaleDateString('es-GT')}` })}
                                         style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '7px', border: '1.5px solid #e2e8f0', cursor: 'zoom-in' }}
                                       />
                                     ) : (
@@ -832,7 +838,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                     )}
                                     {lectura && (
                                       <div style={{ fontSize: '9px', color: '#94a3b8', textAlign: 'center', marginTop: '2px' }}>
-                                        {new Date(lectura.fecha + 'T12:00:00').toLocaleDateString('es-GT')}
+                                        {parseFecha(lectura.fecha).toLocaleDateString('es-GT')}
                                       </div>
                                     )}
                                   </div>
@@ -1210,7 +1216,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                       return (
                                         <tr key={lectura.id} className="lectura-row">
                                           <td style={{ padding: '10px 14px', color: '#374151', whiteSpace: 'nowrap' }}>
-                                            {new Date(lectura.fecha + 'T12:00:00').toLocaleDateString('es-GT')}
+                                            {parseFecha(lectura.fecha).toLocaleDateString('es-GT')}
                                           </td>
                                           <td style={{ padding: '10px 14px', color: '#64748b' }}>
                                             {lectura.dias_servicio != null ? `${lectura.dias_servicio} días` : lectura.mes ? `Mes ${lectura.mes}` : '—'}
