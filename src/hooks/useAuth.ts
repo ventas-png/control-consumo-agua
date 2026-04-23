@@ -261,13 +261,66 @@ export function useAuth() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Periodic session expiry check
+  // Periodic token refresh (every 30 minutes)
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (!currentUser) return
-      if (new Date() >= new Date(currentUser.expires_at)) {
+    if (!currentUser) return
+
+    const interval = setInterval(async () => {
+      try {
+        const { data, error } = await supabase.auth.refreshSession()
+        if (error || !data?.session) {
+          console.warn('Token refresh failed:', error?.message)
+          return
+        }
+
+        // Update session with new expiry
+        const fresh = await buildSessionFromSupabase(
+          data.session.user.id,
+          data.session.user.email ?? '',
+          data.session.expires_at
+        )
+        storeSession(fresh)
+        setCurrentUser(fresh)
+      } catch (err) {
+        console.error('Token refresh error:', err)
+      }
+    }, APP_CONFIG.TOKEN_REFRESH_INTERVAL)
+
+    return () => clearInterval(interval)
+  }, [currentUser])
+
+  // Session expiry warning (5 minutes before expiry) and forced logout
+  useEffect(() => {
+    if (!currentUser) return
+
+    let warningShown = false
+
+    const checkExpiry = () => {
+      const now = new Date()
+      const expiresAt = new Date(currentUser.expires_at)
+      const timeUntilExpiry = expiresAt.getTime() - now.getTime()
+
+      // Show warning 5 minutes before expiry
+      if (timeUntilExpiry <= APP_CONFIG.SESSION_WARNING_BEFORE_EXPIRY && !warningShown) {
+        warningShown = true
         Swal.fire({
           icon: 'warning',
+          title: 'Sesión expirando pronto',
+          html: '<p>Tu sesión expirará en 5 minutos.</p><p>Haz clic para continuar activo.</p>',
+          confirmButtonText: 'Continuar',
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          didClose: () => {
+            // User clicked "Continuar" - try to refresh immediately
+            supabase.auth.refreshSession().catch(console.error)
+          }
+        })
+      }
+
+      // Auto logout when session expires
+      if (timeUntilExpiry <= 0) {
+        Swal.fire({
+          icon: 'info',
           title: 'Sesión Expirada',
           text: 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.',
           confirmButtonText: 'OK',
@@ -278,8 +331,14 @@ export function useAuth() {
           setCurrentUser(null)
         })
       }
-    }, 60000)
-    return () => clearInterval(interval)
+    }
+
+    // Check expiry every 30 seconds
+    const interval = setInterval(checkExpiry, 30000)
+
+    return () => {
+      clearInterval(interval)
+    }
   }, [currentUser])
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { UserSession, Registro } from '../../types'
 import { Chart, registerables } from 'chart.js'
@@ -59,6 +59,8 @@ interface LecturaInfo {
   dias_servicio: number | null
   tipo_cobro: string
   contador_id: string | null
+  cliente_id?: string | null
+  project_id?: string | null
   foto?: string | null
 }
 
@@ -87,6 +89,12 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string; label: string }
   mora: { bg: '#fee2e2', color: '#991b1b', label: 'Mora' },
 }
 
+// Handles both 'YYYY-MM-DD' and full ISO timestamps ('YYYY-MM-DDTHH:mm:ssZ')
+function parseFecha(fecha: string | null | undefined): Date {
+  if (!fecha) return new Date(NaN)
+  return new Date(fecha.includes('T') ? fecha : fecha + 'T12:00:00')
+}
+
 type PortalTab = 'dashboard' | 'servicios' | 'pagos' | 'perfil' | 'comunicacion'
 
 export function CustomerPortal({ currentUser, onLogout }: Props) {
@@ -113,6 +121,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [chartCustomStart, setChartCustomStart] = useState('')
   const [chartCustomEnd, setChartCustomEnd] = useState('')
   const [chartRangeMode, setChartRangeMode] = useState<'preset' | 'custom'>('preset')
+  const [chartMetric, setChartMetric] = useState<'m3' | 'moneda'>('m3')
+  const [selectedUnidadId, setSelectedUnidadId] = useState<string | null>(null)
+  const [selectedTipoAgua, setSelectedTipoAgua] = useState<string | null>(null)
 
   const clienteId = currentUser.cliente_id
 
@@ -137,17 +148,12 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           .select('id, nombre, tipo, piso, area_m2, project_id, company_id, activo')
           .eq('cliente_id', clienteId)
           .eq('activo', true),
-        // Reading history (last 24 months for dashboard analytics)
-        (() => {
-          const twoYearsAgo = new Date()
-          twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2)
-          return supabase
-            .from('registros')
-            .select('id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
-            .eq('cliente_id', clienteId)
-            .gte('fecha', twoYearsAgo.toISOString().split('T')[0])
-            .order('fecha', { ascending: false })
-        })(),
+        // Reading history — all historical records (no date cap)
+        supabase
+          .from('registros')
+          .select('id, cliente_id, cliente_nombre, contador_id, project_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
+          .eq('cliente_id', clienteId)
+          .order('fecha', { ascending: false }),
         // Own contact info
         supabase
           .from('clientes')
@@ -201,23 +207,41 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       setUnidades(unidadesList)
       setContadores(cData)
 
-      // Fetch readings by contador_id to catch registros where cliente_id is missing/mismatched
+      const REGISTROS_SELECT = 'id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto'
+
       let mergedLecturas: LecturaInfo[] = (rData as LecturaInfo[]) ?? []
-      if (cData.length > 0) {
-        const twoYearsAgo2 = new Date()
-        twoYearsAgo2.setFullYear(twoYearsAgo2.getFullYear() - 2)
-        const { data: contReadings } = await supabase
-          .from('registros')
-          .select('id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto')
-          .in('contador_id', cData.map(c => c.id))
-          .gte('fecha', twoYearsAgo2.toISOString().split('T')[0])
-          .order('fecha', { ascending: false })
-        if (contReadings?.length) {
-          const existingIds = new Set(mergedLecturas.map(l => l.id))
-          const extra = (contReadings as LecturaInfo[]).filter(l => !existingIds.has(l.id))
-          if (extra.length > 0) mergedLecturas = [...mergedLecturas, ...extra]
-        }
+      const mergeIn = (rows: unknown[] | null) => {
+        if (!rows?.length) return
+        const seen = new Set(mergedLecturas.map(l => l.id))
+        const extra = (rows as LecturaInfo[]).filter(l => !seen.has(l.id))
+        if (extra.length > 0) mergedLecturas = [...mergedLecturas, ...extra]
       }
+
+      // Fallback 1: by contador_id — catches registros where cliente_id is wrong/null
+      if (cData.length > 0) {
+        const { data: byContador } = await supabase
+          .from('registros').select(REGISTROS_SELECT)
+          .in('contador_id', cData.map(c => c.id))
+          .order('fecha', { ascending: false })
+        mergeIn(byContador)
+      }
+
+      // Fallback 2: by project_id — catches registros where contador_id is also null
+      // Only safe because RLS (after migration 20260420000023) restricts clients to their own data
+      const unidadProjectIds = [...new Set(unidadesList.map(u => u.project_id).filter(Boolean))]
+      if (unidadProjectIds.length > 0 && clienteId) {
+        const { data: byProject } = await supabase
+          .from('registros').select(REGISTROS_SELECT)
+          .in('project_id', unidadProjectIds)
+          .order('fecha', { ascending: false })
+        // Extra safety: only keep rows for this client or for our counters
+        const knownCounterIds = new Set(cData.map(c => c.id))
+        const safe = (byProject as LecturaInfo[] | null)?.filter(l =>
+          l.cliente_id === clienteId || (l.contador_id != null && knownCounterIds.has(l.contador_id))
+        ) ?? []
+        mergeIn(safe)
+      }
+
       setLecturas(mergedLecturas)
       setRegistros(mergedLecturas as Registro[])
 
@@ -241,17 +265,25 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     const curY = now.getFullYear()
     const curM = now.getMonth()
 
-    // Filter lecturas by selected project
-    const filteredContadores = selectedProjectId
+    // Three-level drill-down: project → unidad → tipo de agua
+    const filteredContadoresByProject = selectedProjectId
       ? contadores.filter(c => c.project_id === selectedProjectId)
       : contadores
+    const filteredContadoresByUnidad = selectedUnidadId
+      ? filteredContadoresByProject.filter(c => c.unidad_id === selectedUnidadId)
+      : filteredContadoresByProject
+    // Collect available water types before applying tipo_agua filter (for UI pills)
+    const availableTiposAgua = [...new Set(filteredContadoresByUnidad.map(c => c.tipo_agua))]
+    const filteredContadores = selectedTipoAgua
+      ? filteredContadoresByUnidad.filter(c => c.tipo_agua === selectedTipoAgua)
+      : filteredContadoresByUnidad
     const filteredContadorIds = new Set(filteredContadores.map(c => c.id))
     const filteredLecturas = lecturas.filter(l =>
       l.contador_id != null && filteredContadorIds.has(l.contador_id)
     )
 
     const sameYM = (fecha: string, y: number, m: number) => {
-      const d = new Date(fecha + 'T12:00:00')
+      const d = parseFecha(fecha)
       return d.getFullYear() === y && d.getMonth() === m
     }
 
@@ -267,7 +299,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       monthBuckets[`${d.getFullYear()}-${d.getMonth()}`] = 0
     }
     filteredLecturas.forEach(l => {
-      const d = new Date(l.fecha + 'T12:00:00')
+      const d = parseFecha(l.fecha)
       const key = `${d.getFullYear()}-${d.getMonth()}`
       if (key in monthBuckets) monthBuckets[key] += (l.consumo || 0)
     })
@@ -293,37 +325,60 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       all24Consumo.push(parseFloat(sliceLec.reduce((s, l) => s + (l.consumo || 0), 0).toFixed(2)))
     }
 
-    // Chart display range (default: last 12 months; supports custom date range)
-    const chartLabels: string[] = []
-    const chartConsumo: number[] = []
-    const chartMontos: number[] = []
-    let chartCurrentMonthIdx = -1
-
+    // Compute chart months array — single source of truth for labels + per-counter data
+    const chartMonths: { y: number; m: number; label: string }[] = []
     if (chartRangeMode === 'custom' && chartCustomStart && chartCustomEnd) {
       const [sy, sm] = chartCustomStart.split('-').map(Number)
       const [ey, em] = chartCustomEnd.split('-').map(Number)
       const iter = new Date(sy, sm - 1, 1)
       const end = new Date(ey, em - 1, 1)
       while (iter <= end) {
-        const y = iter.getFullYear(); const m = iter.getMonth()
-        chartLabels.push(`${MESES_LABELS[m]} ${y}`)
-        const sliceLec = filteredLecturas.filter(l => sameYM(l.fecha, y, m))
-        chartConsumo.push(parseFloat(sliceLec.reduce((s, l) => s + (l.consumo || 0), 0).toFixed(2)))
-        chartMontos.push(parseFloat(sliceLec.reduce((s, l) => s + (l.monto_calculado || 0), 0).toFixed(2)))
-        if (y === curY && m === curM) chartCurrentMonthIdx = chartLabels.length - 1
+        chartMonths.push({ y: iter.getFullYear(), m: iter.getMonth(), label: `${MESES_LABELS[iter.getMonth()]} ${iter.getFullYear()}` })
         iter.setMonth(iter.getMonth() + 1)
       }
     } else {
       for (let i = chartMonthsBack - 1; i >= 0; i--) {
         const d = new Date(curY, curM - i, 1)
-        const y = d.getFullYear(); const m = d.getMonth()
-        chartLabels.push(`${MESES_LABELS[m]} ${y}`)
-        const sliceLec = filteredLecturas.filter(l => sameYM(l.fecha, y, m))
-        chartConsumo.push(parseFloat(sliceLec.reduce((s, l) => s + (l.consumo || 0), 0).toFixed(2)))
-        chartMontos.push(parseFloat(sliceLec.reduce((s, l) => s + (l.monto_calculado || 0), 0).toFixed(2)))
-        if (i === 0) chartCurrentMonthIdx = chartLabels.length - 1
+        chartMonths.push({ y: d.getFullYear(), m: d.getMonth(), label: `${MESES_LABELS[d.getMonth()]} ${d.getFullYear()}` })
       }
     }
+    const chartLabels = chartMonths.map(cm => cm.label)
+    const chartCurrentMonthIdx = chartMonths.findIndex(cm => cm.y === curY && cm.m === curM)
+
+    // Per-counter datasets — one dataset per active counter
+    const CHART_COLOR_SETS = [
+      { full: '#0ea5e9', soft: 'rgba(14,165,233,0.5)' },
+      { full: '#10b981', soft: 'rgba(16,185,129,0.5)' },
+      { full: '#f59e0b', soft: 'rgba(245,158,11,0.5)' },
+      { full: '#8b5cf6', soft: 'rgba(139,92,246,0.5)' },
+      { full: '#ef4444', soft: 'rgba(239,68,68,0.5)' },
+      { full: '#ec4899', soft: 'rgba(236,72,153,0.5)' },
+      { full: '#14b8a6', soft: 'rgba(20,184,166,0.5)' },
+      { full: '#f97316', soft: 'rgba(249,115,22,0.5)' },
+    ]
+    const chartDatasets = filteredContadores.map((contador, idx) => {
+      const colorSet = CHART_COLOR_SETS[idx % CHART_COLOR_SETS.length]
+      const label = contador.descripcion || contador.numero_serie
+      const data = chartMonths.map(({ y, m }) => {
+        const cLec = filteredLecturas.filter(l => l.contador_id === contador.id && sameYM(l.fecha, y, m))
+        const val = cLec.reduce((s, l) => s + (chartMetric === 'm3' ? (l.consumo || 0) : (l.monto_calculado || 0)), 0)
+        return parseFloat(val.toFixed(2))
+      })
+      return { label, data, colorSet }
+    })
+
+    // Linear regression trend line across aggregated monthly totals
+    const monthTotals = chartMonths.map((_, mi) =>
+      chartDatasets.reduce((sum, ds) => sum + (ds.data[mi] ?? 0), 0)
+    )
+    const n = monthTotals.length
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+    monthTotals.forEach((y, x) => { sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x })
+    const slope = n > 1 ? (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX) : 0
+    const intercept = n > 0 ? (sumY - slope * sumX) / n : 0
+    const trendData = monthTotals.map((_, x) =>
+      parseFloat(Math.max(0, slope * x + intercept).toFixed(2))
+    )
 
     // Comparaciones (always based on fixed 24m baseline)
     const consumoPrevMes = all24Consumo[22] ?? 0
@@ -342,7 +397,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       tipoAguaMap[c.tipo_agua].count++
       const cLec = filteredLecturas.filter(l => l.contador_id === c.id)
       tipoAguaMap[c.tipo_agua].consumoMes += cLec.filter(l => sameYM(l.fecha, curY, curM)).reduce((s, l) => s + (l.consumo || 0), 0)
-      tipoAguaMap[c.tipo_agua].consumo12m += cLec.filter(l => new Date(l.fecha + 'T12:00:00') >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
+      tipoAguaMap[c.tipo_agua].consumo12m += cLec.filter(l => parseFecha(l.fecha) >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
     })
 
     // Desglose por unidad
@@ -355,9 +410,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       const meters = uContadores.map(contador => {
         const cLec = filteredLecturas
           .filter(l => l.contador_id === contador.id)
-          .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+          .sort((a, b) => parseFecha(b.fecha).getTime() - parseFecha(a.fecha).getTime())
         const consumoMes = cLec.filter(l => sameYM(l.fecha, curY, curM)).reduce((s, l) => s + (l.consumo || 0), 0)
-        const consumo12m = cLec.filter(l => new Date(l.fecha + 'T12:00:00') >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
+        const consumo12m = cLec.filter(l => parseFecha(l.fecha) >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
         // Fotos: última y penúltima lectura con foto
         const withFoto = cLec.filter(l => l.foto)
         return { contador, consumoMes, consumo12m, fotoActual: withFoto[0] ?? null, fotoAnterior: withFoto[1] ?? null }
@@ -371,49 +426,72 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     return {
       consumoMesActual, consumoPromedio, montoPendiente, contadoresActivos,
       consumoPrevMes, consumoSameLastYear, vsAnterior, vsAnioAnterior,
-      chartLabels, chartConsumo, chartMontos, chartCurrentMonthIdx,
-      tipoAguaMap, unidadBreakdown,
+      chartLabels, chartDatasets, chartCurrentMonthIdx, trendData,
+      availableTiposAgua, tipoAguaMap, unidadBreakdown,
       lecturasTotal, filteredLecturasCount,
     }
-  }, [lecturas, contadores, unidades, selectedProjectId, chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode])
+  }, [lecturas, contadores, unidades, selectedProjectId, selectedUnidadId, selectedTipoAgua, chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode, chartMetric])
 
-  // ── Chart.js bar chart (configurable range) ──────────────
+  // ── Chart.js bar chart (per-counter, configurable range & metric) ──
   useEffect(() => {
     if (tab !== 'dashboard') return
     const timeout = setTimeout(() => {
       if (!chartRef.current) return
       if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null }
-      const { chartLabels, chartConsumo, chartMontos, chartCurrentMonthIdx } = dashboardData
-      const n = chartConsumo.length
-      const colors = chartLabels.map((_, i) => {
-        if (i === chartCurrentMonthIdx) return '#0ea5e9'
-        const progress = n > 1 ? i / (n - 1) : 1
-        return `rgba(14, 165, 233, ${(0.18 + progress * 0.42).toFixed(2)})`
-      })
+      const { chartLabels, chartDatasets, chartCurrentMonthIdx, trendData } = dashboardData
+      const moneda = selectedProjectId
+        ? (projects.find(p => p.id === selectedProjectId)?.moneda ?? projects[0]?.moneda ?? 'Q')
+        : (projects[0]?.moneda ?? 'Q')
+      const metricLabel = chartMetric === 'm3' ? 'm³' : moneda
+      const hasTrend = trendData.some(v => v > 0)
       chartInstance.current = new Chart(chartRef.current, {
         type: 'bar',
         data: {
           labels: chartLabels,
-          datasets: [{
-            label: 'Consumo (m³)',
-            data: chartConsumo,
-            backgroundColor: colors,
-            borderRadius: 6,
-            borderSkipped: false,
-          }],
+          datasets: [
+            ...chartDatasets.map(({ label, data, colorSet }) => ({
+              type: 'bar' as const,
+              label,
+              data,
+              backgroundColor: chartLabels.map((_, i) =>
+                i === chartCurrentMonthIdx ? colorSet.full : colorSet.soft
+              ),
+              borderRadius: 6,
+              borderSkipped: false,
+            })),
+            ...(hasTrend ? [{
+              type: 'line' as const,
+              label: 'Tendencia',
+              data: trendData,
+              borderColor: '#f59e0b',
+              borderWidth: 2,
+              borderDash: [6, 4],
+              pointRadius: 0,
+              fill: false,
+              tension: 0.4,
+              backgroundColor: 'transparent',
+              order: -1,
+            }] : []),
+          ],
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           animation: { duration: 400 },
           plugins: {
-            legend: { display: false },
+            legend: {
+              display: chartDatasets.length > 1 || hasTrend,
+              labels: {
+                font: { size: 11 }, color: '#475569', boxWidth: 12, padding: 14,
+                filter: item => item.text !== 'Tendencia' || hasTrend,
+              },
+            },
             tooltip: {
               backgroundColor: '#0f172a',
               padding: 10,
               cornerRadius: 8,
               callbacks: {
-                label: ctx => [`  ${(ctx.parsed.y ?? 0).toFixed(2)} m³`, `  Monto: ${chartMontos[ctx.dataIndex].toFixed(2)}`],
+                label: ctx => `  ${ctx.dataset.label}: ${(ctx.parsed.y ?? 0).toFixed(2)} ${metricLabel}`,
               },
             },
           },
@@ -426,7 +504,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             y: {
               beginAtZero: true,
               grid: { color: '#f1f5f9' },
-              ticks: { font: { size: 11 }, color: '#94a3b8' },
+              ticks: { font: { size: 11 }, color: '#94a3b8', callback: v => `${v} ${metricLabel}` },
               border: { display: false },
             },
           },
@@ -434,7 +512,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       })
     }, 50)
     return () => { clearTimeout(timeout); chartInstance.current?.destroy(); chartInstance.current = null }
-  }, [tab, dashboardData])
+  }, [tab, dashboardData, chartMetric, selectedProjectId, projects])
 
   async function guardarContacto() {
     if (!clienteId) return
@@ -465,7 +543,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     const {
       consumoMesActual, consumoPromedio, montoPendiente, contadoresActivos,
       consumoPrevMes, consumoSameLastYear, vsAnterior, vsAnioAnterior,
-      tipoAguaMap, unidadBreakdown,
+      chartDatasets, availableTiposAgua, tipoAguaMap, unidadBreakdown,
       lecturasTotal, filteredLecturasCount,
     } = dashboardData
 
@@ -503,7 +581,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>🏗️ Proyecto:</span>
             <select
               value={selectedProjectId ?? ''}
-              onChange={e => setSelectedProjectId(e.target.value || null)}
+              onChange={e => { setSelectedProjectId(e.target.value || null); setSelectedUnidadId(null); setSelectedTipoAgua(null) }}
               style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc', color: '#0f172a', cursor: 'pointer' }}
             >
               <option value="">Todos los proyectos</option>
@@ -511,6 +589,28 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             </select>
           </div>
         )}
+
+        {/* Filtro de unidad */}
+        {(() => {
+          const visibleUnidades4Filter = (selectedProjectId
+            ? unidades.filter(u => u.project_id === selectedProjectId)
+            : unidades
+          ).filter(u => contadores.some(c => c.unidad_id === u.id && c.activo))
+          if (visibleUnidades4Filter.length < 2) return null
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', background: 'white', borderRadius: '12px', padding: '12px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>🏠 Unidad:</span>
+              <select
+                value={selectedUnidadId ?? ''}
+                onChange={e => { setSelectedUnidadId(e.target.value || null); setSelectedTipoAgua(null) }}
+                style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc', color: '#0f172a', cursor: 'pointer' }}
+              >
+                <option value="">Todas las unidades</option>
+                {visibleUnidades4Filter.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+              </select>
+            </div>
+          )
+        })()}
 
         {/* KPI Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '14px', marginBottom: '18px' }}>
@@ -536,16 +636,45 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
         {/* Historial de Consumo */}
         <div style={{ background: 'white', borderRadius: '16px', padding: '22px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '18px' }}>
-          {/* Título */}
-          <div style={{ marginBottom: '14px' }}>
-            <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Historial de Consumo</div>
+          {/* Título + filtro tipo de agua */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Historial de Consumo</div>
             <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px' }}>
               {chartRangeMode === 'custom' && chartCustomStart && chartCustomEnd
-                ? `${chartCustomStart} — ${chartCustomEnd} (m³)`
-                : `Últimos ${chartMonthsBack} meses (m³)`}
+                ? `${chartCustomStart} — ${chartCustomEnd} · ${chartMetric === 'm3' ? 'm³' : moneda}`
+                : `Últimos ${chartMonthsBack} meses · ${chartMetric === 'm3' ? 'm³' : moneda}`}
             </div>
+            </div>
+            {availableTiposAgua.length > 1 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setSelectedTipoAgua(null)}
+                  style={{
+                    padding: '4px 12px', fontSize: '11.5px', fontWeight: 600, borderRadius: '20px', cursor: 'pointer',
+                    border: '1.5px solid', transition: 'all 0.15s',
+                    background: selectedTipoAgua === null ? '#0ea5e9' : 'transparent',
+                    borderColor: selectedTipoAgua === null ? '#0ea5e9' : '#cbd5e1',
+                    color: selectedTipoAgua === null ? 'white' : '#475569',
+                  }}
+                >Todos</button>
+                {availableTiposAgua.map(tipo => (
+                  <button
+                    key={tipo}
+                    onClick={() => setSelectedTipoAgua(tipo)}
+                    style={{
+                      padding: '4px 12px', fontSize: '11.5px', fontWeight: 600, borderRadius: '20px', cursor: 'pointer',
+                      border: '1.5px solid', transition: 'all 0.15s',
+                      background: selectedTipoAgua === tipo ? '#0ea5e9' : 'transparent',
+                      borderColor: selectedTipoAgua === tipo ? '#0ea5e9' : '#cbd5e1',
+                      color: selectedTipoAgua === tipo ? 'white' : '#475569',
+                    }}
+                  >{TIPO_AGUA_LABELS[tipo] ?? tipo}</button>
+                ))}
+              </div>
+            )}
           </div>
-          {/* Controles de rango — fila separada siempre visible */}
+          {/* Controles: Período y Métrica */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap' }}>Período:</span>
             <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid #e2e8f0', overflow: 'hidden' }}>
@@ -567,8 +696,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                   if (!chartCustomStart || !chartCustomEnd) {
                     const now = new Date()
                     const endStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-                    const s = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-                    const startStr = `${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}`
+                    const startYear = lecturas.length > 0
+                      ? parseFecha(lecturas[lecturas.length - 1].fecha).getFullYear()
+                      : now.getFullYear() - 2
+                    const startStr = `${startYear}-01`
                     setChartCustomStart(startStr)
                     setChartCustomEnd(endStr)
                   }
@@ -581,34 +712,79 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 }}
               >📅 Rango</button>
             </div>
-            <div style={{ display: 'flex', gap: '10px', fontSize: '11px', color: '#64748b', alignItems: 'center', marginLeft: 'auto' }}>
-              <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: '#0ea5e9', marginRight: '4px' }} />Mes actual</span>
-              <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(14,165,233,0.45)', marginRight: '4px' }} />Anteriores</span>
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap', marginLeft: '6px' }}>Métrica:</span>
+            <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid #e2e8f0', overflow: 'hidden' }}>
+              <button
+                onClick={() => setChartMetric('m3')}
+                style={{
+                  padding: '6px 14px', fontSize: '12.5px', fontWeight: 600,
+                  border: 'none', borderRight: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.15s',
+                  background: chartMetric === 'm3' ? '#0ea5e9' : '#f8fafc',
+                  color: chartMetric === 'm3' ? 'white' : '#475569',
+                }}
+              >m³</button>
+              <button
+                onClick={() => setChartMetric('moneda')}
+                style={{
+                  padding: '6px 14px', fontSize: '12.5px', fontWeight: 600,
+                  border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                  background: chartMetric === 'moneda' ? '#0ea5e9' : '#f8fafc',
+                  color: chartMetric === 'moneda' ? 'white' : '#475569',
+                }}
+              >{moneda}</button>
             </div>
+            {chartDatasets.length === 1 && (
+              <div style={{ display: 'flex', gap: '10px', fontSize: '11px', color: '#64748b', alignItems: 'center', marginLeft: 'auto' }}>
+                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: '#0ea5e9', marginRight: '4px' }} />Mes actual</span>
+                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(14,165,233,0.45)', marginRight: '4px' }} />Anteriores</span>
+                <span><span style={{ display: 'inline-block', width: '18px', height: '0px', borderTop: '2px dashed #f59e0b', marginRight: '4px', verticalAlign: 'middle' }} />Tendencia</span>
+              </div>
+            )}
           </div>
-          {/* Inputs de rango personalizado */}
-          {chartRangeMode === 'custom' && (
-            <div style={{ display: 'flex', gap: '14px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap', background: '#f0f9ff', borderRadius: '10px', padding: '10px 14px', border: '1px solid #bae6fd' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
-                <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Desde:</span>
-                <input
-                  type="month"
-                  value={chartCustomStart}
-                  onChange={e => setChartCustomStart(e.target.value)}
-                  style={{ padding: '5px 10px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }}
-                />
+          {/* Inputs de rango personalizado — selectores Mes/Año */}
+          {chartRangeMode === 'custom' && (() => {
+            const now = new Date()
+            const curYear = now.getFullYear()
+            const years = Array.from({ length: curYear - 2018 + 2 }, (_, i) => 2018 + i)
+            const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+            const selStyle: React.CSSProperties = { padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }
+
+            function parseParts(val: string) {
+              const [y, m] = (val || '').split('-')
+              return { y: y || '', m: m || '' }
+            }
+            function buildVal(y: string, m: string) { return y && m ? `${y}-${m}` : '' }
+
+            const startParts = parseParts(chartCustomStart)
+            const endParts = parseParts(chartCustomEnd)
+
+            return (
+              <div style={{ display: 'flex', gap: '20px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap', background: '#f0f9ff', borderRadius: '10px', padding: '10px 14px', border: '1px solid #bae6fd' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
+                  <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Desde:</span>
+                  <select value={startParts.m} onChange={e => setChartCustomStart(buildVal(startParts.y, e.target.value))} style={selStyle}>
+                    <option value="">Mes</option>
+                    {meses.map((m, i) => <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>)}
+                  </select>
+                  <select value={startParts.y} onChange={e => setChartCustomStart(buildVal(e.target.value, startParts.m))} style={selStyle}>
+                    <option value="">Año</option>
+                    {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
+                  <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Hasta:</span>
+                  <select value={endParts.m} onChange={e => setChartCustomEnd(buildVal(endParts.y, e.target.value))} style={selStyle}>
+                    <option value="">Mes</option>
+                    {meses.map((m, i) => <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>)}
+                  </select>
+                  <select value={endParts.y} onChange={e => setChartCustomEnd(buildVal(e.target.value, endParts.m))} style={selStyle}>
+                    <option value="">Año</option>
+                    {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
+                  </select>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
-                <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Hasta:</span>
-                <input
-                  type="month"
-                  value={chartCustomEnd}
-                  onChange={e => setChartCustomEnd(e.target.value)}
-                  style={{ padding: '5px 10px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }}
-                />
-              </div>
-            </div>
-          )}
+            )
+          })()}
           {/* Gráfico o estado vacío */}
           {lecturasTotal === 0 ? (
             <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '8px', background: '#f8fafc', borderRadius: '10px' }}>
@@ -625,7 +801,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               </span>
             </div>
           ) : (
-            <div style={{ height: '260px' }}><canvas ref={chartRef} /></div>
+            <div style={{ height: chartDatasets.length > 1 ? '300px' : '260px' }}><canvas ref={chartRef} /></div>
           )}
         </div>
 
@@ -720,7 +896,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                       <img
                                         src={lectura.foto}
                                         alt={label}
-                                        onClick={() => setPhotoModal({ url: lectura.foto!, label: `${label} — #${contador.numero_serie} — ${new Date(lectura.fecha + 'T12:00:00').toLocaleDateString('es-GT')}` })}
+                                        onClick={() => setPhotoModal({ url: lectura.foto!, label: `${label} — #${contador.numero_serie} — ${parseFecha(lectura.fecha).toLocaleDateString('es-GT')}` })}
                                         style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '7px', border: '1.5px solid #e2e8f0', cursor: 'zoom-in' }}
                                       />
                                     ) : (
@@ -731,7 +907,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                     )}
                                     {lectura && (
                                       <div style={{ fontSize: '9px', color: '#94a3b8', textAlign: 'center', marginTop: '2px' }}>
-                                        {new Date(lectura.fecha + 'T12:00:00').toLocaleDateString('es-GT')}
+                                        {parseFecha(lectura.fecha).toLocaleDateString('es-GT')}
                                       </div>
                                     )}
                                   </div>
@@ -1109,7 +1285,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                       return (
                                         <tr key={lectura.id} className="lectura-row">
                                           <td style={{ padding: '10px 14px', color: '#374151', whiteSpace: 'nowrap' }}>
-                                            {new Date(lectura.fecha + 'T12:00:00').toLocaleDateString('es-GT')}
+                                            {parseFecha(lectura.fecha).toLocaleDateString('es-GT')}
                                           </td>
                                           <td style={{ padding: '10px 14px', color: '#64748b' }}>
                                             {lectura.dias_servicio != null ? `${lectura.dias_servicio} días` : lectura.mes ? `Mes ${lectura.mes}` : '—'}
