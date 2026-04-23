@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import type {
   UserSession, Proyecto, Unidad,
-  OrdenCompra, AsambleaDigital,
+  OrdenCompra, AsambleaDigital, Proforma,
   CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, TicketMantenimiento, AnuncioComunidad,
   ParqueoCondominio, Mascota, PaqueteRecibido, InfraccionCondominio,
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
@@ -182,6 +182,10 @@ import OrdenesCompraTab from './tabs/OrdenesCompraTab'
 import GraficasTendenciasTab from './tabs/GraficasTendenciasTab'
 import ControlAccesosQRTab from './tabs/ControlAccesosQRTab'
 import AsambleaDigitalTab from './tabs/AsambleaDigitalTab'
+import ComparativoPresupuestoTab from './tabs/ComparativoPresupuestoTab'
+import ProformasTab from './tabs/ProformasTab'
+import BitacoraEventosTab from './tabs/BitacoraEventosTab'
+import IndiceCalidadTab from './tabs/IndiceCalidadTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -219,6 +223,7 @@ type CondominioTab =
   | 'panel_turno' | 'plantillas_mensaje' | 'flujo_aprobacion' | 'cuadro_mando'
   | 'generacion_cuotas' | 'mapa_unidades' | 'envio_masivo' | 'resumen_ejecutivo'
   | 'ordenes_compra' | 'graficas_tendencias' | 'control_accesos_qr' | 'asamblea_digital'
+  | 'comparativo_presupuesto' | 'proformas' | 'bitacora_eventos' | 'indice_calidad'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -363,6 +368,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'graficas_tendencias',   label: 'Tendencias',       icon: '📊' },
   { id: 'control_accesos_qr',    label: 'Accesos QR',       icon: '📱' },
   { id: 'asamblea_digital',      label: 'Asamblea digital', icon: '🖥️' },
+  { id: 'comparativo_presupuesto', label: 'Ppto. vs Real',  icon: '📋' },
+  { id: 'proformas',             label: 'Proformas',        icon: '📑' },
+  { id: 'bitacora_eventos',      label: 'Bitácora eventos', icon: '📰' },
+  { id: 'indice_calidad',        label: 'Índice calidad',   icon: '🏆' },
 ]
 
 interface Props {
@@ -540,6 +549,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   // Fase 37
   const [ordenesCompra, setOrdenesCompra] = useState<OrdenCompra[]>([])
   const [asambleasDigital, setAsambleasDigital] = useState<AsambleaDigital[]>([])
+  // Fase 38
+  const [proformas, setProformas] = useState<Proforma[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -593,6 +604,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       flujoAprobacionRes,
       ordenesCompraRes,
       asambleasDigitalRes,
+      proformasRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -729,6 +741,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       // Fase 37
       supabase.from('ordenes_compra').select('*').eq('project_id', pid).eq('company_id', cid).order('correlativo', { ascending: false }),
       supabase.from('asambleas_digital').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_hora', { ascending: false }),
+      // Fase 38
+      supabase.from('proformas_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -871,6 +885,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setFlujoAprobacion((flujoAprobacionRes.data ?? []) as FlujoAprobacionCond[])
     setOrdenesCompra((ordenesCompraRes.data ?? []) as OrdenCompra[])
     setAsambleasDigital((asambleasDigitalRes.data ?? []) as AsambleaDigital[])
+    setProformas((proformasRes.data ?? []) as Proforma[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -1111,6 +1126,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'graficas_tendencias' && <GraficasTendenciasTab cuotas={cuotas} tickets={tickets} gastos={gastos} incidentes={incidentes} moneda={moneda} />}
         {activeTab === 'control_accesos_qr' && <ControlAccesosQRTab visitantes={visitantes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'asamblea_digital' && <AsambleaDigitalTab asambleas={asambleasDigital} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'comparativo_presupuesto' && <ComparativoPresupuestoTab gastos={gastos} presupuestos={presupuestos} moneda={moneda} />}
+        {activeTab === 'proformas' && <ProformasTab proformas={proformas} proveedores={contratosProveedores} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'bitacora_eventos' && <BitacoraEventosTab visitantes={visitantes} tickets={tickets} incidentes={incidentes} anuncios={anuncios} ordenesCompra={ordenesCompra} asambleas={asambleasDigital} gastos={gastos} cuotas={cuotas} moneda={moneda} />}
+        {activeTab === 'indice_calidad' && <IndiceCalidadTab cuotas={cuotas} tickets={tickets} incidentes={incidentes} encuestas={encuestas} polizas={polizas} contratosProveedores={contratosProveedores} planesMantenimiento={planesMantenimiento} sugerencias={sugerencias} unidades={unidadesProyecto} moneda={moneda} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}

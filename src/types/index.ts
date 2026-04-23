@@ -3155,3 +3155,19 @@ export interface PuntoAsamblea2 {
   votos_contra: number
   votos_abstencion: number
 }
+
+// ── Fase 38 ───────────────────────────────────────────────────────────────────
+export type EstadoProforma = 'borrador' | 'enviada' | 'aprobada' | 'convertida_oc' | 'rechazada'
+export interface Proforma {
+  id: string
+  company_id: string
+  project_id: string
+  proveedor_nombre: string
+  concepto: string
+  descripcion?: string | null
+  monto?: number | null
+  fecha_validez?: string | null
+  estado: EstadoProforma
+  notas?: string | null
+  created_at: string
+}
