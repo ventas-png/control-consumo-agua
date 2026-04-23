@@ -195,6 +195,10 @@ import SimuladorCuotasTab from './tabs/SimuladorCuotasTab'
 import CalendarioMantenimientoTab from './tabs/CalendarioMantenimientoTab'
 import ReporteDeudoresTab from './tabs/ReporteDeudoresTab'
 import ResumenResidenteTab from './tabs/ResumenResidenteTab'
+import GestorAlertasTab from './tabs/GestorAlertasTab'
+import UtilizacionAmenidadesTab from './tabs/UtilizacionAmenidadesTab'
+import ComparativoAnualTab from './tabs/ComparativoAnualTab'
+import GanttMantenimientoTab from './tabs/GanttMantenimientoTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -235,6 +239,7 @@ type CondominioTab =
   | 'comparativo_presupuesto' | 'proformas' | 'bitacora_eventos' | 'indice_calidad'
   | 'kanban_tickets' | 'conciliacion_cobros' | 'estado_cuenta_residente' | 'pronostico_financiero'
   | 'simulador_cuotas' | 'calendario_mantenimiento' | 'reporte_deudores' | 'resumen_residente'
+  | 'gestor_alertas' | 'utilizacion_amenidades' | 'comparativo_anual' | 'gantt_mantenimiento'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -391,6 +396,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'calendario_mantenimiento', label: 'Calendario',   icon: '📆' },
   { id: 'reporte_deudores',      label: 'Deudores',         icon: '📋' },
   { id: 'resumen_residente',     label: 'Vista residente',  icon: '🏠' },
+  { id: 'gestor_alertas',        label: 'Alertas',          icon: '🚨' },
+  { id: 'utilizacion_amenidades',label: 'Uso amenidades',   icon: '📊' },
+  { id: 'comparativo_anual',     label: 'Comp. anual',      icon: '📅' },
+  { id: 'gantt_mantenimiento',   label: 'Gantt tickets',    icon: '📐' },
 ]
 
 interface Props {
@@ -1162,6 +1171,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'calendario_mantenimiento' && <CalendarioMantenimientoTab tickets={tickets} reservas={reservas} planesMantenimiento={planesMantenimiento} inspecciones={inspecciones} vencimientosExtra={vencimientosExtra} />}
         {activeTab === 'reporte_deudores' && <ReporteDeudoresTab cuotas={cuotas} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
         {activeTab === 'resumen_residente' && <ResumenResidenteTab cuotas={cuotas} recargosMora={recargosMora} reservas={reservas} anuncios={anuncios} tickets={tickets} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
+        {activeTab === 'gestor_alertas' && <GestorAlertasTab cuotas={cuotas} tickets={tickets} polizas={polizas} contratosProveedores={contratosProveedores} inspecciones={inspecciones} vencimientosExtra={vencimientosExtra} sugerencias={sugerencias} moneda={moneda} />}
+        {activeTab === 'utilizacion_amenidades' && <UtilizacionAmenidadesTab amenidades={amenidades} reservas={reservas} moneda={moneda} />}
+        {activeTab === 'comparativo_anual' && <ComparativoAnualTab cuotas={cuotas} gastos={gastos} moneda={moneda} />}
+        {activeTab === 'gantt_mantenimiento' && <GanttMantenimientoTab tickets={tickets} moneda={moneda} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}
