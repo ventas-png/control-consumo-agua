@@ -38,9 +38,8 @@ export function LecturasSection({
   onRutaCompletada,
   canCreate: _canCreate = true,
 }: Props) {
-  // Derive project_id from current user's context
+  // Derive project_id from selected unidad/contador, then fall back to single-project context
   const defaultProjectId = proyectos.length === 1 ? proyectos[0].id : null
-  const projectId = defaultProjectId
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
   const [selectedContadorId, setSelectedContadorId] = useState('')
   const [lecturaActual, setLecturaActual] = useState('')
@@ -141,6 +140,12 @@ export function LecturasSection({
     : []
 
   const contadorSeleccionado = contadores.find(c => c.id === selectedContadorId) ?? null
+
+  // Resolve project_id: prefer from selected unidad, then contador, then single-project fallback
+  const projectId: string | null =
+    unidadSeleccionada?.project_id ??
+    contadorSeleccionado?.project_id ??
+    defaultProjectId
   const tarifaDelContador = contadorSeleccionado?.tarifa_id
     ? tarifas.find(t => t.id === contadorSeleccionado.tarifa_id) ?? null
     : null
