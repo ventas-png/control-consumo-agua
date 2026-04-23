@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import type {
   UserSession, Proyecto, Unidad,
+  OrdenCompra, AsambleaDigital,
   CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, TicketMantenimiento, AnuncioComunidad,
   ParqueoCondominio, Mascota, PaqueteRecibido, InfraccionCondominio,
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
@@ -177,6 +178,10 @@ import GeneracionCuotasTab from './tabs/GeneracionCuotasTab'
 import MapaUnidadesTab from './tabs/MapaUnidadesTab'
 import EnvioMasivoTab from './tabs/EnvioMasivoTab'
 import ResumenEjecutivoTab from './tabs/ResumenEjecutivoTab'
+import OrdenesCompraTab from './tabs/OrdenesCompraTab'
+import GraficasTendenciasTab from './tabs/GraficasTendenciasTab'
+import ControlAccesosQRTab from './tabs/ControlAccesosQRTab'
+import AsambleaDigitalTab from './tabs/AsambleaDigitalTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -213,6 +218,7 @@ type CondominioTab =
   | 'exportacion' | 'multi_condominio' | 'automatizaciones' | 'scoring_unidades'
   | 'panel_turno' | 'plantillas_mensaje' | 'flujo_aprobacion' | 'cuadro_mando'
   | 'generacion_cuotas' | 'mapa_unidades' | 'envio_masivo' | 'resumen_ejecutivo'
+  | 'ordenes_compra' | 'graficas_tendencias' | 'control_accesos_qr' | 'asamblea_digital'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -353,6 +359,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'mapa_unidades',         label: 'Mapa unidades',    icon: '🗺️' },
   { id: 'envio_masivo',          label: 'Envío masivo',     icon: '📤' },
   { id: 'resumen_ejecutivo',     label: 'Resumen ejecutivo',icon: '📋' },
+  { id: 'ordenes_compra',        label: 'Órdenes compra',   icon: '🛒' },
+  { id: 'graficas_tendencias',   label: 'Tendencias',       icon: '📊' },
+  { id: 'control_accesos_qr',    label: 'Accesos QR',       icon: '📱' },
+  { id: 'asamblea_digital',      label: 'Asamblea digital', icon: '🖥️' },
 ]
 
 interface Props {
@@ -527,6 +537,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [plantillasMensaje, setPlantillasMensaje] = useState<PlantillaMensajeCond[]>([])
   const [flujoAprobacion, setFlujoAprobacion] = useState<FlujoAprobacionCond[]>([])
   // Fase 36 — GeneracionCuotasLog loaded on demand inside GeneracionCuotasTab
+  // Fase 37
+  const [ordenesCompra, setOrdenesCompra] = useState<OrdenCompra[]>([])
+  const [asambleasDigital, setAsambleasDigital] = useState<AsambleaDigital[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -578,6 +591,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       automatizacionesRes,
       plantillasMensajeRes,
       flujoAprobacionRes,
+      ordenesCompraRes,
+      asambleasDigitalRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -711,6 +726,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       // Fase 35
       supabase.from('plantillas_mensaje_cond').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
       supabase.from('flujo_aprobacion_cond').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_solicitud', { ascending: false }),
+      // Fase 37
+      supabase.from('ordenes_compra').select('*').eq('project_id', pid).eq('company_id', cid).order('correlativo', { ascending: false }),
+      supabase.from('asambleas_digital').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_hora', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -851,6 +869,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setAutomatizaciones((automatizacionesRes.data ?? []) as AutomatizacionCond[])
     setPlantillasMensaje((plantillasMensajeRes.data ?? []) as PlantillaMensajeCond[])
     setFlujoAprobacion((flujoAprobacionRes.data ?? []) as FlujoAprobacionCond[])
+    setOrdenesCompra((ordenesCompraRes.data ?? []) as OrdenCompra[])
+    setAsambleasDigital((asambleasDigitalRes.data ?? []) as AsambleaDigital[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -1087,6 +1107,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'mapa_unidades' && <MapaUnidadesTab unidades={unidadesProyecto} cuotas={cuotas} contratos={contratos} moneda={moneda} />}
         {activeTab === 'envio_masivo' && <EnvioMasivoTab plantillas={plantillasMensaje} cuotas={cuotas} unidades={unidadesProyecto} reservas={reservas} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} onRefresh={cargarDatos} />}
         {activeTab === 'resumen_ejecutivo' && <ResumenEjecutivoTab cuotas={cuotas} tickets={tickets} gastos={gastos} presupuestos={presupuestos} unidades={unidadesProyecto} incidentes={incidentes} polizas={polizas} contratosProveedores={contratosProveedores} inspecciones={inspecciones} vencimientosExtra={vencimientosExtra} sugerencias={sugerencias} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
+        {activeTab === 'ordenes_compra' && <OrdenesCompraTab ordenes={ordenesCompra} proveedores={contratosProveedores} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'graficas_tendencias' && <GraficasTendenciasTab cuotas={cuotas} tickets={tickets} gastos={gastos} incidentes={incidentes} moneda={moneda} />}
+        {activeTab === 'control_accesos_qr' && <ControlAccesosQRTab visitantes={visitantes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'asamblea_digital' && <AsambleaDigitalTab asambleas={asambleasDigital} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}

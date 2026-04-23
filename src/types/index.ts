@@ -368,6 +368,8 @@ export interface Visitante {
   foto_url?: string | null
   registrado_por?: string | null
   notas?: string | null
+  qr_token?: string | null
+  valido_hasta?: string | null
   created_at: string
   // joins opcionales
   unidad_nombre?: string
@@ -3104,4 +3106,52 @@ export interface GeneracionCuotasLog {
   fecha_vencimiento: string
   unidades_generadas: number
   created_at: string
+}
+
+// ── Fase 37 ───────────────────────────────────────────────────────────────────
+export type EstadoOrdenCompra = 'borrador' | 'aprobada' | 'emitida' | 'recibida' | 'cancelada'
+export interface OrdenCompra {
+  id: string
+  company_id: string
+  project_id: string
+  correlativo: number
+  proveedor_nombre: string
+  concepto: string
+  descripcion?: string | null
+  monto_estimado?: number | null
+  monto_real?: number | null
+  fecha_entrega_esperada?: string | null
+  estado: EstadoOrdenCompra
+  notas?: string | null
+  created_by?: string | null
+  created_at: string
+}
+
+export interface AsambleaDigital {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  fecha_hora: string
+  modalidad: 'presencial' | 'virtual' | 'hibrida'
+  link_reunion?: string | null
+  quorum_requerido: number
+  estado: 'programada' | 'en_curso' | 'finalizada' | 'cancelada'
+  acta_url?: string | null
+  created_by?: string | null
+  created_at: string
+}
+
+export interface PuntoAsamblea2 {
+  id: string
+  asamblea_id: string
+  orden: number
+  titulo: string
+  descripcion?: string | null
+  tipo: 'informativo' | 'aprobacion' | 'eleccion'
+  resultado?: string | null
+  votos_favor: number
+  votos_contra: number
+  votos_abstencion: number
 }
