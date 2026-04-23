@@ -3171,3 +3171,21 @@ export interface Proforma {
   notas?: string | null
   created_at: string
 }
+
+// ── Fase 39 ───────────────────────────────────────────────────────────────────
+export interface ConciliacionCobrosLog {
+  id: string
+  company_id: string
+  project_id: string
+  cuota_id: string
+  unidad_id: string
+  monto_cuota: number
+  monto_recibido: number
+  diferencia: number
+  referencia_pago?: string | null
+  fecha_pago: string
+  metodo_pago: string
+  notas?: string | null
+  estado: 'conciliado' | 'diferencia'
+  created_at: string
+}

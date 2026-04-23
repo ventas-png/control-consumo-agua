@@ -38,6 +38,7 @@ import type {
   AutomatizacionCond,
   PlantillaMensajeCond,
   FlujoAprobacionCond,
+  ConciliacionCobrosLog,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -186,6 +187,10 @@ import ComparativoPresupuestoTab from './tabs/ComparativoPresupuestoTab'
 import ProformasTab from './tabs/ProformasTab'
 import BitacoraEventosTab from './tabs/BitacoraEventosTab'
 import IndiceCalidadTab from './tabs/IndiceCalidadTab'
+import KanbanTicketsTab from './tabs/KanbanTicketsTab'
+import ConciliacionCobrosTab from './tabs/ConciliacionCobrosTab'
+import EstadoCuentaResidenteTab from './tabs/EstadoCuentaResidenteTab'
+import PronosticoFinancieroTab from './tabs/PronosticoFinancieroTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -224,6 +229,7 @@ type CondominioTab =
   | 'generacion_cuotas' | 'mapa_unidades' | 'envio_masivo' | 'resumen_ejecutivo'
   | 'ordenes_compra' | 'graficas_tendencias' | 'control_accesos_qr' | 'asamblea_digital'
   | 'comparativo_presupuesto' | 'proformas' | 'bitacora_eventos' | 'indice_calidad'
+  | 'kanban_tickets' | 'conciliacion_cobros' | 'estado_cuenta_residente' | 'pronostico_financiero'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -372,6 +378,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'proformas',             label: 'Proformas',        icon: '📑' },
   { id: 'bitacora_eventos',      label: 'Bitácora eventos', icon: '📰' },
   { id: 'indice_calidad',        label: 'Índice calidad',   icon: '🏆' },
+  { id: 'kanban_tickets',        label: 'Kanban tickets',   icon: '🗂️' },
+  { id: 'conciliacion_cobros',   label: 'Conciliación',     icon: '🔄' },
+  { id: 'estado_cuenta_residente', label: 'Edo. cuenta',    icon: '📃' },
+  { id: 'pronostico_financiero', label: 'Pronóstico',       icon: '🔮' },
 ]
 
 interface Props {
@@ -551,6 +561,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [asambleasDigital, setAsambleasDigital] = useState<AsambleaDigital[]>([])
   // Fase 38
   const [proformas, setProformas] = useState<Proforma[]>([])
+  const [conciliaciones, setConciliaciones] = useState<ConciliacionCobrosLog[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -605,6 +616,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       ordenesCompraRes,
       asambleasDigitalRes,
       proformasRes,
+      conciliacionesRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -743,6 +755,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('asambleas_digital').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_hora', { ascending: false }),
       // Fase 38
       supabase.from('proformas_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      // Fase 39
+      supabase.from('conciliacion_cobros_log').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -886,6 +900,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setOrdenesCompra((ordenesCompraRes.data ?? []) as OrdenCompra[])
     setAsambleasDigital((asambleasDigitalRes.data ?? []) as AsambleaDigital[])
     setProformas((proformasRes.data ?? []) as Proforma[])
+    setConciliaciones((conciliacionesRes.data ?? []) as ConciliacionCobrosLog[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -1130,6 +1145,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'proformas' && <ProformasTab proformas={proformas} proveedores={contratosProveedores} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'bitacora_eventos' && <BitacoraEventosTab visitantes={visitantes} tickets={tickets} incidentes={incidentes} anuncios={anuncios} ordenesCompra={ordenesCompra} asambleas={asambleasDigital} gastos={gastos} cuotas={cuotas} moneda={moneda} />}
         {activeTab === 'indice_calidad' && <IndiceCalidadTab cuotas={cuotas} tickets={tickets} incidentes={incidentes} encuestas={encuestas} polizas={polizas} contratosProveedores={contratosProveedores} planesMantenimiento={planesMantenimiento} sugerencias={sugerencias} unidades={unidadesProyecto} moneda={moneda} />}
+        {activeTab === 'kanban_tickets' && <KanbanTicketsTab tickets={tickets} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'conciliacion_cobros' && <ConciliacionCobrosTab cuotas={cuotas} unidades={unidadesProyecto} conciliaciones={conciliaciones} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'estado_cuenta_residente' && <EstadoCuentaResidenteTab cuotas={cuotas} recargosMora={recargosMora} conveniosCuota={conveniosCuota} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
+        {activeTab === 'pronostico_financiero' && <PronosticoFinancieroTab cuotas={cuotas} gastos={gastos} moneda={moneda} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}
