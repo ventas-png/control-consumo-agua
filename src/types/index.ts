@@ -2416,3 +2416,692 @@ export interface ControlPlagas {
   observaciones?: string | null
   created_at: string
 }
+
+// ── Fase 23 ──────────────────────────────────────────────────────────────────
+export type CategoriaCargoAdicional = 'reparacion' | 'exceso_consumo' | 'dano' | 'servicio' | 'multa' | 'otro'
+export type EstadoCargoAdicional = 'pendiente' | 'pagado' | 'anulado'
+export interface CargoAdicionalUnidad {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  concepto: string
+  categoria: CategoriaCargoAdicional
+  monto: number
+  fecha_cargo: string
+  fecha_vencimiento?: string | null
+  estado: EstadoCargoAdicional
+  referencia?: string | null
+  observaciones?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type CategoriaActividad = 'recreativa' | 'deportiva' | 'cultural' | 'educativa' | 'salud' | 'otro'
+export type EstadoActividad = 'programada' | 'activa' | 'completada' | 'cancelada'
+export interface ProgramaActividad {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  descripcion?: string | null
+  categoria: CategoriaActividad
+  instructor?: string | null
+  lugar?: string | null
+  fecha_inicio: string
+  fecha_fin?: string | null
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  dias_semana?: string[] | null
+  cupo_maximo?: number | null
+  inscritos: number
+  costo: number
+  estado: EstadoActividad
+  activo: boolean
+  notas?: string | null
+  created_at: string
+}
+
+export type TipoAutoridad = 'policia' | 'bomberos' | 'salud' | 'municipalidad' | 'electricidad' | 'agua' | 'otro'
+export type ResultadoAutoridad = 'sin_novedad' | 'acta_levantada' | 'sancion' | 'recomendacion' | 'otro'
+export interface RegistroAutoridad {
+  id: string
+  company_id: string
+  project_id: string
+  tipo_autoridad: TipoAutoridad
+  nombre_institucion?: string | null
+  nombre_funcionario?: string | null
+  motivo: string
+  fecha: string
+  hora_llegada?: string | null
+  hora_salida?: string | null
+  resultado?: ResultadoAutoridad | null
+  documento_referencia?: string | null
+  requiere_seguimiento: boolean
+  fecha_seguimiento?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+export type CategoriaNota = 'general' | 'urgente' | 'recordatorio' | 'seguimiento' | 'reunion' | 'otro'
+export type PrioridadNota = 'normal' | 'alta' | 'urgente'
+export interface NotaAdmin {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  contenido: string
+  categoria: CategoriaNota
+  prioridad: PrioridadNota
+  fijada: boolean
+  resuelta: boolean
+  fecha_recordatorio?: string | null
+  autor?: string | null
+  created_at: string
+}
+
+// ── Fase 24 ───────────────────────────────────────────────────────────────────
+
+export type TurbiededadPiscina = 'cristalina' | 'ligeramente_turbia' | 'turbia'
+export type EstadoPiscina = 'abierta' | 'cerrada_mantenimiento' | 'cerrada_quimica' | 'cerrada_incidente'
+
+export interface ControlPiscina {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  hora?: string | null
+  piscina: string
+  ph?: number | null
+  cloro?: number | null
+  temperatura?: number | null
+  turbiedad: TurbiededadPiscina
+  estado: EstadoPiscina
+  num_usuarios?: number | null
+  registrado_por?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+export type TipoJardineria = 'mantenimiento_general' | 'poda' | 'fumigacion' | 'siembra' | 'riego' | 'limpieza' | 'otro'
+export type EstadoJardineria = 'programado' | 'en_proceso' | 'completado' | 'cancelado'
+
+export interface MantenimientoJardineria {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  tipo: TipoJardineria
+  areas: string[]
+  proveedor?: string | null
+  trabajadores?: number | null
+  horas_trabajo?: number | null
+  insumos?: string | null
+  costo?: number | null
+  estado: EstadoJardineria
+  proxima_visita?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+export type TipoIncidenciaElevador = 'falla' | 'mantenimiento_preventivo' | 'mantenimiento_correctivo' | 'inspeccion_legal' | 'otro'
+export type EstadoIncidenciaElevador = 'reportado' | 'en_atencion' | 'resuelto' | 'requiere_seguimiento'
+
+export interface IncidenciaElevador {
+  id: string
+  company_id: string
+  project_id: string
+  elevador: string
+  tipo: TipoIncidenciaElevador
+  descripcion: string
+  fecha: string
+  hora_inicio?: string | null
+  hora_fin?: string | null
+  empresa_servicio?: string | null
+  tecnico?: string | null
+  estado: EstadoIncidenciaElevador
+  costo?: number | null
+  proxima_inspeccion?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+export type TipoMantenimientoCisterna = 'lectura' | 'limpieza' | 'cloracion' | 'inspeccion' | 'reparacion'
+export type EstadoCisterna = 'normal' | 'bajo_nivel' | 'mantenimiento' | 'fuera_servicio'
+
+export interface MantenimientoCisterna {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  cisterna: string
+  tipo: TipoMantenimientoCisterna
+  nivel_agua_pct?: number | null
+  cloro_residual?: number | null
+  ph?: number | null
+  estado: EstadoCisterna
+  empresa_servicio?: string | null
+  tecnico?: string | null
+  costo?: number | null
+  proxima_revision?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+// ── Fase 25 ───────────────────────────────────────────────────────────────────
+
+export type TipoRegistroGenerador = 'lectura' | 'mantenimiento' | 'prueba' | 'falla' | 'arranque_emergencia'
+export type EstadoGenerador = 'standby' | 'operando' | 'mantenimiento' | 'falla' | 'apagado'
+
+export interface ControlGenerador {
+  id: string
+  company_id: string
+  project_id: string
+  generador: string
+  fecha: string
+  tipo: TipoRegistroGenerador
+  nivel_combustible_pct?: number | null
+  horas_operacion?: number | null
+  horas_acumuladas?: number | null
+  estado: EstadoGenerador
+  voltaje?: number | null
+  frecuencia?: number | null
+  operador?: string | null
+  empresa_servicio?: string | null
+  costo?: number | null
+  proximo_mantenimiento?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+export type TipoSistemaIncendio = 'extintor' | 'rociador' | 'alarma' | 'hidrant' | 'detector_humo' | 'gabinete' | 'otro'
+export type TipoInspeccionIncendio = 'revision_visual' | 'prueba_funcional' | 'recarga' | 'reemplazo' | 'inspeccion_legal'
+export type ResultadoInspeccionIncendio = 'aprobado' | 'observacion' | 'requiere_mantenimiento' | 'fuera_servicio'
+
+export interface ControlSistemaIncendio {
+  id: string
+  company_id: string
+  project_id: string
+  fecha: string
+  tipo_sistema: TipoSistemaIncendio
+  identificador: string
+  ubicacion: string
+  tipo_inspeccion: TipoInspeccionIncendio
+  resultado: ResultadoInspeccionIncendio
+  fecha_vencimiento?: string | null
+  empresa_servicio?: string | null
+  tecnico?: string | null
+  costo?: number | null
+  proxima_inspeccion?: string | null
+  observaciones?: string | null
+  created_at: string
+}
+
+export type TipoCamara = 'domo' | 'bullet' | 'ptz' | 'fisheye' | 'otro'
+export type EstadoCamara = 'activa' | 'falla' | 'mantenimiento' | 'sin_señal' | 'inactiva'
+
+export interface ControlCamaraSeguridad {
+  id: string
+  company_id: string
+  project_id: string
+  codigo: string
+  nombre: string
+  ubicacion: string
+  tipo: TipoCamara
+  resolucion?: string | null
+  ip_address?: string | null
+  grabacion: boolean
+  dias_retencion?: number | null
+  estado: EstadoCamara
+  ultimo_mantenimiento?: string | null
+  proximo_mantenimiento?: string | null
+  observaciones?: string | null
+  activo: boolean
+  created_at: string
+}
+
+export interface LecturaMedidorGas {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  area?: string | null
+  fecha: string
+  lectura_anterior?: number | null
+  lectura_actual: number
+  consumo?: number | null
+  alerta_fuga: boolean
+  costo_unitario?: number | null
+  costo_total?: number | null
+  periodo?: string | null
+  leido_por?: string | null
+  observaciones?: string | null
+  created_at: string
+  // join
+  unidad_nombre?: string
+}
+
+// ── Fase 28: Comentarios Ticket, Recordatorios, Plantillas Cuota, Bitácora ──
+
+export interface ComentarioTicket {
+  id: string
+  company_id: string
+  ticket_id: string
+  autor_id?: string | null
+  autor_nombre: string
+  contenido: string
+  estado_nuevo?: string | null
+  created_at: string
+}
+
+export type PrioridadRecordatorio = 'normal' | 'alta' | 'critica'
+export type TipoEntidadRecordatorio = 'cuota' | 'contrato' | 'inspeccion' | 'mantenimiento' | 'general'
+
+export interface RecordatorioCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  fecha_limite: string
+  tipo_entidad?: TipoEntidadRecordatorio | null
+  entidad_id?: string | null
+  asignado_a?: string | null
+  asignado_nombre?: string | null
+  prioridad: PrioridadRecordatorio
+  completado: boolean
+  fecha_completado?: string | null
+  created_by?: string | null
+  created_at: string
+}
+
+export type PeriodicidadPlantilla = 'mensual' | 'bimestral' | 'trimestral' | 'semestral' | 'anual' | 'única'
+
+export interface PlantillaCuota {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  concepto: string
+  monto: number
+  dia_vencimiento: number
+  periodicidad: PeriodicidadPlantilla
+  aplica_a: string
+  activa: boolean
+  notas?: string | null
+  created_at: string
+}
+
+export type AccionBitacora = 'crear' | 'editar' | 'eliminar' | 'aprobar' | 'rechazar' | 'pagar' | 'cerrar'
+
+export interface BitacoraAccion {
+  id: string
+  company_id: string
+  project_id?: string | null
+  usuario_id?: string | null
+  usuario_nombre: string
+  accion: AccionBitacora
+  modulo: string
+  entidad_id?: string | null
+  entidad_desc?: string | null
+  detalles?: Record<string, unknown> | null
+  ip_address?: string | null
+  created_at: string
+}
+
+// ── Fase 29: Recargos mora, Convenios cuota, Historial saldos, Notificaciones ─
+
+export type EstadoRecargo = 'pendiente' | 'aplicado' | 'anulado'
+export type TipoRecargo = 'porcentaje' | 'monto_fijo'
+
+export interface RecargoMora {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  cuota_id?: string | null
+  tipo: TipoRecargo
+  valor: number
+  monto_calculado: number
+  fecha_aplicacion: string
+  estado: EstadoRecargo
+  motivo?: string | null
+  anulado_por?: string | null
+  fecha_anulacion?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export type EstadoConvenioCuota = 'activo' | 'cumplido' | 'incumplido' | 'anulado'
+
+export interface ConvenioCuotaCond {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  descripcion: string
+  monto_total: number
+  num_cuotas: number
+  monto_cuota: number
+  dia_pago: number
+  fecha_inicio: string
+  fecha_fin?: string | null
+  cuotas_pagadas: number
+  estado: EstadoConvenioCuota
+  aprobado_por?: string | null
+  notas?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export interface HistorialSaldoUnidad {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  periodo: string
+  saldo_anterior: number
+  cargos_periodo: number
+  pagos_periodo: number
+  saldo_final: number
+  num_cuotas_vencidas: number
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+export type EstadoNotificacion = 'enviado' | 'fallido' | 'pendiente' | 'leido'
+
+export interface NotificacionEnviada {
+  id: string
+  company_id: string
+  project_id?: string | null
+  unidad_id?: string | null
+  cliente_id?: string | null
+  canal: CanalNotificacion
+  destinatario: string
+  asunto?: string | null
+  contenido: string
+  estado: EstadoNotificacion
+  error_detalle?: string | null
+  enviado_por?: string | null
+  fecha_envio: string
+  created_at: string
+  // joins
+  unidad_nombre?: string
+}
+
+// ── Fase 30 ────────────────────────────────────────────────────────────────────
+export type TipoReglaRecargo = 'porcentaje' | 'monto_fijo'
+export type AplicarSobreRecargo = 'saldo_vencido' | 'monto_cuota'
+export interface ReglaMoraConfig {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  dias_vencimiento: number
+  tipo: TipoReglaRecargo
+  valor: number
+  aplicar_sobre: AplicarSobreRecargo
+  periodo_gracia: number
+  activa: boolean
+  notas?: string | null
+  created_at: string
+}
+
+export type CanalCampana = 'whatsapp' | 'email' | 'sms'
+export type EstadoCampana = 'borrador' | 'enviada' | 'completada'
+export interface CampanaCobro {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  mensaje: string
+  canal: CanalCampana
+  estado: EstadoCampana
+  total_destinatarios: number
+  enviadas: number
+  fallidas: number
+  criterio_dias_mora?: number | null
+  criterio_monto_min?: number | null
+  enviada_por?: string | null
+  fecha_envio?: string | null
+  created_at: string
+}
+
+export type EstadoCierreAnual = 'borrador' | 'cerrado'
+export interface CierreAnual {
+  id: string
+  company_id: string
+  project_id: string
+  anio: number
+  total_ingresos: number
+  total_egresos: number
+  saldo: number
+  total_cuotas_generadas: number
+  total_cuotas_cobradas: number
+  tasa_recaudacion?: number | null
+  unidades_morosas: number
+  monto_mora_total: number
+  notas?: string | null
+  firmado_por?: string | null
+  fecha_cierre?: string | null
+  estado: EstadoCierreAnual
+  created_at: string
+}
+
+// ── Fase 31 ────────────────────────────────────────────────────────────────────
+export type EtapaCobranzaJudicial = 'carta_notarial' | 'juzgado' | 'sentencia' | 'ejecutado' | 'archivado'
+export type EstadoCobranzaJudicial = 'activo' | 'resuelto' | 'archivado'
+export interface CobranzaJudicial {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  etapa: EtapaCobranzaJudicial
+  monto_adeudado: number
+  fecha_inicio: string
+  fecha_actualizacion?: string | null
+  abogado?: string | null
+  expediente?: string | null
+  notas?: string | null
+  estado: EstadoCobranzaJudicial
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type EstadoReciboDigital = 'generado' | 'enviado' | 'anulado'
+export interface ReciboDigital {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  cuota_id?: string | null
+  numero_recibo: string
+  monto: number
+  concepto: string
+  fecha_emision: string
+  enviado_por?: string | null
+  destinatario_email?: string | null
+  destinatario_nombre?: string | null
+  estado: EstadoReciboDigital
+  notas?: string | null
+  created_at: string
+  unidad_nombre?: string
+}
+
+export type EstadoInformeMensual = 'borrador' | 'publicado'
+export interface InformeMensual {
+  id: string
+  company_id: string
+  project_id: string
+  periodo: string
+  total_cuotas: number
+  cuotas_pagadas: number
+  cuotas_morosas: number
+  total_recaudado: number
+  total_gastos: number
+  num_tickets: number
+  tickets_resueltos: number
+  num_visitantes: number
+  num_incidentes: number
+  notas?: string | null
+  firmado_por?: string | null
+  estado: EstadoInformeMensual
+  created_at: string
+}
+
+export type CategoriaSugerencia = 'instalaciones' | 'seguridad' | 'servicios' | 'convivencia' | 'otro'
+export type EstadoSugerencia = 'pendiente' | 'en_revision' | 'respondida' | 'archivada'
+export interface SugerenciaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id?: string | null
+  categoria: CategoriaSugerencia
+  titulo: string
+  descripcion: string
+  estado: EstadoSugerencia
+  respuesta?: string | null
+  respondido_por?: string | null
+  fecha_respuesta?: string | null
+  anonima: boolean
+  created_at: string
+  unidad_nombre?: string
+}
+
+// ── Fase 32 ────────────────────────────────────────────────────────────────────
+export type CategoriaVencimiento = 'contrato' | 'permiso' | 'certificacion' | 'seguro' | 'otro'
+export interface VencimientoExtra {
+  id: string
+  company_id: string
+  project_id: string
+  titulo: string
+  descripcion?: string | null
+  categoria: CategoriaVencimiento
+  fecha_vencimiento: string
+  entidad?: string | null
+  monto?: number | null
+  alerta_dias: number
+  renovado: boolean
+  notas?: string | null
+  created_at: string
+}
+
+export type EstadoCapacitacion = 'planificado' | 'en_progreso' | 'completado' | 'vencido'
+export interface CapacitacionPersonal {
+  id: string
+  company_id: string
+  project_id: string
+  personal_id?: string | null
+  nombre_empleado: string
+  cargo?: string | null
+  curso: string
+  proveedor?: string | null
+  fecha_inicio: string
+  fecha_fin?: string | null
+  fecha_vencimiento_cert?: string | null
+  costo?: number | null
+  estado: EstadoCapacitacion
+  notas?: string | null
+  created_at: string
+}
+
+export type CategoriaProyectoCond = 'mejora' | 'mantenimiento' | 'seguridad' | 'tecnologia' | 'otro'
+export type EstadoProyectoCond = 'planificado' | 'en_progreso' | 'pausado' | 'completado' | 'cancelado'
+export interface ProyectoCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  descripcion?: string | null
+  categoria: CategoriaProyectoCond
+  estado: EstadoProyectoCond
+  responsable?: string | null
+  fecha_inicio?: string | null
+  fecha_fin_estimada?: string | null
+  fecha_fin_real?: string | null
+  porcentaje_avance: number
+  presupuesto?: number | null
+  costo_real?: number | null
+  notas?: string | null
+  created_at: string
+}
+
+export type SeccionManual = 'amenidades' | 'normas' | 'faq' | 'contactos' | 'otro'
+export interface ArticuloManual {
+  id: string
+  company_id: string
+  project_id: string
+  seccion: SeccionManual
+  titulo: string
+  contenido: string
+  orden: number
+  activo: boolean
+  created_at: string
+}
+
+export type TriggerTipoAuto = 'cuota_vencida_dias' | 'ticket_sin_resolver_dias' | 'vencimiento_critico_dias' | 'cert_personal_vence_dias'
+export type AccionTipoAuto = 'notificacion_interna' | 'crear_alerta' | 'marcar_moroso'
+export interface AutomatizacionCond {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  trigger_tipo: TriggerTipoAuto
+  trigger_valor: number
+  accion_tipo: AccionTipoAuto
+  accion_config: Record<string, unknown>
+  activa: boolean
+  ultima_ejecucion?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export type CanalPlantilla = 'whatsapp' | 'email' | 'sms'
+export interface PlantillaMensajeCond {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  canal: CanalPlantilla
+  asunto?: string | null
+  cuerpo: string
+  variables: string[]
+  activa: boolean
+  created_at: string
+}
+
+export type TipoFlujoAprobacion = 'gasto_mayor' | 'propuesta' | 'permiso_obra' | 'mudanza' | 'otro'
+export type EstadoFlujoAprobacion = 'pendiente' | 'aprobado' | 'rechazado'
+export interface FlujoAprobacionCond {
+  id: string
+  company_id: string
+  project_id: string
+  tipo: TipoFlujoAprobacion
+  titulo: string
+  descripcion?: string | null
+  monto?: number | null
+  solicitado_por?: string | null
+  aprobado_por?: string | null
+  estado: EstadoFlujoAprobacion
+  fecha_solicitud: string
+  fecha_resolucion?: string | null
+  comentario_resolucion?: string | null
+  created_at: string
+}
+
+// ── Fase 36 ───────────────────────────────────────────────────────────────────
+export interface GeneracionCuotasLog {
+  id: string
+  company_id: string
+  project_id: string
+  periodo: string
+  concepto: string
+  monto_unitario: number
+  fecha_vencimiento: string
+  unidades_generadas: number
+  created_at: string
+}

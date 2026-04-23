@@ -1,0 +1,235 @@
+import React, { useState } from 'react'
+import { supabase } from '../../../lib/supabase'
+import Swal from 'sweetalert2'
+import { AutomatizacionCond, TriggerTipoAuto, AccionTipoAuto, CuotaCondominio, TicketMantenimiento } from '../../../types'
+
+interface Props {
+  automatizaciones: AutomatizacionCond[]
+  cuotas: CuotaCondominio[]
+  tickets: TicketMantenimiento[]
+  proyectoId: string
+  companyId: string
+  canCreate: boolean
+  canEdit: boolean
+  onRefresh: () => void
+}
+
+const TRIGGER_CFG: Record<TriggerTipoAuto, { label: string; desc: (v: number) => string; icon: string }> = {
+  cuota_vencida_dias:       { label: 'Cuota vencida',           icon: '💳', desc: v => `Cuotas con más de ${v} días sin pagar` },
+  ticket_sin_resolver_dias: { label: 'Ticket sin resolver',     icon: '🔧', desc: v => `Tickets abiertos por más de ${v} días` },
+  vencimiento_critico_dias: { label: 'Vencimiento próximo',     icon: '⏳', desc: v => `Documentos/contratos que vencen en menos de ${v} días` },
+  cert_personal_vence_dias: { label: 'Cert. personal por vencer', icon: '🎓', desc: v => `Certificados de personal que vencen en menos de ${v} días` },
+}
+
+const ACCION_CFG: Record<AccionTipoAuto, { label: string; icon: string; color: string }> = {
+  notificacion_interna: { label: 'Notificación interna', icon: '🔔', color: '#2563eb' },
+  crear_alerta:         { label: 'Crear alerta',         icon: '🚨', color: '#d97706' },
+  marcar_moroso:        { label: 'Marcar como moroso',   icon: '⚠️', color: '#ef4444' },
+}
+
+const BLANK = {
+  nombre: '', trigger_tipo: 'cuota_vencida_dias' as TriggerTipoAuto,
+  trigger_valor: 30, accion_tipo: 'notificacion_interna' as AccionTipoAuto, notas: '',
+}
+
+export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+  const [mostrarForm, setMostrarForm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState(BLANK)
+
+  const hoy = new Date().toISOString().slice(0, 10)
+
+  function evaluar(a: AutomatizacionCond): number {
+    const dias = a.trigger_valor
+    if (a.trigger_tipo === 'cuota_vencida_dias') {
+      return cuotas.filter(c => {
+        if (!c.fecha_vencimiento || c.estado === 'pagado') return false
+        const d = Math.floor((Date.now() - new Date(c.fecha_vencimiento).getTime()) / 86400000)
+        return d >= dias
+      }).length
+    }
+    if (a.trigger_tipo === 'ticket_sin_resolver_dias') {
+      return tickets.filter(t => {
+        if (t.estado === 'resuelto' || t.estado === 'cerrado') return false
+        const d = Math.floor((Date.now() - new Date(t.created_at).getTime()) / 86400000)
+        return d >= dias
+      }).length
+    }
+    return 0
+  }
+
+  async function guardar() {
+    if (!form.nombre.trim()) { Swal.fire('Error', 'El nombre es obligatorio', 'warning'); return }
+    setSaving(true)
+    const { error } = await supabase.from('automatizaciones_cond').insert({
+      company_id: companyId, project_id: proyectoId,
+      nombre: form.nombre.trim(), trigger_tipo: form.trigger_tipo,
+      trigger_valor: form.trigger_valor, accion_tipo: form.accion_tipo,
+      accion_config: {}, activa: true, notas: form.notas.trim() || null,
+    })
+    setSaving(false)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    setMostrarForm(false); setForm(BLANK); onRefresh()
+  }
+
+  async function toggleActiva(id: string, activa: boolean) {
+    await supabase.from('automatizaciones_cond').update({ activa: !activa }).eq('id', id)
+    onRefresh()
+  }
+
+  async function ejecutarAhora(a: AutomatizacionCond) {
+    const afectados = evaluar(a)
+    const accion = ACCION_CFG[a.accion_tipo]
+    await Swal.fire({
+      title: `Evaluar: ${a.nombre}`,
+      html: `<div style="text-align:left;font-size:14px">
+        <p><strong>Disparador:</strong> ${TRIGGER_CFG[a.trigger_tipo].desc(a.trigger_valor)}</p>
+        <p><strong>Acción:</strong> ${accion.icon} ${accion.label}</p>
+        <p style="font-size:20px;font-weight:700;color:${afectados > 0 ? '#ef4444' : '#16a34a'};margin:12px 0">${afectados} elemento${afectados !== 1 ? 's' : ''} afectado${afectados !== 1 ? 's' : ''}</p>
+        ${afectados > 0 ? `<p style="color:#6b7280;font-size:12px">La ejecución automática estará disponible en futuras versiones con integración de mensajería.</p>` : `<p style="color:#16a34a;font-size:12px">✓ No hay elementos que cumplan el criterio actualmente.</p>`}
+      </div>`,
+      icon: afectados > 0 ? 'warning' : 'success',
+      confirmButtonText: 'Entendido',
+    })
+    await supabase.from('automatizaciones_cond').update({ ultima_ejecucion: new Date().toISOString() }).eq('id', a.id)
+    onRefresh()
+  }
+
+  async function eliminar(id: string) {
+    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar automatización?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    if (!isConfirmed) return
+    await supabase.from('automatizaciones_cond').delete().eq('id', id)
+    onRefresh()
+  }
+
+  const inp: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
+  const lbl: React.CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+
+  const activas = automatizaciones.filter(a => a.activa).length
+
+  return (
+    <div style={{ padding: 16 }}>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
+        <div style={{ background: '#eff6ff', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#2563eb' }}>{automatizaciones.length}</div>
+          <div style={{ fontSize: 11, color: '#2563eb', fontWeight: 600 }}>Reglas configuradas</div>
+        </div>
+        <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>{activas}</div>
+          <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>Activas</div>
+        </div>
+        <div style={{ background: '#fef3c7', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#d97706' }}>{automatizaciones.reduce((s, a) => s + evaluar(a), 0)}</div>
+          <div style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>Elementos afectados ahora</div>
+        </div>
+      </div>
+
+      {/* Botón */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+        {canCreate && (
+          <button onClick={() => setMostrarForm(!mostrarForm)}
+            style={{ padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            {mostrarForm ? '✕ Cancelar' : '+ Nueva automatización'}
+          </button>
+        )}
+      </div>
+
+      {/* Formulario */}
+      {mostrarForm && (
+        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Configurar nueva automatización</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div style={{ gridColumn: 'span 1' }}>
+              <label style={lbl}>Nombre *</label>
+              <input style={inp} value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej. Notificar mora +30d" />
+            </div>
+            <div>
+              <label style={lbl}>Disparador</label>
+              <select style={inp} value={form.trigger_tipo} onChange={e => setForm(p => ({ ...p, trigger_tipo: e.target.value as TriggerTipoAuto }))}>
+                {(Object.keys(TRIGGER_CFG) as TriggerTipoAuto[]).map(k => <option key={k} value={k}>{TRIGGER_CFG[k].icon} {TRIGGER_CFG[k].label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Días</label>
+              <input type="number" min={1} style={inp} value={form.trigger_valor} onChange={e => setForm(p => ({ ...p, trigger_valor: parseInt(e.target.value) || 30 }))} />
+            </div>
+            <div>
+              <label style={lbl}>Acción</label>
+              <select style={inp} value={form.accion_tipo} onChange={e => setForm(p => ({ ...p, accion_tipo: e.target.value as AccionTipoAuto }))}>
+                {(Object.keys(ACCION_CFG) as AccionTipoAuto[]).map(k => <option key={k} value={k}>{ACCION_CFG[k].icon} {ACCION_CFG[k].label}</option>)}
+              </select>
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={lbl}>Notas</label>
+              <input style={inp} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} placeholder="Descripción opcional" />
+            </div>
+          </div>
+          <div style={{ padding: '8px 12px', background: '#dbeafe', borderRadius: 8, fontSize: 11, color: '#1d4ed8', marginBottom: 12 }}>
+            Vista previa: <strong>{TRIGGER_CFG[form.trigger_tipo].desc(form.trigger_valor)}</strong> → {ACCION_CFG[form.accion_tipo].icon} {ACCION_CFG[form.accion_tipo].label}
+          </div>
+          <button onClick={guardar} disabled={saving}
+            style={{ padding: '8px 20px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            {saving ? 'Guardando…' : '✅ Crear regla'}
+          </button>
+        </div>
+      )}
+
+      {/* Lista */}
+      {automatizaciones.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '48px 0', fontSize: 13 }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>⚙️</div>
+          Sin automatizaciones configuradas
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {automatizaciones.map(a => {
+            const tc = TRIGGER_CFG[a.trigger_tipo]
+            const ac = ACCION_CFG[a.accion_tipo]
+            const afectados = evaluar(a)
+            return (
+              <div key={a.id} style={{ background: '#fff', border: `1px solid ${a.activa ? '#e5e7eb' : '#f3f4f6'}`, borderRadius: 10, padding: '12px 16px', opacity: a.activa ? 1 : 0.7 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 20 }}>{tc.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>{a.nombre}</span>
+                      {!a.activa && <span style={{ fontSize: 10, background: '#f3f4f6', color: '#9ca3af', padding: '1px 6px', borderRadius: 10 }}>Inactiva</span>}
+                      {afectados > 0 && a.activa && (
+                        <span style={{ fontSize: 10, background: '#fef2f2', color: '#ef4444', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>
+                          {afectados} elemento{afectados !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                      {tc.desc(a.trigger_valor)} → {ac.icon} {ac.label}
+                      {a.ultima_ejecucion && ` · Última eval.: ${a.ultima_ejecucion.slice(0, 10)}`}
+                    </div>
+                  </div>
+                  {canEdit && (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => ejecutarAhora(a)}
+                        style={{ padding: '5px 10px', background: '#eff6ff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#2563eb', fontWeight: 600 }}>
+                        ▶ Evaluar
+                      </button>
+                      <button onClick={() => toggleActiva(a.id, a.activa)}
+                        style={{ padding: '5px 10px', background: '#f3f4f6', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#6b7280' }}>
+                        {a.activa ? 'Pausar' : 'Activar'}
+                      </button>
+                      <button onClick={() => eliminar(a.id)}
+                        style={{ padding: '5px 10px', background: '#fef2f2', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#ef4444' }}>✕</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      <div style={{ marginTop: 16, padding: '10px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 11, color: '#6b7280' }}>
+        💡 Las automatizaciones evalúan los datos actuales del proyecto. La ejecución automática programada (cron) estará disponible en la próxima versión con integración de mensajería.
+      </div>
+      <div style={{ display: 'none' }}>{hoy}</div>
+    </div>
+  )
+}
