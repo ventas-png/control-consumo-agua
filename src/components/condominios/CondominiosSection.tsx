@@ -199,6 +199,10 @@ import GestorAlertasTab from './tabs/GestorAlertasTab'
 import UtilizacionAmenidadesTab from './tabs/UtilizacionAmenidadesTab'
 import ComparativoAnualTab from './tabs/ComparativoAnualTab'
 import GanttMantenimientoTab from './tabs/GanttMantenimientoTab'
+import MapaCalorCuotasTab from './tabs/MapaCalorCuotasTab'
+import EncuestaDashboardTab from './tabs/EncuestaDashboardTab'
+import AnalisisVisitantesTab from './tabs/AnalisisVisitantesTab'
+import InformeEjecutivoTab from './tabs/InformeEjecutivoTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -240,6 +244,7 @@ type CondominioTab =
   | 'kanban_tickets' | 'conciliacion_cobros' | 'estado_cuenta_residente' | 'pronostico_financiero'
   | 'simulador_cuotas' | 'calendario_mantenimiento' | 'reporte_deudores' | 'resumen_residente'
   | 'gestor_alertas' | 'utilizacion_amenidades' | 'comparativo_anual' | 'gantt_mantenimiento'
+  | 'mapa_calor_cuotas' | 'encuesta_dashboard' | 'analisis_visitantes' | 'informe_ejecutivo'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -400,6 +405,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'utilizacion_amenidades',label: 'Uso amenidades',   icon: '📊' },
   { id: 'comparativo_anual',     label: 'Comp. anual',      icon: '📅' },
   { id: 'gantt_mantenimiento',   label: 'Gantt tickets',    icon: '📐' },
+  { id: 'mapa_calor_cuotas',    label: 'Mapa de calor',    icon: '🌡️' },
+  { id: 'encuesta_dashboard',   label: 'Encuestas',        icon: '📝' },
+  { id: 'analisis_visitantes',  label: 'Visitantes',       icon: '👥' },
+  { id: 'informe_ejecutivo',    label: 'Informe ejecutivo',icon: '📰' },
 ]
 
 interface Props {
@@ -1175,6 +1184,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'utilizacion_amenidades' && <UtilizacionAmenidadesTab amenidades={amenidades} reservas={reservas} moneda={moneda} />}
         {activeTab === 'comparativo_anual' && <ComparativoAnualTab cuotas={cuotas} gastos={gastos} moneda={moneda} />}
         {activeTab === 'gantt_mantenimiento' && <GanttMantenimientoTab tickets={tickets} moneda={moneda} />}
+        {activeTab === 'mapa_calor_cuotas' && <MapaCalorCuotasTab cuotas={cuotas} unidades={unidadesProyecto} moneda={moneda} />}
+        {activeTab === 'encuesta_dashboard' && <EncuestaDashboardTab encuestas={encuestas} respuestas={respuestasEncuesta} />}
+        {activeTab === 'analisis_visitantes' && <AnalisisVisitantesTab visitantes={visitantes} unidades={unidadesProyecto} />}
+        {activeTab === 'informe_ejecutivo' && <InformeEjecutivoTab cuotas={cuotas} gastos={gastos} tickets={tickets} visitantes={visitantes} unidades={unidadesProyecto} polizas={polizas} contratosProveedores={contratosProveedores} inspecciones={inspecciones} sugerencias={sugerencias} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}
