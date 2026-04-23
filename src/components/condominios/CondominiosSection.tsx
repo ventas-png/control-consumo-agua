@@ -209,6 +209,10 @@ import TableroOcupacionTab from './tabs/TableroOcupacionTab'
 import GestionFondoReservaTab from './tabs/GestionFondoReservaTab'
 import DashboardSostenibilidadTab from './tabs/DashboardSostenibilidadTab'
 import ConfiguracionCondominioTab from './tabs/ConfiguracionCondominioTab'
+import BitacoraActividadTab from './tabs/BitacoraActividadTab'
+import PanelDirectivoTab from './tabs/PanelDirectivoTab'
+import GestionConflictosTab from './tabs/GestionConflictosTab'
+import DirectorioComunidadTab from './tabs/DirectorioComunidadTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -252,6 +256,7 @@ type CondominioTab =
   | 'gestor_alertas' | 'utilizacion_amenidades' | 'comparativo_anual' | 'gantt_mantenimiento'
   | 'mapa_calor_cuotas' | 'encuesta_dashboard' | 'analisis_visitantes' | 'informe_ejecutivo'
   | 'tablero_ocupacion' | 'gestion_fondo' | 'dashboard_sostenibilidad' | 'configuracion_cond'
+  | 'bitacora_actividad' | 'panel_directivo' | 'gestion_conflictos' | 'directorio_comunidad'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -420,6 +425,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'gestion_fondo',        label: 'Fondo de reserva', icon: '🏦' },
   { id: 'dashboard_sostenibilidad', label: 'Sostenibilidad', icon: '🌿' },
   { id: 'configuracion_cond',   label: 'Config. condominio',icon: '⚙️' },
+  { id: 'bitacora_actividad',   label: 'Bitácora actividad',icon: '📋' },
+  { id: 'panel_directivo',      label: 'Panel directivo',   icon: '🏛️' },
+  { id: 'gestion_conflictos',   label: 'Conflictos',        icon: '⚖️' },
+  { id: 'directorio_comunidad', label: 'Directorio',        icon: '📒' },
 ]
 
 interface Props {
@@ -1213,6 +1222,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'gestion_fondo' && <GestionFondoReservaTab movimientos={fondoReservaMovs} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'dashboard_sostenibilidad' && <DashboardSostenibilidadTab gastos={gastos} unidades={unidadesProyecto} moneda={moneda} />}
         {activeTab === 'configuracion_cond' && <ConfiguracionCondominioTab config={configCondominio} proyectoId={selectedProyectoId} companyId={cid} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'bitacora_actividad' && <BitacoraActividadTab cuotas={cuotas} visitantes={visitantes} tickets={tickets} reservas={reservas} anuncios={anuncios} conciliaciones={conciliaciones} fondoReservaMovs={fondoReservaMovs} infracciones={infracciones} sugerencias={sugerencias} unidades={unidadesProyecto} moneda={moneda} />}
+        {activeTab === 'panel_directivo' && <PanelDirectivoTab cuotas={cuotas} gastos={gastos} presupuestos={presupuestos} tickets={tickets} polizas={polizas} inspecciones={inspecciones} contratos={contratos} infracciones={infracciones} sugerencias={sugerencias} unidades={unidadesProyecto} recargosMora={recargosMora} fondoReservaMovs={fondoReservaMovs} moneda={moneda} />}
+        {activeTab === 'gestion_conflictos' && <GestionConflictosTab infracciones={infracciones} sugerencias={sugerencias} unidades={unidadesProyecto} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'directorio_comunidad' && <DirectorioComunidadTab unidades={unidadesProyecto} contratos={contratos} mascotas={mascotas} vehiculos={vehiculos} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}
