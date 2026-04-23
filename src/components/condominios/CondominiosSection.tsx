@@ -35,6 +35,8 @@ import type {
   VencimientoExtra, CapacitacionPersonal, ProyectoCondominio,
   ArticuloManual,
   AutomatizacionCond,
+  PlantillaMensajeCond,
+  FlujoAprobacionCond,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -167,6 +169,10 @@ import ExportacionTab from './tabs/ExportacionTab'
 import MultiCondominioTab from './tabs/MultiCondominioTab'
 import AutomatizacionesTab from './tabs/AutomatizacionesTab'
 import ScoringUnidadesTab from './tabs/ScoringUnidadesTab'
+import PanelTurnoTab from './tabs/PanelTurnoTab'
+import PlantillasMensajeTab from './tabs/PlantillasMensajeTab'
+import FlujoAprobacionTab from './tabs/FlujoAprobacionTab'
+import CuadroMandoTab from './tabs/CuadroMandoTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -201,6 +207,7 @@ type CondominioTab =
   | 'vencimientos_criticos' | 'capacitacion_personal' | 'proyectos_cond' | 'metricas_servicio'
   | 'analisis_cartera' | 'integracion_agua' | 'centro_costos' | 'manual_residente'
   | 'exportacion' | 'multi_condominio' | 'automatizaciones' | 'scoring_unidades'
+  | 'panel_turno' | 'plantillas_mensaje' | 'flujo_aprobacion' | 'cuadro_mando'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -333,6 +340,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'multi_condominio',       label: 'Multi-condominio', icon: '🏘️' },
   { id: 'automatizaciones',       label: 'Automatizaciones', icon: '⚙️' },
   { id: 'scoring_unidades',       label: 'Scoring',          icon: '🎯' },
+  { id: 'panel_turno',           label: 'Panel turno',      icon: '🟢' },
+  { id: 'plantillas_mensaje',    label: 'Plantillas msg.',  icon: '📨' },
+  { id: 'flujo_aprobacion',      label: 'Aprobaciones',     icon: '✅' },
+  { id: 'cuadro_mando',          label: 'Cuadro de mando',  icon: '📈' },
 ]
 
 interface Props {
@@ -503,6 +514,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [articulosManual, setArticulosManual] = useState<ArticuloManual[]>([])
   // Fase 34
   const [automatizaciones, setAutomatizaciones] = useState<AutomatizacionCond[]>([])
+  // Fase 35
+  const [plantillasMensaje, setPlantillasMensaje] = useState<PlantillaMensajeCond[]>([])
+  const [flujoAprobacion, setFlujoAprobacion] = useState<FlujoAprobacionCond[]>([])
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -552,6 +566,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       vencimientosExtraRes, capacitacionesRes, proyectosCondRes,
       articulosManualRes,
       automatizacionesRes,
+      plantillasMensajeRes,
+      flujoAprobacionRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -682,6 +698,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('manual_residente_cond').select('*').eq('project_id', pid).eq('company_id', cid).order('orden').order('titulo'),
       // Fase 34
       supabase.from('automatizaciones_cond').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      // Fase 35
+      supabase.from('plantillas_mensaje_cond').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
+      supabase.from('flujo_aprobacion_cond').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha_solicitud', { ascending: false }),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -820,6 +839,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setProyectosCond((proyectosCondRes.data ?? []) as ProyectoCondominio[])
     setArticulosManual((articulosManualRes.data ?? []) as ArticuloManual[])
     setAutomatizaciones((automatizacionesRes.data ?? []) as AutomatizacionCond[])
+    setPlantillasMensaje((plantillasMensajeRes.data ?? []) as PlantillaMensajeCond[])
+    setFlujoAprobacion((flujoAprobacionRes.data ?? []) as FlujoAprobacionCond[])
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -1048,6 +1069,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'multi_condominio' && <MultiCondominioTab proyectos={proyectosActivos} companyId={cid} moneda={moneda} />}
         {activeTab === 'automatizaciones' && <AutomatizacionesTab automatizaciones={automatizaciones} cuotas={cuotas} tickets={tickets} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'scoring_unidades' && <ScoringUnidadesTab cuotas={cuotas} infracciones={infracciones} sanciones={sanciones} unidades={unidadesProyecto} moneda={moneda} />}
+        {activeTab === 'panel_turno' && <PanelTurnoTab visitantes={visitantes} tickets={tickets} tareasCond={tareasCond} reservas={reservas} polizas={polizas} contratosProveedores={contratosProveedores} inspecciones={inspecciones} vencimientosExtra={vencimientosExtra} cuotas={cuotas} />}
+        {activeTab === 'plantillas_mensaje' && <PlantillasMensajeTab plantillas={plantillasMensaje} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'flujo_aprobacion' && <FlujoAprobacionTab flujos={flujoAprobacion} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'cuadro_mando' && <CuadroMandoTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} gastos={gastos} presupuestos={presupuestos} incidentes={incidentes} sugerencias={sugerencias} polizas={polizas} contratosProveedores={contratosProveedores} inspecciones={inspecciones} vencimientosExtra={vencimientosExtra} encuestas={encuestas} moneda={moneda} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}

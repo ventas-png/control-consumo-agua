@@ -3059,3 +3059,36 @@ export interface AutomatizacionCond {
   notas?: string | null
   created_at: string
 }
+
+export type CanalPlantilla = 'whatsapp' | 'email' | 'sms'
+export interface PlantillaMensajeCond {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  canal: CanalPlantilla
+  asunto?: string | null
+  cuerpo: string
+  variables: string[]
+  activa: boolean
+  created_at: string
+}
+
+export type TipoFlujoAprobacion = 'gasto_mayor' | 'propuesta' | 'permiso_obra' | 'mudanza' | 'otro'
+export type EstadoFlujoAprobacion = 'pendiente' | 'aprobado' | 'rechazado'
+export interface FlujoAprobacionCond {
+  id: string
+  company_id: string
+  project_id: string
+  tipo: TipoFlujoAprobacion
+  titulo: string
+  descripcion?: string | null
+  monto?: number | null
+  solicitado_por?: string | null
+  aprobado_por?: string | null
+  estado: EstadoFlujoAprobacion
+  fecha_solicitud: string
+  fecha_resolucion?: string | null
+  comentario_resolucion?: string | null
+  created_at: string
+}
