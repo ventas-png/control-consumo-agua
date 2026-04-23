@@ -173,6 +173,10 @@ import PanelTurnoTab from './tabs/PanelTurnoTab'
 import PlantillasMensajeTab from './tabs/PlantillasMensajeTab'
 import FlujoAprobacionTab from './tabs/FlujoAprobacionTab'
 import CuadroMandoTab from './tabs/CuadroMandoTab'
+import GeneracionCuotasTab from './tabs/GeneracionCuotasTab'
+import MapaUnidadesTab from './tabs/MapaUnidadesTab'
+import EnvioMasivoTab from './tabs/EnvioMasivoTab'
+import ResumenEjecutivoTab from './tabs/ResumenEjecutivoTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -208,6 +212,7 @@ type CondominioTab =
   | 'analisis_cartera' | 'integracion_agua' | 'centro_costos' | 'manual_residente'
   | 'exportacion' | 'multi_condominio' | 'automatizaciones' | 'scoring_unidades'
   | 'panel_turno' | 'plantillas_mensaje' | 'flujo_aprobacion' | 'cuadro_mando'
+  | 'generacion_cuotas' | 'mapa_unidades' | 'envio_masivo' | 'resumen_ejecutivo'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -344,6 +349,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'plantillas_mensaje',    label: 'Plantillas msg.',  icon: '📨' },
   { id: 'flujo_aprobacion',      label: 'Aprobaciones',     icon: '✅' },
   { id: 'cuadro_mando',          label: 'Cuadro de mando',  icon: '📈' },
+  { id: 'generacion_cuotas',     label: 'Generar cuotas',   icon: '🏭' },
+  { id: 'mapa_unidades',         label: 'Mapa unidades',    icon: '🗺️' },
+  { id: 'envio_masivo',          label: 'Envío masivo',     icon: '📤' },
+  { id: 'resumen_ejecutivo',     label: 'Resumen ejecutivo',icon: '📋' },
 ]
 
 interface Props {
@@ -517,6 +526,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   // Fase 35
   const [plantillasMensaje, setPlantillasMensaje] = useState<PlantillaMensajeCond[]>([])
   const [flujoAprobacion, setFlujoAprobacion] = useState<FlujoAprobacionCond[]>([])
+  // Fase 36 — GeneracionCuotasLog loaded on demand inside GeneracionCuotasTab
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -1073,6 +1083,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'plantillas_mensaje' && <PlantillasMensajeTab plantillas={plantillasMensaje} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'flujo_aprobacion' && <FlujoAprobacionTab flujos={flujoAprobacion} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'cuadro_mando' && <CuadroMandoTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} gastos={gastos} presupuestos={presupuestos} incidentes={incidentes} sugerencias={sugerencias} polizas={polizas} contratosProveedores={contratosProveedores} inspecciones={inspecciones} vencimientosExtra={vencimientosExtra} encuestas={encuestas} moneda={moneda} />}
+        {activeTab === 'generacion_cuotas' && <GeneracionCuotasTab cuotas={cuotas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'mapa_unidades' && <MapaUnidadesTab unidades={unidadesProyecto} cuotas={cuotas} contratos={contratos} moneda={moneda} />}
+        {activeTab === 'envio_masivo' && <EnvioMasivoTab plantillas={plantillasMensaje} cuotas={cuotas} unidades={unidadesProyecto} reservas={reservas} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} onRefresh={cargarDatos} />}
+        {activeTab === 'resumen_ejecutivo' && <ResumenEjecutivoTab cuotas={cuotas} tickets={tickets} gastos={gastos} presupuestos={presupuestos} unidades={unidadesProyecto} incidentes={incidentes} polizas={polizas} contratosProveedores={contratosProveedores} inspecciones={inspecciones} vencimientosExtra={vencimientosExtra} sugerencias={sugerencias} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}

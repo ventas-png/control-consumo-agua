@@ -3092,3 +3092,16 @@ export interface FlujoAprobacionCond {
   comentario_resolucion?: string | null
   created_at: string
 }
+
+// ── Fase 36 ───────────────────────────────────────────────────────────────────
+export interface GeneracionCuotasLog {
+  id: string
+  company_id: string
+  project_id: string
+  periodo: string
+  concepto: string
+  monto_unitario: number
+  fecha_vencimiento: string
+  unidades_generadas: number
+  created_at: string
+}
