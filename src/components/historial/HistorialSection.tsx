@@ -62,9 +62,9 @@ export function HistorialSection({
         // Proyecto (si el registro tiene project_id)
         const matchProyecto = filtroProyecto ? (r as any).project_id === filtroProyecto : true
 
-        // Unidad (via contador)
+        // Unidad — match by unidad_id on the registro if available
         const matchUnidad = filtroUnidad
-          ? unidades.some(u => u.id === filtroUnidad && u.contadores?.some(c => c.id === r.contador_id))
+          ? (r as unknown as Record<string, unknown>).unidad_id === filtroUnidad
           : true
 
         return matchTxt && matchEst && matchFechaInicio && matchFechaFin && matchProyecto && matchUnidad
@@ -418,7 +418,6 @@ export function HistorialSection({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px', marginBottom: '20px' }}>
           {paginados.map(r => {
             const total = getTotal(r)
-            const cliente = clientes.find(c => c.id === r.cliente_id)
             return (
               <div
                 key={r.id}

@@ -29,7 +29,7 @@ export function LecturasSection({
   registros,
   tarifas,
   userRole,
-  currentUser,
+  currentUser: _currentUser,
   proyectos = [],
   moneda = 'Q',
   onRegistroAdded,
@@ -40,7 +40,7 @@ export function LecturasSection({
 }: Props) {
   // Derive project_id from current user's context
   const defaultProjectId = proyectos.length === 1 ? proyectos[0].id : null
-  const projectId = currentUser?.project_id ?? defaultProjectId
+  const projectId = defaultProjectId
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
   const [selectedContadorId, setSelectedContadorId] = useState('')
   const [lecturaActual, setLecturaActual] = useState('')
