@@ -325,6 +325,8 @@ export default function App() {
                 registros={registros}
                 tarifas={tarifas}
                 userRole={currentUser.role}
+                currentUser={currentUser}
+                proyectos={proyectos}
                 moneda={moneda}
                 onRegistroAdded={addRegistro}
                 rutaActiva={rutaActivaParaLecturas}
