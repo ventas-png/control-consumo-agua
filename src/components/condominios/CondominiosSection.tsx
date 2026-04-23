@@ -191,6 +191,10 @@ import KanbanTicketsTab from './tabs/KanbanTicketsTab'
 import ConciliacionCobrosTab from './tabs/ConciliacionCobrosTab'
 import EstadoCuentaResidenteTab from './tabs/EstadoCuentaResidenteTab'
 import PronosticoFinancieroTab from './tabs/PronosticoFinancieroTab'
+import SimuladorCuotasTab from './tabs/SimuladorCuotasTab'
+import CalendarioMantenimientoTab from './tabs/CalendarioMantenimientoTab'
+import ReporteDeudoresTab from './tabs/ReporteDeudoresTab'
+import ResumenResidenteTab from './tabs/ResumenResidenteTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -230,6 +234,7 @@ type CondominioTab =
   | 'ordenes_compra' | 'graficas_tendencias' | 'control_accesos_qr' | 'asamblea_digital'
   | 'comparativo_presupuesto' | 'proformas' | 'bitacora_eventos' | 'indice_calidad'
   | 'kanban_tickets' | 'conciliacion_cobros' | 'estado_cuenta_residente' | 'pronostico_financiero'
+  | 'simulador_cuotas' | 'calendario_mantenimiento' | 'reporte_deudores' | 'resumen_residente'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -382,6 +387,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'conciliacion_cobros',   label: 'Conciliación',     icon: '🔄' },
   { id: 'estado_cuenta_residente', label: 'Edo. cuenta',    icon: '📃' },
   { id: 'pronostico_financiero', label: 'Pronóstico',       icon: '🔮' },
+  { id: 'simulador_cuotas',      label: 'Simulador',        icon: '🧮' },
+  { id: 'calendario_mantenimiento', label: 'Calendario',   icon: '📆' },
+  { id: 'reporte_deudores',      label: 'Deudores',         icon: '📋' },
+  { id: 'resumen_residente',     label: 'Vista residente',  icon: '🏠' },
 ]
 
 interface Props {
@@ -1149,6 +1158,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'conciliacion_cobros' && <ConciliacionCobrosTab cuotas={cuotas} unidades={unidadesProyecto} conciliaciones={conciliaciones} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'estado_cuenta_residente' && <EstadoCuentaResidenteTab cuotas={cuotas} recargosMora={recargosMora} conveniosCuota={conveniosCuota} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
         {activeTab === 'pronostico_financiero' && <PronosticoFinancieroTab cuotas={cuotas} gastos={gastos} moneda={moneda} />}
+        {activeTab === 'simulador_cuotas' && <SimuladorCuotasTab cuotas={cuotas} gastos={gastos} unidades={unidadesProyecto} moneda={moneda} />}
+        {activeTab === 'calendario_mantenimiento' && <CalendarioMantenimientoTab tickets={tickets} reservas={reservas} planesMantenimiento={planesMantenimiento} inspecciones={inspecciones} vencimientosExtra={vencimientosExtra} />}
+        {activeTab === 'reporte_deudores' && <ReporteDeudoresTab cuotas={cuotas} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
+        {activeTab === 'resumen_residente' && <ResumenResidenteTab cuotas={cuotas} recargosMora={recargosMora} reservas={reservas} anuncios={anuncios} tickets={tickets} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}
