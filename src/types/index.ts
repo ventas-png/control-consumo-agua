@@ -3189,3 +3189,36 @@ export interface ConciliacionCobrosLog {
   estado: 'conciliado' | 'diferencia'
   created_at: string
 }
+
+// ── Fase 43 ───────────────────────────────────────────────────────────────────
+export interface FondoReservaMovimiento {
+  id: string
+  company_id: string
+  project_id: string
+  tipo: 'aportacion' | 'retiro' | 'rendimiento' | 'ajuste'
+  concepto: string
+  monto: number
+  fecha: string
+  referencia?: string | null
+  notas?: string | null
+  created_at: string
+}
+
+export interface ConfigCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  cuota_base?: number | null
+  dias_gracia: number
+  tasa_mora_mensual: number
+  metodos_pago: string[]
+  nombre_administrador?: string | null
+  telefono_admin?: string | null
+  email_admin?: string | null
+  reglamento_url?: string | null
+  notif_dias_antes_vencimiento: number
+  permitir_reservas_online: boolean
+  max_reservas_por_unidad_mes: number
+  created_at: string
+  updated_at: string
+}

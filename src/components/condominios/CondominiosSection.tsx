@@ -39,6 +39,8 @@ import type {
   PlantillaMensajeCond,
   FlujoAprobacionCond,
   ConciliacionCobrosLog,
+  FondoReservaMovimiento,
+  ConfigCondominio,
 } from '../../types'
 import { PanelGeneralTab } from './tabs/PanelGeneralTab'
 import { CuotasTab } from './tabs/CuotasTab'
@@ -203,6 +205,10 @@ import MapaCalorCuotasTab from './tabs/MapaCalorCuotasTab'
 import EncuestaDashboardTab from './tabs/EncuestaDashboardTab'
 import AnalisisVisitantesTab from './tabs/AnalisisVisitantesTab'
 import InformeEjecutivoTab from './tabs/InformeEjecutivoTab'
+import TableroOcupacionTab from './tabs/TableroOcupacionTab'
+import GestionFondoReservaTab from './tabs/GestionFondoReservaTab'
+import DashboardSostenibilidadTab from './tabs/DashboardSostenibilidadTab'
+import ConfiguracionCondominioTab from './tabs/ConfiguracionCondominioTab'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -245,6 +251,7 @@ type CondominioTab =
   | 'simulador_cuotas' | 'calendario_mantenimiento' | 'reporte_deudores' | 'resumen_residente'
   | 'gestor_alertas' | 'utilizacion_amenidades' | 'comparativo_anual' | 'gantt_mantenimiento'
   | 'mapa_calor_cuotas' | 'encuesta_dashboard' | 'analisis_visitantes' | 'informe_ejecutivo'
+  | 'tablero_ocupacion' | 'gestion_fondo' | 'dashboard_sostenibilidad' | 'configuracion_cond'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -409,6 +416,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'encuesta_dashboard',   label: 'Encuestas',        icon: '📝' },
   { id: 'analisis_visitantes',  label: 'Visitantes',       icon: '👥' },
   { id: 'informe_ejecutivo',    label: 'Informe ejecutivo',icon: '📰' },
+  { id: 'tablero_ocupacion',    label: 'Tablero ocupación',icon: '🏗️' },
+  { id: 'gestion_fondo',        label: 'Fondo de reserva', icon: '🏦' },
+  { id: 'dashboard_sostenibilidad', label: 'Sostenibilidad', icon: '🌿' },
+  { id: 'configuracion_cond',   label: 'Config. condominio',icon: '⚙️' },
 ]
 
 interface Props {
@@ -589,6 +600,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   // Fase 38
   const [proformas, setProformas] = useState<Proforma[]>([])
   const [conciliaciones, setConciliaciones] = useState<ConciliacionCobrosLog[]>([])
+  // Fase 43
+  const [fondoReservaMovs, setFondoReservaMovs] = useState<FondoReservaMovimiento[]>([])
+  const [configCondominio, setConfigCondominio] = useState<ConfigCondominio | null>(null)
 
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
@@ -644,6 +658,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       asambleasDigitalRes,
       proformasRes,
       conciliacionesRes,
+      fondoReservaMovsRes,
+      configCondominioRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -784,6 +800,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('proformas_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       // Fase 39
       supabase.from('conciliacion_cobros_log').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      // Fase 43
+      supabase.from('fondo_reserva').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
+      supabase.from('config_condominio').select('*').eq('project_id', pid).eq('company_id', cid).maybeSingle(),
     ])
 
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
@@ -928,6 +947,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setAsambleasDigital((asambleasDigitalRes.data ?? []) as AsambleaDigital[])
     setProformas((proformasRes.data ?? []) as Proforma[])
     setConciliaciones((conciliacionesRes.data ?? []) as ConciliacionCobrosLog[])
+    setFondoReservaMovs((fondoReservaMovsRes.data ?? []) as FondoReservaMovimiento[])
+    setConfigCondominio((configCondominioRes.data ?? null) as ConfigCondominio | null)
 
     setLoading(false)
   }, [selectedProyectoId, currentUser.company_id])
@@ -1188,6 +1209,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'encuesta_dashboard' && <EncuestaDashboardTab encuestas={encuestas} respuestas={respuestasEncuesta} />}
         {activeTab === 'analisis_visitantes' && <AnalisisVisitantesTab visitantes={visitantes} unidades={unidadesProyecto} />}
         {activeTab === 'informe_ejecutivo' && <InformeEjecutivoTab cuotas={cuotas} gastos={gastos} tickets={tickets} visitantes={visitantes} unidades={unidadesProyecto} polizas={polizas} contratosProveedores={contratosProveedores} inspecciones={inspecciones} sugerencias={sugerencias} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
+        {activeTab === 'tablero_ocupacion' && <TableroOcupacionTab unidades={unidadesProyecto} contratos={contratos} cuotas={cuotas} moneda={moneda} />}
+        {activeTab === 'gestion_fondo' && <GestionFondoReservaTab movimientos={fondoReservaMovs} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'dashboard_sostenibilidad' && <DashboardSostenibilidadTab gastos={gastos} unidades={unidadesProyecto} moneda={moneda} />}
+        {activeTab === 'configuracion_cond' && <ConfiguracionCondominioTab config={configCondominio} proyectoId={selectedProyectoId} companyId={cid} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {ticketSeleccionado && (
           <ComentariosTicketTab
             ticket={ticketSeleccionado}
