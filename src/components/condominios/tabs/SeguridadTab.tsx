@@ -1,11 +1,17 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import type { RondaSeguridad, NovedadSeguridad, TipoNovedad, PrioridadNovedad, EstadoRonda } from '../../../types'
+import type {
+  RondaSeguridad, NovedadSeguridad, TipoNovedad, PrioridadNovedad, EstadoRonda,
+  RutaRonda, PuntoControlRuta, VisitaControl, EstadoVisitaControl,
+} from '../../../types'
 
 interface Props {
   rondas: RondaSeguridad[]
   novedades: NovedadSeguridad[]
+  rutas: RutaRonda[]
+  puntosControl: PuntoControlRuta[]
+  visitasControl: VisitaControl[]
   proyectoId: string
   companyId: string
   userId: string
@@ -34,7 +40,17 @@ const ESTADO_RONDA: Record<EstadoRonda, { label: string; bg: string; color: stri
   incompleta: { label: 'Incompleta', bg: '#fef2f2', color: '#dc2626' },
 }
 
-export function SeguridadTab({ rondas, novedades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
+const VISITA_CONFIG: Record<EstadoVisitaControl, { label: string; icon: string; bg: string; color: string }> = {
+  pendiente: { label: 'Pendiente', icon: '⏳', bg: '#f8fafc',  color: '#64748b' },
+  ok:        { label: 'OK',        icon: '✅', bg: '#f0fdf4',  color: '#16a34a' },
+  novedad:   { label: 'Novedad',   icon: '⚠️', bg: '#fff7ed',  color: '#ea580c' },
+  omitido:   { label: 'Omitido',   icon: '⏭',  bg: '#faf5ff',  color: '#7c3aed' },
+}
+
+export function SeguridadTab({
+  rondas, novedades, rutas, puntosControl, visitasControl,
+  proyectoId, companyId, userId, canCreate, canEdit, onRefresh,
+}: Props) {
   const [vista, setVista] = useState<'novedades' | 'rondas'>('novedades')
   const [showNovedadForm, setShowNovedadForm] = useState(false)
   const [showRondaForm, setShowRondaForm] = useState(false)
@@ -45,7 +61,7 @@ export function SeguridadTab({ rondas, novedades, proyectoId, companyId, userId,
     tipo: 'observacion' as TipoNovedad, descripcion: '', ubicacion: '',
     prioridad: 'normal' as PrioridadNovedad, ronda_id: '',
   })
-  const [rondaForm, setRondaForm] = useState({ notas: '' })
+  const [rondaForm, setRondaForm] = useState({ notas: '', ruta_id: '' })
 
   const novedadesFiltradas = novedades.filter(n =>
     filtroPrioridad === 'todos' || n.prioridad === filtroPrioridad
@@ -56,22 +72,66 @@ export function SeguridadTab({ rondas, novedades, proyectoId, companyId, userId,
   const novedadesHoy = novedades.filter(n => n.created_at.startsWith(hoy))
   const criticas = novedades.filter(n => n.prioridad === 'critica').length
 
+  // Checklist de la ronda en curso
+  const visitasRondaActual = rondaEnCurso
+    ? visitasControl.filter(v => v.ronda_id === rondaEnCurso.id)
+    : []
+  const puntosRondaActual = rondaEnCurso?.ruta_id
+    ? puntosControl.filter(p => p.ruta_id === rondaEnCurso.ruta_id).sort((a, b) => a.orden - b.orden)
+    : []
+  const puntosCompletados = visitasRondaActual.filter(v => v.estado !== 'pendiente').length
+  const progreso = puntosRondaActual.length > 0 ? Math.round((puntosCompletados / puntosRondaActual.length) * 100) : 0
+
+  const rutasActivas = rutas.filter(r => r.activo)
+
   async function iniciarRonda() {
     setSaving(true)
-    const { error } = await supabase.from('rondas_seguridad').insert({
-      company_id: companyId, project_id: proyectoId,
-      guardia_id: userId, estado: 'en_curso',
-      notas: rondaForm.notas.trim() || null,
-    })
-    setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
-    setRondaForm({ notas: '' }); setShowRondaForm(false)
+    const { data: rondaData, error } = await supabase
+      .from('rondas_seguridad')
+      .insert({
+        company_id: companyId, project_id: proyectoId,
+        guardia_id: userId, estado: 'en_curso',
+        ruta_id: rondaForm.ruta_id || null,
+        notas: rondaForm.notas.trim() || null,
+      })
+      .select('id')
+      .single()
+    if (error) { Swal.fire('Error', error.message, 'error'); setSaving(false); return }
+
+    // Si se seleccionó una ruta, crear las visitas_control para cada punto
+    if (rondaForm.ruta_id && rondaData) {
+      const puntos = puntosControl.filter(p => p.ruta_id === rondaForm.ruta_id).sort((a, b) => a.orden - b.orden)
+      if (puntos.length > 0) {
+        await supabase.from('visitas_control').insert(
+          puntos.map(p => ({ ronda_id: rondaData.id, punto_id: p.id, estado: 'pendiente' }))
+        )
+      }
+    }
+    setSaving(false); setRondaForm({ notas: '', ruta_id: '' }); setShowRondaForm(false)
     onRefresh()
   }
 
   async function finalizarRonda(id: string, estado: EstadoRonda) {
     await supabase.from('rondas_seguridad').update({ estado, fin: new Date().toISOString() }).eq('id', id)
     onRefresh()
+  }
+
+  async function marcarVisita(visitaId: string, estado: EstadoVisitaControl, notas?: string) {
+    await supabase.from('visitas_control').update({
+      estado, notas: notas ?? null,
+      visitado_en: estado !== 'pendiente' ? new Date().toISOString() : null,
+    }).eq('id', visitaId)
+    onRefresh()
+  }
+
+  async function marcarVisitaConNovedad(visitaId: string) {
+    const { value: notas } = await Swal.fire({
+      title: 'Registrar novedad en este punto',
+      input: 'textarea', inputPlaceholder: 'Describe la novedad encontrada...',
+      showCancelButton: true, confirmButtonText: 'Registrar', cancelButtonText: 'Cancelar',
+    })
+    if (notas === undefined) return
+    await marcarVisita(visitaId, 'novedad', notas as string)
   }
 
   async function registrarNovedad() {
@@ -132,18 +192,66 @@ export function SeguridadTab({ rondas, novedades, proyectoId, companyId, userId,
 
       {/* Ronda en curso banner */}
       {rondaEnCurso && (
-        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '18px' }}>🛡️</span>
-            <span style={{ fontSize: '13.5px', color: '#1d4ed8', fontWeight: 600 }}>
-              Ronda en curso desde {new Date(rondaEnCurso.inicio).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
-            </span>
+        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: puntosRondaActual.length > 0 ? '12px' : '0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '18px' }}>🛡️</span>
+              <div>
+                <span style={{ fontSize: '13.5px', color: '#1d4ed8', fontWeight: 600 }}>
+                  Ronda en curso desde {new Date(rondaEnCurso.inicio).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                {rondaEnCurso.ruta_id && rutas.find(r => r.id === rondaEnCurso.ruta_id) && (
+                  <span style={{ display: 'block', fontSize: '12px', color: '#3b82f6' }}>
+                    🗺 {rutas.find(r => r.id === rondaEnCurso.ruta_id)?.nombre}
+                  </span>
+                )}
+              </div>
+            </div>
+            {canEdit && (
+              <button onClick={() => finalizarRonda(rondaEnCurso.id, 'incompleta')}
+                style={{ padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                Marcar incompleta
+              </button>
+            )}
           </div>
-          {canEdit && (
-            <button onClick={() => finalizarRonda(rondaEnCurso.id, 'incompleta')}
-              style={{ padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-              Marcar incompleta
-            </button>
+
+          {/* Checklist de puntos de la ronda */}
+          {puntosRondaActual.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <div style={{ flex: 1, height: '8px', background: '#dbeafe', borderRadius: '99px', overflow: 'hidden' }}>
+                  <div style={{ width: `${progreso}%`, height: '100%', background: progreso === 100 ? '#16a34a' : '#3b82f6', borderRadius: '99px', transition: 'width .4s' }} />
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#1d4ed8', whiteSpace: 'nowrap' }}>{puntosCompletados}/{puntosRondaActual.length} puntos ({progreso}%)</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {puntosRondaActual.map((punto, idx) => {
+                  const visita = visitasRondaActual.find(v => v.punto_id === punto.id)
+                  const vc = visita ? VISITA_CONFIG[visita.estado] : VISITA_CONFIG['pendiente']
+                  const area = punto.area_nombre ?? punto.area_id
+                  const icono = punto.area_icono ?? '📍'
+                  return (
+                    <div key={punto.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: vc.bg, borderRadius: '9px', border: `1px solid ${visita?.estado === 'ok' ? '#bbf7d0' : visita?.estado === 'novedad' ? '#fed7aa' : '#e2e8f0'}` }}>
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#6366f1', width: '16px', textAlign: 'center' }}>{idx + 1}</span>
+                      <span style={{ fontSize: '18px' }}>{icono}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a' }}>{area}</div>
+                        {punto.instrucciones && <div style={{ fontSize: '11.5px', color: '#64748b' }}>{punto.instrucciones}</div>}
+                        {visita?.notas && <div style={{ fontSize: '11.5px', color: '#ea580c' }}>⚠ {visita.notas}</div>}
+                      </div>
+                      <span style={{ fontSize: '14px' }}>{vc.icon}</span>
+                      {canEdit && visita && visita.estado === 'pendiente' && (
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button onClick={() => marcarVisita(visita.id, 'ok')} title="OK" style={{ padding: '4px 9px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>✅</button>
+                          <button onClick={() => marcarVisitaConNovedad(visita.id)} title="Novedad" style={{ padding: '4px 9px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>⚠️</button>
+                          <button onClick={() => marcarVisita(visita.id, 'omitido')} title="Omitir" style={{ padding: '4px 9px', background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>⏭</button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -218,10 +326,28 @@ export function SeguridadTab({ rondas, novedades, proyectoId, companyId, userId,
       {showRondaForm && (
         <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Iniciar ronda de seguridad</h3>
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Notas (opcional)</label>
-            <input value={rondaForm.notas} onChange={e => setRondaForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones iniciales..."
-              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Ruta de ronda</label>
+              <select value={rondaForm.ruta_id} onChange={e => setRondaForm(f => ({ ...f, ruta_id: e.target.value }))}
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
+                <option value="">Sin ruta específica</option>
+                {rutasActivas.map(r => {
+                  const cantPuntos = puntosControl.filter(p => p.ruta_id === r.id).length
+                  return <option key={r.id} value={r.id}>{r.nombre} ({cantPuntos} punto{cantPuntos !== 1 ? 's' : ''}{r.tiempo_estimado_min ? ` · ~${r.tiempo_estimado_min} min` : ''})</option>
+                })}
+              </select>
+              {rondaForm.ruta_id && (
+                <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#6366f1' }}>
+                  🗺 Se generará automáticamente el checklist de puntos de control.
+                </p>
+              )}
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Notas (opcional)</label>
+              <input value={rondaForm.notas} onChange={e => setRondaForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones iniciales..."
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button onClick={iniciarRonda} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
@@ -292,6 +418,11 @@ export function SeguridadTab({ rondas, novedades, proyectoId, companyId, userId,
               ? Math.round((new Date(r.fin).getTime() - new Date(r.inicio).getTime()) / 60000)
               : Math.round((Date.now() - new Date(r.inicio).getTime()) / 60000)
             const novsRonda = novedades.filter(n => n.ronda_id === r.id).length
+            const visitasR = visitasControl.filter(v => v.ronda_id === r.id)
+            const okCount = visitasR.filter(v => v.estado === 'ok').length
+            const novCount = visitasR.filter(v => v.estado === 'novedad').length
+            const omitCount = visitasR.filter(v => v.estado === 'omitido').length
+            const rutaNombre = r.ruta_id ? rutas.find(rt => rt.id === r.ruta_id)?.nombre : null
             return (
               <div key={r.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <span style={{ fontSize: '22px', flexShrink: 0 }}>🛡️</span>
@@ -301,6 +432,14 @@ export function SeguridadTab({ rondas, novedades, proyectoId, companyId, userId,
                   </div>
                   <div style={{ fontSize: '12.5px', color: '#64748b', display: 'flex', gap: '12px', marginTop: '3px', flexWrap: 'wrap' }}>
                     <span>⏱ {duracion} min{r.fin ? '' : ' (en curso)'}</span>
+                    {rutaNombre && <span>🗺 {rutaNombre}</span>}
+                    {visitasR.length > 0 && (
+                      <>
+                        {okCount > 0 && <span style={{ color: '#16a34a' }}>✅ {okCount}</span>}
+                        {novCount > 0 && <span style={{ color: '#ea580c' }}>⚠️ {novCount}</span>}
+                        {omitCount > 0 && <span style={{ color: '#7c3aed' }}>⏭ {omitCount}</span>}
+                      </>
+                    )}
                     {novsRonda > 0 && <span>📋 {novsRonda} novedad{novsRonda > 1 ? 'es' : ''}</span>}
                     {r.notas && <span>· {r.notas}</span>}
                   </div>

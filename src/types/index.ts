@@ -558,11 +558,67 @@ export interface RondaSeguridad {
   company_id: string
   project_id: string
   guardia_id?: string | null
+  ruta_id?: string | null
   inicio: string
   fin?: string | null
   estado: EstadoRonda
   notas?: string | null
   created_at: string
+  // joins
+  ruta_nombre?: string
+}
+
+export interface AreaCondominio {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  descripcion?: string | null
+  icono: string
+  orden: number
+  activo: boolean
+  created_at: string
+}
+
+export interface RutaRonda {
+  id: string
+  company_id: string
+  project_id: string
+  nombre: string
+  descripcion?: string | null
+  tiempo_estimado_min?: number | null
+  activo: boolean
+  created_at: string
+}
+
+export interface PuntoControlRuta {
+  id: string
+  ruta_id: string
+  area_id: string
+  orden: number
+  instrucciones?: string | null
+  tiempo_estimado_min?: number | null
+  created_at: string
+  // joins
+  area_nombre?: string
+  area_icono?: string
+}
+
+export type EstadoVisitaControl = 'pendiente' | 'ok' | 'novedad' | 'omitido'
+
+export interface VisitaControl {
+  id: string
+  ronda_id: string
+  punto_id: string
+  estado: EstadoVisitaControl
+  notas?: string | null
+  visitado_en?: string | null
+  created_at: string
+  // joins
+  area_nombre?: string
+  area_icono?: string
+  punto_orden?: number
+  instrucciones?: string | null
 }
 
 export interface NovedadSeguridad {
