@@ -493,57 +493,46 @@ export function HistorialSection({
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-          <button
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            style={{
-              padding: '8px 12px',
-              background: currentPage === 1 ? '#f1f5f9' : '#0ea5e9',
-              color: currentPage === 1 ? '#cbd5e0' : 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-            }}
-          >
-            ← Anterior
-          </button>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            {Array.from({ length: totalPages }).map((_, i) => (
-              <button
-                key={i + 1}
-                onClick={() => setCurrentPage(i + 1)}
-                style={{
-                  padding: '8px 12px',
-                  background: currentPage === i + 1 ? '#0ea5e9' : '#f1f5f9',
-                  color: currentPage === i + 1 ? 'white' : '#475569',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: currentPage === i + 1 ? 600 : 'normal',
-                }}
-              >
-                {i + 1}
-              </button>
-            ))}
+      {totalPages > 1 && (() => {
+        const btnStyle = (active: boolean, disabled = false): React.CSSProperties => ({
+          minWidth: '36px', height: '36px', padding: '0 10px',
+          background: active ? '#0ea5e9' : disabled ? '#f1f5f9' : '#f8fafc',
+          color: active ? 'white' : disabled ? '#cbd5e0' : '#475569',
+          border: '1px solid', borderColor: active ? '#0ea5e9' : '#e2e8f0',
+          borderRadius: '8px', fontSize: '13px', fontWeight: active ? 700 : 400,
+          cursor: disabled ? 'not-allowed' : 'pointer', transition: 'all 0.12s',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        })
+        // Build visible page tokens: numbers + '…' separators
+        const pages: (number | '…')[] = []
+        const delta = 2 // pages around current
+        const add = (n: number) => { if (!pages.includes(n)) pages.push(n) }
+        add(1)
+        for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) add(i)
+        if (totalPages > 1) add(totalPages)
+        const withEllipsis: (number | '…')[] = []
+        pages.forEach((p, idx) => {
+          if (idx > 0) {
+            const prev = pages[idx - 1] as number
+            if ((p as number) - prev > 1) withEllipsis.push('…')
+          }
+          withEllipsis.push(p)
+        })
+        return (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} style={btnStyle(false, currentPage === 1)}>«</button>
+            <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1} style={btnStyle(false, currentPage === 1)}>‹</button>
+            {withEllipsis.map((p, idx) =>
+              p === '…'
+                ? <span key={`e${idx}`} style={{ padding: '0 4px', color: '#94a3b8', fontSize: '13px', userSelect: 'none' }}>…</span>
+                : <button key={p} onClick={() => setCurrentPage(p as number)} style={btnStyle(currentPage === p)}>{p}</button>
+            )}
+            <button onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} style={btnStyle(false, currentPage === totalPages)}>›</button>
+            <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} style={btnStyle(false, currentPage === totalPages)}>»</button>
+            <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: '6px' }}>Pág. {currentPage} de {totalPages}</span>
           </div>
-          <button
-            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage === totalPages}
-            style={{
-              padding: '8px 12px',
-              background: currentPage === totalPages ? '#f1f5f9' : '#0ea5e9',
-              color: currentPage === totalPages ? '#cbd5e0' : 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-            }}
-          >
-            Siguiente →
-          </button>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Edit Status Modal */}
       {editModal && (
