@@ -95,9 +95,12 @@ export function HistorialSection({
       .reduce((sum, r) => sum + (getTotal(r) || 0), 0)
     const mora = filtrados.filter(r => r.estado === 'mora').reduce((sum, r) => sum + (getTotal(r) || 0), 0)
 
+    const totalConsumo = filtrados.reduce((sum, r) => sum + (r.consumo || 0), 0)
+
     return {
       totalRegistros: filtrados.length,
       totalMonto: total,
+      totalConsumo,
       pagado,
       pendiente,
       mora,
@@ -242,6 +245,7 @@ export function HistorialSection({
       {/* Stats Cards */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {statCard('Total Registros', String(stats.totalRegistros), '#0ea5e9', '📝')}
+        {statCard('Total Consumo', `${stats.totalConsumo.toFixed(2)} m³`, '#0d9488', '💧')}
         {statCard('Total Monto', stats.totalMonto, '#8b5cf6', '💰')}
         {statCard('Pagado', stats.pagado, '#10b981', '✓')}
         {statCard('Pendiente', stats.pendiente, '#f59e0b', `⏳ (${stats.countPendiente})`)}
