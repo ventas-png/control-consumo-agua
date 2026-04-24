@@ -109,7 +109,7 @@ export function useData(companyId?: string) {
 
     return Promise.allSettled([
       supabase.from('clientes').select('*'),          // filtered via RLS + company_clientes junction
-      supabase.from('registros').select('*'),          // filtered via RLS + project assignments
+      supabase.from('registros').select('*').order('fecha', { ascending: false }),          // filtered via RLS + project assignments
       supabase.from('empresa').select('*').limit(1),
       fuentesQ,
       rcalQ,
