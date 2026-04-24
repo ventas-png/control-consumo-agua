@@ -7,6 +7,7 @@ import type {
   ParqueoCondominio, Mascota, PaqueteRecibido, InfraccionCondominio,
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
   AreaCondominio, RutaRonda, PuntoControlRuta, VisitaControl,
+  PlantillaTareaCargo, BloqueTurno, TareaBloque, RevisionTarea,
   Asamblea, ContratoProveedor, ObjetoPerdido, AgendaItem,
   ItemInventario, PolizaSeguro, InspeccionNormativa, PersonalCondominio,
   ContactoEmergencia, Mudanza, DocumentoCondominio, RegistroResiduo,
@@ -55,6 +56,9 @@ import { PaqueteriaTab } from './tabs/PaqueteriaTab'
 import { InfraccionesTab } from './tabs/InfraccionesTab'
 import { SeguridadTab } from './tabs/SeguridadTab'
 import { RutasRondaTab } from './tabs/RutasRondaTab'
+import { PlantillasCargoTab } from './tabs/PlantillasCargoTab'
+import { TareasPersonalTab } from './tabs/TareasPersonalTab'
+import { RevisionTareasTab } from './tabs/RevisionTareasTab'
 import { ArrendamientosTab } from './tabs/ArrendamientosTab'
 import { AsambleasTab } from './tabs/AsambleasTab'
 import { ProveedoresTab } from './tabs/ProveedoresTab'
@@ -262,6 +266,7 @@ type CondominioTab =
   | 'tablero_ocupacion' | 'gestion_fondo' | 'dashboard_sostenibilidad' | 'configuracion_cond'
   | 'bitacora_actividad' | 'panel_directivo' | 'gestion_conflictos' | 'directorio_comunidad'
   | 'centro_notificaciones' | 'cumpleanos' | 'rutas_ronda'
+  | 'plantillas_cargo' | 'tareas_personal' | 'revision_tareas'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -275,7 +280,10 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'paqueteria',     label: 'Paquetería',     icon: '📦' },
   { id: 'infracciones',   label: 'Infracciones',   icon: '⚖️' },
   { id: 'seguridad',      label: 'Seguridad',      icon: '🛡️' },
-  { id: 'rutas_ronda',   label: 'Rutas Ronda',    icon: '🗺️' },
+  { id: 'rutas_ronda',      label: 'Rutas Ronda',     icon: '🗺️' },
+  { id: 'plantillas_cargo', label: 'Plantillas',      icon: '📋' },
+  { id: 'tareas_personal',  label: 'Turnos/Tareas',   icon: '⚙️' },
+  { id: 'revision_tareas',  label: 'Revisión Admin',  icon: '🔍' },
   { id: 'arrendamientos', label: 'Arrendamientos', icon: '📄' },
   { id: 'asambleas',      label: 'Asambleas',      icon: '🗳️' },
   { id: 'proveedores',    label: 'Proveedores',    icon: '🤝' },
@@ -481,6 +489,7 @@ const SECTIONS: SectionDef[] = [
   ]},
   { id: 'seguridad', label: 'Seguridad', icon: '🛡️', tabs: [
     'visitantes', 'analisis_visitantes', 'vis_frecuentes', 'seguridad', 'rutas_ronda',
+    'plantillas_cargo', 'tareas_personal', 'revision_tareas',
     'paqueteria', 'objetos', 'incidentes', 'reclamos', 'bitacora_guardia', 'presencia',
     'panel_turno', 'emergencias',
   ]},
@@ -535,6 +544,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [rutas, setRutas] = useState<RutaRonda[]>([])
   const [puntosControl, setPuntosControl] = useState<PuntoControlRuta[]>([])
   const [visitasControl, setVisitasControl] = useState<VisitaControl[]>([])
+  const [plantillasCargo, setPlantillasCargo] = useState<PlantillaTareaCargo[]>([])
+  const [bloquesTurno, setBloquesTurno] = useState<BloqueTurno[]>([])
+  const [tareasBloque, setTareasBloque] = useState<TareaBloque[]>([])
+  const [revisionesTarea, setRevisionesTarea] = useState<RevisionTarea[]>([])
   const [contratos, setContratos] = useState<ContratoArrendamiento[]>([])
   // Fase 3
   const [asambleas, setAsambleas] = useState<Asamblea[]>([])
@@ -929,6 +942,43 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       })
     )
 
+    // Fase 58 — Tareas operativas
+    const [plantillasCargoRes, bloquesTurnoRes] = await Promise.all([
+      supabase.from('plantillas_tarea_cargo').select('*, areas_condominio(nombre)').eq('project_id', pid).eq('company_id', cid).order('cargo').order('orden'),
+      supabase.from('bloques_turno').select('*, personal_condominio(nombre, cargo)').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }).order('created_at', { ascending: false }).limit(200),
+    ])
+    setPlantillasCargo(
+      (plantillasCargoRes.data ?? []).map((p: Record<string, unknown>) => ({
+        ...p,
+        area_nombre: (p.areas_condominio as { nombre: string } | null)?.nombre,
+      })) as PlantillaTareaCargo[]
+    )
+    const bloqueIds = (bloquesTurnoRes.data ?? []).map((b: Record<string, unknown>) => b.id as string)
+    setBloquesTurno(
+      (bloquesTurnoRes.data ?? []).map((b: Record<string, unknown>) => ({
+        ...b,
+        personal_nombre: (b.personal_condominio as { nombre: string; cargo: string } | null)?.nombre,
+        personal_cargo:  (b.personal_condominio as { nombre: string; cargo: string } | null)?.cargo,
+      })) as BloqueTurno[]
+    )
+    if (bloqueIds.length > 0) {
+      const [tareasRes, revisionesRes] = await Promise.all([
+        supabase.from('tareas_bloque').select('*, areas_condominio(nombre, icono)').in('bloque_id', bloqueIds).order('orden'),
+        supabase.from('revisiones_tarea').select('*').in('bloque_id', bloqueIds).order('revisado_en', { ascending: false }),
+      ])
+      setTareasBloque(
+        (tareasRes.data ?? []).map((t: Record<string, unknown>) => ({
+          ...t,
+          foto_urls: (t.foto_urls as string[] | null) ?? [],
+          area_nombre: (t.areas_condominio as { nombre: string; icono: string } | null)?.nombre,
+          area_icono:  (t.areas_condominio as { nombre: string; icono: string } | null)?.icono,
+        })) as TareaBloque[]
+      )
+      setRevisionesTarea((revisionesRes.data ?? []) as RevisionTarea[])
+    } else {
+      setTareasBloque([]); setRevisionesTarea([])
+    }
+
     const mapUnidad = <T extends object>(data: Record<string, unknown>[]): T[] =>
       data.map(r => ({ ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre } as T))
 
@@ -1205,6 +1255,12 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'seguridad' && <SeguridadTab rondas={rondas} novedades={novedades} rutas={rutas} puntosControl={puntosControl} visitasControl={visitasControl} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
         {activeTab === 'rutas_ronda' && <RutasRondaTab areas={areas} rutas={rutas} puntosControl={puntosControl} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'plantillas_cargo' && <PlantillasCargoTab plantillas={plantillasCargo} areas={areas} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'tareas_personal' && <TareasPersonalTab bloques={bloquesTurno} tareas={tareasBloque} plantillas={plantillasCargo} personal={personal} areas={areas} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'revision_tareas' && <RevisionTareasTab bloques={bloquesTurno} tareas={tareasBloque} revisiones={revisionesTarea} personal={personal} userId={uid} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
         {activeTab === 'arrendamientos' && <ArrendamientosTab contratos={contratos} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 

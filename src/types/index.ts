@@ -621,6 +621,82 @@ export interface VisitaControl {
   instrucciones?: string | null
 }
 
+// ── Tareas operativas ─────────────────────────────────────────────────────
+
+export interface PlantillaTareaCargo {
+  id: string
+  company_id: string
+  project_id: string
+  cargo: string
+  titulo: string
+  descripcion?: string | null
+  icono: string
+  orden: number
+  area_id?: string | null
+  requiere_foto: boolean
+  activo: boolean
+  created_at: string
+  // joins
+  area_nombre?: string
+}
+
+export type EstadoBloqueTurno = 'pendiente' | 'en_curso' | 'completado' | 'incompleto'
+export type TurnoTipo = 'manana' | 'tarde' | 'noche'
+
+export interface BloqueTurno {
+  id: string
+  company_id: string
+  project_id: string
+  personal_id: string
+  turno: TurnoTipo
+  fecha: string
+  estado: EstadoBloqueTurno
+  iniciado_en?: string | null
+  cerrado_en?: string | null
+  puntaje_completitud?: number | null
+  creado_por?: string | null
+  notas?: string | null
+  created_at: string
+  // joins
+  personal_nombre?: string
+  personal_cargo?: string
+}
+
+export type EstadoTareaBloque = 'pendiente' | 'completada' | 'con_observacion' | 'omitida'
+
+export interface TareaBloque {
+  id: string
+  bloque_id: string
+  plantilla_id?: string | null
+  titulo: string
+  descripcion?: string | null
+  area_id?: string | null
+  orden: number
+  requiere_foto: boolean
+  estado: EstadoTareaBloque
+  completada_en?: string | null
+  evidencia_texto?: string | null
+  foto_urls: string[]
+  notas_operativo?: string | null
+  created_at: string
+  // joins
+  area_nombre?: string
+  area_icono?: string
+}
+
+export type EstadoRevision = 'pendiente' | 'aprobado' | 'rechazado'
+
+export interface RevisionTarea {
+  id: string
+  tarea_id: string
+  bloque_id: string
+  revisado_por: string
+  estado: EstadoRevision
+  comentario?: string | null
+  revisado_en: string
+  created_at: string
+}
+
 export interface NovedadSeguridad {
   id: string
   company_id: string
