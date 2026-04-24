@@ -84,6 +84,11 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
     onRefresh()
   }
 
+  function notificarWA(i: InfraccionCondominio) {
+    const msg = `⚠️ Infracción registrada\nUnidad: ${i.unidad_nombre ?? ''}\nTipo: ${TIPO_CONFIG[i.tipo].label}\nDescripción: ${i.descripcion}${i.monto_multa ? `\nMulta: ${moneda} ${i.monto_multa.toFixed(2)}` : ''}${i.fecha_limite_descargo ? `\nFecha límite descargo: ${i.fecha_limite_descargo}` : ''}`
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+  }
+
   return (
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
@@ -207,6 +212,9 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
                       </select>
                     ) : (
                       <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: estado.bg, color: estado.color }}>{estado.label}</span>
+                    )}
+                    {!['resuelta', 'anulada'].includes(i.estado) && (
+                      <button onClick={() => notificarWA(i)} title="Notificar por WhatsApp" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '15px', padding: '2px 4px' }}>💬</button>
                     )}
                     <button onClick={() => eliminar(i.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
                   </div>

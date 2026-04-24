@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { GastoCondominio, CategoriaGasto, EstadoGasto } from '../../../types'
 import Swal from 'sweetalert2'
+import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
   gastos: GastoCondominio[]
   proyectoId: string
   companyId: string
   moneda: string
+  proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
@@ -40,7 +42,7 @@ function barWidth(val: number, max: number) {
   return max > 0 ? `${Math.min(100, Math.round((val / max) * 100))}%` : '0%'
 }
 
-export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
   const [filtroCat, setFiltroCat] = useState<CategoriaGasto | 'todos'>('todos')
   const [filtroEstado, setFiltroEstado] = useState<EstadoGasto | 'todos'>('todos')
   const [form, setForm] = useState<Partial<GastoCondominio>>(blank())
@@ -68,6 +70,26 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, canCrea
     (filtroCat === 'todos' || g.categoria === filtroCat) &&
     (filtroEstado === 'todos' || g.estado === filtroEstado)
   )
+
+  function exportarPDF() {
+    exportarPDFTabla({
+      titulo: 'Gastos del Condominio',
+      proyectoNombre,
+      headers: ['Fecha', 'Concepto', 'Categoría', 'Monto', 'Estado', 'Proveedor'],
+      rows: filtered.map(g => [g.fecha, g.concepto, CAT_CONFIG[g.categoria].label, `${moneda} ${g.monto.toFixed(2)}`, ESTADO_CONFIG[g.estado].label, g.proveedor_nombre ?? '—']),
+      totalesRow: ['', '', 'TOTAL PAGADOS', `${moneda} ${filtered.filter(g => g.estado === 'pagado').reduce((s, g) => s + g.monto, 0).toFixed(2)}`, '', ''],
+      rightAlignCols: [3],
+      filename: `gastos-${new Date().toISOString().slice(0, 7)}`,
+    })
+  }
+
+  function exportarXlsx() {
+    exportarExcel(`gastos-${new Date().toISOString().slice(0, 7)}`, [{
+      name: 'Gastos',
+      headers: ['Fecha', 'Concepto', 'Categoría', 'Monto', 'Estado', 'Proveedor', 'Método Pago', 'No. Comprobante', 'Notas'],
+      rows: gastos.map(g => [g.fecha, g.concepto, CAT_CONFIG[g.categoria].label, g.monto, ESTADO_CONFIG[g.estado].label, g.proveedor_nombre ?? '', g.metodo_pago ?? '', g.comprobante_num ?? '', g.notas ?? '']),
+    }])
+  }
 
   function startEdit(g: GastoCondominio) {
     setForm({
@@ -135,9 +157,13 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, canCrea
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
             <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Gastos del Condominio</h2>
-            {canCreate && !showForm && (
-              <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Gasto</button>
-            )}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={exportarPDF} disabled={filtered.length === 0} style={{ padding: '6px 12px', background: '#eff6ff', color: '#2563eb', border: '1.5px solid #bfdbfe', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
+              <button onClick={exportarXlsx} disabled={gastos.length === 0} style={{ padding: '6px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
+              {canCreate && !showForm && (
+                <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Gasto</button>
+              )}
+            </div>
           </div>
 
           {showForm && (

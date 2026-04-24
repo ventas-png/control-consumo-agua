@@ -3,12 +3,14 @@ import { supabase } from '../../../lib/supabase'
 import type { ContratoProveedor, ServicioProveedor, EstadoContrato } from '../../../types'
 import Swal from 'sweetalert2'
 import { FileUploader } from '../FileUploader'
+import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
   contratos: ContratoProveedor[]
   proyectoId: string
   companyId: string
   moneda: string
+  proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
@@ -45,7 +47,7 @@ const blank = (): Partial<ContratoProveedor> => ({
   notas: '',
 })
 
-export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
   const [filtroServicio, setFiltroServicio] = useState<ServicioProveedor | 'todos'>('todos')
   const [filtroEstado, setFiltroEstado] = useState<string>('activo')
   const [form, setForm] = useState<Partial<ContratoProveedor>>(blank())
@@ -147,6 +149,27 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, canCr
   const servicioInfo = (s: ServicioProveedor) => SERVICIOS.find(x => x.value === s) ?? SERVICIOS[SERVICIOS.length - 1]
   const totalMensual = filtered.filter(c => c.estado === 'activo').reduce((s, c) => s + (c.monto_mensual ?? 0), 0)
 
+  function exportarPDF() {
+    exportarPDFTabla({
+      titulo: 'Contratos de Proveedores',
+      proyectoNombre,
+      headers: ['Proveedor', 'Servicio', 'Contacto', 'Teléfono', 'Monto/mes', 'Inicio', 'Fin', 'Estado'],
+      rows: filtered.map(c => [c.proveedor_nombre, servicioInfo(c.servicio).label, c.proveedor_contacto ?? '—', c.proveedor_telefono ?? '—', c.monto_mensual != null ? `${moneda} ${c.monto_mensual.toFixed(2)}` : '—', c.fecha_inicio, c.fecha_fin ?? '—', c.estado]),
+      totalesRow: ['TOTAL ACTIVOS', '', '', '', `${moneda} ${totalMensual.toFixed(2)}`, '', '', ''],
+      rightAlignCols: [4],
+      filename: `proveedores-${new Date().toISOString().slice(0, 10)}`,
+      landscape: true,
+    })
+  }
+
+  function exportarXlsx() {
+    exportarExcel(`proveedores-${new Date().toISOString().slice(0, 10)}`, [{
+      name: 'Proveedores',
+      headers: ['Proveedor', 'Servicio', 'Contacto', 'Teléfono', 'Email', 'Monto Mensual', 'Inicio', 'Fin', 'Estado', 'Notas'],
+      rows: contratos.map(c => [c.proveedor_nombre, servicioInfo(c.servicio).label, c.proveedor_contacto ?? '', c.proveedor_telefono ?? '', c.proveedor_email ?? '', c.monto_mensual ?? '', c.fecha_inicio, c.fecha_fin ?? '', c.estado, c.notas ?? '']),
+    }])
+  }
+
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px',
     fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box',
@@ -176,11 +199,15 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, canCr
             </span>
           )}
         </div>
-        {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-            + Nuevo Contrato
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={exportarPDF} disabled={contratos.length === 0} style={{ padding: '7px 12px', background: '#eff6ff', color: '#2563eb', border: '1.5px solid #bfdbfe', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
+          <button onClick={exportarXlsx} disabled={contratos.length === 0} style={{ padding: '7px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
+          {canCreate && !showForm && (
+            <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              + Nuevo Contrato
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Form */}

@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { IncidenteSeguridad } from '../../../types'
 import Swal from 'sweetalert2'
+import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
   incidentes: IncidenteSeguridad[]
   proyectoId: string
   companyId: string
+  proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
@@ -39,7 +41,7 @@ const inputStyle: React.CSSProperties = {
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }
 
-export function IncidentesTab({ incidentes, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
   const [selected, setSelected] = useState<IncidenteSeguridad | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -104,6 +106,25 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, canCreate, ca
     (!searchArea || (i.area ?? '').toLowerCase().includes(searchArea.toLowerCase()))
   )
 
+  function exportarPDF() {
+    exportarPDFTabla({
+      titulo: 'Registro de Incidentes de Seguridad',
+      proyectoNombre,
+      headers: ['Fecha', 'Hora', 'Tipo', 'Área', 'Descripción', 'Reportado por', 'Estado'],
+      rows: filtered.map(i => [i.fecha, i.hora ?? '—', TIPO_STYLE[i.tipo]?.label ?? i.tipo, i.area ?? '—', i.descripcion, i.reportado_por ?? '—', ESTADO_FLOW[i.estado]?.label ?? i.estado]),
+      filename: `incidentes-${new Date().toISOString().slice(0, 10)}`,
+      landscape: true,
+    })
+  }
+
+  function exportarXlsx() {
+    exportarExcel(`incidentes-${new Date().toISOString().slice(0, 10)}`, [{
+      name: 'Incidentes',
+      headers: ['Fecha', 'Hora', 'Tipo', 'Área', 'Descripción', 'Reportado por', 'Estado', 'Involucrados', 'Seguimiento'],
+      rows: filtered.map(i => [i.fecha, i.hora ?? '', TIPO_STYLE[i.tipo]?.label ?? i.tipo, i.area ?? '', i.descripcion, i.reportado_por ?? '', ESTADO_FLOW[i.estado]?.label ?? i.estado, i.involucrados ?? '', i.seguimiento ?? '']),
+    }])
+  }
+
   const kpiTipos = Object.keys(TIPO_STYLE)
   const abiertos = incidentes.filter(i => i.estado === 'reportado' || i.estado === 'investigando').length
 
@@ -124,11 +145,15 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, canCreate, ca
             </div>
           </div>
 
-          {canCreate && (
-            <button onClick={openNew} style={{ width: '100%', padding: '8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', marginBottom: '8px' }}>
-              🚨 Registrar incidente
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+            {canCreate && (
+              <button onClick={openNew} style={{ flex: 1, padding: '8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+                🚨 Registrar
+              </button>
+            )}
+            <button onClick={exportarPDF} disabled={incidentes.length === 0} style={{ padding: '8px 10px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="PDF">📄</button>
+            <button onClick={exportarXlsx} disabled={incidentes.length === 0} style={{ padding: '8px 10px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="Excel">📊</button>
+          </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <input value={searchArea} onChange={e => setSearchArea(e.target.value)} placeholder="Buscar por área..." style={inputStyle} />

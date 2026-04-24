@@ -275,6 +275,16 @@ export function MudanzasTab({ mudanzas, unidades, proyectoId, companyId, moneda,
                   ) : (
                     <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, background: est.bg, color: est.color }}>{est.label}</span>
                   )}
+                  {(m.estado === 'programada' || m.estado === 'en_curso') && (
+                    <button
+                      title="Enviar recordatorio por WhatsApp"
+                      onClick={() => {
+                        const msg = `🚚 Recordatorio de mudanza (${m.tipo === 'ingreso' ? 'ingreso' : 'salida'})\nResidente: ${m.nombre_residente}${m.unidad_nombre ? `\nUnidad: ${m.unidad_nombre}` : ''}\nFecha: ${m.fecha}${m.hora_inicio ? `\nHorario: ${m.hora_inicio}${m.hora_fin ? `–${m.hora_fin}` : ''}` : ''}${m.ascensor_reservado ? '\n🛗 Ascensor reservado' : ''}${m.deposito_requerido && !m.deposito_pagado ? `\n⚠️ Depósito pendiente${m.monto_deposito ? ` (${moneda} ${m.monto_deposito})` : ''}` : ''}`
+                        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+                      }}
+                      style={{ padding: '5px 7px', background: '#dcfce7', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#16a34a' }}
+                    >💬</button>
+                  )}
                   {canEdit && <button onClick={() => startEdit(m)} style={{ padding: '5px 7px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
                   {canEdit && <button onClick={() => handleDelete(m.id)} style={{ padding: '5px 7px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
                 </div>

@@ -5,6 +5,7 @@ import {
   PolizaSeguro, ContratoProveedor, InspeccionNormativa, VencimientoExtra,
   Encuesta,
 } from '../../../types'
+import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -20,6 +21,7 @@ interface Props {
   vencimientosExtra: VencimientoExtra[]
   encuestas: Encuesta[]
   moneda: string
+  proyectoNombre?: string
 }
 
 function semaforo(val: number, verde: number, amarillo: number) {
@@ -47,7 +49,7 @@ function KpiBox({ k }: { k: KpiCard }) {
   )
 }
 
-export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, presupuestos, incidentes, sugerencias, polizas, contratosProveedores, inspecciones, vencimientosExtra, encuestas, moneda }: Props) {
+export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, presupuestos, incidentes, sugerencias, polizas, contratosProveedores, inspecciones, vencimientosExtra, encuestas, moneda, proyectoNombre = 'Condominio' }: Props) {
   const hoy = new Date().toISOString().slice(0, 10)
   const en30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
   const mes = hoy.slice(0, 7)
@@ -95,6 +97,44 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
 
   const diasRestantes = (fecha: string) => Math.ceil((new Date(fecha).getTime() - Date.now()) / 86400000)
 
+  const recomendaciones = useMemo(() => {
+    const list: { icono: string; texto: string; prioridad: 'alta' | 'media' }[] = []
+    const abiertos = tickets.filter(t => t.estado === 'abierto' || t.estado === 'en_proceso')
+    const urgentes = abiertos.filter(t => t.prioridad === 'urgente' || t.prioridad === 'alta')
+    if (urgentes.length > 0) list.push({ icono: '🔧', texto: `Atender ${urgentes.length} ticket(s) urgentes/altos en Mantenimiento`, prioridad: 'alta' })
+    const morosas = cuotas.filter(c => (c.estado === 'pendiente' || c.estado === 'moroso') && c.fecha_vencimiento && c.fecha_vencimiento < hoy).length
+    if (morosas > 3) list.push({ icono: '💳', texto: `${morosas} cuotas vencidas — ejecutar gestión de cobro`, prioridad: 'alta' })
+    if (vencimientos30.filter(v => diasRestantes(v.fecha) <= 7).length > 0) list.push({ icono: '⏳', texto: 'Vencimientos en menos de 7 días — revisar y renovar', prioridad: 'alta' })
+    const sugerPend = sugerencias.filter(s => s.estado === 'pendiente').length
+    if (sugerPend > 5) list.push({ icono: '💡', texto: `${sugerPend} sugerencias pendientes de respuesta a residentes`, prioridad: 'media' })
+    const incMes = incidentes.filter(i => i.fecha?.startsWith(mes)).length
+    if (incMes > 2) list.push({ icono: '🚨', texto: `${incMes} incidentes de seguridad este mes — revisar protocolos`, prioridad: 'media' })
+    return list
+  }, [tickets, cuotas, vencimientos30, sugerencias, incidentes, hoy, mes])
+
+  function exportarResumenPDF() {
+    const allKpis = [...kpisFinanciero, ...kpisOperacion]
+    exportarPDFTabla({
+      titulo: 'Cuadro de Mando Operativo',
+      proyectoNombre,
+      headers: ['Indicador', 'Valor', 'Detalle'],
+      rows: allKpis.map(k => [k.label, String(k.val), k.sub ?? '']),
+      filename: `cuadro-mando-${hoy}`,
+    })
+  }
+
+  function exportarResumenXlsx() {
+    exportarExcel(`cuadro-mando-${hoy}`, [{
+      name: 'Cuadro de Mando',
+      headers: ['Indicador', 'Valor', 'Detalle'],
+      rows: [...kpisFinanciero, ...kpisOperacion].map(k => [k.label, k.val, k.sub ?? '']),
+    }, {
+      name: 'Vencimientos 30d',
+      headers: ['Título', 'Fecha', 'Tipo', 'Días restantes'],
+      rows: vencimientos30.map(v => [v.titulo, v.fecha, v.tipo, diasRestantes(v.fecha)]),
+    }])
+  }
+
   const ticketsPorPrioridad = useMemo(() => {
     const abiertos = tickets.filter(t => t.estado === 'abierto' || t.estado === 'en_proceso')
     return {
@@ -107,6 +147,13 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
 
   return (
     <div style={{ padding: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>Cuadro de Mando · {hoy}</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={exportarResumenPDF} style={{ padding: '5px 10px', background: '#eff6ff', color: '#2563eb', border: '1.5px solid #bfdbfe', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📄 PDF</button>
+          <button onClick={exportarResumenXlsx} style={{ padding: '5px 10px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📊 Excel</button>
+        </div>
+      </div>
       {/* Sección financiera */}
       <div style={{ fontWeight: 700, fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Finanzas y cobro</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
@@ -167,6 +214,22 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
           )}
         </div>
       </div>
+
+      {/* Acciones recomendadas */}
+      {recomendaciones.length > 0 && (
+        <div style={{ marginTop: 16, background: '#fffbeb', borderRadius: 10, padding: '12px 16px', border: '1px solid #fde68a' }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: '#92400e', marginBottom: 8 }}>💡 Acciones recomendadas</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {recomendaciones.map((r, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '5px 8px', background: r.prioridad === 'alta' ? '#fef2f2' : '#fff', borderRadius: 7, border: `1px solid ${r.prioridad === 'alta' ? '#fecaca' : '#e5e7eb'}` }}>
+                <span style={{ fontSize: 14 }}>{r.icono}</span>
+                <span style={{ fontSize: 11, color: r.prioridad === 'alta' ? '#b91c1c' : '#374151', fontWeight: r.prioridad === 'alta' ? 700 : 500 }}>{r.texto}</span>
+                {r.prioridad === 'alta' && <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, background: '#fef2f2', color: '#ef4444', padding: '1px 5px', borderRadius: 4, border: '1px solid #fecaca' }}>URGENTE</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Semáforo resumen */}
       <div style={{ marginTop: 16, background: '#f8fafc', borderRadius: 10, padding: '12px 16px', border: '1px solid #e5e7eb' }}>

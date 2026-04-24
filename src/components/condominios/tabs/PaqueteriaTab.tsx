@@ -190,6 +190,16 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flexShrink: 0 }}>
                   <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
                   {canEdit && p.estado === 'pendiente' && (
+                    <button
+                      onClick={() => {
+                        const msg = `📦 Paquete recibido en portería\nUnidad: ${p.unidad_nombre ?? ''}\nDescripción: ${p.descripcion}${p.remitente ? `\nDe: ${p.remitente}` : ''}${p.empresa_mensajeria ? `\nMensajería: ${p.empresa_mensajeria}` : ''}\nPuede pasar a recogerlo cuando guste.`
+                        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+                      }}
+                      title="Notificar residente por WhatsApp"
+                      style={{ padding: '5px 10px', background: '#dcfce7', color: '#16a34a', border: '1px solid #86efac', borderRadius: '8px', cursor: 'pointer', fontSize: '11.5px', fontWeight: 600 }}
+                    >💬 Avisar</button>
+                  )}
+                  {canEdit && p.estado === 'pendiente' && (
                     <button onClick={() => marcarEntregado(p.id)} style={{ padding: '6px 12px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                       ✓ Entregar
                     </button>

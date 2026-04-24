@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { ContratoArrendamiento, Unidad, EstadoContrato } from '../../../types'
+import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
   contratos: ContratoArrendamiento[]
@@ -9,6 +10,7 @@ interface Props {
   proyectoId: string
   companyId: string
   moneda: string
+  proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
@@ -20,7 +22,7 @@ const ESTADO_CONFIG: Record<EstadoContrato, { label: string; bg: string; color: 
   terminado: { label: 'Terminado', bg: '#f8fafc', color: '#64748b' },
 }
 
-export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoContrato | 'todos'>('activo')
@@ -91,6 +93,27 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
     resetForm(); onRefresh()
   }
 
+  function exportarPDF() {
+    exportarPDFTabla({
+      titulo: 'Contratos de Arrendamiento',
+      proyectoNombre,
+      headers: ['Arrendatario', 'Unidad', 'Renta/mes', 'Depósito', 'Día pago', 'Inicio', 'Fin', 'Estado'],
+      rows: filtrados.map(c => [c.arrendatario_nombre, c.unidad_nombre ?? '—', `${moneda} ${c.monto_renta.toFixed(2)}`, c.deposito != null ? `${moneda} ${c.deposito.toFixed(2)}` : '—', `Día ${c.dia_pago}`, c.fecha_inicio, c.fecha_fin ?? '—', ESTADO_CONFIG[c.estado].label]),
+      totalesRow: ['TOTAL ACTIVOS', '', `${moneda} ${rentaTotal.toFixed(2)}`, '', '', '', '', ''],
+      rightAlignCols: [2, 3],
+      filename: `arrendamientos-${new Date().toISOString().slice(0, 10)}`,
+      landscape: true,
+    })
+  }
+
+  function exportarXlsx() {
+    exportarExcel(`arrendamientos-${new Date().toISOString().slice(0, 10)}`, [{
+      name: 'Arrendamientos',
+      headers: ['Arrendatario', 'DPI', 'Teléfono', 'Email', 'Unidad', 'Renta/mes', 'Depósito', 'Día pago', 'Inicio', 'Fin', 'Estado'],
+      rows: contratos.map(c => [c.arrendatario_nombre, c.arrendatario_identificacion ?? '', c.arrendatario_telefono ?? '', c.arrendatario_email ?? '', c.unidad_nombre ?? '', c.monto_renta, c.deposito ?? '', c.dia_pago, c.fecha_inicio, c.fecha_fin ?? '', c.estado]),
+    }])
+  }
+
   async function cambiarEstado(id: string, estado: EstadoContrato) {
     await supabase.from('contratos_arrendamiento').update({ estado }).eq('id', id)
     onRefresh()
@@ -113,11 +136,15 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
             {porVencer.length > 0 && <span style={{ color: '#ea580c', fontWeight: 600 }}> · {porVencer.length} por vencer</span>}
           </p>
         </div>
-        {canCreate && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
-            + Nuevo contrato
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={exportarPDF} disabled={contratos.length === 0} style={{ padding: '9px 14px', background: '#eff6ff', color: '#2563eb', border: '1.5px solid #bfdbfe', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>📄 PDF</button>
+          <button onClick={exportarXlsx} disabled={contratos.length === 0} style={{ padding: '9px 14px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>📊 Excel</button>
+          {canCreate && (
+            <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+              + Nuevo contrato
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Alerta por vencer */}
@@ -260,7 +287,17 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
                         <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 14px', display: 'flex', gap: '4px' }}>
+                    <td style={{ padding: '10px 14px', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      {vence30 && (
+                        <button
+                          title="Notificar renovación por WhatsApp"
+                          onClick={() => {
+                            const msg = `📋 Aviso de vencimiento de contrato\nArrendatario: ${c.arrendatario_nombre}\nUnidad: ${c.unidad_nombre ?? ''}\nVencimiento: ${c.fecha_fin}\nPor favor comuníquese para coordinar la renovación.`
+                            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+                          }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: '#16a34a' }}
+                        >💬</button>
+                      )}
                       {canEdit && <button onClick={() => startEdit(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: '#64748b' }}>✏️</button>}
                       <button onClick={() => eliminar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: '#ef4444' }}>🗑</button>
                     </td>

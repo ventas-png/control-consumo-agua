@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
 import { GestionCobranza, EtapaCobranza, EstadoCobranza, TipoContactoCobranza, ContactoCobranza, Unidad } from '../../../types'
+import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
   cobranzas: GestionCobranza[]
@@ -9,6 +10,7 @@ interface Props {
   proyectoId: string
   companyId: string
   moneda: string
+  proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
@@ -35,7 +37,7 @@ const TIPOS_CONTACTO: { value: TipoContactoCobranza; label: string }[] = [
   { value: 'mensaje', label: '💬 Mensaje' },
 ]
 
-export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
   const [selected, setSelected] = useState<GestionCobranza | null>(null)
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -137,6 +139,32 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
     onRefresh()
   }
 
+  function exportarPDF() {
+    exportarPDFTabla({
+      titulo: 'Gestión de Cobranza',
+      proyectoNombre,
+      headers: ['Responsable', 'Unidad', 'Adeudado', 'Pagado', 'Pendiente', 'Etapa', 'Estado', 'Inicio', 'Contactos'],
+      rows: cobranzas.map(c => {
+        const u = unidades.find(u => u.id === c.unidad_id)
+        return [c.responsable, u?.nombre ?? '—', `${moneda} ${c.monto_adeudado.toLocaleString()}`, `${moneda} ${c.monto_pagado.toLocaleString()}`, `${moneda} ${(c.monto_adeudado - c.monto_pagado).toLocaleString()}`, ETAPAS.find(e => e.value === c.etapa)?.label ?? c.etapa, c.estado, c.fecha_inicio, c.contactos.length]
+      }),
+      rightAlignCols: [2, 3, 4, 8],
+      filename: `cobranza-${new Date().toISOString().slice(0, 10)}`,
+      landscape: true,
+    })
+  }
+
+  function exportarXlsx() {
+    exportarExcel(`cobranza-${new Date().toISOString().slice(0, 10)}`, [{
+      name: 'Cobranza',
+      headers: ['Responsable', 'Unidad', 'Adeudado', 'Pagado', 'Pendiente', 'Etapa', 'Estado', 'Inicio', 'Observaciones'],
+      rows: cobranzas.map(c => {
+        const u = unidades.find(u => u.id === c.unidad_id)
+        return [c.responsable, u?.nombre ?? '', c.monto_adeudado, c.monto_pagado, c.monto_adeudado - c.monto_pagado, ETAPAS.find(e => e.value === c.etapa)?.label ?? c.etapa, c.estado, c.fecha_inicio, c.observaciones ?? '']
+      }),
+    }])
+  }
+
   const inp: React.CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
   const lbl: React.CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
 
@@ -145,14 +173,18 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
       {/* Lista */}
       <div style={{ width: 320, borderRight: '1px solid #e5e7eb', overflowY: 'auto', flexShrink: 0 }}>
         <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #e5e7eb' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 4 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Cobranza ({lista.length})</span>
-            {canCreate && (
-              <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                + Nueva
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={exportarPDF} disabled={cobranzas.length === 0} style={{ padding: '4px 8px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>📄</button>
+              <button onClick={exportarXlsx} disabled={cobranzas.length === 0} style={{ padding: '4px 8px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>📊</button>
+              {canCreate && (
+                <button onClick={() => { setMostrarForm(true); setSelected(null) }}
+                  style={{ padding: '5px 10px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                  + Nueva
+                </button>
+              )}
+            </div>
           </div>
           {/* KPI montos */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>

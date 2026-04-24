@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PresupuestoCondominio, GastoCondominio, CategoriaGasto } from '../../../types'
 import Swal from 'sweetalert2'
+import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
   presupuestos: PresupuestoCondominio[]
@@ -9,6 +10,7 @@ interface Props {
   proyectoId: string
   companyId: string
   moneda: string
+  proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
@@ -36,7 +38,7 @@ function barColor(p: number) {
   return '#10b981'
 }
 
-export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, moneda, canEdit, onRefresh }: Props) {
+export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canEdit, onRefresh }: Props) {
   const currentYear = new Date().getFullYear()
   const [anio, setAnio] = useState(currentYear)
   const [editCat, setEditCat] = useState<CategoriaGasto | null>(null)
@@ -95,6 +97,37 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
     onRefresh()
   }
 
+  function exportarPDF() {
+    exportarPDFTabla({
+      titulo: `Presupuesto Anual ${anio}`,
+      proyectoNombre,
+      headers: ['Categoría', 'Presupuestado', 'Ejecutado', 'Varianza', '% Ejec.'],
+      rows: CATEGORIAS.map(cat => {
+        const p = presMap[cat]
+        const presupuestado = p?.monto_presupuestado ?? 0
+        const ejecutado = ejecutadoPorCat[cat] ?? 0
+        const varianza = presupuestado - ejecutado
+        return [CAT_LABELS[cat].label, `${moneda} ${presupuestado.toFixed(0)}`, `${moneda} ${ejecutado.toFixed(0)}`, `${varianza >= 0 ? '+' : ''}${moneda} ${varianza.toFixed(0)}`, `${pct(ejecutado, presupuestado)}%`]
+      }),
+      totalesRow: ['TOTAL', `${moneda} ${totalPresupuestado.toFixed(0)}`, `${moneda} ${totalEjecutado.toFixed(0)}`, `${totalPresupuestado - totalEjecutado >= 0 ? '+' : ''}${moneda} ${(totalPresupuestado - totalEjecutado).toFixed(0)}`, `${pct(totalEjecutado, totalPresupuestado)}%`],
+      rightAlignCols: [1, 2, 3, 4],
+      filename: `presupuesto-${anio}`,
+    })
+  }
+
+  function exportarXlsx() {
+    exportarExcel(`presupuesto-${anio}`, [{
+      name: 'Presupuesto',
+      headers: ['Categoría', 'Presupuestado', 'Ejecutado', 'Varianza', '% Ejecución'],
+      rows: CATEGORIAS.map(cat => {
+        const p = presMap[cat]
+        const presupuestado = p?.monto_presupuestado ?? 0
+        const ejecutado = ejecutadoPorCat[cat] ?? 0
+        return [CAT_LABELS[cat].label, presupuestado, ejecutado, presupuestado - ejecutado, pct(ejecutado, presupuestado)]
+      }),
+    }])
+  }
+
   const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
 
   return (
@@ -108,6 +141,8 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
             style={{ padding: '6px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', fontWeight: 700, color: '#0f172a', background: 'white', cursor: 'pointer' }}>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
+          <button onClick={exportarPDF} style={{ padding: '6px 12px', background: '#eff6ff', color: '#2563eb', border: '1.5px solid #bfdbfe', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
+          <button onClick={exportarXlsx} style={{ padding: '6px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
         </div>
       </div>
 

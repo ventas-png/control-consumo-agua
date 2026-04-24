@@ -4,6 +4,7 @@ import {
   PolizaSeguro, InspeccionNormativa, ContratoArrendamiento, InfraccionCondominio,
   SugerenciaCondominio, Unidad, RecargoMora, FondoReservaMovimiento,
 } from '../../../types'
+import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -19,6 +20,7 @@ interface Props {
   recargosMora: RecargoMora[]
   fondoReservaMovs: FondoReservaMovimiento[]
   moneda: string
+  proyectoNombre?: string
 }
 
 const hoy = new Date().toISOString().slice(0, 10)
@@ -50,7 +52,7 @@ function Semaforo({ valor, umbralBueno, umbralMalo, invertir = false }: { valor:
 
 export default function PanelDirectivoTab({
   cuotas, gastos, presupuestos, tickets, polizas, inspecciones,
-  contratos, infracciones, sugerencias, unidades, recargosMora, fondoReservaMovs, moneda,
+  contratos, infracciones, sugerencias, unidades, recargosMora, fondoReservaMovs, moneda, proyectoNombre = 'Condominio',
 }: Props) {
   const totalUnidades = unidades.filter(u => u.activo).length || 1
 
@@ -131,9 +133,78 @@ export default function PanelDirectivoTab({
 
   const SECTION = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, marginBottom: 14 }
 
+  const maxFinanciero = Math.max(cobradoMes, pendienteMes, gastosMes, 1)
+
+  const alertas: { texto: string; accion: string; nivel: 'rojo' | 'naranja' }[] = []
+  if (ticketsUrgentes > 0) alertas.push({ texto: `${ticketsUrgentes} ticket(s) urgente(s) sin resolver`, accion: 'Ir a Mantenimiento → filtrar por Urgente', nivel: 'rojo' })
+  if (inspeccionesReprobadas > 0) alertas.push({ texto: `${inspeccionesReprobadas} inspección(es) reprobada(s)`, accion: 'Revisar plan de acciones correctivas en Inspecciones', nivel: 'rojo' })
+  if (tasaMorosidad > 20) alertas.push({ texto: `Morosidad alta: ${tasaMorosidad.toFixed(1)}% de unidades en mora`, accion: 'Ejecutar campaña de cobro y revisar convenios de pago', nivel: 'rojo' })
+  if (polizasVencenProx60 > 0) alertas.push({ texto: `${polizasVencenProx60} póliza(s) vencen en 60 días`, accion: 'Contactar agente de seguros para renovación anticipada', nivel: 'naranja' })
+  if (contratosVencenProx30 > 0) alertas.push({ texto: `${contratosVencenProx30} contrato(s) de arrendamiento vence(n) en 30 días`, accion: 'Notificar arrendatarios y gestionar renovación', nivel: 'naranja' })
+  if (ejecucionPresupuesto > 100) alertas.push({ texto: `Presupuesto excedido: ${ejecucionPresupuesto.toFixed(1)}% ejecutado`, accion: 'Revisar gastos del mes y diferir no urgentes', nivel: 'naranja' })
+
+  function exportarInformePDF() {
+    exportarPDFTabla({
+      titulo: 'Informe Panel Directivo',
+      proyectoNombre,
+      headers: ['Indicador', 'Valor', 'Estado'],
+      rows: [
+        ['Índice de salud', `${puntajeSalud}/100`, saludLabel],
+        ['Tasa de cobranza', `${tasaCobranza.toFixed(1)}%`, tasaCobranza >= 90 ? 'Óptimo' : tasaCobranza >= 70 ? 'Regular' : 'Crítico'],
+        ['Unidades morosas', `${morosos} (${tasaMorosidad.toFixed(1)}%)`, morosos === 0 ? 'Óptimo' : 'Atención'],
+        ['Cobrado este mes', `${moneda} ${cobradoMes.toFixed(2)}`, ''],
+        ['Pendiente de cobro', `${moneda} ${pendienteMes.toFixed(2)}`, ''],
+        ['Gasto operativo mes', `${moneda} ${gastosMes.toFixed(2)}`, ''],
+        ['Ejecución presupuestal', `${ejecucionPresupuesto.toFixed(1)}%`, ejecucionPresupuesto <= 100 ? 'Óptimo' : 'Excedido'],
+        ['Fondo de reserva', `${moneda} ${saldoFondo.toFixed(2)}`, saldoFondo > 0 ? 'Positivo' : 'Déficit'],
+        ['Tickets urgentes', String(ticketsUrgentes), ticketsUrgentes === 0 ? 'Óptimo' : 'Urgente'],
+        ['Tickets abiertos total', String(ticketsAbiertos), ''],
+        ['Tiempo prom. resolución', avgResolucion > 0 ? `${avgResolucion} días` : '—', ''],
+        ['Pólizas vigentes', String(polizasVigentes), ''],
+        ['Pólizas vencen 60d', String(polizasVencenProx60), polizasVencenProx60 > 0 ? 'Atención' : 'OK'],
+        ['Infracciones activas', String(infraccionesActivas), ''],
+        ['Sugerencias pendientes', String(sugerenciasPendientes), ''],
+      ],
+      filename: `panel-directivo-${hoy}`,
+    })
+  }
+
+  function exportarResumenXlsx() {
+    exportarExcel(`panel-directivo-${hoy}`, [{
+      name: 'KPIs',
+      headers: ['Indicador', 'Valor', 'Estado'],
+      rows: [
+        ['Índice de salud', puntajeSalud, saludLabel],
+        ['Tasa de cobranza %', tasaCobranza.toFixed(1), tasaCobranza >= 90 ? 'Óptimo' : tasaCobranza >= 70 ? 'Regular' : 'Crítico'],
+        ['Unidades morosas', morosos, ''],
+        ['Tasa morosidad %', tasaMorosidad.toFixed(1), ''],
+        ['Cobrado este mes', cobradoMes, ''],
+        ['Pendiente cobro', pendienteMes, ''],
+        ['Gasto operativo mes', gastosMes, ''],
+        ['Ejecución presupuestal %', ejecucionPresupuesto.toFixed(1), ''],
+        ['Fondo de reserva', saldoFondo, ''],
+        ['Recargos mora pendientes', recargosPendientes, ''],
+        ['Tickets urgentes', ticketsUrgentes, ''],
+        ['Tickets abiertos', ticketsAbiertos, ''],
+        ['Tiempo prom. resolución (días)', avgResolucion, ''],
+        ['Pólizas vigentes', polizasVigentes, ''],
+        ['Pólizas vencen 60d', polizasVencenProx60, ''],
+        ['Inspecciones reprobadas', inspeccionesReprobadas, ''],
+        ['Infracciones activas', infraccionesActivas, ''],
+        ['Sugerencias pendientes', sugerenciasPendientes, ''],
+      ],
+    }])
+  }
+
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 2 }}>Panel Directivo</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>Panel Directivo</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={exportarInformePDF} style={{ padding: '5px 10px', background: '#eff6ff', color: '#2563eb', border: '1.5px solid #bfdbfe', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📄 PDF</button>
+          <button onClick={exportarResumenXlsx} style={{ padding: '5px 10px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📊 Excel</button>
+        </div>
+      </div>
       <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 14 }}>Indicadores clave para la junta directiva · {hoy}</div>
 
       {/* Puntaje de salud */}
@@ -242,14 +313,57 @@ export default function PanelDirectivoTab({
         </div>
       </div>
 
-      {/* Alertas críticas */}
-      {(ticketsUrgentes > 0 || polizasVencenProx60 > 0 || inspeccionesReprobadas > 0 || contratosVencenProx30 > 0) && (
+      {/* Gráfica: Financiero del mes */}
+      <div style={{ ...SECTION, marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 10 }}>📊 Financiero del mes — {mesActual}</div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', height: 80 }}>
+          {[
+            { label: 'Cobrado', val: cobradoMes, color: '#16a34a' },
+            { label: 'Pendiente', val: pendienteMes, color: '#d97706' },
+            { label: 'Gasto', val: gastosMes, color: '#0ea5e9' },
+          ].map(b => {
+            const pct = maxFinanciero > 0 ? (b.val / maxFinanciero) * 64 : 0
+            return (
+              <div key={b.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flex: 1 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: b.color }}>{moneda} {b.val.toFixed(0)}</span>
+                <div style={{ width: '100%', background: '#f1f5f9', borderRadius: '4px 4px 0 0', display: 'flex', alignItems: 'flex-end', height: 64 }}>
+                  <div style={{ width: '100%', background: b.color, height: `${pct}px`, borderRadius: '4px 4px 0 0', transition: 'height 0.4s', minHeight: b.val > 0 ? 4 : 0 }} />
+                </div>
+                <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600 }}>{b.label}</span>
+              </div>
+            )
+          })}
+          <div style={{ flex: 2, paddingLeft: 8, borderLeft: '1px solid #e5e7eb' }}>
+            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>Ejecución presupuestal</div>
+            <div style={{ height: 8, background: '#e5e7eb', borderRadius: 4, marginBottom: 4 }}>
+              <div style={{ height: 8, borderRadius: 4, background: ejecucionPresupuesto > 100 ? '#ef4444' : '#0ea5e9', width: `${Math.min(ejecucionPresupuesto, 100)}%`, transition: 'width 0.4s' }} />
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ejecucionPresupuesto > 100 ? '#ef4444' : '#0ea5e9' }}>{ejecucionPresupuesto.toFixed(1)}%</div>
+            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 6 }}>Fondo reserva: {moneda} {saldoFondo.toFixed(0)}</div>
+            <div style={{ fontSize: 10, color: recargosPendientes > 0 ? '#ef4444' : '#94a3b8' }}>Recargos mora: {moneda} {recargosPendientes.toFixed(0)}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Alertas con acciones recomendadas */}
+      {alertas.length > 0 && (
         <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: 12, marginTop: 4 }}>
-          <div style={{ fontWeight: 700, fontSize: 12, color: '#ef4444', marginBottom: 6 }}>⚠ Alertas que requieren atención inmediata</div>
-          {ticketsUrgentes > 0 && <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 3 }}>• {ticketsUrgentes} ticket(s) urgente(s) sin resolver</div>}
-          {polizasVencenProx60 > 0 && <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 3 }}>• {polizasVencenProx60} póliza(s) vencen en los próximos 60 días</div>}
-          {inspeccionesReprobadas > 0 && <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 3 }}>• {inspeccionesReprobadas} inspección(es) reprobada(s) sin acciones correctivas completadas</div>}
-          {contratosVencenProx30 > 0 && <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 3 }}>• {contratosVencenProx30} contrato(s) de arrendamiento vence(n) en 30 días</div>}
+          <div style={{ fontWeight: 700, fontSize: 12, color: '#ef4444', marginBottom: 8 }}>⚠ Alertas que requieren atención</div>
+          {alertas.map((a, idx) => (
+            <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, background: a.nivel === 'rojo' ? '#fef2f2' : '#fff7ed', borderRadius: 8, padding: '6px 10px', border: `1px solid ${a.nivel === 'rojo' ? '#fecaca' : '#fed7aa'}` }}>
+              <span style={{ fontSize: 14, flexShrink: 0 }}>{a.nivel === 'rojo' ? '🔴' : '🟠'}</span>
+              <div>
+                <div style={{ fontSize: 11, color: a.nivel === 'rojo' ? '#b91c1c' : '#9a3412', fontWeight: 700 }}>{a.texto}</div>
+                <div style={{ fontSize: 10, color: a.nivel === 'rojo' ? '#dc2626' : '#ea580c', marginTop: 2 }}>→ {a.accion}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {alertas.length === 0 && (
+        <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: 12, marginTop: 4, textAlign: 'center' }}>
+          <span style={{ fontSize: 16 }}>✅</span>
+          <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, marginTop: 4 }}>Sin alertas críticas — el condominio opera en condiciones normales</div>
         </div>
       )}
     </div>

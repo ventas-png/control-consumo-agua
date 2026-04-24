@@ -3,12 +3,14 @@ import { supabase } from '../../../lib/supabase'
 import type { PolizaSeguro, TipoPoliza, EstadoPoliza } from '../../../types'
 import Swal from 'sweetalert2'
 import { FileUploader } from '../FileUploader'
+import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
   polizas: PolizaSeguro[]
   proyectoId: string
   companyId: string
   moneda: string
+  proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
@@ -38,7 +40,7 @@ const blank = (): Partial<PolizaSeguro> => ({
   agente_nombre: '', agente_telefono: '', agente_email: '', documento_url: '', notas: '',
 })
 
-export function PolizasTab({ polizas, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
   const hoy = new Date().toISOString().slice(0, 10)
   const [filtroEstado, setFiltroEstado] = useState<EstadoPoliza | 'todos'>('vigente')
   const [form, setForm] = useState<Partial<PolizaSeguro>>(blank())
@@ -106,6 +108,29 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, canCreate, 
     onRefresh()
   }
 
+  function exportarPDF() {
+    exportarPDFTabla({
+      titulo: 'Pólizas de Seguro',
+      proyectoNombre,
+      headers: ['Póliza', 'Aseguradora', 'Tipo', 'Suma Asegurada', 'Prima Anual', 'Inicio', 'Vencimiento', 'Estado'],
+      rows: filtered.map(p => {
+        const dias = p.fecha_vencimiento ? Math.ceil((new Date(p.fecha_vencimiento).getTime() - Date.now()) / 86400000) : null
+        return [p.numero_poliza, p.aseguradora, tipoInfo(p.tipo).label, p.suma_asegurada != null ? `${moneda} ${p.suma_asegurada.toLocaleString()}` : '—', p.prima_anual != null ? `${moneda} ${p.prima_anual.toFixed(2)}` : '—', p.fecha_inicio, p.fecha_vencimiento, `${ESTADO_CONFIG[p.estado].label}${dias !== null && p.estado === 'vigente' ? ` (${dias}d)` : ''}`]
+      }),
+      rightAlignCols: [3, 4],
+      filename: `polizas-${new Date().toISOString().slice(0, 10)}`,
+      landscape: true,
+    })
+  }
+
+  function exportarXlsx() {
+    exportarExcel(`polizas-${new Date().toISOString().slice(0, 10)}`, [{
+      name: 'Pólizas',
+      headers: ['Póliza', 'Aseguradora', 'Tipo', 'Suma Asegurada', 'Prima Anual', 'Inicio', 'Vencimiento', 'Estado', 'Agente', 'Teléfono Agente'],
+      rows: polizas.map(p => [p.numero_poliza, p.aseguradora, tipoInfo(p.tipo).label, p.suma_asegurada ?? '', p.prima_anual ?? '', p.fecha_inicio, p.fecha_vencimiento, p.estado, p.agente_nombre ?? '', p.agente_telefono ?? '']),
+    }])
+  }
+
   const tipoInfo = (t: TipoPoliza) => TIPOS.find(x => x.value === t) ?? TIPOS[TIPOS.length - 1]
 
   const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
@@ -128,11 +153,15 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, canCreate, 
           <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Pólizas de Seguro</h2>
           {primaTotal > 0 && <span style={{ fontSize: '12px', color: '#64748b' }}>Prima anual vigente: <strong style={{ color: '#0ea5e9' }}>{moneda} {primaTotal.toFixed(2)}</strong></span>}
         </div>
-        {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-            + Nueva Póliza
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={exportarPDF} disabled={polizas.length === 0} style={{ padding: '7px 12px', background: '#eff6ff', color: '#2563eb', border: '1.5px solid #bfdbfe', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
+          <button onClick={exportarXlsx} disabled={polizas.length === 0} style={{ padding: '7px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
+          {canCreate && !showForm && (
+            <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              + Nueva Póliza
+            </button>
+          )}
+        </div>
       </div>
 
       {showForm && (
@@ -281,7 +310,18 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, canCreate, 
                       )}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', gap: '4px' }}>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        {p.estado !== 'cancelada' && (
+                          <button
+                            title="Notificar por WhatsApp"
+                            onClick={() => {
+                              const dias = p.fecha_vencimiento ? Math.ceil((new Date(p.fecha_vencimiento).getTime() - Date.now()) / 86400000) : null
+                              const msg = `🛡️ Póliza ${p.numero_poliza}\nAseguradora: ${p.aseguradora}\nTipo: ${tipoInfo(p.tipo).label}\nVencimiento: ${p.fecha_vencimiento}${dias !== null ? ` (${dias} días)` : ''}\nEstado: ${ESTADO_CONFIG[p.estado].label}${p.prima_anual ? `\nPrima anual: ${moneda} ${p.prima_anual.toFixed(2)}` : ''}`
+                              window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+                            }}
+                            style={{ padding: '4px 8px', background: '#dcfce7', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#16a34a' }}
+                          >💬</button>
+                        )}
                         {p.documento_url && <a href={p.documento_url} target="_blank" rel="noreferrer" style={{ padding: '4px 8px', background: '#f1f5f9', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: '#374151' }}>📄</a>}
                         {canEdit && <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
                         {canEdit && <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
