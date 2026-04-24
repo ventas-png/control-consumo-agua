@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
-import { RecargoMora, EstadoRecargo, TipoRecargo, Unidad, CuotaCondominio } from '../../../types'
+import { RecargoMora, EstadoRecargo, TipoRecargo, Unidad, CuotaCondominio, ReglaMoraConfig } from '../../../types'
 
 interface Props {
   recargos: RecargoMora[]
   cuotas: CuotaCondominio[]
+  reglas: ReglaMoraConfig[]
   unidades: Unidad[]
   proyectoId: string
   companyId: string
@@ -21,7 +22,7 @@ const ESTADO_CFG: Record<EstadoRecargo, { label: string; bg: string; color: stri
   anulado:   { label: 'Anulado',   bg: '#f3f4f6', color: '#9ca3af' },
 }
 
-export default function RecargosTab({ recargos, cuotas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoRecargo | ''>('')
@@ -87,32 +88,64 @@ export default function RecargosTab({ recargos, cuotas, unidades, proyectoId, co
   }
 
   async function aplicarMasivo() {
-    const unidadesMorosas = [...new Set(cuotas.filter(c => c.estado === 'moroso').map(c => c.unidad_id).filter(Boolean))]
-    if (unidadesMorosas.length === 0) { Swal.fire('Sin morosos', 'No hay unidades con cuotas en mora', 'info'); return }
-    const { value: pct } = await Swal.fire({
-      title: 'Recargo masivo por mora',
-      html: `<p style="font-size:13px;color:#374151;margin-bottom:8px">${unidadesMorosas.length} unidades con mora · Porcentaje de recargo:</p>
-             <input id="pct-input" class="swal2-input" type="number" min="0.1" max="100" step="0.1" value="5" style="font-size:14px">`,
-      showCancelButton: true, confirmButtonText: 'Aplicar', cancelButtonText: 'Cancelar',
-      preConfirm: () => parseFloat((document.getElementById('pct-input') as HTMLInputElement)?.value ?? '0'),
-    })
-    if (!pct || pct <= 0) return
+    const hoy = new Date().toISOString().slice(0, 10)
+    const reglaActiva = reglas.find(r => r.activa)
+    // cuotas vencidas: moroso o pendiente con fecha_vencimiento superada
+    const cuotasVenc = cuotas.filter(c =>
+      c.estado === 'moroso' ||
+      (c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < hoy)
+    )
+    const unidadesMorosas = [...new Set(cuotasVenc.map(c => c.unidad_id).filter(Boolean))]
+    if (unidadesMorosas.length === 0) { Swal.fire('Sin cuotas vencidas', 'No hay cuotas vencidas a las que aplicar recargo.', 'info'); return }
+
+    let pct = 5
+    let tipoRecargo: TipoRecargo = 'porcentaje'
+    let motivo = `Recargo masivo mora`
+
+    if (reglaActiva) {
+      pct = reglaActiva.valor
+      tipoRecargo = reglaActiva.tipo === 'porcentaje' ? 'porcentaje' : 'monto_fijo'
+      motivo = `Recargo automático — ${reglaActiva.nombre}`
+      const conf = await Swal.fire({
+        title: 'Aplicar mora automática',
+        html: `<p style="font-size:13px;color:#374151">Usando regla: <b>${reglaActiva.nombre}</b><br>
+               Tipo: <b>${tipoRecargo === 'porcentaje' ? pct + '%' : moneda + ' ' + pct + ' fijo'}</b><br>
+               ${unidadesMorosas.length} unidades afectadas</p>`,
+        icon: 'question', showCancelButton: true,
+        confirmButtonText: 'Aplicar', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626',
+      })
+      if (!conf.isConfirmed) return
+    } else {
+      const { value } = await Swal.fire({
+        title: 'Recargo masivo por mora',
+        html: `<p style="font-size:13px;color:#374151;margin-bottom:8px">${unidadesMorosas.length} unidades con cuotas vencidas · Porcentaje de recargo:</p>
+               <input id="pct-input" class="swal2-input" type="number" min="0.1" max="100" step="0.1" value="5" style="font-size:14px">
+               <p style="font-size:11px;color:#94a3b8;margin-top:4px">Configura reglas automáticas en la pestaña "Reglas mora"</p>`,
+        showCancelButton: true, confirmButtonText: 'Aplicar', cancelButtonText: 'Cancelar',
+        preConfirm: () => parseFloat((document.getElementById('pct-input') as HTMLInputElement)?.value ?? '0'),
+      })
+      if (!value || value <= 0) return
+      pct = value
+    }
+
     setSaving(true)
     const today = new Date().toISOString().slice(0, 10)
     const rows = unidadesMorosas.map(uid => {
-      const cuotasU = cuotas.filter(c => c.unidad_id === uid && c.estado === 'moroso')
+      const cuotasU = cuotasVenc.filter(c => c.unidad_id === uid)
       const montoBase = cuotasU.reduce((s, c) => s + c.monto, 0)
+      const monto_calculado = tipoRecargo === 'porcentaje'
+        ? parseFloat(((montoBase * pct) / 100).toFixed(2))
+        : pct
       return {
         company_id: companyId, project_id: proyectoId,
-        unidad_id: uid, tipo: 'porcentaje', valor: pct,
-        monto_calculado: parseFloat(((montoBase * pct) / 100).toFixed(2)),
-        fecha_aplicacion: today, motivo: `Recargo masivo ${pct}% mora`,
+        unidad_id: uid, tipo: tipoRecargo, valor: pct,
+        monto_calculado, fecha_aplicacion: today, motivo,
       }
     })
     const { error } = await supabase.from('recargos_mora').insert(rows)
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: `${rows.length} recargos creados`, timer: 1800, showConfirmButton: false })
+    Swal.fire({ icon: 'success', title: `${rows.length} recargos creados`, text: `Total: ${moneda} ${rows.reduce((s, r) => s + r.monto_calculado, 0).toFixed(2)}`, timer: 2200, showConfirmButton: false })
     onRefresh()
   }
 

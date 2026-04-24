@@ -96,6 +96,22 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
     onRefresh()
   }
 
+  async function activarPortal(o: OnboardingResidente) {
+    if (!o.unidad_id) { Swal.fire('Sin unidad', 'Este onboarding no tiene una unidad asignada.', 'warning'); return }
+    const token = crypto.randomUUID().replace(/-/g, '')
+    const { error } = await supabase.from('unidades')
+      .update({ portal_activo: true, token_portal: token }).eq('id', o.unidad_id)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    const url = `${window.location.origin}/portal/${token}`
+    await Swal.fire({
+      icon: 'success', title: '¡Portal activado!',
+      html: `<p style="font-size:13px;margin-bottom:8px">Comparte este enlace con el residente:</p>
+             <code style="background:#f1f5f9;padding:6px 10px;border-radius:6px;font-size:12px;word-break:break-all">${url}</code>`,
+      confirmButtonText: 'Copiar y cerrar',
+    }).then(() => navigator.clipboard.writeText(url).catch(() => {}))
+    onRefresh()
+  }
+
   async function handleDelete(id: string) {
     const r = await Swal.fire({ title: '¿Eliminar onboarding?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
     if (!r.isConfirmed) return
@@ -216,8 +232,15 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
                       {' · '}{o.fecha_ingreso}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
+                    {canEdit && o.unidad_id && o.estado === 'completado' && (
+                      <button onClick={() => activarPortal(o)}
+                        title="Generar enlace del portal para el residente"
+                        style={{ padding: '4px 9px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#2563eb', fontWeight: 600 }}>
+                        🔗 Portal
+                      </button>
+                    )}
                     {canEdit && <button onClick={() => startEdit(o)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
                     {canEdit && <button onClick={() => handleDelete(o.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
                   </div>

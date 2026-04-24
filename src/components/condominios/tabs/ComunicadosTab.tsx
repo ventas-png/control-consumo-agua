@@ -8,6 +8,7 @@ interface Props {
   unidades: Unidad[]
   proyectoId: string
   companyId: string
+  userId: string
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
@@ -43,7 +44,11 @@ const TEMPLATES: Record<TipoComunicado, string> = {
   acta:     'ACTA DE REUNIÓN\n\nSiendo las ___ horas del día ___ de ___ de ___, reunidos en ___, se llevó a cabo la reunión de ___...',
 }
 
-export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
+const TIPO_A_ANUNCIO: Record<TipoComunicado, string> = {
+  circular: 'aviso', carta: 'aviso', aviso: 'aviso', certificado: 'aviso', acta: 'aviso',
+}
+
+export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ ...BLANK })
   const [saving, setSaving] = useState(false)
@@ -77,6 +82,25 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, c
     setSaving(false)
     if (error) return Swal.fire('Error', error.message, 'error')
     setShowForm(false); setForm({ ...BLANK }); onRefresh()
+  }
+
+  async function publicarEnPortal(c: ComunicadoCondominio) {
+    const r = await Swal.fire({
+      title: '¿Publicar en el portal del residente?',
+      html: `El comunicado <b>${c.titulo}</b> aparecerá como anuncio visible para todos los residentes en su portal.`,
+      icon: 'question', showCancelButton: true,
+      confirmButtonText: 'Publicar', cancelButtonText: 'Cancelar', confirmButtonColor: '#2563eb',
+    })
+    if (!r.isConfirmed) return
+    const { error } = await supabase.from('anuncios_comunidad').insert({
+      company_id: companyId, project_id: proyectoId,
+      titulo: c.titulo, contenido: c.contenido,
+      tipo: TIPO_A_ANUNCIO[c.tipo] ?? 'aviso',
+      publicado_por: userId, activo: true,
+    })
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    Swal.fire({ icon: 'success', title: '¡Publicado en el portal!', text: 'Los residentes ya pueden verlo.', timer: 1800, showConfirmButton: false })
+    onRefresh()
   }
 
   async function handleDelete(id: string) {
@@ -219,10 +243,17 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, c
                           {c.firmado && <span style={{ marginLeft: '6px', color: '#10b981', fontWeight: 700 }}>✓ Firmado</span>}
                         </div>
                       </div>
-                      {canEdit && (
-                        <button onClick={e => { e.stopPropagation(); handleDelete(c.id) }}
-                          style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444', flexShrink: 0, marginLeft: '8px' }}>🗑️</button>
-                      )}
+                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
+                        {canCreate && (
+                          <button onClick={e => { e.stopPropagation(); publicarEnPortal(c) }}
+                            title="Publicar en portal del residente"
+                            style={{ padding: '3px 7px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#2563eb', fontWeight: 600 }}>📢 Portal</button>
+                        )}
+                        {canEdit && (
+                          <button onClick={e => { e.stopPropagation(); handleDelete(c.id) }}
+                            style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )
@@ -237,6 +268,12 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, c
             <div style={{ padding: '10px 14px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>Vista previa</span>
               <div style={{ display: 'flex', gap: '6px' }}>
+                {canCreate && (
+                  <button onClick={() => publicarEnPortal(selected)}
+                    style={{ padding: '4px 10px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                    📢 Publicar en portal
+                  </button>
+                )}
                 <button onClick={() => handlePrint(selected)}
                   style={{ padding: '4px 10px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                   🖨️ Imprimir
