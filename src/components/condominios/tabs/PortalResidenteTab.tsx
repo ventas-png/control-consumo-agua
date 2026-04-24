@@ -1,199 +1,190 @@
-import { useState } from 'react'
-import type { CuotaCondominio, TicketMantenimiento, ReservaAmenidad, ComunicadoCondominio, Unidad, SancionCondominio } from '../../../types'
+import { useState, useEffect } from 'react'
+import { supabase } from '../../../lib/supabase'
+import type {
+  Unidad, CuotaCondominio, TicketMantenimiento,
+  Amenidad, ReservaAmenidad, Visitante, AnuncioComunidad, MensajePortal,
+} from '../../../types'
+import { PortalMiCuentaTab }   from './PortalMiCuentaTab'
+import { PortalMisTicketsTab } from './PortalMisTicketsTab'
+import { PortalReservasTab }   from './PortalReservasTab'
+import { PortalVisitantesTab } from './PortalVisitantesTab'
+import { PortalAnunciosTab }   from './PortalAnunciosTab'
+import { PortalMiUnidadTab }   from './PortalMiUnidadTab'
 
 interface Props {
-  cuotas: CuotaCondominio[]
-  tickets: TicketMantenimiento[]
-  reservas: ReservaAmenidad[]
-  comunicados: ComunicadoCondominio[]
-  sanciones: SancionCondominio[]
-  unidades: Unidad[]
-  moneda: string
+  unidades:   Unidad[]
+  cuotas:     CuotaCondominio[]
+  tickets:    TicketMantenimiento[]
+  amenidades: Amenidad[]
+  reservas:   ReservaAmenidad[]
+  visitantes: Visitante[]
+  anuncios:   AnuncioComunidad[]
+  proyectoId: string
+  companyId:  string
+  moneda:     string
+  canEdit:    boolean
+  onRefresh:  () => void
 }
 
-const TICKET_COLOR: Record<string, string> = {
-  abierto: '#f59e0b', en_proceso: '#0ea5e9', resuelto: '#10b981', cerrado: '#94a3b8',
-}
+type PortalTab = 'cuenta' | 'tickets' | 'reservas' | 'visitantes' | 'anuncios' | 'mi_unidad'
 
-const CUOTA_COLOR: Record<string, { bg: string; color: string }> = {
-  pendiente: { bg: '#fef3c7', color: '#92400e' },
-  moroso:    { bg: '#fee2e2', color: '#ef4444' },
-  pagado:    { bg: '#dcfce7', color: '#16a34a' },
-}
+const SUB_TABS: { id: PortalTab; label: string; icon: string }[] = [
+  { id: 'cuenta',     label: 'Mi cuenta',    icon: '💳' },
+  { id: 'tickets',    label: 'Mantenimiento', icon: '🔧' },
+  { id: 'reservas',   label: 'Amenidades',   icon: '🏊' },
+  { id: 'visitantes', label: 'Visitantes',   icon: '🚪' },
+  { id: 'anuncios',   label: 'Anuncios',     icon: '📢' },
+  { id: 'mi_unidad',  label: 'Mi unidad',    icon: '🏠' },
+]
 
-export function PortalResidenteTab({ cuotas, tickets, reservas, comunicados, sanciones, unidades, moneda }: Props) {
-  const [selectedUnidad, setSelectedUnidad] = useState('')
+export function PortalResidenteTab({
+  unidades, cuotas, tickets, amenidades, reservas, visitantes, anuncios,
+  proyectoId, companyId, moneda, canEdit, onRefresh,
+}: Props) {
+  const [selectedUnidadId, setSelectedUnidadId] = useState('')
+  const [subTab, setSubTab]                     = useState<PortalTab>('cuenta')
+  const [mensajes, setMensajes]                 = useState<MensajePortal[]>([])
 
-  const today = new Date().toISOString().slice(0, 10)
+  const unidad = unidades.find(u => u.id === selectedUnidadId) ?? null
 
-  const cuotasU     = selectedUnidad ? cuotas.filter(c => c.unidad_id === selectedUnidad && c.estado !== 'pagado') : []
-  const ticketsU    = selectedUnidad ? tickets.filter(t => t.unidad_id === selectedUnidad && t.estado !== 'cerrado') : []
-  const reservasU   = selectedUnidad ? reservas.filter(r => r.unidad_id === selectedUnidad && r.fecha >= today).slice(0, 5) : []
-  const sancionesU  = selectedUnidad ? sanciones.filter(s => s.unidad_id === selectedUnidad && s.estado === 'pendiente') : []
-  const comunicadosU = comunicados
-    .filter(c => ['todos', 'propietarios', 'arrendatarios'].includes(c.destinatario) || c.unidad_id === selectedUnidad)
-    .slice(0, 5)
+  useEffect(() => {
+    if (!selectedUnidadId) { setMensajes([]); return }
+    supabase.from('mensajes_portal')
+      .select('*').eq('unidad_id', selectedUnidadId).order('created_at', { ascending: false })
+      .then(({ data }) => setMensajes(data ?? []))
+  }, [selectedUnidadId])
 
-  const deudaTotal    = cuotasU.reduce((s, c) => s + c.monto, 0)
-  const sancionTotal  = sancionesU.reduce((s, x) => s + x.monto, 0)
+  async function generarToken() {
+    if (!unidad) return
+    const token = crypto.randomUUID().replace(/-/g, '')
+    await supabase.from('unidades').update({ token_portal: token, portal_activo: true }).eq('id', unidad.id)
+    onRefresh()
+  }
 
-  function handlePrint() {
-    const unidad = unidades.find(u => u.id === selectedUnidad)
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Estado de Cuenta – ${unidad?.nombre ?? ''}</title>
-    <style>body{font-family:sans-serif;padding:32px;color:#0f172a}h1{font-size:18px}h2{font-size:14px;margin-top:24px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid #e2e8f0;text-align:left}th{background:#f8fafc}</style>
-    </head><body>
-    <h1>Portal del Residente — ${unidad?.nombre ?? ''}</h1>
-    <p style="font-size:12px;color:#64748b">Generado: ${new Date().toLocaleString()}</p>
-    <h2>Cuotas pendientes (${moneda} ${deudaTotal.toFixed(2)})</h2>
-    <table><tr><th>Concepto</th><th>Período</th><th>Monto</th><th>Estado</th></tr>
-    ${cuotasU.map(c => `<tr><td>${c.concepto}</td><td>${c.periodo}</td><td>${moneda} ${c.monto.toFixed(2)}</td><td>${c.estado}</td></tr>`).join('')}
-    </table>
-    <h2>Tickets abiertos</h2>
-    <table><tr><th>Título</th><th>Prioridad</th><th>Estado</th></tr>
-    ${ticketsU.map(t => `<tr><td>${t.titulo}</td><td>${t.prioridad}</td><td>${t.estado}</td></tr>`).join('')}
-    </table>
-    </body></html>`
-    const w = window.open('', '_blank')
-    if (w) { w.document.write(html); w.document.close(); w.print() }
+  const cuotasU     = cuotas.filter(c => c.unidad_id === selectedUnidadId)
+  const ticketsU    = tickets.filter(t => t.unidad_id === selectedUnidadId)
+  const visitantesU = visitantes.filter(v => v.unidad_id === selectedUnidadId)
+
+  const pendientes = cuotasU.filter(c => c.estado !== 'pagado').length
+  const abiertos   = ticketsU.filter(t => t.estado === 'abierto' || t.estado === 'en_proceso').length
+  const nuevosMsgs = mensajes.filter(m => m.estado === 'nuevo' || m.estado === 'respondido').length
+
+  function badge(n: number) {
+    if (n === 0) return null
+    return (
+      <span style={{ marginLeft: '5px', background: '#ef4444', color: 'white', borderRadius: '10px',
+        fontSize: '10px', fontWeight: 800, padding: '1px 6px', verticalAlign: 'middle' }}>
+        {n}
+      </span>
+    )
   }
 
   return (
-    <div style={{ padding: '20px 24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+    <div>
+      {/* Header */}
+      <div style={{ background: 'linear-gradient(135deg,#1e40af,#1d4ed8)', borderRadius: '16px', padding: '20px 24px', marginBottom: '20px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Portal del Residente</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>Vista consolidada por unidad</p>
+          <div style={{ fontSize: '22px', fontWeight: 800, marginBottom: '4px' }}>Portal del Residente</div>
+          <div style={{ fontSize: '13px', opacity: 0.8 }}>Vista del propietario — selecciona una unidad para gestionar</div>
         </div>
-        {selectedUnidad && (
-          <button onClick={handlePrint}
-            style={{ padding: '7px 14px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: '#374151' }}>
-            🖨️ Imprimir resumen
-          </button>
-        )}
+        <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: '12px', padding: '8px 16px', backdropFilter: 'blur(4px)' }}>
+          <div style={{ fontSize: '11px', opacity: 0.75, marginBottom: '4px', fontWeight: 600 }}>Unidad activa</div>
+          <select
+            value={selectedUnidadId}
+            onChange={e => { setSelectedUnidadId(e.target.value); setSubTab('cuenta') }}
+            style={{ background: 'transparent', border: 'none', color: 'white', fontWeight: 700, fontSize: '14px', cursor: 'pointer', outline: 'none' }}>
+            <option value="" style={{ color: '#0f172a' }}>— Seleccionar —</option>
+            {unidades.map(u => (
+              <option key={u.id} value={u.id} style={{ color: '#0f172a' }}>{u.nombre}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* Unit selector */}
-      <div style={{ background: '#f0f9ff', border: '1.5px solid #bae6fd', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
-        <label style={{ fontSize: '12px', fontWeight: 700, color: '#0369a1', display: 'block', marginBottom: '8px' }}>Seleccionar unidad</label>
-        <select value={selectedUnidad} onChange={e => setSelectedUnidad(e.target.value)}
-          style={{ width: '100%', maxWidth: '300px', padding: '8px 10px', border: '1.5px solid #bae6fd', borderRadius: '8px', fontSize: '14px', background: 'white', color: '#0f172a', fontWeight: 600 }}>
-          <option value="">— Elegir unidad —</option>
-          {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
-        </select>
-      </div>
-
-      {!selectedUnidad ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
-          <div style={{ fontSize: '36px', marginBottom: '12px' }}>🏠</div>
-          <div style={{ fontSize: '14px', fontWeight: 600, color: '#64748b' }}>Selecciona una unidad para ver su estado</div>
+      {!selectedUnidadId || !unidad ? (
+        <div style={{ textAlign: 'center', padding: '60px 24px', color: '#94a3b8' }}>
+          <div style={{ fontSize: '48px', marginBottom: '14px' }}>🏠</div>
+          <div style={{ fontWeight: 700, fontSize: '15px', color: '#64748b', marginBottom: '6px' }}>Selecciona una unidad</div>
+          <div style={{ fontSize: '13px' }}>Elige una unidad del desplegable superior para ver su portal completo</div>
         </div>
       ) : (
         <>
-          {/* KPIs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
-            {[
-              { label: 'Deuda cuotas',   value: `${moneda} ${deudaTotal.toFixed(2)}`,  color: deudaTotal > 0 ? '#ef4444' : '#10b981' },
-              { label: 'Sanciones pend.',value: `${moneda} ${sancionTotal.toFixed(2)}`,color: sancionTotal > 0 ? '#ef4444' : '#10b981' },
-              { label: 'Tickets abiertos', value: String(ticketsU.length), color: ticketsU.length > 0 ? '#f59e0b' : '#10b981' },
-              { label: 'Próx. reservas', value: String(reservasU.length), color: '#0ea5e9' },
-            ].map(k => (
-              <div key={k.label} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '16px', fontWeight: 800, color: k.color }}>{k.value}</div>
-                <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>{k.label}</div>
-              </div>
+          {/* Sub-tabs */}
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '20px', borderBottom: '2px solid #e2e8f0', paddingBottom: '10px' }}>
+            {SUB_TABS.map(t => (
+              <button key={t.id} onClick={() => setSubTab(t.id)}
+                style={{
+                  padding: '8px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  fontSize: '13px', fontWeight: 700,
+                  background: subTab === t.id ? '#2563eb' : '#f1f5f9',
+                  color:      subTab === t.id ? 'white'    : '#64748b',
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                }}>
+                <span>{t.icon}</span>
+                <span>{t.label}</span>
+                {t.id === 'cuenta'    && badge(pendientes)}
+                {t.id === 'tickets'   && badge(abiertos)}
+                {t.id === 'mi_unidad' && badge(nuevosMsgs)}
+              </button>
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-            {/* Cuotas */}
-            <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px' }}>
-              <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a', marginBottom: '10px' }}>💳 Cuotas pendientes</div>
-              {cuotasU.length === 0 ? (
-                <div style={{ fontSize: '12px', color: '#10b981', fontWeight: 600 }}>✓ Sin deuda pendiente</div>
-              ) : (
-                cuotasU.map(c => {
-                  const ec = CUOTA_COLOR[c.estado] ?? { bg: '#f1f5f9', color: '#94a3b8' }
-                  return (
-                    <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-                      <div>
-                        <div style={{ fontSize: '12px', fontWeight: 600 }}>{c.concepto}</div>
-                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>{c.periodo}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444' }}>{moneda} {c.monto.toFixed(2)}</div>
-                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '10px', background: ec.bg, color: ec.color }}>{c.estado}</span>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-
-            {/* Tickets */}
-            <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px' }}>
-              <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a', marginBottom: '10px' }}>🔧 Tickets abiertos</div>
-              {ticketsU.length === 0 ? (
-                <div style={{ fontSize: '12px', color: '#10b981', fontWeight: 600 }}>✓ Sin tickets pendientes</div>
-              ) : (
-                ticketsU.map(t => (
-                  <div key={t.id} style={{ padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '2px' }}>{t.titulo}</div>
-                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>Prioridad: {t.prioridad}</div>
-                      </div>
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '10px',
-                        background: '#fef3c7', color: TICKET_COLOR[t.estado] ?? '#94a3b8', marginLeft: '8px', flexShrink: 0 }}>
-                        {t.estado}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Reservas */}
-            <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px' }}>
-              <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a', marginBottom: '10px' }}>🏊 Próximas reservas</div>
-              {reservasU.length === 0 ? (
-                <div style={{ fontSize: '12px', color: '#94a3b8' }}>Sin reservas próximas</div>
-              ) : (
-                reservasU.map(r => (
-                  <div key={r.id} style={{ padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600 }}>{r.amenidad_nombre ?? 'Amenidad'}</div>
-                    <div style={{ fontSize: '11px', color: '#64748b' }}>{r.fecha} · {r.hora_inicio} – {r.hora_fin}</div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Sanciones */}
-            {sancionesU.length > 0 && (
-              <div style={{ background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: '12px', padding: '14px' }}>
-                <div style={{ fontWeight: 700, fontSize: '13px', color: '#c2410c', marginBottom: '10px' }}>⚖️ Sanciones pendientes</div>
-                {sancionesU.map(s => (
-                  <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #fed7aa' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#7c2d12' }}>{s.concepto}</div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444' }}>{moneda} {s.monto.toFixed(2)}</div>
-                  </div>
-                ))}
-              </div>
+          {/* Sub-tab content */}
+          <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '20px' }}>
+            {subTab === 'cuenta' && (
+              <PortalMiCuentaTab
+                cuotas={cuotasU}
+                moneda={moneda}
+                unidadNombre={unidad.nombre}
+              />
             )}
-
-            {/* Comunicados */}
-            <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px' }}>
-              <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a', marginBottom: '10px' }}>📢 Comunicados recientes</div>
-              {comunicadosU.length === 0 ? (
-                <div style={{ fontSize: '12px', color: '#94a3b8' }}>Sin comunicados</div>
-              ) : (
-                comunicadosU.map(c => (
-                  <div key={c.id} style={{ padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '2px' }}>{c.titulo}</div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{c.fecha_envio?.slice(0, 10)} · {c.tipo}</div>
-                  </div>
-                ))
-              )}
-            </div>
+            {subTab === 'tickets' && (
+              <PortalMisTicketsTab
+                tickets={ticketsU}
+                unidadId={selectedUnidadId}
+                proyectoId={proyectoId}
+                companyId={companyId}
+                onRefresh={onRefresh}
+              />
+            )}
+            {subTab === 'reservas' && (
+              <PortalReservasTab
+                amenidades={amenidades}
+                reservas={reservas}
+                unidadId={selectedUnidadId}
+                companyId={companyId}
+                moneda={moneda}
+                onRefresh={onRefresh}
+              />
+            )}
+            {subTab === 'visitantes' && (
+              <PortalVisitantesTab
+                visitantes={visitantesU}
+                unidadId={selectedUnidadId}
+                proyectoId={proyectoId}
+                companyId={companyId}
+                onRefresh={onRefresh}
+              />
+            )}
+            {subTab === 'anuncios' && (
+              <PortalAnunciosTab anuncios={anuncios} />
+            )}
+            {subTab === 'mi_unidad' && (
+              <PortalMiUnidadTab
+                unidad={unidad}
+                mensajes={mensajes}
+                proyectoId={proyectoId}
+                companyId={companyId}
+                isAdmin={canEdit}
+                onRefresh={() => {
+                  supabase.from('mensajes_portal')
+                    .select('*').eq('unidad_id', selectedUnidadId).order('created_at', { ascending: false })
+                    .then(({ data }) => setMensajes(data ?? []))
+                  onRefresh()
+                }}
+                onGenerarToken={generarToken}
+              />
+            )}
           </div>
         </>
       )}

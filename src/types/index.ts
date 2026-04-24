@@ -266,6 +266,28 @@ export interface Unidad {
   fecha_vencimiento_contrato?: string | null;
   updated_by?: string | null;
   updated_by_name?: string | null;
+  // Portal del residente
+  token_portal?: string | null;
+  portal_activo?: boolean;
+}
+
+export type TipoMensajePortal = 'consulta' | 'queja' | 'sugerencia' | 'emergencia'
+export type EstadoMensajePortal = 'nuevo' | 'leido' | 'respondido' | 'cerrado'
+
+export interface MensajePortal {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  asunto: string
+  cuerpo: string
+  tipo: TipoMensajePortal
+  estado: EstadoMensajePortal
+  respuesta?: string | null
+  respondido_en?: string | null
+  created_at: string
+  // joins
+  unidad_nombre?: string
 }
 
 export type EstadoProyecto = 'activo' | 'inactivo' | 'suspendido'
