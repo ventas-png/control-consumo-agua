@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa, Contador, Unidad } from '../../types'
+import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa, Contador, Unidad, Proyecto, UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
@@ -12,6 +12,8 @@ interface Props {
   registros: Registro[]
   tarifas: Tarifa[]
   userRole: UserRole
+  currentUser?: UserSession | null
+  proyectos?: Proyecto[]
   moneda?: string
   onRegistroAdded: (registro: Registro) => void
   rutaActiva?: Ruta | null
@@ -27,6 +29,8 @@ export function LecturasSection({
   registros,
   tarifas,
   userRole,
+  currentUser: _currentUser,
+  proyectos = [],
   moneda = 'Q',
   onRegistroAdded,
   rutaActiva,
@@ -34,6 +38,8 @@ export function LecturasSection({
   onRutaCompletada,
   canCreate: _canCreate = true,
 }: Props) {
+  // Derive project_id from selected unidad/contador, then fall back to single-project context
+  const defaultProjectId = proyectos.length === 1 ? proyectos[0].id : null
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
   const [selectedContadorId, setSelectedContadorId] = useState('')
   const [lecturaActual, setLecturaActual] = useState('')
@@ -134,6 +140,12 @@ export function LecturasSection({
     : []
 
   const contadorSeleccionado = contadores.find(c => c.id === selectedContadorId) ?? null
+
+  // Resolve project_id: prefer from selected unidad, then contador, then single-project fallback
+  const projectId: string | null =
+    unidadSeleccionada?.project_id ??
+    contadorSeleccionado?.project_id ??
+    defaultProjectId
   const tarifaDelContador = contadorSeleccionado?.tarifa_id
     ? tarifas.find(t => t.id === contadorSeleccionado.tarifa_id) ?? null
     : null
@@ -221,10 +233,16 @@ export function LecturasSection({
 
     const resultadoCobro = calcularTotalPagar(consumo, tarifaDelContador!.precio_m3, tarifaDelContador!.canon_fijo, tarifaDelContador!.consumo_minimo ?? 0, tarifaDelContador!.precio_m3_exceso ?? 0, contadorSeleccionado.cantidad_derecho_servicio_m3 ?? null)
 
+    if (!projectId) {
+      Swal.fire('Error', 'No se pudo determinar el proyecto del usuario', 'error')
+      return
+    }
+
     const registro = {
       cliente_id: clienteDeUnidad?.id ?? null,
       cliente_nombre: clienteDeUnidad?.nombre ?? unidadSeleccionada.nombre,
       contador_id: contadorSeleccionado.id,
+      project_id: projectId,
       fecha: new Date(fechaLecturaActual + 'T12:00:00').toISOString(),
       lectura_anterior: ultimaLectura,
       lectura_actual: lecturaNum,
@@ -247,7 +265,8 @@ export function LecturasSection({
     setSaving(false)
 
     if (error || !data) {
-      Swal.fire('Error', 'No se pudo guardar en la base de datos', 'error')
+      console.error('Error inserting registro:', error)
+      Swal.fire('Error', error?.message || 'No se pudo guardar en la base de datos', 'error')
       return
     }
 

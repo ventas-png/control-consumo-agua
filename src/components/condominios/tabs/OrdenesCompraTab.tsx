@@ -1,0 +1,270 @@
+import { useState, useMemo } from 'react'
+import Swal from 'sweetalert2'
+import { supabase } from '../../../lib/supabase'
+import { OrdenCompra, ContratoProveedor } from '../../../types'
+
+interface Props {
+  ordenes: OrdenCompra[]
+  proveedores: ContratoProveedor[]
+  proyectoId: string
+  companyId: string
+  moneda: string
+  canCreate: boolean
+  canEdit: boolean
+  onRefresh: () => void
+}
+
+type EstadoOC = OrdenCompra['estado']
+
+const ESTADO_CFG: Record<EstadoOC, { label: string; color: string; bg: string; next?: EstadoOC; nextLabel?: string }> = {
+  borrador:  { label: 'Borrador',   color: '#64748b', bg: '#f1f5f9', next: 'aprobada',  nextLabel: 'Aprobar' },
+  aprobada:  { label: 'Aprobada',   color: '#2563eb', bg: '#eff6ff', next: 'emitida',   nextLabel: 'Emitir OC' },
+  emitida:   { label: 'Emitida',    color: '#d97706', bg: '#fef3c7', next: 'recibida',  nextLabel: 'Marcar recibida' },
+  recibida:  { label: 'Recibida',   color: '#16a34a', bg: '#dcfce7' },
+  cancelada: { label: 'Cancelada',  color: '#ef4444', bg: '#fef2f2' },
+}
+
+const BLANK = {
+  proveedor_nombre: '', concepto: '', descripcion: '', monto_estimado: '',
+  fecha_entrega_esperada: '', notas: '',
+}
+
+export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+  const [filtroEstado, setFiltroEstado] = useState<EstadoOC | ''>('')
+  const [showForm, setShowForm] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [form, setForm] = useState({ ...BLANK })
+  const [saving, setSaving] = useState(false)
+  const [expandida, setExpandida] = useState<string | null>(null)
+
+  const filtradas = filtroEstado ? ordenes.filter(o => o.estado === filtroEstado) : ordenes
+
+  const totalesPorEstado = useMemo(() => ({
+    borrador:  ordenes.filter(o => o.estado === 'borrador').length,
+    aprobada:  ordenes.filter(o => o.estado === 'aprobada').length,
+    emitida:   ordenes.filter(o => o.estado === 'emitida').length,
+    recibida:  ordenes.filter(o => o.estado === 'recibida').length,
+    cancelada: ordenes.filter(o => o.estado === 'cancelada').length,
+  }), [ordenes])
+
+  const montoTotal = ordenes.filter(o => o.estado !== 'cancelada').reduce((s, o) => s + (o.monto_estimado ?? 0), 0)
+
+  function abrirNueva() {
+    setEditId(null); setForm({ ...BLANK }); setShowForm(true)
+  }
+
+  async function guardar() {
+    if (!form.concepto.trim() || !form.proveedor_nombre.trim()) {
+      Swal.fire('Campos requeridos', 'Proveedor y concepto son obligatorios.', 'warning'); return
+    }
+    setSaving(true)
+    const payload = {
+      company_id: companyId, project_id: proyectoId,
+      proveedor_nombre: form.proveedor_nombre.trim(),
+      concepto: form.concepto.trim(),
+      descripcion: form.descripcion.trim() || null,
+      monto_estimado: form.monto_estimado ? parseFloat(form.monto_estimado) : null,
+      fecha_entrega_esperada: form.fecha_entrega_esperada || null,
+      notas: form.notas.trim() || null,
+      estado: 'borrador' as EstadoOC,
+    }
+    const { error } = editId
+      ? await supabase.from('ordenes_compra').update(payload).eq('id', editId)
+      : await supabase.from('ordenes_compra').insert(payload)
+    setSaving(false)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    setShowForm(false); setEditId(null); setForm({ ...BLANK }); onRefresh()
+  }
+
+  async function avanzarEstado(orden: OrdenCompra) {
+    const cfg = ESTADO_CFG[orden.estado]
+    if (!cfg.next) return
+    const updates: Partial<OrdenCompra> = { estado: cfg.next }
+    if (cfg.next === 'recibida') {
+      const { value: montoReal } = await Swal.fire({
+        title: 'Monto real de la OC',
+        input: 'number', inputPlaceholder: `Estimado: ${orden.monto_estimado ?? '—'}`,
+        showCancelButton: true, confirmButtonText: 'Confirmar recepción',
+      })
+      if (montoReal === undefined) return
+      updates.monto_real = montoReal ? parseFloat(montoReal as string) : orden.monto_estimado
+      updates.fecha_entrega_esperada = new Date().toISOString().slice(0, 10)
+    }
+    const { error } = await supabase.from('ordenes_compra').update(updates).eq('id', orden.id)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    onRefresh()
+  }
+
+  async function cancelar(orden: OrdenCompra) {
+    const r = await Swal.fire({ title: '¿Cancelar orden?', text: orden.concepto, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Cancelar OC' })
+    if (!r.isConfirmed) return
+    await supabase.from('ordenes_compra').update({ estado: 'cancelada' }).eq('id', orden.id)
+    onRefresh()
+  }
+
+  async function eliminar(orden: OrdenCompra) {
+    const r = await Swal.fire({ title: '¿Eliminar borrador?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' })
+    if (!r.isConfirmed) return
+    await supabase.from('ordenes_compra').delete().eq('id', orden.id)
+    onRefresh()
+  }
+
+  const correlativo = (i: number) => `OC-${String(ordenes.length - i).padStart(4, '0')}`
+
+  return (
+    <div style={{ padding: 16 }}>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8, marginBottom: 16 }}>
+        {(Object.keys(ESTADO_CFG) as EstadoOC[]).map(e => {
+          const cfg = ESTADO_CFG[e]
+          return (
+            <div key={e} onClick={() => setFiltroEstado(filtroEstado === e ? '' : e)}
+              style={{ background: filtroEstado === e ? cfg.bg : '#fff', border: `1.5px solid ${filtroEstado === e ? cfg.color : '#e5e7eb'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', textAlign: 'center' }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: cfg.color }}>{totalesPorEstado[e]}</div>
+              <div style={{ fontSize: 10, color: cfg.color, fontWeight: 600 }}>{cfg.label}</div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: '#6b7280' }}>
+          Total comprometido: <strong style={{ color: '#0f172a' }}>{moneda} {montoTotal.toLocaleString('es', { minimumFractionDigits: 2 })}</strong>
+          {filtroEstado && <span> · Filtrando: {ESTADO_CFG[filtroEstado].label} ({filtradas.length})</span>}
+        </div>
+        {canCreate && (
+          <button onClick={abrirNueva}
+            style={{ padding: '6px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            + Nueva OC
+          </button>
+        )}
+      </div>
+
+      {/* Formulario */}
+      {showForm && (
+        <div style={{ background: '#f0f9ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: '#1d4ed8' }}>
+            {editId ? 'Editar orden' : 'Nueva orden de compra'}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Proveedor *</label>
+              <input list="proveedores-list" value={form.proveedor_nombre} onChange={e => setForm(f => ({ ...f, proveedor_nombre: e.target.value }))}
+                placeholder="Nombre del proveedor"
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid #bfdbfe', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+              <datalist id="proveedores-list">
+                {proveedores.map(p => <option key={p.id} value={p.proveedor_nombre} />)}
+              </datalist>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Monto estimado ({moneda})</label>
+              <input type="number" value={form.monto_estimado} onChange={e => setForm(f => ({ ...f, monto_estimado: e.target.value }))}
+                placeholder="0.00"
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid #bfdbfe', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Concepto *</label>
+            <input value={form.concepto} onChange={e => setForm(f => ({ ...f, concepto: e.target.value }))}
+              placeholder="Descripción breve de la compra"
+              style={{ width: '100%', padding: '7px 10px', border: '1px solid #bfdbfe', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Fecha entrega esperada</label>
+              <input type="date" value={form.fecha_entrega_esperada} onChange={e => setForm(f => ({ ...f, fecha_entrega_esperada: e.target.value }))}
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid #bfdbfe', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Notas</label>
+              <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
+                placeholder="Observaciones adicionales"
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid #bfdbfe', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={guardar} disabled={saving}
+              style={{ padding: '8px 18px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Guardando…' : 'Guardar como borrador'}
+            </button>
+            <button onClick={() => { setShowForm(false); setEditId(null) }}
+              style={{ padding: '8px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Lista */}
+      {filtradas.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🛒</div>
+          No hay órdenes de compra{filtroEstado ? ` en estado "${ESTADO_CFG[filtroEstado].label}"` : ''}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filtradas.map((orden, i) => {
+            const cfg = ESTADO_CFG[orden.estado]
+            const isOpen = expandida === orden.id
+            return (
+              <div key={orden.id} style={{ background: '#fff', border: `1px solid ${cfg.color}33`, borderRadius: 10, borderLeft: `4px solid ${cfg.color}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', cursor: 'pointer' }}
+                  onClick={() => setExpandida(isOpen ? null : orden.id)}>
+                  <div style={{ width: 60, fontSize: 10, color: '#9ca3af', fontWeight: 600, flexShrink: 0 }}>{correlativo(i)}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{orden.concepto}</div>
+                    <div style={{ fontSize: 11, color: '#6b7280' }}>{orden.proveedor_nombre}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    {orden.monto_estimado && (
+                      <div style={{ fontWeight: 700, fontSize: 13, color: cfg.color }}>{moneda} {orden.monto_estimado.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
+                    )}
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', background: cfg.bg, color: cfg.color, borderRadius: 6 }}>{cfg.label}</span>
+                  </div>
+                  <span style={{ color: '#9ca3af', fontSize: 12 }}>{isOpen ? '▲' : '▼'}</span>
+                </div>
+
+                {isOpen && (
+                  <div style={{ padding: '0 14px 14px', borderTop: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, margin: '10px 0', fontSize: 11, color: '#6b7280' }}>
+                      {orden.fecha_entrega_esperada && <div>Entrega esperada: <strong>{orden.fecha_entrega_esperada}</strong></div>}
+                      {orden.estado === 'recibida' && <div>Recibido: <strong style={{ color: '#16a34a' }}>✓</strong></div>}
+                      {orden.monto_real && <div>Monto real: <strong style={{ color: '#0f172a' }}>{moneda} {orden.monto_real.toFixed(2)}</strong></div>}
+                    </div>
+                    {orden.notas && <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 10 }}>📝 {orden.notas}</div>}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {canEdit && cfg.next && (
+                        <button onClick={() => avanzarEstado(orden)}
+                          style={{ padding: '5px 12px', background: ESTADO_CFG[cfg.next!].bg, color: ESTADO_CFG[cfg.next!].color, border: `1px solid ${ESTADO_CFG[cfg.next!].color}66`, borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                          → {cfg.nextLabel}
+                        </button>
+                      )}
+                      {canEdit && orden.estado === 'borrador' && (
+                        <button onClick={() => { setEditId(orden.id); setForm({ proveedor_nombre: orden.proveedor_nombre, concepto: orden.concepto, descripcion: orden.descripcion ?? '', monto_estimado: String(orden.monto_estimado ?? ''), fecha_entrega_esperada: orden.fecha_entrega_esperada ?? '', notas: orden.notas ?? '' }); setShowForm(true) }}
+                          style={{ padding: '5px 12px', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: '#f9fafb' }}>
+                          ✏️ Editar
+                        </button>
+                      )}
+                      {canEdit && (orden.estado === 'borrador' || orden.estado === 'aprobada') && (
+                        <button onClick={() => cancelar(orden)}
+                          style={{ padding: '5px 12px', border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: '#fef2f2', color: '#ef4444' }}>
+                          Cancelar OC
+                        </button>
+                      )}
+                      {canEdit && orden.estado === 'borrador' && (
+                        <button onClick={() => eliminar(orden)}
+                          style={{ padding: '5px 12px', border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: '#fef2f2', color: '#ef4444' }}>
+                          🗑 Eliminar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}

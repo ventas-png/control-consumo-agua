@@ -1,0 +1,241 @@
+import React, { useState } from 'react'
+import { supabase } from '../../../lib/supabase'
+import Swal from 'sweetalert2'
+import { ConvenioCuotaCond, EstadoConvenioCuota, Unidad } from '../../../types'
+
+interface Props {
+  convenios: ConvenioCuotaCond[]
+  unidades: Unidad[]
+  proyectoId: string
+  companyId: string
+  moneda: string
+  autorNombre: string
+  canCreate: boolean
+  canEdit: boolean
+  onRefresh: () => void
+}
+
+const ESTADO_CFG: Record<EstadoConvenioCuota, { label: string; bg: string; color: string }> = {
+  activo:      { label: 'Activo',      bg: '#dbeafe', color: '#1d4ed8' },
+  cumplido:    { label: 'Cumplido',    bg: '#d1fae5', color: '#065f46' },
+  incumplido:  { label: 'Incumplido', bg: '#fee2e2', color: '#ef4444' },
+  anulado:     { label: 'Anulado',    bg: '#f3f4f6', color: '#9ca3af' },
+}
+
+export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, companyId, moneda, autorNombre, canCreate, canEdit, onRefresh }: Props) {
+  const [mostrarForm, setMostrarForm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState<ConvenioCuotaCond | null>(null)
+  const [filtroEstado, setFiltroEstado] = useState<EstadoConvenioCuota | ''>('')
+  const [form, setForm] = useState({
+    unidad_id: '', descripcion: '', monto_total: '', num_cuotas: '3', dia_pago: '5',
+    fecha_inicio: new Date().toISOString().slice(0, 10), notas: '',
+  })
+
+  const montoC = form.monto_total && form.num_cuotas
+    ? parseFloat(form.monto_total) / parseInt(form.num_cuotas)
+    : null
+
+  const lista = convenios.filter(c => !filtroEstado || c.estado === filtroEstado)
+  const activos = convenios.filter(c => c.estado === 'activo').length
+  const incumplidos = convenios.filter(c => c.estado === 'incumplido').length
+
+  function resetForm() {
+    setForm({ unidad_id: '', descripcion: '', monto_total: '', num_cuotas: '3', dia_pago: '5', fecha_inicio: new Date().toISOString().slice(0, 10), notas: '' })
+    setMostrarForm(false)
+  }
+
+  async function guardar() {
+    if (!form.unidad_id || !form.descripcion.trim() || !form.monto_total || !form.num_cuotas) {
+      Swal.fire('Error', 'Unidad, descripción, monto y número de cuotas son obligatorios', 'warning'); return
+    }
+    const monto_total = parseFloat(form.monto_total)
+    const num_cuotas = parseInt(form.num_cuotas)
+    const monto_cuota = parseFloat((monto_total / num_cuotas).toFixed(2))
+    setSaving(true)
+    const { error } = await supabase.from('convenios_cuota_cond').insert({
+      company_id: companyId, project_id: proyectoId,
+      unidad_id: form.unidad_id,
+      descripcion: form.descripcion.trim(),
+      monto_total, num_cuotas, monto_cuota,
+      dia_pago: parseInt(form.dia_pago),
+      fecha_inicio: form.fecha_inicio,
+      aprobado_por: autorNombre,
+      notas: form.notas.trim() || null,
+    })
+    setSaving(false)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    resetForm(); onRefresh()
+  }
+
+  async function registrarPago(c: ConvenioCuotaCond) {
+    const nuevasPagadas = c.cuotas_pagadas + 1
+    const nuevoEstado: EstadoConvenioCuota = nuevasPagadas >= c.num_cuotas ? 'cumplido' : 'activo'
+    await supabase.from('convenios_cuota_cond').update({ cuotas_pagadas: nuevasPagadas, estado: nuevoEstado }).eq('id', c.id)
+    Swal.fire({ icon: 'success', title: nuevoEstado === 'cumplido' ? '✅ Convenio cumplido' : 'Pago registrado', timer: 1500, showConfirmButton: false })
+    onRefresh()
+  }
+
+  async function cambiarEstado(id: string, estado: EstadoConvenioCuota) {
+    await supabase.from('convenios_cuota_cond').update({ estado }).eq('id', id)
+    onRefresh()
+  }
+
+  const inp: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
+  const lbl: React.CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+
+  return (
+    <div style={{ padding: 16 }}>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
+        {[
+          { label: 'Activos', val: activos, bg: '#eff6ff', color: '#2563eb' },
+          { label: 'Incumplidos', val: incumplidos, bg: '#fef2f2', color: '#ef4444' },
+          { label: 'Cumplidos', val: convenios.filter(c => c.estado === 'cumplido').length, bg: '#f0fdf4', color: '#16a34a' },
+          { label: 'Total', val: convenios.length, bg: '#f9fafb', color: '#374151' },
+        ].map(k => (
+          <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: k.color }}>{k.val}</div>
+            <div style={{ fontSize: 11, color: k.color }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtros + botón */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {(['', 'activo', 'cumplido', 'incumplido', 'anulado'] as (EstadoConvenioCuota | '')[]).map(e => (
+            <button key={e} onClick={() => setFiltroEstado(e)}
+              style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#4f46e5' : '#e2e8f0', background: filtroEstado === e ? '#eef2ff' : 'white', color: filtroEstado === e ? '#4f46e5' : '#64748b' }}>
+              {e === '' ? 'Todos' : ESTADO_CFG[e].label}
+            </button>
+          ))}
+        </div>
+        {canCreate && (
+          <button onClick={() => setMostrarForm(!mostrarForm)}
+            style={{ padding: '8px 16px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            {mostrarForm ? '✕ Cancelar' : '+ Nuevo convenio'}
+          </button>
+        )}
+      </div>
+
+      {/* Formulario */}
+      {mostrarForm && (
+        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nuevo convenio de pago</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={lbl}>Unidad *</label>
+              <select style={inp} value={form.unidad_id} onChange={e => setForm(p => ({ ...p, unidad_id: e.target.value }))}>
+                <option value="">Seleccionar…</option>
+                {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+              </select>
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={lbl}>Descripción *</label>
+              <input style={inp} value={form.descripcion} onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))} placeholder="Ej. Acuerdo de pago cuotas atrasadas Q1 2026" />
+            </div>
+            <div>
+              <label style={lbl}>Monto total ({moneda}) *</label>
+              <input type="number" step="0.01" style={inp} value={form.monto_total} onChange={e => setForm(p => ({ ...p, monto_total: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl}>Número de cuotas *</label>
+              <input type="number" min={1} max={24} style={inp} value={form.num_cuotas} onChange={e => setForm(p => ({ ...p, num_cuotas: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl}>Cuota mensual</label>
+              <div style={{ ...inp, background: '#f3f4f6', color: montoC ? '#374151' : '#9ca3af' }}>
+                {montoC ? `${moneda} ${montoC.toFixed(2)}` : 'Auto-calculado'}
+              </div>
+            </div>
+            <div>
+              <label style={lbl}>Día de pago mensual</label>
+              <input type="number" min={1} max={28} style={inp} value={form.dia_pago} onChange={e => setForm(p => ({ ...p, dia_pago: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl}>Fecha de inicio</label>
+              <input type="date" style={inp} value={form.fecha_inicio} onChange={e => setForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
+            </div>
+            <div>
+              <label style={lbl}>Notas</label>
+              <input style={inp} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} placeholder="Opcional" />
+            </div>
+          </div>
+          <button onClick={guardar} disabled={saving}
+            style={{ padding: '8px 20px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            {saving ? 'Guardando…' : '✅ Crear convenio'}
+          </button>
+        </div>
+      )}
+
+      {/* Lista */}
+      {lista.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0', fontSize: 13 }}>Sin convenios de pago registrados</div>
+      ) : (
+        <div style={{ display: 'flex', gap: 12 }}>
+          {/* Lista */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {lista.map(c => {
+              const ec = ESTADO_CFG[c.estado]
+              const pct = Math.round((c.cuotas_pagadas / c.num_cuotas) * 100)
+              const unidad = unidades.find(u => u.id === c.unidad_id)
+              return (
+                <div key={c.id} onClick={() => setSelected(c === selected ? null : c)}
+                  style={{ background: selected?.id === c.id ? '#eef2ff' : '#fff', border: `1.5px solid ${selected?.id === c.id ? '#6366f1' : '#e5e7eb'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{unidad?.nombre ?? c.unidad_nombre ?? '—'}</div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>{c.descripcion}</div>
+                    </div>
+                    <span style={{ padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ flex: 1, background: '#e5e7eb', borderRadius: 20, height: 8, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', background: c.estado === 'cumplido' ? '#16a34a' : c.estado === 'incumplido' ? '#ef4444' : '#4f46e5', width: `${pct}%`, borderRadius: 20, transition: 'width 0.3s' }} />
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>
+                      {c.cuotas_pagadas}/{c.num_cuotas} · {moneda} {c.monto_cuota.toFixed(2)}/mes
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {/* Detalle */}
+          {selected && (
+            <div style={{ width: 260, flexShrink: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+              <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 14 }}>Detalle del convenio</div>
+              {[
+                ['Monto total', `${moneda} ${selected.monto_total.toFixed(2)}`],
+                ['Cuotas', `${selected.num_cuotas} de ${moneda} ${selected.monto_cuota.toFixed(2)}`],
+                ['Día de pago', `Día ${selected.dia_pago}`],
+                ['Inicio', selected.fecha_inicio],
+                ['Pagadas', `${selected.cuotas_pagadas} de ${selected.num_cuotas}`],
+                ['Aprobado por', selected.aprobado_por ?? '—'],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid #f3f4f6' }}>
+                  <span style={{ color: '#6b7280' }}>{k}</span>
+                  <span style={{ fontWeight: 600, color: '#374151' }}>{v}</span>
+                </div>
+              ))}
+              {selected.notas && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8 }}>{selected.notas}</div>}
+              {canEdit && selected.estado === 'activo' && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
+                  <button onClick={() => registrarPago(selected)}
+                    style={{ flex: 1, padding: '7px 0', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    💳 Registrar pago
+                  </button>
+                  <button onClick={() => cambiarEstado(selected.id, 'incumplido')}
+                    style={{ padding: '7px 10px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    ✗
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
