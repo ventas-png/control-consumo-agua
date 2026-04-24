@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto } from '../../../types'
+import { exportarExcel } from '../exportUtils'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -103,11 +104,22 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Cuotas de Mantenimiento</h2>
           <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '13.5px' }}>{cuotas.length} cuotas registradas</p>
         </div>
-        {canCreate && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}>
-            + Nueva cuota
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => exportarExcel(`cuotas-${new Date().toISOString().slice(0,10)}`, [{
+              name: 'Cuotas',
+              headers: ['Unidad', 'Concepto', 'Período', 'Monto', 'Vencimiento', 'Estado'],
+              rows: cuotas.map(c => [c.unidad_nombre ?? 'General', c.concepto, c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado]),
+            }])}
+            style={{ padding: '10px 16px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+            📊 Excel
           </button>
-        )}
+          {canCreate && (
+            <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}>
+              + Nueva cuota
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Resumen */}

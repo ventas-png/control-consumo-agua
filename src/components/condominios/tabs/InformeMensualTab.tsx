@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
 import { InformeMensual, EstadoInformeMensual, CuotaCondominio, GastoCondominio, TicketMantenimiento, Visitante, IncidenteSeguridad } from '../../../types'
+import { exportarPDFInformeMensual } from '../exportUtils'
 
 interface Props {
   informes: InformeMensual[]
@@ -164,9 +165,13 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
                 </div>
               ))}
               {selected.notas && <div style={{ fontSize: 11, color: '#6b7280', marginTop: 8, lineHeight: 1.4, background: '#f9fafb', borderRadius: 6, padding: '8px 10px' }}>{selected.notas}</div>}
+              <button onClick={() => exportarPDFInformeMensual(selected, moneda, autorNombre)}
+                style={{ width: '100%', marginTop: 14, padding: '8px 0', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                📄 Descargar PDF
+              </button>
               {selected.estado === 'borrador' && (
                 <button onClick={() => publicar(selected)}
-                  style={{ width: '100%', marginTop: 14, padding: '8px 0', background: '#0d9488', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  style={{ width: '100%', marginTop: 8, padding: '8px 0', background: '#0d9488', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                   📢 Publicar informe
                 </button>
               )}

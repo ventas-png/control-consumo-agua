@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { CuotaCondominio, RecargoMora, ConvenioCuotaCond, Unidad } from '../../../types'
+import { exportarPDFEstadoCuenta } from '../exportUtils'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -160,9 +161,13 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
             style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, background: '#fff' }}>
             {aniosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
+          <button onClick={() => exportarPDFEstadoCuenta(movimientos, unidad?.nombre ?? unidadId, anio, moneda, proyectoNombre)}
+            style={{ padding: '6px 16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+            📄 Descargar PDF
+          </button>
           <button onClick={imprimir}
             style={{ padding: '6px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
-            🖨️ Imprimir / PDF
+            🖨️ Imprimir
           </button>
         </div>
       </div>

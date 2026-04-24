@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { CuotaCondominio, Unidad } from '../../../types'
+import { exportarExcel, exportarPDFCartaCobro } from '../exportUtils'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -61,42 +62,20 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
     total:   acc.total   + d.total,
   }), { t0_30: 0, t31_60: 0, t61_90: 0, t90plus: 0, total: 0 }), [deudores])
 
+  function exportarExcelDeudores() {
+    exportarExcel(`deudores-${new Date().toISOString().slice(0, 10)}`, [{
+      name: 'Deudores',
+      headers: ['Unidad', '0–30 días', '31–60 días', '61–90 días', '+90 días', 'Total', 'Cuotas pendientes'],
+      rows: deudores.map(d => [d.unidadNombre, d.t0_30, d.t31_60, d.t61_90, d.t90plus, d.total, d.cuotasCount]),
+    }])
+  }
+
   function cartaCobro(row: DeudorRow) {
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>Carta de Cobro — ${row.unidadNombre}</title>
-    <style>
-      body{font-family:Arial,sans-serif;padding:40px;max-width:700px;margin:auto;color:#0f172a;font-size:13px}
-      .header{border-bottom:3px solid #0f172a;padding-bottom:16px;margin-bottom:24px}
-      h1{font-size:22px;margin:0 0 4px}h2{font-size:13px;color:#64748b;font-weight:normal;margin:0}
-      .box{background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:16px;margin:20px 0}
-      .amount{font-size:28px;font-weight:800;color:#ef4444}
-      table{width:100%;border-collapse:collapse;margin:16px 0;font-size:12px}
-      th{background:#f1f5f9;padding:8px 10px;text-align:left;color:#64748b}
-      td{padding:8px 10px;border-bottom:1px solid #f1f5f9}
-      .footer{margin-top:32px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:12px}
-    </style></head><body>
-    <div class="header"><h1>${proyectoNombre ?? 'Administración'}</h1><h2>Carta de Cobro — ${new Date().toLocaleDateString('es')}</h2></div>
-    <p>Estimado(a) residente de la unidad <strong>${row.unidadNombre}</strong>,</p>
-    <p>Nos permitimos informarle que a la fecha presenta el siguiente saldo pendiente con la administración del condominio:</p>
-    <div class="box">
-      <div style="font-size:12px;color:#dc2626">Saldo total pendiente</div>
-      <div class="amount">${moneda} ${row.total.toFixed(2)}</div>
-    </div>
-    <table>
-      <thead><tr><th>Tramo de mora</th><th style="text-align:right">Monto</th></tr></thead>
-      <tbody>
-        ${row.t0_30   > 0 ? `<tr><td>0–30 días</td><td style="text-align:right">${moneda} ${row.t0_30.toFixed(2)}</td></tr>` : ''}
-        ${row.t31_60  > 0 ? `<tr><td>31–60 días</td><td style="text-align:right">${moneda} ${row.t31_60.toFixed(2)}</td></tr>` : ''}
-        ${row.t61_90  > 0 ? `<tr><td>61–90 días</td><td style="text-align:right">${moneda} ${row.t61_90.toFixed(2)}</td></tr>` : ''}
-        ${row.t90plus > 0 ? `<tr style="color:#ef4444;font-weight:700"><td>+90 días (mora grave)</td><td style="text-align:right">${moneda} ${row.t90plus.toFixed(2)}</td></tr>` : ''}
-      </tbody>
-    </table>
-    <p>Le solicitamos atender este pago a la brevedad para evitar recargos adicionales. Para regularizar su situación puede comunicarse con la administración o realizar su pago en los medios habilitados.</p>
-    <p style="margin-top:24px">Atentamente,<br><strong>Administración del Condominio</strong><br>${proyectoNombre ?? ''}</p>
-    <div class="footer">Este documento es de carácter informativo y no constituye acción legal.</div>
-    </body></html>`
-    const win = window.open('', '_blank')
-    if (win) { win.document.write(html); win.document.close(); win.print() }
+    exportarPDFCartaCobro(
+      { unidadNombre: row.unidadNombre, t0_30: row.t0_30, t31_60: row.t31_60, t61_90: row.t61_90, t90plus: row.t90plus, total: row.total, cuotasCount: row.cuotasCount },
+      moneda,
+      proyectoNombre
+    )
   }
 
   function exportarCSV() {
@@ -127,10 +106,16 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
           <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>Reporte de Deudores — Antigüedad de Saldos</div>
           <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{deudores.length} unidades con saldo pendiente</div>
         </div>
-        <button onClick={exportarCSV}
-          style={{ padding: '6px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-          ⬇️ Exportar CSV
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={exportarExcelDeudores}
+            style={{ padding: '6px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            📊 Excel
+          </button>
+          <button onClick={exportarCSV}
+            style={{ padding: '6px 14px', background: '#f1f5f9', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+            CSV
+          </button>
+        </div>
       </div>
 
       {/* KPIs por tramo */}
