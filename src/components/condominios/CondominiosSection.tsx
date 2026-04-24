@@ -431,6 +431,70 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'directorio_comunidad', label: 'Directorio',        icon: '📒' },
 ]
 
+// ── Secciones de navegación de 2 niveles ─────────────────────────────────────
+type SectionKey = 'panel' | 'finanzas' | 'residentes' | 'operaciones' | 'instalaciones' | 'seguridad' | 'comunidad' | 'administracion' | 'especiales'
+
+interface SectionDef { id: SectionKey; label: string; icon: string; tabs: string[] }
+
+const SECTIONS: SectionDef[] = [
+  { id: 'panel', label: 'Panel', icon: '📊', tabs: [
+    'panel', 'panel_directivo', 'cuadro_mando', 'dashboard_ejecutivo', 'resumen_ejecutivo',
+    'informe_ejecutivo', 'informe_mensual', 'indice_calidad', 'dashboard_sostenibilidad',
+    'bitacora_actividad', 'gestor_alertas', 'alertas', 'graficas_tendencias', 'metricas_servicio',
+    'bitacora_eventos', 'reportes', 'kpis_financieros',
+  ]},
+  { id: 'finanzas', label: 'Finanzas', icon: '💰', tabs: [
+    'cuotas', 'generacion_cuotas', 'plantillas_cuota', 'recargos_mora', 'reglas_mora',
+    'campanas_cobro', 'reporte_deudores', 'mapa_calor_cuotas', 'conciliacion_cobros',
+    'estado_cuenta_residente', 'estadocuenta', 'convenios_cuota', 'plan_pago', 'avisos_cobro',
+    'cobranza', 'cobranza_judicial', 'presupuesto', 'contabilidad', 'comparativo_presupuesto',
+    'comparativo_anual', 'pronostico_financiero', 'simulador_cuotas', 'caja_chica',
+    'gestion_fondo', 'fondo_reserva', 'tarifas', 'cargos_adicionales', 'recibos_digitales',
+    'cierres', 'cierre_anual', 'historial_saldos', 'notificaciones_enviadas', 'proformas',
+    'exportacion', 'centro_costos', 'analisis_cartera',
+  ]},
+  { id: 'residentes', label: 'Residentes', icon: '🏠', tabs: [
+    'tablero_ocupacion', 'directorio_comunidad', 'directorio', 'arrendamientos', 'onboarding',
+    'entrega_unidad', 'portal', 'resumen_residente', 'solicitudes', 'vehiculos', 'mascotas',
+    'accesos_res', 'control_accesos_qr', 'certificados', 'manual_residente', 'mapa_unidades',
+    'scoring_unidades',
+  ]},
+  { id: 'operaciones', label: 'Operaciones', icon: '🔧', tabs: [
+    'mantenimiento', 'kanban_tickets', 'gantt_mantenimiento', 'calendario_mantenimiento',
+    'mant_preventivo', 'bitacora_manto', 'inventario', 'suministros', 'tareas_cond',
+    'ordenes_compra', 'eval_proveedor', 'proveedores', 'obras', 'proyectos_cond',
+    'permisos_obra', 'garantias', 'checklist_areas', 'prog_limpieza', 'control_plagas',
+    'prestamos',
+  ]},
+  { id: 'instalaciones', label: 'Instalaciones', icon: '🏗️', tabs: [
+    'amenidades', 'utilizacion_amenidades', 'parqueos', 'estac_visita', 'bodegas', 'llaves',
+    'equipos', 'consumo_energia', 'medidores_unidad', 'control_piscina', 'jardineria',
+    'elevadores', 'cisternas', 'generador', 'incendio', 'camaras', 'gas', 'integracion_agua',
+  ]},
+  { id: 'seguridad', label: 'Seguridad', icon: '🛡️', tabs: [
+    'visitantes', 'analisis_visitantes', 'vis_frecuentes', 'seguridad', 'paqueteria',
+    'objetos', 'incidentes', 'reclamos', 'bitacora_guardia', 'presencia', 'panel_turno',
+    'emergencias',
+  ]},
+  { id: 'comunidad', label: 'Comunidad', icon: '🏘️', tabs: [
+    'comunidad', 'infracciones', 'sanciones', 'gestion_conflictos', 'asambleas',
+    'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos', 'eventos_comunidad',
+    'agenda', 'programa_actividades', 'buzon_sugerencias', 'encuestas', 'encuesta_dashboard',
+    'comunicados', 'recordatorios',
+  ]},
+  { id: 'administracion', label: 'Administración', icon: '📋', tabs: [
+    'documentos', 'reglamento', 'firmas', 'personal', 'capacitacion_personal',
+    'correspondencia', 'libro_novedades', 'notas_admin', 'reg_autoridades', 'bitacora_acciones',
+    'vencimientos_criticos', 'polizas', 'inspecciones', 'propuestas', 'memoria',
+    'automatizaciones', 'plantillas_mensaje', 'flujo_aprobacion', 'envio_masivo',
+    'notificaciones', 'configuracion_cond', 'configuracion', 'multi_condominio',
+  ]},
+  { id: 'especiales', label: 'Especiales', icon: '⭐', tabs: [
+    'str', 'locales', 'housekeeping', 'concierge', 'residuos', 'mudanzas', 'sostenibilidad',
+  ]},
+]
+
+
 interface Props {
   proyectos: Proyecto[]
   unidades: Unidad[]
@@ -441,6 +505,7 @@ interface Props {
 
 export function CondominiosSection({ proyectos, unidades, currentUser, canCreate, canEdit }: Props) {
   const [activeTab, setActiveTab] = useState<CondominioTab>('panel')
+  const [activeSection, setActiveSection] = useState<SectionKey>('panel')
   const [selectedProyectoId, setSelectedProyectoId] = useState<string>('')
   const [loading, setLoading] = useState(false)
 
@@ -1001,21 +1066,51 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
           {loading && <span style={{ fontSize: '12px', color: '#94a3b8' }}>Cargando...</span>}
         </div>
 
-        {/* Sub-tabs scrollable */}
-        <div style={{ display: 'flex', gap: '2px', overflowX: 'auto', paddingBottom: '1px' }}>
-          {TABS.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '8px 14px', borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer',
-                fontSize: '13px', fontWeight: activeTab === tab.id ? 700 : 500,
-                background: activeTab === tab.id ? '#f8fafc' : 'transparent',
-                color: activeTab === tab.id ? '#0ea5e9' : '#64748b',
-                borderBottom: activeTab === tab.id ? '2px solid #0ea5e9' : '2px solid transparent',
-                whiteSpace: 'nowrap',
-              }}>
-              {tab.icon} {tab.label}
-            </button>
-          ))}
+        {/* Barra de secciones (nivel 1) */}
+        <div style={{ display: 'flex', gap: 1, overflowX: 'auto', marginTop: 8, borderBottom: '2px solid #e2e8f0' }}>
+          {SECTIONS.map(sec => {
+            const activa = activeSection === sec.id
+            return (
+              <button key={sec.id} onClick={() => {
+                setActiveSection(sec.id)
+                if (!sec.tabs.includes(activeTab)) {
+                  const primero = sec.tabs.find(tid => TABS.some(t => t.id === tid))
+                  if (primero) setActiveTab(primero as CondominioTab)
+                }
+              }}
+                style={{
+                  padding: '7px 13px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                  fontSize: 12, fontWeight: activa ? 700 : 500,
+                  background: activa ? '#0f172a' : '#f1f5f9',
+                  color: activa ? '#fff' : '#64748b',
+                  borderRadius: '6px 6px 0 0',
+                  borderBottom: activa ? '2px solid #0f172a' : '2px solid transparent',
+                  marginBottom: -2,
+                }}>
+                {sec.icon} {sec.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Barra de sub-tabs (nivel 2) */}
+        <div style={{ display: 'flex', gap: 1, overflowX: 'auto', background: '#f8fafc', padding: '0 2px', borderBottom: '1px solid #e2e8f0' }}>
+          {SECTIONS.find(s => s.id === activeSection)?.tabs
+            .map(tid => TABS.find(t => t.id === tid))
+            .filter(Boolean)
+            .map(tab => tab && (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id as CondominioTab)}
+                style={{
+                  padding: '6px 12px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                  fontSize: 11, fontWeight: activeTab === tab.id ? 700 : 400,
+                  background: activeTab === tab.id ? '#fff' : 'transparent',
+                  color: activeTab === tab.id ? '#0ea5e9' : '#94a3b8',
+                  borderBottom: activeTab === tab.id ? '2px solid #0ea5e9' : '2px solid transparent',
+                  borderRadius: '4px 4px 0 0',
+                }}>
+                {tab.icon} {tab.label}
+              </button>
+            ))}
         </div>
       </div>
 
