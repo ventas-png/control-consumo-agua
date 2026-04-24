@@ -1092,6 +1092,7 @@ export interface PersonalCondominio {
   telefono?: string | null
   email?: string | null
   fecha_ingreso?: string | null
+  fecha_nacimiento?: string | null
   turno: TurnoPersonal
   estado: EstadoPersonal
   salario?: number | null

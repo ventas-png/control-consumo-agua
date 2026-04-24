@@ -31,7 +31,7 @@ const ESTADO_CONFIG: Record<EstadoPersonal, { label: string; color: string; bg: 
 
 const blank = (): Partial<PersonalCondominio> => ({
   nombre: '', cargo: 'conserje', telefono: '', email: '',
-  fecha_ingreso: '', turno: 'diurno', estado: 'activo',
+  fecha_ingreso: '', fecha_nacimiento: '', turno: 'diurno', estado: 'activo',
   salario: undefined, dpi: '', notas: '',
 })
 
@@ -54,7 +54,8 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
   function startEdit(p: PersonalCondominio) {
     setForm({
       nombre: p.nombre, cargo: p.cargo, telefono: p.telefono ?? '',
-      email: p.email ?? '', fecha_ingreso: p.fecha_ingreso ?? '', turno: p.turno,
+      email: p.email ?? '', fecha_ingreso: p.fecha_ingreso ?? '',
+      fecha_nacimiento: p.fecha_nacimiento ?? '', turno: p.turno,
       estado: p.estado, salario: p.salario ?? undefined, dpi: p.dpi ?? '', notas: p.notas ?? '',
     })
     setEditId(p.id); setShowForm(true)
@@ -69,7 +70,9 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
       company_id: companyId, project_id: proyectoId,
       nombre: form.nombre!.trim(), cargo: form.cargo ?? 'conserje',
       telefono: form.telefono || null, email: form.email || null,
-      fecha_ingreso: form.fecha_ingreso || null, turno: form.turno ?? 'diurno',
+      fecha_ingreso: form.fecha_ingreso || null,
+      fecha_nacimiento: form.fecha_nacimiento || null,
+      turno: form.turno ?? 'diurno',
       estado: form.estado ?? 'activo', salario: form.salario ?? null,
       dpi: form.dpi || null, notas: form.notas || null,
     }
@@ -162,6 +165,10 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
             <div>
               <label style={labelStyle}>Fecha de ingreso</label>
               <input style={inputStyle} type="date" value={form.fecha_ingreso ?? ''} onChange={e => setForm(f => ({ ...f, fecha_ingreso: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>🎂 Fecha de nacimiento</label>
+              <input style={inputStyle} type="date" value={form.fecha_nacimiento ?? ''} onChange={e => setForm(f => ({ ...f, fecha_nacimiento: e.target.value }))} />
             </div>
             <div>
               <label style={labelStyle}>Salario mensual ({moneda})</label>

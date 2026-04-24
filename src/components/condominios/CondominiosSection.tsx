@@ -84,6 +84,7 @@ import { AlertasTab } from './tabs/AlertasTab'
 import { ReportesTab } from './tabs/ReportesTab'
 import { EstadoCuentaTab } from './tabs/EstadoCuentaTab'
 import { CalendarioTab } from './tabs/CalendarioTab'
+import { CumpleanosTab } from './tabs/CumpleanosTab'
 import { DirectorioTab } from './tabs/DirectorioTab'
 import { ConfiguracionTab } from './tabs/ConfiguracionTab'
 import { SolicitudesTab } from './tabs/SolicitudesTab'
@@ -258,7 +259,7 @@ type CondominioTab =
   | 'mapa_calor_cuotas' | 'encuesta_dashboard' | 'analisis_visitantes' | 'informe_ejecutivo'
   | 'tablero_ocupacion' | 'gestion_fondo' | 'dashboard_sostenibilidad' | 'configuracion_cond'
   | 'bitacora_actividad' | 'panel_directivo' | 'gestion_conflictos' | 'directorio_comunidad'
-  | 'centro_notificaciones'
+  | 'centro_notificaciones' | 'cumpleanos'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -277,6 +278,7 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'proveedores',    label: 'Proveedores',    icon: '🤝' },
   { id: 'objetos',        label: 'Obj. Perdidos',  icon: '🔍' },
   { id: 'agenda',         label: 'Agenda',         icon: '📅' },
+  { id: 'cumpleanos',    label: 'Cumpleaños',     icon: '🎂' },
   { id: 'inventario',    label: 'Inventario',     icon: '🗃️' },
   { id: 'polizas',       label: 'Pólizas',        icon: '🛡️' },
   { id: 'inspecciones',  label: 'Inspecciones',   icon: '🏛️' },
@@ -482,7 +484,7 @@ const SECTIONS: SectionDef[] = [
   { id: 'comunidad', label: 'Comunidad', icon: '🏘️', tabs: [
     'comunidad', 'infracciones', 'sanciones', 'gestion_conflictos', 'asambleas',
     'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos', 'eventos_comunidad',
-    'agenda', 'programa_actividades', 'buzon_sugerencias', 'encuestas', 'encuesta_dashboard',
+    'agenda', 'cumpleanos', 'programa_actividades', 'buzon_sugerencias', 'encuestas', 'encuesta_dashboard',
     'comunicados', 'recordatorios',
   ]},
   { id: 'administracion', label: 'Administración', icon: '📋', tabs: [
@@ -537,6 +539,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [polizas, setPolizas] = useState<PolizaSeguro[]>([])
   const [inspecciones, setInspecciones] = useState<InspeccionNormativa[]>([])
   const [personal, setPersonal] = useState<PersonalCondominio[]>([])
+  const [clientesBirthday, setClientesBirthday] = useState<{ id: string; nombre: string; fecha_nacimiento: string; unidad_nombre?: string }[]>([])
   // Fase 5
   const [contactosEmergencia, setContactosEmergencia] = useState<ContactoEmergencia[]>([])
   const [mudanzas, setMudanzas] = useState<Mudanza[]>([])
@@ -913,6 +916,22 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setPolizas((polizasRes.data ?? []) as PolizaSeguro[])
     setInspecciones((inspeccionesRes.data ?? []) as InspeccionNormativa[])
     setPersonal((personalRes.data ?? []) as PersonalCondominio[])
+    // Fetch clients linked to project units (for birthday calendar)
+    const clienteIds = unidades.filter(u => u.project_id === pid && u.cliente_id).map(u => u.cliente_id as string)
+    if (clienteIds.length > 0) {
+      const { data: cliData } = await supabase
+        .from('clientes')
+        .select('id, nombre, fecha_nacimiento')
+        .in('id', clienteIds)
+        .not('fecha_nacimiento', 'is', null)
+      const unidadesPid = unidades.filter(u => u.project_id === pid)
+      setClientesBirthday((cliData ?? []).map(c => ({
+        id: c.id, nombre: c.nombre, fecha_nacimiento: c.fecha_nacimiento!,
+        unidad_nombre: unidadesPid.find(u => u.cliente_id === c.id)?.nombre,
+      })))
+    } else {
+      setClientesBirthday([])
+    }
     setContactosEmergencia((contactosEmergRes.data ?? []) as ContactoEmergencia[])
     setMudanzas((mudanzasRes.data ?? []).map((r: Record<string, unknown>) => ({
       ...r, unidad_nombre: (r.unidades as { nombre: string } | null)?.nombre,
@@ -1150,6 +1169,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'objetos' && <ObjetosTab objetos={objetos} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
         {activeTab === 'agenda' && <AgendaTab agenda={agenda} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'cumpleanos' && <CumpleanosTab personal={personal} clientesBirthday={clientesBirthday} proyectoNombre={proyectoActual?.nombre} />}
 
         {activeTab === 'inventario' && <InventarioTab inventario={inventario} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
