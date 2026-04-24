@@ -35,6 +35,7 @@ export function HistorialSection({
   const [filtroEstado, setFiltroEstado] = useState('')
   const [filtroProyecto, setFiltroProyecto] = useState('')
   const [filtroUnidad, setFiltroUnidad] = useState('')
+  const [filtroTipoAgua, setFiltroTipoAgua] = useState('')
   const [filtroFechaInicio, setFiltroFechaInicio] = useState('')
   const [filtroFechaFin, setFiltroFechaFin] = useState('')
   const [editModal, setEditModal] = useState<{ registroId: string; estado: Registro['estado'] } | null>(null)
@@ -69,10 +70,15 @@ export function HistorialSection({
           ? contadores.some(c => c.unidad_id === filtroUnidad && c.id === r.contador_id)
           : true
 
-        return matchTxt && matchEst && matchFechaInicio && matchFechaFin && matchProyecto && matchUnidad
+        // Tipo de agua — registros link via contador_id → contador.tipo_agua
+        const matchTipoAgua = filtroTipoAgua
+          ? contadores.some(c => c.tipo_agua === filtroTipoAgua && c.id === r.contador_id)
+          : true
+
+        return matchTxt && matchEst && matchFechaInicio && matchFechaFin && matchProyecto && matchUnidad && matchTipoAgua
       })
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-  }, [registros, filtroTexto, filtroEstado, filtroFechaInicio, filtroFechaFin, filtroProyecto, filtroUnidad, contadores])
+  }, [registros, filtroTexto, filtroEstado, filtroFechaInicio, filtroFechaFin, filtroProyecto, filtroUnidad, filtroTipoAgua, contadores])
 
   // Paginación
   const totalPages = Math.ceil(filtrados.length / itemsPerPage)
@@ -290,6 +296,28 @@ export function HistorialSection({
               ))}
             </select>
           )}
+          {(() => {
+            const tiposDisponibles = [...new Set(contadores.map(c => c.tipo_agua).filter(Boolean))]
+            if (tiposDisponibles.length < 2) return null
+            const TIPO_LABELS: Record<string, string> = {
+              potable: 'Agua Potable', rehuso: 'Agua de Rehúso', piscina: 'Piscina',
+              desalinada: 'Desalinada', riego: 'Riego', jacuzzi: 'Jacuzzi',
+              consumo_humano: 'Consumo Humano', desmineralizada: 'Desmineralizada',
+              residuales_tratadas: 'Residuales Tratadas',
+            }
+            return (
+              <select
+                value={filtroTipoAgua}
+                onChange={e => { setFiltroTipoAgua(e.target.value); setCurrentPage(1) }}
+                style={{ padding: '10px 12px', border: '1px solid #cbd5e0', borderRadius: '8px', fontSize: '14px' }}
+              >
+                <option value="">Todos los Tipos de Agua</option>
+                {tiposDisponibles.map(tipo => (
+                  <option key={tipo} value={tipo}>{TIPO_LABELS[tipo] ?? tipo}</option>
+                ))}
+              </select>
+            )
+          })()}
           <div>
             <input
               type="date"
@@ -314,6 +342,7 @@ export function HistorialSection({
               setFiltroEstado('')
               setFiltroProyecto('')
               setFiltroUnidad('')
+              setFiltroTipoAgua('')
               setFiltroFechaInicio('')
               setFiltroFechaFin('')
               setCurrentPage(1)
