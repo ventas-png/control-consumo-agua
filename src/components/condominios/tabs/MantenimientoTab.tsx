@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/supabase'
 import type { TicketMantenimiento, Unidad } from '../../../types'
 import { MultiImageUploader } from '../ImageUploader'
 import { ImageGallery } from '../ImageGallery'
+import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
   tickets: TicketMantenimiento[]
@@ -11,6 +12,7 @@ interface Props {
   proyectoId: string
   companyId: string
   userId: string
+  proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
@@ -30,7 +32,7 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
   cerrado:    { bg: '#f8fafc', color: '#64748b' },
 }
 
-export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
+export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroPrioridad, setFiltroPrioridad] = useState<string>('todos')
@@ -58,17 +60,61 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
     return matchBusqueda && matchPrioridad && matchEstado
   })
 
+  // KPI calculations
+  const activos = tickets.filter(t => t.estado !== 'cerrado')
+  const resueltos = tickets.filter(t => t.estado === 'resuelto' || t.estado === 'cerrado')
+  const costoEstimadoTotal = tickets.reduce((s, t) => s + (t.costo_estimado ?? 0), 0)
+  const costoRealTotal = tickets.reduce((s, t) => s + (t.costo_real ?? 0), 0)
+  const pctResueltos = tickets.length > 0 ? Math.round((resueltos.length / tickets.length) * 100) : 0
+  const urgentesActivos = activos.filter(t => t.prioridad === 'urgente').length
+
   const conteos = {
     abierto: tickets.filter(t => t.estado === 'abierto').length,
     en_proceso: tickets.filter(t => t.estado === 'en_proceso').length,
     resuelto: tickets.filter(t => t.estado === 'resuelto').length,
-    urgentes: tickets.filter(t => t.prioridad === 'urgente' && t.estado !== 'cerrado').length,
+    urgentes: urgentesActivos,
   }
 
   function resetForm() {
     setForm({ tipo: 'correctivo', titulo: '', descripcion: '', prioridad: 'media', unidad_id: '', fecha_limite: '', costo_estimado: '' })
     setFotoUrls([])
     setShowForm(false)
+  }
+
+  function exportarPDF() {
+    exportarPDFTabla({
+      titulo: 'Tickets de Mantenimiento',
+      subtitulo: `${filtrados.length} ticket${filtrados.length !== 1 ? 's' : ''} · Filtro: ${filtroEstado}`,
+      proyectoNombre,
+      headers: ['Título', 'Tipo', 'Prioridad', 'Unidad', 'Estado', 'Fecha límite', 'Costo est.', 'Costo real'],
+      rows: filtrados.map(t => [
+        t.titulo,
+        t.tipo,
+        t.prioridad,
+        t.unidad_nombre ?? 'Área común',
+        t.estado.replace('_', ' '),
+        t.fecha_limite ?? '—',
+        t.costo_estimado != null ? t.costo_estimado.toFixed(2) : '—',
+        t.costo_real != null ? t.costo_real.toFixed(2) : '—',
+      ]),
+      rightAlignCols: [6, 7],
+      filename: `tickets-mantenimiento-${new Date().toISOString().slice(0, 10)}`,
+      landscape: true,
+    })
+  }
+
+  function exportarXlsx() {
+    exportarExcel(`tickets-mantenimiento-${new Date().toISOString().slice(0, 10)}`, [{
+      name: 'Tickets',
+      headers: ['Título', 'Descripción', 'Tipo', 'Prioridad', 'Unidad', 'Estado', 'Fecha límite', 'Costo estimado', 'Costo real', 'Fecha creación', 'Fecha cierre'],
+      rows: filtrados.map(t => [
+        t.titulo, t.descripcion ?? '', t.tipo, t.prioridad,
+        t.unidad_nombre ?? 'Área común', t.estado,
+        t.fecha_limite ?? '', t.costo_estimado ?? '', t.costo_real ?? '',
+        new Date(t.created_at).toLocaleDateString('es'),
+        t.fecha_cierre ? new Date(t.fecha_cierre).toLocaleDateString('es') : '',
+      ]),
+    }])
   }
 
   async function handleGuardar() {
@@ -113,22 +159,59 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
 
   return (
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Mantenimiento</h2>
           <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '13.5px' }}>
             {conteos.abierto} abiertos · {conteos.en_proceso} en proceso · <span style={{ color: '#dc2626', fontWeight: 600 }}>{conteos.urgentes} urgentes</span>
           </p>
         </div>
-        {canCreate && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
-            + Nuevo ticket
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={exportarPDF} disabled={filtrados.length === 0}
+            style={{ padding: '9px 14px', background: filtrados.length === 0 ? '#f1f5f9' : '#eff6ff', color: filtrados.length === 0 ? '#94a3b8' : '#2563eb', border: '1.5px solid #bfdbfe', borderRadius: '9px', fontSize: '12px', fontWeight: 600, cursor: filtrados.length === 0 ? 'not-allowed' : 'pointer' }}>
+            📄 PDF
           </button>
-        )}
+          <button onClick={exportarXlsx} disabled={filtrados.length === 0}
+            style={{ padding: '9px 14px', background: filtrados.length === 0 ? '#f1f5f9' : '#f0fdf4', color: filtrados.length === 0 ? '#94a3b8' : '#16a34a', border: '1.5px solid #bbf7d0', borderRadius: '9px', fontSize: '12px', fontWeight: 600, cursor: filtrados.length === 0 ? 'not-allowed' : 'pointer' }}>
+            📊 Excel
+          </button>
+          {canCreate && (
+            <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+              + Nuevo ticket
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
+        {[
+          { label: 'Total tickets', val: tickets.length, color: '#2563eb', bg: '#eff6ff', icon: '🔧' },
+          { label: 'Urgentes activos', val: urgentesActivos, color: urgentesActivos > 0 ? '#dc2626' : '#16a34a', bg: urgentesActivos > 0 ? '#fef2f2' : '#f0fdf4', icon: '🚨' },
+          { label: 'Costo estimado', val: costoEstimadoTotal > 0 ? costoEstimadoTotal.toFixed(2) : '—', color: '#ea580c', bg: '#fff7ed', icon: '💰' },
+          { label: `% Resueltos`, val: `${pctResueltos}%`, color: pctResueltos >= 70 ? '#16a34a' : '#ea580c', bg: pctResueltos >= 70 ? '#f0fdf4' : '#fff7ed', icon: '✅' },
+        ].map(k => (
+          <div key={k.label} style={{ background: k.bg, borderRadius: '10px', padding: '12px 14px', textAlign: 'center' }}>
+            <div style={{ fontSize: '20px', marginBottom: '3px' }}>{k.icon}</div>
+            <div style={{ fontSize: '17px', fontWeight: 800, color: k.color }}>{k.val}</div>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {costoRealTotal > 0 && (
+        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 14px', marginBottom: '14px', fontSize: '12px', color: '#64748b' }}>
+          Costo real acumulado: <strong style={{ color: '#0f172a' }}>{costoRealTotal.toFixed(2)}</strong>
+          {costoEstimadoTotal > 0 && (
+            <span style={{ marginLeft: 10, color: costoRealTotal > costoEstimadoTotal ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
+              ({costoRealTotal > costoEstimadoTotal ? '+' : ''}{((costoRealTotal - costoEstimadoTotal) / costoEstimadoTotal * 100).toFixed(1)}% vs estimado)
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Filtros */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar ticket..."
           style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13.5px', background: '#f8fafc' }} />
         {(['todos', 'activos', 'abierto', 'en_proceso', 'resuelto', 'cerrado'] as const).map(e => (
