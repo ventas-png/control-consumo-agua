@@ -1119,7 +1119,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
       {/* Tab content */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {activeTab === 'panel' && <PanelGeneralTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} amenidades={amenidades} moneda={moneda} />}
+        {activeTab === 'panel' && <PanelGeneralTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} amenidades={amenidades} reservas={reservas} polizas={polizas} inspecciones={inspecciones} gastos={gastos} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
 
         {activeTab === 'cuotas' && <CuotasTab cuotas={cuotas} unidades={unidadesProyecto} proyectos={proyectosActivos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
