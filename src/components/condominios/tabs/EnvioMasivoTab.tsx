@@ -11,6 +11,7 @@ interface Props {
   proyectoId: string
   companyId: string
   moneda: string
+  proyectoNombre?: string
   onRefresh: () => void
 }
 
@@ -29,7 +30,7 @@ const CANAL_CFG: Record<CanalPlantilla, { label: string; icon: string; color: st
   sms:      { label: 'SMS',      icon: '📱', color: '#7c3aed' },
 }
 
-function resolverVariables(cuerpo: string, unidad: Unidad, cuotasU: CuotaCondominio[], moneda: string): string {
+function resolverVariables(cuerpo: string, unidad: Unidad, cuotasU: CuotaCondominio[], moneda: string, proyecto = ''): string {
   const hoy = new Date().toISOString().slice(0, 10)
   const vencidas = cuotasU.filter(c => (c.estado === 'pendiente' || c.estado === 'moroso') && c.fecha_vencimiento && c.fecha_vencimiento < hoy)
   const saldo = cuotasU.filter(c => c.estado !== 'pagado').reduce((s, c) => s + c.monto, 0)
@@ -43,10 +44,10 @@ function resolverVariables(cuerpo: string, unidad: Unidad, cuotasU: CuotaCondomi
     .replace(/\{\{fecha_vencimiento\}\}/g, ultimaVenc || hoy)
     .replace(/\{\{periodo\}\}/g, new Date().toISOString().slice(0, 7))
     .replace(/\{\{dias_mora\}\}/g, String(diasMora))
-    .replace(/\{\{proyecto\}\}/g, '')
+    .replace(/\{\{proyecto\}\}/g, proyecto)
 }
 
-export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas, proyectoId, companyId, moneda, onRefresh }: Props) {
+export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas, proyectoId, companyId, moneda, proyectoNombre, onRefresh }: Props) {
   const hoy = new Date().toISOString().slice(0, 10)
   const [plantillaId, setPlantillaId] = useState('')
   const [segmento, setSegmento] = useState<SegmentoEnvio>('todos')
@@ -83,7 +84,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
     if (!plantilla || destinatarios.length === 0) return []
     return destinatarios.slice(0, 5).map(u => ({
       unidad: u,
-      mensaje: resolverVariables(plantilla.cuerpo, u, cuotas.filter(c => c.unidad_id === u.id), moneda),
+      mensaje: resolverVariables(plantilla.cuerpo, u, cuotas.filter(c => c.unidad_id === u.id), moneda, proyectoNombre),
     }))
   }, [plantilla, destinatarios, cuotas, moneda])
 
@@ -97,7 +98,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
       unidad_id: u.id,
       canal: plantilla.canal,
       plantilla_id: plantilla.id,
-      mensaje: resolverVariables(plantilla.cuerpo, u, cuotas.filter(c => c.unidad_id === u.id), moneda),
+      mensaje: resolverVariables(plantilla.cuerpo, u, cuotas.filter(c => c.unidad_id === u.id), moneda, proyectoNombre),
       estado: 'enviado',
       fecha_envio: new Date().toISOString(),
     }))
@@ -227,7 +228,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
                   {plantilla.asunto && <span> · Asunto: {plantilla.asunto}</span>}
                 </div>
                 <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6, color: '#0f172a' }}>
-                  {resolverVariables(plantilla.cuerpo, previewUnidad, cuotas.filter(c => c.unidad_id === previewUnidad.id), moneda)}
+                  {resolverVariables(plantilla.cuerpo, previewUnidad, cuotas.filter(c => c.unidad_id === previewUnidad.id), moneda, proyectoNombre)}
                 </div>
               </div>
             )}
@@ -240,16 +241,44 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
       )}
 
       {paso === 3 && (
-        <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#16a34a', marginBottom: 8 }}>Envío registrado</div>
-          <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 24 }}>
-            Se registraron <strong>{destinatarios.length}</strong> mensajes en el log de notificaciones enviadas.
+        <div>
+          <div style={{ textAlign: 'center', padding: '32px 0 20px' }}>
+            <div style={{ fontSize: 48, marginBottom: 10 }}>✅</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#16a34a', marginBottom: 6 }}>Envío registrado</div>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>
+              Se registraron <strong>{destinatarios.length}</strong> mensajes en el log de notificaciones enviadas.
+            </div>
+            <button onClick={() => { setPaso(1); setPlantillaId(''); }}
+              style={{ padding: '9px 22px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+              Nuevo envío
+            </button>
           </div>
-          <button onClick={() => { setPaso(1); setPlantillaId(''); }}
-            style={{ padding: '10px 24px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
-            Nuevo envío
-          </button>
+
+          {plantilla?.canal === 'whatsapp' && destinatarios.length > 0 && (
+            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#15803d', marginBottom: 4 }}>
+                💬 Links directos de WhatsApp
+              </div>
+              <div style={{ fontSize: 11, color: '#16a34a', marginBottom: 12 }}>
+                Haz clic en cada botón para abrir WhatsApp con el mensaje pre-cargado. Selecciona el contacto al abrir.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 340, overflowY: 'auto' }}>
+                {destinatarios.map(u => {
+                  const msg = resolverVariables(plantilla.cuerpo, u, cuotas.filter(c => c.unidad_id === u.id), moneda)
+                  const url = `https://wa.me/?text=${encodeURIComponent(msg)}`
+                  return (
+                    <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: '#fff', border: '1px solid #bbf7d0', borderRadius: 8 }}>
+                      <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{u.nombre}</span>
+                      <a href={url} target="_blank" rel="noreferrer"
+                        style={{ padding: '5px 12px', background: '#16a34a', color: '#fff', borderRadius: 6, fontSize: 11, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                        💬 Abrir WhatsApp
+                      </a>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

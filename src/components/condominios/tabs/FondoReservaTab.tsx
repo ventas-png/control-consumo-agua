@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { FondoReserva } from '../../../types'
 import Swal from 'sweetalert2'
+import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
   movimientos: FondoReserva[]
   proyectoId: string
   companyId: string
   moneda: string
+  proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
@@ -39,7 +41,7 @@ function fmt(n: number, m: string) {
   return `${m} ${n.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<Record<string, string>>({ ...BLANK })
@@ -111,6 +113,30 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, ca
   const totalAportes = movimientos.filter(m => m.tipo === 'aporte' && m.estado !== 'rechazado').reduce((a, m) => a + m.monto, 0)
   const totalRetiros = movimientos.filter(m => m.tipo === 'retiro' && m.estado !== 'rechazado').reduce((a, m) => a + m.monto, 0)
 
+  function exportarPDF() {
+    exportarPDFTabla({
+      titulo: 'Fondo de Reserva',
+      subtitulo: `Saldo actual: ${fmt(saldoTotal, moneda)}`,
+      proyectoNombre,
+      headers: ['Fecha', 'Concepto', 'Tipo', 'Estado', 'Monto', 'Saldo acum.'],
+      rows: filtered.map(m => {
+        const ts = TIPO_STYLE[m.tipo]
+        return [m.fecha, m.concepto, ts.label, ESTADO_STYLE[m.estado].label, `${ts.sign} ${fmt(m.monto, moneda)}`, fmt(m.saldo, moneda)]
+      }),
+      rightAlignCols: [4, 5],
+      filename: 'fondo-reserva',
+      landscape: false,
+    })
+  }
+
+  function exportarXlsx() {
+    exportarExcel('fondo-reserva', [{
+      name: 'Movimientos',
+      headers: ['Fecha', 'Concepto', 'Tipo', 'Estado', 'Monto', 'Saldo acumulado', 'Aprobado por', 'Justificación', 'Notas'],
+      rows: filtered.map(m => [m.fecha, m.concepto, m.tipo, m.estado, m.monto, m.saldo, m.aprobado_por ?? '', m.justificacion ?? '', m.notas ?? '']),
+    }])
+  }
+
   return (
     <div style={{ padding: '20px', maxWidth: '960px', margin: '0 auto' }}>
       {/* KPIs */}
@@ -147,6 +173,16 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, ca
           <option value="aprobado">Aprobado</option>
           <option value="rechazado">Rechazado</option>
         </select>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
+          <button onClick={exportarPDF} disabled={filtered.length === 0}
+            style={{ padding: '7px 14px', background: filtered.length === 0 ? '#f1f5f9' : '#eff6ff', color: filtered.length === 0 ? '#94a3b8' : '#2563eb', border: '1px solid #bfdbfe', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: filtered.length === 0 ? 'not-allowed' : 'pointer' }}>
+            📄 PDF
+          </button>
+          <button onClick={exportarXlsx} disabled={filtered.length === 0}
+            style={{ padding: '7px 14px', background: filtered.length === 0 ? '#f1f5f9' : '#f0fdf4', color: filtered.length === 0 ? '#94a3b8' : '#16a34a', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: filtered.length === 0 ? 'not-allowed' : 'pointer' }}>
+            📊 Excel
+          </button>
+        </div>
       </div>
 
       {/* Form */}

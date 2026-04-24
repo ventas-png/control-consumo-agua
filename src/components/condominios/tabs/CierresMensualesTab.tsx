@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { CierreMensual, CuotaCondominio, GastoCondominio } from '../../../types'
 import Swal from 'sweetalert2'
+import { exportarPDFTabla } from '../exportUtils'
 
 interface Props {
   cierres: CierreMensual[]
@@ -10,6 +11,7 @@ interface Props {
   proyectoId: string
   companyId: string
   moneda: string
+  proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
@@ -29,7 +31,7 @@ function calcCierre(periodo: string, cuotas: CuotaCondominio[], gastos: GastoCon
   return { totalEmitidas, totalCobradas, totalGastos, saldo: totalCobradas - totalGastos, unidadesMorosas }
 }
 
-export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
   const now = new Date()
   const [periodoNuevo, setPeriodoNuevo] = useState(getPeriodo(new Date(now.getFullYear(), now.getMonth() - 1)))
   const [notas, setNotas] = useState('')
@@ -68,6 +70,26 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
     setSaving(false)
     if (error) return Swal.fire('Error', error.message, 'error')
     setNotas(''); setCerradoPor(''); setPreviewing(false); onRefresh()
+  }
+
+  function exportarPDF(c: CierreMensual) {
+    exportarPDFTabla({
+      titulo: `Cierre Mensual — ${c.periodo}`,
+      subtitulo: `Estado: ${c.estado === 'cerrado' ? 'Cerrado' : 'Borrador'}${c.cerrado_por ? ` · ${c.cerrado_por}` : ''}`,
+      proyectoNombre,
+      headers: ['Indicador', 'Valor'],
+      rows: [
+        ['Cuotas emitidas',  `${moneda} ${c.total_cuotas_emitidas.toFixed(2)}`],
+        ['Cuotas cobradas',  `${moneda} ${c.total_cuotas_cobradas.toFixed(2)}`],
+        ['Total gastos',     `${moneda} ${c.total_gastos.toFixed(2)}`],
+        ['Saldo del período', `${c.saldo_periodo >= 0 ? '+' : ''}${moneda} ${c.saldo_periodo.toFixed(2)}`],
+        ['Unidades morosas', String(c.unidades_morosas)],
+        ['Estado',           c.estado === 'cerrado' ? 'Cerrado' : 'Borrador'],
+        ['Notas',            c.notas ?? '—'],
+      ],
+      rightAlignCols: [1],
+      filename: `cierre-${c.periodo}`,
+    })
   }
 
   async function toggleEstado(c: CierreMensual) {
@@ -180,16 +202,22 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
                     </span>
                   </td>
                   <td style={{ padding: '10px 12px' }}>
-                    {canEdit && (
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button onClick={() => toggleEstado(c)}
-                          style={{ padding: '3px 8px', background: c.estado === 'cerrado' ? '#fef3c7' : '#dcfce7', color: c.estado === 'cerrado' ? '#92400e' : '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                          {c.estado === 'cerrado' ? '↩ Reabrir' : '✓ Cerrar'}
-                        </button>
-                        <button onClick={() => handleDelete(c.id)}
-                          style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button onClick={() => exportarPDF(c)}
+                        style={{ padding: '3px 7px', background: '#eff6ff', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#2563eb', fontWeight: 600 }} title="Exportar PDF">
+                        📄
+                      </button>
+                      {canEdit && (
+                        <>
+                          <button onClick={() => toggleEstado(c)}
+                            style={{ padding: '3px 8px', background: c.estado === 'cerrado' ? '#fef3c7' : '#dcfce7', color: c.estado === 'cerrado' ? '#92400e' : '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                            {c.estado === 'cerrado' ? '↩ Reabrir' : '✓ Cerrar'}
+                          </button>
+                          <button onClick={() => handleDelete(c.id)}
+                            style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
