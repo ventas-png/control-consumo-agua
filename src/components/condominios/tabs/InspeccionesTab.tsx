@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { InspeccionNormativa, TipoInspeccion, ResultadoInspeccion } from '../../../types'
 import Swal from 'sweetalert2'
+import { FileUploader } from '../FileUploader'
 
 interface Props {
   inspecciones: InspeccionNormativa[]
@@ -160,9 +161,13 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
               <label style={labelStyle}>Próxima inspección</label>
               <input style={inputStyle} type="date" value={form.fecha_proxima ?? ''} onChange={e => setForm(f => ({ ...f, fecha_proxima: e.target.value }))} />
             </div>
-            <div>
-              <label style={labelStyle}>URL Certificado</label>
-              <input style={inputStyle} value={form.certificado_url ?? ''} onChange={e => setForm(f => ({ ...f, certificado_url: e.target.value }))} placeholder="https://…" />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <FileUploader
+                value={form.certificado_url ?? null}
+                onChange={url => setForm(f => ({ ...f, certificado_url: url ?? '' }))}
+                folder="inspecciones"
+                label="Certificado de inspección (PDF)"
+              />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Hallazgos</label>

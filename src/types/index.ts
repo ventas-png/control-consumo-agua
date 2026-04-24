@@ -349,6 +349,11 @@ export interface CuotaCondominio {
   notas?: string | null
   created_by?: string | null
   created_at: string
+  // campos de pago
+  fecha_pago?: string | null
+  metodo_pago?: string | null
+  referencia_pago?: string | null
+  comprobante_url?: string | null
   // joins opcionales
   unidad_nombre?: string
 }

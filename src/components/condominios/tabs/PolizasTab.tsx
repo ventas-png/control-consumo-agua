@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PolizaSeguro, TipoPoliza, EstadoPoliza } from '../../../types'
 import Swal from 'sweetalert2'
+import { FileUploader } from '../FileUploader'
 
 interface Props {
   polizas: PolizaSeguro[]
@@ -186,9 +187,13 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, canCreate, 
               <label style={labelStyle}>Email Agente</label>
               <input style={inputStyle} type="email" value={form.agente_email ?? ''} onChange={e => setForm(f => ({ ...f, agente_email: e.target.value }))} />
             </div>
-            <div>
-              <label style={labelStyle}>URL Documento</label>
-              <input style={inputStyle} value={form.documento_url ?? ''} onChange={e => setForm(f => ({ ...f, documento_url: e.target.value }))} placeholder="https://…" />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <FileUploader
+                value={form.documento_url ?? null}
+                onChange={url => setForm(f => ({ ...f, documento_url: url ?? '' }))}
+                folder="polizas"
+                label="Documento de póliza (PDF)"
+              />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Descripción / Notas</label>

@@ -85,6 +85,49 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
 
   async function cambiarEstado(cuota: CuotaCondominio, nuevoEstado: EstadoCuota) {
     if (!canEdit) return
+
+    if (nuevoEstado === 'pagado') {
+      const hoy = new Date().toISOString().slice(0, 10)
+      const { value: datos } = await Swal.fire({
+        title: 'Registrar pago',
+        html: `
+          <div style="text-align:left;font-size:13px">
+            <label style="font-weight:600;color:#374151;display:block;margin-bottom:4px">Fecha de pago</label>
+            <input id="sw-fecha" type="date" class="swal2-input" value="${hoy}" style="margin:0 0 12px;width:100%;box-sizing:border-box">
+            <label style="font-weight:600;color:#374151;display:block;margin-bottom:4px">Método de pago</label>
+            <select id="sw-metodo" class="swal2-select" style="margin:0 0 12px;width:100%;box-sizing:border-box">
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia bancaria</option>
+              <option value="cheque">Cheque</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="deposito">Depósito</option>
+              <option value="otro">Otro</option>
+            </select>
+            <label style="font-weight:600;color:#374151;display:block;margin-bottom:4px">Referencia / No. transacción</label>
+            <input id="sw-ref" type="text" class="swal2-input" placeholder="Opcional" style="margin:0;width:100%;box-sizing:border-box">
+          </div>`,
+        showCancelButton: true,
+        confirmButtonText: 'Confirmar pago',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#16a34a',
+        preConfirm: () => ({
+          fecha_pago: (document.getElementById('sw-fecha') as HTMLInputElement).value,
+          metodo_pago: (document.getElementById('sw-metodo') as HTMLSelectElement).value,
+          referencia_pago: (document.getElementById('sw-ref') as HTMLInputElement).value || null,
+        }),
+      })
+      if (!datos) return
+      const { error } = await supabase.from('cuotas_condominio').update({
+        estado: 'pagado',
+        fecha_pago: datos.fecha_pago,
+        metodo_pago: datos.metodo_pago,
+        referencia_pago: datos.referencia_pago,
+      }).eq('id', cuota.id)
+      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      onRefresh()
+      return
+    }
+
     const { error } = await supabase.from('cuotas_condominio').update({ estado: nuevoEstado }).eq('id', cuota.id)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
     onRefresh()
@@ -207,7 +250,14 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                   <td style={{ padding: '10px 14px', color: '#374151' }}>{c.unidad_nombre || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>General</span>}</td>
                   <td style={{ padding: '10px 14px', color: '#374151' }}>{CONCEPTOS.find(x => x.value === c.concepto)?.label || c.concepto}</td>
                   <td style={{ padding: '10px 14px', color: '#374151' }}>{c.periodo}</td>
-                  <td style={{ padding: '10px 14px', fontWeight: 700, color: '#0f172a' }}>{moneda} {c.monto.toFixed(2)}</td>
+                  <td style={{ padding: '10px 14px' }}>
+                    <div style={{ fontWeight: 700, color: '#0f172a' }}>{moneda} {c.monto.toFixed(2)}</div>
+                    {c.estado === 'pagado' && c.metodo_pago && (
+                      <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '1px' }}>
+                        {c.metodo_pago}{c.fecha_pago ? ` · ${c.fecha_pago}` : ''}
+                      </div>
+                    )}
+                  </td>
                   <td style={{ padding: '10px 14px', color: c.fecha_vencimiento && c.fecha_vencimiento < new Date().toISOString().slice(0, 10) && c.estado !== 'pagado' ? '#dc2626' : '#374151' }}>
                     {c.fecha_vencimiento || '—'}
                   </td>

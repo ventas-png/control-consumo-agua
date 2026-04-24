@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ContratoProveedor, ServicioProveedor, EstadoContrato } from '../../../types'
 import Swal from 'sweetalert2'
+import { FileUploader } from '../FileUploader'
 
 interface Props {
   contratos: ContratoProveedor[]
@@ -231,9 +232,13 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, canCr
                 <option value="terminado">Terminado</option>
               </select>
             </div>
-            <div>
-              <label style={labelStyle}>URL Documento</label>
-              <input style={inputStyle} value={form.documento_url ?? ''} onChange={e => setForm(f => ({ ...f, documento_url: e.target.value }))} placeholder="https://..." />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <FileUploader
+                value={form.documento_url ?? null}
+                onChange={url => setForm(f => ({ ...f, documento_url: url ?? '' }))}
+                folder="contratos"
+                label="Contrato / Documento (PDF)"
+              />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Descripción</label>
