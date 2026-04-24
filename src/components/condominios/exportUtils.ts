@@ -406,3 +406,98 @@ export function exportarPDFInformeMensual(
   paginaFooter(doc)
   doc.save(`informe-mensual-${inf.periodo}.pdf`)
 }
+
+// ── Recibo digital de pago ────────────────────────────────────────────────────
+
+export interface ReciboExport {
+  numero_recibo: string
+  concepto: string
+  monto: number
+  fecha_emision: string
+  unidadNombre?: string | null
+  destinatario_nombre?: string | null
+  destinatario_email?: string | null
+  metodo_pago?: string | null
+  referencia_pago?: string | null
+  notas?: string | null
+}
+
+export function exportarPDFRecibo(
+  recibo: ReciboExport,
+  moneda: string,
+  proyectoNombre = 'Condominio'
+): void {
+  const doc = new jsPDF({ orientation: 'portrait' })
+  const w = doc.internal.pageSize.width
+
+  let y = headerBand(doc, proyectoNombre)
+  y += 10
+
+  // Número de recibo grande
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(120)
+  doc.text('RECIBO DE PAGO', 14, y)
+  doc.setFontSize(18); doc.setFont('helvetica', 'bold'); doc.setTextColor(...DARK)
+  doc.text(recibo.numero_recibo, 14, y + 8)
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(120)
+  doc.text(`Emitido: ${recibo.fecha_emision}`, w - 14, y + 8, { align: 'right' })
+  doc.setTextColor(0)
+  y += 18
+
+  // Caja de monto (verde)
+  doc.setFillColor(240, 253, 244)
+  doc.setDrawColor(134, 239, 172)
+  doc.roundedRect(14, y, w - 28, 26, 3, 3, 'FD')
+  doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(22, 101, 52)
+  doc.text('MONTO PAGADO', w / 2, y + 8, { align: 'center' })
+  doc.setFontSize(22); doc.setFont('helvetica', 'bold'); doc.setTextColor(22, 163, 74)
+  doc.text(`${moneda} ${recibo.monto.toFixed(2)}`, w / 2, y + 20, { align: 'center' })
+  doc.setTextColor(0)
+  y += 34
+
+  // Detalle del recibo
+  const rows: [string, string][] = [
+    ['Concepto', recibo.concepto],
+    ['Unidad', recibo.unidadNombre ?? '—'],
+    ['Destinatario', recibo.destinatario_nombre ?? '—'],
+  ]
+  if (recibo.metodo_pago) rows.push(['Método de pago', recibo.metodo_pago])
+  if (recibo.referencia_pago) rows.push(['Referencia / N° transacción', recibo.referencia_pago])
+  if (recibo.destinatario_email) rows.push(['Email', recibo.destinatario_email])
+  if (recibo.notas) rows.push(['Notas', recibo.notas])
+
+  autoTable(doc, {
+    startY: y,
+    body: rows,
+    theme: 'plain',
+    bodyStyles: { fontSize: 9.5, cellPadding: { top: 4, bottom: 4, left: 6, right: 6 } },
+    alternateRowStyles: { fillColor: [248, 250, 252] as [number, number, number] },
+    columnStyles: {
+      0: { fontStyle: 'bold', textColor: [100, 116, 139] as [number, number, number], cellWidth: 60 },
+      1: { textColor: DARK },
+    },
+    margin: { left: 14, right: 14 },
+  })
+
+  const afterTable = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 16
+
+  // Líneas de firma
+  const lineY = afterTable + 16
+  doc.setDrawColor(200); doc.setLineWidth(0.3)
+  doc.line(14, lineY, 90, lineY)
+  doc.line(w - 90, lineY, w - 14, lineY)
+  doc.setFontSize(8); doc.setTextColor(140)
+  doc.text('Firma del administrador', 52, lineY + 5, { align: 'center' })
+  doc.text('Firma del residente', w - 52, lineY + 5, { align: 'center' })
+
+  // Sello "PAGADO"
+  doc.setGState(doc.GState({ opacity: 0.07 }))
+  doc.setFontSize(54); doc.setFont('helvetica', 'bold'); doc.setTextColor(22, 163, 74)
+  doc.text('PAGADO', w / 2, 160, { align: 'center', angle: 35 })
+  doc.setGState(doc.GState({ opacity: 1 }))
+
+  doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(150)
+  doc.text('Este recibo es comprobante de pago válido emitido por la administración del condominio.', 14, doc.internal.pageSize.height - 10)
+
+  paginaFooter(doc)
+  doc.save(`recibo-${recibo.numero_recibo}.pdf`)
+}

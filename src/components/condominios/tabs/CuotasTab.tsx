@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto } from '../../../types'
-import { exportarExcel } from '../exportUtils'
+import { exportarExcel, exportarPDFRecibo } from '../exportUtils'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -137,6 +137,46 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     const result = await Swal.fire({ title: '¿Eliminar cuota?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: '#ef4444' })
     if (!result.isConfirmed) return
     await supabase.from('cuotas_condominio').delete().eq('id', id)
+    onRefresh()
+  }
+
+  async function crearRecibo(cuota: CuotaCondominio) {
+    const { count } = await supabase
+      .from('recibos_digitales')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', proyectoId)
+    const numero = `REC-${String((count ?? 0) + 1).padStart(4, '0')}`
+
+    const { error } = await supabase.from('recibos_digitales').insert({
+      company_id: companyId,
+      project_id: proyectoId,
+      unidad_id: cuota.unidad_id ?? null,
+      cuota_id: cuota.id,
+      numero_recibo: numero,
+      monto: cuota.monto,
+      concepto: `${cuota.concepto} — Período ${cuota.periodo}`,
+      fecha_emision: cuota.fecha_pago ?? new Date().toISOString().slice(0, 10),
+      estado: 'generado',
+    })
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+
+    const { value: descargar } = await Swal.fire({
+      icon: 'success', title: `Recibo ${numero} creado`,
+      text: '¿Desea descargar el PDF ahora?',
+      showCancelButton: true, confirmButtonText: 'Descargar PDF', cancelButtonText: 'Cerrar',
+      timer: 8000,
+    })
+    if (descargar) {
+      exportarPDFRecibo({
+        numero_recibo: numero,
+        concepto: `${cuota.concepto} — Período ${cuota.periodo}`,
+        monto: cuota.monto,
+        fecha_emision: cuota.fecha_pago ?? new Date().toISOString().slice(0, 10),
+        unidadNombre: cuota.unidad_nombre,
+        metodo_pago: cuota.metodo_pago,
+        referencia_pago: cuota.referencia_pago,
+      }, moneda)
+    }
     onRefresh()
   }
 
@@ -276,7 +316,15 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                     )}
                   </td>
                   <td style={{ padding: '10px 14px' }}>
-                    <button onClick={() => eliminar(c.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '16px', padding: '2px 6px', borderRadius: '6px' }}>🗑</button>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {c.estado === 'pagado' && canCreate && (
+                        <button onClick={() => crearRecibo(c)} title="Crear recibo digital"
+                          style={{ background: '#eff6ff', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
+                          🧾
+                        </button>
+                      )}
+                      <button onClick={() => eliminar(c.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '16px', padding: '2px 6px', borderRadius: '6px' }}>🗑</button>
+                    </div>
                   </td>
                 </tr>
               ))}

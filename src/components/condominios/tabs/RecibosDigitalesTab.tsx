@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
 import { ReciboDigital, EstadoReciboDigital, CuotaCondominio, Unidad } from '../../../types'
+import { exportarPDFRecibo, exportarExcel } from '../exportUtils'
 
 interface Props {
   recibos: ReciboDigital[]
@@ -11,6 +12,7 @@ interface Props {
   companyId: string
   moneda: string
   autorNombre: string
+  proyectoNombre?: string
   canCreate: boolean
   canEdit: boolean
   onRefresh: () => void
@@ -34,7 +36,7 @@ function nextNumero(recibos: ReciboDigital[]): string {
   return `REC-${String(Math.max(...nums) + 1).padStart(4, '0')}`
 }
 
-export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyectoId, companyId, moneda, autorNombre, canCreate, canEdit, onRefresh }: Props) {
+export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyectoId, companyId, moneda, autorNombre, proyectoNombre, canCreate, canEdit, onRefresh }: Props) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroEstado, setFiltroEstado] = useState<EstadoReciboDigital | ''>('')
@@ -129,12 +131,28 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
           </select>
           <span style={{ fontSize: 12, color: '#6b7280', alignSelf: 'center' }}>{lista.length} registros</span>
         </div>
-        {canCreate && (
-          <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-            {mostrarForm ? '✕ Cancelar' : '🧾 Nuevo recibo'}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => exportarExcel(`recibos-${new Date().toISOString().slice(0,10)}`, [{
+              name: 'Recibos',
+              headers: ['N° Recibo', 'Unidad', 'Concepto', `Monto (${moneda})`, 'Fecha emisión', 'Destinatario', 'Email', 'Estado'],
+              rows: lista.map(r => [
+                r.numero_recibo,
+                unidades.find(u => u.id === r.unidad_id)?.nombre ?? r.unidad_nombre ?? '',
+                r.concepto, r.monto, r.fecha_emision,
+                r.destinatario_nombre ?? '', r.destinatario_email ?? '', r.estado,
+              ]),
+            }])}
+            style={{ padding: '7px 14px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            📊 Excel
           </button>
-        )}
+          {canCreate && (
+            <button onClick={() => setMostrarForm(!mostrarForm)}
+              style={{ padding: '8px 16px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+              {mostrarForm ? '✕ Cancelar' : '🧾 Nuevo recibo'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Formulario */}
@@ -222,18 +240,34 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
                       <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                     </td>
                     <td style={{ padding: '8px 12px' }}>
-                      {canEdit && r.estado === 'generado' && (
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button onClick={() => marcarEnviado(r.id)}
-                            style={{ padding: '3px 8px', background: '#dbeafe', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: '#2563eb' }}>
-                            ✉️ Enviado
-                          </button>
-                          <button onClick={() => anular(r.id)}
-                            style={{ padding: '3px 8px', background: '#fee2e2', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: '#ef4444' }}>
-                            ✕
-                          </button>
-                        </div>
-                      )}
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button
+                          onClick={() => exportarPDFRecibo({
+                            numero_recibo: r.numero_recibo,
+                            concepto: r.concepto,
+                            monto: r.monto,
+                            fecha_emision: r.fecha_emision,
+                            unidadNombre: unidades.find(u => u.id === r.unidad_id)?.nombre ?? r.unidad_nombre,
+                            destinatario_nombre: r.destinatario_nombre,
+                            destinatario_email: r.destinatario_email,
+                            notas: r.notas,
+                          }, moneda, proyectoNombre)}
+                          style={{ padding: '3px 8px', background: '#eff6ff', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: '#2563eb' }}>
+                          📄 PDF
+                        </button>
+                        {canEdit && r.estado === 'generado' && (
+                          <>
+                            <button onClick={() => marcarEnviado(r.id)}
+                              style={{ padding: '3px 8px', background: '#dbeafe', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: '#2563eb' }}>
+                              ✉️ Enviado
+                            </button>
+                            <button onClick={() => anular(r.id)}
+                              style={{ padding: '3px 8px', background: '#fee2e2', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: '#ef4444' }}>
+                              ✕
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
