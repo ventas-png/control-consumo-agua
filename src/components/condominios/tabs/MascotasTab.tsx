@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Mascota, Unidad, EspecieMascota } from '../../../types'
+import { ImageUploader } from '../ImageUploader'
 
 interface Props {
   mascotas: Mascota[]
@@ -21,6 +22,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
   const [busqueda, setBusqueda] = useState('')
   const [filtroEspecie, setFiltroEspecie] = useState<EspecieMascota | 'todos'>('todos')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [form, setForm] = useState({
     unidad_id: '', nombre: '', especie: 'perro' as EspecieMascota,
     raza: '', color: '', fecha_nacimiento: '', fecha_ultima_vacuna: '', notas: '',
@@ -46,6 +48,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
 
   function resetForm() {
     setForm({ unidad_id: '', nombre: '', especie: 'perro', raza: '', color: '', fecha_nacimiento: '', fecha_ultima_vacuna: '', notas: '' })
+    setFotoUrl(null)
     setShowForm(false); setEditingId(null)
   }
 
@@ -56,6 +59,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
       fecha_nacimiento: m.fecha_nacimiento ?? '', fecha_ultima_vacuna: m.fecha_ultima_vacuna ?? '',
       notas: m.notas ?? '',
     })
+    setFotoUrl(m.foto_url ?? null)
     setEditingId(m.id); setShowForm(true)
   }
 
@@ -69,6 +73,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
       raza: form.raza.trim() || null, color: form.color.trim() || null,
       fecha_nacimiento: form.fecha_nacimiento || null, fecha_ultima_vacuna: form.fecha_ultima_vacuna || null,
       notas: form.notas.trim() || null,
+      foto_url: fotoUrl,
     }
     const { error } = editingId
       ? await supabase.from('mascotas').update(data).eq('id', editingId)
@@ -175,6 +180,9 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
               <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional"
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
             </div>
+            <div>
+              <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="mascotas" label="Foto de la mascota" />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
@@ -201,9 +209,12 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
             return (
               <div key={m.id} style={{ background: 'white', border: `1.5px solid ${vacunaVencida ? '#fde68a' : '#e2e8f0'}`, borderRadius: '14px', padding: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-                    {ESPECIE_ICON[m.especie]}
-                  </div>
+                  {m.foto_url
+                    ? <img src={m.foto_url} alt={m.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', flexShrink: 0 }} />
+                    : <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                        {ESPECIE_ICON[m.especie]}
+                      </div>
+                  }
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '14.5px', color: '#0f172a' }}>{m.nombre}</div>
                     <div style={{ fontSize: '12px', color: '#64748b' }}>{m.especie}{m.raza ? ` · ${m.raza}` : ''}</div>

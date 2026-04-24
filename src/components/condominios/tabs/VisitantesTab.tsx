@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Visitante, Unidad } from '../../../types'
+import { ImageUploader } from '../ImageUploader'
 
 interface Props {
   visitantes: Visitante[]
@@ -18,6 +19,7 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   const [saving, setSaving] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [soloActivos, setSoloActivos] = useState(false)
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [form, setForm] = useState({
     unidad_id: '',
     nombre: '',
@@ -37,6 +39,7 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
 
   function resetForm() {
     setForm({ unidad_id: '', nombre: '', identificacion: '', placa_vehiculo: '', motivo: '', notas: '' })
+    setFotoUrl(null)
     setShowForm(false)
   }
 
@@ -53,6 +56,7 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
       placa_vehiculo: form.placa_vehiculo.trim() || null,
       motivo: form.motivo.trim() || null,
       notas: form.notas.trim() || null,
+      foto_url: fotoUrl,
       registrado_por: userId,
       hora_entrada: new Date().toISOString(),
     })
@@ -141,6 +145,9 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
                 placeholder="Opcional"
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
             </div>
+            <div>
+              <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="visitantes" label="Foto del visitante" />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button onClick={handleRegistrar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
@@ -163,9 +170,12 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
             const enPremisa = !v.hora_salida
             return (
               <div key={v.id} style={{ background: 'white', border: `1.5px solid ${enPremisa ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: enPremisa ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: enPremisa ? 'white' : '#94a3b8', fontWeight: 700, fontSize: '15px', flexShrink: 0 }}>
-                  {v.nombre.charAt(0).toUpperCase()}
-                </div>
+                {v.foto_url
+                  ? <img src={v.foto_url} alt={v.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `2px solid ${enPremisa ? '#10b981' : '#e2e8f0'}` }} />
+                  : <div style={{ width: 40, height: 40, borderRadius: '50%', background: enPremisa ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: enPremisa ? 'white' : '#94a3b8', fontWeight: 700, fontSize: '15px', flexShrink: 0 }}>
+                      {v.nombre.charAt(0).toUpperCase()}
+                    </div>
+                }
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{v.nombre}</div>
                   <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '2px' }}>

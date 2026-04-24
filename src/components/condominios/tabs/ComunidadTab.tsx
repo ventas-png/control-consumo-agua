@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { AnuncioComunidad, TipoAnuncio } from '../../../types'
+import { ImageUploader } from '../ImageUploader'
 
 interface Props {
   anuncios: AnuncioComunidad[]
@@ -24,6 +25,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
   const [saving, setSaving] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState<TipoAnuncio | 'todos'>('todos')
   const [soloActivos, setSoloActivos] = useState(true)
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [form, setForm] = useState({
     titulo: '',
     contenido: '',
@@ -39,6 +41,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
 
   function resetForm() {
     setForm({ titulo: '', contenido: '', tipo: 'aviso', fecha_evento: '' })
+    setFotoUrl(null)
     setShowForm(false)
   }
 
@@ -54,6 +57,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
       tipo: form.tipo,
       publicado_por: userId,
       fecha_evento: form.fecha_evento || null,
+      foto_url: fotoUrl,
       activo: true,
     })
     setSaving(false)
@@ -145,6 +149,9 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
                 placeholder="Escribe el mensaje para los residentes..." rows={4}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc', resize: 'vertical' }} />
             </div>
+            <div>
+              <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="anuncios" label="Imagen del anuncio" />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button onClick={handlePublicar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
@@ -179,6 +186,10 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
                     </div>
                     <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '6px' }}>{a.titulo}</div>
                     <div style={{ fontSize: '13.5px', color: '#374151', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{a.contenido}</div>
+                    {a.foto_url && (
+                      <img src={a.foto_url} alt="anuncio" style={{ marginTop: 10, maxWidth: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid #e2e8f0', cursor: 'zoom-in' }}
+                        onClick={() => window.open(a.foto_url!, '_blank')} />
+                    )}
                     <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '8px' }}>
                       {a.publicado_por_nombre && `Publicado por ${a.publicado_por_nombre} · `}
                       {new Date(a.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { TicketMantenimiento, Unidad } from '../../../types'
+import { MultiImageUploader } from '../ImageUploader'
+import { ImageGallery } from '../ImageGallery'
 
 interface Props {
   tickets: TicketMantenimiento[]
@@ -34,6 +36,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   const [filtroPrioridad, setFiltroPrioridad] = useState<string>('todos')
   const [filtroEstado, setFiltroEstado] = useState<string>('activos')
   const [busqueda, setBusqueda] = useState('')
+  const [fotoUrls, setFotoUrls] = useState<string[]>([])
   const [form, setForm] = useState({
     tipo: 'correctivo',
     titulo: '',
@@ -64,6 +67,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
 
   function resetForm() {
     setForm({ tipo: 'correctivo', titulo: '', descripcion: '', prioridad: 'media', unidad_id: '', fecha_limite: '', costo_estimado: '' })
+    setFotoUrls([])
     setShowForm(false)
   }
 
@@ -82,6 +86,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
       reportado_por: userId,
       fecha_limite: form.fecha_limite || null,
       costo_estimado: form.costo_estimado ? Number(form.costo_estimado) : null,
+      foto_urls: fotoUrls,
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
@@ -199,6 +204,9 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
                 placeholder="Detalle el problema o trabajo requerido..." rows={3}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc', resize: 'vertical' }} />
             </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <MultiImageUploader values={fotoUrls} onChange={setFotoUrls} folder="tickets" label="Fotos del problema" maxFiles={6} />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
@@ -239,6 +247,11 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
                       {t.costo_real && <span>✅ Real {t.costo_real.toFixed(2)}</span>}
                       <span>🕐 {new Date(t.created_at).toLocaleDateString('es')}</span>
                     </div>
+                    {t.foto_urls?.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <ImageGallery urls={t.foto_urls} maxVisible={4} />
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
                     {canEdit ? (

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, Unidad } from '../../../types'
+import { ImageUploader } from '../ImageUploader'
 
 interface Props {
   amenidades: Amenidad[]
@@ -21,6 +22,7 @@ export function AmenidadesTab({ amenidades, reservas, unidades, proyectoId, comp
   const [showAmenidadForm, setShowAmenidadForm] = useState(false)
   const [showReservaForm, setShowReservaForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [amenidadFotoUrl, setAmenidadFotoUrl] = useState<string | null>(null)
   const [amenidadForm, setAmenidadForm] = useState({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '' })
   const [reservaForm, setReservaForm] = useState({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '' })
 
@@ -36,10 +38,12 @@ export function AmenidadesTab({ amenidades, reservas, unidades, proyectoId, comp
       horario_fin: amenidadForm.horario_fin || null,
       requiere_deposito: amenidadForm.requiere_deposito,
       monto_deposito: amenidadForm.monto_deposito ? Number(amenidadForm.monto_deposito) : null,
+      foto_url: amenidadFotoUrl,
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
     setAmenidadForm({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '' })
+    setAmenidadFotoUrl(null)
     setShowAmenidadForm(false)
     onRefresh()
   }
@@ -160,6 +164,9 @@ export function AmenidadesTab({ amenidades, reservas, unidades, proyectoId, comp
                       style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
                   </div>
                 )}
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <ImageUploader value={amenidadFotoUrl} onChange={setAmenidadFotoUrl} folder="amenidades" label="Foto de la amenidad" />
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
                 <button onClick={guardarAmenidad} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
@@ -177,7 +184,11 @@ export function AmenidadesTab({ amenidades, reservas, unidades, proyectoId, comp
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '14px' }}>
               {amenidades.map(a => (
-                <div key={a.id} style={{ background: 'white', border: `1.5px solid ${a.activo ? '#e2e8f0' : '#f1f5f9'}`, borderRadius: '14px', padding: '18px', opacity: a.activo ? 1 : 0.6 }}>
+                <div key={a.id} style={{ background: 'white', border: `1.5px solid ${a.activo ? '#e2e8f0' : '#f1f5f9'}`, borderRadius: '14px', overflow: 'hidden', opacity: a.activo ? 1 : 0.6 }}>
+                  {a.foto_url && (
+                    <img src={a.foto_url} alt={a.nombre} style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} />
+                  )}
+                  <div style={{ padding: '18px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                     <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{a.nombre}</h4>
                     {canEdit && (
@@ -194,6 +205,7 @@ export function AmenidadesTab({ amenidades, reservas, unidades, proyectoId, comp
                   </div>
                   <div style={{ marginTop: '12px', fontSize: '12px', color: '#94a3b8' }}>
                     {reservas.filter(r => r.amenidad_id === a.id && r.estado === 'confirmada').length} reservas activas
+                  </div>
                   </div>
                 </div>
               ))}
