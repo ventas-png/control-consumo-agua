@@ -59,6 +59,8 @@ import { RutasRondaTab } from './tabs/RutasRondaTab'
 import { PlantillasCargoTab } from './tabs/PlantillasCargoTab'
 import { TareasPersonalTab } from './tabs/TareasPersonalTab'
 import { RevisionTareasTab } from './tabs/RevisionTareasTab'
+import { DesempenoPersonalTab } from './tabs/DesempenoPersonalTab'
+import { ReporteConsolidadoTab } from './tabs/ReporteConsolidadoTab'
 import { ArrendamientosTab } from './tabs/ArrendamientosTab'
 import { AsambleasTab } from './tabs/AsambleasTab'
 import { ProveedoresTab } from './tabs/ProveedoresTab'
@@ -267,6 +269,7 @@ type CondominioTab =
   | 'bitacora_actividad' | 'panel_directivo' | 'gestion_conflictos' | 'directorio_comunidad'
   | 'centro_notificaciones' | 'cumpleanos' | 'rutas_ronda'
   | 'plantillas_cargo' | 'tareas_personal' | 'revision_tareas'
+  | 'desempeno_personal' | 'reporte_consolidado'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -281,9 +284,11 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'infracciones',   label: 'Infracciones',   icon: '⚖️' },
   { id: 'seguridad',      label: 'Seguridad',      icon: '🛡️' },
   { id: 'rutas_ronda',      label: 'Rutas Ronda',     icon: '🗺️' },
-  { id: 'plantillas_cargo', label: 'Plantillas',      icon: '📋' },
-  { id: 'tareas_personal',  label: 'Turnos/Tareas',   icon: '⚙️' },
-  { id: 'revision_tareas',  label: 'Revisión Admin',  icon: '🔍' },
+  { id: 'plantillas_cargo',    label: 'Plantillas',      icon: '📋' },
+  { id: 'tareas_personal',     label: 'Turnos/Tareas',   icon: '⚙️' },
+  { id: 'revision_tareas',     label: 'Revisión Admin',  icon: '🔍' },
+  { id: 'desempeno_personal',  label: 'Desempeño',       icon: '🏆' },
+  { id: 'reporte_consolidado', label: 'Rpt. Consolidado',icon: '📋' },
   { id: 'arrendamientos', label: 'Arrendamientos', icon: '📄' },
   { id: 'asambleas',      label: 'Asambleas',      icon: '🗳️' },
   { id: 'proveedores',    label: 'Proveedores',    icon: '🤝' },
@@ -457,7 +462,7 @@ const SECTIONS: SectionDef[] = [
     'panel', 'panel_directivo', 'cuadro_mando', 'dashboard_ejecutivo', 'resumen_ejecutivo',
     'informe_ejecutivo', 'informe_mensual', 'indice_calidad', 'dashboard_sostenibilidad',
     'bitacora_actividad', 'gestor_alertas', 'alertas', 'centro_notificaciones', 'graficas_tendencias', 'metricas_servicio',
-    'bitacora_eventos', 'reportes', 'kpis_financieros',
+    'bitacora_eventos', 'reportes', 'kpis_financieros', 'reporte_consolidado',
   ]},
   { id: 'finanzas', label: 'Finanzas', icon: '💰', tabs: [
     'cuotas', 'generacion_cuotas', 'plantillas_cuota', 'recargos_mora', 'reglas_mora',
@@ -489,7 +494,7 @@ const SECTIONS: SectionDef[] = [
   ]},
   { id: 'seguridad', label: 'Seguridad', icon: '🛡️', tabs: [
     'visitantes', 'analisis_visitantes', 'vis_frecuentes', 'seguridad', 'rutas_ronda',
-    'plantillas_cargo', 'tareas_personal', 'revision_tareas',
+    'plantillas_cargo', 'tareas_personal', 'revision_tareas', 'desempeno_personal',
     'paqueteria', 'objetos', 'incidentes', 'reclamos', 'bitacora_guardia', 'presencia',
     'panel_turno', 'emergencias',
   ]},
@@ -1261,6 +1266,10 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'tareas_personal' && <TareasPersonalTab bloques={bloquesTurno} tareas={tareasBloque} plantillas={plantillasCargo} personal={personal} areas={areas} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
         {activeTab === 'revision_tareas' && <RevisionTareasTab bloques={bloquesTurno} tareas={tareasBloque} revisiones={revisionesTarea} personal={personal} userId={uid} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+
+        {activeTab === 'desempeno_personal' && <DesempenoPersonalTab bloques={bloquesTurno} tareas={tareasBloque} revisiones={revisionesTarea} rondas={rondas} visitasControl={visitasControl} personal={personal} />}
+
+        {activeTab === 'reporte_consolidado' && <ReporteConsolidadoTab cuotas={cuotas} gastos={gastos} tickets={tickets} presupuestos={presupuestos} visitantes={visitantes} novedades={novedades} rondas={rondas} anuncios={anuncios} reservas={reservas} bloques={bloquesTurno} tareas={tareasBloque} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
 
         {activeTab === 'arrendamientos' && <ArrendamientosTab contratos={contratos} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
