@@ -1,8 +1,24 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto } from '../../../types'
 import { exportarExcel, exportarPDFRecibo } from '../exportUtils'
+
+interface CSVRow {
+  rawUnidad: string
+  rawConcepto: string
+  rawMonto: string
+  rawPeriodo: string
+  rawVencimiento: string
+  rawNotas: string
+  unidadId: string | null
+  concepto: ConceptoCuota | null
+  monto: number | null
+  status: 'ok' | 'warn' | 'error'
+  errores: string[]
+}
+
+const CONCEPTOS_VALIDOS: ConceptoCuota[] = ['mantenimiento', 'extraordinaria', 'CAM', 'otro']
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -32,6 +48,9 @@ const ESTADO_COLORS: Record<EstadoCuota, { bg: string; color: string }> = {
 export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [csvRows, setCsvRows] = useState<CSVRow[] | null>(null)
+  const [importando, setImportando] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [filtroEstado, setFiltroEstado] = useState<EstadoCuota | 'todos'>('todos')
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set())
   const [form, setForm] = useState({
@@ -53,6 +72,97 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     pendiente: cuotas.filter(c => c.estado === 'pendiente').reduce((s, c) => s + c.monto, 0),
     moroso:    cuotas.filter(c => c.estado === 'moroso').reduce((s, c) => s + c.monto, 0),
     pagado:    cuotas.filter(c => c.estado === 'pagado').reduce((s, c) => s + c.monto, 0),
+  }
+
+  function parsearCSV(text: string): CSVRow[] {
+    const lineas = text.trim().split('\n').filter(l => l.trim())
+    if (lineas.length < 2) return []
+    // skip header row
+    return lineas.slice(1).map(linea => {
+      const cols = linea.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      const [rawUnidad = '', rawConcepto = '', rawMonto = '', rawPeriodo = '', rawVencimiento = '', rawNotas = ''] = cols
+      const errores: string[] = []
+
+      const unidadMatch = unidades.find(u => u.nombre.toLowerCase() === rawUnidad.toLowerCase())
+      if (!rawUnidad) errores.push('Unidad vacía')
+      else if (!unidadMatch) errores.push(`Unidad "${rawUnidad}" no encontrada`)
+
+      const conceptoNorm = rawConcepto.toLowerCase()
+      const concepto = CONCEPTOS_VALIDOS.includes(conceptoNorm as ConceptoCuota)
+        ? (conceptoNorm as ConceptoCuota)
+        : rawConcepto === '' ? null : null
+      if (!concepto) errores.push(`Concepto "${rawConcepto}" inválido (usa: ${CONCEPTOS_VALIDOS.join(', ')})`)
+
+      const monto = parseFloat(rawMonto)
+      if (!rawMonto || isNaN(monto) || monto <= 0) errores.push('Monto inválido')
+
+      if (!rawPeriodo.match(/^\d{4}-\d{2}$/)) errores.push('Período debe ser AAAA-MM')
+
+      const status: CSVRow['status'] = errores.length === 0 ? 'ok'
+        : errores.some(e => e.includes('no encontrada')) ? 'warn'
+        : 'error'
+
+      return {
+        rawUnidad, rawConcepto, rawMonto, rawPeriodo, rawVencimiento, rawNotas,
+        unidadId: unidadMatch?.id ?? null,
+        concepto: errores.length === 0 || !errores.some(e => e.includes('Concepto')) ? concepto : null,
+        monto: isNaN(monto) ? null : monto,
+        status,
+        errores,
+      }
+    })
+  }
+
+  function handleCSVFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const text = ev.target?.result as string
+      const filas = parsearCSV(text)
+      if (filas.length === 0) {
+        Swal.fire('Error', 'El archivo CSV no tiene filas válidas. Verifique el formato.', 'error')
+      } else {
+        setCsvRows(filas)
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  async function confirmarImportCSV() {
+    if (!csvRows) return
+    const validas = csvRows.filter(r => r.status === 'ok' && r.unidadId && r.concepto && r.monto)
+    if (validas.length === 0) {
+      Swal.fire('Sin filas válidas', 'Corrija los errores antes de importar.', 'warning')
+      return
+    }
+    const { isConfirmed } = await Swal.fire({
+      title: `Importar ${validas.length} cuota${validas.length > 1 ? 's' : ''}`,
+      html: `<p style="font-size:13px;color:#374151">${csvRows.length - validas.length > 0 ? `<strong>${csvRows.length - validas.length} fila(s) con errores serán omitidas.</strong><br>` : ''}Se insertarán ${validas.length} cuotas con estado <strong>pendiente</strong>.</p>`,
+      icon: 'question', showCancelButton: true,
+      confirmButtonText: '📥 Importar', cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#2563eb',
+    })
+    if (!isConfirmed) return
+    setImportando(true)
+    const inserts = validas.map(r => ({
+      company_id: companyId,
+      project_id: proyectoId,
+      unidad_id: r.unidadId,
+      concepto: r.concepto!,
+      monto: r.monto!,
+      periodo: r.rawPeriodo,
+      fecha_vencimiento: r.rawVencimiento || null,
+      notas: r.rawNotas || null,
+      estado: 'pendiente' as EstadoCuota,
+    }))
+    const { error } = await supabase.from('cuotas_condominio').insert(inserts)
+    setImportando(false)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    Swal.fire({ icon: 'success', title: `${validas.length} cuotas importadas`, timer: 1800, showConfirmButton: false })
+    setCsvRows(null)
+    onRefresh()
   }
 
   function resetForm() {
@@ -311,9 +421,16 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             </button>
           )}
           {canCreate && (
-            <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}>
-              + Nueva cuota
-            </button>
+            <>
+              <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleCSVFile} />
+              <button onClick={() => fileInputRef.current?.click()}
+                style={{ padding: '10px 16px', background: '#faf5ff', color: '#7c3aed', border: '1.5px solid #c4b5fd', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+                📥 Importar CSV
+              </button>
+              <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}>
+                + Nueva cuota
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -377,6 +494,67 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
             <button onClick={resetForm} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Preview */}
+      {csvRows && (
+        <div style={{ background: 'white', border: '1.5px solid #c4b5fd', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: 8 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>Vista previa del CSV</h3>
+              <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: '#64748b' }}>
+                {csvRows.filter(r => r.status === 'ok').length} filas válidas · {csvRows.filter(r => r.status !== 'ok').length} con errores
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={confirmarImportCSV} disabled={importando || csvRows.filter(r => r.status === 'ok').length === 0}
+                style={{ padding: '9px 18px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+                {importando ? 'Importando...' : `📥 Confirmar (${csvRows.filter(r => r.status === 'ok').length})`}
+              </button>
+              <button onClick={() => setCsvRows(null)}
+                style={{ padding: '9px 14px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '9px', cursor: 'pointer', fontSize: '13px' }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  {['', 'Unidad', 'Concepto', 'Monto', 'Período', 'Vencimiento', 'Notas'].map(h => (
+                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: '#6b7280', fontSize: '11px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {csvRows.map((r, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #f1f5f9', background: r.status === 'error' ? '#fef2f2' : r.status === 'warn' ? '#fffbeb' : undefined }}>
+                    <td style={{ padding: '7px 12px', fontSize: '14px' }}>
+                      {r.status === 'ok' ? '✅' : r.status === 'warn' ? '⚠️' : '❌'}
+                    </td>
+                    <td style={{ padding: '7px 12px', color: r.unidadId ? '#374151' : '#dc2626' }}>{r.rawUnidad || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: r.concepto ? '#374151' : '#dc2626' }}>{r.rawConcepto || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: r.monto ? '#374151' : '#dc2626' }}>{r.rawMonto || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: '#374151' }}>{r.rawPeriodo || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: '#374151' }}>{r.rawVencimiento || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: '#374151', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.rawNotas || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {csvRows.some(r => r.errores.length > 0) && (
+            <div style={{ marginTop: '10px', padding: '10px 14px', background: '#fef2f2', borderRadius: '8px', fontSize: '12px', color: '#dc2626' }}>
+              <strong>Errores detectados:</strong>
+              <ul style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
+                {csvRows.flatMap((r, i) => r.errores.map(e => <li key={`${i}-${e}`}>Fila {i + 2}: {e}</li>))}
+              </ul>
+            </div>
+          )}
+          <div style={{ marginTop: '10px', padding: '8px 12px', background: '#f0f9ff', borderRadius: '8px', fontSize: '11.5px', color: '#0369a1' }}>
+            Formato esperado: <code>unidad,concepto,monto,periodo,vencimiento,notas</code> — ejemplo: <code>Apto 101,mantenimiento,350.00,2026-04,2026-04-30,</code>
           </div>
         </div>
       )}
