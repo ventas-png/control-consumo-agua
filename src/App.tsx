@@ -341,6 +341,8 @@ export default function App() {
               <HistorialSection
                 registros={registros}
                 clientes={clientes}
+                proyectos={proyectos}
+                unidades={unidades}
                 userRole={currentUser.role}
                 moneda={moneda}
                 onEstadoUpdated={updateRegistroEstado}
