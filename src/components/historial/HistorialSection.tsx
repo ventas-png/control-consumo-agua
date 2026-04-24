@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import Swal from 'sweetalert2'
-import type { Registro, Cliente, UserRole, Unidad, Proyecto } from '../../types'
+import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
 import { exportarPDFGlobal } from '../../lib/pdf'
@@ -11,6 +11,7 @@ interface Props {
   clientes: Cliente[]
   unidades?: Unidad[]
   proyectos?: Proyecto[]
+  contadores?: Contador[]
   userRole: UserRole
   moneda?: string
   onEstadoUpdated: (id: string, estado: Registro['estado']) => void
@@ -23,6 +24,7 @@ export function HistorialSection({
   clientes,
   unidades = [],
   proyectos = [],
+  contadores = [],
   userRole,
   moneda = 'Q',
   onEstadoUpdated,
@@ -62,15 +64,15 @@ export function HistorialSection({
         // Proyecto (si el registro tiene project_id)
         const matchProyecto = filtroProyecto ? (r as any).project_id === filtroProyecto : true
 
-        // Unidad — match by unidad_id on the registro if available
+        // Unidad — registros link via contador_id → contador.unidad_id
         const matchUnidad = filtroUnidad
-          ? (r as unknown as Record<string, unknown>).unidad_id === filtroUnidad
+          ? contadores.some(c => c.unidad_id === filtroUnidad && c.id === r.contador_id)
           : true
 
         return matchTxt && matchEst && matchFechaInicio && matchFechaFin && matchProyecto && matchUnidad
       })
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-  }, [registros, filtroTexto, filtroEstado, filtroFechaInicio, filtroFechaFin, filtroProyecto, filtroUnidad, unidades])
+  }, [registros, filtroTexto, filtroEstado, filtroFechaInicio, filtroFechaFin, filtroProyecto, filtroUnidad, contadores])
 
   // Paginación
   const totalPages = Math.ceil(filtrados.length / itemsPerPage)
@@ -233,7 +235,7 @@ export function HistorialSection({
 
       {/* Stats Cards */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {statCard('Total Registros', stats.totalRegistros, '#0ea5e9', '📝')}
+        {statCard('Total Registros', String(stats.totalRegistros), '#0ea5e9', '📝')}
         {statCard('Total Monto', stats.totalMonto, '#8b5cf6', '💰')}
         {statCard('Pagado', stats.pagado, '#10b981', '✓')}
         {statCard('Pendiente', stats.pendiente, '#f59e0b', `⏳ (${stats.countPendiente})`)}

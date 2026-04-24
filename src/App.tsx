@@ -343,6 +343,7 @@ export default function App() {
                 clientes={clientes}
                 proyectos={proyectos}
                 unidades={unidades}
+                contadores={contadores}
                 userRole={currentUser.role}
                 moneda={moneda}
                 onEstadoUpdated={updateRegistroEstado}
