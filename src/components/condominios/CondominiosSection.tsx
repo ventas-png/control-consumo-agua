@@ -184,6 +184,7 @@ import ResumenEjecutivoTab from './tabs/ResumenEjecutivoTab'
 import OrdenesCompraTab from './tabs/OrdenesCompraTab'
 import GraficasTendenciasTab from './tabs/GraficasTendenciasTab'
 import ControlAccesosQRTab from './tabs/ControlAccesosQRTab'
+import CentroNotificacionesTab from './tabs/CentroNotificacionesTab'
 import AsambleaDigitalTab from './tabs/AsambleaDigitalTab'
 import ComparativoPresupuestoTab from './tabs/ComparativoPresupuestoTab'
 import ProformasTab from './tabs/ProformasTab'
@@ -257,6 +258,7 @@ type CondominioTab =
   | 'mapa_calor_cuotas' | 'encuesta_dashboard' | 'analisis_visitantes' | 'informe_ejecutivo'
   | 'tablero_ocupacion' | 'gestion_fondo' | 'dashboard_sostenibilidad' | 'configuracion_cond'
   | 'bitacora_actividad' | 'panel_directivo' | 'gestion_conflictos' | 'directorio_comunidad'
+  | 'centro_notificaciones'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -298,6 +300,7 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'contabilidad',  label: 'Contabilidad',   icon: '🧾' },
   { id: 'presupuesto',   label: 'Presupuesto',    icon: '📋' },
   { id: 'alertas',       label: 'Alertas',        icon: '🔔' },
+  { id: 'centro_notificaciones', label: 'Centro notif.', icon: '📬' },
   { id: 'reportes',      label: 'Reportes',       icon: '📑' },
   { id: 'estadocuenta',  label: 'Estado Cuenta',  icon: '🧾' },
   { id: 'calendario',    label: 'Calendario',     icon: '📅' },
@@ -440,7 +443,7 @@ const SECTIONS: SectionDef[] = [
   { id: 'panel', label: 'Panel', icon: '📊', tabs: [
     'panel', 'panel_directivo', 'cuadro_mando', 'dashboard_ejecutivo', 'resumen_ejecutivo',
     'informe_ejecutivo', 'informe_mensual', 'indice_calidad', 'dashboard_sostenibilidad',
-    'bitacora_actividad', 'gestor_alertas', 'alertas', 'graficas_tendencias', 'metricas_servicio',
+    'bitacora_actividad', 'gestor_alertas', 'alertas', 'centro_notificaciones', 'graficas_tendencias', 'metricas_servicio',
     'bitacora_eventos', 'reportes', 'kpis_financieros',
   ]},
   { id: 'finanzas', label: 'Finanzas', icon: '💰', tabs: [
@@ -1190,6 +1193,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'contabilidad' && <ContabilidadTab gastos={gastos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'presupuesto' && <PresupuestoTab presupuestos={presupuestos} gastos={gastos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'alertas' && <AlertasTab alertas={alertasCondominio} polizas={polizas} contratos={contratosProveedores} inspecciones={inspecciones} llaves={llaves} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'centro_notificaciones' && <CentroNotificacionesTab cuotas={cuotas} tickets={tickets} reservas={reservas} polizas={polizas} sugerencias={sugerencias} vencimientosExtra={vencimientosExtra} inspecciones={inspecciones} contratos={contratos} unidades={unidadesProyecto} moneda={moneda} />}
         {activeTab === 'reportes' && <ReportesTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} contratos={contratosProveedores} gastos={gastos} presupuestos={presupuestos} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
         {activeTab === 'estadocuenta' && <EstadoCuentaTab cuotas={cuotas} unidades={unidadesProyecto} moneda={moneda} proyectoId={selectedProyectoId} companyId={cid} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'calendario' && <CalendarioTab eventos={eventosCalendario} asambleas={asambleas} agenda={agenda} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
