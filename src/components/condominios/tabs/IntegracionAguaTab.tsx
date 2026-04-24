@@ -1,25 +1,38 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { Unidad } from '../../../types'
+import Swal from 'sweetalert2'
 
 interface Props {
   unidades: Unidad[]
   proyectoId: string
   companyId: string
+  moneda: string
+  canCreate: boolean
+  onRefresh: () => void
 }
 
 interface ResumenMedidor {
   contador_id: string
   numero_medidor: string
+  unidad_id: string | null
   unidad_nombre: string
   ultima_lectura: number | null
   consumo_ultimo: number | null
   fecha_lectura: string | null
 }
 
-export default function IntegracionAguaTab({ unidades, proyectoId, companyId }: Props) {
+export default function IntegracionAguaTab({ unidades, proyectoId, companyId, moneda, canCreate, onRefresh }: Props) {
   const [resumen, setResumen] = useState<ResumenMedidor[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Generación de cuotas
+  const [tarifa, setTarifa] = useState('')
+  const [periodo, setPeriodo] = useState(new Date().toISOString().slice(0, 7))
+  const [fechaVenc, setFechaVenc] = useState('')
+  const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set())
+  const [generando, setGenerando] = useState(false)
+  const [showGenerar, setShowGenerar] = useState(false)
 
   useEffect(() => {
     async function cargar() {
@@ -50,6 +63,7 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId }: 
         return {
           contador_id: c.id as string,
           numero_medidor: c.numero_medidor as string,
+          unidad_id: (c.unidad_id as string) ?? null,
           unidad_nombre: nombre,
           ultima_lectura: ultima ? (ultima.lectura_actual as number) : null,
           consumo_ultimo: ultima ? (ultima.consumo as number) : null,
@@ -65,31 +79,148 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId }: 
 
   const totalConsumo = resumen.reduce((s, r) => s + (r.consumo_ultimo ?? 0), 0)
   const sinLectura = resumen.filter(r => !r.fecha_lectura).length
-  const promedio = resumen.length > 0 ? totalConsumo / resumen.filter(r => r.consumo_ultimo !== null).length : 0
+  const conConsumo = resumen.filter(r => r.consumo_ultimo !== null && r.consumo_ultimo > 0)
+  const promedio = conConsumo.length > 0 ? totalConsumo / conConsumo.length : 0
   const maxConsumo = Math.max(...resumen.map(r => r.consumo_ultimo ?? 0), 1)
+
+  const tarifaNum = parseFloat(tarifa) || 0
+  const conGenerables = resumen.filter(r => r.consumo_ultimo !== null && r.consumo_ultimo > 0 && r.unidad_id)
+
+  function toggleAll() {
+    if (seleccionadas.size === conGenerables.length) setSeleccionadas(new Set())
+    else setSeleccionadas(new Set(conGenerables.map(r => r.contador_id)))
+  }
+
+  function toggle(id: string) {
+    setSeleccionadas(prev => {
+      const s = new Set(prev)
+      if (s.has(id)) s.delete(id); else s.add(id)
+      return s
+    })
+  }
+
+  async function generarCuotasAgua() {
+    if (!tarifa || tarifaNum <= 0) { Swal.fire('Error', 'Ingresa una tarifa válida por m³.', 'warning'); return }
+    if (!periodo) { Swal.fire('Error', 'Selecciona el período.', 'warning'); return }
+    if (seleccionadas.size === 0) { Swal.fire('Error', 'Selecciona al menos una unidad.', 'warning'); return }
+
+    const items = conGenerables.filter(r => seleccionadas.has(r.contador_id))
+    const total = items.reduce((s, r) => s + (r.consumo_ultimo ?? 0) * tarifaNum, 0)
+
+    const { isConfirmed } = await Swal.fire({
+      title: `Generar ${items.length} cuotas de agua`,
+      html: `<p style="font-size:13px;color:#374151;margin:0 0 8px">Período: <strong>${periodo}</strong></p>
+             <p style="font-size:13px;color:#374151;margin:0 0 8px">Tarifa: <strong>${moneda} ${tarifaNum.toFixed(4)}/m³</strong></p>
+             <p style="font-size:16px;font-weight:800;color:#2563eb">Total a generar: ${moneda} ${total.toFixed(2)}</p>`,
+      icon: 'question', showCancelButton: true,
+      confirmButtonText: '💧 Generar cuotas', cancelButtonText: 'Cancelar', confirmButtonColor: '#2563eb',
+    })
+    if (!isConfirmed) return
+
+    setGenerando(true)
+    const inserts = items.map(r => ({
+      company_id: companyId,
+      project_id: proyectoId,
+      unidad_id: r.unidad_id,
+      concepto: 'CAM',
+      monto: parseFloat(((r.consumo_ultimo ?? 0) * tarifaNum).toFixed(2)),
+      periodo,
+      fecha_vencimiento: fechaVenc || null,
+      estado: 'pendiente',
+      notas: `Consumo agua: ${r.consumo_ultimo} m³ × ${moneda} ${tarifaNum}/m³`,
+    }))
+
+    const { error } = await supabase.from('cuotas_condominio').insert(inserts)
+    setGenerando(false)
+
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    Swal.fire({ icon: 'success', title: `${items.length} cuotas de agua generadas`, text: `Total: ${moneda} ${total.toFixed(2)}`, timer: 2000, showConfirmButton: false })
+    setSeleccionadas(new Set())
+    setShowGenerar(false)
+    onRefresh()
+  }
 
   return (
     <div style={{ padding: 16 }}>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
-        <div style={{ background: '#eff6ff', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#2563eb' }}>{resumen.length}</div>
-          <div style={{ fontSize: 11, color: '#2563eb', fontWeight: 600 }}>Medidores activos</div>
-        </div>
-        <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>{totalConsumo.toLocaleString('es')} m³</div>
-          <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>Consumo total último período</div>
-        </div>
-        <div style={{ background: '#f5f3ff', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#7c3aed' }}>{isNaN(promedio) ? '—' : promedio.toFixed(1)} m³</div>
-          <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600 }}>Promedio por unidad</div>
-        </div>
-        <div style={{ background: sinLectura > 0 ? '#fef3c7' : '#f0fdf4', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: sinLectura > 0 ? '#d97706' : '#16a34a' }}>{sinLectura}</div>
-          <div style={{ fontSize: 11, color: sinLectura > 0 ? '#d97706' : '#16a34a', fontWeight: 600 }}>Sin lectura registrada</div>
-        </div>
+        {[
+          { label: 'Medidores activos', val: resumen.length, color: '#2563eb', bg: '#eff6ff' },
+          { label: 'Consumo total último período', val: `${totalConsumo.toLocaleString('es')} m³`, color: '#16a34a', bg: '#f0fdf4' },
+          { label: 'Promedio por unidad', val: isNaN(promedio) || promedio === 0 ? '—' : `${promedio.toFixed(1)} m³`, color: '#7c3aed', bg: '#f5f3ff' },
+          { label: 'Sin lectura registrada', val: sinLectura, color: sinLectura > 0 ? '#d97706' : '#16a34a', bg: sinLectura > 0 ? '#fef3c7' : '#f0fdf4' },
+        ].map(k => (
+          <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '12px 16px' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.val}</div>
+            <div style={{ fontSize: 11, color: k.color, fontWeight: 600 }}>{k.label}</div>
+          </div>
+        ))}
       </div>
 
+      {/* Botón generar */}
+      {canCreate && conGenerables.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <button onClick={() => { setShowGenerar(!showGenerar); setSeleccionadas(new Set(conGenerables.map(r => r.contador_id))) }}
+            style={{ padding: '8px 18px', background: showGenerar ? '#f1f5f9' : '#2563eb', color: showGenerar ? '#374151' : '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            {showGenerar ? '✕ Cancelar' : '💧 Generar cuotas de agua'}
+          </button>
+        </div>
+      )}
+
+      {/* Panel generación */}
+      {showGenerar && (
+        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14, color: '#1e40af' }}>Generar cuotas de agua por consumo</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Tarifa por m³ ({moneda}) *</label>
+              <input type="number" step="0.0001" min="0" value={tarifa}
+                onChange={e => setTarifa(e.target.value)} placeholder="0.0000"
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #93c5fd', borderRadius: 6, fontSize: 13 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Período (YYYY-MM) *</label>
+              <input type="month" value={periodo} onChange={e => setPeriodo(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #93c5fd', borderRadius: 6, fontSize: 13 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Fecha vencimiento</label>
+              <input type="date" value={fechaVenc} onChange={e => setFechaVenc(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #93c5fd', borderRadius: 6, fontSize: 13 }} />
+            </div>
+          </div>
+
+          {tarifaNum > 0 && (
+            <div style={{ background: '#fff', border: '1px solid #bfdbfe', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#dbeafe', borderBottom: '1px solid #bfdbfe' }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={seleccionadas.size === conGenerables.length} onChange={toggleAll} />
+                  {seleccionadas.size} de {conGenerables.length} unidades · Total: {moneda} {conGenerables.filter(r => seleccionadas.has(r.contador_id)).reduce((s, r) => s + (r.consumo_ultimo ?? 0) * tarifaNum, 0).toFixed(2)}
+                </label>
+              </div>
+              {conGenerables.map(r => {
+                const monto = ((r.consumo_ultimo ?? 0) * tarifaNum).toFixed(2)
+                return (
+                  <div key={r.contador_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>
+                    <input type="checkbox" checked={seleccionadas.has(r.contador_id)} onChange={() => toggle(r.contador_id)} />
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{r.unidad_nombre}</span>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>#{r.numero_medidor}</span>
+                    <span style={{ fontSize: 12, color: '#374151' }}>{r.consumo_ultimo} m³</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#2563eb', minWidth: 80, textAlign: 'right' }}>{moneda} {monto}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <button onClick={generarCuotasAgua} disabled={generando || tarifaNum <= 0 || seleccionadas.size === 0}
+            style={{ padding: '9px 20px', background: generando || tarifaNum <= 0 || seleccionadas.size === 0 ? '#94a3b8' : '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: generando || tarifaNum <= 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600 }}>
+            {generando ? '⏳ Generando…' : `💧 Generar ${seleccionadas.size} cuota${seleccionadas.size !== 1 ? 's' : ''}`}
+          </button>
+        </div>
+      )}
+
+      {/* Lista de medidores */}
       {loading ? (
         <div style={{ textAlign: 'center', color: '#9ca3af', padding: '48px 0', fontSize: 13 }}>Cargando medidores…</div>
       ) : resumen.length === 0 ? (
@@ -111,9 +242,7 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId }: 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontWeight: 600, fontSize: 12, color: '#0f172a' }}>{r.unidad_nombre}</span>
                       <span style={{ fontSize: 10, color: '#9ca3af' }}>#{r.numero_medidor}</span>
-                      {alto && (
-                        <span style={{ fontSize: 10, background: '#fef2f2', color: '#ef4444', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>⚠ Alto</span>
-                      )}
+                      {alto && <span style={{ fontSize: 10, background: '#fef2f2', color: '#ef4444', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>⚠ Alto</span>}
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <span style={{ fontSize: 12, fontWeight: 700, color: alto ? '#ef4444' : '#0f172a' }}>

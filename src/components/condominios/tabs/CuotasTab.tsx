@@ -140,6 +140,26 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     onRefresh()
   }
 
+  async function aplicarMoraMasiva() {
+    const hoy = new Date().toISOString().slice(0, 10)
+    const vencidas = cuotas.filter(c => c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < hoy)
+    if (vencidas.length === 0) {
+      Swal.fire({ icon: 'success', title: '¡Sin vencidas!', text: 'No hay cuotas pendientes con fecha de vencimiento pasada.', timer: 2000, showConfirmButton: false })
+      return
+    }
+    const { isConfirmed } = await Swal.fire({
+      title: `¿Marcar ${vencidas.length} cuota${vencidas.length > 1 ? 's' : ''} como morosas?`,
+      html: `<p style="font-size:13px;color:#374151">Cuotas <strong>pendientes</strong> cuya fecha de vencimiento ya pasó.<br>Esta acción se puede revertir cambiando el estado individualmente.</p>`,
+      icon: 'warning', showCancelButton: true,
+      confirmButtonText: '⚡ Aplicar mora', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626',
+    })
+    if (!isConfirmed) return
+    const { error } = await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).in('id', vencidas.map(c => c.id))
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    Swal.fire({ icon: 'success', title: `${vencidas.length} cuotas marcadas como morosas`, timer: 1500, showConfirmButton: false })
+    onRefresh()
+  }
+
   async function crearRecibo(cuota: CuotaCondominio) {
     const { count } = await supabase
       .from('recibos_digitales')
@@ -197,6 +217,13 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             style={{ padding: '10px 16px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             📊 Excel
           </button>
+          {canEdit && (
+            <button onClick={aplicarMoraMasiva}
+              title="Marcar como morosas todas las cuotas pendientes con vencimiento pasado"
+              style={{ padding: '10px 16px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              ⚡ Mora
+            </button>
+          )}
           {canCreate && (
             <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}>
               + Nueva cuota

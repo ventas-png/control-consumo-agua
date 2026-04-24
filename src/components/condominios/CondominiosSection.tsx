@@ -1278,7 +1278,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'proyectos_cond' && <ProyectosCondominioTab proyectos={proyectosCond} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'metricas_servicio' && <MetricasServicioTab tickets={tickets} sugerencias={sugerencias} visitantes={visitantes} cuotas={cuotas} moneda={moneda} />}
         {activeTab === 'analisis_cartera' && <AnalisisCarteraTab cuotas={cuotas} unidades={unidadesProyecto} moneda={moneda} />}
-        {activeTab === 'integracion_agua' && <IntegracionAguaTab unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} />}
+        {activeTab === 'integracion_agua' && <IntegracionAguaTab unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'centro_costos' && <CentroCostosTab gastos={gastos} cuotas={cuotas} moneda={moneda} />}
         {activeTab === 'manual_residente' && <ManualResidenteTab articulos={articulosManual} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'exportacion' && <ExportacionTab cuotas={cuotas} gastos={gastos} tickets={tickets} visitantes={visitantes} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}

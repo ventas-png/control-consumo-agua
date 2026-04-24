@@ -80,13 +80,46 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
   async function ejecutarAhora(a: AutomatizacionCond) {
     const afectados = evaluar(a)
     const accion = ACCION_CFG[a.accion_tipo]
+
+    // Ejecución real: marcar_moroso sobre cuotas vencidas
+    if (a.accion_tipo === 'marcar_moroso' && a.trigger_tipo === 'cuota_vencida_dias') {
+      if (afectados === 0) {
+        Swal.fire({ icon: 'success', title: 'Sin elementos afectados', text: '✓ No hay cuotas que cumplan el criterio actualmente.', timer: 2000, showConfirmButton: false })
+        await supabase.from('automatizaciones_cond').update({ ultima_ejecucion: new Date().toISOString() }).eq('id', a.id)
+        onRefresh(); return
+      }
+      const { isConfirmed } = await Swal.fire({
+        title: `Ejecutar: ${a.nombre}`,
+        html: `<div style="text-align:left;font-size:14px">
+          <p><strong>Disparador:</strong> ${TRIGGER_CFG[a.trigger_tipo].desc(a.trigger_valor)}</p>
+          <p><strong>Acción:</strong> ${accion.icon} ${accion.label}</p>
+          <p style="font-size:20px;font-weight:800;color:#ef4444;margin:12px 0">${afectados} cuota${afectados !== 1 ? 's' : ''} serán marcadas como morosas</p>
+        </div>`,
+        icon: 'warning', showCancelButton: true,
+        confirmButtonText: '⚡ Ejecutar ahora', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626',
+      })
+      if (!isConfirmed) return
+
+      const limitDate = new Date(Date.now() - a.trigger_valor * 86400000).toISOString().slice(0, 10)
+      const afectadas = cuotas.filter(c =>
+        c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < limitDate
+      )
+      const { error } = await supabase.from('cuotas_condominio')
+        .update({ estado: 'moroso' }).in('id', afectadas.map(c => c.id))
+      if (error) { Swal.fire('Error', error.message, 'error'); return }
+      Swal.fire({ icon: 'success', title: `${afectadas.length} cuotas marcadas como morosas`, timer: 1600, showConfirmButton: false })
+      await supabase.from('automatizaciones_cond').update({ ultima_ejecucion: new Date().toISOString() }).eq('id', a.id)
+      onRefresh(); return
+    }
+
+    // Para otras acciones: solo evaluación informativa
     await Swal.fire({
       title: `Evaluar: ${a.nombre}`,
       html: `<div style="text-align:left;font-size:14px">
         <p><strong>Disparador:</strong> ${TRIGGER_CFG[a.trigger_tipo].desc(a.trigger_valor)}</p>
         <p><strong>Acción:</strong> ${accion.icon} ${accion.label}</p>
         <p style="font-size:20px;font-weight:700;color:${afectados > 0 ? '#ef4444' : '#16a34a'};margin:12px 0">${afectados} elemento${afectados !== 1 ? 's' : ''} afectado${afectados !== 1 ? 's' : ''}</p>
-        ${afectados > 0 ? `<p style="color:#6b7280;font-size:12px">La ejecución automática estará disponible en futuras versiones con integración de mensajería.</p>` : `<p style="color:#16a34a;font-size:12px">✓ No hay elementos que cumplan el criterio actualmente.</p>`}
+        ${afectados > 0 ? `<p style="color:#6b7280;font-size:12px">Esta acción genera notificaciones internas — revisa el Centro de Notificaciones.</p>` : `<p style="color:#16a34a;font-size:12px">✓ No hay elementos que cumplan el criterio actualmente.</p>`}
       </div>`,
       icon: afectados > 0 ? 'warning' : 'success',
       confirmButtonText: 'Entendido',
