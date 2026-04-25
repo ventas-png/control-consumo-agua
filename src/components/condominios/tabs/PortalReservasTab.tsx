@@ -1,16 +1,26 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import type { Amenidad, ReservaAmenidad, MetodoPagoTarifa } from '../../../types'
+import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
+import { bloqueoSolapaReserva } from './AmenidadesTab'
 
 interface Props {
   amenidades: Amenidad[]
   reservas: ReservaAmenidad[]
+  bloqueos: BloqueoAmenidad[]
   unidadId: string
   proyectoId: string
   companyId: string
   moneda: string
   onRefresh: () => void
+}
+
+const MOTIVO_LABEL: Record<BloqueoAmenidad['motivo'], string> = {
+  mantenimiento: 'Mantenimiento',
+  limpieza: 'Limpieza profunda',
+  evento_privado: 'Evento privado',
+  reparacion: 'Reparación',
+  otro: 'No disponible',
 }
 
 type EstadoReserva = 'confirmada' | 'cancelada' | 'pendiente'
@@ -25,7 +35,7 @@ function blankForm(): { amenidad_id: string; fecha: string; hora_inicio: string;
   return { amenidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: 0, notas: '', metodo_pago_tarifa: 'cargar_unidad' }
 }
 
-export function PortalReservasTab({ amenidades, reservas, unidadId, proyectoId, companyId, moneda, onRefresh }: Props) {
+export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, proyectoId, companyId, moneda, onRefresh }: Props) {
   const [showForm, setShowForm]   = useState(false)
   const [saving, setSaving]       = useState(false)
   const [form, setForm]           = useState(blankForm())
@@ -49,6 +59,18 @@ export function PortalReservasTab({ amenidades, reservas, unidadId, proyectoId, 
       form.hora_inicio < r.hora_fin && form.hora_fin > r.hora_inicio
     )
     if (conflicto) { Swal.fire('Horario ocupado', 'Esa amenidad ya está reservada en ese horario. Elija otro.', 'warning'); return }
+
+    const bloqueo = bloqueos.find(b =>
+      b.amenidad_id === form.amenidad_id &&
+      bloqueoSolapaReserva(b, form.fecha, form.hora_inicio, form.hora_fin)
+    )
+    if (bloqueo) {
+      const detalle = bloqueo.hora_inicio
+        ? `${bloqueo.fecha_inicio === bloqueo.fecha_fin ? bloqueo.fecha_inicio : `${bloqueo.fecha_inicio} → ${bloqueo.fecha_fin}`} ${bloqueo.hora_inicio}–${bloqueo.hora_fin}`
+        : `${bloqueo.fecha_inicio === bloqueo.fecha_fin ? bloqueo.fecha_inicio : `${bloqueo.fecha_inicio} → ${bloqueo.fecha_fin}`} (día completo)`
+      Swal.fire('Amenidad no disponible', `${MOTIVO_LABEL[bloqueo.motivo]} · ${detalle}. Por favor elige otra fecha u horario.`, 'warning')
+      return
+    }
 
     const aplicaTarifa = !!(amenidadSel?.requiere_tarifa && amenidadSel.tarifa_uso && amenidadSel.tarifa_uso > 0)
     const montoTarifa = aplicaTarifa ? Number(amenidadSel!.tarifa_uso) : null
@@ -157,6 +179,20 @@ export function PortalReservasTab({ amenidades, reservas, unidadId, proyectoId, 
               {amenidadSel?.requiere_deposito && amenidadSel.monto_deposito && (
                 <p style={{ margin: '5px 0 0', fontSize: '12px', color: '#c2410c' }}>⚠ Esta amenidad requiere depósito de {moneda} {amenidadSel.monto_deposito.toFixed(2)}</p>
               )}
+              {(() => {
+                if (!amenidadSel) return null
+                const proximos = bloqueos
+                  .filter(b => b.amenidad_id === amenidadSel.id && b.fecha_fin >= hoy)
+                  .slice()
+                  .sort((a, b) => a.fecha_inicio < b.fecha_inicio ? -1 : 1)
+                  .slice(0, 3)
+                if (proximos.length === 0) return null
+                return (
+                  <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: '#fffbeb', border: '1px solid #fde68a', fontSize: 11.5, color: '#92400e' }}>
+                    🚫 Fechas no disponibles: {proximos.map(b => `${b.fecha_inicio === b.fecha_fin ? b.fecha_inicio : `${b.fecha_inicio}→${b.fecha_fin}`}${b.hora_inicio ? ` ${b.hora_inicio}-${b.hora_fin}` : ''}`).join(' · ')}
+                  </div>
+                )
+              })()}
             </div>
             {amenidadSel?.requiere_tarifa && amenidadSel.tarifa_uso != null && amenidadSel.tarifa_uso > 0 && (
               <div style={{ gridColumn: '1 / -1', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 10, padding: '12px 14px' }}>

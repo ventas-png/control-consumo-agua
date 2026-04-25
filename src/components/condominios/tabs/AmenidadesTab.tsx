@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import type { Amenidad, ReservaAmenidad, Unidad } from '../../../types'
+import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, Unidad } from '../../../types'
 import { ImageUploader } from '../ImageUploader'
 
 interface Props {
   amenidades: Amenidad[]
   reservas: ReservaAmenidad[]
+  bloqueos: BloqueoAmenidad[]
   unidades: Unidad[]
   proyectoId: string
   companyId: string
@@ -17,7 +18,21 @@ interface Props {
   onRefresh: () => void
 }
 
-type Vista = 'amenidades' | 'reservas' | 'calendario'
+type Vista = 'amenidades' | 'reservas' | 'calendario' | 'bloqueos'
+
+const MOTIVO_LABEL: Record<MotivoBloqueoAmenidad, string> = {
+  mantenimiento: 'Mantenimiento',
+  limpieza: 'Limpieza profunda',
+  evento_privado: 'Evento privado',
+  reparacion: 'Reparación',
+  otro: 'Otro',
+}
+
+export function bloqueoSolapaReserva(b: BloqueoAmenidad, fecha: string, hi: string, hf: string): boolean {
+  if (fecha < b.fecha_inicio || fecha > b.fecha_fin) return false
+  if (!b.hora_inicio || !b.hora_fin) return true   // día completo
+  return hi < b.hora_fin && hf > b.hora_inicio
+}
 
 const DIAS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -51,14 +66,16 @@ const RESERVA_CAL_COLORS = [
   { bg: '#fef3c7', border: '#fcd34d', color: '#78350f' },
 ]
 
-export function AmenidadesTab({ amenidades, reservas, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, onRefresh }: Props) {
+export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [vista, setVista] = useState<Vista>('amenidades')
   const [showAmenidadForm, setShowAmenidadForm] = useState(false)
   const [showReservaForm, setShowReservaForm] = useState(false)
+  const [showBloqueoForm, setShowBloqueoForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [amenidadFotoUrl, setAmenidadFotoUrl] = useState<string | null>(null)
   const [amenidadForm, setAmenidadForm] = useState({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '' })
   const [reservaForm, setReservaForm] = useState({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad' as 'cargar_unidad' | 'pagar_momento', tarifa_pagada: false })
+  const [bloqueoForm, setBloqueoForm] = useState({ amenidad_id: '', fecha_inicio: '', fecha_fin: '', dia_completo: true, hora_inicio: '', hora_fin: '', motivo: 'mantenimiento' as MotivoBloqueoAmenidad, notas: '' })
   const [semana, setSemana] = useState<Date>(() => lunesDeSemana(new Date()))
   const [selectedReserva, setSelectedReserva] = useState<ReservaAmenidad | null>(null)
 
@@ -135,6 +152,18 @@ export function AmenidadesTab({ amenidades, reservas, unidades, proyectoId, comp
       r.hora_fin > reservaForm.hora_inicio
     )
     if (conflict) { Swal.fire('Conflicto', 'Ya existe una reserva en ese horario para esta amenidad.', 'warning'); return }
+
+    const bloqueo = bloqueos.find(b =>
+      b.amenidad_id === reservaForm.amenidad_id &&
+      bloqueoSolapaReserva(b, reservaForm.fecha, reservaForm.hora_inicio, reservaForm.hora_fin)
+    )
+    if (bloqueo) {
+      const detalle = bloqueo.hora_inicio
+        ? `${bloqueo.fecha_inicio === bloqueo.fecha_fin ? bloqueo.fecha_inicio : `${bloqueo.fecha_inicio} → ${bloqueo.fecha_fin}`} ${bloqueo.hora_inicio}–${bloqueo.hora_fin}`
+        : `${bloqueo.fecha_inicio === bloqueo.fecha_fin ? bloqueo.fecha_inicio : `${bloqueo.fecha_inicio} → ${bloqueo.fecha_fin}`} (día completo)`
+      Swal.fire('Amenidad bloqueada', `${MOTIVO_LABEL[bloqueo.motivo]} · ${detalle}`, 'warning')
+      return
+    }
 
     const amen = amenidades.find(a => a.id === reservaForm.amenidad_id)
     const aplicaTarifa = !!(amen?.requiere_tarifa && amen.tarifa_uso && amen.tarifa_uso > 0)
@@ -219,6 +248,45 @@ export function AmenidadesTab({ amenidades, reservas, unidades, proyectoId, comp
     onRefresh()
   }
 
+  async function guardarBloqueo() {
+    if (!bloqueoForm.amenidad_id || !bloqueoForm.fecha_inicio || !bloqueoForm.fecha_fin) {
+      Swal.fire('Error', 'Seleccione amenidad y rango de fechas.', 'error'); return
+    }
+    if (bloqueoForm.fecha_fin < bloqueoForm.fecha_inicio) {
+      Swal.fire('Error', 'La fecha fin debe ser igual o posterior a la fecha inicio.', 'error'); return
+    }
+    if (!bloqueoForm.dia_completo) {
+      if (!bloqueoForm.hora_inicio || !bloqueoForm.hora_fin) { Swal.fire('Error', 'Indique horario o marque día completo.', 'error'); return }
+      if (bloqueoForm.hora_fin <= bloqueoForm.hora_inicio) { Swal.fire('Error', 'La hora fin debe ser posterior a la hora inicio.', 'error'); return }
+    }
+    setSaving(true)
+    const { error } = await supabase.from('amenidades_bloqueos').insert({
+      company_id: companyId,
+      project_id: proyectoId,
+      amenidad_id: bloqueoForm.amenidad_id,
+      fecha_inicio: bloqueoForm.fecha_inicio,
+      fecha_fin: bloqueoForm.fecha_fin,
+      hora_inicio: bloqueoForm.dia_completo ? null : bloqueoForm.hora_inicio,
+      hora_fin: bloqueoForm.dia_completo ? null : bloqueoForm.hora_fin,
+      motivo: bloqueoForm.motivo,
+      notas: bloqueoForm.notas.trim() || null,
+      created_by: userId,
+    })
+    setSaving(false)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    setBloqueoForm({ amenidad_id: '', fecha_inicio: '', fecha_fin: '', dia_completo: true, hora_inicio: '', hora_fin: '', motivo: 'mantenimiento', notas: '' })
+    setShowBloqueoForm(false)
+    Swal.fire({ icon: 'success', title: 'Bloqueo registrado', timer: 1500, showConfirmButton: false })
+    onRefresh()
+  }
+
+  async function eliminarBloqueo(id: string) {
+    const r = await Swal.fire({ title: '¿Eliminar bloqueo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, eliminar', cancelButtonText: 'No', confirmButtonColor: '#ef4444' })
+    if (!r.isConfirmed) return
+    await supabase.from('amenidades_bloqueos').delete().eq('id', id)
+    onRefresh()
+  }
+
   return (
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
@@ -229,14 +297,15 @@ export function AmenidadesTab({ amenidades, reservas, unidades, proyectoId, comp
         <div style={{ display: 'flex', gap: '8px' }}>
           {canCreate && vista === 'amenidades' && <button onClick={() => setShowAmenidadForm(true)} style={{ padding: '10px 16px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>+ Amenidad</button>}
           {(vista === 'reservas' || vista === 'calendario') && canCreate && <button onClick={() => { setVista('reservas'); setShowReservaForm(true) }} style={{ padding: '10px 16px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>+ Reserva</button>}
+          {vista === 'bloqueos' && canEdit && <button onClick={() => setShowBloqueoForm(true)} style={{ padding: '10px 16px', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>+ Bloqueo</button>}
         </div>
       </div>
 
       {/* Vista toggle */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-        {(['amenidades', 'reservas', 'calendario'] as const).map(v => (
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        {(['amenidades', 'reservas', 'calendario', 'bloqueos'] as const).map(v => (
           <button key={v} onClick={() => setVista(v)} style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px', background: vista === v ? 'linear-gradient(135deg,#0ea5e9,#0d9488)' : '#f1f5f9', color: vista === v ? 'white' : '#374151' }}>
-            {v === 'amenidades' ? '🏊 Amenidades' : v === 'reservas' ? '📋 Lista' : '📆 Calendario'}
+            {v === 'amenidades' ? '🏊 Amenidades' : v === 'reservas' ? '📋 Lista' : v === 'calendario' ? '📆 Calendario' : '🚫 Bloqueos'}
           </button>
         ))}
       </div>
@@ -527,10 +596,19 @@ export function AmenidadesTab({ amenidades, reservas, unidades, proyectoId, comp
                         const fechaStr = d.toISOString().slice(0, 10)
                         const esHoy = fechaStr === hoy
                         const resDia = reservas.filter(r => r.amenidad_id === a.id && r.fecha === fechaStr && r.estado !== 'cancelada')
+                        const bloqDia = bloqueos.filter(b => b.amenidad_id === a.id && fechaStr >= b.fecha_inicio && fechaStr <= b.fecha_fin)
+                        const bloqDiaCompleto = bloqDia.some(b => !b.hora_inicio || !b.hora_fin)
                         const paleta = RESERVA_CAL_COLORS[ai % RESERVA_CAL_COLORS.length]
                         return (
-                          <td key={di} style={{ padding: '6px', border: '1px solid #e2e8f0', background: esHoy ? '#f0f9ff' : 'white', verticalAlign: 'top', minHeight: 60 }}>
+                          <td key={di} style={{ padding: '6px', border: '1px solid #e2e8f0', background: bloqDiaCompleto ? '#fef3c7' : (esHoy ? '#f0f9ff' : 'white'), verticalAlign: 'top', minHeight: 60 }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minHeight: 48 }}>
+                              {bloqDia.map(b => (
+                                <div key={b.id} title={b.notas || MOTIVO_LABEL[b.motivo]}
+                                  style={{ padding: '4px 7px', borderRadius: 6, border: '1px solid #fcd34d', background: 'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 4px,#fde68a 4px,#fde68a 8px)' }}>
+                                  <div style={{ fontSize: 10.5, fontWeight: 700, color: '#92400e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🚫 {MOTIVO_LABEL[b.motivo]}</div>
+                                  <div style={{ fontSize: 9.5, color: '#92400e', opacity: 0.85 }}>{b.hora_inicio && b.hora_fin ? `${b.hora_inicio}–${b.hora_fin}` : 'día completo'}</div>
+                                </div>
+                              ))}
                               {resDia.map(r => (
                                 <div key={r.id}
                                   onClick={() => setSelectedReserva(selectedReserva?.id === r.id ? null : r)}
@@ -539,9 +617,9 @@ export function AmenidadesTab({ amenidades, reservas, unidades, proyectoId, comp
                                   <div style={{ fontSize: 10, color: paleta.color, opacity: 0.8 }}>{r.hora_inicio}–{r.hora_fin}</div>
                                 </div>
                               ))}
-                              {canCreate && (
+                              {canCreate && !bloqDiaCompleto && (
                                 <button onClick={() => abrirReservaDesdeCalendario(a.id, fechaStr)}
-                                  style={{ marginTop: resDia.length > 0 ? 2 : 'auto', padding: '2px 6px', border: '1px dashed #cbd5e1', borderRadius: 5, background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#94a3b8', lineHeight: 1, display: 'block', width: '100%', textAlign: 'center' }}
+                                  style={{ marginTop: (resDia.length + bloqDia.length) > 0 ? 2 : 'auto', padding: '2px 6px', border: '1px dashed #cbd5e1', borderRadius: 5, background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#94a3b8', lineHeight: 1, display: 'block', width: '100%', textAlign: 'center' }}
                                   title={`Reservar ${a.nombre} el ${fechaStr}`}>+</button>
                               )}
                             </div>
@@ -584,6 +662,112 @@ export function AmenidadesTab({ amenidades, reservas, unidades, proyectoId, comp
             Haz clic en una reserva para ver detalles · Haz clic en <strong>+</strong> para crear una nueva reserva en esa fecha y amenidad.
           </div>
         </div>
+      )}
+
+      {/* ── BLOQUEOS ── */}
+      {vista === 'bloqueos' && (
+        <>
+          {showBloqueoForm && (
+            <div style={{ background: 'white', border: '1.5px solid #fde68a', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+              <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Nuevo bloqueo</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Amenidad *</label>
+                  <select value={bloqueoForm.amenidad_id} onChange={e => setBloqueoForm(f => ({ ...f, amenidad_id: e.target.value }))}
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
+                    <option value="">Seleccionar...</option>
+                    {amenidades.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Desde *</label>
+                  <input type="date" value={bloqueoForm.fecha_inicio} onChange={e => setBloqueoForm(f => ({ ...f, fecha_inicio: e.target.value, fecha_fin: f.fecha_fin || e.target.value }))} min={hoy}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Hasta *</label>
+                  <input type="date" value={bloqueoForm.fecha_fin} onChange={e => setBloqueoForm(f => ({ ...f, fecha_fin: e.target.value }))} min={bloqueoForm.fecha_inicio || hoy}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                </div>
+                <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" id="dia_completo" checked={bloqueoForm.dia_completo} onChange={e => setBloqueoForm(f => ({ ...f, dia_completo: e.target.checked }))} />
+                  <label htmlFor="dia_completo" style={{ fontSize: '13.5px', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>Día completo (sin horario específico)</label>
+                </div>
+                {!bloqueoForm.dia_completo && (
+                  <>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Hora inicio *</label>
+                      <input type="time" value={bloqueoForm.hora_inicio} onChange={e => setBloqueoForm(f => ({ ...f, hora_inicio: e.target.value }))}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Hora fin *</label>
+                      <input type="time" value={bloqueoForm.hora_fin} onChange={e => setBloqueoForm(f => ({ ...f, hora_fin: e.target.value }))}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                  </>
+                )}
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Motivo *</label>
+                  <select value={bloqueoForm.motivo} onChange={e => setBloqueoForm(f => ({ ...f, motivo: e.target.value as MotivoBloqueoAmenidad }))}
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
+                    {(Object.keys(MOTIVO_LABEL) as MotivoBloqueoAmenidad[]).map(m => <option key={m} value={m}>{MOTIVO_LABEL[m]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Notas</label>
+                  <input value={bloqueoForm.notas} onChange={e => setBloqueoForm(f => ({ ...f, notas: e.target.value }))} placeholder="Detalle del bloqueo (opcional)"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                <button onClick={guardarBloqueo} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                  {saving ? 'Guardando...' : 'Registrar bloqueo'}
+                </button>
+                <button onClick={() => setShowBloqueoForm(false)} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          {bloqueos.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>🚫</div>
+              <p style={{ fontWeight: 600, color: '#64748b' }}>No hay bloqueos registrados</p>
+              <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Registra un bloqueo cuando una amenidad no esté disponible (mantenimiento, limpieza, etc.).</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {bloqueos
+                .slice()
+                .sort((a, b) => a.fecha_inicio < b.fecha_inicio ? 1 : -1)
+                .map(b => {
+                  const vigente = b.fecha_fin >= hoy
+                  return (
+                    <div key={b.id} style={{ background: 'white', border: `1.5px solid ${vigente ? '#fde68a' : '#e2e8f0'}`, borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', opacity: vigente ? 1 : 0.7 }}>
+                      <div style={{ flex: 1, minWidth: 220 }}>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+                          {b.amenidad_nombre || amenidades.find(a => a.id === b.amenidad_id)?.nombre || 'Amenidad'}
+                          <span style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: '#fef3c7', color: '#92400e' }}>{MOTIVO_LABEL[b.motivo]}</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                          {b.fecha_inicio === b.fecha_fin ? b.fecha_inicio : `${b.fecha_inicio} → ${b.fecha_fin}`}
+                          {b.hora_inicio && b.hora_fin ? ` · ${b.hora_inicio}–${b.hora_fin}` : ' · día completo'}
+                        </div>
+                        {b.notas && <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>{b.notas}</div>}
+                      </div>
+                      <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, background: vigente ? '#fef3c7' : '#f1f5f9', color: vigente ? '#92400e' : '#94a3b8' }}>
+                        {vigente ? 'Vigente' : 'Pasado'}
+                      </span>
+                      {canEdit && (
+                        <button onClick={() => eliminarBloqueo(b.id)} style={{ padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                          Eliminar
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

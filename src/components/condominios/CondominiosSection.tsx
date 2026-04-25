@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import type {
   UserSession, Proyecto, Unidad,
   OrdenCompra, AsambleaDigital, Proforma,
-  CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, TicketMantenimiento, AnuncioComunidad,
+  CuotaCondominio, Visitante, Amenidad, ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento, AnuncioComunidad,
   ParqueoCondominio, Mascota, PaqueteRecibido, InfraccionCondominio,
   RondaSeguridad, NovedadSeguridad, ContratoArrendamiento,
   AreaCondominio, RutaRonda, PuntoControlRuta, VisitaControl,
@@ -536,6 +536,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   const [visitantes, setVisitantes] = useState<Visitante[]>([])
   const [amenidades, setAmenidades] = useState<Amenidad[]>([])
   const [reservas, setReservas] = useState<ReservaAmenidad[]>([])
+  const [bloqueosAmenidades, setBloqueosAmenidades] = useState<BloqueoAmenidad[]>([])
   const [tickets, setTickets] = useState<TicketMantenimiento[]>([])
   const [anuncios, setAnuncios] = useState<AnuncioComunidad[]>([])
   // Fase 2
@@ -911,11 +912,18 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     ])
 
     // Fase 57 — Rutas de ronda (separate to avoid giant Promise.all size limit)
-    const [areasRes, rutasRes, puntosControlRes] = await Promise.all([
+    const [areasRes, rutasRes, puntosControlRes, bloqueosAmenRes] = await Promise.all([
       supabase.from('areas_condominio').select('*').eq('project_id', pid).eq('company_id', cid).order('orden').order('nombre'),
       supabase.from('rutas_ronda').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
       supabase.from('puntos_control_ruta').select('*, areas_condominio(nombre, icono)').eq('areas_condominio.project_id', pid).order('orden'),
+      supabase.from('amenidades_bloqueos').select('*, amenidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('fecha_inicio', { ascending: false }),
     ])
+    setBloqueosAmenidades(
+      (bloqueosAmenRes.data ?? []).map((b: Record<string, unknown>) => ({
+        ...b,
+        amenidad_nombre: (b.amenidades as { nombre: string } | null)?.nombre,
+      })) as BloqueoAmenidad[]
+    )
     setAreas((areasRes.data ?? []) as AreaCondominio[])
     setRutas((rutasRes.data ?? []) as RutaRonda[])
     setPuntosControl(
@@ -1243,7 +1251,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
         {activeTab === 'visitantes' && <VisitantesTab visitantes={visitantes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} proyectoNombre={proyectoActual?.nombre} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
 
-        {activeTab === 'amenidades' && <AmenidadesTab amenidades={amenidades} reservas={reservas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'amenidades' && <AmenidadesTab amenidades={amenidades} reservas={reservas} bloqueos={bloqueosAmenidades} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
         {activeTab === 'mantenimiento' && <MantenimientoTab tickets={tickets} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} proyectoNombre={proyectoActual?.nombre} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
@@ -1341,7 +1349,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'votaciones' && <VotacionesTab votaciones={votaciones} unidades={unidadesProyecto} asambleas={asambleas} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'sanciones' && <SancionesTab sanciones={sanciones} unidades={unidadesProyecto} infracciones={infracciones} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'mant_preventivo' && <MantenimientoPrevTab planes={planesMantenimiento} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
-        {activeTab === 'portal' && <PortalResidenteTab unidades={unidadesProyecto} cuotas={cuotas} tickets={tickets} amenidades={amenidades} reservas={reservas} visitantes={visitantes} anuncios={anuncios} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'portal' && <PortalResidenteTab unidades={unidadesProyecto} cuotas={cuotas} tickets={tickets} amenidades={amenidades} reservas={reservas} bloqueosAmenidades={bloqueosAmenidades} visitantes={visitantes} anuncios={anuncios} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'correspondencia' && <CorrespondenciaCondTab correspondencia={correspondencia} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'libro_novedades' && <LibroNovedadesTab novedades={libroNovedades} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'acuerdos' && <SeguimientoAcuerdosTab acuerdos={acuerdos} actas={actas} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}

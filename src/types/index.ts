@@ -423,6 +423,25 @@ export interface Amenidad {
 export type EstadoReserva = 'confirmada' | 'cancelada' | 'pendiente'
 export type MetodoPagoTarifa = 'cargar_unidad' | 'pagar_momento'
 
+export type MotivoBloqueoAmenidad = 'mantenimiento' | 'limpieza' | 'evento_privado' | 'reparacion' | 'otro'
+
+export interface BloqueoAmenidad {
+  id: string
+  company_id: string
+  project_id: string
+  amenidad_id: string
+  fecha_inicio: string         // 'YYYY-MM-DD'
+  fecha_fin: string            // 'YYYY-MM-DD'
+  hora_inicio?: string | null  // 'HH:MM' — null = día completo
+  hora_fin?: string | null
+  motivo: MotivoBloqueoAmenidad
+  notas?: string | null
+  created_by?: string | null
+  created_at: string
+  // joins opcionales
+  amenidad_nombre?: string
+}
+
 export interface ReservaAmenidad {
   id: string
   company_id: string
