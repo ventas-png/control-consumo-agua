@@ -658,6 +658,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px' }}>
+      <style>{SHIMMER_KEYFRAMES}</style>
       {/* Hero header con gradiente */}
       <div style={{
         background: 'linear-gradient(135deg,#0ea5e9 0%,#0d9488 100%)',
@@ -830,10 +831,16 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
             </div>
           )}
           {amenidades.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
-              <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏊</div>
-              <p style={{ fontWeight: 600, color: '#64748b' }}>No hay amenidades registradas</p>
-            </div>
+            <EmptyState
+              icon="🏊"
+              title="Aún no hay amenidades registradas"
+              hint="Crea piscinas, salones, gimnasios u otras áreas comunes. Cada amenidad puede tener foto, horario, capacidad, depósito, tarifa y reglas de reserva."
+              action={canCreate ? (
+                <button onClick={() => setShowAmenidadForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
+                  + Crear primera amenidad
+                </button>
+              ) : null}
+            />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
               {amenidades.map((a, idx) => {
@@ -1017,10 +1024,16 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
             )
           })()}
           {reservas.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
-              <div style={{ fontSize: '40px', marginBottom: '12px' }}>📅</div>
-              <p style={{ fontWeight: 600, color: '#64748b' }}>No hay reservas registradas</p>
-            </div>
+            <EmptyState
+              icon="📅"
+              title="Aún no hay reservas"
+              hint="Las reservas que se hagan desde esta vista o desde el portal del residente aparecerán aquí. Puedes crear una manualmente para una unidad."
+              action={canCreate ? (
+                <button onClick={() => setShowReservaForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
+                  + Crear reserva manual
+                </button>
+              ) : null}
+            />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {reservas.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(r => {
@@ -1100,7 +1113,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           </div>
 
           {amenidadesActivas.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 13 }}>No hay amenidades activas para mostrar en el calendario.</div>
+            <EmptyState icon="📆" title="No hay amenidades activas"
+              hint="Activa al menos una amenidad desde la pestaña Amenidades para ver el calendario semanal con horarios y reservas." />
           ) : (() => {
             // Rango horario global
             const minH = Math.min(...amenidadesActivas.map(a => a.horario_inicio ? parseInt(a.horario_inicio.slice(0, 2)) : 8), 8)
@@ -1334,11 +1348,16 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
             </div>
           )}
           {bloqueos.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
-              <div style={{ fontSize: '40px', marginBottom: '12px' }}>🚫</div>
-              <p style={{ fontWeight: 600, color: '#64748b' }}>No hay bloqueos registrados</p>
-              <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Registra un bloqueo cuando una amenidad no esté disponible (mantenimiento, limpieza, etc.).</p>
-            </div>
+            <EmptyState
+              icon="🚫"
+              title="No hay bloqueos registrados"
+              hint="Registra un bloqueo cuando una amenidad no esté disponible — mantenimiento, limpieza, evento privado, reparación. Puede ser día completo o sólo en un rango horario."
+              action={canEdit ? (
+                <button onClick={() => setShowBloqueoForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
+                  + Registrar bloqueo
+                </button>
+              ) : null}
+            />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {bloqueos
@@ -1577,10 +1596,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>Al hacer clic en <strong>Enviar WhatsApp</strong> se abrirá la app/web de WhatsApp con el mensaje listo. La reserva queda marcada como recordada.</div>
             </div>
             {proximas.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
-                <div style={{ fontSize: '40px', marginBottom: '12px' }}>📨</div>
-                <p style={{ fontWeight: 600, color: '#64748b' }}>No hay reservas próximas para recordar</p>
-              </div>
+              <EmptyState icon="📨" title="No hay reservas próximas para recordar"
+                hint="Cuando haya reservas confirmadas para hoy o los próximos 2 días, aparecerán aquí con un botón para enviarles WhatsApp." />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {proximas.map(r => {
@@ -1618,6 +1635,46 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     </div>
   )
 }
+
+function EmptyState({ icon, title, hint, action }: { icon: string; title: string; hint?: string; action?: React.ReactNode }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: '56px 24px', textAlign: 'center',
+      background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+      border: '1.5px dashed #cbd5e1', borderRadius: 16,
+    }}>
+      <div style={{
+        width: 72, height: 72, borderRadius: '50%',
+        background: 'linear-gradient(135deg,#e0f2fe,#ccfbf1)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 32, marginBottom: 14,
+        boxShadow: '0 8px 20px -8px rgba(14,165,233,0.35)',
+      }}>{icon}</div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>{title}</div>
+      {hint && <div style={{ fontSize: 12.5, color: '#64748b', maxWidth: 360, lineHeight: 1.5, marginBottom: action ? 14 : 0 }}>{hint}</div>}
+      {action}
+    </div>
+  )
+}
+
+function SkeletonCard() {
+  return (
+    <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: 18, overflow: 'hidden' }}>
+      <div style={{ height: 140, background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear' }} />
+      <div style={{ padding: 18 }}>
+        <div style={{ height: 14, width: '60%', borderRadius: 6, background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear', marginBottom: 8 }} />
+        <div style={{ height: 10, width: '90%', borderRadius: 6, background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear', marginBottom: 12 }} />
+        <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ height: 18, width: 60, borderRadius: 999, background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear' }} />
+          <div style={{ height: 18, width: 80, borderRadius: 999, background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear' }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const SHIMMER_KEYFRAMES = `@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`
 
 function CheckoutForm({ onSave }: { onSave: (foto: string | null, obs: string) => void }) {
   const [foto, setFoto] = useState<string | null>(null)

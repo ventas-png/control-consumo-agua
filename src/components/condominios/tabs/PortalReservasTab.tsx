@@ -310,8 +310,14 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
       </div>
 
       {(vistaFutura ? futuras : pasadas).length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
-          <p style={{ fontWeight: 600, color: '#64748b' }}>Sin reservas {vistaFutura ? 'próximas' : 'anteriores'}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,#f8fafc)', border: '1.5px dashed #cbd5e1', textAlign: 'center' }}>
+          <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#dbeafe,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>
+            {vistaFutura ? '📅' : '📜'}
+          </div>
+          <p style={{ fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Sin reservas {vistaFutura ? 'próximas' : 'anteriores'}</p>
+          <p style={{ fontSize: 12.5, color: '#64748b', margin: 0, maxWidth: 320, lineHeight: 1.5 }}>
+            {vistaFutura ? 'Reserva una amenidad arriba para que aparezca aquí.' : 'Tu historial de reservas pasadas se mostrará aquí.'}
+          </p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
