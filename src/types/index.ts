@@ -419,6 +419,8 @@ export interface Amenidad {
   max_reservas_mes_unidad?: number | null
   horas_minimas_antelacion?: number | null
   duracion_max_horas?: number | null
+  requiere_aprobacion: boolean
+  reglamento?: string | null
   activo: boolean
   foto_url?: string | null
   created_at: string
@@ -478,6 +480,10 @@ export interface ReservaAmenidad {
   deposito_retenido_monto?: number | null
   deposito_retenido_motivo?: string | null
   cuota_retencion_id?: string | null
+  reglamento_aceptado_at?: string | null
+  aprobada_por?: string | null
+  aprobada_at?: string | null
+  rechazada_motivo?: string | null
   notas?: string | null
   created_by?: string | null
   created_at: string

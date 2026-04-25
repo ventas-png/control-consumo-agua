@@ -31,8 +31,8 @@ const ESTADO_RES: Record<EstadoReserva, { label: string; bg: string; color: stri
   cancelada:  { label: 'Cancelada',  bg: '#f8fafc', color: '#94a3b8' },
 }
 
-function blankForm(): { amenidad_id: string; fecha: string; hora_inicio: string; hora_fin: string; num_invitados: number; notas: string; metodo_pago_tarifa: MetodoPagoTarifa } {
-  return { amenidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: 0, notas: '', metodo_pago_tarifa: 'cargar_unidad' }
+function blankForm(): { amenidad_id: string; fecha: string; hora_inicio: string; hora_fin: string; num_invitados: number; notas: string; metodo_pago_tarifa: MetodoPagoTarifa; reglamento_aceptado: boolean } {
+  return { amenidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: 0, notas: '', metodo_pago_tarifa: 'cargar_unidad', reglamento_aceptado: false }
 }
 
 export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, proyectoId, companyId, moneda, onRefresh }: Props) {
@@ -52,10 +52,13 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
     if (!form.amenidad_id) { Swal.fire('Error', 'Seleccione una amenidad.', 'error'); return }
     if (!form.fecha || !form.hora_inicio || !form.hora_fin) { Swal.fire('Error', 'Complete fecha y horario.', 'error'); return }
     if (form.hora_fin <= form.hora_inicio) { Swal.fire('Error', 'La hora de fin debe ser posterior al inicio.', 'error'); return }
-    // Conflict check
+    if (amenidadSel?.reglamento && !form.reglamento_aceptado) {
+      Swal.fire('Reglamento', 'Debes leer y aceptar el reglamento antes de continuar.', 'warning'); return
+    }
+    // Conflict check (sólo contra reservas confirmadas)
     const conflicto = reservas.find(r =>
       r.amenidad_id === form.amenidad_id && r.fecha === form.fecha &&
-      r.estado !== 'cancelada' &&
+      r.estado === 'confirmada' &&
       form.hora_inicio < r.hora_fin && form.hora_fin > r.hora_inicio
     )
     if (conflicto) { Swal.fire('Horario ocupado', 'Esa amenidad ya está reservada en ese horario. Elija otro.', 'warning'); return }
@@ -81,10 +84,13 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
     const aplicaTarifa = !!(amenidadSel?.requiere_tarifa && tarifaCalc > 0)
     const montoTarifa = aplicaTarifa ? tarifaCalc : null
     const metodoPago = aplicaTarifa ? form.metodo_pago_tarifa : null
+    const requiereAprob = !!amenidadSel?.requiere_aprobacion
+    const estadoInicial: 'confirmada' | 'pendiente' = requiereAprob ? 'pendiente' : 'confirmada'
 
     setSaving(true)
     let cuotaId: string | null = null
-    if (aplicaTarifa && metodoPago === 'cargar_unidad') {
+    // Sólo generar cuota cuando la reserva queda confirmada de inmediato
+    if (!requiereAprob && aplicaTarifa && metodoPago === 'cargar_unidad') {
       const periodo = form.fecha.slice(0, 7)
       const { data: cuotaData, error: cuotaErr } = await supabase
         .from('cuotas_condominio')
@@ -110,24 +116,27 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
       unidad_id: unidadId, fecha: form.fecha,
       hora_inicio: form.hora_inicio, hora_fin: form.hora_fin,
       num_invitados: form.num_invitados, notas: form.notas.trim() || null,
-      estado: 'confirmada',
+      estado: estadoInicial,
       monto_tarifa: montoTarifa,
       metodo_pago_tarifa: metodoPago,
       tarifa_pagada: false,
       cuota_id: cuotaId,
       deposito_estado: amenidadSel?.requiere_deposito ? 'pendiente' : 'no_aplica',
+      reglamento_aceptado_at: amenidadSel?.reglamento ? new Date().toISOString() : null,
     })
     setSaving(false)
     if (error) {
       if (cuotaId) await supabase.from('cuotas_condominio').delete().eq('id', cuotaId)
       Swal.fire('Error', error.message, 'error'); return
     }
-    const titulo = aplicaTarifa
-      ? metodoPago === 'cargar_unidad'
-        ? `Reserva confirmada. Se cargó ${moneda} ${montoTarifa!.toFixed(2)} a tu cuenta.`
-        : `Reserva confirmada. Pagar ${moneda} ${montoTarifa!.toFixed(2)} en sitio.`
-      : '¡Reserva confirmada!'
-    Swal.fire({ icon: 'success', title: titulo, timer: 2400, showConfirmButton: false })
+    const titulo = requiereAprob
+      ? 'Solicitud enviada. La administración debe aprobarla.'
+      : aplicaTarifa
+        ? metodoPago === 'cargar_unidad'
+          ? `Reserva confirmada. Se cargó ${moneda} ${montoTarifa!.toFixed(2)} a tu cuenta.`
+          : `Reserva confirmada. Pagar ${moneda} ${montoTarifa!.toFixed(2)} en sitio.`
+        : '¡Reserva confirmada!'
+    Swal.fire({ icon: 'success', title: titulo, timer: 2600, showConfirmButton: false })
     setForm(blankForm()); setShowForm(false); onRefresh()
   }
 
@@ -168,11 +177,12 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
                 ? <div style={{ fontSize: '12px', color: '#1d4ed8', marginTop: '3px', fontWeight: 600 }}>Tarifa: L–V {moneda} {Number(a.tarifa_uso).toFixed(2)} · S–D {moneda} {Number(a.tarifa_uso_finde).toFixed(2)}</div>
                 : <div style={{ fontSize: '12px', color: '#1d4ed8', marginTop: '3px', fontWeight: 600 }}>Tarifa: {moneda} {Number(a.tarifa_uso).toFixed(2)}</div>
             )}
-            {(a.max_reservas_mes_unidad != null || (a.horas_minimas_antelacion ?? 0) > 0 || a.duracion_max_horas != null) && (
+            {(a.max_reservas_mes_unidad != null || (a.horas_minimas_antelacion ?? 0) > 0 || a.duracion_max_horas != null || a.requiere_aprobacion) && (
               <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, lineHeight: 1.3 }}>
                 {a.max_reservas_mes_unidad != null && <div>Máx {a.max_reservas_mes_unidad}/mes</div>}
                 {(a.horas_minimas_antelacion ?? 0) > 0 && <div>Reservar con {a.horas_minimas_antelacion}h de antelación</div>}
                 {a.duracion_max_horas != null && <div>Hasta {a.duracion_max_horas}h por reserva</div>}
+                {a.requiere_aprobacion && <div style={{ color: '#9a3412', fontWeight: 600 }}>Requiere aprobación</div>}
               </div>
             )}
           </div>
@@ -237,6 +247,23 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
               </div>
               )
             })()}
+            {amenidadSel?.requiere_aprobacion && (
+              <div style={{ gridColumn: '1 / -1', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: 10, padding: '10px 14px', fontSize: 12.5, color: '#9a3412' }}>
+                ⚠ Esta amenidad requiere aprobación del administrador. Tu solicitud quedará en estado <strong>pendiente</strong> hasta ser confirmada.
+              </div>
+            )}
+            {amenidadSel?.reglamento && (
+              <div style={{ gridColumn: '1 / -1', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>📜 Reglamento</div>
+                <div style={{ fontSize: 12, color: '#475569', whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto', padding: '6px 8px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, lineHeight: 1.5 }}>
+                  {amenidadSel.reglamento}
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12.5, color: '#374151', cursor: 'pointer', fontWeight: 600 }}>
+                  <input type="checkbox" checked={form.reglamento_aceptado} onChange={e => setForm(f => ({ ...f, reglamento_aceptado: e.target.checked }))} />
+                  He leído y acepto el reglamento
+                </label>
+              </div>
+            )}
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Fecha *</label>
               <input type="date" value={form.fecha} min={hoy} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
@@ -306,6 +333,9 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
                       {r.metodo_pago_tarifa === 'cargar_unidad' && ' · cargado a tu unidad'}
                       {r.metodo_pago_tarifa === 'pagar_momento' && (r.tarifa_pagada ? ' · pagado' : ' · pagar en sitio')}
                     </div>
+                  )}
+                  {r.rechazada_motivo && (
+                    <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 3, fontStyle: 'italic' }}>Rechazada: {r.rechazada_motivo}</div>
                   )}
                 </div>
                 <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ec.bg, color: ec.color, flexShrink: 0 }}>{ec.label}</span>

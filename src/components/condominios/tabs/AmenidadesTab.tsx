@@ -132,7 +132,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   const [showBloqueoForm, setShowBloqueoForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [amenidadFotoUrl, setAmenidadFotoUrl] = useState<string | null>(null)
-  const [amenidadForm, setAmenidadForm] = useState({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '' })
+  const [amenidadForm, setAmenidadForm] = useState({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', requiere_aprobacion: false, reglamento: '' })
   const [reservaForm, setReservaForm] = useState({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad' as 'cargar_unidad' | 'pagar_momento', tarifa_pagada: false })
   const [bloqueoForm, setBloqueoForm] = useState({ amenidad_id: '', fecha_inicio: '', fecha_fin: '', dia_completo: true, hora_inicio: '', hora_fin: '', motivo: 'mantenimiento' as MotivoBloqueoAmenidad, notas: '' })
   const [semana, setSemana] = useState<Date>(() => lunesDeSemana(new Date()))
@@ -168,11 +168,13 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       max_reservas_mes_unidad: amenidadForm.max_reservas_mes_unidad ? Number(amenidadForm.max_reservas_mes_unidad) : null,
       horas_minimas_antelacion: amenidadForm.horas_minimas_antelacion ? Number(amenidadForm.horas_minimas_antelacion) : null,
       duracion_max_horas: amenidadForm.duracion_max_horas ? Number(amenidadForm.duracion_max_horas) : null,
+      requiere_aprobacion: amenidadForm.requiere_aprobacion,
+      reglamento: amenidadForm.reglamento.trim() || null,
       foto_url: amenidadFotoUrl,
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    setAmenidadForm({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '' })
+    setAmenidadForm({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', requiere_aprobacion: false, reglamento: '' })
     setAmenidadFotoUrl(null)
     setShowAmenidadForm(false)
     onRefresh()
@@ -227,11 +229,11 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     const conflict = reservas.find(r =>
       r.amenidad_id === reservaForm.amenidad_id &&
       r.fecha === reservaForm.fecha &&
-      r.estado !== 'cancelada' &&
+      r.estado === 'confirmada' &&
       r.hora_inicio < reservaForm.hora_fin &&
       r.hora_fin > reservaForm.hora_inicio
     )
-    if (conflict) { Swal.fire('Conflicto', 'Ya existe una reserva en ese horario para esta amenidad.', 'warning'); return }
+    if (conflict) { Swal.fire('Conflicto', 'Ya existe una reserva confirmada en ese horario para esta amenidad.', 'warning'); return }
 
     const bloqueo = bloqueos.find(b =>
       b.amenidad_id === reservaForm.amenidad_id &&
@@ -254,10 +256,13 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     const aplicaTarifa = !!(amen?.requiere_tarifa && tarifaCalc > 0)
     const montoTarifa = aplicaTarifa ? tarifaCalc : null
     const metodoPago = aplicaTarifa ? reservaForm.metodo_pago_tarifa : null
+    const requiereAprob = !!amen?.requiere_aprobacion
+    const estadoInicial: 'confirmada' | 'pendiente' = requiereAprob ? 'pendiente' : 'confirmada'
 
     setSaving(true)
     let cuotaId: string | null = null
-    if (aplicaTarifa && metodoPago === 'cargar_unidad') {
+    // Solo generar cuota si la reserva queda confirmada de inmediato
+    if (!requiereAprob && aplicaTarifa && metodoPago === 'cargar_unidad') {
       const periodo = reservaForm.fecha.slice(0, 7)
       const { data: cuotaData, error: cuotaErr } = await supabase
         .from('cuotas_condominio')
@@ -295,6 +300,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       tarifa_pagada: tarifaPagada,
       cuota_id: cuotaId,
       deposito_estado: amen?.requiere_deposito ? 'pendiente' : 'no_aplica',
+      estado: estadoInicial,
       created_by: userId,
     })
     setSaving(false)
@@ -304,14 +310,16 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     }
     setReservaForm({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad', tarifa_pagada: false })
     setShowReservaForm(false)
-    const msg = aplicaTarifa
-      ? metodoPago === 'cargar_unidad'
-        ? `Reserva confirmada. Se cargó ${moneda} ${montoTarifa!.toFixed(2)} a la unidad.`
-        : tarifaPagada
-          ? `Reserva confirmada. Pago en sitio registrado.`
-          : `Reserva confirmada. Cobrar ${moneda} ${montoTarifa!.toFixed(2)} en sitio.`
-      : 'Reserva confirmada'
-    Swal.fire({ icon: 'success', title: msg, timer: 2200, showConfirmButton: false })
+    const msg = requiereAprob
+      ? 'Reserva enviada como pendiente. Apruébala desde la lista.'
+      : aplicaTarifa
+        ? metodoPago === 'cargar_unidad'
+          ? `Reserva confirmada. Se cargó ${moneda} ${montoTarifa!.toFixed(2)} a la unidad.`
+          : tarifaPagada
+            ? `Reserva confirmada. Pago en sitio registrado.`
+            : `Reserva confirmada. Cobrar ${moneda} ${montoTarifa!.toFixed(2)} en sitio.`
+        : 'Reserva confirmada'
+    Swal.fire({ icon: 'success', title: msg, timer: 2400, showConfirmButton: false })
     onRefresh()
   }
 
@@ -503,6 +511,81 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     setReservaDetalle(d => d && d.id === r.id ? { ...d, ...update } as ReservaAmenidad : d)
   }
 
+  async function aprobarReserva(r: ReservaAmenidad) {
+    // Detectar conflicto con otra reserva ya confirmada
+    const conflict = reservas.find(x =>
+      x.id !== r.id &&
+      x.amenidad_id === r.amenidad_id &&
+      x.fecha === r.fecha &&
+      x.estado === 'confirmada' &&
+      x.hora_inicio < r.hora_fin &&
+      x.hora_fin > r.hora_inicio
+    )
+    if (conflict) {
+      Swal.fire('Conflicto', 'Otra reserva ya confirmada ocupa ese horario. No es posible aprobar.', 'warning')
+      return
+    }
+    const amen = amenidades.find(a => a.id === r.amenidad_id)
+    let cuotaId: string | null = r.cuota_id ?? null
+    // Generar cargo si tiene tarifa con cargar_unidad y aún no existe
+    if (!cuotaId && r.monto_tarifa && r.monto_tarifa > 0 && r.metodo_pago_tarifa === 'cargar_unidad') {
+      const periodo = r.fecha.slice(0, 7)
+      const { data: cuotaData, error: cuotaErr } = await supabase
+        .from('cuotas_condominio')
+        .insert({
+          company_id: companyId,
+          project_id: proyectoId,
+          unidad_id: r.unidad_id,
+          concepto: 'amenidad',
+          monto: r.monto_tarifa,
+          periodo,
+          fecha_vencimiento: r.fecha,
+          estado: 'pendiente',
+          notas: `Reserva ${amen?.nombre || 'amenidad'} ${r.fecha} ${r.hora_inicio}-${r.hora_fin}`,
+          created_by: userId,
+        })
+        .select('id')
+        .single()
+      if (cuotaErr) { Swal.fire('Error', `No se pudo generar el cargo: ${cuotaErr.message}`, 'error'); return }
+      cuotaId = cuotaData?.id ?? null
+    }
+    const { error } = await supabase.from('reservas_amenidades').update({
+      estado: 'confirmada',
+      aprobada_por: userId,
+      aprobada_at: new Date().toISOString(),
+      cuota_id: cuotaId,
+      rechazada_motivo: null,
+    }).eq('id', r.id)
+    if (error) {
+      if (cuotaId && !r.cuota_id) await supabase.from('cuotas_condominio').delete().eq('id', cuotaId)
+      Swal.fire('Error', error.message, 'error'); return
+    }
+    onRefresh()
+  }
+
+  async function rechazarReserva(r: ReservaAmenidad) {
+    const { value: motivo } = await Swal.fire({
+      title: 'Rechazar reserva',
+      input: 'textarea',
+      inputLabel: 'Motivo del rechazo',
+      inputPlaceholder: 'Ej. el salón está reservado para evento del condominio...',
+      showCancelButton: true,
+      confirmButtonText: 'Rechazar',
+      confirmButtonColor: '#ef4444',
+      cancelButtonText: 'Cancelar',
+      inputValidator: v => (!v || !v.trim()) ? 'Indica un motivo.' : null,
+    })
+    if (!motivo) return
+    if (r.cuota_id) {
+      await supabase.from('cuotas_condominio').delete().eq('id', r.cuota_id).eq('estado', 'pendiente')
+    }
+    await supabase.from('reservas_amenidades').update({
+      estado: 'cancelada',
+      rechazada_motivo: motivo.trim(),
+    }).eq('id', r.id)
+    onRefresh()
+  }
+
   async function eliminarBloqueo(id: string) {
     const r = await Swal.fire({ title: '¿Eliminar bloqueo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, eliminar', cancelButtonText: 'No', confirmButtonColor: '#ef4444' })
     if (!r.isConfirmed) return
@@ -594,6 +677,16 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                     </div>
                   </>
                 )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input type="checkbox" id="aprobacion" checked={amenidadForm.requiere_aprobacion} onChange={e => setAmenidadForm(f => ({ ...f, requiere_aprobacion: e.target.checked }))} />
+                  <label htmlFor="aprobacion" style={{ fontSize: '13.5px', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>Requiere aprobación del administrador</label>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Reglamento (opcional)</label>
+                  <textarea value={amenidadForm.reglamento} onChange={e => setAmenidadForm(f => ({ ...f, reglamento: e.target.value }))}
+                    placeholder="Texto del reglamento que el residente debe aceptar al reservar (horarios, limpieza, daños, invitados, etc.)"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13.5px', background: '#f8fafc', minHeight: 70, resize: 'vertical' }} />
+                </div>
                 <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #e2e8f0', paddingTop: 12, marginTop: 4 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 8 }}>Reglas de reserva (opcional)</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
@@ -658,6 +751,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                       {a.max_reservas_mes_unidad != null && <span>📅 Máx {a.max_reservas_mes_unidad}/mes</span>}
                       {a.horas_minimas_antelacion != null && a.horas_minimas_antelacion > 0 && <span>⏱ {a.horas_minimas_antelacion}h antelación</span>}
                       {a.duracion_max_horas != null && <span>⌛ Máx {a.duracion_max_horas}h</span>}
+                      {a.requiere_aprobacion && <span>👤 Requiere aprobación</span>}
+                      {a.reglamento && <span>📜 Con reglamento</span>}
                     </div>
                     <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                       <div style={{ fontSize: '12px', color: '#94a3b8' }}>
@@ -763,6 +858,15 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               </div>
             </div>
           )}
+          {(() => {
+            const pendientesAprob = reservas.filter(r => r.estado === 'pendiente' && r.fecha >= hoy).length
+            if (pendientesAprob === 0) return null
+            return (
+              <div style={{ background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: 12, padding: '12px 16px', marginBottom: 12, fontSize: 13, color: '#9a3412', fontWeight: 600 }}>
+                ⚠ {pendientesAprob} reserva{pendientesAprob > 1 ? 's' : ''} esperando aprobación.
+              </div>
+            )
+          })()}
           {reservas.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>📅</div>
@@ -788,6 +892,9 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                         {r.metodo_pago_tarifa === 'pagar_momento' && (r.tarifa_pagada ? ' · pagado en sitio' : ' · por cobrar en sitio')}
                       </div>
                     )}
+                    {r.rechazada_motivo && (
+                      <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 3, fontStyle: 'italic' }}>Rechazada: {r.rechazada_motivo}</div>
+                    )}
                   </div>
                   <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ESTADO_COLORS[r.estado]?.bg || '#f1f5f9', color: ESTADO_COLORS[r.estado]?.color || '#374151' }}>
                     {r.estado}
@@ -796,6 +903,16 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                     <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: '#fef2f2', color: '#b91c1c' }}>
                       No show
                     </span>
+                  )}
+                  {r.estado === 'pendiente' && canEdit && (
+                    <>
+                      <button onClick={() => aprobarReserva(r)} style={{ padding: '5px 12px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
+                        ✓ Aprobar
+                      </button>
+                      <button onClick={() => rechazarReserva(r)} style={{ padding: '5px 12px', background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
+                        ✗ Rechazar
+                      </button>
+                    </>
                   )}
                   {pendientePago && canEdit && (
                     <button onClick={() => marcarTarifaPagada(r)} style={{ padding: '5px 12px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
@@ -884,14 +1001,16 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                                   <div style={{ fontSize: 9.5, color: '#92400e', opacity: 0.85 }}>{b.hora_inicio && b.hora_fin ? `${b.hora_inicio}–${b.hora_fin}` : 'día completo'}</div>
                                 </div>
                               ))}
-                              {resDia.map(r => (
+                              {resDia.map(r => {
+                                const pend = r.estado === 'pendiente'
+                                return (
                                 <div key={r.id}
                                   onClick={() => setSelectedReserva(selectedReserva?.id === r.id ? null : r)}
-                                  style={{ padding: '4px 7px', borderRadius: 6, border: `1px solid ${paleta.border}`, background: paleta.bg, cursor: 'pointer' }}>
-                                  <div style={{ fontSize: 11, fontWeight: 700, color: paleta.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.unidad_nombre}</div>
+                                  style={{ padding: '4px 7px', borderRadius: 6, border: `1px ${pend ? 'dashed' : 'solid'} ${paleta.border}`, background: pend ? 'white' : paleta.bg, cursor: 'pointer', opacity: pend ? 0.85 : 1 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: paleta.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pend && '⏳ '}{r.unidad_nombre}</div>
                                   <div style={{ fontSize: 10, color: paleta.color, opacity: 0.8 }}>{r.hora_inicio}–{r.hora_fin}</div>
                                 </div>
-                              ))}
+                              )})}
                               {canCreate && !bloqDiaCompleto && (
                                 <button onClick={() => abrirReservaDesdeCalendario(a.id, fechaStr)}
                                   style={{ marginTop: (resDia.length + bloqDia.length) > 0 ? 2 : 'auto', padding: '2px 6px', border: '1px dashed #cbd5e1', borderRadius: 5, background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#94a3b8', lineHeight: 1, display: 'block', width: '100%', textAlign: 'center' }}
