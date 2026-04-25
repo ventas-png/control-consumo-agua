@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, Unidad } from '../../../types'
+import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
 import { ImageUploader } from '../ImageUploader'
 import { formatPhoneForWa } from '../../../lib/validation'
 
@@ -137,6 +137,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   const [bloqueoForm, setBloqueoForm] = useState({ amenidad_id: '', fecha_inicio: '', fecha_fin: '', dia_completo: true, hora_inicio: '', hora_fin: '', motivo: 'mantenimiento' as MotivoBloqueoAmenidad, notas: '' })
   const [semana, setSemana] = useState<Date>(() => lunesDeSemana(new Date()))
   const [selectedReserva, setSelectedReserva] = useState<ReservaAmenidad | null>(null)
+  const [reservaDetalle, setReservaDetalle] = useState<ReservaAmenidad | null>(null)
 
   const hoy = new Date().toISOString().slice(0, 10)
   const amenidadesActivas = amenidades.filter(a => a.activo)
@@ -293,6 +294,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       metodo_pago_tarifa: metodoPago,
       tarifa_pagada: tarifaPagada,
       cuota_id: cuotaId,
+      deposito_estado: amen?.requiere_deposito ? 'pendiente' : 'no_aplica',
       created_by: userId,
     })
     setSaving(false)
@@ -393,6 +395,112 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       .update({ recordatorio_enviado: true, recordatorio_enviado_at: new Date().toISOString() })
       .eq('id', r.id)
     onRefresh()
+  }
+
+  async function registrarCheckin(r: ReservaAmenidad, fotoUrl: string | null) {
+    const update: Record<string, unknown> = {
+      checkin_at: new Date().toISOString(),
+      checkin_foto_url: fotoUrl,
+      checkin_por: userId,
+    }
+    const amen = amenidades.find(a => a.id === r.amenidad_id)
+    if (amen?.requiere_deposito && r.deposito_estado === 'no_aplica') {
+      update.deposito_estado = 'pendiente'
+    }
+    const { error } = await supabase.from('reservas_amenidades').update(update).eq('id', r.id)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    onRefresh()
+    setReservaDetalle(d => d && d.id === r.id ? { ...d, ...update } as ReservaAmenidad : d)
+  }
+
+  async function registrarCheckout(r: ReservaAmenidad, fotoUrl: string | null, observaciones: string) {
+    const { error } = await supabase.from('reservas_amenidades').update({
+      checkout_at: new Date().toISOString(),
+      checkout_foto_url: fotoUrl,
+      checkout_por: userId,
+      observaciones_uso: observaciones || null,
+    }).eq('id', r.id)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    onRefresh()
+    setReservaDetalle(d => d && d.id === r.id ? { ...d, checkout_at: new Date().toISOString(), checkout_foto_url: fotoUrl, observaciones_uso: observaciones || null } : d)
+  }
+
+  async function actualizarEstadoDeposito(r: ReservaAmenidad, nuevoEstado: EstadoDepositoReserva) {
+    const update: Record<string, unknown> = { deposito_estado: nuevoEstado }
+    if (nuevoEstado === 'cobrado') {
+      update.deposito_pagado = true
+    }
+    if (nuevoEstado === 'devuelto') {
+      update.deposito_devuelto_at = new Date().toISOString()
+      update.deposito_retenido_monto = null
+      update.deposito_retenido_motivo = null
+    }
+    const { error } = await supabase.from('reservas_amenidades').update(update).eq('id', r.id)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    onRefresh()
+    setReservaDetalle(d => d && d.id === r.id ? { ...d, ...update } as ReservaAmenidad : d)
+  }
+
+  async function retenerDeposito(r: ReservaAmenidad) {
+    const amen = amenidades.find(a => a.id === r.amenidad_id)
+    const tope = amen?.monto_deposito ?? null
+    const { value: form } = await Swal.fire({
+      title: 'Retener depósito',
+      html:
+        `<p style="font-size:13px;color:#64748b;margin:0 0 10px;text-align:left">Indica el monto que se retiene${tope != null ? ` (máximo ${moneda} ${tope.toFixed(2)})` : ''} y el motivo. Opcionalmente puedes generar un cargo a la unidad si la retención no cubre el daño.</p>` +
+        `<input id="swal-monto" type="number" min="0" step="0.01" max="${tope ?? ''}" class="swal2-input" placeholder="Monto retenido (${moneda})">` +
+        `<textarea id="swal-motivo" class="swal2-textarea" placeholder="Motivo de la retención"></textarea>` +
+        `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;margin-top:6px;text-align:left"><input type="checkbox" id="swal-cargo"> Generar cargo a la unidad por el monto retenido</label>`,
+      showCancelButton: true,
+      confirmButtonText: 'Retener',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+      preConfirm: () => {
+        const monto = (document.getElementById('swal-monto') as HTMLInputElement | null)?.value ?? ''
+        const motivo = (document.getElementById('swal-motivo') as HTMLTextAreaElement | null)?.value ?? ''
+        const cargo = (document.getElementById('swal-cargo') as HTMLInputElement | null)?.checked ?? false
+        if (!monto || Number(monto) <= 0) { Swal.showValidationMessage('Indica un monto mayor a 0.'); return false }
+        if (!motivo.trim()) { Swal.showValidationMessage('Indica un motivo.'); return false }
+        if (tope != null && Number(monto) > tope) { Swal.showValidationMessage(`El monto excede el depósito (${tope}).`); return false }
+        return { monto: Number(monto), motivo: motivo.trim(), cargo }
+      },
+    })
+    if (!form) return
+    let cuotaId: string | null = null
+    if (form.cargo) {
+      const periodo = r.fecha.slice(0, 7)
+      const { data: cuotaData, error: cuotaErr } = await supabase
+        .from('cuotas_condominio')
+        .insert({
+          company_id: companyId,
+          project_id: proyectoId,
+          unidad_id: r.unidad_id,
+          concepto: 'amenidad',
+          monto: form.monto,
+          periodo,
+          fecha_vencimiento: new Date().toISOString().slice(0, 10),
+          estado: 'pendiente',
+          notas: `Retención por daños — ${amen?.nombre || 'amenidad'} · ${r.fecha} · ${form.motivo}`,
+          created_by: userId,
+        })
+        .select('id')
+        .single()
+      if (cuotaErr) { Swal.fire('Error', `No se pudo generar el cargo: ${cuotaErr.message}`, 'error'); return }
+      cuotaId = cuotaData?.id ?? null
+    }
+    const update = {
+      deposito_estado: 'retenido' as EstadoDepositoReserva,
+      deposito_retenido_monto: form.monto,
+      deposito_retenido_motivo: form.motivo,
+      cuota_retencion_id: cuotaId,
+    }
+    const { error } = await supabase.from('reservas_amenidades').update(update).eq('id', r.id)
+    if (error) {
+      if (cuotaId) await supabase.from('cuotas_condominio').delete().eq('id', cuotaId)
+      Swal.fire('Error', error.message, 'error'); return
+    }
+    onRefresh()
+    setReservaDetalle(d => d && d.id === r.id ? { ...d, ...update } as ReservaAmenidad : d)
   }
 
   async function eliminarBloqueo(id: string) {
@@ -699,6 +807,11 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                       {r.no_show ? '↶ Quitar no-show' : 'No show'}
                     </button>
                   )}
+                  {canEdit && (
+                    <button onClick={() => setReservaDetalle(reservaDetalle?.id === r.id ? null : r)} style={{ padding: '5px 12px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                      {reservaDetalle?.id === r.id ? 'Cerrar' : 'Detalle'}
+                    </button>
+                  )}
                   {r.estado !== 'cancelada' && canEdit && (
                     <button onClick={() => cancelarReserva(r.id)} style={{ padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                       Cancelar
@@ -932,6 +1045,115 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
         </>
       )}
 
+      {/* ── PANEL DETALLE / CHECK-IN-OUT ── */}
+      {reservaDetalle && (() => {
+        const r = reservaDetalle
+        const amen = amenidades.find(a => a.id === r.amenidad_id)
+        return (
+          <div onClick={() => setReservaDetalle(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background: 'white', borderRadius: 16, maxWidth: 640, width: '100%', maxHeight: '90vh', overflow: 'auto', padding: 22 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: '#0f172a' }}>{r.amenidad_nombre}</div>
+                  <div style={{ fontSize: 13, color: '#64748b' }}>{r.unidad_nombre} · {r.fecha} · {r.hora_inicio}–{r.hora_fin}</div>
+                </div>
+                <button onClick={() => setReservaDetalle(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontSize: 14 }}>✕</button>
+              </div>
+
+              {/* Check-in */}
+              <section style={{ marginBottom: 18, padding: 14, border: '1.5px solid #e2e8f0', borderRadius: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>📥 Check-in</div>
+                  {r.checkin_at && <div style={{ fontSize: 11.5, color: '#16a34a', fontWeight: 600 }}>✓ {new Date(r.checkin_at).toLocaleString('es')}</div>}
+                </div>
+                {r.checkin_foto_url && (
+                  <img src={r.checkin_foto_url} alt="check-in" style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 10, marginBottom: 10 }} />
+                )}
+                {!r.checkin_at && canEdit && (
+                  <ImageUploader value={null} onChange={(url) => registrarCheckin(r, url)} folder="amenidades-checkin" label="Foto de estado inicial (opcional, registra check-in)" />
+                )}
+                {r.checkin_at && canEdit && !r.checkout_at && !r.checkin_foto_url && (
+                  <ImageUploader value={null} onChange={async (url) => {
+                    if (!url) return
+                    await supabase.from('reservas_amenidades').update({ checkin_foto_url: url }).eq('id', r.id)
+                    onRefresh()
+                    setReservaDetalle(d => d ? { ...d, checkin_foto_url: url } : d)
+                  }} folder="amenidades-checkin" label="Agregar foto de estado inicial" />
+                )}
+                {!r.checkin_at && canEdit && (
+                  <button onClick={() => registrarCheckin(r, null)} style={{ marginTop: 8, padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+                    Registrar check-in sin foto
+                  </button>
+                )}
+              </section>
+
+              {/* Check-out */}
+              <section style={{ marginBottom: 18, padding: 14, border: '1.5px solid #e2e8f0', borderRadius: 12, opacity: r.checkin_at ? 1 : 0.55 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>📤 Check-out</div>
+                  {r.checkout_at && <div style={{ fontSize: 11.5, color: '#16a34a', fontWeight: 600 }}>✓ {new Date(r.checkout_at).toLocaleString('es')}</div>}
+                </div>
+                {!r.checkin_at && <div style={{ fontSize: 12, color: '#94a3b8' }}>Primero registra el check-in.</div>}
+                {r.checkin_at && (
+                  <>
+                    {r.checkout_foto_url && (
+                      <img src={r.checkout_foto_url} alt="check-out" style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 10, marginBottom: 10 }} />
+                    )}
+                    {r.observaciones_uso && (
+                      <div style={{ fontSize: 12.5, color: '#475569', background: '#f8fafc', borderRadius: 8, padding: 8, marginBottom: 10 }}>
+                        <strong>Observaciones:</strong> {r.observaciones_uso}
+                      </div>
+                    )}
+                    {!r.checkout_at && canEdit && (
+                      <CheckoutForm onSave={(foto, obs) => registrarCheckout(r, foto, obs)} />
+                    )}
+                  </>
+                )}
+              </section>
+
+              {/* Depósito */}
+              {amen?.requiere_deposito && (
+                <section style={{ padding: 14, border: '1.5px solid #fde68a', borderRadius: 12, background: '#fffbeb' }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>💰 Depósito {moneda} {amen.monto_deposito?.toFixed(2)}</div>
+                  <div style={{ fontSize: 12.5, marginBottom: 10 }}>
+                    Estado actual: <strong>{r.deposito_estado}</strong>
+                    {r.deposito_estado === 'retenido' && r.deposito_retenido_monto && (
+                      <span> · retenido {moneda} {Number(r.deposito_retenido_monto).toFixed(2)} {r.deposito_retenido_motivo ? `— ${r.deposito_retenido_motivo}` : ''}</span>
+                    )}
+                  </div>
+                  {canEdit && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {r.deposito_estado === 'pendiente' && (
+                        <button onClick={() => actualizarEstadoDeposito(r, 'cobrado')} style={{ padding: '6px 12px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                          Marcar cobrado
+                        </button>
+                      )}
+                      {(r.deposito_estado === 'cobrado') && (
+                        <>
+                          <button onClick={() => actualizarEstadoDeposito(r, 'devuelto')} style={{ padding: '6px 12px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                            Devolver completo
+                          </button>
+                          <button onClick={() => retenerDeposito(r)} style={{ padding: '6px 12px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                            Retener por daños
+                          </button>
+                        </>
+                      )}
+                      {(r.deposito_estado === 'devuelto' || r.deposito_estado === 'retenido') && (
+                        <span style={{ fontSize: 12, color: '#64748b' }}>
+                          {r.deposito_estado === 'devuelto' && r.deposito_devuelto_at && `Devuelto el ${new Date(r.deposito_devuelto_at).toLocaleDateString('es')}`}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </section>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* ── RECORDATORIOS ── */}
       {vista === 'recordatorios' && (() => {
         const limite = new Date()
@@ -988,5 +1210,20 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
         )
       })()}
     </div>
+  )
+}
+
+function CheckoutForm({ onSave }: { onSave: (foto: string | null, obs: string) => void }) {
+  const [foto, setFoto] = useState<string | null>(null)
+  const [obs, setObs] = useState('')
+  return (
+    <>
+      <ImageUploader value={foto} onChange={setFoto} folder="amenidades-checkout" label="Foto de cierre (opcional)" />
+      <textarea value={obs} onChange={e => setObs(e.target.value)} placeholder="Observaciones del estado al salir (daños, basura, mobiliario, etc.)"
+        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13.5, background: '#f8fafc', marginTop: 8, minHeight: 60, resize: 'vertical' }} />
+      <button onClick={() => onSave(foto, obs)} style={{ marginTop: 10, padding: '8px 16px', background: '#0d9488', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+        Registrar check-out
+      </button>
+    </>
   )
 }

@@ -426,6 +426,7 @@ export interface Amenidad {
 
 export type EstadoReserva = 'confirmada' | 'cancelada' | 'pendiente'
 export type MetodoPagoTarifa = 'cargar_unidad' | 'pagar_momento'
+export type EstadoDepositoReserva = 'no_aplica' | 'pendiente' | 'cobrado' | 'devuelto' | 'retenido'
 
 export type MotivoBloqueoAmenidad = 'mantenimiento' | 'limpieza' | 'evento_privado' | 'reparacion' | 'otro'
 
@@ -465,6 +466,18 @@ export interface ReservaAmenidad {
   recordatorio_enviado: boolean
   recordatorio_enviado_at?: string | null
   no_show: boolean
+  checkin_at?: string | null
+  checkin_foto_url?: string | null
+  checkin_por?: string | null
+  checkout_at?: string | null
+  checkout_foto_url?: string | null
+  checkout_por?: string | null
+  observaciones_uso?: string | null
+  deposito_estado: EstadoDepositoReserva
+  deposito_devuelto_at?: string | null
+  deposito_retenido_monto?: number | null
+  deposito_retenido_motivo?: string | null
+  cuota_retencion_id?: string | null
   notas?: string | null
   created_by?: string | null
   created_at: string

@@ -115,6 +115,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
       metodo_pago_tarifa: metodoPago,
       tarifa_pagada: false,
       cuota_id: cuotaId,
+      deposito_estado: amenidadSel?.requiere_deposito ? 'pendiente' : 'no_aplica',
     })
     setSaving(false)
     if (error) {
