@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import type { Amenidad, ReservaAmenidad } from '../../../types'
+import type { Amenidad, ReservaAmenidad, MetodoPagoTarifa } from '../../../types'
 
 interface Props {
   amenidades: Amenidad[]
   reservas: ReservaAmenidad[]
   unidadId: string
+  proyectoId: string
   companyId: string
   moneda: string
   onRefresh: () => void
@@ -20,11 +21,11 @@ const ESTADO_RES: Record<EstadoReserva, { label: string; bg: string; color: stri
   cancelada:  { label: 'Cancelada',  bg: '#f8fafc', color: '#94a3b8' },
 }
 
-function blankForm() {
-  return { amenidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: 0, notas: '' }
+function blankForm(): { amenidad_id: string; fecha: string; hora_inicio: string; hora_fin: string; num_invitados: number; notas: string; metodo_pago_tarifa: MetodoPagoTarifa } {
+  return { amenidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: 0, notas: '', metodo_pago_tarifa: 'cargar_unidad' }
 }
 
-export function PortalReservasTab({ amenidades, reservas, unidadId, companyId, moneda, onRefresh }: Props) {
+export function PortalReservasTab({ amenidades, reservas, unidadId, proyectoId, companyId, moneda, onRefresh }: Props) {
   const [showForm, setShowForm]   = useState(false)
   const [saving, setSaving]       = useState(false)
   const [form, setForm]           = useState(blankForm())
@@ -48,24 +49,67 @@ export function PortalReservasTab({ amenidades, reservas, unidadId, companyId, m
       form.hora_inicio < r.hora_fin && form.hora_fin > r.hora_inicio
     )
     if (conflicto) { Swal.fire('Horario ocupado', 'Esa amenidad ya está reservada en ese horario. Elija otro.', 'warning'); return }
+
+    const aplicaTarifa = !!(amenidadSel?.requiere_tarifa && amenidadSel.tarifa_uso && amenidadSel.tarifa_uso > 0)
+    const montoTarifa = aplicaTarifa ? Number(amenidadSel!.tarifa_uso) : null
+    const metodoPago = aplicaTarifa ? form.metodo_pago_tarifa : null
+
     setSaving(true)
+    let cuotaId: string | null = null
+    if (aplicaTarifa && metodoPago === 'cargar_unidad') {
+      const periodo = form.fecha.slice(0, 7)
+      const { data: cuotaData, error: cuotaErr } = await supabase
+        .from('cuotas_condominio')
+        .insert({
+          company_id: companyId,
+          project_id: proyectoId,
+          unidad_id: unidadId,
+          concepto: 'amenidad',
+          monto: montoTarifa,
+          periodo,
+          fecha_vencimiento: form.fecha,
+          estado: 'pendiente',
+          notas: `Reserva ${amenidadSel!.nombre} ${form.fecha} ${form.hora_inicio}-${form.hora_fin}`,
+        })
+        .select('id')
+        .single()
+      if (cuotaErr) { setSaving(false); Swal.fire('Error', `No se pudo generar el cargo: ${cuotaErr.message}`, 'error'); return }
+      cuotaId = cuotaData?.id ?? null
+    }
+
     const { error } = await supabase.from('reservas_amenidades').insert({
       company_id: companyId, amenidad_id: form.amenidad_id,
       unidad_id: unidadId, fecha: form.fecha,
       hora_inicio: form.hora_inicio, hora_fin: form.hora_fin,
       num_invitados: form.num_invitados, notas: form.notas.trim() || null,
       estado: 'confirmada',
+      monto_tarifa: montoTarifa,
+      metodo_pago_tarifa: metodoPago,
+      tarifa_pagada: false,
+      cuota_id: cuotaId,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: '¡Reserva confirmada!', timer: 1800, showConfirmButton: false })
+    if (error) {
+      if (cuotaId) await supabase.from('cuotas_condominio').delete().eq('id', cuotaId)
+      Swal.fire('Error', error.message, 'error'); return
+    }
+    const titulo = aplicaTarifa
+      ? metodoPago === 'cargar_unidad'
+        ? `Reserva confirmada. Se cargó ${moneda} ${montoTarifa!.toFixed(2)} a tu cuenta.`
+        : `Reserva confirmada. Pagar ${moneda} ${montoTarifa!.toFixed(2)} en sitio.`
+      : '¡Reserva confirmada!'
+    Swal.fire({ icon: 'success', title: titulo, timer: 2400, showConfirmButton: false })
     setForm(blankForm()); setShowForm(false); onRefresh()
   }
 
   async function cancelarReserva(id: string) {
     const r = await Swal.fire({ title: '¿Cancelar reserva?', icon: 'question', showCancelButton: true, confirmButtonText: 'Sí, cancelar', cancelButtonText: 'No' })
     if (!r.isConfirmed) return
+    const reserva = reservas.find(x => x.id === id)
     await supabase.from('reservas_amenidades').update({ estado: 'cancelada' }).eq('id', id)
+    if (reserva?.cuota_id) {
+      await supabase.from('cuotas_condominio').delete().eq('id', reserva.cuota_id).eq('estado', 'pendiente')
+    }
     onRefresh()
   }
 
@@ -90,6 +134,7 @@ export function PortalReservasTab({ amenidades, reservas, unidadId, companyId, m
             {a.capacidad_max && <div style={{ fontSize: '12px', color: '#64748b' }}>Hasta {a.capacidad_max} personas</div>}
             {a.horario_inicio && a.horario_fin && <div style={{ fontSize: '12px', color: '#64748b' }}>{a.horario_inicio} – {a.horario_fin}</div>}
             {a.requiere_deposito && a.monto_deposito && <div style={{ fontSize: '12px', color: '#c2410c', marginTop: '3px' }}>Depósito: {moneda} {a.monto_deposito.toFixed(2)}</div>}
+            {a.requiere_tarifa && a.tarifa_uso != null && <div style={{ fontSize: '12px', color: '#1d4ed8', marginTop: '3px', fontWeight: 600 }}>Tarifa: {moneda} {Number(a.tarifa_uso).toFixed(2)}</div>}
           </div>
         ))}
         {amenidadesActivas.length === 0 && (
@@ -113,6 +158,26 @@ export function PortalReservasTab({ amenidades, reservas, unidadId, companyId, m
                 <p style={{ margin: '5px 0 0', fontSize: '12px', color: '#c2410c' }}>⚠ Esta amenidad requiere depósito de {moneda} {amenidadSel.monto_deposito.toFixed(2)}</p>
               )}
             </div>
+            {amenidadSel?.requiere_tarifa && amenidadSel.tarifa_uso != null && amenidadSel.tarifa_uso > 0 && (
+              <div style={{ gridColumn: '1 / -1', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 8 }}>
+                  🎟 Tarifa por uso: {moneda} {Number(amenidadSel.tarifa_uso).toFixed(2)}
+                </div>
+                <div style={{ fontSize: 12, color: '#475569', marginBottom: 8 }}>¿Cómo deseas pagar la tarifa?</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                    <input type="radio" name="metodo_pago" checked={form.metodo_pago_tarifa === 'cargar_unidad'}
+                      onChange={() => setForm(f => ({ ...f, metodo_pago_tarifa: 'cargar_unidad' }))} />
+                    <span><strong>Cargar a mi unidad</strong> — el monto aparecerá como cargo pendiente en mi cuenta.</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                    <input type="radio" name="metodo_pago" checked={form.metodo_pago_tarifa === 'pagar_momento'}
+                      onChange={() => setForm(f => ({ ...f, metodo_pago_tarifa: 'pagar_momento' }))} />
+                    <span><strong>Pagar al momento</strong> — pagaré directamente a la administración antes de usar la amenidad.</span>
+                  </label>
+                </div>
+              </div>
+            )}
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Fecha *</label>
               <input type="date" value={form.fecha} min={hoy} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
@@ -176,6 +241,13 @@ export function PortalReservasTab({ amenidades, reservas, unidadId, companyId, m
                     {new Date(r.fecha + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long' })} · {r.hora_inicio} – {r.hora_fin}
                     {r.num_invitados > 0 && ` · ${r.num_invitados} invitado${r.num_invitados > 1 ? 's' : ''}`}
                   </div>
+                  {r.monto_tarifa != null && r.monto_tarifa > 0 && (
+                    <div style={{ fontSize: 11.5, marginTop: 3, fontWeight: 600, color: r.metodo_pago_tarifa === 'cargar_unidad' ? '#1d4ed8' : (r.tarifa_pagada ? '#16a34a' : '#c2410c') }}>
+                      🎟 {moneda} {Number(r.monto_tarifa).toFixed(2)}
+                      {r.metodo_pago_tarifa === 'cargar_unidad' && ' · cargado a tu unidad'}
+                      {r.metodo_pago_tarifa === 'pagar_momento' && (r.tarifa_pagada ? ' · pagado' : ' · pagar en sitio')}
+                    </div>
+                  )}
                 </div>
                 <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ec.bg, color: ec.color, flexShrink: 0 }}>{ec.label}</span>
                 {vistaFutura && r.estado !== 'cancelada' && (

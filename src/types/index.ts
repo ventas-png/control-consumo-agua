@@ -354,7 +354,7 @@ export type AppSection =
 
 // ── Módulo Condominios ────────────────────────────────────────────────────────
 
-export type ConceptoCuota = 'mantenimiento' | 'extraordinaria' | 'CAM' | 'otro'
+export type ConceptoCuota = 'mantenimiento' | 'extraordinaria' | 'CAM' | 'amenidad' | 'otro'
 export type EstadoCuota = 'pendiente' | 'pagado' | 'moroso'
 
 export interface CuotaCondominio {
@@ -413,12 +413,15 @@ export interface Amenidad {
   horario_fin?: string | null      // 'HH:MM'
   requiere_deposito: boolean
   monto_deposito?: number | null
+  requiere_tarifa: boolean
+  tarifa_uso?: number | null
   activo: boolean
   foto_url?: string | null
   created_at: string
 }
 
 export type EstadoReserva = 'confirmada' | 'cancelada' | 'pendiente'
+export type MetodoPagoTarifa = 'cargar_unidad' | 'pagar_momento'
 
 export interface ReservaAmenidad {
   id: string
@@ -432,6 +435,10 @@ export interface ReservaAmenidad {
   num_invitados: number
   estado: EstadoReserva
   deposito_pagado: boolean
+  monto_tarifa?: number | null
+  metodo_pago_tarifa?: MetodoPagoTarifa | null
+  tarifa_pagada: boolean
+  cuota_id?: string | null
   notas?: string | null
   created_by?: string | null
   created_at: string

@@ -152,6 +152,7 @@ export function PortalResidenteTab({
                 amenidades={amenidades}
                 reservas={reservas}
                 unidadId={selectedUnidadId}
+                proyectoId={proyectoId}
                 companyId={companyId}
                 moneda={moneda}
                 onRefresh={onRefresh}
