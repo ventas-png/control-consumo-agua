@@ -130,6 +130,44 @@ function pillStyle(bg: string, border: string, color: string): React.CSSProperti
   }
 }
 
+const CHIP_STYLES: Record<string, { bg: string; border: string; color: string }> = {
+  confirmada:        { bg: '#dcfce7', border: '#86efac', color: '#15803d' },
+  pendiente:         { bg: '#fef3c7', border: '#fcd34d', color: '#92400e' },
+  cancelada:         { bg: '#f1f5f9', border: '#cbd5e1', color: '#475569' },
+  no_show:           { bg: '#fee2e2', border: '#fca5a5', color: '#b91c1c' },
+  pagado:            { bg: '#dcfce7', border: '#86efac', color: '#15803d' },
+  cobro_pendiente:   { bg: '#fed7aa', border: '#fb923c', color: '#9a3412' },
+}
+
+function chipStyle(estado: string): React.CSSProperties {
+  const c = CHIP_STYLES[estado] ?? CHIP_STYLES.cancelada
+  return {
+    padding: '3px 10px',
+    borderRadius: 999,
+    border: `1px solid ${c.border}`,
+    background: c.bg,
+    color: c.color,
+    fontSize: 11,
+    fontWeight: 800,
+    letterSpacing: '0.01em',
+    whiteSpace: 'nowrap',
+  }
+}
+
+function btnAction(bg: string, border: string, color: string): React.CSSProperties {
+  return {
+    padding: '6px 12px',
+    background: bg,
+    color,
+    border: `1px solid ${border}`,
+    borderRadius: 8,
+    cursor: 'pointer',
+    fontSize: 12,
+    fontWeight: 700,
+    transition: 'transform 0.12s ease, filter 0.12s ease',
+  }
+}
+
 const btnHero: React.CSSProperties = {
   padding: '10px 18px',
   background: 'rgba(255,255,255,0.18)',
@@ -988,62 +1026,55 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               {reservas.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(r => {
                 const tieneTarifa = r.monto_tarifa != null && r.monto_tarifa > 0
                 const pendientePago = tieneTarifa && r.metodo_pago_tarifa === 'pagar_momento' && !r.tarifa_pagada && r.estado !== 'cancelada'
+                const accent = r.estado === 'confirmada' ? '#16a34a' : r.estado === 'pendiente' ? '#f59e0b' : '#94a3b8'
                 return (
-                <div key={r.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                <div key={r.id}
+                  style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: '14px 18px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease, border-color 0.15s ease' }}
+                  onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 18px -8px rgba(15,23,42,0.18)'; e.currentTarget.style.borderColor = '#cbd5e1' }}
+                  onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#e2e8f0' }}>
+                  {/* barra acento lateral */}
+                  <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: accent }} />
                   <div style={{ flex: 1, minWidth: 220 }}>
-                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{r.amenidad_nombre}</div>
-                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                      {r.unidad_nombre} · {r.fecha} · {r.hora_inicio}–{r.hora_fin}
-                      {r.num_invitados > 0 && ` · ${r.num_invitados} invitados`}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <div style={{ fontWeight: 800, fontSize: 14.5, color: '#0f172a' }}>{r.amenidad_nombre}</div>
+                      <span style={chipStyle(r.estado)}>{r.estado === 'confirmada' ? '✓ Confirmada' : r.estado === 'pendiente' ? '⏳ Pendiente' : '✗ Cancelada'}</span>
+                      {r.no_show && <span style={chipStyle('no_show')}>👻 No show</span>}
+                      {tieneTarifa && (
+                        <span style={chipStyle(pendientePago ? 'cobro_pendiente' : 'pagado')}>
+                          🎟 {moneda} {Number(r.monto_tarifa).toFixed(2)}
+                          {r.metodo_pago_tarifa === 'cargar_unidad' ? ' · unidad' : (r.tarifa_pagada ? ' · pagado' : ' · pendiente')}
+                        </span>
+                      )}
                     </div>
-                    {tieneTarifa && (
-                      <div style={{ fontSize: 11.5, marginTop: 4, color: pendientePago ? '#c2410c' : '#16a34a', fontWeight: 600 }}>
-                        🎟 {moneda} {Number(r.monto_tarifa).toFixed(2)}
-                        {r.metodo_pago_tarifa === 'cargar_unidad' && ' · cargado a unidad'}
-                        {r.metodo_pago_tarifa === 'pagar_momento' && (r.tarifa_pagada ? ' · pagado en sitio' : ' · por cobrar en sitio')}
-                      </div>
-                    )}
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                      🏠 {r.unidad_nombre} · 📅 {r.fecha} · ⏰ {r.hora_inicio}–{r.hora_fin}
+                      {r.num_invitados > 0 && ` · 👥 ${r.num_invitados} invitados`}
+                    </div>
                     {r.rechazada_motivo && (
-                      <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 3, fontStyle: 'italic' }}>Rechazada: {r.rechazada_motivo}</div>
+                      <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 4, fontStyle: 'italic', background: '#fef2f2', padding: '4px 8px', borderRadius: 6, display: 'inline-block' }}>↩ {r.rechazada_motivo}</div>
                     )}
                   </div>
-                  <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ESTADO_COLORS[r.estado]?.bg || '#f1f5f9', color: ESTADO_COLORS[r.estado]?.color || '#374151' }}>
-                    {r.estado}
-                  </span>
-                  {r.no_show && (
-                    <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: '#fef2f2', color: '#b91c1c' }}>
-                      No show
-                    </span>
-                  )}
                   {r.estado === 'pendiente' && canEdit && (
                     <>
-                      <button onClick={() => aprobarReserva(r)} style={{ padding: '5px 12px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
-                        ✓ Aprobar
-                      </button>
-                      <button onClick={() => rechazarReserva(r)} style={{ padding: '5px 12px', background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
-                        ✗ Rechazar
-                      </button>
+                      <button onClick={() => aprobarReserva(r)} style={btnAction('#dcfce7', '#bbf7d0', '#15803d')}>✓ Aprobar</button>
+                      <button onClick={() => rechazarReserva(r)} style={btnAction('#fee2e2', '#fecaca', '#b91c1c')}>✗ Rechazar</button>
                     </>
                   )}
                   {pendientePago && canEdit && (
-                    <button onClick={() => marcarTarifaPagada(r)} style={{ padding: '5px 12px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                      Marcar pagado
-                    </button>
+                    <button onClick={() => marcarTarifaPagada(r)} style={btnAction('#f0fdf4', '#bbf7d0', '#16a34a')}>Marcar pagado</button>
                   )}
                   {r.fecha < hoy && r.estado === 'confirmada' && canEdit && (
-                    <button onClick={() => marcarNoShow(r)} style={{ padding: '5px 12px', background: r.no_show ? '#f1f5f9' : '#fff7ed', color: r.no_show ? '#64748b' : '#c2410c', border: `1px solid ${r.no_show ? '#cbd5e1' : '#fed7aa'}`, borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                    <button onClick={() => marcarNoShow(r)} style={btnAction(r.no_show ? '#f1f5f9' : '#fff7ed', r.no_show ? '#cbd5e1' : '#fed7aa', r.no_show ? '#64748b' : '#c2410c')}>
                       {r.no_show ? '↶ Quitar no-show' : 'No show'}
                     </button>
                   )}
                   {canEdit && (
-                    <button onClick={() => setReservaDetalle(reservaDetalle?.id === r.id ? null : r)} style={{ padding: '5px 12px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                      {reservaDetalle?.id === r.id ? 'Cerrar' : 'Detalle'}
+                    <button onClick={() => setReservaDetalle(reservaDetalle?.id === r.id ? null : r)} style={btnAction('#eff6ff', '#bfdbfe', '#2563eb')}>
+                      {reservaDetalle?.id === r.id ? 'Cerrar' : '⋯ Detalle'}
                     </button>
                   )}
                   {r.estado !== 'cancelada' && canEdit && (
-                    <button onClick={() => cancelarReserva(r.id)} style={{ padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                      Cancelar
-                    </button>
+                    <button onClick={() => cancelarReserva(r.id)} style={btnAction('#fef2f2', '#fecaca', '#dc2626')}>Cancelar</button>
                   )}
                 </div>
               )})}
