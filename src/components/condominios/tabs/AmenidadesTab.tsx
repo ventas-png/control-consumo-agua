@@ -1101,73 +1101,142 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
 
           {amenidadesActivas.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 48, color: '#94a3b8', fontSize: 13 }}>No hay amenidades activas para mostrar en el calendario.</div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
-                <thead>
-                  <tr>
-                    <th style={{ width: 110, padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'left', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px 0 0 0' }}>Amenidad</th>
-                    {dias.map((d, i) => {
-                      const fechaStr = d.toISOString().slice(0, 10)
-                      const esHoy = fechaStr === hoy
-                      return (
-                        <th key={i} style={{ padding: '8px 6px', fontSize: 11, fontWeight: 700, textAlign: 'center', border: '1px solid #e2e8f0', background: esHoy ? '#eff6ff' : '#f8fafc', color: esHoy ? '#2563eb' : '#64748b', minWidth: 100 }}>
-                          <div style={{ fontWeight: 800 }}>{DIAS_ES[i]}</div>
-                          <div style={{ fontSize: 14, color: esHoy ? '#1d4ed8' : '#374151', fontWeight: esHoy ? 800 : 600 }}>{d.getDate()}</div>
-                        </th>
-                      )
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {amenidadesActivas.map((a, ai) => (
-                    <tr key={a.id}>
-                      <td style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#374151', border: '1px solid #e2e8f0', background: '#fafafa', verticalAlign: 'middle' }}>
-                        {a.nombre}
-                        {a.horario_inicio && <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 400 }}>{a.horario_inicio}–{a.horario_fin}</div>}
-                      </td>
+          ) : (() => {
+            // Rango horario global
+            const minH = Math.min(...amenidadesActivas.map(a => a.horario_inicio ? parseInt(a.horario_inicio.slice(0, 2)) : 8), 8)
+            const maxH = Math.max(...amenidadesActivas.map(a => a.horario_fin ? parseInt(a.horario_fin.slice(0, 2)) + (parseInt(a.horario_fin.slice(3, 5)) > 0 ? 1 : 0) : 22), 22)
+            const horas = Array.from({ length: maxH - minH + 1 }, (_, i) => minH + i)
+            const ROW_H = 220                      // alto de cada fila amenidad
+            const minutosTotal = (maxH - minH) * 60
+            const toPct = (hhmm: string) => {
+              const [h, m] = hhmm.split(':').map(Number)
+              return Math.max(0, Math.min(100, ((h - minH) * 60 + m) / minutosTotal * 100))
+            }
+            return (
+              <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: 16, overflowX: 'auto' }}>
+                {/* Header de días */}
+                <div style={{ display: 'grid', gridTemplateColumns: `140px repeat(7, minmax(120px,1fr))`, gap: 4, marginBottom: 8, minWidth: 980 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', alignSelf: 'end', paddingBottom: 6 }}>Amenidad / Día</div>
+                  {dias.map((d, i) => {
+                    const fechaStr = d.toISOString().slice(0, 10)
+                    const esHoy = fechaStr === hoy
+                    return (
+                      <div key={i} style={{ textAlign: 'center', padding: '8px 4px', borderRadius: 10, background: esHoy ? 'linear-gradient(135deg,#0ea5e9,#0d9488)' : '#f8fafc', color: esHoy ? 'white' : '#475569' }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, opacity: esHoy ? 0.9 : 1 }}>{DIAS_ES[i]}</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em' }}>{d.getDate()}</div>
+                        <div style={{ fontSize: 9.5, opacity: 0.8, textTransform: 'capitalize' }}>{d.toLocaleDateString('es', { month: 'short' })}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Filas amenidad */}
+                {amenidadesActivas.map((a, ai) => {
+                  const paleta = RESERVA_CAL_COLORS[ai % RESERVA_CAL_COLORS.length]
+                  return (
+                    <div key={a.id} style={{ display: 'grid', gridTemplateColumns: `140px repeat(7, minmax(120px,1fr))`, gap: 4, marginBottom: 6, minWidth: 980 }}>
+                      {/* Etiqueta de amenidad */}
+                      <div style={{ background: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderLeft: `4px solid ${paleta.color}` }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{a.nombre}</div>
+                        {a.horario_inicio && <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>⏰ {a.horario_inicio}–{a.horario_fin}</div>}
+                      </div>
                       {dias.map((d, di) => {
                         const fechaStr = d.toISOString().slice(0, 10)
                         const esHoy = fechaStr === hoy
                         const resDia = reservas.filter(r => r.amenidad_id === a.id && r.fecha === fechaStr && r.estado !== 'cancelada')
                         const bloqDia = bloqueos.filter(b => b.amenidad_id === a.id && fechaStr >= b.fecha_inicio && fechaStr <= b.fecha_fin)
                         const bloqDiaCompleto = bloqDia.some(b => !b.hora_inicio || !b.hora_fin)
-                        const paleta = RESERVA_CAL_COLORS[ai % RESERVA_CAL_COLORS.length]
                         return (
-                          <td key={di} style={{ padding: '6px', border: '1px solid #e2e8f0', background: bloqDiaCompleto ? '#fef3c7' : (esHoy ? '#f0f9ff' : 'white'), verticalAlign: 'top', minHeight: 60 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minHeight: 48 }}>
-                              {bloqDia.map(b => (
+                          <div key={di} style={{
+                            position: 'relative',
+                            height: ROW_H,
+                            background: bloqDiaCompleto
+                              ? 'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 6px,#fde68a 6px,#fde68a 12px)'
+                              : esHoy ? '#f0f9ff' : '#fcfcfd',
+                            border: `1px solid ${esHoy ? '#bae6fd' : '#e2e8f0'}`,
+                            borderRadius: 10,
+                            overflow: 'hidden',
+                            cursor: canCreate && !bloqDiaCompleto ? 'pointer' : 'default',
+                          }}
+                          onClick={(e) => {
+                            // sólo si no es click en una reserva
+                            if (canCreate && !bloqDiaCompleto && (e.target as HTMLElement).dataset.role !== 'reserva') {
+                              abrirReservaDesdeCalendario(a.id, fechaStr)
+                            }
+                          }}>
+                            {/* Líneas de hora horizontales */}
+                            {horas.slice(1).map((h, hi) => (
+                              <div key={h} style={{ position: 'absolute', left: 0, right: 0, top: `${((h - minH) / (maxH - minH)) * 100}%`, height: 1, background: hi % 2 === 0 ? '#e2e8f0' : '#f1f5f9' }} />
+                            ))}
+                            {/* Etiquetas de hora a la izquierda (solo en primera celda de día) */}
+                            {di === 0 && horas.map((h, hi) => (
+                              <div key={h} style={{ position: 'absolute', left: 2, top: `${(hi / (maxH - minH)) * 100}%`, fontSize: 8.5, color: '#cbd5e1', fontWeight: 600, transform: 'translateY(-3px)', pointerEvents: 'none' }}>
+                                {String(h).padStart(2, '0')}
+                              </div>
+                            ))}
+                            {/* Bloqueos por horario */}
+                            {bloqDia.filter(b => b.hora_inicio && b.hora_fin).map(b => {
+                              const top = toPct(b.hora_inicio!)
+                              const bottom = toPct(b.hora_fin!)
+                              return (
                                 <div key={b.id} title={b.notas || MOTIVO_LABEL[b.motivo]}
-                                  style={{ padding: '4px 7px', borderRadius: 6, border: '1px solid #fcd34d', background: 'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 4px,#fde68a 4px,#fde68a 8px)' }}>
-                                  <div style={{ fontSize: 10.5, fontWeight: 700, color: '#92400e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🚫 {MOTIVO_LABEL[b.motivo]}</div>
-                                  <div style={{ fontSize: 9.5, color: '#92400e', opacity: 0.85 }}>{b.hora_inicio && b.hora_fin ? `${b.hora_inicio}–${b.hora_fin}` : 'día completo'}</div>
+                                  style={{ position: 'absolute', left: 4, right: 4, top: `${top}%`, height: `${bottom - top}%`, borderRadius: 6, background: 'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 4px,#fde68a 4px,#fde68a 8px)', border: '1px solid #fcd34d', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#92400e' }}>
+                                  🚫 {MOTIVO_LABEL[b.motivo]}
                                 </div>
-                              ))}
-                              {resDia.map(r => {
-                                const pend = r.estado === 'pendiente'
-                                return (
-                                <div key={r.id}
-                                  onClick={() => setSelectedReserva(selectedReserva?.id === r.id ? null : r)}
-                                  style={{ padding: '4px 7px', borderRadius: 6, border: `1px ${pend ? 'dashed' : 'solid'} ${paleta.border}`, background: pend ? 'white' : paleta.bg, cursor: 'pointer', opacity: pend ? 0.85 : 1 }}>
-                                  <div style={{ fontSize: 11, fontWeight: 700, color: paleta.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pend && '⏳ '}{r.unidad_nombre}</div>
-                                  <div style={{ fontSize: 10, color: paleta.color, opacity: 0.8 }}>{r.hora_inicio}–{r.hora_fin}</div>
+                              )
+                            })}
+                            {/* Reservas */}
+                            {resDia.map(r => {
+                              const pend = r.estado === 'pendiente'
+                              const top = toPct(r.hora_inicio)
+                              const bottom = toPct(r.hora_fin)
+                              return (
+                                <div key={r.id} data-role="reserva"
+                                  onClick={(e) => { e.stopPropagation(); setSelectedReserva(selectedReserva?.id === r.id ? null : r) }}
+                                  title={`${r.unidad_nombre} · ${r.hora_inicio}–${r.hora_fin}${pend ? ' (pendiente)' : ''}`}
+                                  style={{
+                                    position: 'absolute', left: 6, right: 6,
+                                    top: `${top}%`, height: `${Math.max(bottom - top, 4)}%`,
+                                    borderRadius: 8, padding: '4px 8px',
+                                    background: pend ? 'white' : `linear-gradient(135deg, ${paleta.bg}, ${paleta.border})`,
+                                    border: `${pend ? '1.5px dashed' : '1px solid'} ${paleta.border}`,
+                                    color: paleta.color, cursor: 'pointer',
+                                    boxShadow: pend ? 'none' : '0 2px 6px -2px rgba(0,0,0,0.15)',
+                                    overflow: 'hidden', transition: 'transform 0.12s ease',
+                                  }}
+                                  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.03)' }}
+                                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}>
+                                  <div style={{ fontSize: 10.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pend && '⏳ '}{r.unidad_nombre}</div>
+                                  <div style={{ fontSize: 9.5, opacity: 0.85, fontWeight: 600 }}>{r.hora_inicio}–{r.hora_fin}</div>
                                 </div>
-                              )})}
-                              {canCreate && !bloqDiaCompleto && (
-                                <button onClick={() => abrirReservaDesdeCalendario(a.id, fechaStr)}
-                                  style={{ marginTop: (resDia.length + bloqDia.length) > 0 ? 2 : 'auto', padding: '2px 6px', border: '1px dashed #cbd5e1', borderRadius: 5, background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#94a3b8', lineHeight: 1, display: 'block', width: '100%', textAlign: 'center' }}
-                                  title={`Reservar ${a.nombre} el ${fechaStr}`}>+</button>
-                              )}
-                            </div>
-                          </td>
+                              )
+                            })}
+                            {/* Hover para crear */}
+                            {canCreate && !bloqDiaCompleto && resDia.length === 0 && bloqDia.length === 0 && (
+                              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', fontSize: 22, pointerEvents: 'none' }}>+</div>
+                            )}
+                          </div>
                         )
                       })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    </div>
+                  )
+                })}
+
+                {/* Leyenda */}
+                <div style={{ display: 'flex', gap: 14, marginTop: 14, flexWrap: 'wrap', fontSize: 11, color: '#64748b' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 14, height: 10, borderRadius: 4, background: '#dbeafe', border: '1px solid #93c5fd' }} /> Confirmada
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 14, height: 10, borderRadius: 4, background: 'white', border: '1.5px dashed #93c5fd' }} /> Pendiente
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 14, height: 10, borderRadius: 4, background: 'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 3px,#fde68a 3px,#fde68a 6px)', border: '1px solid #fcd34d' }} /> Bloqueado
+                  </span>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Detalle de reserva seleccionada */}
           {selectedReserva && (
