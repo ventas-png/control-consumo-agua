@@ -415,6 +415,7 @@ export interface Amenidad {
   monto_deposito?: number | null
   requiere_tarifa: boolean
   tarifa_uso?: number | null
+  tarifa_uso_finde?: number | null
   max_reservas_mes_unidad?: number | null
   horas_minimas_antelacion?: number | null
   duracion_max_horas?: number | null

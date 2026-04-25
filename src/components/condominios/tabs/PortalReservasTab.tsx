@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
-import { bloqueoSolapaReserva, validarReglasAmenidad } from './AmenidadesTab'
+import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSemana } from './AmenidadesTab'
 
 interface Props {
   amenidades: Amenidad[]
@@ -77,8 +77,9 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
       if (errReglas) { Swal.fire('No permitido', errReglas, 'warning'); return }
     }
 
-    const aplicaTarifa = !!(amenidadSel?.requiere_tarifa && amenidadSel.tarifa_uso && amenidadSel.tarifa_uso > 0)
-    const montoTarifa = aplicaTarifa ? Number(amenidadSel!.tarifa_uso) : null
+    const tarifaCalc = amenidadSel ? tarifaAplicable(amenidadSel, form.fecha) : 0
+    const aplicaTarifa = !!(amenidadSel?.requiere_tarifa && tarifaCalc > 0)
+    const montoTarifa = aplicaTarifa ? tarifaCalc : null
     const metodoPago = aplicaTarifa ? form.metodo_pago_tarifa : null
 
     setSaving(true)
@@ -161,7 +162,11 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
             {a.capacidad_max && <div style={{ fontSize: '12px', color: '#64748b' }}>Hasta {a.capacidad_max} personas</div>}
             {a.horario_inicio && a.horario_fin && <div style={{ fontSize: '12px', color: '#64748b' }}>{a.horario_inicio} – {a.horario_fin}</div>}
             {a.requiere_deposito && a.monto_deposito && <div style={{ fontSize: '12px', color: '#c2410c', marginTop: '3px' }}>Depósito: {moneda} {a.monto_deposito.toFixed(2)}</div>}
-            {a.requiere_tarifa && a.tarifa_uso != null && <div style={{ fontSize: '12px', color: '#1d4ed8', marginTop: '3px', fontWeight: 600 }}>Tarifa: {moneda} {Number(a.tarifa_uso).toFixed(2)}</div>}
+            {a.requiere_tarifa && a.tarifa_uso != null && (
+              a.tarifa_uso_finde != null
+                ? <div style={{ fontSize: '12px', color: '#1d4ed8', marginTop: '3px', fontWeight: 600 }}>Tarifa: L–V {moneda} {Number(a.tarifa_uso).toFixed(2)} · S–D {moneda} {Number(a.tarifa_uso_finde).toFixed(2)}</div>
+                : <div style={{ fontSize: '12px', color: '#1d4ed8', marginTop: '3px', fontWeight: 600 }}>Tarifa: {moneda} {Number(a.tarifa_uso).toFixed(2)}</div>
+            )}
             {(a.max_reservas_mes_unidad != null || (a.horas_minimas_antelacion ?? 0) > 0 || a.duracion_max_horas != null) && (
               <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, lineHeight: 1.3 }}>
                 {a.max_reservas_mes_unidad != null && <div>Máx {a.max_reservas_mes_unidad}/mes</div>}
@@ -206,10 +211,14 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
                 )
               })()}
             </div>
-            {amenidadSel?.requiere_tarifa && amenidadSel.tarifa_uso != null && amenidadSel.tarifa_uso > 0 && (
+            {amenidadSel?.requiere_tarifa && (() => {
+              const tarifa = tarifaAplicable(amenidadSel, form.fecha)
+              if (tarifa <= 0) return null
+              const finde = form.fecha && esFinDeSemana(form.fecha) && amenidadSel.tarifa_uso_finde != null
+              return (
               <div style={{ gridColumn: '1 / -1', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 10, padding: '12px 14px' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 8 }}>
-                  🎟 Tarifa por uso: {moneda} {Number(amenidadSel.tarifa_uso).toFixed(2)}
+                  🎟 Tarifa por uso: {moneda} {tarifa.toFixed(2)} {finde && <span style={{ fontSize: 11, fontWeight: 600 }}>(fin de semana)</span>}
                 </div>
                 <div style={{ fontSize: 12, color: '#475569', marginBottom: 8 }}>¿Cómo deseas pagar la tarifa?</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -225,7 +234,8 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
                   </label>
                 </div>
               </div>
-            )}
+              )
+            })()}
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Fecha *</label>
               <input type="date" value={form.fecha} min={hoy} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}

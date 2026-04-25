@@ -35,6 +35,21 @@ export function bloqueoSolapaReserva(b: BloqueoAmenidad, fecha: string, hi: stri
   return hi < b.hora_fin && hf > b.hora_inicio
 }
 
+export function esFinDeSemana(fecha: string): boolean {
+  if (!fecha) return false
+  const dow = new Date(fecha + 'T12:00:00').getDay()
+  return dow === 0 || dow === 6
+}
+
+export function tarifaAplicable(amen: Amenidad, fecha: string): number {
+  if (!amen.requiere_tarifa) return 0
+  const base = Number(amen.tarifa_uso ?? 0)
+  if (esFinDeSemana(fecha) && amen.tarifa_uso_finde != null) {
+    return Number(amen.tarifa_uso_finde)
+  }
+  return base
+}
+
 function diferenciaHoras(hi: string, hf: string): number {
   const [h1, m1] = hi.split(':').map(Number)
   const [h2, m2] = hf.split(':').map(Number)
@@ -117,7 +132,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   const [showBloqueoForm, setShowBloqueoForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [amenidadFotoUrl, setAmenidadFotoUrl] = useState<string | null>(null)
-  const [amenidadForm, setAmenidadForm] = useState({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '' })
+  const [amenidadForm, setAmenidadForm] = useState({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '' })
   const [reservaForm, setReservaForm] = useState({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad' as 'cargar_unidad' | 'pagar_momento', tarifa_pagada: false })
   const [bloqueoForm, setBloqueoForm] = useState({ amenidad_id: '', fecha_inicio: '', fecha_fin: '', dia_completo: true, hora_inicio: '', hora_fin: '', motivo: 'mantenimiento' as MotivoBloqueoAmenidad, notas: '' })
   const [semana, setSemana] = useState<Date>(() => lunesDeSemana(new Date()))
@@ -148,6 +163,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       monto_deposito: amenidadForm.monto_deposito ? Number(amenidadForm.monto_deposito) : null,
       requiere_tarifa: amenidadForm.requiere_tarifa,
       tarifa_uso: amenidadForm.requiere_tarifa && amenidadForm.tarifa_uso ? Number(amenidadForm.tarifa_uso) : null,
+      tarifa_uso_finde: amenidadForm.requiere_tarifa && amenidadForm.tarifa_uso_finde ? Number(amenidadForm.tarifa_uso_finde) : null,
       max_reservas_mes_unidad: amenidadForm.max_reservas_mes_unidad ? Number(amenidadForm.max_reservas_mes_unidad) : null,
       horas_minimas_antelacion: amenidadForm.horas_minimas_antelacion ? Number(amenidadForm.horas_minimas_antelacion) : null,
       duracion_max_horas: amenidadForm.duracion_max_horas ? Number(amenidadForm.duracion_max_horas) : null,
@@ -155,7 +171,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    setAmenidadForm({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '' })
+    setAmenidadForm({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '' })
     setAmenidadFotoUrl(null)
     setShowAmenidadForm(false)
     onRefresh()
@@ -167,21 +183,37 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   async function actualizarTarifa(a: Amenidad) {
-    const { value } = await Swal.fire({
+    const result = await Swal.fire({
       title: `Tarifa por uso de ${a.nombre}`,
-      html: `<p style="font-size:13px;color:#64748b;margin:0 0 8px">Monto en ${moneda} cobrado por cada reserva. Deja vacío para desactivar.</p>`,
-      input: 'number',
-      inputValue: a.tarifa_uso ? String(a.tarifa_uso) : '',
-      inputAttributes: { min: '0', step: '0.01' },
+      html:
+        `<p style="font-size:13px;color:#64748b;margin:0 0 12px">Monto en ${moneda}. Deja vacío para desactivar.</p>` +
+        `<label style="display:block;text-align:left;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">Entre semana (L–V)</label>` +
+        `<input id="swal-tarifa" type="number" min="0" step="0.01" class="swal2-input" style="margin:0 0 10px" value="${a.tarifa_uso ?? ''}">` +
+        `<label style="display:block;text-align:left;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">Fin de semana (S–D, opcional)</label>` +
+        `<input id="swal-tarifa-finde" type="number" min="0" step="0.01" class="swal2-input" style="margin:0" placeholder="Igual que entre semana" value="${a.tarifa_uso_finde ?? ''}">`,
+      focusConfirm: false,
       showCancelButton: true,
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
+      preConfirm: () => {
+        const base = (document.getElementById('swal-tarifa') as HTMLInputElement | null)?.value ?? ''
+        const finde = (document.getElementById('swal-tarifa-finde') as HTMLInputElement | null)?.value ?? ''
+        return { base, finde }
+      },
     })
-    if (value === undefined) return
-    const monto = value === '' ? null : Number(value)
-    if (monto !== null && (Number.isNaN(monto) || monto < 0)) { Swal.fire('Error', 'Monto inválido.', 'error'); return }
+    if (!result.isConfirmed || !result.value) return
+    const baseStr = result.value.base as string
+    const findeStr = result.value.finde as string
+    const monto = baseStr === '' ? null : Number(baseStr)
+    const montoFinde = findeStr === '' ? null : Number(findeStr)
+    if (monto !== null && (Number.isNaN(monto) || monto < 0)) { Swal.fire('Error', 'Monto entre semana inválido.', 'error'); return }
+    if (montoFinde !== null && (Number.isNaN(montoFinde) || montoFinde < 0)) { Swal.fire('Error', 'Monto fin de semana inválido.', 'error'); return }
     const { error } = await supabase.from('amenidades')
-      .update({ tarifa_uso: monto, requiere_tarifa: monto !== null && monto > 0 })
+      .update({
+        tarifa_uso: monto,
+        tarifa_uso_finde: montoFinde,
+        requiere_tarifa: monto !== null && monto > 0,
+      })
       .eq('id', a.id)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
     onRefresh()
@@ -217,8 +249,9 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       const errReglas = validarReglasAmenidad(amen, reservaForm.fecha, reservaForm.hora_inicio, reservaForm.hora_fin, reservaForm.unidad_id, reservas)
       if (errReglas) { Swal.fire('No permitido', errReglas, 'warning'); return }
     }
-    const aplicaTarifa = !!(amen?.requiere_tarifa && amen.tarifa_uso && amen.tarifa_uso > 0)
-    const montoTarifa = aplicaTarifa ? Number(amen!.tarifa_uso) : null
+    const tarifaCalc = amen ? tarifaAplicable(amen, reservaForm.fecha) : 0
+    const aplicaTarifa = !!(amen?.requiere_tarifa && tarifaCalc > 0)
+    const montoTarifa = aplicaTarifa ? tarifaCalc : null
     const metodoPago = aplicaTarifa ? reservaForm.metodo_pago_tarifa : null
 
     setSaving(true)
@@ -440,11 +473,18 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                   <label htmlFor="tarifa" style={{ fontSize: '13.5px', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>Tarifa por uso</label>
                 </div>
                 {amenidadForm.requiere_tarifa && (
-                  <div>
-                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Tarifa por reserva ({moneda})</label>
-                    <input type="number" value={amenidadForm.tarifa_uso} onChange={e => setAmenidadForm(f => ({ ...f, tarifa_uso: e.target.value }))} min="0" step="0.01"
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-                  </div>
+                  <>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Tarifa entre semana ({moneda})</label>
+                      <input type="number" value={amenidadForm.tarifa_uso} onChange={e => setAmenidadForm(f => ({ ...f, tarifa_uso: e.target.value }))} min="0" step="0.01"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Tarifa fin de semana ({moneda})</label>
+                      <input type="number" value={amenidadForm.tarifa_uso_finde} onChange={e => setAmenidadForm(f => ({ ...f, tarifa_uso_finde: e.target.value }))} min="0" step="0.01" placeholder="Igual que entre semana"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                  </>
                 )}
                 <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #e2e8f0', paddingTop: 12, marginTop: 4 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 8 }}>Reglas de reserva (opcional)</div>
@@ -502,7 +542,11 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                       {a.capacidad_max && <span>👥 Máx {a.capacidad_max}</span>}
                       {a.horario_inicio && <span>⏰ {a.horario_inicio}–{a.horario_fin}</span>}
                       {a.requiere_deposito && <span>💰 Depósito {moneda} {a.monto_deposito}</span>}
-                      {a.requiere_tarifa && a.tarifa_uso != null && <span>🎟 Tarifa {moneda} {Number(a.tarifa_uso).toFixed(2)}</span>}
+                      {a.requiere_tarifa && a.tarifa_uso != null && (
+                        a.tarifa_uso_finde != null
+                          ? <span>🎟 Tarifa L–V {moneda} {Number(a.tarifa_uso).toFixed(2)} · S–D {moneda} {Number(a.tarifa_uso_finde).toFixed(2)}</span>
+                          : <span>🎟 Tarifa {moneda} {Number(a.tarifa_uso).toFixed(2)}</span>
+                      )}
                       {a.max_reservas_mes_unidad != null && <span>📅 Máx {a.max_reservas_mes_unidad}/mes</span>}
                       {a.horas_minimas_antelacion != null && a.horas_minimas_antelacion > 0 && <span>⏱ {a.horas_minimas_antelacion}h antelación</span>}
                       {a.duracion_max_horas != null && <span>⌛ Máx {a.duracion_max_horas}h</span>}
@@ -571,11 +615,14 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 </div>
                 {(() => {
                   const am = amenidades.find(a => a.id === reservaForm.amenidad_id)
-                  if (!am?.requiere_tarifa || !am.tarifa_uso) return null
+                  if (!am?.requiere_tarifa) return null
+                  const tarifa = tarifaAplicable(am, reservaForm.fecha)
+                  if (tarifa <= 0) return null
+                  const finde = esFinDeSemana(reservaForm.fecha) && am.tarifa_uso_finde != null
                   return (
                     <div style={{ gridColumn: '1 / -1', background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: 10, padding: '12px 14px' }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 8 }}>
-                        🎟 Tarifa por uso: {moneda} {Number(am.tarifa_uso).toFixed(2)}
+                        🎟 Tarifa por uso: {moneda} {tarifa.toFixed(2)} {finde && <span style={{ fontSize: 11, fontWeight: 600 }}>(fin de semana)</span>}
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
