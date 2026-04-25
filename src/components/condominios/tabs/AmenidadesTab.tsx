@@ -1375,110 +1375,186 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
         </>
       )}
 
-      {/* ── PANEL DETALLE / CHECK-IN-OUT ── */}
+      {/* ── PANEL DETALLE / CHECK-IN-OUT (stepper) ── */}
       {reservaDetalle && (() => {
         const r = reservaDetalle
         const amen = amenidades.find(a => a.id === r.amenidad_id)
-        return (
-          <div onClick={() => setReservaDetalle(null)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <div onClick={e => e.stopPropagation()}
-              style={{ background: 'white', borderRadius: 16, maxWidth: 640, width: '100%', maxHeight: '90vh', overflow: 'auto', padding: 22 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: '#0f172a' }}>{r.amenidad_nombre}</div>
-                  <div style={{ fontSize: 13, color: '#64748b' }}>{r.unidad_nombre} · {r.fecha} · {r.hora_inicio}–{r.hora_fin}</div>
+        // Pasos del ciclo de la reserva
+        const steps: { id: string; label: string; done: boolean; current: boolean; meta?: string; render?: React.ReactNode }[] = []
+        steps.push({
+          id: 'creada', label: 'Solicitud creada', done: true, current: false,
+          meta: new Date(r.created_at).toLocaleString('es'),
+        })
+        if (amen?.requiere_aprobacion || r.estado === 'pendiente' || r.aprobada_at || r.rechazada_motivo) {
+          const apr = !!r.aprobada_at
+          const rch = !!r.rechazada_motivo
+          steps.push({
+            id: 'aprobacion',
+            label: rch ? 'Rechazada' : apr ? 'Aprobada' : 'En aprobación',
+            done: apr || rch,
+            current: !apr && !rch,
+            meta: apr && r.aprobada_at ? new Date(r.aprobada_at).toLocaleString('es') : (rch ? r.rechazada_motivo! : 'Esperando admin'),
+          })
+        }
+        // Check-in
+        steps.push({
+          id: 'checkin', label: 'Check-in', done: !!r.checkin_at,
+          current: !r.checkin_at && r.estado === 'confirmada',
+          meta: r.checkin_at ? new Date(r.checkin_at).toLocaleString('es') : 'Pendiente',
+          render: (
+            <>
+              {r.checkin_foto_url && (
+                <img src={r.checkin_foto_url} alt="check-in" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, marginTop: 8 }} />
+              )}
+              {!r.checkin_at && canEdit && r.estado === 'confirmada' && (
+                <div style={{ marginTop: 10 }}>
+                  <ImageUploader value={null} onChange={(url) => registrarCheckin(r, url)} folder="amenidades-checkin" label="Foto del estado inicial" />
+                  <button onClick={() => registrarCheckin(r, null)} style={{ marginTop: 6, padding: '6px 12px', background: 'transparent', color: '#0ea5e9', border: '1px dashed #7dd3fc', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                    Registrar sin foto
+                  </button>
                 </div>
-                <button onClick={() => setReservaDetalle(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontSize: 14 }}>✕</button>
-              </div>
-
-              {/* Check-in */}
-              <section style={{ marginBottom: 18, padding: 14, border: '1.5px solid #e2e8f0', borderRadius: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>📥 Check-in</div>
-                  {r.checkin_at && <div style={{ fontSize: 11.5, color: '#16a34a', fontWeight: 600 }}>✓ {new Date(r.checkin_at).toLocaleString('es')}</div>}
-                </div>
-                {r.checkin_foto_url && (
-                  <img src={r.checkin_foto_url} alt="check-in" style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 10, marginBottom: 10 }} />
-                )}
-                {!r.checkin_at && canEdit && (
-                  <ImageUploader value={null} onChange={(url) => registrarCheckin(r, url)} folder="amenidades-checkin" label="Foto de estado inicial (opcional, registra check-in)" />
-                )}
-                {r.checkin_at && canEdit && !r.checkout_at && !r.checkin_foto_url && (
+              )}
+              {r.checkin_at && canEdit && !r.checkin_foto_url && !r.checkout_at && (
+                <div style={{ marginTop: 8 }}>
                   <ImageUploader value={null} onChange={async (url) => {
                     if (!url) return
                     await supabase.from('reservas_amenidades').update({ checkin_foto_url: url }).eq('id', r.id)
                     onRefresh()
                     setReservaDetalle(d => d ? { ...d, checkin_foto_url: url } : d)
-                  }} folder="amenidades-checkin" label="Agregar foto de estado inicial" />
-                )}
-                {!r.checkin_at && canEdit && (
-                  <button onClick={() => registrarCheckin(r, null)} style={{ marginTop: 8, padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
-                    Registrar check-in sin foto
-                  </button>
-                )}
-              </section>
-
-              {/* Check-out */}
-              <section style={{ marginBottom: 18, padding: 14, border: '1.5px solid #e2e8f0', borderRadius: 12, opacity: r.checkin_at ? 1 : 0.55 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>📤 Check-out</div>
-                  {r.checkout_at && <div style={{ fontSize: 11.5, color: '#16a34a', fontWeight: 600 }}>✓ {new Date(r.checkout_at).toLocaleString('es')}</div>}
+                  }} folder="amenidades-checkin" label="Agregar foto" />
                 </div>
-                {!r.checkin_at && <div style={{ fontSize: 12, color: '#94a3b8' }}>Primero registra el check-in.</div>}
-                {r.checkin_at && (
+              )}
+            </>
+          ),
+        })
+        // Check-out
+        steps.push({
+          id: 'checkout', label: 'Check-out', done: !!r.checkout_at,
+          current: !!r.checkin_at && !r.checkout_at,
+          meta: r.checkout_at ? new Date(r.checkout_at).toLocaleString('es') : (r.checkin_at ? 'Pendiente' : '—'),
+          render: r.checkin_at ? (
+            <>
+              {r.checkout_foto_url && (
+                <img src={r.checkout_foto_url} alt="check-out" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, marginTop: 8 }} />
+              )}
+              {r.observaciones_uso && (
+                <div style={{ fontSize: 12.5, color: '#475569', background: '#f8fafc', borderRadius: 8, padding: 8, marginTop: 8 }}>
+                  <strong>Observaciones:</strong> {r.observaciones_uso}
+                </div>
+              )}
+              {!r.checkout_at && canEdit && (
+                <div style={{ marginTop: 10 }}>
+                  <CheckoutForm onSave={(foto, obs) => registrarCheckout(r, foto, obs)} />
+                </div>
+              )}
+            </>
+          ) : null,
+        })
+        // Depósito
+        if (amen?.requiere_deposito) {
+          const cerrado = r.deposito_estado === 'devuelto' || r.deposito_estado === 'retenido'
+          steps.push({
+            id: 'deposito',
+            label: r.deposito_estado === 'devuelto' ? 'Depósito devuelto'
+              : r.deposito_estado === 'retenido' ? 'Depósito retenido'
+              : r.deposito_estado === 'cobrado' ? 'Depósito cobrado'
+              : 'Depósito pendiente',
+            done: cerrado,
+            current: !cerrado,
+            meta: r.deposito_estado === 'retenido' && r.deposito_retenido_motivo
+              ? `${moneda} ${Number(r.deposito_retenido_monto || 0).toFixed(2)} retenido — ${r.deposito_retenido_motivo}`
+              : r.deposito_devuelto_at ? `Devuelto el ${new Date(r.deposito_devuelto_at).toLocaleDateString('es')}`
+              : `${moneda} ${amen.monto_deposito?.toFixed(2)} en garantía`,
+            render: canEdit ? (
+              <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {r.deposito_estado === 'pendiente' && (
+                  <button onClick={() => actualizarEstadoDeposito(r, 'cobrado')} style={btnAction('#dbeafe', '#93c5fd', '#1d4ed8')}>💵 Marcar cobrado</button>
+                )}
+                {r.deposito_estado === 'cobrado' && (
                   <>
-                    {r.checkout_foto_url && (
-                      <img src={r.checkout_foto_url} alt="check-out" style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 10, marginBottom: 10 }} />
-                    )}
-                    {r.observaciones_uso && (
-                      <div style={{ fontSize: 12.5, color: '#475569', background: '#f8fafc', borderRadius: 8, padding: 8, marginBottom: 10 }}>
-                        <strong>Observaciones:</strong> {r.observaciones_uso}
-                      </div>
-                    )}
-                    {!r.checkout_at && canEdit && (
-                      <CheckoutForm onSave={(foto, obs) => registrarCheckout(r, foto, obs)} />
-                    )}
+                    <button onClick={() => actualizarEstadoDeposito(r, 'devuelto')} style={btnAction('#dcfce7', '#86efac', '#15803d')}>↩ Devolver completo</button>
+                    <button onClick={() => retenerDeposito(r)} style={btnAction('#fee2e2', '#fca5a5', '#b91c1c')}>⚠ Retener por daños</button>
                   </>
                 )}
-              </section>
-
-              {/* Depósito */}
-              {amen?.requiere_deposito && (
-                <section style={{ padding: 14, border: '1.5px solid #fde68a', borderRadius: 12, background: '#fffbeb' }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>💰 Depósito {moneda} {amen.monto_deposito?.toFixed(2)}</div>
-                  <div style={{ fontSize: 12.5, marginBottom: 10 }}>
-                    Estado actual: <strong>{r.deposito_estado}</strong>
-                    {r.deposito_estado === 'retenido' && r.deposito_retenido_monto && (
-                      <span> · retenido {moneda} {Number(r.deposito_retenido_monto).toFixed(2)} {r.deposito_retenido_motivo ? `— ${r.deposito_retenido_motivo}` : ''}</span>
-                    )}
+              </div>
+            ) : null,
+          })
+        }
+        const accent = r.estado === 'confirmada' ? '#0d9488' : r.estado === 'pendiente' ? '#f59e0b' : '#94a3b8'
+        return (
+          <div onClick={() => setReservaDetalle(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, animation: 'fadeIn 0.15s ease' }}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background: 'white', borderRadius: 18, maxWidth: 700, width: '100%', maxHeight: '92vh', overflow: 'auto', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.4)' }}>
+              {/* Header gradiente */}
+              <div style={{ padding: '20px 24px', background: `linear-gradient(135deg, ${accent}, ${accent}dd)`, color: 'white', borderRadius: '18px 18px 0 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Reserva · {r.estado}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>{r.amenidad_nombre}</div>
+                  <div style={{ fontSize: 13, opacity: 0.92, marginTop: 4 }}>
+                    🏠 {r.unidad_nombre} · 📅 {new Date(r.fecha + 'T12:00').toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long' })} · ⏰ {r.hora_inicio}–{r.hora_fin}
                   </div>
-                  {canEdit && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {r.deposito_estado === 'pendiente' && (
-                        <button onClick={() => actualizarEstadoDeposito(r, 'cobrado')} style={{ padding: '6px 12px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
-                          Marcar cobrado
-                        </button>
-                      )}
-                      {(r.deposito_estado === 'cobrado') && (
-                        <>
-                          <button onClick={() => actualizarEstadoDeposito(r, 'devuelto')} style={{ padding: '6px 12px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
-                            Devolver completo
-                          </button>
-                          <button onClick={() => retenerDeposito(r)} style={{ padding: '6px 12px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
-                            Retener por daños
-                          </button>
-                        </>
-                      )}
-                      {(r.deposito_estado === 'devuelto' || r.deposito_estado === 'retenido') && (
-                        <span style={{ fontSize: 12, color: '#64748b' }}>
-                          {r.deposito_estado === 'devuelto' && r.deposito_devuelto_at && `Devuelto el ${new Date(r.deposito_devuelto_at).toLocaleDateString('es')}`}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </section>
-              )}
+                </div>
+                <button onClick={() => setReservaDetalle(null)} style={{ background: 'rgba(255,255,255,0.18)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>✕</button>
+              </div>
+
+              {/* Stepper */}
+              <div style={{ padding: 24 }}>
+                <div style={{ position: 'relative' }}>
+                  {steps.map((s, i) => {
+                    const isLast = i === steps.length - 1
+                    const dotColor = s.done ? '#16a34a' : s.current ? accent : '#cbd5e1'
+                    const lineColor = s.done ? '#86efac' : '#e2e8f0'
+                    return (
+                      <div key={s.id} style={{ display: 'flex', gap: 14, position: 'relative', paddingBottom: isLast ? 0 : 18 }}>
+                        {/* Línea vertical */}
+                        {!isLast && (
+                          <div style={{ position: 'absolute', left: 13, top: 28, bottom: 0, width: 2, background: lineColor }} />
+                        )}
+                        {/* Bullet */}
+                        <div style={{
+                          width: 28, height: 28, borderRadius: '50%',
+                          background: s.done ? '#dcfce7' : s.current ? `${accent}22` : '#f1f5f9',
+                          border: `2px solid ${dotColor}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: dotColor, fontWeight: 800, fontSize: 13,
+                          flexShrink: 0, zIndex: 1, position: 'relative',
+                          boxShadow: s.current ? `0 0 0 4px ${accent}22` : 'none',
+                        }}>
+                          {s.done ? '✓' : i + 1}
+                        </div>
+                        {/* Contenido */}
+                        <div style={{ flex: 1, paddingTop: 2 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                            <div style={{ fontWeight: 800, fontSize: 14, color: s.done ? '#0f172a' : s.current ? '#0f172a' : '#94a3b8' }}>{s.label}</div>
+                            {s.id === 'aprobacion' && r.estado === 'pendiente' && canEdit && (
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button onClick={() => aprobarReserva(r)} style={btnAction('#dcfce7', '#bbf7d0', '#15803d')}>✓ Aprobar</button>
+                                <button onClick={() => rechazarReserva(r)} style={btnAction('#fee2e2', '#fecaca', '#b91c1c')}>✗ Rechazar</button>
+                              </div>
+                            )}
+                          </div>
+                          {s.meta && <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{s.meta}</div>}
+                          {s.render && <div>{s.render}</div>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Datos extra: tarifa y notas */}
+                {(r.monto_tarifa || r.notas) && (
+                  <div style={{ marginTop: 18, padding: 14, background: '#f8fafc', borderRadius: 12 }}>
+                    {r.monto_tarifa != null && r.monto_tarifa > 0 && (
+                      <div style={{ fontSize: 12.5, color: '#475569', marginBottom: r.notas ? 6 : 0 }}>
+                        🎟 <strong>Tarifa:</strong> {moneda} {Number(r.monto_tarifa).toFixed(2)} ·
+                        {r.metodo_pago_tarifa === 'cargar_unidad' ? ' cargado a unidad' : (r.tarifa_pagada ? ' pagado en sitio' : ' por cobrar en sitio')}
+                      </div>
+                    )}
+                    {r.notas && <div style={{ fontSize: 12.5, color: '#475569' }}>📝 {r.notas}</div>}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )
