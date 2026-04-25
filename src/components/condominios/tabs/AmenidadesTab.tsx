@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
@@ -115,6 +115,31 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
   confirmada: { bg: '#f0fdf4', color: '#16a34a' },
   pendiente:  { bg: '#eff6ff', color: '#2563eb' },
   cancelada:  { bg: '#f1f5f9', color: '#94a3b8' },
+}
+
+function pillStyle(bg: string, border: string, color: string): React.CSSProperties {
+  return {
+    padding: '3px 9px',
+    borderRadius: 999,
+    border: `1px solid ${border}`,
+    background: bg,
+    color,
+    fontSize: 10.5,
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
+  }
+}
+
+const btnHero: React.CSSProperties = {
+  padding: '10px 18px',
+  background: 'rgba(255,255,255,0.18)',
+  color: 'white',
+  border: '1.5px solid rgba(255,255,255,0.45)',
+  borderRadius: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontSize: 13.5,
+  backdropFilter: 'blur(6px)',
 }
 
 const RESERVA_CAL_COLORS = [
@@ -594,18 +619,65 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1100px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+    <div style={{ padding: '24px', maxWidth: '1200px' }}>
+      {/* Hero header con gradiente */}
+      <div style={{
+        background: 'linear-gradient(135deg,#0ea5e9 0%,#0d9488 100%)',
+        borderRadius: 20,
+        padding: '24px 28px',
+        marginBottom: 16,
+        color: 'white',
+        boxShadow: '0 10px 30px -10px rgba(14,165,233,0.4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16,
+      }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Amenidades y Reservas</h2>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '13.5px' }}>{amenidadesActivas.length} amenidades activas · {reservas.filter(r => r.estado === 'confirmada').length} reservas activas</p>
+          <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Módulo de amenidades</div>
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em' }}>Amenidades y Reservas</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13.5, opacity: 0.9 }}>Gestiona el ciclo completo: configuración, reservas, cobros, check-in y depósitos.</p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {canCreate && vista === 'amenidades' && <button onClick={() => setShowAmenidadForm(true)} style={{ padding: '10px 16px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>+ Amenidad</button>}
-          {(vista === 'reservas' || vista === 'calendario') && canCreate && <button onClick={() => { setVista('reservas'); setShowReservaForm(true) }} style={{ padding: '10px 16px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>+ Reserva</button>}
-          {vista === 'bloqueos' && canEdit && <button onClick={() => setShowBloqueoForm(true)} style={{ padding: '10px 16px', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>+ Bloqueo</button>}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {canCreate && vista === 'amenidades' && <button onClick={() => setShowAmenidadForm(true)} style={btnHero}>+ Amenidad</button>}
+          {(vista === 'reservas' || vista === 'calendario') && canCreate && <button onClick={() => { setVista('reservas'); setShowReservaForm(true) }} style={btnHero}>+ Reserva</button>}
+          {vista === 'bloqueos' && canEdit && <button onClick={() => setShowBloqueoForm(true)} style={btnHero}>+ Bloqueo</button>}
         </div>
       </div>
+
+      {/* KPIs */}
+      {(() => {
+        const hoyReservas = reservas.filter(r => r.fecha === hoy && r.estado === 'confirmada').length
+        const pendientesAprob = reservas.filter(r => r.estado === 'pendiente' && r.fecha >= hoy).length
+        const depositosPorCerrar = reservas.filter(r => r.deposito_estado === 'cobrado' && r.fecha < hoy).length
+        const cobrosPendientes = reservas.filter(r => r.metodo_pago_tarifa === 'pagar_momento' && !r.tarifa_pagada && r.estado === 'confirmada' && r.fecha >= hoy).length
+        const mes = hoy.slice(0, 7)
+        const tarifasMes = reservas
+          .filter(r => r.estado === 'confirmada' && r.fecha.startsWith(mes) && r.monto_tarifa)
+          .reduce((s, r) => s + Number(r.monto_tarifa || 0), 0)
+        const kpis = [
+          { label: 'Amenidades activas', value: amenidadesActivas.length, accent: '#0ea5e9', icon: '🏊' },
+          { label: 'Reservas hoy', value: hoyReservas, accent: '#0d9488', icon: '📅' },
+          { label: 'Pendientes aprobación', value: pendientesAprob, accent: pendientesAprob > 0 ? '#f59e0b' : '#94a3b8', icon: '⏳' },
+          { label: 'Depósitos por cerrar', value: depositosPorCerrar, accent: depositosPorCerrar > 0 ? '#dc2626' : '#94a3b8', icon: '💰' },
+          { label: 'Cobros en sitio', value: cobrosPendientes, accent: cobrosPendientes > 0 ? '#c2410c' : '#94a3b8', icon: '🎟' },
+          { label: `Tarifa cobrada ${mes}`, value: `${moneda} ${tarifasMes.toFixed(2)}`, accent: '#16a34a', icon: '💸' },
+        ]
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginBottom: 20 }}>
+            {kpis.map(k => (
+              <div key={k.label}
+                style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 4, position: 'relative', overflow: 'hidden', transition: 'transform 0.15s ease, box-shadow 0.15s ease', cursor: 'default' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px -10px rgba(15,23,42,0.18)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', background: k.accent }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 11.5, color: '#64748b', fontWeight: 600 }}>{k.label}</span>
+                  <span style={{ fontSize: 16 }}>{k.icon}</span>
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: k.accent, letterSpacing: '-0.02em' }}>{k.value}</div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Vista toggle */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
@@ -725,49 +797,88 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               <p style={{ fontWeight: 600, color: '#64748b' }}>No hay amenidades registradas</p>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '14px' }}>
-              {amenidades.map(a => (
-                <div key={a.id} style={{ background: 'white', border: `1.5px solid ${a.activo ? '#e2e8f0' : '#f1f5f9'}`, borderRadius: '14px', overflow: 'hidden', opacity: a.activo ? 1 : 0.6 }}>
-                  {a.foto_url && <img src={a.foto_url} alt={a.nombre} style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} />}
-                  <div style={{ padding: '18px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                      <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{a.nombre}</h4>
-                      {canEdit && (
-                        <button onClick={() => toggleAmenidad(a)} style={{ padding: '3px 10px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontSize: '11.5px', fontWeight: 700, background: a.activo ? '#f0fdf4' : '#f1f5f9', color: a.activo ? '#16a34a' : '#94a3b8' }}>
-                          {a.activo ? 'Activa' : 'Inactiva'}
-                        </button>
-                      )}
-                    </div>
-                    {a.descripcion && <p style={{ margin: '0 0 8px', fontSize: '12.5px', color: '#64748b' }}>{a.descripcion}</p>}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '12px', color: '#64748b' }}>
-                      {a.capacidad_max && <span>👥 Máx {a.capacidad_max}</span>}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+              {amenidades.map((a, idx) => {
+                const reservasA = reservas.filter(r => r.amenidad_id === a.id && r.estado === 'confirmada')
+                const proxima = reservasA.filter(r => r.fecha >= hoy).sort((x, y) => (x.fecha + x.hora_inicio).localeCompare(y.fecha + y.hora_inicio))[0]
+                const paleta = RESERVA_CAL_COLORS[idx % RESERVA_CAL_COLORS.length]
+                return (
+                <div key={a.id}
+                  style={{
+                    background: 'white',
+                    border: `1.5px solid ${a.activo ? '#e2e8f0' : '#f1f5f9'}`,
+                    borderRadius: 18,
+                    overflow: 'hidden',
+                    opacity: a.activo ? 1 : 0.55,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'transform 0.18s ease, box-shadow 0.18s ease',
+                    boxShadow: '0 2px 8px -4px rgba(15,23,42,0.08)',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 14px 32px -14px rgba(15,23,42,0.25)' }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px -4px rgba(15,23,42,0.08)' }}>
+                  {/* Hero foto */}
+                  <div style={{ position: 'relative', height: 140, background: a.foto_url ? `center/cover no-repeat url(${a.foto_url})` : `linear-gradient(135deg, ${paleta.bg}, ${paleta.border})` }}>
+                    {!a.foto_url && (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48, opacity: 0.7 }}>🏊</div>
+                    )}
+                    {/* Overlay gradiente abajo */}
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(15,23,42,0.75) 0%, rgba(15,23,42,0.0) 60%)' }} />
+                    {/* Estado pill */}
+                    {canEdit && (
+                      <button onClick={() => toggleAmenidad(a)}
+                        style={{ position: 'absolute', top: 10, right: 10, padding: '4px 10px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, background: a.activo ? 'rgba(240,253,244,0.95)' : 'rgba(241,245,249,0.95)', color: a.activo ? '#15803d' : '#64748b', backdropFilter: 'blur(4px)', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
+                        {a.activo ? '● Activa' : '○ Inactiva'}
+                      </button>
+                    )}
+                    {/* Nombre */}
+                    <h4 style={{ position: 'absolute', bottom: 12, left: 14, right: 14, margin: 0, fontSize: 18, fontWeight: 800, color: 'white', letterSpacing: '-0.01em', textShadow: '0 2px 6px rgba(0,0,0,0.4)' }}>
+                      {a.nombre}
+                    </h4>
+                  </div>
+                  <div style={{ padding: '16px 18px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    {a.descripcion && <p style={{ margin: '0 0 10px', fontSize: 12.5, color: '#475569', lineHeight: 1.45 }}>{a.descripcion}</p>}
+                    {/* Datos clave */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11.5, color: '#475569', marginBottom: 10 }}>
+                      {a.capacidad_max && <span>👥 Máx <strong>{a.capacidad_max}</strong></span>}
                       {a.horario_inicio && <span>⏰ {a.horario_inicio}–{a.horario_fin}</span>}
-                      {a.requiere_deposito && <span>💰 Depósito {moneda} {a.monto_deposito}</span>}
+                    </div>
+                    {/* Badges */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>
+                      {a.requiere_deposito && <span style={pillStyle('#fffbeb', '#fde68a', '#92400e')}>💰 Dep. {moneda} {a.monto_deposito}</span>}
                       {a.requiere_tarifa && a.tarifa_uso != null && (
                         a.tarifa_uso_finde != null
-                          ? <span>🎟 Tarifa L–V {moneda} {Number(a.tarifa_uso).toFixed(2)} · S–D {moneda} {Number(a.tarifa_uso_finde).toFixed(2)}</span>
-                          : <span>🎟 Tarifa {moneda} {Number(a.tarifa_uso).toFixed(2)}</span>
+                          ? <span style={pillStyle('#eff6ff', '#bfdbfe', '#1d4ed8')}>🎟 L–V {moneda} {Number(a.tarifa_uso).toFixed(0)} · S–D {moneda} {Number(a.tarifa_uso_finde).toFixed(0)}</span>
+                          : <span style={pillStyle('#eff6ff', '#bfdbfe', '#1d4ed8')}>🎟 {moneda} {Number(a.tarifa_uso).toFixed(2)}</span>
                       )}
-                      {a.max_reservas_mes_unidad != null && <span>📅 Máx {a.max_reservas_mes_unidad}/mes</span>}
-                      {a.horas_minimas_antelacion != null && a.horas_minimas_antelacion > 0 && <span>⏱ {a.horas_minimas_antelacion}h antelación</span>}
-                      {a.duracion_max_horas != null && <span>⌛ Máx {a.duracion_max_horas}h</span>}
-                      {a.requiere_aprobacion && <span>👤 Requiere aprobación</span>}
-                      {a.reglamento && <span>📜 Con reglamento</span>}
+                      {a.max_reservas_mes_unidad != null && <span style={pillStyle('#f0f9ff', '#bae6fd', '#0369a1')}>📅 Máx {a.max_reservas_mes_unidad}/mes</span>}
+                      {a.horas_minimas_antelacion != null && a.horas_minimas_antelacion > 0 && <span style={pillStyle('#f0f9ff', '#bae6fd', '#0369a1')}>⏱ {a.horas_minimas_antelacion}h</span>}
+                      {a.duracion_max_horas != null && <span style={pillStyle('#f0f9ff', '#bae6fd', '#0369a1')}>⌛ {a.duracion_max_horas}h máx</span>}
+                      {a.requiere_aprobacion && <span style={pillStyle('#fff7ed', '#fed7aa', '#9a3412')}>👤 Aprobación</span>}
+                      {a.reglamento && <span style={pillStyle('#f5f3ff', '#ddd6fe', '#6d28d9')}>📜 Reglamento</span>}
                     </div>
-                    <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                        {reservas.filter(r => r.amenidad_id === a.id && r.estado === 'confirmada').length} reservas activas
+                    {/* Stats footer */}
+                    <div style={{ marginTop: 'auto', paddingTop: 10, borderTop: '1px dashed #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+                          <strong style={{ color: paleta.color, fontSize: 14 }}>{reservasA.length}</strong> reservas confirmadas
+                        </div>
+                        {proxima && (
+                          <div style={{ fontSize: 10.5, color: '#64748b' }}>Próxima: {proxima.fecha === hoy ? 'HOY' : new Date(proxima.fecha + 'T12:00').toLocaleDateString('es', { day: '2-digit', month: 'short' })} {proxima.hora_inicio}</div>
+                        )}
                       </div>
                       {canEdit && (
                         <button onClick={() => actualizarTarifa(a)} title="Actualizar tarifa por uso"
-                          style={{ padding: '4px 10px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: 6, cursor: 'pointer', fontSize: 11.5, fontWeight: 600 }}>
+                          style={{ padding: '5px 11px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff' }}>
                           {a.requiere_tarifa && a.tarifa_uso != null ? '✎ Tarifa' : '+ Tarifa'}
                         </button>
                       )}
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           )}
         </>
