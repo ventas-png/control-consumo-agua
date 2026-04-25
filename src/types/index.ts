@@ -415,6 +415,9 @@ export interface Amenidad {
   monto_deposito?: number | null
   requiere_tarifa: boolean
   tarifa_uso?: number | null
+  max_reservas_mes_unidad?: number | null
+  horas_minimas_antelacion?: number | null
+  duracion_max_horas?: number | null
   activo: boolean
   foto_url?: string | null
   created_at: string
@@ -460,6 +463,7 @@ export interface ReservaAmenidad {
   cuota_id?: string | null
   recordatorio_enviado: boolean
   recordatorio_enviado_at?: string | null
+  no_show: boolean
   notas?: string | null
   created_by?: string | null
   created_at: string

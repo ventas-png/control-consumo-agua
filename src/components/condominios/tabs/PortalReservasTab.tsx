@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
-import { bloqueoSolapaReserva } from './AmenidadesTab'
+import { bloqueoSolapaReserva, validarReglasAmenidad } from './AmenidadesTab'
 
 interface Props {
   amenidades: Amenidad[]
@@ -70,6 +70,11 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
         : `${bloqueo.fecha_inicio === bloqueo.fecha_fin ? bloqueo.fecha_inicio : `${bloqueo.fecha_inicio} → ${bloqueo.fecha_fin}`} (día completo)`
       Swal.fire('Amenidad no disponible', `${MOTIVO_LABEL[bloqueo.motivo]} · ${detalle}. Por favor elige otra fecha u horario.`, 'warning')
       return
+    }
+
+    if (amenidadSel) {
+      const errReglas = validarReglasAmenidad(amenidadSel, form.fecha, form.hora_inicio, form.hora_fin, unidadId, reservas)
+      if (errReglas) { Swal.fire('No permitido', errReglas, 'warning'); return }
     }
 
     const aplicaTarifa = !!(amenidadSel?.requiere_tarifa && amenidadSel.tarifa_uso && amenidadSel.tarifa_uso > 0)
@@ -157,6 +162,13 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
             {a.horario_inicio && a.horario_fin && <div style={{ fontSize: '12px', color: '#64748b' }}>{a.horario_inicio} – {a.horario_fin}</div>}
             {a.requiere_deposito && a.monto_deposito && <div style={{ fontSize: '12px', color: '#c2410c', marginTop: '3px' }}>Depósito: {moneda} {a.monto_deposito.toFixed(2)}</div>}
             {a.requiere_tarifa && a.tarifa_uso != null && <div style={{ fontSize: '12px', color: '#1d4ed8', marginTop: '3px', fontWeight: 600 }}>Tarifa: {moneda} {Number(a.tarifa_uso).toFixed(2)}</div>}
+            {(a.max_reservas_mes_unidad != null || (a.horas_minimas_antelacion ?? 0) > 0 || a.duracion_max_horas != null) && (
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, lineHeight: 1.3 }}>
+                {a.max_reservas_mes_unidad != null && <div>Máx {a.max_reservas_mes_unidad}/mes</div>}
+                {(a.horas_minimas_antelacion ?? 0) > 0 && <div>Reservar con {a.horas_minimas_antelacion}h de antelación</div>}
+                {a.duracion_max_horas != null && <div>Hasta {a.duracion_max_horas}h por reserva</div>}
+              </div>
+            )}
           </div>
         ))}
         {amenidadesActivas.length === 0 && (
