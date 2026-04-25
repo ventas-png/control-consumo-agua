@@ -153,42 +153,96 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
-        <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>Amenidades y reservas</h3>
+      {/* Header del portal */}
+      <div style={{
+        background: 'linear-gradient(135deg,#1d4ed8 0%,#0d9488 100%)',
+        borderRadius: 16, padding: '18px 22px', marginBottom: 18,
+        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: 12,
+        boxShadow: '0 10px 24px -10px rgba(29,78,216,0.4)',
+      }}>
+        <div>
+          <div style={{ fontSize: 10.5, fontWeight: 700, opacity: 0.85, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Tu condominio</div>
+          <h3 style={{ margin: '2px 0 0', fontSize: 19, fontWeight: 800, letterSpacing: '-0.01em' }}>Amenidades y reservas</h3>
+          <div style={{ fontSize: 12, opacity: 0.9, marginTop: 3 }}>
+            {futuras.length} próxima{futuras.length === 1 ? '' : 's'} · {misReservas.filter(r => r.estado === 'pendiente').length > 0 ? `${misReservas.filter(r => r.estado === 'pendiente').length} pendiente${misReservas.filter(r => r.estado === 'pendiente').length === 1 ? '' : 's'} de aprobación` : 'Tap en una amenidad para reservar'}
+          </div>
+        </div>
         {amenidadesActivas.length > 0 && (
           <button onClick={() => setShowForm(true)}
-            style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+            style={{ padding: '10px 18px', background: 'rgba(255,255,255,0.18)', color: 'white', border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: 12, fontWeight: 700, cursor: 'pointer', fontSize: 13.5, backdropFilter: 'blur(6px)' }}>
             + Nueva reserva
           </button>
         )}
       </div>
 
-      {/* Amenidades disponibles */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '22px' }}>
-        {amenidadesActivas.map(a => (
-          <div key={a.id} style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
-            <div style={{ fontSize: '28px', marginBottom: '6px' }}>🏖</div>
-            <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{a.nombre}</div>
-            {a.capacidad_max && <div style={{ fontSize: '12px', color: '#64748b' }}>Hasta {a.capacidad_max} personas</div>}
-            {a.horario_inicio && a.horario_fin && <div style={{ fontSize: '12px', color: '#64748b' }}>{a.horario_inicio} – {a.horario_fin}</div>}
-            {a.requiere_deposito && a.monto_deposito && <div style={{ fontSize: '12px', color: '#c2410c', marginTop: '3px' }}>Depósito: {moneda} {a.monto_deposito.toFixed(2)}</div>}
-            {a.requiere_tarifa && a.tarifa_uso != null && (
-              a.tarifa_uso_finde != null
-                ? <div style={{ fontSize: '12px', color: '#1d4ed8', marginTop: '3px', fontWeight: 600 }}>Tarifa: L–V {moneda} {Number(a.tarifa_uso).toFixed(2)} · S–D {moneda} {Number(a.tarifa_uso_finde).toFixed(2)}</div>
-                : <div style={{ fontSize: '12px', color: '#1d4ed8', marginTop: '3px', fontWeight: 600 }}>Tarifa: {moneda} {Number(a.tarifa_uso).toFixed(2)}</div>
-            )}
-            {(a.max_reservas_mes_unidad != null || (a.horas_minimas_antelacion ?? 0) > 0 || a.duracion_max_horas != null || a.requiere_aprobacion) && (
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, lineHeight: 1.3 }}>
-                {a.max_reservas_mes_unidad != null && <div>Máx {a.max_reservas_mes_unidad}/mes</div>}
-                {(a.horas_minimas_antelacion ?? 0) > 0 && <div>Reservar con {a.horas_minimas_antelacion}h de antelación</div>}
-                {a.duracion_max_horas != null && <div>Hasta {a.duracion_max_horas}h por reserva</div>}
-                {a.requiere_aprobacion && <div style={{ color: '#9a3412', fontWeight: 600 }}>Requiere aprobación</div>}
+      {/* Amenidades disponibles - estilo hero card */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14, marginBottom: 22 }}>
+        {amenidadesActivas.map(a => {
+          const fondo = a.foto_url
+            ? `linear-gradient(180deg, rgba(15,23,42,0.05) 0%, rgba(15,23,42,0.85) 100%), center/cover no-repeat url(${a.foto_url})`
+            : 'linear-gradient(135deg,#0ea5e9 0%,#0d9488 100%)'
+          return (
+            <button key={a.id}
+              onClick={() => { setForm(f => ({ ...f, amenidad_id: a.id })); setShowForm(true) }}
+              style={{
+                position: 'relative',
+                height: 180,
+                background: fondo,
+                border: 'none', borderRadius: 16,
+                cursor: 'pointer',
+                color: 'white',
+                display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+                padding: 14, textAlign: 'left',
+                boxShadow: '0 4px 14px -6px rgba(15,23,42,0.25)',
+                transition: 'transform 0.18s ease, box-shadow 0.18s ease',
+                overflow: 'hidden',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 18px 36px -14px rgba(15,23,42,0.35)' }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px -6px rgba(15,23,42,0.25)' }}>
+              {/* Icono fallback si no hay foto */}
+              {!a.foto_url && (
+                <div style={{ position: 'absolute', top: 16, right: 16, fontSize: 36, opacity: 0.55 }}>🏖</div>
+              )}
+              {/* Badges arriba */}
+              <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>
+                {a.requiere_aprobacion && (
+                  <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(254,215,170,0.95)', color: '#9a3412', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>Aprobación</span>
+                )}
+                {a.requiere_deposito && a.monto_deposito && (
+                  <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(254,243,199,0.95)', color: '#92400e', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>Depósito {moneda} {a.monto_deposito.toFixed(0)}</span>
+                )}
+                {a.requiere_tarifa && a.tarifa_uso != null && (
+                  <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(219,234,254,0.95)', color: '#1d4ed8', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>
+                    Tarifa {moneda} {Number(a.tarifa_uso).toFixed(0)}
+                    {a.tarifa_uso_finde != null && ` / ${Number(a.tarifa_uso_finde).toFixed(0)}`}
+                  </span>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+              {/* Footer con datos */}
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.01em', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{a.nombre}</div>
+                <div style={{ fontSize: 11.5, opacity: 0.92, marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {a.capacidad_max && <span>👥 Hasta {a.capacidad_max}</span>}
+                  {a.horario_inicio && a.horario_fin && <span>⏰ {a.horario_inicio}–{a.horario_fin}</span>}
+                </div>
+                {(a.max_reservas_mes_unidad != null || (a.horas_minimas_antelacion ?? 0) > 0 || a.duracion_max_horas != null) && (
+                  <div style={{ fontSize: 10.5, opacity: 0.85, marginTop: 4 }}>
+                    {a.max_reservas_mes_unidad != null && `Máx ${a.max_reservas_mes_unidad}/mes`}
+                    {(a.horas_minimas_antelacion ?? 0) > 0 && ` · ${a.horas_minimas_antelacion}h antelación`}
+                    {a.duracion_max_horas != null && ` · hasta ${a.duracion_max_horas}h`}
+                  </div>
+                )}
+              </div>
+            </button>
+          )
+        })}
         {amenidadesActivas.length === 0 && (
-          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '13px' }}>No hay amenidades disponibles actualmente.</div>
+          <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,#f8fafc)', border: '1.5px dashed #cbd5e1', textAlign: 'center' }}>
+            <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#dbeafe,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>🏖</div>
+            <p style={{ fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>No hay amenidades disponibles</p>
+            <p style={{ fontSize: 12.5, color: '#64748b', margin: 0 }}>Cuando la administración active las áreas comunes, aparecerán aquí.</p>
+          </div>
         )}
       </div>
 
@@ -324,29 +378,33 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
           {(vistaFutura ? futuras : pasadas).sort((a, b) => a.fecha < b.fecha ? -1 : 1).map(r => {
             const ec = ESTADO_RES[(r.estado as EstadoReserva) ?? 'confirmada']
             const amenidad = amenidades.find(a => a.id === r.amenidad_id)
+            const accent = r.estado === 'confirmada' ? '#16a34a' : r.estado === 'pendiente' ? '#c2410c' : '#94a3b8'
             return (
-              <div key={r.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '22px', flexShrink: 0 }}>📅</span>
+              <div key={r.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: '14px 16px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease' }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 16px -8px rgba(15,23,42,0.18)' }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}>
+                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: accent }} />
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,#dbeafe,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📅</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{amenidad?.nombre ?? 'Amenidad'}</div>
-                  <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '2px' }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>{amenidad?.nombre ?? 'Amenidad'}</div>
+                  <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2, textTransform: 'capitalize' }}>
                     {new Date(r.fecha + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long' })} · {r.hora_inicio} – {r.hora_fin}
                     {r.num_invitados > 0 && ` · ${r.num_invitados} invitado${r.num_invitados > 1 ? 's' : ''}`}
                   </div>
                   {r.monto_tarifa != null && r.monto_tarifa > 0 && (
-                    <div style={{ fontSize: 11.5, marginTop: 3, fontWeight: 600, color: r.metodo_pago_tarifa === 'cargar_unidad' ? '#1d4ed8' : (r.tarifa_pagada ? '#16a34a' : '#c2410c') }}>
+                    <div style={{ fontSize: 11.5, marginTop: 3, fontWeight: 700, color: r.metodo_pago_tarifa === 'cargar_unidad' ? '#1d4ed8' : (r.tarifa_pagada ? '#16a34a' : '#c2410c') }}>
                       🎟 {moneda} {Number(r.monto_tarifa).toFixed(2)}
                       {r.metodo_pago_tarifa === 'cargar_unidad' && ' · cargado a tu unidad'}
                       {r.metodo_pago_tarifa === 'pagar_momento' && (r.tarifa_pagada ? ' · pagado' : ' · pagar en sitio')}
                     </div>
                   )}
                   {r.rechazada_motivo && (
-                    <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 3, fontStyle: 'italic' }}>Rechazada: {r.rechazada_motivo}</div>
+                    <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 3, fontStyle: 'italic', background: '#fef2f2', padding: '3px 8px', borderRadius: 6, display: 'inline-block' }}>↩ {r.rechazada_motivo}</div>
                   )}
                 </div>
-                <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ec.bg, color: ec.color, flexShrink: 0 }}>{ec.label}</span>
+                <span style={{ padding: '4px 11px', borderRadius: 999, fontSize: 11, fontWeight: 800, background: ec.bg, color: ec.color, flexShrink: 0, border: `1px solid ${ec.color}33` }}>{ec.label}</span>
                 {vistaFutura && r.estado !== 'cancelada' && (
-                  <button onClick={() => cancelarReserva(r.id)} style={{ padding: '5px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#dc2626', fontWeight: 600, flexShrink: 0 }}>
+                  <button onClick={() => cancelarReserva(r.id)} style={{ padding: '6px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#dc2626', fontWeight: 700, flexShrink: 0 }}>
                     Cancelar
                   </button>
                 )}
