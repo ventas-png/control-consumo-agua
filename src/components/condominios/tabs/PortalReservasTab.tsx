@@ -1,15 +1,26 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import type { Amenidad, ReservaAmenidad } from '../../../types'
+import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
+import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSemana } from './AmenidadesTab'
 
 interface Props {
   amenidades: Amenidad[]
   reservas: ReservaAmenidad[]
+  bloqueos: BloqueoAmenidad[]
   unidadId: string
+  proyectoId: string
   companyId: string
   moneda: string
   onRefresh: () => void
+}
+
+const MOTIVO_LABEL: Record<BloqueoAmenidad['motivo'], string> = {
+  mantenimiento: 'Mantenimiento',
+  limpieza: 'Limpieza profunda',
+  evento_privado: 'Evento privado',
+  reparacion: 'Reparación',
+  otro: 'No disponible',
 }
 
 type EstadoReserva = 'confirmada' | 'cancelada' | 'pendiente'
@@ -20,11 +31,11 @@ const ESTADO_RES: Record<EstadoReserva, { label: string; bg: string; color: stri
   cancelada:  { label: 'Cancelada',  bg: '#f8fafc', color: '#94a3b8' },
 }
 
-function blankForm() {
-  return { amenidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: 0, notas: '' }
+function blankForm(): { amenidad_id: string; fecha: string; hora_inicio: string; hora_fin: string; num_invitados: number; notas: string; metodo_pago_tarifa: MetodoPagoTarifa; reglamento_aceptado: boolean } {
+  return { amenidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: 0, notas: '', metodo_pago_tarifa: 'cargar_unidad', reglamento_aceptado: false }
 }
 
-export function PortalReservasTab({ amenidades, reservas, unidadId, companyId, moneda, onRefresh }: Props) {
+export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, proyectoId, companyId, moneda, onRefresh }: Props) {
   const [showForm, setShowForm]   = useState(false)
   const [saving, setSaving]       = useState(false)
   const [form, setForm]           = useState(blankForm())
@@ -41,59 +52,197 @@ export function PortalReservasTab({ amenidades, reservas, unidadId, companyId, m
     if (!form.amenidad_id) { Swal.fire('Error', 'Seleccione una amenidad.', 'error'); return }
     if (!form.fecha || !form.hora_inicio || !form.hora_fin) { Swal.fire('Error', 'Complete fecha y horario.', 'error'); return }
     if (form.hora_fin <= form.hora_inicio) { Swal.fire('Error', 'La hora de fin debe ser posterior al inicio.', 'error'); return }
-    // Conflict check
+    if (amenidadSel?.reglamento && !form.reglamento_aceptado) {
+      Swal.fire('Reglamento', 'Debes leer y aceptar el reglamento antes de continuar.', 'warning'); return
+    }
+    // Conflict check (sólo contra reservas confirmadas)
     const conflicto = reservas.find(r =>
       r.amenidad_id === form.amenidad_id && r.fecha === form.fecha &&
-      r.estado !== 'cancelada' &&
+      r.estado === 'confirmada' &&
       form.hora_inicio < r.hora_fin && form.hora_fin > r.hora_inicio
     )
     if (conflicto) { Swal.fire('Horario ocupado', 'Esa amenidad ya está reservada en ese horario. Elija otro.', 'warning'); return }
+
+    const bloqueo = bloqueos.find(b =>
+      b.amenidad_id === form.amenidad_id &&
+      bloqueoSolapaReserva(b, form.fecha, form.hora_inicio, form.hora_fin)
+    )
+    if (bloqueo) {
+      const detalle = bloqueo.hora_inicio
+        ? `${bloqueo.fecha_inicio === bloqueo.fecha_fin ? bloqueo.fecha_inicio : `${bloqueo.fecha_inicio} → ${bloqueo.fecha_fin}`} ${bloqueo.hora_inicio}–${bloqueo.hora_fin}`
+        : `${bloqueo.fecha_inicio === bloqueo.fecha_fin ? bloqueo.fecha_inicio : `${bloqueo.fecha_inicio} → ${bloqueo.fecha_fin}`} (día completo)`
+      Swal.fire('Amenidad no disponible', `${MOTIVO_LABEL[bloqueo.motivo]} · ${detalle}. Por favor elige otra fecha u horario.`, 'warning')
+      return
+    }
+
+    if (amenidadSel) {
+      const errReglas = validarReglasAmenidad(amenidadSel, form.fecha, form.hora_inicio, form.hora_fin, unidadId, reservas)
+      if (errReglas) { Swal.fire('No permitido', errReglas, 'warning'); return }
+    }
+
+    const tarifaCalc = amenidadSel ? tarifaAplicable(amenidadSel, form.fecha) : 0
+    const aplicaTarifa = !!(amenidadSel?.requiere_tarifa && tarifaCalc > 0)
+    const montoTarifa = aplicaTarifa ? tarifaCalc : null
+    const metodoPago = aplicaTarifa ? form.metodo_pago_tarifa : null
+    const requiereAprob = !!amenidadSel?.requiere_aprobacion
+    const estadoInicial: 'confirmada' | 'pendiente' = requiereAprob ? 'pendiente' : 'confirmada'
+
     setSaving(true)
+    let cuotaId: string | null = null
+    // Sólo generar cuota cuando la reserva queda confirmada de inmediato
+    if (!requiereAprob && aplicaTarifa && metodoPago === 'cargar_unidad') {
+      const periodo = form.fecha.slice(0, 7)
+      const { data: cuotaData, error: cuotaErr } = await supabase
+        .from('cuotas_condominio')
+        .insert({
+          company_id: companyId,
+          project_id: proyectoId,
+          unidad_id: unidadId,
+          concepto: 'amenidad',
+          monto: montoTarifa,
+          periodo,
+          fecha_vencimiento: form.fecha,
+          estado: 'pendiente',
+          notas: `Reserva ${amenidadSel!.nombre} ${form.fecha} ${form.hora_inicio}-${form.hora_fin}`,
+        })
+        .select('id')
+        .single()
+      if (cuotaErr) { setSaving(false); Swal.fire('Error', `No se pudo generar el cargo: ${cuotaErr.message}`, 'error'); return }
+      cuotaId = cuotaData?.id ?? null
+    }
+
     const { error } = await supabase.from('reservas_amenidades').insert({
       company_id: companyId, amenidad_id: form.amenidad_id,
       unidad_id: unidadId, fecha: form.fecha,
       hora_inicio: form.hora_inicio, hora_fin: form.hora_fin,
       num_invitados: form.num_invitados, notas: form.notas.trim() || null,
-      estado: 'confirmada',
+      estado: estadoInicial,
+      monto_tarifa: montoTarifa,
+      metodo_pago_tarifa: metodoPago,
+      tarifa_pagada: false,
+      cuota_id: cuotaId,
+      deposito_estado: amenidadSel?.requiere_deposito ? 'pendiente' : 'no_aplica',
+      reglamento_aceptado_at: amenidadSel?.reglamento ? new Date().toISOString() : null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: '¡Reserva confirmada!', timer: 1800, showConfirmButton: false })
+    if (error) {
+      if (cuotaId) await supabase.from('cuotas_condominio').delete().eq('id', cuotaId)
+      Swal.fire('Error', error.message, 'error'); return
+    }
+    const titulo = requiereAprob
+      ? 'Solicitud enviada. La administración debe aprobarla.'
+      : aplicaTarifa
+        ? metodoPago === 'cargar_unidad'
+          ? `Reserva confirmada. Se cargó ${moneda} ${montoTarifa!.toFixed(2)} a tu cuenta.`
+          : `Reserva confirmada. Pagar ${moneda} ${montoTarifa!.toFixed(2)} en sitio.`
+        : '¡Reserva confirmada!'
+    Swal.fire({ icon: 'success', title: titulo, timer: 2600, showConfirmButton: false })
     setForm(blankForm()); setShowForm(false); onRefresh()
   }
 
   async function cancelarReserva(id: string) {
     const r = await Swal.fire({ title: '¿Cancelar reserva?', icon: 'question', showCancelButton: true, confirmButtonText: 'Sí, cancelar', cancelButtonText: 'No' })
     if (!r.isConfirmed) return
+    const reserva = reservas.find(x => x.id === id)
     await supabase.from('reservas_amenidades').update({ estado: 'cancelada' }).eq('id', id)
+    if (reserva?.cuota_id) {
+      await supabase.from('cuotas_condominio').delete().eq('id', reserva.cuota_id).eq('estado', 'pendiente')
+    }
     onRefresh()
   }
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
-        <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>Amenidades y reservas</h3>
+      {/* Header del portal */}
+      <div style={{
+        background: 'linear-gradient(135deg,#1d4ed8 0%,#0d9488 100%)',
+        borderRadius: 16, padding: '18px 22px', marginBottom: 18,
+        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: 12,
+        boxShadow: '0 10px 24px -10px rgba(29,78,216,0.4)',
+      }}>
+        <div>
+          <div style={{ fontSize: 10.5, fontWeight: 700, opacity: 0.85, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Tu condominio</div>
+          <h3 style={{ margin: '2px 0 0', fontSize: 19, fontWeight: 800, letterSpacing: '-0.01em' }}>Amenidades y reservas</h3>
+          <div style={{ fontSize: 12, opacity: 0.9, marginTop: 3 }}>
+            {futuras.length} próxima{futuras.length === 1 ? '' : 's'} · {misReservas.filter(r => r.estado === 'pendiente').length > 0 ? `${misReservas.filter(r => r.estado === 'pendiente').length} pendiente${misReservas.filter(r => r.estado === 'pendiente').length === 1 ? '' : 's'} de aprobación` : 'Tap en una amenidad para reservar'}
+          </div>
+        </div>
         {amenidadesActivas.length > 0 && (
           <button onClick={() => setShowForm(true)}
-            style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+            style={{ padding: '10px 18px', background: 'rgba(255,255,255,0.18)', color: 'white', border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: 12, fontWeight: 700, cursor: 'pointer', fontSize: 13.5, backdropFilter: 'blur(6px)' }}>
             + Nueva reserva
           </button>
         )}
       </div>
 
-      {/* Amenidades disponibles */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '22px' }}>
-        {amenidadesActivas.map(a => (
-          <div key={a.id} style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
-            <div style={{ fontSize: '28px', marginBottom: '6px' }}>🏖</div>
-            <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{a.nombre}</div>
-            {a.capacidad_max && <div style={{ fontSize: '12px', color: '#64748b' }}>Hasta {a.capacidad_max} personas</div>}
-            {a.horario_inicio && a.horario_fin && <div style={{ fontSize: '12px', color: '#64748b' }}>{a.horario_inicio} – {a.horario_fin}</div>}
-            {a.requiere_deposito && a.monto_deposito && <div style={{ fontSize: '12px', color: '#c2410c', marginTop: '3px' }}>Depósito: {moneda} {a.monto_deposito.toFixed(2)}</div>}
-          </div>
-        ))}
+      {/* Amenidades disponibles - estilo hero card */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14, marginBottom: 22 }}>
+        {amenidadesActivas.map(a => {
+          const fondo = a.foto_url
+            ? `linear-gradient(180deg, rgba(15,23,42,0.05) 0%, rgba(15,23,42,0.85) 100%), center/cover no-repeat url(${a.foto_url})`
+            : 'linear-gradient(135deg,#0ea5e9 0%,#0d9488 100%)'
+          return (
+            <button key={a.id}
+              onClick={() => { setForm(f => ({ ...f, amenidad_id: a.id })); setShowForm(true) }}
+              style={{
+                position: 'relative',
+                height: 180,
+                background: fondo,
+                border: 'none', borderRadius: 16,
+                cursor: 'pointer',
+                color: 'white',
+                display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+                padding: 14, textAlign: 'left',
+                boxShadow: '0 4px 14px -6px rgba(15,23,42,0.25)',
+                transition: 'transform 0.18s ease, box-shadow 0.18s ease',
+                overflow: 'hidden',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 18px 36px -14px rgba(15,23,42,0.35)' }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px -6px rgba(15,23,42,0.25)' }}>
+              {/* Icono fallback si no hay foto */}
+              {!a.foto_url && (
+                <div style={{ position: 'absolute', top: 16, right: 16, fontSize: 36, opacity: 0.55 }}>🏖</div>
+              )}
+              {/* Badges arriba */}
+              <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>
+                {a.requiere_aprobacion && (
+                  <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(254,215,170,0.95)', color: '#9a3412', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>Aprobación</span>
+                )}
+                {a.requiere_deposito && a.monto_deposito && (
+                  <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(254,243,199,0.95)', color: '#92400e', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>Depósito {moneda} {a.monto_deposito.toFixed(0)}</span>
+                )}
+                {a.requiere_tarifa && a.tarifa_uso != null && (
+                  <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(219,234,254,0.95)', color: '#1d4ed8', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>
+                    Tarifa {moneda} {Number(a.tarifa_uso).toFixed(0)}
+                    {a.tarifa_uso_finde != null && ` / ${Number(a.tarifa_uso_finde).toFixed(0)}`}
+                  </span>
+                )}
+              </div>
+              {/* Footer con datos */}
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.01em', textShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>{a.nombre}</div>
+                <div style={{ fontSize: 11.5, opacity: 0.92, marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {a.capacidad_max && <span>👥 Hasta {a.capacidad_max}</span>}
+                  {a.horario_inicio && a.horario_fin && <span>⏰ {a.horario_inicio}–{a.horario_fin}</span>}
+                </div>
+                {(a.max_reservas_mes_unidad != null || (a.horas_minimas_antelacion ?? 0) > 0 || a.duracion_max_horas != null) && (
+                  <div style={{ fontSize: 10.5, opacity: 0.85, marginTop: 4 }}>
+                    {a.max_reservas_mes_unidad != null && `Máx ${a.max_reservas_mes_unidad}/mes`}
+                    {(a.horas_minimas_antelacion ?? 0) > 0 && ` · ${a.horas_minimas_antelacion}h antelación`}
+                    {a.duracion_max_horas != null && ` · hasta ${a.duracion_max_horas}h`}
+                  </div>
+                )}
+              </div>
+            </button>
+          )
+        })}
         {amenidadesActivas.length === 0 && (
-          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '13px' }}>No hay amenidades disponibles actualmente.</div>
+          <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,#f8fafc)', border: '1.5px dashed #cbd5e1', textAlign: 'center' }}>
+            <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#dbeafe,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>🏖</div>
+            <p style={{ fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>No hay amenidades disponibles</p>
+            <p style={{ fontSize: 12.5, color: '#64748b', margin: 0 }}>Cuando la administración active las áreas comunes, aparecerán aquí.</p>
+          </div>
         )}
       </div>
 
@@ -112,7 +261,63 @@ export function PortalReservasTab({ amenidades, reservas, unidadId, companyId, m
               {amenidadSel?.requiere_deposito && amenidadSel.monto_deposito && (
                 <p style={{ margin: '5px 0 0', fontSize: '12px', color: '#c2410c' }}>⚠ Esta amenidad requiere depósito de {moneda} {amenidadSel.monto_deposito.toFixed(2)}</p>
               )}
+              {(() => {
+                if (!amenidadSel) return null
+                const proximos = bloqueos
+                  .filter(b => b.amenidad_id === amenidadSel.id && b.fecha_fin >= hoy)
+                  .slice()
+                  .sort((a, b) => a.fecha_inicio < b.fecha_inicio ? -1 : 1)
+                  .slice(0, 3)
+                if (proximos.length === 0) return null
+                return (
+                  <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: '#fffbeb', border: '1px solid #fde68a', fontSize: 11.5, color: '#92400e' }}>
+                    🚫 Fechas no disponibles: {proximos.map(b => `${b.fecha_inicio === b.fecha_fin ? b.fecha_inicio : `${b.fecha_inicio}→${b.fecha_fin}`}${b.hora_inicio ? ` ${b.hora_inicio}-${b.hora_fin}` : ''}`).join(' · ')}
+                  </div>
+                )
+              })()}
             </div>
+            {amenidadSel?.requiere_tarifa && (() => {
+              const tarifa = tarifaAplicable(amenidadSel, form.fecha)
+              if (tarifa <= 0) return null
+              const finde = form.fecha && esFinDeSemana(form.fecha) && amenidadSel.tarifa_uso_finde != null
+              return (
+              <div style={{ gridColumn: '1 / -1', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 8 }}>
+                  🎟 Tarifa por uso: {moneda} {tarifa.toFixed(2)} {finde && <span style={{ fontSize: 11, fontWeight: 600 }}>(fin de semana)</span>}
+                </div>
+                <div style={{ fontSize: 12, color: '#475569', marginBottom: 8 }}>¿Cómo deseas pagar la tarifa?</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                    <input type="radio" name="metodo_pago" checked={form.metodo_pago_tarifa === 'cargar_unidad'}
+                      onChange={() => setForm(f => ({ ...f, metodo_pago_tarifa: 'cargar_unidad' }))} />
+                    <span><strong>Cargar a mi unidad</strong> — el monto aparecerá como cargo pendiente en mi cuenta.</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                    <input type="radio" name="metodo_pago" checked={form.metodo_pago_tarifa === 'pagar_momento'}
+                      onChange={() => setForm(f => ({ ...f, metodo_pago_tarifa: 'pagar_momento' }))} />
+                    <span><strong>Pagar al momento</strong> — pagaré directamente a la administración antes de usar la amenidad.</span>
+                  </label>
+                </div>
+              </div>
+              )
+            })()}
+            {amenidadSel?.requiere_aprobacion && (
+              <div style={{ gridColumn: '1 / -1', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: 10, padding: '10px 14px', fontSize: 12.5, color: '#9a3412' }}>
+                ⚠ Esta amenidad requiere aprobación del administrador. Tu solicitud quedará en estado <strong>pendiente</strong> hasta ser confirmada.
+              </div>
+            )}
+            {amenidadSel?.reglamento && (
+              <div style={{ gridColumn: '1 / -1', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>📜 Reglamento</div>
+                <div style={{ fontSize: 12, color: '#475569', whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto', padding: '6px 8px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, lineHeight: 1.5 }}>
+                  {amenidadSel.reglamento}
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12.5, color: '#374151', cursor: 'pointer', fontWeight: 600 }}>
+                  <input type="checkbox" checked={form.reglamento_aceptado} onChange={e => setForm(f => ({ ...f, reglamento_aceptado: e.target.checked }))} />
+                  He leído y acepto el reglamento
+                </label>
+              </div>
+            )}
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Fecha *</label>
               <input type="date" value={form.fecha} min={hoy} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
@@ -159,27 +364,47 @@ export function PortalReservasTab({ amenidades, reservas, unidadId, companyId, m
       </div>
 
       {(vistaFutura ? futuras : pasadas).length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
-          <p style={{ fontWeight: 600, color: '#64748b' }}>Sin reservas {vistaFutura ? 'próximas' : 'anteriores'}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,#f8fafc)', border: '1.5px dashed #cbd5e1', textAlign: 'center' }}>
+          <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#dbeafe,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>
+            {vistaFutura ? '📅' : '📜'}
+          </div>
+          <p style={{ fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Sin reservas {vistaFutura ? 'próximas' : 'anteriores'}</p>
+          <p style={{ fontSize: 12.5, color: '#64748b', margin: 0, maxWidth: 320, lineHeight: 1.5 }}>
+            {vistaFutura ? 'Reserva una amenidad arriba para que aparezca aquí.' : 'Tu historial de reservas pasadas se mostrará aquí.'}
+          </p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {(vistaFutura ? futuras : pasadas).sort((a, b) => a.fecha < b.fecha ? -1 : 1).map(r => {
             const ec = ESTADO_RES[(r.estado as EstadoReserva) ?? 'confirmada']
             const amenidad = amenidades.find(a => a.id === r.amenidad_id)
+            const accent = r.estado === 'confirmada' ? '#16a34a' : r.estado === 'pendiente' ? '#c2410c' : '#94a3b8'
             return (
-              <div key={r.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '22px', flexShrink: 0 }}>📅</span>
+              <div key={r.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: '14px 16px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease' }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 16px -8px rgba(15,23,42,0.18)' }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}>
+                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: accent }} />
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,#dbeafe,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📅</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{amenidad?.nombre ?? 'Amenidad'}</div>
-                  <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '2px' }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>{amenidad?.nombre ?? 'Amenidad'}</div>
+                  <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2, textTransform: 'capitalize' }}>
                     {new Date(r.fecha + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long' })} · {r.hora_inicio} – {r.hora_fin}
                     {r.num_invitados > 0 && ` · ${r.num_invitados} invitado${r.num_invitados > 1 ? 's' : ''}`}
                   </div>
+                  {r.monto_tarifa != null && r.monto_tarifa > 0 && (
+                    <div style={{ fontSize: 11.5, marginTop: 3, fontWeight: 700, color: r.metodo_pago_tarifa === 'cargar_unidad' ? '#1d4ed8' : (r.tarifa_pagada ? '#16a34a' : '#c2410c') }}>
+                      🎟 {moneda} {Number(r.monto_tarifa).toFixed(2)}
+                      {r.metodo_pago_tarifa === 'cargar_unidad' && ' · cargado a tu unidad'}
+                      {r.metodo_pago_tarifa === 'pagar_momento' && (r.tarifa_pagada ? ' · pagado' : ' · pagar en sitio')}
+                    </div>
+                  )}
+                  {r.rechazada_motivo && (
+                    <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 3, fontStyle: 'italic', background: '#fef2f2', padding: '3px 8px', borderRadius: 6, display: 'inline-block' }}>↩ {r.rechazada_motivo}</div>
+                  )}
                 </div>
-                <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ec.bg, color: ec.color, flexShrink: 0 }}>{ec.label}</span>
+                <span style={{ padding: '4px 11px', borderRadius: 999, fontSize: 11, fontWeight: 800, background: ec.bg, color: ec.color, flexShrink: 0, border: `1px solid ${ec.color}33` }}>{ec.label}</span>
                 {vistaFutura && r.estado !== 'cancelada' && (
-                  <button onClick={() => cancelarReserva(r.id)} style={{ padding: '5px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#dc2626', fontWeight: 600, flexShrink: 0 }}>
+                  <button onClick={() => cancelarReserva(r.id)} style={{ padding: '6px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#dc2626', fontWeight: 700, flexShrink: 0 }}>
                     Cancelar
                   </button>
                 )}

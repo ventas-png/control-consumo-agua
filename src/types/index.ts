@@ -354,7 +354,7 @@ export type AppSection =
 
 // ── Módulo Condominios ────────────────────────────────────────────────────────
 
-export type ConceptoCuota = 'mantenimiento' | 'extraordinaria' | 'CAM' | 'otro'
+export type ConceptoCuota = 'mantenimiento' | 'extraordinaria' | 'CAM' | 'amenidad' | 'otro'
 export type EstadoCuota = 'pendiente' | 'pagado' | 'moroso'
 
 export interface CuotaCondominio {
@@ -413,12 +413,41 @@ export interface Amenidad {
   horario_fin?: string | null      // 'HH:MM'
   requiere_deposito: boolean
   monto_deposito?: number | null
+  requiere_tarifa: boolean
+  tarifa_uso?: number | null
+  tarifa_uso_finde?: number | null
+  max_reservas_mes_unidad?: number | null
+  horas_minimas_antelacion?: number | null
+  duracion_max_horas?: number | null
+  requiere_aprobacion: boolean
+  reglamento?: string | null
   activo: boolean
   foto_url?: string | null
   created_at: string
 }
 
 export type EstadoReserva = 'confirmada' | 'cancelada' | 'pendiente'
+export type MetodoPagoTarifa = 'cargar_unidad' | 'pagar_momento'
+export type EstadoDepositoReserva = 'no_aplica' | 'pendiente' | 'cobrado' | 'devuelto' | 'retenido'
+
+export type MotivoBloqueoAmenidad = 'mantenimiento' | 'limpieza' | 'evento_privado' | 'reparacion' | 'otro'
+
+export interface BloqueoAmenidad {
+  id: string
+  company_id: string
+  project_id: string
+  amenidad_id: string
+  fecha_inicio: string         // 'YYYY-MM-DD'
+  fecha_fin: string            // 'YYYY-MM-DD'
+  hora_inicio?: string | null  // 'HH:MM' — null = día completo
+  hora_fin?: string | null
+  motivo: MotivoBloqueoAmenidad
+  notas?: string | null
+  created_by?: string | null
+  created_at: string
+  // joins opcionales
+  amenidad_nombre?: string
+}
 
 export interface ReservaAmenidad {
   id: string
@@ -432,6 +461,29 @@ export interface ReservaAmenidad {
   num_invitados: number
   estado: EstadoReserva
   deposito_pagado: boolean
+  monto_tarifa?: number | null
+  metodo_pago_tarifa?: MetodoPagoTarifa | null
+  tarifa_pagada: boolean
+  cuota_id?: string | null
+  recordatorio_enviado: boolean
+  recordatorio_enviado_at?: string | null
+  no_show: boolean
+  checkin_at?: string | null
+  checkin_foto_url?: string | null
+  checkin_por?: string | null
+  checkout_at?: string | null
+  checkout_foto_url?: string | null
+  checkout_por?: string | null
+  observaciones_uso?: string | null
+  deposito_estado: EstadoDepositoReserva
+  deposito_devuelto_at?: string | null
+  deposito_retenido_monto?: number | null
+  deposito_retenido_motivo?: string | null
+  cuota_retencion_id?: string | null
+  reglamento_aceptado_at?: string | null
+  aprobada_por?: string | null
+  aprobada_at?: string | null
+  rechazada_motivo?: string | null
   notas?: string | null
   created_by?: string | null
   created_at: string

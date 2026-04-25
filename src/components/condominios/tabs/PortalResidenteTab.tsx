@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type {
   Unidad, CuotaCondominio, TicketMantenimiento,
-  Amenidad, ReservaAmenidad, Visitante, AnuncioComunidad, MensajePortal,
+  Amenidad, ReservaAmenidad, BloqueoAmenidad, Visitante, AnuncioComunidad, MensajePortal,
 } from '../../../types'
 import { PortalMiCuentaTab }   from './PortalMiCuentaTab'
 import { PortalMisTicketsTab } from './PortalMisTicketsTab'
@@ -17,6 +17,7 @@ interface Props {
   tickets:    TicketMantenimiento[]
   amenidades: Amenidad[]
   reservas:   ReservaAmenidad[]
+  bloqueosAmenidades: BloqueoAmenidad[]
   visitantes: Visitante[]
   anuncios:   AnuncioComunidad[]
   proyectoId: string
@@ -38,7 +39,7 @@ const SUB_TABS: { id: PortalTab; label: string; icon: string }[] = [
 ]
 
 export function PortalResidenteTab({
-  unidades, cuotas, tickets, amenidades, reservas, visitantes, anuncios,
+  unidades, cuotas, tickets, amenidades, reservas, bloqueosAmenidades, visitantes, anuncios,
   proyectoId, companyId, moneda, canEdit, onRefresh,
 }: Props) {
   const [selectedUnidadId, setSelectedUnidadId] = useState('')
@@ -151,7 +152,9 @@ export function PortalResidenteTab({
               <PortalReservasTab
                 amenidades={amenidades}
                 reservas={reservas}
+                bloqueos={bloqueosAmenidades}
                 unidadId={selectedUnidadId}
+                proyectoId={proyectoId}
                 companyId={companyId}
                 moneda={moneda}
                 onRefresh={onRefresh}
