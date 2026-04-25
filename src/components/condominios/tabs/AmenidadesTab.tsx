@@ -3,6 +3,7 @@ import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, Unidad } from '../../../types'
 import { ImageUploader } from '../ImageUploader'
+import { formatPhoneForWa } from '../../../lib/validation'
 
 interface Props {
   amenidades: Amenidad[]
@@ -18,7 +19,7 @@ interface Props {
   onRefresh: () => void
 }
 
-type Vista = 'amenidades' | 'reservas' | 'calendario' | 'bloqueos'
+type Vista = 'amenidades' | 'reservas' | 'calendario' | 'bloqueos' | 'recordatorios'
 
 const MOTIVO_LABEL: Record<MotivoBloqueoAmenidad, string> = {
   mantenimiento: 'Mantenimiento',
@@ -280,6 +281,31 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     onRefresh()
   }
 
+  function buildMensajeRecordatorio(r: ReservaAmenidad, unidad: Unidad | undefined): string {
+    const fechaStr = new Date(r.fecha + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long' })
+    const tarifa = r.monto_tarifa && r.monto_tarifa > 0 && r.metodo_pago_tarifa === 'pagar_momento' && !r.tarifa_pagada
+      ? `\n\n💰 Recuerda traer ${moneda} ${Number(r.monto_tarifa).toFixed(2)} para la tarifa de uso.`
+      : ''
+    const nombreSaludo = unidad?.propietario_nombre ? `Hola ${unidad.propietario_nombre.split(' ')[0]}, ` : 'Hola, '
+    return `${nombreSaludo}te recordamos tu reserva de *${r.amenidad_nombre}* el ${fechaStr} de ${r.hora_inicio} a ${r.hora_fin}.${tarifa}\n\nNos vemos pronto. 🏖`
+  }
+
+  async function enviarRecordatorio(r: ReservaAmenidad) {
+    const unidad = unidades.find(u => u.id === r.unidad_id)
+    const tel = unidad?.propietario_telefono?.trim()
+    if (!tel) {
+      Swal.fire('Sin teléfono', `La unidad ${r.unidad_nombre || ''} no tiene un teléfono registrado para el propietario.`, 'warning')
+      return
+    }
+    const mensaje = buildMensajeRecordatorio(r, unidad)
+    const url = `https://wa.me/${formatPhoneForWa(tel)}?text=${encodeURIComponent(mensaje)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+    await supabase.from('reservas_amenidades')
+      .update({ recordatorio_enviado: true, recordatorio_enviado_at: new Date().toISOString() })
+      .eq('id', r.id)
+    onRefresh()
+  }
+
   async function eliminarBloqueo(id: string) {
     const r = await Swal.fire({ title: '¿Eliminar bloqueo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, eliminar', cancelButtonText: 'No', confirmButtonColor: '#ef4444' })
     if (!r.isConfirmed) return
@@ -303,9 +329,9 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
 
       {/* Vista toggle */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {(['amenidades', 'reservas', 'calendario', 'bloqueos'] as const).map(v => (
+        {(['amenidades', 'reservas', 'calendario', 'bloqueos', 'recordatorios'] as const).map(v => (
           <button key={v} onClick={() => setVista(v)} style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px', background: vista === v ? 'linear-gradient(135deg,#0ea5e9,#0d9488)' : '#f1f5f9', color: vista === v ? 'white' : '#374151' }}>
-            {v === 'amenidades' ? '🏊 Amenidades' : v === 'reservas' ? '📋 Lista' : v === 'calendario' ? '📆 Calendario' : '🚫 Bloqueos'}
+            {v === 'amenidades' ? '🏊 Amenidades' : v === 'reservas' ? '📋 Lista' : v === 'calendario' ? '📆 Calendario' : v === 'bloqueos' ? '🚫 Bloqueos' : '📨 Recordatorios'}
           </button>
         ))}
       </div>
@@ -769,6 +795,62 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           )}
         </>
       )}
+
+      {/* ── RECORDATORIOS ── */}
+      {vista === 'recordatorios' && (() => {
+        const limite = new Date()
+        limite.setDate(limite.getDate() + 2)
+        const limiteStr = limite.toISOString().slice(0, 10)
+        const proximas = reservas
+          .filter(r => r.estado !== 'cancelada' && r.fecha >= hoy && r.fecha <= limiteStr)
+          .sort((a, b) => (a.fecha + a.hora_inicio).localeCompare(b.fecha + b.hora_inicio))
+        const pendientes = proximas.filter(r => !r.recordatorio_enviado)
+
+        return (
+          <>
+            <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 12, padding: '14px 18px', marginBottom: 16, fontSize: 13, color: '#1e40af' }}>
+              📨 Reservas para hoy y los próximos 2 días: <strong>{proximas.length}</strong> · Sin recordatorio enviado: <strong>{pendientes.length}</strong>
+              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>Al hacer clic en <strong>Enviar WhatsApp</strong> se abrirá la app/web de WhatsApp con el mensaje listo. La reserva queda marcada como recordada.</div>
+            </div>
+            {proximas.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+                <div style={{ fontSize: '40px', marginBottom: '12px' }}>📨</div>
+                <p style={{ fontWeight: 600, color: '#64748b' }}>No hay reservas próximas para recordar</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {proximas.map(r => {
+                  const unidad = unidades.find(u => u.id === r.unidad_id)
+                  const tieneTel = !!unidad?.propietario_telefono?.trim()
+                  return (
+                    <div key={r.id} style={{ background: 'white', border: `1.5px solid ${r.recordatorio_enviado ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 220 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{r.amenidad_nombre}</div>
+                        <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                          {r.unidad_nombre} · {r.fecha === hoy ? 'HOY' : new Date(r.fecha + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long' })} · {r.hora_inicio}–{r.hora_fin}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
+                          {unidad?.propietario_nombre || '— sin propietario —'} {tieneTel ? `· ${unidad?.propietario_telefono}` : '· sin teléfono'}
+                        </div>
+                      </div>
+                      {r.recordatorio_enviado && (
+                        <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, background: '#f0fdf4', color: '#16a34a' }}>
+                          ✓ Enviado
+                        </span>
+                      )}
+                      <button onClick={() => enviarRecordatorio(r)} disabled={!tieneTel}
+                        style={{ padding: '7px 14px', background: tieneTel ? '#25d366' : '#e2e8f0', color: tieneTel ? 'white' : '#94a3b8', border: 'none', borderRadius: 8, cursor: tieneTel ? 'pointer' : 'not-allowed', fontSize: 12.5, fontWeight: 700 }}
+                        title={tieneTel ? 'Abrir WhatsApp con mensaje' : 'Falta teléfono del propietario'}>
+                        💬 {r.recordatorio_enviado ? 'Reenviar' : 'Enviar WhatsApp'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        )
+      })()}
     </div>
   )
 }

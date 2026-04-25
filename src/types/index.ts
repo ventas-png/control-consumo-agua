@@ -458,6 +458,8 @@ export interface ReservaAmenidad {
   metodo_pago_tarifa?: MetodoPagoTarifa | null
   tarifa_pagada: boolean
   cuota_id?: string | null
+  recordatorio_enviado: boolean
+  recordatorio_enviado_at?: string | null
   notas?: string | null
   created_by?: string | null
   created_at: string
