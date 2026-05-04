@@ -134,6 +134,8 @@ export interface UserSession {
   login_time: string;
   expires_at: string;
   module_permissions?: ModulePermissionsMap;
+  servicio_agua?: boolean;
+  servicio_condominios?: boolean;
 }
 
 export interface Ruta {

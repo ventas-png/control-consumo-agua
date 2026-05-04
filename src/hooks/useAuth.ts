@@ -149,6 +149,22 @@ async function buildSessionFromSupabase(
     }
   }
 
+  // Cargar flags de líneas de servicio
+  let servicio_agua: boolean | undefined
+  let servicio_condominios: boolean | undefined
+  if (companyId) {
+    const { data: companyFlags } = await supabase
+      .from('companies')
+      .select('servicio_agua, servicio_condominios')
+      .eq('id', companyId)
+      .single()
+    if (companyFlags) {
+      const flags = companyFlags as { servicio_agua: boolean; servicio_condominios: boolean }
+      servicio_agua = flags.servicio_agua
+      servicio_condominios = flags.servicio_condominios
+    }
+  }
+
   return {
     user_id: userId,
     email,
@@ -161,6 +177,8 @@ async function buildSessionFromSupabase(
       ? new Date(expiresAt * 1000).toISOString()
       : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString(),
     module_permissions: modulePermissions,
+    servicio_agua,
+    servicio_condominios,
   }
 }
 

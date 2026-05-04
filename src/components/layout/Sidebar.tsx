@@ -295,6 +295,18 @@ const ROLE_LABELS: Record<UserRole, string> = {
 const NON_CONFIGURABLE = ['perfil', 'admin_dashboard', 'empresa_proyectos', 'superadmin_empresas']
 const BYPASS_ROLES: UserRole[] = ['super_admin', 'company_owner']
 
+const WATER_MODULES = new Set([
+  'dashboard', 'lecturas', 'cobros', 'rutas', 'calidad',
+  'mapa', 'tabla', 'contadores', 'tarifas', 'servicios_energia',
+])
+const CONDOMINIOS_MODULES = new Set(['condominios'])
+
+function isServiceEnabled(tabId: string, session: UserSession): boolean {
+  if (WATER_MODULES.has(tabId)) return session.servicio_agua !== false
+  if (CONDOMINIOS_MODULES.has(tabId)) return session.servicio_condominios !== false
+  return true
+}
+
 function isTabVisible(tab: Tab, userRole: UserRole, canViewModule: (key: string) => boolean): boolean {
   if (NON_CONFIGURABLE.includes(tab.id)) return tab.roles.includes(userRole)
   if (BYPASS_ROLES.includes(userRole)) return tab.roles.includes(userRole)
@@ -485,11 +497,14 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
         {NAV.map(entry => {
           if (entry.kind === 'tab') {
             if (!isTabVisible(entry.tab, userRole, canViewModule)) return null
+            if (!isServiceEnabled(entry.tab.id, currentUser)) return null
             return renderTabButton(entry.tab)
           }
 
           // Group entry
-          const visibleTabs = entry.tabs.filter(t => isTabVisible(t, userRole, canViewModule))
+          const visibleTabs = entry.tabs.filter(t =>
+            isTabVisible(t, userRole, canViewModule) && isServiceEnabled(t.id, currentUser)
+          )
           if (visibleTabs.length === 0) return null
 
           const isExpanded = expanded[entry.id] ?? true
