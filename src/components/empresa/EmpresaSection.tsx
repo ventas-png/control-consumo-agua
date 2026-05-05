@@ -399,37 +399,40 @@ export function EmpresaSection({ currentUser }: Props) {
 
     if (!formValues) return
 
-    // Llamar al Edge Function para crear el usuario (requiere service role key)
-    const { data: session } = await supabase.auth.getSession()
-    const token = session.session?.access_token
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-    const res = await fetch(`${supabaseUrl}/functions/v1/create-user`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token ?? ''}`,
-      },
-      body: JSON.stringify({
-        email: formValues.email,
-        password: formValues.password,
-        full_name: formValues.nombre,
-        role: formValues.rol,
-        company_id: currentUser.company_id,
-      }),
-    })
+    try {
+      const { data: session } = await supabase.auth.getSession()
+      const token = session.session?.access_token
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+      const res = await fetch(`${supabaseUrl}/functions/v1/create-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token ?? ''}`,
+        },
+        body: JSON.stringify({
+          email: formValues.email,
+          password: formValues.password,
+          full_name: formValues.nombre,
+          role: formValues.rol,
+          company_id: currentUser.company_id,
+        }),
+      })
 
-    if (!res.ok) {
-      const err = await res.json() as { error?: string }
-      void Swal.fire({ icon: 'error', title: 'Error', text: err.error ?? 'No se pudo crear el usuario.' })
-    } else {
-      const created = await res.json() as { user_id?: string }
-      if (formValues.condominiosRol && created.user_id) {
-        await supabase.from('app_users')
-          .update({ condominios_role: formValues.condominiosRol })
-          .eq('id', created.user_id)
+      if (!res.ok) {
+        const err = await res.json() as { error?: string }
+        void Swal.fire({ icon: 'error', title: 'Error al crear usuario', text: err.error ?? 'No se pudo crear el usuario.' })
+      } else {
+        const created = await res.json() as { user_id?: string }
+        if (formValues.condominiosRol && created.user_id) {
+          await supabase.from('app_users')
+            .update({ condominios_role: formValues.condominiosRol })
+            .eq('id', created.user_id)
+        }
+        void Swal.fire({ icon: 'success', title: 'Usuario creado', timer: 1500, showConfirmButton: false })
+        void cargar()
       }
-      void Swal.fire({ icon: 'success', title: 'Usuario creado', timer: 1500, showConfirmButton: false })
-      void cargar()
+    } catch {
+      void Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No se pudo conectar con el servidor. Verifique su conexión e intente nuevamente.' })
     }
   }
 
