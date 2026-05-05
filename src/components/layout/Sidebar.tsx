@@ -297,8 +297,17 @@ const NON_CONFIGURABLE = ['perfil', 'admin_dashboard', 'empresa_proyectos', 'sup
 const BYPASS_ROLES: UserRole[] = ['super_admin', 'company_owner']
 
 function isServiceEnabled(tabId: string, session: UserSession): boolean {
-  if (WATER_MODULE_KEYS.has(tabId)) return session.servicio_agua !== false
-  if (CONDOMINIOS_MODULE_KEYS.has(tabId)) return session.servicio_condominios !== false
+  const isExempt = (['super_admin', 'company_owner'] as string[]).includes(session.role)
+  if (WATER_MODULE_KEYS.has(tabId)) {
+    if (session.servicio_agua === false) return false
+    if (isExempt) return true
+    return session.agua_role != null
+  }
+  if (CONDOMINIOS_MODULE_KEYS.has(tabId)) {
+    if (session.servicio_condominios === false) return false
+    if (isExempt) return true
+    return session.condominios_role != null
+  }
   return true
 }
 

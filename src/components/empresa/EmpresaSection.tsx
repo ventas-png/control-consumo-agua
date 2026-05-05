@@ -7,6 +7,7 @@ import { AsignacionModal } from './AsignacionModal'
 import { PermisosModuloModal } from './PermisosModuloModal'
 import { StripePayPalConfig } from './StripePayPalConfig'
 import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
+import { AGUA_ROLE_PERMISSIONS, WATER_MODULE_KEYS } from '../../lib/moduleConfig'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: '#22c55e' },
@@ -29,6 +30,7 @@ interface Usuario {
   full_name: string
   role: string
   activo: boolean
+  agua_role?: string | null
   condominios_role?: string | null
 }
 
@@ -61,7 +63,7 @@ export function EmpresaSection({ currentUser }: Props) {
     const [empresaRes, proyectosRes, usuariosRes] = await Promise.all([
       supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects, logo_url').eq('id', currentUser.company_id).single(),
       supabase.from('projects').select('id, nombre, logo_url, descripcion, direccion, latitud, longitud, moneda, estado, max_unidades_apartamento, max_unidades_casa, max_unidades_bodega, max_unidades_local_comercial, max_unidades_oficina, max_unidades_parqueadero, max_unidades_otro').eq('company_id', currentUser.company_id).order('nombre'),
-      supabase.from('app_users').select('id, full_name, role, activo, condominios_role')
+      supabase.from('app_users').select('id, full_name, role, activo, agua_role, condominios_role')
         .eq('company_id', currentUser.company_id)
         .neq('id', currentUser.user_id)
         .order('full_name'),
@@ -348,52 +350,88 @@ export function EmpresaSection({ currentUser }: Props) {
   }
 
   async function crearAdmin() {
-    const showCondominiosRole = currentUser.servicio_condominios !== false
-    const condominiosRoleOptions = CONDOMINIOS_ROLES.map(r =>
-      `<option value="${r.id}">${r.label}</option>`
-    ).join('')
-
+    const showAgua = currentUser.servicio_agua !== false
+    const showCond = currentUser.servicio_condominios !== false
+    const condOpts = CONDOMINIOS_ROLES.map(r => `<option value="${r.id}">${r.label}</option>`).join('')
+    const selStyle = 'width:100%;padding:8px 10px;border-radius:6px;border:1px solid #d0d3d4;font-size:13px;margin-top:8px;background:#fff;color:#1e293b'
+    const cols = showAgua && showCond ? '1fr 1fr' : '1fr'
 
     const { value: formValues } = await Swal.fire({
-      title: 'Nuevo Administrador',
+      title: 'Nuevo Usuario',
+      width: 520,
       html: `
-        <input id="swal-nombre" class="swal2-input" placeholder="Nombre completo" />
-        <input id="swal-email" class="swal2-input" placeholder="Correo electrónico" type="email" />
-        <input id="swal-password" class="swal2-input" placeholder="Contraseña temporal" type="password" />
-        <select id="swal-rol" class="swal2-select" style="width:100%;margin-top:8px;padding:10px;border-radius:6px;border:1px solid #d0d3d4">
-          <option value="admin">Administrador</option>
-          <option value="operator">Operador (Lecturas)</option>
-          <option value="collector">Gestor de Cobros</option>
-          <option value="viewer">Visualizador</option>
-        </select>
-        ${showCondominiosRole ? `
-        <p style="font-size:12px;color:#94a3b8;margin:12px 0 4px;text-align:left;padding-left:4px">Rol en Condominios (opcional)</p>
-        <select id="swal-condominios-rol" class="swal2-select" style="width:100%;padding:10px;border-radius:6px;border:1px solid #d0d3d4">
-          <option value="">— Sin rol de condominios —</option>
-          ${condominiosRoleOptions}
-        </select>
-        ` : ''}
+        <div style="text-align:left">
+          <input id="swal-nombre" class="swal2-input" placeholder="Nombre completo" style="margin:0 0 8px" />
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+            <input id="swal-email" class="swal2-input" placeholder="Correo electrónico" type="email" style="margin:0" />
+            <input id="swal-password" class="swal2-input" placeholder="Contraseña temporal" type="password" style="margin:0" />
+          </div>
+          <p style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin:0 0 10px">
+            Acceso a aplicaciones
+          </p>
+          <div style="display:grid;grid-template-columns:${cols};gap:12px">
+            ${showAgua ? `
+            <div id="card-agua" style="border:1px solid #0ea5e933;border-radius:10px;padding:12px">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#0f172a;margin-bottom:2px">
+                <input type="checkbox" id="chk-agua" style="width:16px;height:16px;cursor:pointer;accent-color:#0ea5e9" />
+                💧 Control de Agua
+              </label>
+              <select id="swal-rol-agua" disabled style="${selStyle};opacity:0.4">
+                <option value="admin">Administrador — acceso completo</option>
+                <option value="operator">Operador — lecturas y operaciones</option>
+                <option value="collector">Gestor de Cobros</option>
+                <option value="viewer">Visualizador — solo lectura</option>
+              </select>
+            </div>
+            ` : ''}
+            ${showCond ? `
+            <div id="card-cond" style="border:1px solid #8b5cf633;border-radius:10px;padding:12px">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#0f172a;margin-bottom:2px">
+                <input type="checkbox" id="chk-cond" style="width:16px;height:16px;cursor:pointer;accent-color:#8b5cf6" />
+                🏢 Condominios
+              </label>
+              <select id="swal-rol-cond" disabled style="${selStyle};opacity:0.4">
+                <option value="">— Seleccionar rol —</option>
+                ${condOpts}
+              </select>
+            </div>
+            ` : ''}
+          </div>
+        </div>
       `,
       showCancelButton: true,
-      confirmButtonText: 'Crear',
+      confirmButtonText: 'Crear usuario',
       cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        const wireToggle = (chkId: string, selId: string, cardId: string, color: string) => {
+          const chk = document.getElementById(chkId) as HTMLInputElement | null
+          const sel = document.getElementById(selId) as HTMLSelectElement | null
+          const card = document.getElementById(cardId) as HTMLDivElement | null
+          if (!chk || !sel || !card) return
+          chk.addEventListener('change', () => {
+            sel.disabled = !chk.checked
+            sel.style.opacity = chk.checked ? '1' : '0.4'
+            card.style.borderColor = chk.checked ? color + '88' : color + '33'
+            card.style.background = chk.checked ? color + '11' : 'transparent'
+          })
+        }
+        wireToggle('chk-agua', 'swal-rol-agua', 'card-agua', '#0ea5e9')
+        wireToggle('chk-cond', 'swal-rol-cond', 'card-cond', '#8b5cf6')
+      },
       preConfirm: () => {
         const nombre = (document.getElementById('swal-nombre') as HTMLInputElement)?.value?.trim()
         const email = (document.getElementById('swal-email') as HTMLInputElement)?.value?.trim()
         const password = (document.getElementById('swal-password') as HTMLInputElement)?.value
-        const rol = (document.getElementById('swal-rol') as HTMLSelectElement)?.value
-        const condominiosRol = showCondominiosRole
-          ? ((document.getElementById('swal-condominios-rol') as HTMLSelectElement)?.value || null)
-          : null
-        if (!nombre || !email || !password) {
-          Swal.showValidationMessage('Todos los campos son obligatorios')
-          return false
-        }
-        if (password.length < 8) {
-          Swal.showValidationMessage('La contraseña debe tener al menos 8 caracteres')
-          return false
-        }
-        return { nombre, email, password, rol, condominiosRol }
+        const aguaEnabled = showAgua && (document.getElementById('chk-agua') as HTMLInputElement)?.checked
+        const condEnabled = showCond && (document.getElementById('chk-cond') as HTMLInputElement)?.checked
+        const aguaRol = aguaEnabled ? (document.getElementById('swal-rol-agua') as HTMLSelectElement)?.value : null
+        const condRol = condEnabled ? ((document.getElementById('swal-rol-cond') as HTMLSelectElement)?.value || null) : null
+
+        if (!nombre || !email || !password) { Swal.showValidationMessage('Nombre, correo y contraseña son obligatorios'); return false }
+        if (password.length < 8) { Swal.showValidationMessage('La contraseña debe tener al menos 8 caracteres'); return false }
+        if (!aguaEnabled && !condEnabled) { Swal.showValidationMessage('Selecciona acceso a al menos una aplicación'); return false }
+        if (condEnabled && !condRol) { Swal.showValidationMessage('Selecciona un rol para Condominios'); return false }
+        return { nombre, email, password, rol: aguaRol ?? 'viewer', aguaRol, condRol }
       },
     })
 
@@ -405,10 +443,7 @@ export function EmpresaSection({ currentUser }: Props) {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
       const res = await fetch(`${supabaseUrl}/functions/v1/create-user`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token ?? ''}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token ?? ''}` },
         body: JSON.stringify({
           email: formValues.email,
           password: formValues.password,
@@ -421,19 +456,109 @@ export function EmpresaSection({ currentUser }: Props) {
       if (!res.ok) {
         const err = await res.json() as { error?: string }
         void Swal.fire({ icon: 'error', title: 'Error al crear usuario', text: err.error ?? 'No se pudo crear el usuario.' })
-      } else {
-        const created = await res.json() as { user_id?: string }
-        if (formValues.condominiosRol && created.user_id) {
-          await supabase.from('app_users')
-            .update({ condominios_role: formValues.condominiosRol })
-            .eq('id', created.user_id)
-        }
-        void Swal.fire({ icon: 'success', title: 'Usuario creado', timer: 1500, showConfirmButton: false })
-        void cargar()
+        return
       }
+
+      const created = await res.json() as { user_id?: string }
+      if (!created.user_id) return
+
+      // Set agua_role + override agua module permissions independently
+      if (formValues.aguaRol) {
+        await supabase.from('app_users').update({ agua_role: formValues.aguaRol }).eq('id', created.user_id)
+        const perms = AGUA_ROLE_PERMISSIONS[formValues.aguaRol as keyof typeof AGUA_ROLE_PERMISSIONS]
+        if (perms) {
+          await supabase.from('user_module_permissions').upsert(
+            Array.from(WATER_MODULE_KEYS).map(key => ({ user_id: created.user_id!, module_key: key, ...perms })),
+            { onConflict: 'user_id,module_key' }
+          )
+        }
+      }
+
+      if (formValues.condRol) {
+        await supabase.from('app_users').update({ condominios_role: formValues.condRol }).eq('id', created.user_id)
+      }
+
+      void Swal.fire({ icon: 'success', title: 'Usuario creado', timer: 1500, showConfirmButton: false })
+      void cargar()
     } catch {
       void Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No se pudo conectar con el servidor. Verifique su conexión e intente nuevamente.' })
     }
+  }
+
+  async function cambiarRolAgua(usuario: Usuario) {
+    const allRoles = [
+      { id: '', label: 'Sin acceso a Control de Agua', description: 'Los módulos de agua no serán visibles', color: '#64748b' },
+      { id: 'admin',     label: 'Administrador',    description: 'Acceso completo a todos los módulos de agua', color: '#0ea5e9' },
+      { id: 'operator',  label: 'Operador',         description: 'Lecturas, rutas, calidad y operaciones', color: '#10b981' },
+      { id: 'collector', label: 'Gestor de Cobros', description: 'Cobros, historial y comunicaciones', color: '#f59e0b' },
+      { id: 'viewer',    label: 'Visualizador',     description: 'Solo lectura, sin modificaciones', color: '#8b5cf6' },
+    ]
+    const rolesHtml = allRoles.map(r => {
+      const isActive = usuario.agua_role === r.id || (!usuario.agua_role && r.id === '')
+      return `
+        <button data-rol="${r.id}" type="button" style="
+          display:flex;align-items:flex-start;gap:10px;width:100%;padding:10px 12px;
+          margin-bottom:6px;border-radius:8px;text-align:left;cursor:pointer;
+          border:1px solid ${isActive ? r.color + '88' : r.color + '33'};
+          background:${isActive ? r.color + '22' : 'rgba(0,0,0,0)'};
+        ">
+          <span style="width:10px;height:10px;border-radius:50%;background:${r.color};flex-shrink:0;margin-top:3px"></span>
+          <div style="min-width:0">
+            <div style="font-weight:600;font-size:13px;color:#1e293b;line-height:1.3">${r.label}</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;line-height:1.4">${r.description}</div>
+          </div>
+        </button>`
+    }).join('')
+
+    await Swal.fire({
+      title: 'Rol Control de Agua',
+      width: 440,
+      html: `
+        <p style="color:#64748b;font-size:13px;margin-bottom:14px">
+          Usuario: <strong style="color:#1e293b">${usuario.full_name}</strong>
+        </p>
+        <div style="max-height:320px;overflow-y:auto;padding:2px 4px">${rolesHtml}</div>
+      `,
+      showConfirmButton: false,
+      showCancelButton: true,
+      cancelButtonText: 'Cancelar',
+      didOpen: () => {
+        document.querySelectorAll('[data-rol]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const rolId = (btn as HTMLElement).dataset.rol ?? ''
+            Swal.close()
+            void aplicarRolAgua(usuario, rolId || null)
+          })
+        })
+      },
+    })
+  }
+
+  async function aplicarRolAgua(usuario: Usuario, nuevoRol: string | null) {
+    const { error } = await supabase.from('app_users')
+      .update({ agua_role: nuevoRol })
+      .eq('id', usuario.id)
+    if (error) {
+      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el rol.' })
+      return
+    }
+    // Update agua module permissions based on new role
+    if (nuevoRol) {
+      const perms = AGUA_ROLE_PERMISSIONS[nuevoRol as keyof typeof AGUA_ROLE_PERMISSIONS]
+      if (perms) {
+        await supabase.from('user_module_permissions').upsert(
+          Array.from(WATER_MODULE_KEYS).map(key => ({ user_id: usuario.id, module_key: key, ...perms })),
+          { onConflict: 'user_id,module_key' }
+        )
+      }
+    } else {
+      // Remove agua module permissions
+      await supabase.from('user_module_permissions')
+        .delete()
+        .eq('user_id', usuario.id)
+        .in('module_key', Array.from(WATER_MODULE_KEYS))
+    }
+    void cargar()
   }
 
   async function cambiarRolCondominios(usuario: Usuario) {
@@ -864,20 +989,20 @@ export function EmpresaSection({ currentUser }: Props) {
                       {u.full_name}
                     </div>
                     <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '3px' }}>
-                      <span style={{
-                        padding: '1px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                        background: `${roleBadgeColor[u.role] ?? '#64748b'}22`,
-                        color: roleBadgeColor[u.role] ?? '#64748b',
-                      }}>
-                        {roleLabel[u.role] ?? u.role}
-                      </span>
+                      {u.agua_role && currentUser.servicio_agua !== false && (() => {
+                        const aguaColors: Record<string, string> = { admin: '#0ea5e9', operator: '#10b981', collector: '#f59e0b', viewer: '#8b5cf6' }
+                        const aguaLabels: Record<string, string> = { admin: 'Admin Agua', operator: 'Operador', collector: 'Cobros', viewer: 'Visualizador' }
+                        const c = aguaColors[u.agua_role] ?? '#64748b'
+                        return (
+                          <span style={{ padding: '1px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: c + '22', color: c }}>
+                            💧 {aguaLabels[u.agua_role] ?? u.agua_role}
+                          </span>
+                        )
+                      })()}
                       {u.condominios_role && currentUser.servicio_condominios !== false && (() => {
                         const rDef = CONDOMINIOS_ROLES.find(r => r.id === u.condominios_role)
                         return rDef ? (
-                          <span style={{
-                            padding: '1px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                            background: rDef.color + '22', color: rDef.color,
-                          }}>
+                          <span style={{ padding: '1px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: rDef.color + '22', color: rDef.color }}>
                             🏢 {rDef.label}
                           </span>
                         ) : null
@@ -917,6 +1042,20 @@ export function EmpresaSection({ currentUser }: Props) {
                     </svg>
                     Permisos
                   </button>
+                  {currentUser.servicio_agua !== false && (
+                    <button
+                      onClick={() => void cambiarRolAgua(u)}
+                      title="Rol en Control de Agua"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                        padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(14,165,233,0.3)',
+                        background: 'rgba(14,165,233,0.08)', color: '#38bdf8',
+                        cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
+                      }}
+                    >
+                      💧 Rol
+                    </button>
+                  )}
                   {currentUser.servicio_condominios !== false && (
                     <button
                       onClick={() => void cambiarRolCondominios(u)}

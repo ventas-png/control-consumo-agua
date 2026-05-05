@@ -1,4 +1,4 @@
-import type { ModulePermission, UserRole } from '../types'
+import type { AguaRole, ModulePermission, UserRole } from '../types'
 
 export type ModuleAction = 'view' | 'create' | 'edit' | 'change_status'
 
@@ -30,6 +30,14 @@ export const CONFIGURABLE_MODULES: readonly ModuleDefinition[] = [
   { key: 'comunicacion',      label: 'Comunicación',       actions: ['view', 'create', 'edit'] },
   { key: 'condominios',       label: 'Condominios',        actions: ['view', 'create', 'edit', 'change_status'] },
 ] as const
+
+/** Permisos de módulos de agua por agua_role (usados al crear/cambiar rol de agua). */
+export const AGUA_ROLE_PERMISSIONS: Record<AguaRole, Pick<ModulePermission, 'can_view' | 'can_create' | 'can_edit' | 'can_change_status'>> = {
+  admin:     { can_view: true,  can_create: true,  can_edit: true,  can_change_status: true },
+  operator:  { can_view: true,  can_create: true,  can_edit: true,  can_change_status: false },
+  collector: { can_view: true,  can_create: true,  can_edit: false, can_change_status: true },
+  viewer:    { can_view: true,  can_create: false, can_edit: false, can_change_status: false },
+}
 
 /** Keys de módulos agrupados por línea de servicio (usados en Sidebar y modal de permisos). */
 export const WATER_MODULE_KEYS = new Set([
