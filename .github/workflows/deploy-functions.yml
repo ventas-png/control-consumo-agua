@@ -34,7 +34,8 @@ jobs:
       - name: Deploy create-user
         run: |
           supabase functions deploy create-user \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
 
       - name: Deploy save-payment-config
         run: |
