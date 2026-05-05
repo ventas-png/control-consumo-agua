@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import Swal from 'sweetalert2'
 import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../types'
 import { supabase } from '../lib/supabase'
@@ -83,6 +83,12 @@ const PROJECT_EXEMPT_ROLES = new Set(['super_admin', 'company_owner', 'admin'])
 
 export function useData(companyId?: string, userId?: string, userRole?: string) {
   const [data, setData] = useState<AppData>(() => loadCache() ?? INITIAL_DATA)
+
+  // Refs so the stable cargarDatos closure always reads the latest values
+  const userIdRef = useRef(userId)
+  const userRoleRef = useRef(userRole)
+  userIdRef.current = userId
+  userRoleRef.current = userRole
 
   const fetchAllData = async () => {
     // Defense-in-depth: add company_id filters where columns exist.
@@ -189,11 +195,13 @@ export function useData(companyId?: string, userId?: string, userRole?: string) 
   }
 
   const filterProyectosByAssignment = async (appData: AppData): Promise<AppData> => {
-    if (!userId || !userRole || PROJECT_EXEMPT_ROLES.has(userRole)) return appData
+    const uid = userIdRef.current
+    const role = userRoleRef.current
+    if (!uid || !role || PROJECT_EXEMPT_ROLES.has(role)) return appData
     const { data: assignments } = await supabase
       .from('user_project_assignments')
       .select('project_id')
-      .eq('user_id', userId)
+      .eq('user_id', uid)
     if (!assignments) return appData
     const allowed = new Set(assignments.map((a: { project_id: string }) => a.project_id))
     const filtered = appData.proyectos.filter(p => allowed.has(p.id))
