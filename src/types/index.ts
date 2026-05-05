@@ -114,6 +114,16 @@ export interface RegistroCalidad {
 
 export type UserRole = 'admin' | 'super_admin' | 'company_owner' | 'operator' | 'viewer' | 'cliente' | 'collector';
 
+export type CondominiosRole =
+  | 'administrador_general'
+  | 'junta_directiva'
+  | 'finanzas'
+  | 'operaciones'
+  | 'seguridad'
+  | 'comunidad'
+  | 'recepcion'
+  | 'visualizador'
+
 export interface ModulePermission {
   module_key: string
   can_view: boolean
@@ -136,6 +146,7 @@ export interface UserSession {
   module_permissions?: ModulePermissionsMap;
   servicio_agua?: boolean;
   servicio_condominios?: boolean;
+  condominios_role?: CondominiosRole;
 }
 
 export interface Ruta {

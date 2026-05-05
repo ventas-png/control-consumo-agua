@@ -6,6 +6,7 @@ import { MONEDAS } from '../../types'
 import { AsignacionModal } from './AsignacionModal'
 import { PermisosModuloModal } from './PermisosModuloModal'
 import { StripePayPalConfig } from './StripePayPalConfig'
+import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: '#22c55e' },
@@ -28,6 +29,7 @@ interface Usuario {
   full_name: string
   role: string
   activo: boolean
+  condominios_role?: string | null
 }
 
 interface EmpresaInfo {
@@ -59,7 +61,7 @@ export function EmpresaSection({ currentUser }: Props) {
     const [empresaRes, proyectosRes, usuariosRes] = await Promise.all([
       supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects, logo_url').eq('id', currentUser.company_id).single(),
       supabase.from('projects').select('id, nombre, logo_url, descripcion, direccion, latitud, longitud, moneda, estado, max_unidades_apartamento, max_unidades_casa, max_unidades_bodega, max_unidades_local_comercial, max_unidades_oficina, max_unidades_parqueadero, max_unidades_otro').eq('company_id', currentUser.company_id).order('nombre'),
-      supabase.from('app_users').select('id, full_name, role, activo')
+      supabase.from('app_users').select('id, full_name, role, activo, condominios_role')
         .eq('company_id', currentUser.company_id)
         .neq('id', currentUser.user_id)
         .order('full_name'),
@@ -346,6 +348,11 @@ export function EmpresaSection({ currentUser }: Props) {
   }
 
   async function crearAdmin() {
+    const showCondominiosRole = currentUser.servicio_condominios !== false
+    const condominiosRoleOptions = CONDOMINIOS_ROLES.map(r =>
+      `<option value="${r.id}">${r.label}</option>`
+    ).join('')
+
     const { value: formValues } = await Swal.fire({
       title: 'Nuevo Administrador',
       html: `
@@ -358,6 +365,13 @@ export function EmpresaSection({ currentUser }: Props) {
           <option value="collector">Gestor de Cobros</option>
           <option value="viewer">Visualizador</option>
         </select>
+        ${showCondominiosRole ? `
+        <p style="font-size:12px;color:#94a3b8;margin:12px 0 4px;text-align:left;padding-left:4px">Rol en Condominios (opcional)</p>
+        <select id="swal-condominios-rol" class="swal2-select" style="width:100%;padding:10px;border-radius:6px;border:1px solid #d0d3d4">
+          <option value="">— Sin rol de condominios —</option>
+          ${condominiosRoleOptions}
+        </select>
+        ` : ''}
       `,
       showCancelButton: true,
       confirmButtonText: 'Crear',
@@ -367,6 +381,9 @@ export function EmpresaSection({ currentUser }: Props) {
         const email = (document.getElementById('swal-email') as HTMLInputElement)?.value?.trim()
         const password = (document.getElementById('swal-password') as HTMLInputElement)?.value
         const rol = (document.getElementById('swal-rol') as HTMLSelectElement)?.value
+        const condominiosRol = showCondominiosRole
+          ? ((document.getElementById('swal-condominios-rol') as HTMLSelectElement)?.value || null)
+          : null
         if (!nombre || !email || !password) {
           Swal.showValidationMessage('Todos los campos son obligatorios')
           return false
@@ -375,7 +392,7 @@ export function EmpresaSection({ currentUser }: Props) {
           Swal.showValidationMessage('La contraseña debe tener al menos 8 caracteres')
           return false
         }
-        return { nombre, email, password, rol }
+        return { nombre, email, password, rol, condominiosRol }
       },
     })
 
@@ -404,7 +421,46 @@ export function EmpresaSection({ currentUser }: Props) {
       const err = await res.json() as { error?: string }
       void Swal.fire({ icon: 'error', title: 'Error', text: err.error ?? 'No se pudo crear el usuario.' })
     } else {
+      const created = await res.json() as { user_id?: string }
+      if (formValues.condominiosRol && created.user_id) {
+        await supabase.from('app_users')
+          .update({ condominios_role: formValues.condominiosRol })
+          .eq('id', created.user_id)
+      }
       void Swal.fire({ icon: 'success', title: 'Usuario creado', timer: 1500, showConfirmButton: false })
+      void cargar()
+    }
+  }
+
+  async function cambiarRolCondominios(usuario: Usuario) {
+    const condominiosRoleOptions = CONDOMINIOS_ROLES.map(r =>
+      `<option value="${r.id}" ${usuario.condominios_role === r.id ? 'selected' : ''}>${r.label} — ${r.description}</option>`
+    ).join('')
+
+    const { value: nuevoRol } = await Swal.fire({
+      title: `Rol Condominios`,
+      html: `
+        <p style="color:#94a3b8;font-size:13px;margin-bottom:12px">Usuario: <strong style="color:#e2e8f0">${usuario.full_name}</strong></p>
+        <select id="swal-cond-rol" class="swal2-select" style="width:100%;padding:10px;border-radius:6px;border:1px solid #d0d3d4">
+          <option value="" ${!usuario.condominios_role ? 'selected' : ''}>— Sin rol de condominios —</option>
+          ${condominiosRoleOptions}
+        </select>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => {
+        return (document.getElementById('swal-cond-rol') as HTMLSelectElement)?.value || null
+      },
+    })
+
+    if (nuevoRol === undefined) return
+    const { error } = await supabase.from('app_users')
+      .update({ condominios_role: nuevoRol || null })
+      .eq('id', usuario.id)
+    if (error) {
+      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el rol.' })
+    } else {
       void cargar()
     }
   }
@@ -817,6 +873,20 @@ export function EmpresaSection({ currentUser }: Props) {
                     </svg>
                     Permisos
                   </button>
+                  {currentUser.servicio_condominios !== false && (
+                    <button
+                      onClick={() => void cambiarRolCondominios(u)}
+                      title="Rol en módulo condominios"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        padding: '7px 12px', borderRadius: '7px', border: '1px solid rgba(139,92,246,0.3)',
+                        background: 'rgba(139,92,246,0.08)', color: '#a78bfa',
+                        cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                      }}
+                    >
+                      Rol Cond.
+                    </button>
+                  )}
                   <button
                     onClick={() => void toggleActivoUsuario(u)}
                     title={u.activo ? 'Desactivar' : 'Activar'}
