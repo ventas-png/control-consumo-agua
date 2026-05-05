@@ -353,6 +353,7 @@ export function EmpresaSection({ currentUser }: Props) {
       `<option value="${r.id}">${r.label}</option>`
     ).join('')
 
+
     const { value: formValues } = await Swal.fire({
       title: 'Nuevo Administrador',
       html: `
@@ -433,30 +434,57 @@ export function EmpresaSection({ currentUser }: Props) {
   }
 
   async function cambiarRolCondominios(usuario: Usuario) {
-    const condominiosRoleOptions = CONDOMINIOS_ROLES.map(r =>
-      `<option value="${r.id}" ${usuario.condominios_role === r.id ? 'selected' : ''}>${r.label} — ${r.description}</option>`
-    ).join('')
+    const allRoles = [
+      { id: '', label: 'Sin rol de condominios', description: 'Acceso estándar según permisos de módulo', color: '#64748b' },
+      ...CONDOMINIOS_ROLES,
+    ]
+    const rolesHtml = allRoles.map(r => {
+      const isActive = usuario.condominios_role === r.id || (!usuario.condominios_role && r.id === '')
+      return `
+        <button data-rol="${r.id}" type="button" style="
+          display:flex;align-items:flex-start;gap:10px;width:100%;padding:10px 12px;
+          margin-bottom:6px;border-radius:8px;text-align:left;cursor:pointer;
+          border:1px solid ${isActive ? r.color + '88' : r.color + '33'};
+          background:${isActive ? r.color + '22' : 'rgba(0,0,0,0)'};
+          transition:background 0.15s;
+        ">
+          <span style="width:10px;height:10px;border-radius:50%;background:${r.color};flex-shrink:0;margin-top:3px"></span>
+          <div style="min-width:0">
+            <div style="font-weight:600;font-size:13px;color:#1e293b;line-height:1.3">${r.label}</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;line-height:1.4">${r.description}</div>
+          </div>
+        </button>`
+    }).join('')
 
-    const { value: nuevoRol } = await Swal.fire({
-      title: `Rol Condominios`,
+    await Swal.fire({
+      title: 'Rol Condominios',
+      width: 480,
       html: `
-        <p style="color:#94a3b8;font-size:13px;margin-bottom:12px">Usuario: <strong style="color:#e2e8f0">${usuario.full_name}</strong></p>
-        <select id="swal-cond-rol" class="swal2-select" style="width:100%;padding:10px;border-radius:6px;border:1px solid #d0d3d4">
-          <option value="" ${!usuario.condominios_role ? 'selected' : ''}>— Sin rol de condominios —</option>
-          ${condominiosRoleOptions}
-        </select>
+        <p style="color:#64748b;font-size:13px;margin-bottom:14px">
+          Usuario: <strong style="color:#1e293b">${usuario.full_name}</strong>
+        </p>
+        <div style="max-height:340px;overflow-y:auto;padding:2px 4px">
+          ${rolesHtml}
+        </div>
       `,
+      showConfirmButton: false,
       showCancelButton: true,
-      confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
-      preConfirm: () => {
-        return (document.getElementById('swal-cond-rol') as HTMLSelectElement)?.value || null
+      didOpen: () => {
+        document.querySelectorAll('[data-rol]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const rolId = (btn as HTMLElement).dataset.rol ?? ''
+            Swal.close()
+            void aplicarRolCondominios(usuario, rolId || null)
+          })
+        })
       },
     })
+  }
 
-    if (nuevoRol === undefined) return
+  async function aplicarRolCondominios(usuario: Usuario, nuevoRol: string | null) {
     const { error } = await supabase.from('app_users')
-      .update({ condominios_role: nuevoRol || null })
+      .update({ condominios_role: nuevoRol })
       .eq('id', usuario.id)
     if (error) {
       void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el rol.' })
@@ -814,10 +842,11 @@ export function EmpresaSection({ currentUser }: Props) {
               <div key={u.id} style={{
                 background: '#1e293b', borderRadius: '12px', padding: '14px 18px',
                 border: '1px solid rgba(255,255,255,0.06)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+                flexWrap: 'wrap',
                 opacity: u.activo ? 1 : 0.5,
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '160px' }}>
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
                     background: `${roleBadgeColor[u.role] ?? '#64748b'}22`,
@@ -831,44 +860,56 @@ export function EmpresaSection({ currentUser }: Props) {
                     <div style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {u.full_name}
                     </div>
-                    <div style={{
-                      display: 'inline-block', marginTop: '3px',
-                      padding: '1px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                      background: `${roleBadgeColor[u.role] ?? '#64748b'}22`,
-                      color: roleBadgeColor[u.role] ?? '#64748b',
-                    }}>
-                      {roleLabel[u.role] ?? u.role}
+                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '3px' }}>
+                      <span style={{
+                        padding: '1px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                        background: `${roleBadgeColor[u.role] ?? '#64748b'}22`,
+                        color: roleBadgeColor[u.role] ?? '#64748b',
+                      }}>
+                        {roleLabel[u.role] ?? u.role}
+                      </span>
+                      {u.condominios_role && currentUser.servicio_condominios !== false && (() => {
+                        const rDef = CONDOMINIOS_ROLES.find(r => r.id === u.condominios_role)
+                        return rDef ? (
+                          <span style={{
+                            padding: '1px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                            background: rDef.color + '22', color: rDef.color,
+                          }}>
+                            🏢 {rDef.label}
+                          </span>
+                        ) : null
+                      })()}
                     </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   <button
                     onClick={() => setUsuarioAsignar(u)}
                     title="Asignar acceso a proyectos"
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '6px',
-                      padding: '7px 12px', borderRadius: '7px', border: '1px solid rgba(14,165,233,0.3)',
+                      display: 'flex', alignItems: 'center', gap: '5px',
+                      padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(14,165,233,0.3)',
                       background: 'rgba(14,165,233,0.08)', color: '#38bdf8',
-                      cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                      cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                     }}
                   >
-                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                     </svg>
-                    Asignar Acceso
+                    Acceso
                   </button>
                   <button
                     onClick={() => setUsuarioPermisos(u)}
-                    title="Configurar permisos de modulos"
+                    title="Configurar permisos de módulos"
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '6px',
-                      padding: '7px 12px', borderRadius: '7px', border: '1px solid rgba(168,85,247,0.3)',
+                      display: 'flex', alignItems: 'center', gap: '5px',
+                      padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(168,85,247,0.3)',
                       background: 'rgba(168,85,247,0.08)', color: '#c084fc',
-                      cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                      cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                     }}
                   >
-                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     Permisos
@@ -878,24 +919,24 @@ export function EmpresaSection({ currentUser }: Props) {
                       onClick={() => void cambiarRolCondominios(u)}
                       title="Rol en módulo condominios"
                       style={{
-                        display: 'flex', alignItems: 'center', gap: '6px',
-                        padding: '7px 12px', borderRadius: '7px', border: '1px solid rgba(139,92,246,0.3)',
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                        padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(139,92,246,0.3)',
                         background: 'rgba(139,92,246,0.08)', color: '#a78bfa',
-                        cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                        cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                       }}
                     >
-                      Rol Cond.
+                      🏢 Rol
                     </button>
                   )}
                   <button
                     onClick={() => void toggleActivoUsuario(u)}
                     title={u.activo ? 'Desactivar' : 'Activar'}
                     style={{
-                      padding: '7px 10px', borderRadius: '7px',
+                      padding: '6px 10px', borderRadius: '7px', whiteSpace: 'nowrap',
                       border: `1px solid ${u.activo ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
                       background: u.activo ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
                       color: u.activo ? '#f87171' : '#4ade80',
-                      cursor: 'pointer', fontSize: '12px',
+                      cursor: 'pointer', fontSize: '12px', fontWeight: 600,
                     }}
                   >
                     {u.activo ? 'Desactivar' : 'Activar'}
