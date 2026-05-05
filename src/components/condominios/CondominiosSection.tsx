@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
+import { canViewCondominiosTab } from '../../lib/condominiosRoles'
 import type {
   UserSession, Proyecto, Unidad,
   OrdenCompra, AsambleaDigital, Proforma,
@@ -526,6 +527,21 @@ interface Props {
 }
 
 export function CondominiosSection({ proyectos, unidades, currentUser, canCreate, canEdit }: Props) {
+  // Roles exentos siempre ven todo; los demás respetan condominios_role
+  const condominiosRole = (['super_admin', 'company_owner'] as string[]).includes(currentUser.role)
+    ? null
+    : (currentUser.condominios_role ?? null)
+
+  const visibleSections = useMemo(() =>
+    SECTIONS
+      .map(sec => ({
+        ...sec,
+        tabs: sec.tabs.filter(tid => canViewCondominiosTab(tid, condominiosRole)),
+      }))
+      .filter(sec => sec.tabs.length > 0),
+    [condominiosRole]
+  )
+
   const [activeTab, setActiveTab] = useState<CondominioTab>('panel')
   const [activeSection, setActiveSection] = useState<SectionKey>('panel')
   const [selectedProyectoId, setSelectedProyectoId] = useState<string>('')
@@ -1197,7 +1213,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
         {/* Barra de secciones (nivel 1) */}
         <div style={{ display: 'flex', gap: 1, overflowX: 'auto', marginTop: 8, borderBottom: '2px solid #e2e8f0' }}>
-          {SECTIONS.map(sec => {
+          {visibleSections.map(sec => {
             const activa = activeSection === sec.id
             return (
               <button key={sec.id} onClick={() => {
@@ -1224,7 +1240,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
         {/* Barra de sub-tabs (nivel 2) */}
         <div style={{ display: 'flex', gap: 1, overflowX: 'auto', background: '#f8fafc', padding: '0 2px', borderBottom: '1px solid #e2e8f0' }}>
-          {SECTIONS.find(s => s.id === activeSection)?.tabs
+          {visibleSections.find(s => s.id === activeSection)?.tabs
             .map(tid => TABS.find(t => t.id === tid))
             .filter(Boolean)
             .map(tab => tab && (
