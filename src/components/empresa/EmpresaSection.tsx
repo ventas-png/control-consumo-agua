@@ -867,6 +867,8 @@ export function EmpresaSection({ currentUser }: Props) {
       {usuarioPermisos && (
         <PermisosModuloModal
           usuario={usuarioPermisos}
+          servicioAgua={currentUser.servicio_agua !== false}
+          servicioCondominios={currentUser.servicio_condominios !== false}
           onClose={() => setUsuarioPermisos(null)}
           onSaved={() => void cargar()}
         />

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { AppSection, UserRole, UserSession } from '../../types'
+import { WATER_MODULE_KEYS, CONDOMINIOS_MODULE_KEYS } from '../../lib/moduleConfig'
 
 interface Tab {
   id: AppSection
@@ -295,15 +296,9 @@ const ROLE_LABELS: Record<UserRole, string> = {
 const NON_CONFIGURABLE = ['perfil', 'admin_dashboard', 'empresa_proyectos', 'superadmin_empresas']
 const BYPASS_ROLES: UserRole[] = ['super_admin', 'company_owner']
 
-const WATER_MODULES = new Set([
-  'dashboard', 'lecturas', 'cobros', 'rutas', 'calidad',
-  'mapa', 'tabla', 'contadores', 'tarifas', 'servicios_energia',
-])
-const CONDOMINIOS_MODULES = new Set(['condominios'])
-
 function isServiceEnabled(tabId: string, session: UserSession): boolean {
-  if (WATER_MODULES.has(tabId)) return session.servicio_agua !== false
-  if (CONDOMINIOS_MODULES.has(tabId)) return session.servicio_condominios !== false
+  if (WATER_MODULE_KEYS.has(tabId)) return session.servicio_agua !== false
+  if (CONDOMINIOS_MODULE_KEYS.has(tabId)) return session.servicio_condominios !== false
   return true
 }
 
