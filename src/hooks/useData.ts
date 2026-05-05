@@ -79,7 +79,9 @@ const INITIAL_DATA: AppData = {
   facturasEnergia: [],
 }
 
-export function useData(companyId?: string) {
+const PROJECT_EXEMPT_ROLES = new Set(['super_admin', 'company_owner', 'admin'])
+
+export function useData(companyId?: string, userId?: string, userRole?: string) {
   const [data, setData] = useState<AppData>(() => loadCache() ?? INITIAL_DATA)
 
   const fetchAllData = async () => {
@@ -186,6 +188,33 @@ export function useData(companyId?: string) {
     return next
   }
 
+  const filterProyectosByAssignment = async (appData: AppData): Promise<AppData> => {
+    if (!userId || !userRole || PROJECT_EXEMPT_ROLES.has(userRole)) return appData
+    const { data: assignments } = await supabase
+      .from('user_project_assignments')
+      .select('project_id')
+      .eq('user_id', userId)
+    if (!assignments) return appData
+    const allowed = new Set(assignments.map((a: { project_id: string }) => a.project_id))
+    const filtered = appData.proyectos.filter(p => allowed.has(p.id))
+    if (filtered.length === appData.proyectos.length) return appData
+    const first = filtered[0]
+    return {
+      ...appData,
+      proyectos: filtered,
+      moneda: first?.moneda ?? appData.moneda,
+      maxUnidadesPorTipo: first ? {
+        apartamento:     first.max_unidades_apartamento ?? null,
+        casa:            first.max_unidades_casa ?? null,
+        bodega:          first.max_unidades_bodega ?? null,
+        local_comercial: first.max_unidades_local_comercial ?? null,
+        oficina:         first.max_unidades_oficina ?? null,
+        parqueadero:     first.max_unidades_parqueadero ?? null,
+        otro:            first.max_unidades_otro ?? null,
+      } : appData.maxUnidadesPorTipo,
+    }
+  }
+
   const hasErrors = (results: Awaited<ReturnType<typeof fetchAllData>>) => {
     const [clRes, regRes, , , , , , contadoresRes, unidadesRes] = results
     return (
@@ -204,7 +233,7 @@ export function useData(companyId?: string) {
     const base = loadCache() ?? INITIAL_DATA
 
     let results = await fetchAllData()
-    const freshData = applyResults(base, results)
+    const freshData = await filterProyectosByAssignment(applyResults(base, results))
     setData(freshData)
 
     if (!hasErrors(results)) {
@@ -215,7 +244,7 @@ export function useData(companyId?: string) {
     // Retry 1: wait 1.5 s to handle cold-start timeouts on the DB connection pool
     await new Promise(resolve => setTimeout(resolve, 1500))
     results = await fetchAllData()
-    const retryData = applyResults(base, results)
+    const retryData = await filterProyectosByAssignment(applyResults(base, results))
     setData(retryData)
 
     if (!hasErrors(results)) {
@@ -226,7 +255,7 @@ export function useData(companyId?: string) {
     // Retry 2: wait an additional 3 s for slow Supabase cold starts
     await new Promise(resolve => setTimeout(resolve, 3000))
     results = await fetchAllData()
-    const retryData2 = applyResults(base, results)
+    const retryData2 = await filterProyectosByAssignment(applyResults(base, results))
     setData(retryData2)
 
     if (!hasErrors(results)) {
