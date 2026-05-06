@@ -4,7 +4,9 @@ import { supabase } from '../../../lib/supabase'
 import type {
   RondaSeguridad, NovedadSeguridad, TipoNovedad, PrioridadNovedad, EstadoRonda,
   RutaRonda, PuntoControlRuta, VisitaControl, EstadoVisitaControl,
+  Visitante, Unidad,
 } from '../../../types'
+import { ImageUploader } from '../ImageUploader'
 
 interface Props {
   rondas: RondaSeguridad[]
@@ -12,6 +14,8 @@ interface Props {
   rutas: RutaRonda[]
   puntosControl: PuntoControlRuta[]
   visitasControl: VisitaControl[]
+  visitantes: Visitante[]
+  unidades: Unidad[]
   proyectoId: string
   companyId: string
   userId: string
@@ -49,9 +53,10 @@ const VISITA_CONFIG: Record<EstadoVisitaControl, { label: string; icon: string; 
 
 export function SeguridadTab({
   rondas, novedades, rutas, puntosControl, visitasControl,
+  visitantes, unidades,
   proyectoId, companyId, userId, canCreate, canEdit, onRefresh,
 }: Props) {
-  const [vista, setVista] = useState<'novedades' | 'rondas'>('novedades')
+  const [vista, setVista] = useState<'novedades' | 'rondas' | 'accesos'>('novedades')
   const [showNovedadForm, setShowNovedadForm] = useState(false)
   const [showRondaForm, setShowRondaForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -62,6 +67,20 @@ export function SeguridadTab({
     prioridad: 'normal' as PrioridadNovedad, ronda_id: '',
   })
   const [rondaForm, setRondaForm] = useState({ notas: '', ruta_id: '' })
+
+  // Accesos / verificación visitante
+  const [dpiSearch, setDpiSearch] = useState('')
+  const [searchResult, setSearchResult] = useState<'idle' | 'found' | 'not_found'>('idle')
+  const [searchResultVisitantes, setSearchResultVisitantes] = useState<Visitante[]>([])
+  const [searching, setSearching] = useState(false)
+  const [showRegForm, setShowRegForm] = useState(false)
+  const [regSaving, setRegSaving] = useState(false)
+  const [fotoPersonaUrl, setFotoPersonaUrl] = useState<string | null>(null)
+  const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
+  const [fotoVehiculoUrl, setFotoVehiculoUrl] = useState<string | null>(null)
+  const [regForm, setRegForm] = useState({
+    nombre: '', unidad_id: '', placa_vehiculo: '', motivo: '', notas: '', identificacion: '',
+  })
 
   const novedadesFiltradas = novedades.filter(n =>
     filtroPrioridad === 'todos' || n.prioridad === filtroPrioridad
@@ -155,6 +174,82 @@ export function SeguridadTab({
     const r = await Swal.fire({ title: '¿Eliminar novedad?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('novedades_seguridad').delete().eq('id', id)
+    onRefresh()
+  }
+
+  function resetAccesos() {
+    setDpiSearch('')
+    setSearchResult('idle')
+    setSearchResultVisitantes([])
+    setShowRegForm(false)
+    setRegForm({ nombre: '', unidad_id: '', placa_vehiculo: '', motivo: '', notas: '', identificacion: '' })
+    setFotoPersonaUrl(null)
+    setFotoDocumentoUrl(null)
+    setFotoVehiculoUrl(null)
+  }
+
+  async function buscarPorDpi() {
+    const dpi = dpiSearch.trim()
+    if (!dpi) return
+    setSearching(true)
+    setSearchResult('idle')
+    setSearchResultVisitantes([])
+    setShowRegForm(false)
+    const { data, error } = await supabase
+      .from('visitantes')
+      .select('*, unidades(nombre)')
+      .eq('company_id', companyId)
+      .eq('identificacion', dpi)
+      .order('hora_entrada', { ascending: false })
+      .limit(50)
+    setSearching(false)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (data && data.length > 0) {
+      const mapped = data.map((v: any) => ({ ...v, unidad_nombre: v.unidades?.nombre }))
+      setSearchResultVisitantes(mapped)
+      setSearchResult('found')
+      const latest = mapped[0]
+      setRegForm({
+        nombre: latest.nombre,
+        identificacion: latest.identificacion ?? dpi,
+        placa_vehiculo: latest.placa_vehiculo ?? '',
+        motivo: '',
+        notas: '',
+        unidad_id: '',
+      })
+      setFotoPersonaUrl(latest.foto_url ?? null)
+      setFotoDocumentoUrl(latest.foto_documento_url ?? null)
+      setFotoVehiculoUrl(latest.foto_vehiculo_url ?? null)
+    } else {
+      setSearchResult('not_found')
+      setRegForm(f => ({ ...f, identificacion: dpi }))
+      setShowRegForm(true)
+    }
+  }
+
+  async function handleRegistrarAcceso() {
+    if (!regForm.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre del visitante.', 'error'); return }
+    if (!regForm.unidad_id) { Swal.fire('Error', 'Seleccione la unidad a visitar.', 'error'); return }
+    setRegSaving(true)
+    const { error } = await supabase.from('visitantes').insert({
+      company_id: companyId,
+      project_id: proyectoId,
+      unidad_id: regForm.unidad_id,
+      nombre: regForm.nombre.trim(),
+      identificacion: regForm.identificacion.trim() || null,
+      placa_vehiculo: regForm.placa_vehiculo.trim() || null,
+      motivo: regForm.motivo.trim() || null,
+      notas: regForm.notas.trim() || null,
+      foto_url: fotoPersonaUrl,
+      foto_documento_url: fotoDocumentoUrl,
+      foto_vehiculo_url: fotoVehiculoUrl,
+      registrado_por: userId,
+      hora_entrada: new Date().toISOString(),
+    })
+    setRegSaving(false)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    Swal.fire({ icon: 'success', title: 'Entrada registrada', timer: 1500, showConfirmButton: false })
+    resetAccesos()
     onRefresh()
   }
 
@@ -257,7 +352,7 @@ export function SeguridadTab({
       )}
 
       {/* Vista toggle */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => setVista('novedades')}
           style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === 'novedades' ? '#0ea5e9' : '#e2e8f0', background: vista === 'novedades' ? '#eff6ff' : 'white', color: vista === 'novedades' ? '#0ea5e9' : '#64748b' }}>
           📋 Novedades ({novedades.length})
@@ -265,6 +360,10 @@ export function SeguridadTab({
         <button onClick={() => setVista('rondas')}
           style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === 'rondas' ? '#0ea5e9' : '#e2e8f0', background: vista === 'rondas' ? '#eff6ff' : 'white', color: vista === 'rondas' ? '#0ea5e9' : '#64748b' }}>
           🛡 Rondas ({rondas.length})
+        </button>
+        <button onClick={() => setVista('accesos')}
+          style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === 'accesos' ? '#0ea5e9' : '#e2e8f0', background: vista === 'accesos' ? '#eff6ff' : 'white', color: vista === 'accesos' ? '#0ea5e9' : '#64748b' }}>
+          🚪 Accesos
         </button>
       </div>
 
@@ -453,6 +552,176 @@ export function SeguridadTab({
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Vista accesos: verificación de visitantes por DPI */}
+      {vista === 'accesos' && (
+        <div>
+          {/* Panel de búsqueda */}
+          <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>Verificar visitante por DPI</h3>
+            <p style={{ margin: '0 0 14px', fontSize: '13px', color: '#64748b' }}>Busque el DPI del visitante para revisar si ya ha ingresado antes. Si no aparece, podrá registrarlo con sus datos y fotografías.</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input
+                value={dpiSearch}
+                onChange={e => setDpiSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && buscarPorDpi()}
+                placeholder="Ingrese número de DPI o identificación..."
+                style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', background: '#f8fafc' }}
+              />
+              <button
+                onClick={buscarPorDpi}
+                disabled={searching || !dpiSearch.trim()}
+                style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: searching || !dpiSearch.trim() ? 'not-allowed' : 'pointer', opacity: searching || !dpiSearch.trim() ? 0.7 : 1, minWidth: '110px', fontSize: '13.5px' }}>
+                {searching ? 'Buscando...' : '🔍 Buscar'}
+              </button>
+              {searchResult !== 'idle' && (
+                <button onClick={resetAccesos}
+                  style={{ padding: '10px 14px', background: '#f1f5f9', color: '#374151', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+                  Limpiar
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Resultado: visitante encontrado */}
+          {searchResult === 'found' && (
+            <div>
+              <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {searchResultVisitantes[0]?.foto_url
+                    ? <img src={searchResultVisitantes[0].foto_url} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #86efac' }} />
+                    : <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,#10b981,#059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '18px', flexShrink: 0 }}>
+                        {searchResultVisitantes[0]?.nombre.charAt(0).toUpperCase()}
+                      </div>
+                  }
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#15803d' }}>
+                      Visitante encontrado: {searchResultVisitantes[0]?.nombre}
+                    </div>
+                    <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '2px' }}>
+                      DPI: {dpiSearch} · {searchResultVisitantes.length} visita{searchResultVisitantes.length !== 1 ? 's' : ''} registrada{searchResultVisitantes.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                </div>
+                {canCreate && (
+                  <button onClick={() => setShowRegForm(true)}
+                    style={{ padding: '9px 18px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px', flexShrink: 0 }}>
+                    + Registrar nueva entrada
+                  </button>
+                )}
+              </div>
+
+              {/* Historial de visitas */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                {searchResultVisitantes.map(v => {
+                  const enPremisa = !v.hora_salida
+                  return (
+                    <div key={v.id} style={{ background: 'white', border: `1.5px solid ${enPremisa ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      {v.foto_url && <img src={v.foto_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#0f172a' }}>
+                          {new Date(v.hora_entrada).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {' — '}
+                          {new Date(v.hora_entrada).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '10px', marginTop: '2px', flexWrap: 'wrap' }}>
+                          {v.unidad_nombre && <span>📍 {v.unidad_nombre}</span>}
+                          {v.motivo && <span>· {v.motivo}</span>}
+                          {v.placa_vehiculo && <span>· 🚗 {v.placa_vehiculo}</span>}
+                          {v.project_id !== proyectoId && <span style={{ color: '#7c3aed', fontWeight: 600 }}>· Otro proyecto</span>}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        {enPremisa
+                          ? <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', background: '#dcfce7', color: '#16a34a', fontWeight: 700 }}>En premisas</span>
+                          : <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>
+                              Salida: {new Date(v.hora_salida!).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        }
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Resultado: no encontrado */}
+          {searchResult === 'not_found' && (
+            <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: '#dc2626' }}>No se encontró ningún visitante con ese DPI</div>
+                <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '2px' }}>Complete el formulario para registrarlo como nuevo visitante.</div>
+              </div>
+              {canCreate && !showRegForm && (
+                <button onClick={() => setShowRegForm(true)}
+                  style={{ padding: '8px 16px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>
+                  + Registrar nuevo
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Formulario de registro */}
+          {showRegForm && canCreate && (
+            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+              <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>
+                {searchResult === 'found' ? 'Registrar nueva entrada' : 'Registrar nuevo visitante'}
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Nombre completo *</label>
+                  <input value={regForm.nombre} onChange={e => setRegForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre del visitante"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
+                  <select value={regForm.unidad_id} onChange={e => setRegForm(f => ({ ...f, unidad_id: e.target.value }))}
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
+                    <option value="">Seleccionar...</option>
+                    {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
+                  <input value={regForm.identificacion} onChange={e => setRegForm(f => ({ ...f, identificacion: e.target.value }))} placeholder="Número de documento"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
+                  <input value={regForm.placa_vehiculo} onChange={e => setRegForm(f => ({ ...f, placa_vehiculo: e.target.value }))} placeholder="Ej. ABC-123"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Motivo de visita</label>
+                  <input value={regForm.motivo} onChange={e => setRegForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Ej. Entrega, Social..."
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Notas</label>
+                  <input value={regForm.notas} onChange={e => setRegForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                </div>
+                <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+                  <ImageUploader value={fotoPersonaUrl} onChange={setFotoPersonaUrl} folder="visitantes" label="Foto del visitante" />
+                  <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" />
+                  <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                <button onClick={handleRegistrarAcceso} disabled={regSaving}
+                  style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: regSaving ? 'not-allowed' : 'pointer', opacity: regSaving ? 0.7 : 1 }}>
+                  {regSaving ? 'Registrando...' : '✓ Registrar entrada'}
+                </button>
+                <button onClick={() => setShowRegForm(false)}
+                  style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

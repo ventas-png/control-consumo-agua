@@ -409,6 +409,8 @@ export interface Visitante {
   hora_entrada: string
   hora_salida?: string | null
   foto_url?: string | null
+  foto_documento_url?: string | null
+  foto_vehiculo_url?: string | null
   registrado_por?: string | null
   notas?: string | null
   qr_token?: string | null
