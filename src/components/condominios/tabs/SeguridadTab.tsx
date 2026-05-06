@@ -56,7 +56,8 @@ export function SeguridadTab({
   visitantes, unidades,
   proyectoId, companyId, userId, canCreate, canEdit, onRefresh,
 }: Props) {
-  const [vista, setVista] = useState<'novedades' | 'rondas' | 'accesos'>('novedades')
+  const [vista, setVista] = useState<'novedades' | 'rondas'>('novedades')
+  const [showAccesosModal, setShowAccesosModal] = useState(false)
   const [showNovedadForm, setShowNovedadForm] = useState(false)
   const [showRondaForm, setShowRondaForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -186,6 +187,7 @@ export function SeguridadTab({
     setFotoPersonaUrl(null)
     setFotoDocumentoUrl(null)
     setFotoVehiculoUrl(null)
+    setShowAccesosModal(false)
   }
 
   async function buscarPorDpi() {
@@ -264,7 +266,10 @@ export function SeguridadTab({
             {rondaEnCurso && <span style={{ color: '#2563eb', fontWeight: 600 }}> · Ronda en curso</span>}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={() => setShowAccesosModal(true)} style={{ padding: '9px 16px', background: '#f5f3ff', color: '#7c3aed', border: '1.5px solid #ddd6fe', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+            🚪 Verificar acceso
+          </button>
           {canCreate && (
             <>
               <button onClick={() => setShowNovedadForm(true)} style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
@@ -360,10 +365,6 @@ export function SeguridadTab({
         <button onClick={() => setVista('rondas')}
           style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === 'rondas' ? '#0ea5e9' : '#e2e8f0', background: vista === 'rondas' ? '#eff6ff' : 'white', color: vista === 'rondas' ? '#0ea5e9' : '#64748b' }}>
           🛡 Rondas ({rondas.length})
-        </button>
-        <button onClick={() => setVista('accesos')}
-          style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === 'accesos' ? '#0ea5e9' : '#e2e8f0', background: vista === 'accesos' ? '#eff6ff' : 'white', color: vista === 'accesos' ? '#0ea5e9' : '#64748b' }}>
-          🚪 Accesos
         </button>
       </div>
 
@@ -555,173 +556,195 @@ export function SeguridadTab({
         </div>
       )}
 
-      {/* Vista accesos: verificación de visitantes por DPI */}
-      {vista === 'accesos' && (
-        <div>
-          {/* Panel de búsqueda */}
-          <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-            <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>Verificar visitante por DPI</h3>
-            <p style={{ margin: '0 0 14px', fontSize: '13px', color: '#64748b' }}>Busque el DPI del visitante para revisar si ya ha ingresado antes. Si no aparece, podrá registrarlo con sus datos y fotografías.</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <input
-                value={dpiSearch}
-                onChange={e => setDpiSearch(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && buscarPorDpi()}
-                placeholder="Ingrese número de DPI o identificación..."
-                style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', background: '#f8fafc' }}
-              />
-              <button
-                onClick={buscarPorDpi}
-                disabled={searching || !dpiSearch.trim()}
-                style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: searching || !dpiSearch.trim() ? 'not-allowed' : 'pointer', opacity: searching || !dpiSearch.trim() ? 0.7 : 1, minWidth: '110px', fontSize: '13.5px' }}>
-                {searching ? 'Buscando...' : '🔍 Buscar'}
+      {/* Modal de verificación de acceso */}
+      {showAccesosModal && (
+        <div onClick={resetAccesos}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '24px 16px', overflowY: 'auto' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'white', borderRadius: '18px', width: '100%', maxWidth: '680px', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.4)', marginBottom: '24px' }}>
+
+            {/* Header del modal */}
+            <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: 'white', borderRadius: '18px 18px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.8, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Control de Seguridad</div>
+                <div style={{ fontSize: 19, fontWeight: 800, marginTop: 2 }}>🚪 Verificar visitante</div>
+                <div style={{ fontSize: 12.5, opacity: 0.88, marginTop: 4 }}>Busque por DPI para ver historial o registrar nueva entrada</div>
+              </div>
+              <button onClick={resetAccesos}
+                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '10px', color: 'white', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '6px 10px', flexShrink: 0 }}>
+                ✕
               </button>
-              {searchResult !== 'idle' && (
-                <button onClick={resetAccesos}
-                  style={{ padding: '10px 14px', background: '#f1f5f9', color: '#374151', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
-                  Limpiar
-                </button>
+            </div>
+
+            {/* Cuerpo del modal */}
+            <div style={{ padding: '20px 24px' }}>
+
+              {/* Buscador DPI */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: '#374151', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>DPI / Identificación</label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input
+                    value={dpiSearch}
+                    onChange={e => setDpiSearch(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && buscarPorDpi()}
+                    placeholder="Ingrese número de DPI o identificación..."
+                    autoFocus
+                    style={{ flex: 1, padding: '11px 14px', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', background: '#f8fafc' }}
+                  />
+                  <button
+                    onClick={buscarPorDpi}
+                    disabled={searching || !dpiSearch.trim()}
+                    style={{ padding: '11px 20px', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: searching || !dpiSearch.trim() ? 'not-allowed' : 'pointer', opacity: searching || !dpiSearch.trim() ? 0.65 : 1, minWidth: '110px', fontSize: '13.5px' }}>
+                    {searching ? 'Buscando...' : '🔍 Buscar'}
+                  </button>
+                  {searchResult !== 'idle' && (
+                    <button onClick={() => { setDpiSearch(''); setSearchResult('idle'); setSearchResultVisitantes([]); setShowRegForm(false); }}
+                      style={{ padding: '11px 14px', background: '#f1f5f9', color: '#64748b', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Resultado: visitante encontrado */}
+              {searchResult === 'found' && (
+                <div>
+                  <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '14px 16px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {searchResultVisitantes[0]?.foto_url
+                        ? <img src={searchResultVisitantes[0].foto_url} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #86efac', flexShrink: 0 }} />
+                        : <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,#10b981,#059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '18px', flexShrink: 0 }}>
+                            {searchResultVisitantes[0]?.nombre.charAt(0).toUpperCase()}
+                          </div>
+                      }
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '15px', color: '#15803d' }}>
+                          {searchResultVisitantes[0]?.nombre}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                          DPI: {dpiSearch} · {searchResultVisitantes.length} visita{searchResultVisitantes.length !== 1 ? 's' : ''} registrada{searchResultVisitantes.length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    </div>
+                    {canCreate && (
+                      <button onClick={() => setShowRegForm(true)}
+                        style={{ padding: '8px 16px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>
+                        + Registrar nueva entrada
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Historial */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', maxHeight: showRegForm ? '160px' : '280px', overflowY: 'auto', marginBottom: showRegForm ? '16px' : '0' }}>
+                    {searchResultVisitantes.map(v => {
+                      const enPremisa = !v.hora_salida
+                      return (
+                        <div key={v.id} style={{ background: enPremisa ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${enPremisa ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: '10px', padding: '10px 14px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                          {v.foto_url && <img src={v.foto_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a' }}>
+                              {new Date(v.hora_entrada).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              {' · '}
+                              {new Date(v.hora_entrada).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            <div style={{ fontSize: '11.5px', color: '#64748b', display: 'flex', gap: '8px', marginTop: '1px', flexWrap: 'wrap' }}>
+                              {v.unidad_nombre && <span>📍 {v.unidad_nombre}</span>}
+                              {v.motivo && <span>· {v.motivo}</span>}
+                              {v.placa_vehiculo && <span>· 🚗 {v.placa_vehiculo}</span>}
+                              {v.project_id !== proyectoId && <span style={{ color: '#7c3aed', fontWeight: 600 }}>· Otro proyecto</span>}
+                            </div>
+                          </div>
+                          <div style={{ flexShrink: 0 }}>
+                            {enPremisa
+                              ? <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', background: '#dcfce7', color: '#16a34a', fontWeight: 700 }}>En premisas</span>
+                              : <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                  Salida {new Date(v.hora_salida!).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                            }
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Resultado: no encontrado */}
+              {searchResult === 'not_found' && (
+                <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#dc2626' }}>No se encontró ningún visitante con ese DPI</div>
+                    <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '2px' }}>Complete el formulario para registrarlo como nuevo visitante.</div>
+                  </div>
+                  {canCreate && !showRegForm && (
+                    <button onClick={() => setShowRegForm(true)}
+                      style={{ padding: '8px 16px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>
+                      + Registrar nuevo
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Formulario de registro */}
+              {showRegForm && canCreate && (
+                <div style={{ borderTop: '1.5px solid #e2e8f0', paddingTop: '18px', marginTop: searchResult === 'found' ? '4px' : '0' }}>
+                  <h3 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+                    {searchResult === 'found' ? 'Registrar nueva entrada' : 'Registrar nuevo visitante'}
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Nombre completo *</label>
+                      <input value={regForm.nombre} onChange={e => setRegForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre del visitante"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
+                      <select value={regForm.unidad_id} onChange={e => setRegForm(f => ({ ...f, unidad_id: e.target.value }))}
+                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
+                        <option value="">Seleccionar...</option>
+                        {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
+                      <input value={regForm.identificacion} onChange={e => setRegForm(f => ({ ...f, identificacion: e.target.value }))} placeholder="Número de documento"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
+                      <input value={regForm.placa_vehiculo} onChange={e => setRegForm(f => ({ ...f, placa_vehiculo: e.target.value }))} placeholder="Ej. ABC-123"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Motivo de visita</label>
+                      <input value={regForm.motivo} onChange={e => setRegForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Ej. Entrega, Social..."
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Notas</label>
+                      <input value={regForm.notas} onChange={e => setRegForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                    <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                      <ImageUploader value={fotoPersonaUrl} onChange={setFotoPersonaUrl} folder="visitantes" label="Foto del visitante" />
+                      <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto DPI / Documento" />
+                      <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                    <button onClick={handleRegistrarAcceso} disabled={regSaving}
+                      style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: regSaving ? 'not-allowed' : 'pointer', opacity: regSaving ? 0.7 : 1 }}>
+                      {regSaving ? 'Registrando...' : '✓ Registrar entrada'}
+                    </button>
+                    <button onClick={() => setShowRegForm(false)}
+                      style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
-
-          {/* Resultado: visitante encontrado */}
-          {searchResult === 'found' && (
-            <div>
-              <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  {searchResultVisitantes[0]?.foto_url
-                    ? <img src={searchResultVisitantes[0].foto_url} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #86efac' }} />
-                    : <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,#10b981,#059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '18px', flexShrink: 0 }}>
-                        {searchResultVisitantes[0]?.nombre.charAt(0).toUpperCase()}
-                      </div>
-                  }
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#15803d' }}>
-                      Visitante encontrado: {searchResultVisitantes[0]?.nombre}
-                    </div>
-                    <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '2px' }}>
-                      DPI: {dpiSearch} · {searchResultVisitantes.length} visita{searchResultVisitantes.length !== 1 ? 's' : ''} registrada{searchResultVisitantes.length !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                </div>
-                {canCreate && (
-                  <button onClick={() => setShowRegForm(true)}
-                    style={{ padding: '9px 18px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px', flexShrink: 0 }}>
-                    + Registrar nueva entrada
-                  </button>
-                )}
-              </div>
-
-              {/* Historial de visitas */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-                {searchResultVisitantes.map(v => {
-                  const enPremisa = !v.hora_salida
-                  return (
-                    <div key={v.id} style={{ background: 'white', border: `1.5px solid ${enPremisa ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: '12px', padding: '12px 16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      {v.foto_url && <img src={v.foto_url} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#0f172a' }}>
-                          {new Date(v.hora_entrada).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
-                          {' — '}
-                          {new Date(v.hora_entrada).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '10px', marginTop: '2px', flexWrap: 'wrap' }}>
-                          {v.unidad_nombre && <span>📍 {v.unidad_nombre}</span>}
-                          {v.motivo && <span>· {v.motivo}</span>}
-                          {v.placa_vehiculo && <span>· 🚗 {v.placa_vehiculo}</span>}
-                          {v.project_id !== proyectoId && <span style={{ color: '#7c3aed', fontWeight: 600 }}>· Otro proyecto</span>}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        {enPremisa
-                          ? <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', background: '#dcfce7', color: '#16a34a', fontWeight: 700 }}>En premisas</span>
-                          : <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>
-                              Salida: {new Date(v.hora_salida!).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                        }
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Resultado: no encontrado */}
-          {searchResult === 'not_found' && (
-            <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '14px', color: '#dc2626' }}>No se encontró ningún visitante con ese DPI</div>
-                <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '2px' }}>Complete el formulario para registrarlo como nuevo visitante.</div>
-              </div>
-              {canCreate && !showRegForm && (
-                <button onClick={() => setShowRegForm(true)}
-                  style={{ padding: '8px 16px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>
-                  + Registrar nuevo
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Formulario de registro */}
-          {showRegForm && canCreate && (
-            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>
-                {searchResult === 'found' ? 'Registrar nueva entrada' : 'Registrar nuevo visitante'}
-              </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Nombre completo *</label>
-                  <input value={regForm.nombre} onChange={e => setRegForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre del visitante"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
-                  <select value={regForm.unidad_id} onChange={e => setRegForm(f => ({ ...f, unidad_id: e.target.value }))}
-                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
-                    <option value="">Seleccionar...</option>
-                    {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
-                  <input value={regForm.identificacion} onChange={e => setRegForm(f => ({ ...f, identificacion: e.target.value }))} placeholder="Número de documento"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
-                  <input value={regForm.placa_vehiculo} onChange={e => setRegForm(f => ({ ...f, placa_vehiculo: e.target.value }))} placeholder="Ej. ABC-123"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Motivo de visita</label>
-                  <input value={regForm.motivo} onChange={e => setRegForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Ej. Entrega, Social..."
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Notas</label>
-                  <input value={regForm.notas} onChange={e => setRegForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-                </div>
-                <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-                  <ImageUploader value={fotoPersonaUrl} onChange={setFotoPersonaUrl} folder="visitantes" label="Foto del visitante" />
-                  <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" />
-                  <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={handleRegistrarAcceso} disabled={regSaving}
-                  style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: regSaving ? 'not-allowed' : 'pointer', opacity: regSaving ? 0.7 : 1 }}>
-                  {regSaving ? 'Registrando...' : '✓ Registrar entrada'}
-                </button>
-                <button onClick={() => setShowRegForm(false)}
-                  style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
