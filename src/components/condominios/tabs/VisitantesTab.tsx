@@ -25,6 +25,8 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   const [soloActivos, setSoloActivos] = useState(false)
   const [filtroFecha, setFiltroFecha] = useState<FiltroFecha>('todos')
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
+  const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
+  const [fotoVehiculoUrl, setFotoVehiculoUrl] = useState<string | null>(null)
   const [form, setForm] = useState({
     unidad_id: '',
     nombre: '',
@@ -78,6 +80,8 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   function resetForm() {
     setForm({ unidad_id: '', nombre: '', identificacion: '', placa_vehiculo: '', motivo: '', notas: '' })
     setFotoUrl(null)
+    setFotoDocumentoUrl(null)
+    setFotoVehiculoUrl(null)
     setShowForm(false)
   }
 
@@ -106,6 +110,8 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
       motivo: form.motivo.trim() || null,
       notas: form.notas.trim() || null,
       foto_url: fotoUrl,
+      foto_documento_url: fotoDocumentoUrl,
+      foto_vehiculo_url: fotoVehiculoUrl,
       registrado_por: userId,
       hora_entrada: new Date().toISOString(),
     })
@@ -281,8 +287,10 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
                 placeholder="Opcional"
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
             </div>
-            <div>
+            <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
               <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="visitantes" label="Foto del visitante" />
+              <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" />
+              <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
