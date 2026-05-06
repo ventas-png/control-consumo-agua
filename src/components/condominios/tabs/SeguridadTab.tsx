@@ -4,8 +4,20 @@ import { supabase } from '../../../lib/supabase'
 import type {
   RondaSeguridad, NovedadSeguridad, TipoNovedad, PrioridadNovedad, EstadoRonda,
   RutaRonda, PuntoControlRuta, VisitaControl, EstadoVisitaControl,
-  Visitante, Unidad,
+  Visitante, Unidad, ReservaSTR,
 } from '../../../types'
+
+const PLATAFORMA_LABEL: Record<string, string> = {
+  airbnb: 'Airbnb', booking: 'Booking.com', vrbo: 'VRBO', directo: 'Directo', otro: 'Otro',
+}
+
+const PLATAFORMA_COLOR: Record<string, { bg: string; color: string }> = {
+  airbnb:   { bg: '#fff1f2', color: '#e11d48' },
+  booking:  { bg: '#eff6ff', color: '#2563eb' },
+  vrbo:     { bg: '#f0fdf4', color: '#16a34a' },
+  directo:  { bg: '#f5f3ff', color: '#7c3aed' },
+  otro:     { bg: '#f8fafc', color: '#475569' },
+}
 import { ImageUploader } from '../ImageUploader'
 
 interface Props {
@@ -16,6 +28,7 @@ interface Props {
   visitasControl: VisitaControl[]
   visitantes: Visitante[]
   unidades: Unidad[]
+  reservasSTR: ReservaSTR[]
   proyectoId: string
   companyId: string
   userId: string
@@ -53,7 +66,7 @@ const VISITA_CONFIG: Record<EstadoVisitaControl, { label: string; icon: string; 
 
 export function SeguridadTab({
   rondas, novedades, rutas, puntosControl, visitasControl,
-  visitantes, unidades,
+  visitantes, unidades, reservasSTR,
   proyectoId, companyId, userId, canCreate, canEdit, onRefresh,
 }: Props) {
   const [vista, setVista] = useState<'novedades' | 'rondas'>('novedades')
@@ -70,6 +83,8 @@ export function SeguridadTab({
   const [rondaForm, setRondaForm] = useState({ notas: '', ruta_id: '' })
 
   // Accesos / verificación visitante
+  const [modoModal, setModoModal] = useState<'dpi' | 'str'>('dpi')
+  const [strSearch, setStrSearch] = useState('')
   const [dpiSearch, setDpiSearch] = useState('')
   const [searchResult, setSearchResult] = useState<'idle' | 'found' | 'not_found'>('idle')
   const [searchResultVisitantes, setSearchResultVisitantes] = useState<Visitante[]>([])
@@ -179,6 +194,8 @@ export function SeguridadTab({
   }
 
   function resetAccesos() {
+    setModoModal('dpi')
+    setStrSearch('')
     setDpiSearch('')
     setSearchResult('idle')
     setSearchResultVisitantes([])
@@ -188,6 +205,35 @@ export function SeguridadTab({
     setFotoDocumentoUrl(null)
     setFotoVehiculoUrl(null)
     setShowAccesosModal(false)
+  }
+
+  function cambiarModo(modo: 'dpi' | 'str') {
+    setModoModal(modo)
+    setStrSearch('')
+    setDpiSearch('')
+    setSearchResult('idle')
+    setSearchResultVisitantes([])
+    setShowRegForm(false)
+    setRegForm({ nombre: '', unidad_id: '', placa_vehiculo: '', motivo: '', notas: '', identificacion: '' })
+    setFotoPersonaUrl(null)
+    setFotoDocumentoUrl(null)
+    setFotoVehiculoUrl(null)
+  }
+
+  function precargarDesdeSTR(r: ReservaSTR) {
+    const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
+    setRegForm({
+      nombre: r.huesped_nombre,
+      unidad_id: r.unidad_id ?? '',
+      placa_vehiculo: '',
+      motivo: `Renta corta · ${PLATAFORMA_LABEL[r.plataforma] ?? r.plataforma}`,
+      notas: `Entrada: ${r.fecha_entrada} · Salida: ${r.fecha_salida} (${noches} noche${noches !== 1 ? 's' : ''})`,
+      identificacion: '',
+    })
+    setFotoPersonaUrl(null)
+    setFotoDocumentoUrl(null)
+    setFotoVehiculoUrl(null)
+    setShowRegForm(true)
   }
 
   async function buscarPorDpi() {
@@ -567,8 +613,10 @@ export function SeguridadTab({
             <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: 'white', borderRadius: '18px 18px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.8, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Control de Seguridad</div>
-                <div style={{ fontSize: 19, fontWeight: 800, marginTop: 2 }}>🚪 Verificar visitante</div>
-                <div style={{ fontSize: 12.5, opacity: 0.88, marginTop: 4 }}>Busque por DPI para ver historial o registrar nueva entrada</div>
+                <div style={{ fontSize: 19, fontWeight: 800, marginTop: 2 }}>🚪 Registro de acceso</div>
+                <div style={{ fontSize: 12.5, opacity: 0.88, marginTop: 4 }}>
+                  {modoModal === 'dpi' ? 'Busque por DPI para ver historial o registrar entrada' : 'Seleccione una reserva STR para registrar el ingreso'}
+                </div>
               </div>
               <button onClick={resetAccesos}
                 style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '10px', color: 'white', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '6px 10px', flexShrink: 0 }}>
@@ -579,6 +627,21 @@ export function SeguridadTab({
             {/* Cuerpo del modal */}
             <div style={{ padding: '20px 24px' }}>
 
+              {/* Tabs de modo */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1.5px solid #f1f5f9', paddingBottom: '16px' }}>
+                <button onClick={() => cambiarModo('dpi')}
+                  style={{ padding: '8px 16px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: modoModal === 'dpi' ? '#7c3aed' : '#e2e8f0', background: modoModal === 'dpi' ? '#f5f3ff' : 'white', color: modoModal === 'dpi' ? '#7c3aed' : '#64748b' }}>
+                  🔍 Verificar por DPI
+                </button>
+                <button onClick={() => cambiarModo('str')}
+                  style={{ padding: '8px 16px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: modoModal === 'str' ? '#7c3aed' : '#e2e8f0', background: modoModal === 'str' ? '#f5f3ff' : 'white', color: modoModal === 'str' ? '#7c3aed' : '#64748b' }}>
+                  🏠 Renta corta
+                </button>
+              </div>
+
+              {/* ── MODO DPI ── */}
+              {modoModal === 'dpi' && (
+                <>
               {/* Buscador DPI */}
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ fontSize: '12px', fontWeight: 700, color: '#374151', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>DPI / Identificación</label>
@@ -685,11 +748,85 @@ export function SeguridadTab({
                 </div>
               )}
 
-              {/* Formulario de registro */}
+                </>
+              )}
+
+              {/* ── MODO STR ── */}
+              {modoModal === 'str' && (
+                <>
+                  {/* Buscador de huésped */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <input
+                      value={strSearch}
+                      onChange={e => setStrSearch(e.target.value)}
+                      placeholder="Buscar por nombre de huésped o unidad..."
+                      autoFocus
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', background: '#f8fafc' }}
+                    />
+                  </div>
+
+                  {/* Lista de reservas STR activas/próximas */}
+                  {(() => {
+                    const hoy = new Date().toISOString().slice(0, 10)
+                    const reservasFiltradas = reservasSTR
+                      .filter(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy)
+                      .filter(r => !strSearch || r.huesped_nombre.toLowerCase().includes(strSearch.toLowerCase()) || (r.unidad_nombre ?? '').toLowerCase().includes(strSearch.toLowerCase()))
+                      .sort((a, b) => a.fecha_entrada.localeCompare(b.fecha_entrada))
+
+                    if (reservasFiltradas.length === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94a3b8' }}>
+                          <div style={{ fontSize: '32px', marginBottom: '10px' }}>🏠</div>
+                          <p style={{ fontWeight: 600, color: '#64748b', margin: 0 }}>
+                            {strSearch ? 'No se encontraron reservas con ese nombre' : 'No hay reservas STR activas o próximas'}
+                          </p>
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: showRegForm ? '140px' : '320px', overflowY: 'auto' }}>
+                        {reservasFiltradas.map(r => {
+                          const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
+                          const plat = PLATAFORMA_COLOR[r.plataforma] ?? PLATAFORMA_COLOR.otro
+                          const enCurso = r.estado === 'en_curso'
+                          return (
+                            <div key={r.id} style={{ background: enCurso ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${enCurso ? '#86efac' : '#e2e8f0'}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{r.huesped_nombre}</span>
+                                  <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: plat.bg, color: plat.color }}>
+                                    {PLATAFORMA_LABEL[r.plataforma] ?? r.plataforma}
+                                  </span>
+                                  {enCurso && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#dcfce7', color: '#16a34a' }}>En curso</span>}
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                  {r.unidad_nombre && <span>🏠 {r.unidad_nombre}</span>}
+                                  <span>📅 {r.fecha_entrada} → {r.fecha_salida}</span>
+                                  <span>· {noches} noche{noches !== 1 ? 's' : ''}</span>
+                                  {r.num_adultos > 0 && <span>· 👥 {r.num_adultos + r.num_ninos}</span>}
+                                </div>
+                              </div>
+                              {canCreate && (
+                                <button onClick={() => precargarDesdeSTR(r)}
+                                  style={{ padding: '7px 14px', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12.5px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                                  Registrar ingreso
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
+                </>
+              )}
+
+              {/* Formulario de registro (compartido entre modos DPI y STR) */}
               {showRegForm && canCreate && (
-                <div style={{ borderTop: '1.5px solid #e2e8f0', paddingTop: '18px', marginTop: searchResult === 'found' ? '4px' : '0' }}>
+                <div style={{ borderTop: '1.5px solid #e2e8f0', paddingTop: '18px', marginTop: '16px' }}>
                   <h3 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
-                    {searchResult === 'found' ? 'Registrar nueva entrada' : 'Registrar nuevo visitante'}
+                    {modoModal === 'str' ? 'Registrar ingreso del huésped' : searchResult === 'found' ? 'Registrar nueva entrada' : 'Registrar nuevo visitante'}
                   </h3>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div style={{ gridColumn: '1 / -1' }}>
