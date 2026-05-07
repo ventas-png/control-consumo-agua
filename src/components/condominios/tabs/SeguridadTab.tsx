@@ -18,7 +18,7 @@ const PLATAFORMA_COLOR: Record<string, { bg: string; color: string }> = {
   directo:  { bg: '#f5f3ff', color: '#7c3aed' },
   otro:     { bg: '#f8fafc', color: '#475569' },
 }
-import { ImageUploader } from '../ImageUploader'
+import { ImageUploader, MultiImageUploader } from '../ImageUploader'
 
 interface Props {
   rondas: RondaSeguridad[]
@@ -81,6 +81,7 @@ export function SeguridadTab({
     tipo: 'observacion' as TipoNovedad, descripcion: '', ubicacion: '',
     prioridad: 'normal' as PrioridadNovedad, ronda_id: '',
   })
+  const [fotosNovedadForm, setFotosNovedadForm] = useState<string[]>([])
   const [rondaForm, setRondaForm] = useState({ notas: '', ruta_id: '' })
 
   // Accesos / verificación visitante
@@ -181,11 +182,14 @@ export function SeguridadTab({
       tipo: novedadForm.tipo, descripcion: novedadForm.descripcion.trim(),
       ubicacion: novedadForm.ubicacion.trim() || null,
       prioridad: novedadForm.prioridad, reportado_por: userId,
+      foto_url: fotosNovedadForm[0] ?? null,
+      fotos: fotosNovedadForm.length > 0 ? fotosNovedadForm : null,
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
     Swal.fire({ icon: 'success', title: 'Novedad registrada', timer: 1400, showConfirmButton: false })
     setNovedadForm({ tipo: 'observacion', descripcion: '', ubicacion: '', prioridad: 'normal', ronda_id: '' })
+    setFotosNovedadForm([])
     setShowNovedadForm(false); onRefresh()
   }
 
@@ -469,12 +473,22 @@ export function SeguridadTab({
                 </label>
               </div>
             )}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <MultiImageUploader
+                values={fotosNovedadForm}
+                onChange={setFotosNovedadForm}
+                folder="novedades"
+                label="Fotografías de evidencia (opcional)"
+                capture
+                maxFiles={10}
+              />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button onClick={registrarNovedad} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Registrar'}
             </button>
-            <button onClick={() => setShowNovedadForm(false)} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={() => { setShowNovedadForm(false); setFotosNovedadForm([]) }} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
