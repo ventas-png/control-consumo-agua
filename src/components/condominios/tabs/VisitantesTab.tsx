@@ -335,12 +335,21 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
                   {v.hora_salida && <div style={{ fontSize: '12px', color: '#94a3b8' }}>Salida: {new Date(v.hora_salida).toLocaleString('es', { hour: '2-digit', minute: '2-digit' })}</div>}
                   {enPremisa && <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: '#dcfce7', color: '#16a34a', fontWeight: 700 }}>En premisas</span>}
                 </div>
-                {enPremisa && (
-                  <button onClick={() => registrarSalida(v.id)}
-                    style={{ padding: '7px 14px', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, flexShrink: 0 }}>
-                    Registrar salida
-                  </button>
-                )}
+                {enPremisa && (() => {
+                  const esSTR = v.motivo?.startsWith('Renta corta')
+                  const fechaSalidaSTR = esSTR ? (v.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
+                  const salidaHabilitada = !fechaSalidaSTR || hoy >= fechaSalidaSTR
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                      <button onClick={() => salidaHabilitada && registrarSalida(v.id)}
+                        title={!salidaHabilitada ? `Salida programada: ${fechaSalidaSTR}` : undefined}
+                        style={{ padding: '7px 14px', background: salidaHabilitada ? '#fef3c7' : '#f1f5f9', color: salidaHabilitada ? '#92400e' : '#94a3b8', border: `1px solid ${salidaHabilitada ? '#fde68a' : '#e2e8f0'}`, borderRadius: '8px', cursor: salidaHabilitada ? 'pointer' : 'not-allowed', fontSize: '12.5px', fontWeight: 600 }}>
+                        Registrar salida
+                      </button>
+                      {!salidaHabilitada && <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>Hasta {fechaSalidaSTR}</span>}
+                    </div>
+                  )
+                })()}
               </div>
             )
           })}
