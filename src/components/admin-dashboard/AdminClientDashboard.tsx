@@ -42,6 +42,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [convStats, setConvStats] = useState<ConvStats>({ sinAsignar: 0, cerradasHoy: 0, criticas: 0, urgentes: 0, enProceso: 0 })
+  const [perProjectStats, setPerProjectStats] = useState<Record<string, ConvStats>>({})
 
   // Cargar datos específicos al montar
   useEffect(() => {
@@ -56,27 +57,60 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
     const now = new Date()
     const hace24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
     const hace48h = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString()
-    const abiertos = ['abierta', 'en_progreso', 'esperando_cliente']
-    const mkBase = () => {
-      let q = supabase.from('conversations').select('id', { count: 'exact', head: true })
-        .eq('company_id', companyId).eq('service_type', 'agua')
-      if (selectedProjectId) q = q.eq('project_id', selectedProjectId)
-      return q
+    const abiertos = new Set(['abierta', 'en_progreso', 'esperando_cliente'])
+
+    if (selectedProjectId) {
+      // Single project: 5 lightweight count queries
+      const mkBase = () => {
+        return supabase.from('conversations').select('id', { count: 'exact', head: true })
+          .eq('company_id', companyId).eq('service_type', 'agua').eq('project_id', selectedProjectId)
+      }
+      const abArr = [...abiertos]
+      const [sinAsignarRes, cerradasRes, criticasRes, urgentesRes, enProcesoRes] = await Promise.all([
+        mkBase().in('status', abArr).is('assigned_to', null),
+        mkBase().eq('status', 'cerrada').gte('closed_at', hace24h),
+        mkBase().in('status', abArr).lt('created_at', hace48h),
+        mkBase().in('status', abArr).lt('created_at', hace24h).gte('created_at', hace48h),
+        mkBase().in('status', abArr).gte('created_at', hace24h),
+      ])
+      setConvStats({
+        sinAsignar: sinAsignarRes.count ?? 0,
+        cerradasHoy: cerradasRes.count ?? 0,
+        criticas: criticasRes.count ?? 0,
+        urgentes: urgentesRes.count ?? 0,
+        enProceso: enProcesoRes.count ?? 0,
+      })
+      setPerProjectStats({})
+    } else {
+      // All projects: fetch lightweight rows and compute per-project stats in JS
+      const { data: rows } = await supabase
+        .from('conversations')
+        .select('project_id, status, assigned_to, created_at, closed_at')
+        .eq('company_id', companyId)
+        .eq('service_type', 'agua')
+      if (!rows) return
+
+      const empty = (): ConvStats => ({ sinAsignar: 0, cerradasHoy: 0, criticas: 0, urgentes: 0, enProceso: 0 })
+      const totals = empty()
+      const byProject: Record<string, ConvStats> = {}
+
+      for (const r of rows) {
+        const pid = r.project_id ?? '__sin_proyecto__'
+        if (!byProject[pid]) byProject[pid] = empty()
+        const s = byProject[pid]
+        const isOpen = abiertos.has(r.status)
+        const createdAt = r.created_at
+
+        if (isOpen && !r.assigned_to) { s.sinAsignar++; totals.sinAsignar++ }
+        if (r.status === 'cerrada' && r.closed_at && r.closed_at >= hace24h) { s.cerradasHoy++; totals.cerradasHoy++ }
+        if (isOpen && createdAt < hace48h) { s.criticas++; totals.criticas++ }
+        if (isOpen && createdAt < hace24h && createdAt >= hace48h) { s.urgentes++; totals.urgentes++ }
+        if (isOpen && createdAt >= hace24h) { s.enProceso++; totals.enProceso++ }
+      }
+
+      setConvStats(totals)
+      setPerProjectStats(byProject)
     }
-    const [sinAsignarRes, cerradasRes, criticasRes, urgentesRes, enProcesoRes] = await Promise.all([
-      mkBase().in('status', abiertos).is('assigned_to', null),
-      mkBase().eq('status', 'cerrada').gte('closed_at', hace24h),
-      mkBase().in('status', abiertos).lt('created_at', hace48h),
-      mkBase().in('status', abiertos).lt('created_at', hace24h).gte('created_at', hace48h),
-      mkBase().in('status', abiertos).gte('created_at', hace24h),
-    ])
-    setConvStats({
-      sinAsignar: sinAsignarRes.count ?? 0,
-      cerradasHoy: cerradasRes.count ?? 0,
-      criticas: criticasRes.count ?? 0,
-      urgentes: urgentesRes.count ?? 0,
-      enProceso: enProcesoRes.count ?? 0,
-    })
   }, [currentUser.company_id, selectedProjectId])
 
   useEffect(() => { void cargarConvStats() }, [cargarConvStats])
@@ -242,6 +276,50 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
                   </button>
                 ))}
               </div>
+
+              {/* Desglose por proyecto cuando se ven todos */}
+              {!selectedProjectId && data.proyectos.length > 1 && Object.keys(perProjectStats).length > 0 && (
+                <div style={{ marginTop: '20px', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc' }}>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#475569', borderBottom: '2px solid #e2e8f0' }}>Proyecto</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#d97706', borderBottom: '2px solid #e2e8f0' }}>📥 Sin asignar</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#059669', borderBottom: '2px solid #e2e8f0' }}>✅ Cerradas hoy</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#dc2626', borderBottom: '2px solid #e2e8f0' }}>🚨 Críticas</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#ea580c', borderBottom: '2px solid #e2e8f0' }}>⚠️ Urgentes</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#0284c7', borderBottom: '2px solid #e2e8f0' }}>🔄 En proceso</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.proyectos.filter(p => p.estado === 'activo').map((p, i) => {
+                        const s = perProjectStats[p.id] ?? { sinAsignar: 0, cerradasHoy: 0, criticas: 0, urgentes: 0, enProceso: 0 }
+                        const hasCritica = s.criticas > 0
+                        return (
+                          <tr
+                            key={p.id}
+                            style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', cursor: 'pointer', transition: 'background 0.15s' }}
+                            onClick={() => setSelectedProjectId(p.id)}
+                            onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#eff6ff'}
+                            onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'white' : '#f8fafc'}
+                          >
+                            <td style={{ padding: '10px 14px', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #f1f5f9' }}>
+                              {hasCritica && <span style={{ marginRight: 6, color: '#ef4444' }}>●</span>}
+                              {p.nombre}
+                            </td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', fontWeight: s.sinAsignar > 0 ? 700 : 400, color: s.sinAsignar > 0 ? '#d97706' : '#94a3b8' }}>{s.sinAsignar}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', fontWeight: s.cerradasHoy > 0 ? 700 : 400, color: s.cerradasHoy > 0 ? '#059669' : '#94a3b8' }}>{s.cerradasHoy}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', fontWeight: s.criticas > 0 ? 700 : 400, color: s.criticas > 0 ? '#dc2626' : '#94a3b8' }}>{s.criticas}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', fontWeight: s.urgentes > 0 ? 700 : 400, color: s.urgentes > 0 ? '#ea580c' : '#94a3b8' }}>{s.urgentes}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', fontWeight: s.enProceso > 0 ? 700 : 400, color: s.enProceso > 0 ? '#0284c7' : '#94a3b8' }}>{s.enProceso}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: 8 }}>Haz clic en un proyecto para filtrar el dashboard</p>
+                </div>
+              )}
             </div>
 
             <div style={{ marginTop: '32px' }}>
