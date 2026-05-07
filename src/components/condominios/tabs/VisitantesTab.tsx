@@ -94,6 +94,9 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
       unidad_id: v.unidad_id,
       motivo: v.motivo ?? '',
     }))
+    setFotoUrl(v.foto_url ?? null)
+    setFotoDocumentoUrl(v.foto_documento_url ?? null)
+    setFotoVehiculoUrl(v.foto_vehiculo_url ?? null)
   }
 
   async function handleRegistrar() {
