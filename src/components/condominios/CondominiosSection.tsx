@@ -187,7 +187,7 @@ import PanelTurnoTab from './tabs/PanelTurnoTab'
 import PlantillasMensajeTab from './tabs/PlantillasMensajeTab'
 import FlujoAprobacionTab from './tabs/FlujoAprobacionTab'
 import CuadroMandoTab from './tabs/CuadroMandoTab'
-import GeneracionCuotasTab from './tabs/GeneracionCuotasTab'
+import GeneradorCuotasTab from './tabs/GeneradorCuotasTab'
 import MapaUnidadesTab from './tabs/MapaUnidadesTab'
 import EnvioMasivoTab from './tabs/EnvioMasivoTab'
 import ResumenEjecutivoTab from './tabs/ResumenEjecutivoTab'
@@ -1458,7 +1458,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'plantillas_mensaje' && <PlantillasMensajeTab plantillas={plantillasMensaje} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'flujo_aprobacion' && <FlujoAprobacionTab flujos={flujoAprobacion} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'cuadro_mando' && <CuadroMandoTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} gastos={gastos} presupuestos={presupuestos} incidentes={incidentes} sugerencias={sugerencias} polizas={polizas} contratosProveedores={contratosProveedores} inspecciones={inspecciones} vencimientosExtra={vencimientosExtra} encuestas={encuestas} moneda={moneda} />}
-        {activeTab === 'generacion_cuotas' && <GeneracionCuotasTab cuotas={cuotas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'generacion_cuotas' && <GeneradorCuotasTab cuotas={cuotas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'mapa_unidades' && <MapaUnidadesTab unidades={unidadesProyecto} cuotas={cuotas} contratos={contratos} moneda={moneda} />}
         {activeTab === 'envio_masivo' && <EnvioMasivoTab plantillas={plantillasMensaje} cuotas={cuotas} unidades={unidadesProyecto} reservas={reservas} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} proyectoNombre={proyectoActual?.nombre} onRefresh={cargarDatos} />}
         {activeTab === 'resumen_ejecutivo' && <ResumenEjecutivoTab cuotas={cuotas} tickets={tickets} gastos={gastos} presupuestos={presupuestos} unidades={unidadesProyecto} incidentes={incidentes} polizas={polizas} contratosProveedores={contratosProveedores} inspecciones={inspecciones} vencimientosExtra={vencimientosExtra} sugerencias={sugerencias} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}

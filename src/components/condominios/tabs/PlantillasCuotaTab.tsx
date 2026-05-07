@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
-import { PlantillaCuota, PeriodicidadPlantilla, Unidad } from '../../../types'
+import { PlantillaCuota, PeriodicidadPlantilla, RubroConfig, Unidad } from '../../../types'
+import { RubrosBuilder } from '../RubrosBuilder'
 
 interface Props {
   plantillas: PlantillaCuota[]
@@ -19,11 +20,27 @@ const PERIODO_LABELS: Record<PeriodicidadPlantilla, string> = {
   semestral: 'Semestral', anual: 'Anual', 'única': 'Única',
 }
 
+function calcularMontoPorUnidad(unidad: Unidad, rubros: RubroConfig[], totalM2: number): number {
+  return rubros.reduce((sum, r) => {
+    if (r.metodo === 'fijo') return sum + r.valor
+    if (r.metodo === 'por_m2') return sum + (unidad.area_m2 ?? 0) * r.valor
+    if (r.metodo === 'alicuota') {
+      const pct = unidad.alicuota_pct != null
+        ? unidad.alicuota_pct
+        : totalM2 > 0 ? ((unidad.area_m2 ?? 0) / totalM2) * 100 : 0
+      return sum + r.valor * (pct / 100)
+    }
+    return sum
+  }, 0)
+}
+
 export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [generando, setGenerando] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [usarRubros, setUsarRubros] = useState(false)
+  const [rubros, setRubros] = useState<RubroConfig[]>([{ nombre: 'Mantenimiento general', metodo: 'fijo', valor: 0 }])
   const [form, setForm] = useState({
     nombre: '', concepto: 'mantenimiento', monto: '',
     dia_vencimiento: '5', periodicidad: 'mensual' as PeriodicidadPlantilla,
@@ -32,6 +49,8 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
 
   function resetForm() {
     setForm({ nombre: '', concepto: 'mantenimiento', monto: '', dia_vencimiento: '5', periodicidad: 'mensual', aplica_a: 'todas', notas: '' })
+    setRubros([{ nombre: 'Mantenimiento general', metodo: 'fijo', valor: 0 }])
+    setUsarRubros(false)
     setMostrarForm(false); setEditingId(null)
   }
 
@@ -41,18 +60,38 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
       dia_vencimiento: String(p.dia_vencimiento), periodicidad: p.periodicidad,
       aplica_a: p.aplica_a, notas: p.notas ?? '',
     })
+    if (p.rubros && p.rubros.length > 0) {
+      setRubros(p.rubros)
+      setUsarRubros(true)
+    } else {
+      setRubros([{ nombre: 'Mantenimiento general', metodo: 'fijo', valor: 0 }])
+      setUsarRubros(false)
+    }
     setEditingId(p.id); setMostrarForm(true)
   }
 
   async function guardar() {
-    if (!form.nombre.trim() || !form.monto) { Swal.fire('Error', 'Nombre y monto son obligatorios', 'warning'); return }
+    if (!form.nombre.trim()) { Swal.fire('Error', 'El nombre es obligatorio', 'warning'); return }
+    if (!usarRubros && !form.monto) { Swal.fire('Error', 'El monto es obligatorio', 'warning'); return }
+    if (usarRubros && rubros.length === 0) { Swal.fire('Error', 'Agrega al menos un rubro', 'warning'); return }
+    if (usarRubros && rubros.some(r => !r.nombre.trim() || r.valor <= 0)) {
+      Swal.fire('Error', 'Todos los rubros deben tener nombre y valor mayor a 0', 'warning'); return
+    }
+
     setSaving(true)
+    const montoTotal = usarRubros
+      ? rubros.filter(r => r.metodo === 'fijo').reduce((s, r) => s + r.valor, 0)
+      : parseFloat(form.monto)
+
     const data = {
       company_id: companyId, project_id: proyectoId,
       nombre: form.nombre.trim(), concepto: form.concepto,
-      monto: parseFloat(form.monto), dia_vencimiento: parseInt(form.dia_vencimiento),
+      monto: montoTotal,
+      dia_vencimiento: parseInt(form.dia_vencimiento),
       periodicidad: form.periodicidad, aplica_a: form.aplica_a,
       notas: form.notas.trim() || null,
+      rubros: usarRubros ? rubros : null,
+      monto_total_estimado: usarRubros ? montoTotal : null,
     }
     const { error } = editingId
       ? await supabase.from('plantillas_cuota').update(data).eq('id', editingId)
@@ -86,17 +125,19 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
     })
     if (!periodo) return
 
-    const unidadesTarget = unidades.filter(u => {
-      if (!u.activo) return false
-      if (p.aplica_a === 'todas') return true
-      return true // extend with tipo_unidad filter if needed
-    })
-
+    const unidadesTarget = unidades.filter(u => u.activo !== false)
     if (unidadesTarget.length === 0) { Swal.fire('Sin unidades', 'No hay unidades activas para generar cuotas', 'info'); return }
+
+    const usaRubros = p.rubros && p.rubros.length > 0
+    const totalM2 = unidadesTarget.reduce((s, u) => s + (u.area_m2 ?? 0), 0)
+
+    const resumenMonto = usaRubros
+      ? `rubros variables (${p.rubros!.length} rubro${p.rubros!.length !== 1 ? 's' : ''})`
+      : `${moneda} ${p.monto.toLocaleString()} c/u`
 
     const confirm = await Swal.fire({
       title: '¿Confirmar generación?',
-      text: `Se crearán ${unidadesTarget.length} cuotas de ${moneda} ${p.monto.toLocaleString()} para el período ${periodo}`,
+      text: `Se crearán ${unidadesTarget.length} cuotas — ${resumenMonto} — período ${periodo}`,
       icon: 'question', showCancelButton: true, confirmButtonText: 'Generar', cancelButtonText: 'Cancelar',
     })
     if (!confirm.isConfirmed) return
@@ -104,15 +145,25 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
     setGenerando(p.id)
     const [year, month] = periodo.split('-').map(Number)
     const fechaVenc = new Date(year, month - 1, p.dia_vencimiento).toISOString().slice(0, 10)
-    const rows = unidadesTarget.map(u => ({
-      company_id: companyId, project_id: proyectoId,
-      unidad_id: u.id,
-      concepto: p.concepto,
-      monto: p.monto,
-      periodo,
-      fecha_vencimiento: fechaVenc,
-      estado: 'pendiente',
-    }))
+
+    const rows = unidadesTarget.map(u => {
+      const monto = usaRubros
+        ? Math.round(calcularMontoPorUnidad(u, p.rubros!, totalM2) * 100) / 100
+        : p.monto
+      return {
+        company_id: companyId, project_id: proyectoId,
+        unidad_id: u.id,
+        concepto: p.concepto,
+        monto,
+        periodo,
+        fecha_vencimiento: fechaVenc,
+        estado: 'pendiente',
+        rubros_detalle: usaRubros ? p.rubros!.map(r => ({
+          ...r,
+          monto_calculado: Math.round(calcularMontoPorUnidad(u, [r], totalM2) * 100) / 100,
+        })) : null,
+      }
+    })
 
     const { error } = await supabase.from('cuotas_condominio').insert(rows)
     setGenerando(null)
@@ -130,7 +181,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: 16 }}>Plantillas de cuota</div>
-          <div style={{ fontSize: 12, color: '#6b7280' }}>{plantillas.filter(p => p.activa).length} activas · {unidades.filter(u => u.activo).length} unidades</div>
+          <div style={{ fontSize: 12, color: '#6b7280' }}>{plantillas.filter(p => p.activa).length} activas · {unidades.filter(u => u.activo !== false).length} unidades</div>
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
@@ -156,10 +207,6 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
               </select>
             </div>
             <div>
-              <label style={lbl}>Monto ({moneda}) *</label>
-              <input type="number" step="0.01" style={inp} value={form.monto} onChange={e => setForm(p => ({ ...p, monto: e.target.value }))} />
-            </div>
-            <div>
               <label style={lbl}>Día de vencimiento</label>
               <input type="number" min={1} max={28} style={inp} value={form.dia_vencimiento} onChange={e => setForm(p => ({ ...p, dia_vencimiento: e.target.value }))} />
             </div>
@@ -182,6 +229,36 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
               <input style={inp} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} placeholder="Opcional" />
             </div>
           </div>
+
+          {/* Toggle monto simple vs rubros */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: usarRubros ? 0 : 12 }}>
+              <button type="button" onClick={() => setUsarRubros(false)}
+                style={{ padding: '6px 14px', fontSize: 12, border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer',
+                  background: !usarRubros ? '#2563eb' : '#f9fafb', color: !usarRubros ? '#fff' : '#374151', fontWeight: !usarRubros ? 700 : 400 }}>
+                Monto fijo simple
+              </button>
+              <button type="button" onClick={() => setUsarRubros(true)}
+                style={{ padding: '6px 14px', fontSize: 12, border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer',
+                  background: usarRubros ? '#2563eb' : '#f9fafb', color: usarRubros ? '#fff' : '#374151', fontWeight: usarRubros ? 700 : 400 }}>
+                Rubros desglozados
+              </button>
+            </div>
+
+            {!usarRubros && (
+              <div style={{ marginTop: 8, maxWidth: 200 }}>
+                <label style={lbl}>Monto ({moneda}) *</label>
+                <input type="number" step="0.01" style={inp} value={form.monto} onChange={e => setForm(p => ({ ...p, monto: e.target.value }))} placeholder="0.00" />
+              </div>
+            )}
+
+            {usarRubros && (
+              <div style={{ marginTop: 12, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 14 }}>
+                <RubrosBuilder rubros={rubros} onChange={setRubros} />
+              </div>
+            )}
+          </div>
+
           <button onClick={guardar} disabled={saving}
             style={{ padding: '8px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Guardar plantilla'}
@@ -197,35 +274,47 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {plantillas.map(p => (
-            <div key={p.id} style={{ background: p.activa ? '#fff' : '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14, opacity: p.activa ? 1 : 0.65 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{p.nombre}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#16a34a' }}>{PERIODO_LABELS[p.periodicidad]}</span>
-                  <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, background: '#f3f4f6', color: '#374151' }}>{p.concepto}</span>
+          {plantillas.map(p => {
+            const tieneRubros = p.rubros && p.rubros.length > 0
+            return (
+              <div key={p.id} style={{ background: p.activa ? '#fff' : '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 14, opacity: p.activa ? 1 : 0.65 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{p.nombre}</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#16a34a' }}>{PERIODO_LABELS[p.periodicidad]}</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, background: '#f3f4f6', color: '#374151' }}>{p.concepto}</span>
+                    {tieneRubros && (
+                      <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, background: '#eff6ff', color: '#2563eb' }}>
+                        {p.rubros!.length} rubro{p.rubros!.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#374151' }}>
+                    {tieneRubros
+                      ? <span style={{ color: '#6b7280' }}>{p.rubros!.map(r => `${r.nombre} (${r.metodo === 'fijo' ? `${moneda} ${r.valor}` : r.metodo === 'por_m2' ? `${moneda} ${r.valor}/m²` : `${r.valor.toLocaleString()} total alíc.`})`).join(' + ')}</span>
+                      : <><strong>{moneda} {p.monto.toLocaleString()}</strong> por unidad</>
+                    }
+                    {' '}· vence día {p.dia_vencimiento} · {p.aplica_a === 'todas' ? 'Todas las unidades' : p.aplica_a}
+                  </div>
                 </div>
-                <div style={{ fontSize: 13, color: '#374151' }}>
-                  <strong>{moneda} {p.monto.toLocaleString()}</strong> · vence día {p.dia_vencimiento} · {p.aplica_a === 'todas' ? 'Todas las unidades' : p.aplica_a}
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  {canCreate && p.activa && (
+                    <button onClick={() => generarCuotas(p)} disabled={generando === p.id}
+                      style={{ padding: '7px 14px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      {generando === p.id ? '⏳' : '⚡ Generar'}
+                    </button>
+                  )}
+                  {canEdit && (
+                    <>
+                      <button onClick={() => startEdit(p)} style={{ padding: '7px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>✏️</button>
+                      <button onClick={() => toggleActiva(p)} style={{ padding: '7px 12px', background: p.activa ? '#fef3c7' : '#f0fdf4', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{p.activa ? '⏸' : '▶'}</button>
+                      <button onClick={() => eliminar(p.id)} style={{ padding: '7px 10px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>🗑</button>
+                    </>
+                  )}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                {canCreate && p.activa && (
-                  <button onClick={() => generarCuotas(p)} disabled={generando === p.id}
-                    style={{ padding: '7px 14px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                    {generando === p.id ? '⏳' : '⚡ Generar'}
-                  </button>
-                )}
-                {canEdit && (
-                  <>
-                    <button onClick={() => startEdit(p)} style={{ padding: '7px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>✏️</button>
-                    <button onClick={() => toggleActiva(p)} style={{ padding: '7px 12px', background: p.activa ? '#fef3c7' : '#f0fdf4', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{p.activa ? '⏸' : '▶'}</button>
-                    <button onClick={() => eliminar(p.id)} style={{ padding: '7px 10px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>🗑</button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

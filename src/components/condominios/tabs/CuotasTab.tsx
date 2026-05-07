@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto } from '../../../types'
+import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
 import { exportarExcel, exportarPDFRecibo } from '../exportUtils'
 
 interface CSVRow {
@@ -53,6 +53,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [filtroEstado, setFiltroEstado] = useState<EstadoCuota | 'todos'>('todos')
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set())
+  const [expandidasRubros, setExpandidasRubros] = useState<Set<string>>(new Set())
   const [form, setForm] = useState({
     unidad_id: '',
     concepto: 'mantenimiento' as ConceptoCuota,
@@ -184,6 +185,14 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     } else {
       setSeleccionadas(new Set(cuotasPagables.map(c => c.id)))
     }
+  }
+
+  function toggleRubros(id: string) {
+    setExpandidasRubros(prev => {
+      const s = new Set(prev)
+      s.has(id) ? s.delete(id) : s.add(id)
+      return s
+    })
   }
 
   function whatsappRecordatorio(cuota: CuotaCondominio) {
@@ -579,17 +588,23 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                     />
                   </th>
                 )}
-                {['Unidad', 'Concepto', 'Período', 'Monto', 'Vencimiento', 'Estado', ''].map(h => (
+                {['Unidad', 'Concepto', 'Período', 'Monto', 'Vencimiento', 'Estado', 'Rubros', ''].map(h => (
                   <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {cuotasFiltradas.map(c => {
+              {cuotasFiltradas.flatMap(c => {
                 const esPagable = c.estado !== 'pagado'
                 const seleccionada = seleccionadas.has(c.id)
-                return (
-                  <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9', background: seleccionada ? '#f0fdf4' : undefined }}>
+                const rubrosDetalle = c.rubros_detalle as RubroDetalle[] | null | undefined
+                const tieneRubros = rubrosDetalle && rubrosDetalle.length > 0
+                const expandido = expandidasRubros.has(c.id)
+                const hoy = new Date().toISOString().slice(0, 10)
+                const colCount = canEdit ? 9 : 8
+
+                const mainRow = (
+                  <tr key={c.id} style={{ borderBottom: expandido ? 'none' : '1px solid #f1f5f9', background: seleccionada ? '#f0fdf4' : undefined }}>
                     {canEdit && (
                       <td style={{ padding: '10px 14px' }}>
                         {esPagable && (
@@ -608,7 +623,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                         </div>
                       )}
                     </td>
-                    <td style={{ padding: '10px 14px', color: c.fecha_vencimiento && c.fecha_vencimiento < new Date().toISOString().slice(0, 10) && c.estado !== 'pagado' ? '#dc2626' : '#374151' }}>
+                    <td style={{ padding: '10px 14px', color: c.fecha_vencimiento && c.fecha_vencimiento < hoy && c.estado !== 'pagado' ? '#dc2626' : '#374151' }}>
                       {c.fecha_vencimiento || '—'}
                     </td>
                     <td style={{ padding: '10px 14px' }}>
@@ -624,6 +639,14 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                           {c.estado}
                         </span>
                       )}
+                    </td>
+                    <td style={{ padding: '10px 14px' }}>
+                      {tieneRubros ? (
+                        <button onClick={() => toggleRubros(c.id)}
+                          style={{ fontSize: '11px', padding: '3px 8px', border: '1px solid #c7d2fe', borderRadius: '6px', cursor: 'pointer', background: expandido ? '#eff6ff' : '#f8fafc', color: '#4f46e5', fontWeight: 600 }}>
+                          {expandido ? '▲' : '▼'} {rubrosDetalle!.length}
+                        </button>
+                      ) : <span style={{ color: '#d1d5db', fontSize: 11 }}>—</span>}
                     </td>
                     <td style={{ padding: '10px 14px' }}>
                       <div style={{ display: 'flex', gap: '4px' }}>
@@ -644,6 +667,30 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                     </td>
                   </tr>
                 )
+
+                if (!expandido || !tieneRubros) return [mainRow]
+
+                const detalleRow = (
+                  <tr key={`${c.id}-rubros`} style={{ borderBottom: '1px solid #f1f5f9', background: '#f8faff' }}>
+                    <td colSpan={colCount} style={{ padding: '0 14px 10px 48px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 12px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #e0e7ff' }}>
+                        {rubrosDetalle!.map((rd, ri) => (
+                          <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#374151' }}>
+                            <span>
+                              {rd.nombre}
+                              <span style={{ marginLeft: 6, color: '#9ca3af', fontSize: 11 }}>
+                                ({rd.metodo === 'fijo' ? 'fijo' : rd.metodo === 'por_m2' ? `${moneda} ${rd.valor}/m²` : `alíc. ${rd.valor.toLocaleString('es')}`})
+                              </span>
+                            </span>
+                            <span style={{ fontWeight: 600 }}>{moneda} {rd.monto_calculado.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                )
+
+                return [mainRow, detalleRow]
               })}
             </tbody>
           </table>

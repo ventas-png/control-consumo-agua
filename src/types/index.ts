@@ -285,6 +285,8 @@ export interface Unidad {
   // Portal del residente
   token_portal?: string | null;
   portal_activo?: boolean;
+  // Alícuota de participación en gastos comunes (0-100)
+  alicuota_pct?: number | null;
 }
 
 export type TipoMensajePortal = 'consulta' | 'queja' | 'sugerencia' | 'emergencia'
@@ -374,6 +376,19 @@ export type AppSection =
 
 // ── Módulo Condominios ────────────────────────────────────────────────────────
 
+export type MetodoCalculo = 'fijo' | 'por_m2' | 'alicuota'
+
+export interface RubroConfig {
+  nombre: string
+  metodo: MetodoCalculo
+  valor: number        // fijo: monto total; por_m2: precio/m²; alicuota: monto total del gasto
+  notas?: string
+}
+
+export interface RubroDetalle extends RubroConfig {
+  monto_calculado: number
+}
+
 export type ConceptoCuota = 'mantenimiento' | 'extraordinaria' | 'CAM' | 'amenidad' | 'otro'
 export type EstadoCuota = 'pendiente' | 'pagado' | 'moroso'
 
@@ -398,6 +413,8 @@ export interface CuotaCondominio {
   comprobante_url?: string | null
   // joins opcionales
   unidad_nombre?: string
+  // Desglose de rubros calculados para esta cuota
+  rubros_detalle?: RubroDetalle[] | null
 }
 
 export interface Visitante {
@@ -2975,6 +2992,8 @@ export interface PlantillaCuota {
   activa: boolean
   notas?: string | null
   created_at: string
+  rubros?: RubroConfig[] | null
+  monto_total_estimado?: number | null
 }
 
 export type AccionBitacora = 'crear' | 'editar' | 'eliminar' | 'aprobar' | 'rechazar' | 'pagar' | 'cerrar'
@@ -3349,6 +3368,8 @@ export interface GeneracionCuotasLog {
   fecha_vencimiento: string
   unidades_generadas: number
   created_at: string
+  rubros?: RubroConfig[] | null
+  metodo_calculo?: string | null
 }
 
 // ── Fase 37 ───────────────────────────────────────────────────────────────────

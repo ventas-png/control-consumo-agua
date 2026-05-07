@@ -89,6 +89,7 @@ const EMPTY_FORM = {
   descripcion: '',
   piso: '',
   area_m2: '',
+  alicuota_pct: '',
   propietario_nombre: '',
   propietario_telefono: '',
   propietario_email: '',
@@ -192,6 +193,7 @@ export function UnidadesSection({
       descripcion: u.descripcion ?? '',
       piso: u.piso != null ? String(u.piso) : '',
       area_m2: u.area_m2 != null ? String(u.area_m2) : '',
+      alicuota_pct: u.alicuota_pct != null ? String(u.alicuota_pct) : '',
       propietario_nombre: u.propietario_nombre ?? '',
       propietario_telefono: u.propietario_telefono ?? '',
       propietario_email: u.propietario_email ?? '',
@@ -283,6 +285,7 @@ export function UnidadesSection({
       descripcion: form.descripcion || null,
       piso: form.piso ? parseInt(form.piso) : null,
       area_m2: form.area_m2 ? parseFloat(form.area_m2) : null,
+      alicuota_pct: form.alicuota_pct ? parseFloat(form.alicuota_pct) : null,
       propietario_nombre: form.propietario_nombre || null,
       propietario_telefono: form.propietario_telefono || null,
       propietario_email: form.propietario_email || null,
@@ -658,6 +661,19 @@ export function UnidadesSection({
                   value={form.area_m2}
                   onChange={e => setForm(f => ({ ...f, area_m2: e.target.value }))}
                   placeholder="Ej: 85.50"
+                />
+              </div>
+              <div>
+                <label style={labelStyle} title="Porcentaje de participación en gastos comunes (0-100). Si no se define, se calcula proporcionalmente por área.">Alícuota % <span style={{ color: '#9ca3af', fontWeight: 400 }}>(opcional)</span></label>
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.0001"
+                  value={form.alicuota_pct}
+                  onChange={e => setForm(f => ({ ...f, alicuota_pct: e.target.value }))}
+                  placeholder="Ej: 3.2500"
                 />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
