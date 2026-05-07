@@ -135,72 +135,93 @@ export function EmpresaSection({ currentUser }: Props) {
       `<option value="${m.simbolo}" ${(proyecto.moneda_condominios ?? proyecto.moneda) === m.simbolo ? 'selected' : ''}>${m.simbolo} — ${m.nombre}</option>`
     ).join('')
 
+    const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;color:#0f172a;background:#fff;outline:none;transition:border-color .15s'
+    const selStyle = `${inpStyle};cursor:pointer;appearance:auto`
+    const secTitle = (icon: string, text: string) =>
+      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:18px">${icon}</span><span style="font-size:13px;font-weight:700;color:#0f172a;letter-spacing:.01em">${text}</span></div>`
+    const lbl = (text: string, sub = '') =>
+      `<label style="display:block;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">${text}${sub ? `<span style="font-weight:400;text-transform:none;color:#94a3b8;margin-left:4px">${sub}</span>` : ''}</label>`
+
     const tiposLimites = TIPOS_UNIDAD_LABELS.map(t => {
       const val = (proyecto[t.key] as number | null) ?? ''
+      const icons: Record<string, string> = {
+        max_unidades_apartamento: '🏢', max_unidades_casa: '🏠',
+        max_unidades_bodega: '📦', max_unidades_local_comercial: '🏪',
+        max_unidades_oficina: '💼', max_unidades_parqueadero: '🚗',
+        max_unidades_otro: '📋',
+      }
       return `
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <span style="font-size:12px;color:#475569;min-width:140px">${t.label}</span>
+        <div style="display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #f1f5f9;border-radius:10px;padding:10px 12px">
+          <span style="font-size:18px;flex-shrink:0">${icons[t.key] ?? '📋'}</span>
+          <span style="font-size:13px;color:#374151;flex:1">${t.label}</span>
           <input id="swal-${t.key}" type="number" min="0" step="1"
-            class="swal2-input"
-            placeholder="Sin límite"
+            placeholder="∞"
             value="${val}"
-            style="margin:0;width:110px;text-align:right;font-size:13px" />
+            style="width:80px;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:700;text-align:center;color:#0f172a;background:#f8fafc" />
         </div>`
     }).join('')
 
     const { value: formValues } = await Swal.fire({
-      title: 'Editar Proyecto',
-      width: 560,
+      title: '<span style="font-size:20px;font-weight:800;color:#0f172a">Editar Proyecto</span>',
+      width: 620,
       html: `
-        <div style="text-align:left;padding:0 4px;max-height:70vh;overflow-y:auto">
-          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Nombre *</label>
-          <input id="swal-nombre" class="swal2-input" value="${proyecto.nombre}" style="margin:4px 0 14px" />
+        <div style="text-align:left;padding:0 2px;max-height:72vh;overflow-y:auto;display:flex;flex-direction:column;gap:16px">
 
-          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Descripción</label>
-          <textarea id="swal-descripcion" class="swal2-textarea" style="margin:4px 0 14px;height:72px;resize:vertical">${proyecto.descripcion ?? ''}</textarea>
-
-          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Dirección</label>
-          <input id="swal-direccion" class="swal2-input" placeholder="Ej: Calle 123 #45-67" value="${proyecto.direccion ?? ''}" style="margin:4px 0 14px" />
-
-          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Geolocalización</label>
-          <div style="display:flex;gap:8px;margin:4px 0 6px">
-            <input id="swal-lat" class="swal2-input" placeholder="Latitud" value="${proyecto.latitud ?? ''}" style="margin:0" />
-            <input id="swal-lng" class="swal2-input" placeholder="Longitud" value="${proyecto.longitud ?? ''}" style="margin:0" />
-          </div>
-          <button id="swal-geolocate" type="button" style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #0ea5e9;background:transparent;color:#0ea5e9;cursor:pointer;margin-top:4px;margin-bottom:16px">
-            📍 Usar mi ubicación actual
-          </button>
-
-          <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0" />
-
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
-            <div>
-              <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Moneda Agua</label>
-              <select id="swal-moneda" class="swal2-select" style="margin:4px 0 0;width:100%;padding:9px 10px;border-radius:6px;border:1px solid #d0d3d4;font-size:13px">
-                ${monedasOpts}
-              </select>
-            </div>
-            <div>
-              <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Moneda Condominios</label>
-              <select id="swal-moneda-condominios" class="swal2-select" style="margin:4px 0 0;width:100%;padding:9px 10px;border-radius:6px;border:1px solid #d0d3d4;font-size:13px">
-                ${monedasOptsCondominios}
-              </select>
-            </div>
-            <div>
-              <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Estado</label>
-              <select id="swal-estado" class="swal2-select" style="margin:4px 0 0;width:100%;padding:9px 10px;border-radius:6px;border:1px solid #d0d3d4;font-size:13px">
-                <option value="activo"     ${proyecto.estado === 'activo'     ? 'selected' : ''}>Activo</option>
-                <option value="inactivo"   ${proyecto.estado === 'inactivo'   ? 'selected' : ''}>Inactivo</option>
-                <option value="suspendido" ${proyecto.estado === 'suspendido' ? 'selected' : ''}>Suspendido</option>
-              </select>
-            </div>
+          <!-- Info básica -->
+          <div style="background:#f8fafc;border-radius:14px;padding:16px 18px">
+            ${secTitle('📋', 'Información del proyecto')}
+            ${lbl('Nombre', '(requerido)')}
+            <input id="swal-nombre" value="${proyecto.nombre}" style="${inpStyle};margin-bottom:12px" />
+            ${lbl('Descripción')}
+            <textarea id="swal-descripcion" style="${inpStyle};height:68px;resize:vertical;font-family:inherit">${proyecto.descripcion ?? ''}</textarea>
           </div>
 
-          <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0" />
+          <!-- Ubicación -->
+          <div style="background:#f8fafc;border-radius:14px;padding:16px 18px">
+            ${secTitle('📍', 'Ubicación')}
+            ${lbl('Dirección')}
+            <input id="swal-direccion" placeholder="Ej: Calle 123 #45-67" value="${proyecto.direccion ?? ''}" style="${inpStyle};margin-bottom:12px" />
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+              <div style="flex:1">${lbl('Latitud')}<input id="swal-lat" placeholder="0.000000" value="${proyecto.latitud ?? ''}" style="${inpStyle}" /></div>
+              <div style="flex:1">${lbl('Longitud')}<input id="swal-lng" placeholder="0.000000" value="${proyecto.longitud ?? ''}" style="${inpStyle}" /></div>
+            </div>
+            <button id="swal-geolocate" type="button" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;border:1.5px solid #0ea5e9;background:#f0f9ff;color:#0284c7;cursor:pointer">
+              📍 Usar mi ubicación actual
+            </button>
+          </div>
 
-          <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Límite de Unidades por Tipo</label>
-          <p style="font-size:11px;color:#94a3b8;margin:4px 0 10px">Dejar en blanco = sin límite</p>
-          ${tiposLimites}
+          <!-- Configuración financiera y estado -->
+          <div style="background:#f8fafc;border-radius:14px;padding:16px 18px">
+            ${secTitle('⚙️', 'Configuración')}
+            <div style="display:flex;flex-wrap:wrap;gap:12px">
+              <div style="flex:1;min-width:140px">
+                ${lbl('💧 Moneda Agua')}
+                <select id="swal-moneda" style="${selStyle}">${monedasOpts}</select>
+              </div>
+              <div style="flex:1;min-width:140px">
+                ${lbl('🏢 Moneda Condominios')}
+                <select id="swal-moneda-condominios" style="${selStyle}">${monedasOptsCondominios}</select>
+              </div>
+              <div style="flex:1;min-width:120px">
+                ${lbl('Estado')}
+                <select id="swal-estado" style="${selStyle}">
+                  <option value="activo"     ${proyecto.estado === 'activo'     ? 'selected' : ''}>✅ Activo</option>
+                  <option value="inactivo"   ${proyecto.estado === 'inactivo'   ? 'selected' : ''}>⏸ Inactivo</option>
+                  <option value="suspendido" ${proyecto.estado === 'suspendido' ? 'selected' : ''}>🚫 Suspendido</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Límite de unidades -->
+          <div style="background:#f8fafc;border-radius:14px;padding:16px 18px">
+            ${secTitle('🏗️', 'Límite de unidades por tipo')}
+            <p style="font-size:12px;color:#94a3b8;margin:0 0 12px">Dejar vacío = sin límite (∞)</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              ${tiposLimites}
+            </div>
+          </div>
+
         </div>
       `,
       didOpen: () => {
