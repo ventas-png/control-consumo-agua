@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad, UserSession, Ruta, AppSection } from '../../types'
+import { supabase } from '../../lib/supabase'
 import { AdminDashboardStats } from './AdminDashboardStats'
 import { AdminDashboardCharts } from './AdminDashboardCharts'
 import { AdminClientsList } from './AdminClientsList'
@@ -29,9 +30,18 @@ interface Props {
 
 type TabType = 'dashboard' | 'clientes' | 'nueva_lectura' | 'historial'
 
+interface ConvStats {
+  sinAsignar: number
+  cerradasHoy: number
+  criticas: number
+  urgentes: number
+  enProceso: number
+}
+
 export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh, onNavigateSection }: Props) {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [convStats, setConvStats] = useState<ConvStats>({ sinAsignar: 0, cerradasHoy: 0, criticas: 0, urgentes: 0, enProceso: 0 })
 
   // Cargar datos específicos al montar
   useEffect(() => {
@@ -39,6 +49,37 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
       setSelectedProjectId(data.proyectos[0].id)
     }
   }, [data.proyectos, selectedProjectId])
+
+  const cargarConvStats = useCallback(async () => {
+    const companyId = currentUser.company_id
+    if (!companyId) return
+    const now = new Date()
+    const hace24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+    const hace48h = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString()
+    const abiertos = ['abierta', 'en_progreso', 'esperando_cliente']
+    const mkBase = () => {
+      let q = supabase.from('conversations').select('id', { count: 'exact', head: true })
+        .eq('company_id', companyId).eq('service_type', 'agua')
+      if (selectedProjectId) q = q.eq('project_id', selectedProjectId)
+      return q
+    }
+    const [sinAsignarRes, cerradasRes, criticasRes, urgentesRes, enProcesoRes] = await Promise.all([
+      mkBase().in('status', abiertos).is('assigned_to', null),
+      mkBase().eq('status', 'cerrada').gte('closed_at', hace24h),
+      mkBase().in('status', abiertos).lt('created_at', hace48h),
+      mkBase().in('status', abiertos).lt('created_at', hace24h).gte('created_at', hace48h),
+      mkBase().in('status', abiertos).gte('created_at', hace24h),
+    ])
+    setConvStats({
+      sinAsignar: sinAsignarRes.count ?? 0,
+      cerradasHoy: cerradasRes.count ?? 0,
+      criticas: criticasRes.count ?? 0,
+      urgentes: urgentesRes.count ?? 0,
+      enProceso: enProcesoRes.count ?? 0,
+    })
+  }, [currentUser.company_id, selectedProjectId])
+
+  useEffect(() => { void cargarConvStats() }, [cargarConvStats])
 
   // Obtener IDs de clientes que pertenecen al proyecto seleccionado (a través de unidades)
   const clienteIdsEnProyecto = selectedProjectId
@@ -163,6 +204,46 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
                 onNavigate={(section) => onNavigateSection(section as AppSection)}
               />
             )}
+
+            {/* ── Estadísticas de Comunicaciones ─────────────────────── */}
+            <div style={{ marginBottom: '32px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                💬 Comunicaciones
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px' }}>
+                {([
+                  { label: 'Sin asignar', sub: 'sin agente asignado', value: convStats.sinAsignar, from: '#f59e0b', to: '#d97706', icon: '📥' },
+                  { label: 'Cerradas hoy', sub: 'últimas 24 horas', value: convStats.cerradasHoy, from: '#10b981', to: '#059669', icon: '✅' },
+                  { label: 'Críticas', sub: 'abiertas > 48h', value: convStats.criticas, from: '#ef4444', to: '#dc2626', icon: '🚨' },
+                  { label: 'Urgentes', sub: 'abiertas 24–48h', value: convStats.urgentes, from: '#f97316', to: '#ea580c', icon: '⚠️' },
+                  { label: 'En proceso', sub: 'abiertas < 24h', value: convStats.enProceso, from: '#0ea5e9', to: '#0284c7', icon: '🔄' },
+                ] as const).map(card => (
+                  <button
+                    key={card.label}
+                    onClick={() => onNavigateSection?.('comunicacion')}
+                    style={{
+                      background: `linear-gradient(135deg, ${card.from}, ${card.to})`,
+                      borderRadius: '14px',
+                      padding: '20px',
+                      color: 'white',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+                      transition: 'transform 0.15s, box-shadow 0.15s',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 10px 28px rgba(0,0,0,0.18)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = ''; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 20px rgba(0,0,0,0.12)' }}
+                  >
+                    <div style={{ fontSize: '20px', marginBottom: '6px' }}>{card.icon}</div>
+                    <div style={{ fontSize: '28px', fontWeight: 800, lineHeight: 1 }}>{card.value}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '6px', opacity: 0.95 }}>{card.label}</div>
+                    <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '2px' }}>{card.sub}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div style={{ marginTop: '32px' }}>
               <AdminDashboardCharts
                 registros={registrosFiltrados}
