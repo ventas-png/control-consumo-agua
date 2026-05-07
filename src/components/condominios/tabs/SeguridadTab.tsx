@@ -75,6 +75,7 @@ export function SeguridadTab({
   const [showRondaForm, setShowRondaForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroPrioridad, setFiltroPrioridad] = useState<PrioridadNovedad | 'todos'>('todos')
+  const [novedadDetalle, setNovedadDetalle] = useState<NovedadSeguridad | null>(null)
 
   const [novedadForm, setNovedadForm] = useState({
     tipo: 'observacion' as TipoNovedad, descripcion: '', ubicacion: '',
@@ -537,20 +538,51 @@ export function SeguridadTab({
               {novedadesFiltradas.map(n => {
                 const pc = PRIORIDAD_CONFIG[n.prioridad]
                 const tc = TIPO_NOVEDAD_CONFIG[n.tipo]
+                const rondaVinculada = n.ronda_id ? rondas.find(r => r.id === n.ronda_id) : null
+                const accentColor = n.prioridad === 'critica' ? '#dc2626' : n.prioridad === 'alta' ? '#ea580c' : '#16a34a'
                 return (
-                  <div key={n.id} style={{ background: 'white', border: `1.5px solid ${n.prioridad === 'critica' ? '#fecaca' : '#e2e8f0'}`, borderRadius: '12px', padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <span style={{ fontSize: '20px', flexShrink: 0 }}>{tc.icon}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '4px', alignItems: 'center' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{tc.label}</span>
-                          <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: pc.bg, color: pc.color }}>{pc.label}</span>
-                          {n.ubicacion && <span style={{ fontSize: '12px', color: '#64748b' }}>📍 {n.ubicacion}</span>}
+                  <div key={n.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', display: 'flex' }}>
+                    {/* Accent stripe */}
+                    <div style={{ width: '5px', background: accentColor, flexShrink: 0 }} />
+                    <div style={{ flex: 1, padding: '14px 16px' }}>
+                      {/* Top row */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                        <span style={{ fontSize: '22px', flexShrink: 0, lineHeight: 1 }}>{tc.icon}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#0f172a' }}>{tc.label}</span>
+                            <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: pc.bg, color: pc.color }}>{pc.label}</span>
+                            <span style={{ fontSize: '11.5px', color: '#94a3b8', marginLeft: 'auto' }}>
+                              {new Date(n.created_at).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          {/* Description */}
+                          <p style={{ margin: '0 0 8px', fontSize: '13.5px', color: '#374151', lineHeight: 1.5 }}>{n.descripcion}</p>
+                          {/* Metadata footer */}
+                          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {n.ubicacion && (
+                              <span style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                📍 {n.ubicacion}
+                              </span>
+                            )}
+                            {rondaVinculada && (
+                              <span style={{ fontSize: '12px', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                🛡 Ronda {new Date(rondaVinculada.inicio).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                            <button onClick={() => setNovedadDetalle(n)}
+                              style={{ fontSize: '12px', color: '#0ea5e9', background: 'none', border: 'none', cursor: 'pointer', padding: '0', fontWeight: 600, marginLeft: 'auto' }}>
+                              Ver detalle →
+                            </button>
+                            {canEdit && (
+                              <button onClick={() => eliminarNovedad(n.id)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px', padding: '2px 4px' }}>
+                                🗑
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <p style={{ margin: '0 0 4px', fontSize: '13.5px', color: '#374151' }}>{n.descripcion}</p>
-                        <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>{new Date(n.created_at).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
-                      <button onClick={() => eliminarNovedad(n.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '15px', padding: '2px 4px', flexShrink: 0 }}>🗑</button>
                     </div>
                   </div>
                 )
@@ -611,6 +643,97 @@ export function SeguridadTab({
           })}
         </div>
       )}
+
+      {/* Modal detalle de novedad */}
+      {novedadDetalle && (() => {
+        const pc = PRIORIDAD_CONFIG[novedadDetalle.prioridad]
+        const tc = TIPO_NOVEDAD_CONFIG[novedadDetalle.tipo]
+        const rondaVinculada = novedadDetalle.ronda_id ? rondas.find(r => r.id === novedadDetalle.ronda_id) : null
+        const accentColor = novedadDetalle.prioridad === 'critica' ? '#dc2626' : novedadDetalle.prioridad === 'alta' ? '#ea580c' : '#16a34a'
+        return (
+          <div onClick={() => setNovedadDetalle(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '520px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+              {/* Header con color de prioridad */}
+              <div style={{ height: '6px', background: accentColor }} />
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'flex-start', gap: '12px', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '28px', lineHeight: 1 }}>{tc.icon}</span>
+                  <div>
+                    <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>{tc.label}</div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                      <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: pc.bg, color: pc.color }}>{pc.label}</span>
+                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                        {new Date(novedadDetalle.created_at).toLocaleString('es', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setNovedadDetalle(null)}
+                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', color: '#64748b', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '6px 10px', flexShrink: 0 }}>
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Foto adjunta */}
+                {novedadDetalle.foto_url && (
+                  <img src={novedadDetalle.foto_url} alt="Evidencia" style={{ width: '100%', maxHeight: '220px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #e2e8f0' }} />
+                )}
+
+                {/* Descripción */}
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Descripción</div>
+                  <p style={{ margin: 0, fontSize: '14.5px', color: '#0f172a', lineHeight: 1.6, background: '#f8fafc', padding: '12px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    {novedadDetalle.descripcion}
+                  </p>
+                </div>
+
+                {/* Metadatos en grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  {novedadDetalle.ubicacion && (
+                    <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Ubicación</div>
+                      <div style={{ fontSize: '13.5px', color: '#374151', fontWeight: 600 }}>📍 {novedadDetalle.ubicacion}</div>
+                    </div>
+                  )}
+                  {rondaVinculada && (
+                    <div style={{ background: '#eff6ff', borderRadius: '10px', padding: '12px', border: '1px solid #bfdbfe' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Ronda vinculada</div>
+                      <div style={{ fontSize: '13.5px', color: '#1d4ed8', fontWeight: 600 }}>
+                        🛡 {new Date(rondaVinculada.inicio).toLocaleDateString('es', { day: '2-digit', month: 'short' })} · {new Date(rondaVinculada.inicio).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Tipo</div>
+                    <div style={{ fontSize: '13.5px', color: '#374151', fontWeight: 600 }}>{tc.icon} {tc.label}</div>
+                  </div>
+                  <div style={{ background: pc.bg, borderRadius: '10px', padding: '12px', border: `1px solid ${accentColor}30` }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: pc.color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Prioridad</div>
+                    <div style={{ fontSize: '13.5px', color: pc.color, fontWeight: 700 }}>{pc.label}</div>
+                  </div>
+                </div>
+
+                {/* Acciones */}
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
+                  {canEdit && (
+                    <button onClick={async () => { setNovedadDetalle(null); await eliminarNovedad(novedadDetalle.id) }}
+                      style={{ padding: '9px 16px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                      🗑 Eliminar
+                    </button>
+                  )}
+                  <button onClick={() => setNovedadDetalle(null)}
+                    style={{ padding: '9px 20px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Modal de verificación de acceso */}
       {showAccesosModal && (
