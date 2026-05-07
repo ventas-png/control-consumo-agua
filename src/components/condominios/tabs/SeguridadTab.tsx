@@ -96,6 +96,7 @@ export function SeguridadTab({
   const [fotoPersonaUrl, setFotoPersonaUrl] = useState<string | null>(null)
   const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
   const [fotoVehiculoUrl, setFotoVehiculoUrl] = useState<string | null>(null)
+  const [fotosExpiradas, setFotosExpiradas] = useState<{ foto: boolean; documento: boolean; vehiculo: boolean }>({ foto: false, documento: false, vehiculo: false })
   const [regForm, setRegForm] = useState({
     nombre: '', unidad_id: '', placa_vehiculo: '', motivo: '', notas: '', identificacion: '',
   })
@@ -211,6 +212,7 @@ export function SeguridadTab({
     setFotoPersonaUrl(null)
     setFotoDocumentoUrl(null)
     setFotoVehiculoUrl(null)
+    setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
     setStrReservaId(null)
     setStrIngresados(new Set())
     setShowAccesosModal(false)
@@ -227,6 +229,7 @@ export function SeguridadTab({
     setFotoPersonaUrl(null)
     setFotoDocumentoUrl(null)
     setFotoVehiculoUrl(null)
+    setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
     setStrReservaId(null)
   }
 
@@ -279,6 +282,14 @@ export function SeguridadTab({
       setFotoPersonaUrl(latest.foto_url ?? null)
       setFotoDocumentoUrl(latest.foto_documento_url ?? null)
       setFotoVehiculoUrl(latest.foto_vehiculo_url ?? null)
+      const DIAS_90 = 90 * 24 * 60 * 60 * 1000
+      const ahora = Date.now()
+      const esVencida = (r: Visitante | undefined) => !!r && (ahora - new Date(r.hora_entrada).getTime()) > DIAS_90
+      setFotosExpiradas({
+        foto:      esVencida(mapped.find((r: Visitante) => r.foto_url)),
+        documento: esVencida(mapped.find((r: Visitante) => r.foto_documento_url)),
+        vehiculo:  esVencida(mapped.find((r: Visitante) => r.foto_vehiculo_url)),
+      })
     } else {
       setSearchResult('not_found')
       setRegForm(f => ({ ...f, identificacion: dpi }))
@@ -1062,10 +1073,26 @@ export function SeguridadTab({
                       <input value={regForm.notas} onChange={e => setRegForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional"
                         style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
                     </div>
-                    <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                      <ImageUploader value={fotoPersonaUrl} onChange={setFotoPersonaUrl} folder="visitantes" label="Foto del visitante" capture />
-                      <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto DPI / Documento" capture />
-                      <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" capture />
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      {(fotosExpiradas.foto || fotosExpiradas.documento || fotosExpiradas.vehiculo) && (
+                        <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#92400e', marginBottom: 10 }}>
+                          ⚠️ Una o más fotos tienen más de 90 días. Se recomienda renovarlas.
+                        </div>
+                      )}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                        <div>
+                          <ImageUploader value={fotoPersonaUrl} onChange={setFotoPersonaUrl} folder="visitantes" label="Foto del visitante" capture />
+                          {fotosExpiradas.foto && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                        </div>
+                        <div>
+                          <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto DPI / Documento" capture />
+                          {fotosExpiradas.documento && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                        </div>
+                        <div>
+                          <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" capture />
+                          {fotosExpiradas.vehiculo && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>

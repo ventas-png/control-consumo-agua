@@ -44,6 +44,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const sessionUploadsRef = useRef<Set<string>>(new Set())
 
   async function handleFile(file: File) {
     setError(null)
@@ -57,6 +58,12 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
       const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, blob, { contentType: 'image/jpeg', upsert: false })
       if (upErr) { setError(upErr.message); return }
       const { data } = supabase.storage.from('condominios-media').getPublicUrl(path)
+      // Delete previous photo only if it was uploaded in this same session (not a pre-existing record)
+      if (value && sessionUploadsRef.current.has(value)) {
+        const match = value.match(/condominios-media\/(.+)$/)
+        if (match) await supabase.storage.from('condominios-media').remove([match[1]])
+      }
+      sessionUploadsRef.current.add(data.publicUrl)
       onChange(data.publicUrl)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al subir')
@@ -73,9 +80,9 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
 
   async function handleRemove() {
     if (!value) return
-    // Extract path from public URL
     const match = value.match(/condominios-media\/(.+)$/)
     if (match) await supabase.storage.from('condominios-media').remove([match[1]])
+    sessionUploadsRef.current.delete(value)
     onChange(null)
   }
 

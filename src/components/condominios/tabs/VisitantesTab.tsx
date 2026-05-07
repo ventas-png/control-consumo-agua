@@ -35,6 +35,7 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
   const [fotoVehiculoUrl, setFotoVehiculoUrl] = useState<string | null>(null)
+  const [fotosExpiradas, setFotosExpiradas] = useState<{ foto: boolean; documento: boolean; vehiculo: boolean }>({ foto: false, documento: false, vehiculo: false })
   const [form, setForm] = useState({
     unidad_id: '',
     nombre: '',
@@ -91,6 +92,7 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
     setFotoUrl(null)
     setFotoDocumentoUrl(null)
     setFotoVehiculoUrl(null)
+    setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
     setShowForm(false)
   }
 
@@ -100,9 +102,17 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
       .filter(r => r.nombre === v.nombre && r.identificacion === v.identificacion)
       .sort((a, b) => b.hora_entrada.localeCompare(a.hora_entrada))
     // Pick the most recent non-null URL for each photo slot
-    const mejorFoto     = mismoVisitante.find(r => r.foto_url)?.foto_url ?? null
-    const mejorDoc      = mismoVisitante.find(r => r.foto_documento_url)?.foto_documento_url ?? null
-    const mejorVehiculo = mismoVisitante.find(r => r.foto_vehiculo_url)?.foto_vehiculo_url ?? null
+    const registroFoto     = mismoVisitante.find(r => r.foto_url)
+    const registroDoc      = mismoVisitante.find(r => r.foto_documento_url)
+    const registroVehiculo = mismoVisitante.find(r => r.foto_vehiculo_url)
+    const DIAS_90 = 90 * 24 * 60 * 60 * 1000
+    const ahora = Date.now()
+    const esVencida = (r: Visitante | undefined) => !!r && (ahora - new Date(r.hora_entrada).getTime()) > DIAS_90
+    setFotosExpiradas({
+      foto:      esVencida(registroFoto),
+      documento: esVencida(registroDoc),
+      vehiculo:  esVencida(registroVehiculo),
+    })
     setForm(f => ({
       ...f,
       nombre: v.nombre,
@@ -111,9 +121,9 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
       unidad_id: v.unidad_id,
       motivo: v.motivo ?? '',
     }))
-    setFotoUrl(mejorFoto)
-    setFotoDocumentoUrl(mejorDoc)
-    setFotoVehiculoUrl(mejorVehiculo)
+    setFotoUrl(registroFoto?.foto_url ?? null)
+    setFotoDocumentoUrl(registroDoc?.foto_documento_url ?? null)
+    setFotoVehiculoUrl(registroVehiculo?.foto_vehiculo_url ?? null)
   }
 
   async function handleRegistrar() {
@@ -355,10 +365,26 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
                 placeholder="Opcional"
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
             </div>
-            <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-              <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="visitantes" label="Foto del visitante" capture />
-              <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" capture />
-              <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" capture />
+            <div style={{ gridColumn: '1 / -1' }}>
+              {(fotosExpiradas.foto || fotosExpiradas.documento || fotosExpiradas.vehiculo) && (
+                <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#92400e', marginBottom: 10 }}>
+                  ⚠️ Una o más fotos tienen más de 90 días. Se recomienda renovarlas.
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+                <div>
+                  <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="visitantes" label="Foto del visitante" capture />
+                  {fotosExpiradas.foto && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                </div>
+                <div>
+                  <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" capture />
+                  {fotosExpiradas.documento && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                </div>
+                <div>
+                  <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" capture />
+                  {fotosExpiradas.vehiculo && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                </div>
+              </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
