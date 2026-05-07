@@ -677,10 +677,27 @@ export function SeguridadTab({
               </div>
 
               <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {/* Foto adjunta */}
-                {novedadDetalle.foto_url && (
-                  <img src={novedadDetalle.foto_url} alt="Evidencia" style={{ width: '100%', maxHeight: '220px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #e2e8f0' }} />
-                )}
+                {/* Fotos de evidencia */}
+                {((novedadDetalle.fotos && novedadDetalle.fotos.length > 0) || novedadDetalle.foto_url) && (() => {
+                  const todas = novedadDetalle.fotos && novedadDetalle.fotos.length > 0
+                    ? novedadDetalle.fotos
+                    : [novedadDetalle.foto_url!]
+                  return (
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
+                        Evidencia fotográfica ({todas.length})
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: todas.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+                        {todas.map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noreferrer">
+                            <img src={url} alt={`Evidencia ${i + 1}`}
+                              style={{ width: '100%', height: todas.length === 1 ? '200px' : '100px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'block' }} />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* Descripción */}
                 <div>
@@ -1009,9 +1026,9 @@ export function SeguridadTab({
                         style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
                     </div>
                     <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                      <ImageUploader value={fotoPersonaUrl} onChange={setFotoPersonaUrl} folder="visitantes" label="Foto del visitante" />
-                      <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto DPI / Documento" />
-                      <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" />
+                      <ImageUploader value={fotoPersonaUrl} onChange={setFotoPersonaUrl} folder="visitantes" label="Foto del visitante" capture />
+                      <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto DPI / Documento" capture />
+                      <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" capture />
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>

@@ -36,9 +36,10 @@ interface SingleProps {
   folder: string
   label?: string
   maxSizeMB?: number
+  capture?: boolean
 }
 
-export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSizeMB = 5 }: SingleProps) {
+export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSizeMB = 5, capture = false }: SingleProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -106,6 +107,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
         </div>
       )}
       <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }}
+        {...(capture ? { capture: 'environment' } : {})}
         onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }} />
       {error && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>{error}</div>}
     </div>
@@ -121,9 +123,10 @@ interface MultiProps {
   label?: string
   maxFiles?: number
   maxSizeMB?: number
+  capture?: boolean
 }
 
-export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', maxFiles = 6, maxSizeMB = 5 }: MultiProps) {
+export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', maxFiles = 10, maxSizeMB = 5, capture = false }: MultiProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -192,11 +195,15 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
             style={{ width: 80, height: 60, border: `2px dashed ${dragOver ? '#0ea5e9' : '#d1d5db'}`, borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: dragOver ? '#f0f9ff' : '#f8fafc', flexShrink: 0 }}>
             {uploading
               ? <span style={{ fontSize: 10, color: '#0ea5e9' }}>…</span>
-              : <span style={{ fontSize: 20 }}>+</span>}
+              : <>
+                  <span style={{ fontSize: 18 }}>{capture ? '📷' : '+'}</span>
+                  {capture && <span style={{ fontSize: 9, color: '#94a3b8', marginTop: 2 }}>Cámara</span>}
+                </>}
           </div>
         )}
       </div>
-      <input ref={inputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+      <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }}
+        {...(capture ? { capture: 'environment' } : { multiple: true })}
         onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = '' }} />
       {error && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>{error}</div>}
     </div>

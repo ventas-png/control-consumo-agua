@@ -800,6 +800,7 @@ export interface NovedadSeguridad {
   prioridad: PrioridadNovedad
   reportado_por?: string | null
   foto_url?: string | null
+  fotos?: string[] | null
   created_at: string
 }
 

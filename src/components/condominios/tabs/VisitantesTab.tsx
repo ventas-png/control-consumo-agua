@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Visitante, Unidad } from '../../../types'
-import { ImageUploader } from '../ImageUploader'
+import { ImageUploader, MultiImageUploader } from '../ImageUploader'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -30,7 +30,7 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   const [modoSalida, setModoSalida] = useState<'idle' | 'sin_novedad' | 'con_novedad'>('idle')
   const [guardandoSalida, setGuardandoSalida] = useState(false)
   const [novedadForm, setNovedadForm] = useState({ tipo: 'incidente' as TipoNovedad, comentarios: '', ubicacion: '', prioridad: 'normal' as PrioridadNovedad })
-  const [fotoNovedadUrl, setFotoNovedadUrl] = useState<string | null>(null)
+  const [fotosNovedad, setFotosNovedad] = useState<string[]>([])
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
   const [fotoVehiculoUrl, setFotoVehiculoUrl] = useState<string | null>(null)
@@ -136,13 +136,13 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
     setSalidaPendiente(v)
     setModoSalida('idle')
     setNovedadForm({ tipo: 'incidente', comentarios: '', ubicacion: v.unidad_nombre ?? '', prioridad: 'normal' })
-    setFotoNovedadUrl(null)
+    setFotosNovedad([])
   }
 
   function cancelarSalida() {
     setSalidaPendiente(null)
     setModoSalida('idle')
-    setFotoNovedadUrl(null)
+    setFotosNovedad([])
   }
 
   async function confirmarSalida() {
@@ -174,14 +174,15 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
         ubicacion,
         prioridad: novedadForm.prioridad,
         reportado_por: userId,
-        foto_url: fotoNovedadUrl,
+        foto_url: fotosNovedad[0] ?? null,
+        fotos: fotosNovedad.length > 0 ? fotosNovedad : null,
       })
       if (ne) { setGuardandoSalida(false); Swal.fire('Error al registrar novedad', ne.message, 'error'); return }
     }
     setGuardandoSalida(false)
     setSalidaPendiente(null)
     setModoSalida('idle')
-    setFotoNovedadUrl(null)
+    setFotosNovedad([])
     onRefresh()
   }
 
@@ -345,9 +346,9 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
             </div>
             <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-              <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="visitantes" label="Foto del visitante" />
-              <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" />
-              <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" />
+              <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="visitantes" label="Foto del visitante" capture />
+              <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" capture />
+              <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" capture />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
@@ -500,8 +501,7 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
                       style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white', resize: 'vertical' }} />
                   </div>
                   <div>
-                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>Fotografía de evidencia (opcional)</label>
-                    <ImageUploader value={fotoNovedadUrl} onChange={setFotoNovedadUrl} folder="novedades" label="Adjuntar foto" />
+                    <MultiImageUploader values={fotosNovedad} onChange={setFotosNovedad} folder="novedades" label="Fotografías de evidencia" capture maxFiles={10} />
                   </div>
                 </div>
               )}
