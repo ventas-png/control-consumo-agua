@@ -366,7 +366,11 @@ export type AppSection =
   | 'superadmin_empresas'
   | 'comunicacion'
   | 'servicios_energia'
-  | 'condominios';
+  | 'condominios'
+  | 'condominios_dashboard'
+  | 'condominios_visitantes'
+  | 'condominios_cuotas'
+  | 'condominios_mantenimiento';
 
 // ── Módulo Condominios ────────────────────────────────────────────────────────
 

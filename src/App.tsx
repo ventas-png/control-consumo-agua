@@ -31,6 +31,7 @@ import { CobrosSection } from './components/cobros/CobrosSection'
 import { ComunicacionSection } from './components/comunicacion/ComunicacionSection'
 import ServiciosEnergiaSection from './components/servicios-energia/ServiciosEnergiaSection'
 import { CondominiosSection } from './components/condominios/CondominiosSection'
+import { CondominiosDashboard } from './components/condominios/CondominiosDashboard'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RoleGuard } from './components/shared/AccessDenied'
 import { usePermissions } from './hooks/usePermissions'
@@ -555,6 +556,29 @@ export default function App() {
                 onFacturaUpdated={updateFacturaEnergia}
                 onFacturaDeleted={deleteFacturaEnergia}
               />
+            </ErrorBoundary>
+          )}
+          {activeSection === 'condominios_dashboard' && (
+            <CondominiosDashboard
+              currentUser={currentUser}
+              proyectos={proyectos}
+              unidades={unidades}
+              onNavigateSection={setActiveSection}
+            />
+          )}
+          {activeSection === 'condominios_visitantes' && (
+            <ErrorBoundary sectionName="condominios">
+              <CondominiosSection proyectos={proyectos} unidades={unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} initialTab="visitantes" />
+            </ErrorBoundary>
+          )}
+          {activeSection === 'condominios_cuotas' && (
+            <ErrorBoundary sectionName="condominios">
+              <CondominiosSection proyectos={proyectos} unidades={unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} initialTab="cuotas" />
+            </ErrorBoundary>
+          )}
+          {activeSection === 'condominios_mantenimiento' && (
+            <ErrorBoundary sectionName="condominios">
+              <CondominiosSection proyectos={proyectos} unidades={unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} initialTab="mantenimiento" />
             </ErrorBoundary>
           )}
           {activeSection === 'condominios' && (

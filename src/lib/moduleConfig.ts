@@ -44,7 +44,7 @@ export const WATER_MODULE_KEYS = new Set([
   'dashboard', 'lecturas', 'cobros', 'rutas', 'calidad',
   'mapa', 'tabla', 'contadores', 'tarifas', 'servicios_energia',
 ])
-export const CONDOMINIOS_MODULE_KEYS = new Set(['condominios'])
+export const CONDOMINIOS_MODULE_KEYS = new Set(['condominios', 'condominios_dashboard', 'condominios_visitantes', 'condominios_cuotas', 'condominios_mantenimiento'])
 
 /** Módulos que no son configurables (siempre visibles para su rol). */
 export const NON_CONFIGURABLE_MODULES = ['perfil', 'admin_dashboard', 'empresa_proyectos', 'superadmin_empresas'] as const

@@ -526,9 +526,10 @@ interface Props {
   currentUser: UserSession
   canCreate: (section: string) => boolean
   canEdit: (section: string) => boolean
+  initialTab?: CondominioTab
 }
 
-export function CondominiosSection({ proyectos, unidades, currentUser, canCreate, canEdit }: Props) {
+export function CondominiosSection({ proyectos, unidades, currentUser, canCreate, canEdit, initialTab }: Props) {
   // Roles exentos siempre ven todo; los demás respetan condominios_role
   const condominiosRole = (['super_admin', 'company_owner'] as string[]).includes(currentUser.role)
     ? null
@@ -544,7 +545,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     [condominiosRole]
   )
 
-  const [activeTab, setActiveTab] = useState<CondominioTab>('panel')
+  const [activeTab, setActiveTab] = useState<CondominioTab>(initialTab ?? 'panel')
   const [activeSection, setActiveSection] = useState<SectionKey>('panel')
   const [selectedProyectoId, setSelectedProyectoId] = useState<string>('')
   const [loading, setLoading] = useState(false)
