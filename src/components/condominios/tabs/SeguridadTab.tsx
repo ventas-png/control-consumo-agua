@@ -781,7 +781,13 @@ export function SeguridadTab({
                     const reservasFiltradas = reservasSTR
                       .filter(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy && !strIngresados.has(r.id))
                       .filter(r => !strSearch || r.huesped_nombre.toLowerCase().includes(strSearch.toLowerCase()) || (r.unidad_nombre ?? '').toLowerCase().includes(strSearch.toLowerCase()))
-                      .sort((a, b) => a.fecha_entrada.localeCompare(b.fecha_entrada))
+                      .sort((a, b) => {
+                        // Hoy y pasadas primero, luego futuras por fecha ascendente
+                        const aHoy = a.fecha_entrada <= hoy
+                        const bHoy = b.fecha_entrada <= hoy
+                        if (aHoy !== bHoy) return aHoy ? -1 : 1
+                        return a.fecha_entrada.localeCompare(b.fecha_entrada)
+                      })
 
                     if (reservasFiltradas.length === 0) {
                       return (
@@ -817,12 +823,19 @@ export function SeguridadTab({
                                   {r.num_adultos > 0 && <span>· 👥 {r.num_adultos + r.num_ninos}</span>}
                                 </div>
                               </div>
-                              {canCreate && (
-                                <button onClick={() => precargarDesdeSTR(r)}
-                                  style={{ padding: '7px 14px', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12.5px', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                                  Registrar ingreso
-                                </button>
-                              )}
+                              {canCreate && (() => {
+                                const ingresoHabilitado = r.fecha_entrada <= hoy
+                                return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                                    <button onClick={() => ingresoHabilitado && precargarDesdeSTR(r)}
+                                      title={!ingresoHabilitado ? `Ingreso habilitado desde: ${r.fecha_entrada}` : undefined}
+                                      style={{ padding: '7px 14px', background: ingresoHabilitado ? 'linear-gradient(135deg,#7c3aed,#6d28d9)' : '#f1f5f9', color: ingresoHabilitado ? 'white' : '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: ingresoHabilitado ? 'pointer' : 'not-allowed', fontSize: '12.5px', whiteSpace: 'nowrap' }}>
+                                      Registrar ingreso
+                                    </button>
+                                    {!ingresoHabilitado && <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>Desde {r.fecha_entrada}</span>}
+                                  </div>
+                                )
+                              })()}
                             </div>
                           )
                         })}
