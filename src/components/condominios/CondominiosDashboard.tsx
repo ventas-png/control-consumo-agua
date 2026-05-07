@@ -28,6 +28,7 @@ const EMPTY_STATS = (): ProjectStats => ({
 
 export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavigateSection }: Props) {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [projectInitialized, setProjectInitialized] = useState(false)
   const [stats, setStats] = useState<ProjectStats>(EMPTY_STATS())
   const [perProject, setPerProject] = useState<Record<string, ProjectStats>>({})
   const companyId = currentUser.company_id
@@ -35,10 +36,11 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
   const proyectosActivos = proyectos.filter(p => p.estado === 'activo')
 
   useEffect(() => {
-    if (proyectosActivos.length > 0 && !selectedProjectId) {
+    if (proyectosActivos.length > 0 && !projectInitialized) {
       setSelectedProjectId(proyectosActivos[0].id)
+      setProjectInitialized(true)
     }
-  }, [proyectosActivos.length])
+  }, [proyectosActivos.length, projectInitialized])
 
   const cargarStats = useCallback(async () => {
     if (!companyId) return

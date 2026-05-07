@@ -41,15 +41,17 @@ interface ConvStats {
 export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh, onNavigateSection }: Props) {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [projectInitialized, setProjectInitialized] = useState(false)
   const [convStats, setConvStats] = useState<ConvStats>({ sinAsignar: 0, cerradasHoy: 0, criticas: 0, urgentes: 0, enProceso: 0 })
   const [perProjectStats, setPerProjectStats] = useState<Record<string, ConvStats>>({})
 
-  // Cargar datos específicos al montar
+  // Auto-select first project only once on mount, never override user's choice
   useEffect(() => {
-    if (data.proyectos.length > 0 && !selectedProjectId) {
+    if (data.proyectos.length > 0 && !projectInitialized) {
       setSelectedProjectId(data.proyectos[0].id)
+      setProjectInitialized(true)
     }
-  }, [data.proyectos, selectedProjectId])
+  }, [data.proyectos, projectInitialized])
 
   const cargarConvStats = useCallback(async () => {
     const companyId = currentUser.company_id
