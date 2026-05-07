@@ -17,6 +17,8 @@ interface Props {
 }
 
 type FiltroFecha = 'hoy' | 'semana' | 'mes' | 'todos'
+type TipoNovedad = 'incidente' | 'observacion' | 'alarma' | 'acceso' | 'otro'
+type PrioridadNovedad = 'normal' | 'alta' | 'critica'
 
 export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, userId, proyectoNombre = 'Condominio', canCreate, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
@@ -24,6 +26,10 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   const [busqueda, setBusqueda] = useState('')
   const [soloActivos, setSoloActivos] = useState(false)
   const [filtroFecha, setFiltroFecha] = useState<FiltroFecha>('todos')
+  const [salidaPendiente, setSalidaPendiente] = useState<Visitante | null>(null)
+  const [modoSalida, setModoSalida] = useState<'idle' | 'sin_novedad' | 'con_novedad'>('idle')
+  const [guardandoSalida, setGuardandoSalida] = useState(false)
+  const [novedadForm, setNovedadForm] = useState({ tipo: 'incidente' as TipoNovedad, descripcion: '', ubicacion: '', prioridad: 'normal' as PrioridadNovedad })
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
   const [fotoVehiculoUrl, setFotoVehiculoUrl] = useState<string | null>(null)
@@ -125,9 +131,42 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
     onRefresh()
   }
 
-  async function registrarSalida(id: string) {
-    const { error } = await supabase.from('visitantes').update({ hora_salida: new Date().toISOString() }).eq('id', id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+  function iniciarSalida(v: Visitante) {
+    setSalidaPendiente(v)
+    setModoSalida('idle')
+    setNovedadForm({ tipo: 'incidente', descripcion: '', ubicacion: '', prioridad: 'normal' })
+  }
+
+  function cancelarSalida() {
+    setSalidaPendiente(null)
+    setModoSalida('idle')
+  }
+
+  async function confirmarSalida() {
+    if (!salidaPendiente) return
+    if (modoSalida === 'con_novedad' && !novedadForm.descripcion.trim()) {
+      Swal.fire('Error', 'Ingrese la descripción de la novedad.', 'error'); return
+    }
+    setGuardandoSalida(true)
+    const { error } = await supabase.from('visitantes').update({ hora_salida: new Date().toISOString() }).eq('id', salidaPendiente.id)
+    if (error) { setGuardandoSalida(false); Swal.fire('Error', error.message, 'error'); return }
+    if (modoSalida === 'con_novedad') {
+      const ubicacion = novedadForm.ubicacion.trim() || salidaPendiente.unidad_nombre || null
+      const { error: ne } = await supabase.from('novedades_seguridad').insert({
+        company_id: companyId,
+        project_id: proyectoId,
+        ronda_id: null,
+        tipo: novedadForm.tipo,
+        descripcion: `[Salida de visitante: ${salidaPendiente.nombre}] ${novedadForm.descripcion.trim()}`,
+        ubicacion,
+        prioridad: novedadForm.prioridad,
+        reportado_por: userId,
+      })
+      if (ne) { setGuardandoSalida(false); Swal.fire('Error al registrar novedad', ne.message, 'error'); return }
+    }
+    setGuardandoSalida(false)
+    setSalidaPendiente(null)
+    setModoSalida('idle')
     onRefresh()
   }
 
@@ -344,7 +383,7 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
                   const salidaHabilitada = !fechaSalidaSTR || hoy >= fechaSalidaSTR
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
-                      <button onClick={() => salidaHabilitada && registrarSalida(v.id)}
+                      <button onClick={() => salidaHabilitada && iniciarSalida(v)}
                         title={!salidaHabilitada ? `Salida programada: ${fechaSalidaSTR}` : undefined}
                         style={{ padding: '7px 14px', background: salidaHabilitada ? '#fef3c7' : '#f1f5f9', color: salidaHabilitada ? '#92400e' : '#94a3b8', border: `1px solid ${salidaHabilitada ? '#fde68a' : '#e2e8f0'}`, borderRadius: '8px', cursor: salidaHabilitada ? 'pointer' : 'not-allowed', fontSize: '12.5px', fontWeight: 600 }}>
                         Registrar salida
@@ -356,6 +395,95 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Modal salida */}
+      {salidaPendiente && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>Registrar salida</div>
+              <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
+                {salidaPendiente.nombre}
+                {salidaPendiente.unidad_nombre ? ` · ${salidaPendiente.unidad_nombre}` : ''}
+              </div>
+            </div>
+
+            <div style={{ padding: '20px 24px' }}>
+              {/* Opciones principales */}
+              <p style={{ margin: '0 0 14px', fontSize: '13.5px', color: '#374151', fontWeight: 600 }}>¿Cómo fue la salida?</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+                <button
+                  onClick={() => setModoSalida('sin_novedad')}
+                  style={{ padding: '14px 12px', borderRadius: '10px', border: `2px solid ${modoSalida === 'sin_novedad' ? '#16a34a' : '#e2e8f0'}`, background: modoSalida === 'sin_novedad' ? '#f0fdf4' : '#f8fafc', color: modoSalida === 'sin_novedad' ? '#15803d' : '#374151', fontWeight: 700, fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
+                  ✅ Sin novedad
+                  <div style={{ fontSize: '11px', fontWeight: 400, marginTop: '4px', color: modoSalida === 'sin_novedad' ? '#16a34a' : '#94a3b8' }}>Todo en orden</div>
+                </button>
+                <button
+                  onClick={() => setModoSalida('con_novedad')}
+                  style={{ padding: '14px 12px', borderRadius: '10px', border: `2px solid ${modoSalida === 'con_novedad' ? '#dc2626' : '#e2e8f0'}`, background: modoSalida === 'con_novedad' ? '#fff1f2' : '#f8fafc', color: modoSalida === 'con_novedad' ? '#dc2626' : '#374151', fontWeight: 700, fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
+                  ⚠️ Con novedad
+                  <div style={{ fontSize: '11px', fontWeight: 400, marginTop: '4px', color: modoSalida === 'con_novedad' ? '#ef4444' : '#94a3b8' }}>Registrar incidencia</div>
+                </button>
+              </div>
+
+              {/* Formulario de novedad */}
+              {modoSalida === 'con_novedad' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: '10px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#c2410c', marginBottom: '2px' }}>Detalle de la novedad</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Tipo</label>
+                      <select value={novedadForm.tipo} onChange={e => setNovedadForm(f => ({ ...f, tipo: e.target.value as TipoNovedad }))}
+                        style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
+                        <option value="incidente">Incidente</option>
+                        <option value="observacion">Observación</option>
+                        <option value="alarma">Alarma</option>
+                        <option value="acceso">Acceso</option>
+                        <option value="otro">Otro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Prioridad</label>
+                      <select value={novedadForm.prioridad} onChange={e => setNovedadForm(f => ({ ...f, prioridad: e.target.value as PrioridadNovedad }))}
+                        style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
+                        <option value="normal">Normal</option>
+                        <option value="alta">Alta</option>
+                        <option value="critica">Crítica</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Descripción *</label>
+                    <textarea value={novedadForm.descripcion} onChange={e => setNovedadForm(f => ({ ...f, descripcion: e.target.value }))}
+                      placeholder="Describe la novedad ocurrida durante la salida..."
+                      rows={3}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white', resize: 'vertical' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Ubicación</label>
+                    <input value={novedadForm.ubicacion} onChange={e => setNovedadForm(f => ({ ...f, ubicacion: e.target.value }))}
+                      placeholder={`Ej. ${salidaPendiente.unidad_nombre ?? 'Entrada principal'}`}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Acciones */}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button onClick={cancelarSalida} disabled={guardandoSalida}
+                  style={{ padding: '9px 18px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                  Cancelar
+                </button>
+                <button onClick={confirmarSalida} disabled={guardandoSalida || modoSalida === 'idle'}
+                  style={{ padding: '9px 20px', background: modoSalida === 'idle' ? '#e2e8f0' : modoSalida === 'sin_novedad' ? 'linear-gradient(135deg,#16a34a,#15803d)' : 'linear-gradient(135deg,#dc2626,#b91c1c)', color: modoSalida === 'idle' ? '#94a3b8' : 'white', border: 'none', borderRadius: '8px', cursor: modoSalida === 'idle' ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                  {guardandoSalida ? 'Registrando...' : modoSalida === 'con_novedad' ? '⚠️ Registrar salida y novedad' : '✓ Confirmar salida'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
