@@ -29,7 +29,8 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   const [salidaPendiente, setSalidaPendiente] = useState<Visitante | null>(null)
   const [modoSalida, setModoSalida] = useState<'idle' | 'sin_novedad' | 'con_novedad'>('idle')
   const [guardandoSalida, setGuardandoSalida] = useState(false)
-  const [novedadForm, setNovedadForm] = useState({ tipo: 'incidente' as TipoNovedad, descripcion: '', ubicacion: '', prioridad: 'normal' as PrioridadNovedad })
+  const [novedadForm, setNovedadForm] = useState({ tipo: 'incidente' as TipoNovedad, comentarios: '', ubicacion: '', prioridad: 'normal' as PrioridadNovedad })
+  const [fotoNovedadUrl, setFotoNovedadUrl] = useState<string | null>(null)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
   const [fotoVehiculoUrl, setFotoVehiculoUrl] = useState<string | null>(null)
@@ -134,39 +135,53 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   function iniciarSalida(v: Visitante) {
     setSalidaPendiente(v)
     setModoSalida('idle')
-    setNovedadForm({ tipo: 'incidente', descripcion: '', ubicacion: '', prioridad: 'normal' })
+    setNovedadForm({ tipo: 'incidente', comentarios: '', ubicacion: v.unidad_nombre ?? '', prioridad: 'normal' })
+    setFotoNovedadUrl(null)
   }
 
   function cancelarSalida() {
     setSalidaPendiente(null)
     setModoSalida('idle')
+    setFotoNovedadUrl(null)
   }
 
   async function confirmarSalida() {
     if (!salidaPendiente) return
-    if (modoSalida === 'con_novedad' && !novedadForm.descripcion.trim()) {
-      Swal.fire('Error', 'Ingrese la descripción de la novedad.', 'error'); return
+    if (modoSalida === 'con_novedad' && !novedadForm.comentarios.trim()) {
+      Swal.fire('Error', 'Ingrese los comentarios de la novedad.', 'error'); return
     }
     setGuardandoSalida(true)
-    const { error } = await supabase.from('visitantes').update({ hora_salida: new Date().toISOString() }).eq('id', salidaPendiente.id)
+    const horaSalida = new Date().toISOString()
+    const { error } = await supabase.from('visitantes').update({ hora_salida: horaSalida }).eq('id', salidaPendiente.id)
     if (error) { setGuardandoSalida(false); Swal.fire('Error', error.message, 'error'); return }
     if (modoSalida === 'con_novedad') {
+      const partes: string[] = []
+      partes.push(`Visitante: ${salidaPendiente.nombre}`)
+      if (salidaPendiente.identificacion) partes.push(`DPI: ${salidaPendiente.identificacion}`)
+      if (salidaPendiente.unidad_nombre) partes.push(`Unidad: ${salidaPendiente.unidad_nombre}`)
+      if (salidaPendiente.placa_vehiculo) partes.push(`Vehículo: ${salidaPendiente.placa_vehiculo}`)
+      if (salidaPendiente.motivo) partes.push(`Motivo visita: ${salidaPendiente.motivo}`)
+      partes.push(`Entrada: ${new Date(salidaPendiente.hora_entrada).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`)
+      partes.push(`Salida: ${new Date(horaSalida).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`)
+      const descripcion = `${partes.join(' | ')}\n\n${novedadForm.comentarios.trim()}`
       const ubicacion = novedadForm.ubicacion.trim() || salidaPendiente.unidad_nombre || null
       const { error: ne } = await supabase.from('novedades_seguridad').insert({
         company_id: companyId,
         project_id: proyectoId,
         ronda_id: null,
         tipo: novedadForm.tipo,
-        descripcion: `[Salida de visitante: ${salidaPendiente.nombre}] ${novedadForm.descripcion.trim()}`,
+        descripcion,
         ubicacion,
         prioridad: novedadForm.prioridad,
         reportado_por: userId,
+        foto_url: fotoNovedadUrl,
       })
       if (ne) { setGuardandoSalida(false); Swal.fire('Error al registrar novedad', ne.message, 'error'); return }
     }
     setGuardandoSalida(false)
     setSalidaPendiente(null)
     setModoSalida('idle')
+    setFotoNovedadUrl(null)
     onRefresh()
   }
 
@@ -432,7 +447,23 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
               {/* Formulario de novedad */}
               {modoSalida === 'con_novedad' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: '10px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#c2410c', marginBottom: '2px' }}>Detalle de la novedad</div>
+                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#c2410c' }}>Detalle de la novedad</div>
+
+                  {/* Resumen automático del visitante */}
+                  <div style={{ background: 'white', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px' }}>
+                    <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Datos del registro (se incluyen automáticamente)</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+                      <span style={{ fontSize: '12px', color: '#374151' }}>👤 <b>{salidaPendiente.nombre}</b></span>
+                      {salidaPendiente.identificacion && <span style={{ fontSize: '12px', color: '#374151' }}>🪪 {salidaPendiente.identificacion}</span>}
+                      {salidaPendiente.unidad_nombre && <span style={{ fontSize: '12px', color: '#374151' }}>📍 {salidaPendiente.unidad_nombre}</span>}
+                      {salidaPendiente.placa_vehiculo && <span style={{ fontSize: '12px', color: '#374151' }}>🚗 {salidaPendiente.placa_vehiculo}</span>}
+                      {salidaPendiente.motivo && <span style={{ fontSize: '12px', color: '#374151' }}>· {salidaPendiente.motivo}</span>}
+                      <span style={{ fontSize: '12px', color: '#64748b' }}>
+                        Entrada: {new Date(salidaPendiente.hora_entrada).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div>
                       <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Tipo</label>
@@ -456,17 +487,21 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
                     </div>
                   </div>
                   <div>
-                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Descripción *</label>
-                    <textarea value={novedadForm.descripcion} onChange={e => setNovedadForm(f => ({ ...f, descripcion: e.target.value }))}
-                      placeholder="Describe la novedad ocurrida durante la salida..."
-                      rows={3}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white', resize: 'vertical' }} />
-                  </div>
-                  <div>
                     <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Ubicación</label>
                     <input value={novedadForm.ubicacion} onChange={e => setNovedadForm(f => ({ ...f, ubicacion: e.target.value }))}
                       placeholder={`Ej. ${salidaPendiente.unidad_nombre ?? 'Entrada principal'}`}
                       style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Comentarios / descripción de la novedad *</label>
+                    <textarea value={novedadForm.comentarios} onChange={e => setNovedadForm(f => ({ ...f, comentarios: e.target.value }))}
+                      placeholder="Describe con detalle lo ocurrido durante la salida..."
+                      rows={3}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white', resize: 'vertical' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>Fotografía de evidencia (opcional)</label>
+                    <ImageUploader value={fotoNovedadUrl} onChange={setFotoNovedadUrl} folder="novedades" label="Adjuntar foto" />
                   </div>
                 </div>
               )}
