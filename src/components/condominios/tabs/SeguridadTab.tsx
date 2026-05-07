@@ -97,6 +97,8 @@ export function SeguridadTab({
   const [regForm, setRegForm] = useState({
     nombre: '', unidad_id: '', placa_vehiculo: '', motivo: '', notas: '', identificacion: '',
   })
+  const [strReservaId, setStrReservaId] = useState<string | null>(null)
+  const [strIngresados, setStrIngresados] = useState<Set<string>>(new Set())
 
   const novedadesFiltradas = novedades.filter(n =>
     filtroPrioridad === 'todos' || n.prioridad === filtroPrioridad
@@ -204,6 +206,8 @@ export function SeguridadTab({
     setFotoPersonaUrl(null)
     setFotoDocumentoUrl(null)
     setFotoVehiculoUrl(null)
+    setStrReservaId(null)
+    setStrIngresados(new Set())
     setShowAccesosModal(false)
   }
 
@@ -218,10 +222,12 @@ export function SeguridadTab({
     setFotoPersonaUrl(null)
     setFotoDocumentoUrl(null)
     setFotoVehiculoUrl(null)
+    setStrReservaId(null)
   }
 
   function precargarDesdeSTR(r: ReservaSTR) {
     const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
+    setStrReservaId(r.id)
     setRegForm({
       nombre: r.huesped_nombre,
       unidad_id: r.unidad_id ?? '',
@@ -296,6 +302,10 @@ export function SeguridadTab({
     })
     setRegSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (strReservaId) {
+      setStrIngresados(prev => new Set([...prev, strReservaId]))
+      setStrReservaId(null)
+    }
     Swal.fire({ icon: 'success', title: 'Entrada registrada', timer: 1500, showConfirmButton: false })
     resetAccesos()
     onRefresh()
@@ -769,7 +779,7 @@ export function SeguridadTab({
                   {(() => {
                     const hoy = new Date().toISOString().slice(0, 10)
                     const reservasFiltradas = reservasSTR
-                      .filter(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy)
+                      .filter(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy && !strIngresados.has(r.id))
                       .filter(r => !strSearch || r.huesped_nombre.toLowerCase().includes(strSearch.toLowerCase()) || (r.unidad_nombre ?? '').toLowerCase().includes(strSearch.toLowerCase()))
                       .sort((a, b) => a.fecha_entrada.localeCompare(b.fecha_entrada))
 
