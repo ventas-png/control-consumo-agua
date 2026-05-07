@@ -45,10 +45,14 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
   const [convStats, setConvStats] = useState<ConvStats>({ sinAsignar: 0, cerradasHoy: 0, criticas: 0, urgentes: 0, enProceso: 0 })
   const [perProjectStats, setPerProjectStats] = useState<Record<string, ConvStats>>({})
 
-  // Auto-select first project only once on mount, never override user's choice
+  // Auto-select project only once on mount:
+  // - 1 project → select it directly
+  // - multiple projects → stay on "Todos los proyectos" (empty string)
   useEffect(() => {
     if (data.proyectos.length > 0 && !projectInitialized) {
-      setSelectedProjectId(data.proyectos[0].id)
+      if (data.proyectos.length === 1) {
+        setSelectedProjectId(data.proyectos[0].id)
+      }
       setProjectInitialized(true)
     }
   }, [data.proyectos, projectInitialized])

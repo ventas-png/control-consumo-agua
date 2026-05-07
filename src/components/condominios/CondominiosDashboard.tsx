@@ -37,7 +37,9 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
 
   useEffect(() => {
     if (proyectosActivos.length > 0 && !projectInitialized) {
-      setSelectedProjectId(proyectosActivos[0].id)
+      if (proyectosActivos.length === 1) {
+        setSelectedProjectId(proyectosActivos[0].id)
+      }
       setProjectInitialized(true)
     }
   }, [proyectosActivos.length, projectInitialized])
