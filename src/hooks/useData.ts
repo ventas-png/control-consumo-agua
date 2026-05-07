@@ -81,14 +81,16 @@ const INITIAL_DATA: AppData = {
 
 const PROJECT_EXEMPT_ROLES = new Set(['super_admin', 'company_owner', 'admin'])
 
-export function useData(companyId?: string, userId?: string, userRole?: string) {
+export function useData(companyId?: string, userId?: string, userRole?: string, condominiosRole?: string) {
   const [data, setData] = useState<AppData>(() => loadCache() ?? INITIAL_DATA)
 
   // Refs so the stable cargarDatos closure always reads the latest values
   const userIdRef = useRef(userId)
   const userRoleRef = useRef(userRole)
+  const condominiosRoleRef = useRef(condominiosRole)
   userIdRef.current = userId
   userRoleRef.current = userRole
+  condominiosRoleRef.current = condominiosRole
 
   const fetchAllData = async () => {
     // Defense-in-depth: add company_id filters where columns exist.
@@ -197,7 +199,10 @@ export function useData(companyId?: string, userId?: string, userRole?: string) 
   const filterProyectosByAssignment = async (appData: AppData): Promise<AppData> => {
     const uid = userIdRef.current
     const role = userRoleRef.current
-    if (!uid || !role || PROJECT_EXEMPT_ROLES.has(role)) return appData
+    const condRole = condominiosRoleRef.current
+    // Exempt only if agua role is exempt AND user has no restricted condominios role
+    const hasRestrictedCondRole = condRole && condRole !== 'administrador_general'
+    if (!uid || !role || (PROJECT_EXEMPT_ROLES.has(role) && !hasRestrictedCondRole)) return appData
     const { data: assignments } = await supabase
       .from('user_project_assignments')
       .select('project_id')
