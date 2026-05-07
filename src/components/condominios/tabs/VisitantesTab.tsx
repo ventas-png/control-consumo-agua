@@ -31,6 +31,7 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   const [guardandoSalida, setGuardandoSalida] = useState(false)
   const [novedadForm, setNovedadForm] = useState({ tipo: 'incidente' as TipoNovedad, comentarios: '', ubicacion: '', prioridad: 'normal' as PrioridadNovedad })
   const [fotosNovedad, setFotosNovedad] = useState<string[]>([])
+  const [visitanteDetalle, setVisitanteDetalle] = useState<Visitante | null>(null)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
   const [fotoVehiculoUrl, setFotoVehiculoUrl] = useState<string | null>(null)
@@ -371,46 +372,142 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtrados.map(v => {
             const enPremisa = !v.hora_salida
+            const esSTR = v.motivo?.startsWith('Renta corta')
+            const fechaSalidaSTR = esSTR ? (v.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
+            const salidaHabilitada = !fechaSalidaSTR || hoy >= fechaSalidaSTR
             return (
-              <div key={v.id} style={{ background: 'white', border: `1.5px solid ${enPremisa ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                {v.foto_url
-                  ? <img src={v.foto_url} alt={v.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `2px solid ${enPremisa ? '#10b981' : '#e2e8f0'}` }} />
-                  : <div style={{ width: 40, height: 40, borderRadius: '50%', background: enPremisa ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: enPremisa ? 'white' : '#94a3b8', fontWeight: 700, fontSize: '15px', flexShrink: 0 }}>
-                      {v.nombre.charAt(0).toUpperCase()}
+              <div key={v.id} style={{ background: 'white', border: `1.5px solid ${enPremisa ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: '12px', padding: '12px 14px' }}>
+                {/* Fila superior: avatar + nombre + info */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  {v.foto_url
+                    ? <img src={v.foto_url} alt={v.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `2px solid ${enPremisa ? '#10b981' : '#e2e8f0'}` }} />
+                    : <div style={{ width: 40, height: 40, borderRadius: '50%', background: enPremisa ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: enPremisa ? 'white' : '#94a3b8', fontWeight: 700, fontSize: '15px', flexShrink: 0 }}>
+                        {v.nombre.charAt(0).toUpperCase()}
+                      </div>
+                  }
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{v.nombre}</div>
+                    <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '3px' }}>
+                      {v.unidad_nombre && <span>📍 {v.unidad_nombre}</span>}
+                      {v.motivo && <span>· {v.motivo}</span>}
+                      {v.identificacion && <span>· ID: {v.identificacion}</span>}
+                      {v.placa_vehiculo && <span>· 🚗 {v.placa_vehiculo}</span>}
                     </div>
-                }
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{v.nombre}</div>
-                  <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '2px' }}>
-                    {v.unidad_nombre && <span>📍 {v.unidad_nombre}</span>}
-                    {v.motivo && <span>· {v.motivo}</span>}
-                    {v.identificacion && <span>· ID: {v.identificacion}</span>}
-                    {v.placa_vehiculo && <span>· 🚗 {v.placa_vehiculo}</span>}
                   </div>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>Entrada: {new Date(v.hora_entrada).toLocaleString('es', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</div>
-                  {v.hora_salida && <div style={{ fontSize: '12px', color: '#94a3b8' }}>Salida: {new Date(v.hora_salida).toLocaleString('es', { hour: '2-digit', minute: '2-digit' })}</div>}
-                  {enPremisa && <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: '#dcfce7', color: '#16a34a', fontWeight: 700 }}>En premisas</span>}
+
+                {/* Fila inferior: tiempo + estado + botones */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', flexWrap: 'wrap', gap: '6px' }}>
+                  <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span>Entrada: {new Date(v.hora_entrada).toLocaleString('es', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</span>
+                    {v.hora_salida && <span style={{ color: '#94a3b8' }}>· Salida: {new Date(v.hora_salida).toLocaleString('es', { hour: '2-digit', minute: '2-digit' })}</span>}
+                    {enPremisa && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: '#dcfce7', color: '#16a34a', fontWeight: 700 }}>En premisas</span>}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    <button onClick={() => setVisitanteDetalle(v)}
+                      style={{ padding: '6px 12px', background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                      Ver detalle
+                    </button>
+                    {enPremisa && (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                        <button onClick={() => salidaHabilitada && iniciarSalida(v)}
+                          title={!salidaHabilitada ? `Salida programada: ${fechaSalidaSTR}` : undefined}
+                          style={{ padding: '6px 12px', background: salidaHabilitada ? '#fef3c7' : '#f1f5f9', color: salidaHabilitada ? '#92400e' : '#94a3b8', border: `1px solid ${salidaHabilitada ? '#fde68a' : '#e2e8f0'}`, borderRadius: '8px', cursor: salidaHabilitada ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                          Registrar salida
+                        </button>
+                        {!salidaHabilitada && <span style={{ fontSize: '10px', color: '#94a3b8' }}>Hasta {fechaSalidaSTR}</span>}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {enPremisa && (() => {
-                  const esSTR = v.motivo?.startsWith('Renta corta')
-                  const fechaSalidaSTR = esSTR ? (v.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
-                  const salidaHabilitada = !fechaSalidaSTR || hoy >= fechaSalidaSTR
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
-                      <button onClick={() => salidaHabilitada && iniciarSalida(v)}
-                        title={!salidaHabilitada ? `Salida programada: ${fechaSalidaSTR}` : undefined}
-                        style={{ padding: '7px 14px', background: salidaHabilitada ? '#fef3c7' : '#f1f5f9', color: salidaHabilitada ? '#92400e' : '#94a3b8', border: `1px solid ${salidaHabilitada ? '#fde68a' : '#e2e8f0'}`, borderRadius: '8px', cursor: salidaHabilitada ? 'pointer' : 'not-allowed', fontSize: '12.5px', fontWeight: 600 }}>
-                        Registrar salida
-                      </button>
-                      {!salidaHabilitada && <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>Hasta {fechaSalidaSTR}</span>}
-                    </div>
-                  )
-                })()}
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Modal detalle visita */}
+      {visitanteDetalle && (
+        <div onClick={() => setVisitanteDetalle(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '500px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden', marginBottom: '16px' }}>
+
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '18px 20px', borderBottom: '1px solid #f1f5f9' }}>
+              {visitanteDetalle.foto_url
+                ? <img src={visitanteDetalle.foto_url} alt={visitanteDetalle.nombre} style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', flexShrink: 0 }} />
+                : <div style={{ width: 52, height: 52, borderRadius: '50%', background: !visitanteDetalle.hora_salida ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: !visitanteDetalle.hora_salida ? 'white' : '#94a3b8', fontWeight: 800, fontSize: '20px', flexShrink: 0 }}>
+                    {visitanteDetalle.nombre.charAt(0).toUpperCase()}
+                  </div>
+              }
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>{visitanteDetalle.nombre}</div>
+                {visitanteDetalle.unidad_nombre && <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>📍 {visitanteDetalle.unidad_nombre}</div>}
+              </div>
+              <button onClick={() => setVisitanteDetalle(null)}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', color: '#64748b', cursor: 'pointer', fontSize: '18px', padding: '6px 10px', flexShrink: 0 }}>
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Info grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                {[
+                  { label: 'Entrada', value: new Date(visitanteDetalle.hora_entrada).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) },
+                  { label: 'Salida', value: visitanteDetalle.hora_salida ? new Date(visitanteDetalle.hora_salida).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '— En premisas' },
+                  ...(visitanteDetalle.identificacion ? [{ label: 'DPI / ID', value: visitanteDetalle.identificacion }] : []),
+                  ...(visitanteDetalle.placa_vehiculo ? [{ label: 'Vehículo', value: `🚗 ${visitanteDetalle.placa_vehiculo}` }] : []),
+                  ...(visitanteDetalle.motivo ? [{ label: 'Motivo', value: visitanteDetalle.motivo }] : []),
+                  ...(visitanteDetalle.notas ? [{ label: 'Notas', value: visitanteDetalle.notas }] : []),
+                ].map(({ label, value }) => (
+                  <div key={label} style={{ background: '#f8fafc', borderRadius: '10px', padding: '10px 12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>{label}</div>
+                    <div style={{ fontSize: '13px', color: '#374151', fontWeight: 600, wordBreak: 'break-word' }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Fotos */}
+              {(visitanteDetalle.foto_url || visitanteDetalle.foto_documento_url || visitanteDetalle.foto_vehiculo_url) && (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Fotografías registradas</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                    {[
+                      { url: visitanteDetalle.foto_url, label: 'Persona' },
+                      { url: visitanteDetalle.foto_documento_url, label: 'DPI' },
+                      { url: visitanteDetalle.foto_vehiculo_url, label: 'Vehículo' },
+                    ].filter(f => f.url).map(f => (
+                      <a key={f.label} href={f.url!} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+                        <img src={f.url!} alt={f.label} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'block' }} />
+                        <div style={{ fontSize: '10px', color: '#94a3b8', textAlign: 'center', marginTop: '3px' }}>{f.label}</div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Acciones */}
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
+                {!visitanteDetalle.hora_salida && (() => {
+                  const esSTR = visitanteDetalle.motivo?.startsWith('Renta corta')
+                  const fechaSalidaSTR = esSTR ? (visitanteDetalle.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
+                  const salidaHabilitada = !fechaSalidaSTR || hoy >= fechaSalidaSTR
+                  return salidaHabilitada ? (
+                    <button onClick={() => { setVisitanteDetalle(null); iniciarSalida(visitanteDetalle) }}
+                      style={{ padding: '9px 18px', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                      Registrar salida
+                    </button>
+                  ) : null
+                })()}
+                <button onClick={() => setVisitanteDetalle(null)}
+                  style={{ padding: '9px 20px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
