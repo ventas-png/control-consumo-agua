@@ -1179,7 +1179,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
   const unidadesProyecto = unidades.filter(u => u.project_id === selectedProyectoId)
   const proyectoActual = proyectos.find(p => p.id === selectedProyectoId)
-  const moneda = proyectoActual?.moneda ?? 'Q'
+  const moneda = proyectoActual?.moneda_condominios ?? proyectoActual?.moneda ?? 'Q'
   const cid = currentUser.company_id ?? ''
   const uid = currentUser.user_id
 

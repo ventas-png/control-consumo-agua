@@ -254,7 +254,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
 
             {usarRubros && (
               <div style={{ marginTop: 12, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 14 }}>
-                <RubrosBuilder rubros={rubros} onChange={setRubros} />
+                <RubrosBuilder rubros={rubros} onChange={setRubros} moneda={moneda} />
               </div>
             )}
           </div>

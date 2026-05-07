@@ -342,7 +342,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
               {/* Panel derecho: rubros */}
               <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 16, color: '#0f172a' }}>💰 Rubros y métodos de cálculo</div>
-                <RubrosBuilder rubros={rubros} onChange={setRubros} />
+                <RubrosBuilder rubros={rubros} onChange={setRubros} moneda={moneda} />
 
                 {canCreate && (
                   <button onClick={irAPreview}

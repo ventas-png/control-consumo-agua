@@ -329,6 +329,7 @@ export interface Proyecto {
   latitud: number | null
   longitud: number | null
   moneda: string
+  moneda_condominios: string | null
   estado: EstadoProyecto
   max_unidades_apartamento: number | null
   max_unidades_casa: number | null

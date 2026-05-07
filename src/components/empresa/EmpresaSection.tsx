@@ -62,7 +62,7 @@ export function EmpresaSection({ currentUser }: Props) {
 
     const [empresaRes, proyectosRes, usuariosRes] = await Promise.all([
       supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects, logo_url').eq('id', currentUser.company_id).single(),
-      supabase.from('projects').select('id, nombre, logo_url, descripcion, direccion, latitud, longitud, moneda, estado, max_unidades_apartamento, max_unidades_casa, max_unidades_bodega, max_unidades_local_comercial, max_unidades_oficina, max_unidades_parqueadero, max_unidades_otro').eq('company_id', currentUser.company_id).order('nombre'),
+      supabase.from('projects').select('id, nombre, logo_url, descripcion, direccion, latitud, longitud, moneda, moneda_condominios, estado, max_unidades_apartamento, max_unidades_casa, max_unidades_bodega, max_unidades_local_comercial, max_unidades_oficina, max_unidades_parqueadero, max_unidades_otro').eq('company_id', currentUser.company_id).order('nombre'),
       supabase.from('app_users').select('id, full_name, role, activo, agua_role, condominios_role')
         .eq('company_id', currentUser.company_id)
         .neq('id', currentUser.user_id)
@@ -131,6 +131,9 @@ export function EmpresaSection({ currentUser }: Props) {
     const monedasOpts = MONEDAS.map(m =>
       `<option value="${m.simbolo}" ${proyecto.moneda === m.simbolo ? 'selected' : ''}>${m.simbolo} — ${m.nombre}</option>`
     ).join('')
+    const monedasOptsCondominios = MONEDAS.map(m =>
+      `<option value="${m.simbolo}" ${(proyecto.moneda_condominios ?? proyecto.moneda) === m.simbolo ? 'selected' : ''}>${m.simbolo} — ${m.nombre}</option>`
+    ).join('')
 
     const tiposLimites = TIPOS_UNIDAD_LABELS.map(t => {
       const val = (proyecto[t.key] as number | null) ?? ''
@@ -170,14 +173,20 @@ export function EmpresaSection({ currentUser }: Props) {
 
           <hr style="border:none;border-top:1px solid #e2e8f0;margin:12px 0" />
 
-          <div style="display:flex;gap:16px;margin-bottom:14px">
-            <div style="flex:1">
-              <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Moneda</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+            <div>
+              <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Moneda Agua</label>
               <select id="swal-moneda" class="swal2-select" style="margin:4px 0 0;width:100%;padding:9px 10px;border-radius:6px;border:1px solid #d0d3d4;font-size:13px">
                 ${monedasOpts}
               </select>
             </div>
-            <div style="flex:1">
+            <div>
+              <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Moneda Condominios</label>
+              <select id="swal-moneda-condominios" class="swal2-select" style="margin:4px 0 0;width:100%;padding:9px 10px;border-radius:6px;border:1px solid #d0d3d4;font-size:13px">
+                ${monedasOptsCondominios}
+              </select>
+            </div>
+            <div>
               <label style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Estado</label>
               <select id="swal-estado" class="swal2-select" style="margin:4px 0 0;width:100%;padding:9px 10px;border-radius:6px;border:1px solid #d0d3d4;font-size:13px">
                 <option value="activo"     ${proyecto.estado === 'activo'     ? 'selected' : ''}>Activo</option>
@@ -233,6 +242,7 @@ export function EmpresaSection({ currentUser }: Props) {
           latitud: latRaw ? parseFloat(latRaw) : null,
           longitud: lngRaw ? parseFloat(lngRaw) : null,
           moneda: (document.getElementById('swal-moneda') as HTMLSelectElement).value,
+          moneda_condominios: (document.getElementById('swal-moneda-condominios') as HTMLSelectElement).value,
           estado: (document.getElementById('swal-estado') as HTMLSelectElement).value,
           max_unidades_apartamento:     getLimit('swal-max_unidades_apartamento'),
           max_unidades_casa:            getLimit('swal-max_unidades_casa'),
