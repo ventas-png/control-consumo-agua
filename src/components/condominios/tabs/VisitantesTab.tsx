@@ -61,9 +61,10 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   const estaSemana = visitantes.filter(v => v.hora_entrada.slice(0, 10) >= inicioSemana).length
   const totalHistorico = visitantes.length
 
-  // Deduped frequent visitor suggestions when name >= 3 chars
+  // Deduped frequent visitor suggestions — sorted by most recent first
   const sugerencias = form.nombre.length >= 3
-    ? visitantes
+    ? [...visitantes]
+        .sort((a, b) => b.hora_entrada.localeCompare(a.hora_entrada))
         .filter(v => v.nombre.toLowerCase().includes(form.nombre.toLowerCase()))
         .reduce<Visitante[]>((acc, v) => {
           if (!acc.some(a => a.nombre === v.nombre && a.identificacion === v.identificacion)) acc.push(v)
@@ -94,6 +95,14 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   }
 
   function autocompletar(v: Visitante) {
+    // Collect all records for this exact visitor (same name + DPI), sorted recent first
+    const mismoVisitante = [...visitantes]
+      .filter(r => r.nombre === v.nombre && r.identificacion === v.identificacion)
+      .sort((a, b) => b.hora_entrada.localeCompare(a.hora_entrada))
+    // Pick the most recent non-null URL for each photo slot
+    const mejorFoto     = mismoVisitante.find(r => r.foto_url)?.foto_url ?? null
+    const mejorDoc      = mismoVisitante.find(r => r.foto_documento_url)?.foto_documento_url ?? null
+    const mejorVehiculo = mismoVisitante.find(r => r.foto_vehiculo_url)?.foto_vehiculo_url ?? null
     setForm(f => ({
       ...f,
       nombre: v.nombre,
@@ -102,9 +111,9 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
       unidad_id: v.unidad_id,
       motivo: v.motivo ?? '',
     }))
-    setFotoUrl(v.foto_url ?? null)
-    setFotoDocumentoUrl(v.foto_documento_url ?? null)
-    setFotoVehiculoUrl(v.foto_vehiculo_url ?? null)
+    setFotoUrl(mejorFoto)
+    setFotoDocumentoUrl(mejorDoc)
+    setFotoVehiculoUrl(mejorVehiculo)
   }
 
   async function handleRegistrar() {
