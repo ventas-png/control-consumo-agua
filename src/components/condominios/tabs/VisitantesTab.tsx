@@ -311,88 +311,99 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
         </label>
       </div>
 
-      {/* Form */}
+      {/* Form modal */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Registrar visitante</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Nombre completo *</label>
-              <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
-                placeholder="Nombre del visitante"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-              {sugerencias.length > 0 && (
-                <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>Frecuente:</span>
-                  {sugerencias.map((v, i) => (
-                    <button key={i} type="button" onClick={() => autocompletar(v)}
-                      style={{ padding: '3px 10px', background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                      {v.nombre}{v.identificacion ? ` · ${v.identificacion}` : ''}
-                    </button>
-                  ))}
-                </div>
-              )}
+        <div
+          onClick={e => { if (e.target === e.currentTarget) resetForm() }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'white', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '640px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Registrar visitante</h3>
+              <button onClick={resetForm}
+                style={{ width: 28, height: 28, borderRadius: '50%', background: '#f1f5f9', border: 'none', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', lineHeight: 1 }}>
+                ×
+              </button>
             </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
-              <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
-                <option value="">Seleccionar...</option>
-                {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
-              <input value={form.identificacion} onChange={e => setForm(f => ({ ...f, identificacion: e.target.value }))}
-                placeholder="Número de documento"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
-              <input value={form.placa_vehiculo} onChange={e => setForm(f => ({ ...f, placa_vehiculo: e.target.value }))}
-                placeholder="Ej. ABC-123"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Motivo de visita</label>
-              <input value={form.motivo} onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}
-                placeholder="Ej. Entrega, Social, Mantenimiento..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Notas</label>
-              <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
-                placeholder="Opcional"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              {(fotosExpiradas.foto || fotosExpiradas.documento || fotosExpiradas.vehiculo) && (
-                <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#92400e', marginBottom: 10 }}>
-                  ⚠️ Una o más fotos tienen más de 90 días. Se recomienda renovarlas.
-                </div>
-              )}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-                <div>
-                  <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="visitantes" label="Foto del visitante" capture />
-                  {fotosExpiradas.foto && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
-                </div>
-                <div>
-                  <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" capture />
-                  {fotosExpiradas.documento && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
-                </div>
-                <div>
-                  <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" capture />
-                  {fotosExpiradas.vehiculo && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Nombre completo *</label>
+                <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+                  placeholder="Nombre del visitante"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                {sugerencias.length > 0 && (
+                  <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>Frecuente:</span>
+                    {sugerencias.map((v, i) => (
+                      <button key={i} type="button" onClick={() => autocompletar(v)}
+                        style={{ padding: '3px 10px', background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        {v.nombre}{v.identificacion ? ` · ${v.identificacion}` : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
+                <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
+                  style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
+                  <option value="">Seleccionar...</option>
+                  {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
+                <input value={form.identificacion} onChange={e => setForm(f => ({ ...f, identificacion: e.target.value }))}
+                  placeholder="Número de documento"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
+                <input value={form.placa_vehiculo} onChange={e => setForm(f => ({ ...f, placa_vehiculo: e.target.value }))}
+                  placeholder="Ej. ABC-123"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Motivo de visita</label>
+                <input value={form.motivo} onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}
+                  placeholder="Ej. Entrega, Social, Mantenimiento..."
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Notas</label>
+                <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
+                  placeholder="Opcional"
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                {(fotosExpiradas.foto || fotosExpiradas.documento || fotosExpiradas.vehiculo) && (
+                  <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#92400e', marginBottom: 10 }}>
+                    ⚠️ Una o más fotos tienen más de 90 días. Se recomienda renovarlas.
+                  </div>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+                  <div>
+                    <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="visitantes" label="Foto del visitante" capture />
+                    {fotosExpiradas.foto && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                  </div>
+                  <div>
+                    <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" capture />
+                    {fotosExpiradas.documento && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                  </div>
+                  <div>
+                    <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" capture />
+                    {fotosExpiradas.vehiculo && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleRegistrar} disabled={saving}
-              style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Registrando...' : '✓ Registrar entrada'}
-            </button>
-            <button onClick={resetForm} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button onClick={handleRegistrar} disabled={saving}
+                style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                {saving ? 'Registrando...' : '✓ Registrar entrada'}
+              </button>
+              <button onClick={resetForm} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
+            </div>
           </div>
         </div>
       )}
