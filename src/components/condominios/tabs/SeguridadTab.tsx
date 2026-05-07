@@ -4,7 +4,21 @@ import { supabase } from '../../../lib/supabase'
 import type {
   RondaSeguridad, NovedadSeguridad, TipoNovedad, PrioridadNovedad, EstadoRonda,
   RutaRonda, PuntoControlRuta, VisitaControl, EstadoVisitaControl,
+  Visitante, Unidad, ReservaSTR,
 } from '../../../types'
+
+const PLATAFORMA_LABEL: Record<string, string> = {
+  airbnb: 'Airbnb', booking: 'Booking.com', vrbo: 'VRBO', directo: 'Directo', otro: 'Otro',
+}
+
+const PLATAFORMA_COLOR: Record<string, { bg: string; color: string }> = {
+  airbnb:   { bg: '#fff1f2', color: '#e11d48' },
+  booking:  { bg: '#eff6ff', color: '#2563eb' },
+  vrbo:     { bg: '#f0fdf4', color: '#16a34a' },
+  directo:  { bg: '#f5f3ff', color: '#7c3aed' },
+  otro:     { bg: '#f8fafc', color: '#475569' },
+}
+import { ImageUploader, MultiImageUploader } from '../ImageUploader'
 
 interface Props {
   rondas: RondaSeguridad[]
@@ -12,6 +26,9 @@ interface Props {
   rutas: RutaRonda[]
   puntosControl: PuntoControlRuta[]
   visitasControl: VisitaControl[]
+  visitantes: Visitante[]
+  unidades: Unidad[]
+  reservasSTR: ReservaSTR[]
   proyectoId: string
   companyId: string
   userId: string
@@ -49,19 +66,42 @@ const VISITA_CONFIG: Record<EstadoVisitaControl, { label: string; icon: string; 
 
 export function SeguridadTab({
   rondas, novedades, rutas, puntosControl, visitasControl,
+  visitantes, unidades, reservasSTR,
   proyectoId, companyId, userId, canCreate, canEdit, onRefresh,
 }: Props) {
   const [vista, setVista] = useState<'novedades' | 'rondas'>('novedades')
+  const [showAccesosModal, setShowAccesosModal] = useState(false)
   const [showNovedadForm, setShowNovedadForm] = useState(false)
   const [showRondaForm, setShowRondaForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroPrioridad, setFiltroPrioridad] = useState<PrioridadNovedad | 'todos'>('todos')
+  const [novedadDetalle, setNovedadDetalle] = useState<NovedadSeguridad | null>(null)
 
   const [novedadForm, setNovedadForm] = useState({
     tipo: 'observacion' as TipoNovedad, descripcion: '', ubicacion: '',
     prioridad: 'normal' as PrioridadNovedad, ronda_id: '',
   })
+  const [fotosNovedadForm, setFotosNovedadForm] = useState<string[]>([])
   const [rondaForm, setRondaForm] = useState({ notas: '', ruta_id: '' })
+
+  // Accesos / verificación visitante
+  const [modoModal, setModoModal] = useState<'dpi' | 'str'>('dpi')
+  const [strSearch, setStrSearch] = useState('')
+  const [dpiSearch, setDpiSearch] = useState('')
+  const [searchResult, setSearchResult] = useState<'idle' | 'found' | 'not_found'>('idle')
+  const [searchResultVisitantes, setSearchResultVisitantes] = useState<Visitante[]>([])
+  const [searching, setSearching] = useState(false)
+  const [showRegForm, setShowRegForm] = useState(false)
+  const [regSaving, setRegSaving] = useState(false)
+  const [fotoPersonaUrl, setFotoPersonaUrl] = useState<string | null>(null)
+  const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
+  const [fotoVehiculoUrl, setFotoVehiculoUrl] = useState<string | null>(null)
+  const [fotosExpiradas, setFotosExpiradas] = useState<{ foto: boolean; documento: boolean; vehiculo: boolean }>({ foto: false, documento: false, vehiculo: false })
+  const [regForm, setRegForm] = useState({
+    nombre: '', unidad_id: '', placa_vehiculo: '', motivo: '', notas: '', identificacion: '',
+  })
+  const [strReservaId, setStrReservaId] = useState<string | null>(null)
+  const [strIngresados, setStrIngresados] = useState<Set<string>>(new Set())
 
   const novedadesFiltradas = novedades.filter(n =>
     filtroPrioridad === 'todos' || n.prioridad === filtroPrioridad
@@ -143,11 +183,14 @@ export function SeguridadTab({
       tipo: novedadForm.tipo, descripcion: novedadForm.descripcion.trim(),
       ubicacion: novedadForm.ubicacion.trim() || null,
       prioridad: novedadForm.prioridad, reportado_por: userId,
+      foto_url: fotosNovedadForm[0] ?? null,
+      fotos: fotosNovedadForm.length > 0 ? fotosNovedadForm : null,
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
     Swal.fire({ icon: 'success', title: 'Novedad registrada', timer: 1400, showConfirmButton: false })
     setNovedadForm({ tipo: 'observacion', descripcion: '', ubicacion: '', prioridad: 'normal', ronda_id: '' })
+    setFotosNovedadForm([])
     setShowNovedadForm(false); onRefresh()
   }
 
@@ -155,6 +198,132 @@ export function SeguridadTab({
     const r = await Swal.fire({ title: '¿Eliminar novedad?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('novedades_seguridad').delete().eq('id', id)
+    onRefresh()
+  }
+
+  function resetAccesos() {
+    setModoModal('dpi')
+    setStrSearch('')
+    setDpiSearch('')
+    setSearchResult('idle')
+    setSearchResultVisitantes([])
+    setShowRegForm(false)
+    setRegForm({ nombre: '', unidad_id: '', placa_vehiculo: '', motivo: '', notas: '', identificacion: '' })
+    setFotoPersonaUrl(null)
+    setFotoDocumentoUrl(null)
+    setFotoVehiculoUrl(null)
+    setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
+    setStrReservaId(null)
+    setStrIngresados(new Set())
+    setShowAccesosModal(false)
+  }
+
+  function cambiarModo(modo: 'dpi' | 'str') {
+    setModoModal(modo)
+    setStrSearch('')
+    setDpiSearch('')
+    setSearchResult('idle')
+    setSearchResultVisitantes([])
+    setShowRegForm(false)
+    setRegForm({ nombre: '', unidad_id: '', placa_vehiculo: '', motivo: '', notas: '', identificacion: '' })
+    setFotoPersonaUrl(null)
+    setFotoDocumentoUrl(null)
+    setFotoVehiculoUrl(null)
+    setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
+    setStrReservaId(null)
+  }
+
+  function precargarDesdeSTR(r: ReservaSTR) {
+    const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
+    setStrReservaId(r.id)
+    setRegForm({
+      nombre: r.huesped_nombre,
+      unidad_id: r.unidad_id ?? '',
+      placa_vehiculo: '',
+      motivo: `Renta corta · ${PLATAFORMA_LABEL[r.plataforma] ?? r.plataforma}`,
+      notas: `Entrada: ${r.fecha_entrada} · Salida: ${r.fecha_salida} (${noches} noche${noches !== 1 ? 's' : ''})`,
+      identificacion: '',
+    })
+    setFotoPersonaUrl(null)
+    setFotoDocumentoUrl(null)
+    setFotoVehiculoUrl(null)
+    setShowRegForm(true)
+  }
+
+  async function buscarPorDpi() {
+    const dpi = dpiSearch.trim()
+    if (!dpi) return
+    setSearching(true)
+    setSearchResult('idle')
+    setSearchResultVisitantes([])
+    setShowRegForm(false)
+    const { data, error } = await supabase
+      .from('visitantes')
+      .select('*, unidades(nombre)')
+      .eq('company_id', companyId)
+      .eq('identificacion', dpi)
+      .order('hora_entrada', { ascending: false })
+      .limit(50)
+    setSearching(false)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (data && data.length > 0) {
+      const mapped = data.map((v: any) => ({ ...v, unidad_nombre: v.unidades?.nombre }))
+      setSearchResultVisitantes(mapped)
+      setSearchResult('found')
+      const latest = mapped[0]
+      setRegForm({
+        nombre: latest.nombre,
+        identificacion: latest.identificacion ?? dpi,
+        placa_vehiculo: latest.placa_vehiculo ?? '',
+        motivo: '',
+        notas: '',
+        unidad_id: '',
+      })
+      setFotoPersonaUrl(latest.foto_url ?? null)
+      setFotoDocumentoUrl(latest.foto_documento_url ?? null)
+      setFotoVehiculoUrl(latest.foto_vehiculo_url ?? null)
+      const DIAS_90 = 90 * 24 * 60 * 60 * 1000
+      const ahora = Date.now()
+      const esVencida = (r: Visitante | undefined) => !!r && (ahora - new Date(r.hora_entrada).getTime()) > DIAS_90
+      setFotosExpiradas({
+        foto:      esVencida(mapped.find((r: Visitante) => r.foto_url)),
+        documento: esVencida(mapped.find((r: Visitante) => r.foto_documento_url)),
+        vehiculo:  esVencida(mapped.find((r: Visitante) => r.foto_vehiculo_url)),
+      })
+    } else {
+      setSearchResult('not_found')
+      setRegForm(f => ({ ...f, identificacion: dpi }))
+      setShowRegForm(true)
+    }
+  }
+
+  async function handleRegistrarAcceso() {
+    if (!regForm.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre del visitante.', 'error'); return }
+    if (!regForm.unidad_id) { Swal.fire('Error', 'Seleccione la unidad a visitar.', 'error'); return }
+    setRegSaving(true)
+    const { error } = await supabase.from('visitantes').insert({
+      company_id: companyId,
+      project_id: proyectoId,
+      unidad_id: regForm.unidad_id,
+      nombre: regForm.nombre.trim(),
+      identificacion: regForm.identificacion.trim() || null,
+      placa_vehiculo: regForm.placa_vehiculo.trim() || null,
+      motivo: regForm.motivo.trim() || null,
+      notas: regForm.notas.trim() || null,
+      foto_url: fotoPersonaUrl,
+      foto_documento_url: fotoDocumentoUrl,
+      foto_vehiculo_url: fotoVehiculoUrl,
+      registrado_por: userId,
+      hora_entrada: new Date().toISOString(),
+    })
+    setRegSaving(false)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (strReservaId) {
+      setStrIngresados(prev => new Set([...prev, strReservaId]))
+      setStrReservaId(null)
+    }
+    Swal.fire({ icon: 'success', title: 'Entrada registrada', timer: 1500, showConfirmButton: false })
+    resetAccesos()
     onRefresh()
   }
 
@@ -169,7 +338,10 @@ export function SeguridadTab({
             {rondaEnCurso && <span style={{ color: '#2563eb', fontWeight: 600 }}> · Ronda en curso</span>}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={() => setShowAccesosModal(true)} style={{ padding: '9px 16px', background: '#f5f3ff', color: '#7c3aed', border: '1.5px solid #ddd6fe', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+            🚪 Verificar acceso
+          </button>
           {canCreate && (
             <>
               <button onClick={() => setShowNovedadForm(true)} style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
@@ -257,7 +429,7 @@ export function SeguridadTab({
       )}
 
       {/* Vista toggle */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => setVista('novedades')}
           style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === 'novedades' ? '#0ea5e9' : '#e2e8f0', background: vista === 'novedades' ? '#eff6ff' : 'white', color: vista === 'novedades' ? '#0ea5e9' : '#64748b' }}>
           📋 Novedades ({novedades.length})
@@ -312,12 +484,22 @@ export function SeguridadTab({
                 </label>
               </div>
             )}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <MultiImageUploader
+                values={fotosNovedadForm}
+                onChange={setFotosNovedadForm}
+                folder="novedades"
+                label="Fotografías de evidencia (opcional)"
+                capture
+                maxFiles={10}
+              />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button onClick={registrarNovedad} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Registrar'}
             </button>
-            <button onClick={() => setShowNovedadForm(false)} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={() => { setShowNovedadForm(false); setFotosNovedadForm([]) }} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
@@ -381,20 +563,51 @@ export function SeguridadTab({
               {novedadesFiltradas.map(n => {
                 const pc = PRIORIDAD_CONFIG[n.prioridad]
                 const tc = TIPO_NOVEDAD_CONFIG[n.tipo]
+                const rondaVinculada = n.ronda_id ? rondas.find(r => r.id === n.ronda_id) : null
+                const accentColor = n.prioridad === 'critica' ? '#dc2626' : n.prioridad === 'alta' ? '#ea580c' : '#16a34a'
                 return (
-                  <div key={n.id} style={{ background: 'white', border: `1.5px solid ${n.prioridad === 'critica' ? '#fecaca' : '#e2e8f0'}`, borderRadius: '12px', padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <span style={{ fontSize: '20px', flexShrink: 0 }}>{tc.icon}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '4px', alignItems: 'center' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{tc.label}</span>
-                          <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: pc.bg, color: pc.color }}>{pc.label}</span>
-                          {n.ubicacion && <span style={{ fontSize: '12px', color: '#64748b' }}>📍 {n.ubicacion}</span>}
+                  <div key={n.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', display: 'flex' }}>
+                    {/* Accent stripe */}
+                    <div style={{ width: '5px', background: accentColor, flexShrink: 0 }} />
+                    <div style={{ flex: 1, padding: '14px 16px' }}>
+                      {/* Top row */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                        <span style={{ fontSize: '22px', flexShrink: 0, lineHeight: 1 }}>{tc.icon}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#0f172a' }}>{tc.label}</span>
+                            <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: pc.bg, color: pc.color }}>{pc.label}</span>
+                            <span style={{ fontSize: '11.5px', color: '#94a3b8', marginLeft: 'auto' }}>
+                              {new Date(n.created_at).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          {/* Description */}
+                          <p style={{ margin: '0 0 8px', fontSize: '13.5px', color: '#374151', lineHeight: 1.5 }}>{n.descripcion}</p>
+                          {/* Metadata footer */}
+                          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {n.ubicacion && (
+                              <span style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                📍 {n.ubicacion}
+                              </span>
+                            )}
+                            {rondaVinculada && (
+                              <span style={{ fontSize: '12px', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                🛡 Ronda {new Date(rondaVinculada.inicio).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                            <button onClick={() => setNovedadDetalle(n)}
+                              style={{ fontSize: '12px', color: '#0ea5e9', background: 'none', border: 'none', cursor: 'pointer', padding: '0', fontWeight: 600, marginLeft: 'auto' }}>
+                              Ver detalle →
+                            </button>
+                            {canEdit && (
+                              <button onClick={() => eliminarNovedad(n.id)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px', padding: '2px 4px' }}>
+                                🗑
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <p style={{ margin: '0 0 4px', fontSize: '13.5px', color: '#374151' }}>{n.descripcion}</p>
-                        <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>{new Date(n.created_at).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
-                      <button onClick={() => eliminarNovedad(n.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '15px', padding: '2px 4px', flexShrink: 0 }}>🗑</button>
                     </div>
                   </div>
                 )
@@ -453,6 +666,449 @@ export function SeguridadTab({
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Modal detalle de novedad */}
+      {novedadDetalle && (() => {
+        const pc = PRIORIDAD_CONFIG[novedadDetalle.prioridad]
+        const tc = TIPO_NOVEDAD_CONFIG[novedadDetalle.tipo]
+        const rondaVinculada = novedadDetalle.ronda_id ? rondas.find(r => r.id === novedadDetalle.ronda_id) : null
+        const accentColor = novedadDetalle.prioridad === 'critica' ? '#dc2626' : novedadDetalle.prioridad === 'alta' ? '#ea580c' : '#16a34a'
+        return (
+          <div onClick={() => setNovedadDetalle(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '520px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+              {/* Header con color de prioridad */}
+              <div style={{ height: '6px', background: accentColor }} />
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'flex-start', gap: '12px', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '28px', lineHeight: 1 }}>{tc.icon}</span>
+                  <div>
+                    <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>{tc.label}</div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                      <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: pc.bg, color: pc.color }}>{pc.label}</span>
+                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                        {new Date(novedadDetalle.created_at).toLocaleString('es', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setNovedadDetalle(null)}
+                  style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', color: '#64748b', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '6px 10px', flexShrink: 0 }}>
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
+                {/* Fotos de evidencia */}
+                {((novedadDetalle.fotos && novedadDetalle.fotos.length > 0) || novedadDetalle.foto_url) && (() => {
+                  const todas = novedadDetalle.fotos && novedadDetalle.fotos.length > 0
+                    ? novedadDetalle.fotos
+                    : [novedadDetalle.foto_url!]
+                  return (
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
+                        Evidencia fotográfica ({todas.length})
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: todas.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+                        {todas.map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noreferrer">
+                            <img src={url} alt={`Evidencia ${i + 1}`}
+                              style={{ width: '100%', height: todas.length === 1 ? '200px' : '100px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'block' }} />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Descripción: separar datos del registro vs comentario del guardia */}
+                {(() => {
+                  const partes = novedadDetalle.descripcion.split('\n\n')
+                  const tieneDatos = partes.length >= 2
+                  const datosRegistro = tieneDatos ? partes[0] : null
+                  const comentario = tieneDatos ? partes.slice(1).join('\n\n') : novedadDetalle.descripcion
+                  return (
+                    <>
+                      {datosRegistro && (
+                        <div>
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Datos del registro</div>
+                          <div style={{ fontSize: '12.5px', color: '#64748b', background: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', lineHeight: 1.7 }}>
+                            {datosRegistro.split(' | ').map((item, i) => (
+                              <span key={i} style={{ display: 'inline-block', marginRight: '6px' }}>
+                                {i > 0 && <span style={{ color: '#cbd5e1', marginRight: '6px' }}>·</span>}
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Comentarios</div>
+                        <p style={{ margin: 0, fontSize: '14.5px', color: '#0f172a', lineHeight: 1.6, background: '#fffbeb', padding: '12px 14px', borderRadius: '10px', border: '1px solid #fde68a', whiteSpace: 'pre-wrap' }}>
+                          {comentario}
+                        </p>
+                      </div>
+                    </>
+                  )
+                })()}
+
+                {/* Metadatos en grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  {novedadDetalle.ubicacion && (
+                    <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Ubicación</div>
+                      <div style={{ fontSize: '13.5px', color: '#374151', fontWeight: 600 }}>📍 {novedadDetalle.ubicacion}</div>
+                    </div>
+                  )}
+                  {rondaVinculada && (
+                    <div style={{ background: '#eff6ff', borderRadius: '10px', padding: '12px', border: '1px solid #bfdbfe' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Ronda vinculada</div>
+                      <div style={{ fontSize: '13.5px', color: '#1d4ed8', fontWeight: 600 }}>
+                        🛡 {new Date(rondaVinculada.inicio).toLocaleDateString('es', { day: '2-digit', month: 'short' })} · {new Date(rondaVinculada.inicio).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Tipo</div>
+                    <div style={{ fontSize: '13.5px', color: '#374151', fontWeight: 600 }}>{tc.icon} {tc.label}</div>
+                  </div>
+                  <div style={{ background: pc.bg, borderRadius: '10px', padding: '12px', border: `1px solid ${accentColor}30` }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: pc.color, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Prioridad</div>
+                    <div style={{ fontSize: '13.5px', color: pc.color, fontWeight: 700 }}>{pc.label}</div>
+                  </div>
+                </div>
+
+                {/* Acciones */}
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
+                  {canEdit && (
+                    <button onClick={async () => { setNovedadDetalle(null); await eliminarNovedad(novedadDetalle.id) }}
+                      style={{ padding: '9px 16px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                      🗑 Eliminar
+                    </button>
+                  )}
+                  <button onClick={() => setNovedadDetalle(null)}
+                    style={{ padding: '9px 20px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Modal de verificación de acceso */}
+      {showAccesosModal && (
+        <div onClick={resetAccesos}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '24px 16px', overflowY: 'auto' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'white', borderRadius: '18px', width: '100%', maxWidth: '680px', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.4)', marginBottom: '24px' }}>
+
+            {/* Header del modal */}
+            <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: 'white', borderRadius: '18px 18px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.8, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Control de Seguridad</div>
+                <div style={{ fontSize: 19, fontWeight: 800, marginTop: 2 }}>🚪 Registro de acceso</div>
+                <div style={{ fontSize: 12.5, opacity: 0.88, marginTop: 4 }}>
+                  {modoModal === 'dpi' ? 'Busque por DPI para ver historial o registrar entrada' : 'Seleccione una reserva STR para registrar el ingreso'}
+                </div>
+              </div>
+              <button onClick={resetAccesos}
+                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '10px', color: 'white', cursor: 'pointer', fontSize: '20px', lineHeight: 1, padding: '6px 10px', flexShrink: 0 }}>
+                ✕
+              </button>
+            </div>
+
+            {/* Cuerpo del modal */}
+            <div style={{ padding: '20px 24px' }}>
+
+              {/* Tabs de modo */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1.5px solid #f1f5f9', paddingBottom: '16px' }}>
+                <button onClick={() => cambiarModo('dpi')}
+                  style={{ padding: '8px 16px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: modoModal === 'dpi' ? '#7c3aed' : '#e2e8f0', background: modoModal === 'dpi' ? '#f5f3ff' : 'white', color: modoModal === 'dpi' ? '#7c3aed' : '#64748b' }}>
+                  🔍 Verificar por DPI
+                </button>
+                <button onClick={() => cambiarModo('str')}
+                  style={{ padding: '8px 16px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: modoModal === 'str' ? '#7c3aed' : '#e2e8f0', background: modoModal === 'str' ? '#f5f3ff' : 'white', color: modoModal === 'str' ? '#7c3aed' : '#64748b' }}>
+                  🏠 Renta corta
+                </button>
+              </div>
+
+              {/* ── MODO DPI ── */}
+              {modoModal === 'dpi' && (
+                <>
+              {/* Buscador DPI */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: '#374151', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>DPI / Identificación</label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input
+                    value={dpiSearch}
+                    onChange={e => setDpiSearch(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && buscarPorDpi()}
+                    placeholder="Ingrese número de DPI o identificación..."
+                    autoFocus
+                    style={{ flex: 1, padding: '11px 14px', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', background: '#f8fafc' }}
+                  />
+                  <button
+                    onClick={buscarPorDpi}
+                    disabled={searching || !dpiSearch.trim()}
+                    style={{ padding: '11px 20px', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: searching || !dpiSearch.trim() ? 'not-allowed' : 'pointer', opacity: searching || !dpiSearch.trim() ? 0.65 : 1, minWidth: '110px', fontSize: '13.5px' }}>
+                    {searching ? 'Buscando...' : '🔍 Buscar'}
+                  </button>
+                  {searchResult !== 'idle' && (
+                    <button onClick={() => { setDpiSearch(''); setSearchResult('idle'); setSearchResultVisitantes([]); setShowRegForm(false); }}
+                      style={{ padding: '11px 14px', background: '#f1f5f9', color: '#64748b', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Resultado: visitante encontrado */}
+              {searchResult === 'found' && (
+                <div>
+                  <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '14px 16px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {searchResultVisitantes[0]?.foto_url
+                        ? <img src={searchResultVisitantes[0].foto_url} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #86efac', flexShrink: 0 }} />
+                        : <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,#10b981,#059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '18px', flexShrink: 0 }}>
+                            {searchResultVisitantes[0]?.nombre.charAt(0).toUpperCase()}
+                          </div>
+                      }
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '15px', color: '#15803d' }}>
+                          {searchResultVisitantes[0]?.nombre}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                          DPI: {dpiSearch} · {searchResultVisitantes.length} visita{searchResultVisitantes.length !== 1 ? 's' : ''} registrada{searchResultVisitantes.length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    </div>
+                    {canCreate && (
+                      <button onClick={() => setShowRegForm(true)}
+                        style={{ padding: '8px 16px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>
+                        + Registrar nueva entrada
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Historial */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', maxHeight: showRegForm ? '160px' : '280px', overflowY: 'auto', marginBottom: showRegForm ? '16px' : '0' }}>
+                    {searchResultVisitantes.map(v => {
+                      const enPremisa = !v.hora_salida
+                      return (
+                        <div key={v.id} style={{ background: enPremisa ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${enPremisa ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: '10px', padding: '10px 14px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                          {v.foto_url && <img src={v.foto_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a' }}>
+                              {new Date(v.hora_entrada).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              {' · '}
+                              {new Date(v.hora_entrada).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            <div style={{ fontSize: '11.5px', color: '#64748b', display: 'flex', gap: '8px', marginTop: '1px', flexWrap: 'wrap' }}>
+                              {v.unidad_nombre && <span>📍 {v.unidad_nombre}</span>}
+                              {v.motivo && <span>· {v.motivo}</span>}
+                              {v.placa_vehiculo && <span>· 🚗 {v.placa_vehiculo}</span>}
+                              {v.project_id !== proyectoId && <span style={{ color: '#7c3aed', fontWeight: 600 }}>· Otro proyecto</span>}
+                            </div>
+                          </div>
+                          <div style={{ flexShrink: 0 }}>
+                            {enPremisa
+                              ? <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', background: '#dcfce7', color: '#16a34a', fontWeight: 700 }}>En premisas</span>
+                              : <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                  Salida {new Date(v.hora_salida!).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                            }
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Resultado: no encontrado */}
+              {searchResult === 'not_found' && (
+                <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#dc2626' }}>No se encontró ningún visitante con ese DPI</div>
+                    <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '2px' }}>Complete el formulario para registrarlo como nuevo visitante.</div>
+                  </div>
+                  {canCreate && !showRegForm && (
+                    <button onClick={() => setShowRegForm(true)}
+                      style={{ padding: '8px 16px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>
+                      + Registrar nuevo
+                    </button>
+                  )}
+                </div>
+              )}
+
+                </>
+              )}
+
+              {/* ── MODO STR ── */}
+              {modoModal === 'str' && (
+                <>
+                  {/* Buscador de huésped */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <input
+                      value={strSearch}
+                      onChange={e => setStrSearch(e.target.value)}
+                      placeholder="Buscar por nombre de huésped o unidad..."
+                      autoFocus
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', background: '#f8fafc' }}
+                    />
+                  </div>
+
+                  {/* Lista de reservas STR activas/próximas */}
+                  {(() => {
+                    const hoy = new Date().toISOString().slice(0, 10)
+                    const reservasFiltradas = reservasSTR
+                      .filter(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy && !strIngresados.has(r.id))
+                      .filter(r => !strSearch || r.huesped_nombre.toLowerCase().includes(strSearch.toLowerCase()) || (r.unidad_nombre ?? '').toLowerCase().includes(strSearch.toLowerCase()))
+                      .sort((a, b) => {
+                        // Hoy y pasadas primero, luego futuras por fecha ascendente
+                        const aHoy = a.fecha_entrada <= hoy
+                        const bHoy = b.fecha_entrada <= hoy
+                        if (aHoy !== bHoy) return aHoy ? -1 : 1
+                        return a.fecha_entrada.localeCompare(b.fecha_entrada)
+                      })
+
+                    if (reservasFiltradas.length === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94a3b8' }}>
+                          <div style={{ fontSize: '32px', marginBottom: '10px' }}>🏠</div>
+                          <p style={{ fontWeight: 600, color: '#64748b', margin: 0 }}>
+                            {strSearch ? 'No se encontraron reservas con ese nombre' : 'No hay reservas STR activas o próximas'}
+                          </p>
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: showRegForm ? '140px' : '320px', overflowY: 'auto' }}>
+                        {reservasFiltradas.map(r => {
+                          const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
+                          const plat = PLATAFORMA_COLOR[r.plataforma] ?? PLATAFORMA_COLOR.otro
+                          const enCurso = r.estado === 'en_curso'
+                          return (
+                            <div key={r.id} style={{ background: enCurso ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${enCurso ? '#86efac' : '#e2e8f0'}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{r.huesped_nombre}</span>
+                                  <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: plat.bg, color: plat.color }}>
+                                    {PLATAFORMA_LABEL[r.plataforma] ?? r.plataforma}
+                                  </span>
+                                  {enCurso && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#dcfce7', color: '#16a34a' }}>En curso</span>}
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                  {r.unidad_nombre && <span>🏠 {r.unidad_nombre}</span>}
+                                  <span>📅 {r.fecha_entrada} → {r.fecha_salida}</span>
+                                  <span>· {noches} noche{noches !== 1 ? 's' : ''}</span>
+                                  {r.num_adultos > 0 && <span>· 👥 {r.num_adultos + r.num_ninos}</span>}
+                                </div>
+                              </div>
+                              {canCreate && (() => {
+                                const ingresoHabilitado = r.fecha_entrada <= hoy
+                                return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                                    <button onClick={() => ingresoHabilitado && precargarDesdeSTR(r)}
+                                      title={!ingresoHabilitado ? `Ingreso habilitado desde: ${r.fecha_entrada}` : undefined}
+                                      style={{ padding: '7px 14px', background: ingresoHabilitado ? 'linear-gradient(135deg,#7c3aed,#6d28d9)' : '#f1f5f9', color: ingresoHabilitado ? 'white' : '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: ingresoHabilitado ? 'pointer' : 'not-allowed', fontSize: '12.5px', whiteSpace: 'nowrap' }}>
+                                      Registrar ingreso
+                                    </button>
+                                    {!ingresoHabilitado && <span style={{ fontSize: '10.5px', color: '#94a3b8' }}>Desde {r.fecha_entrada}</span>}
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
+                </>
+              )}
+
+              {/* Formulario de registro (compartido entre modos DPI y STR) */}
+              {showRegForm && canCreate && (
+                <div style={{ borderTop: '1.5px solid #e2e8f0', paddingTop: '18px', marginTop: '16px' }}>
+                  <h3 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+                    {modoModal === 'str' ? 'Registrar ingreso del huésped' : searchResult === 'found' ? 'Registrar nueva entrada' : 'Registrar nuevo visitante'}
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Nombre completo *</label>
+                      <input value={regForm.nombre} onChange={e => setRegForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre del visitante"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
+                      <select value={regForm.unidad_id} onChange={e => setRegForm(f => ({ ...f, unidad_id: e.target.value }))}
+                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
+                        <option value="">Seleccionar...</option>
+                        {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
+                      <input value={regForm.identificacion} onChange={e => setRegForm(f => ({ ...f, identificacion: e.target.value }))} placeholder="Número de documento"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
+                      <input value={regForm.placa_vehiculo} onChange={e => setRegForm(f => ({ ...f, placa_vehiculo: e.target.value }))} placeholder="Ej. ABC-123"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Motivo de visita</label>
+                      <input value={regForm.motivo} onChange={e => setRegForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Ej. Entrega, Social..."
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Notas</label>
+                      <input value={regForm.notas} onChange={e => setRegForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      {(fotosExpiradas.foto || fotosExpiradas.documento || fotosExpiradas.vehiculo) && (
+                        <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#92400e', marginBottom: 10 }}>
+                          ⚠️ Una o más fotos tienen más de 90 días. Se recomienda renovarlas.
+                        </div>
+                      )}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                        <div>
+                          <ImageUploader value={fotoPersonaUrl} onChange={setFotoPersonaUrl} folder="visitantes" label="Foto del visitante" capture />
+                          {fotosExpiradas.foto && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                        </div>
+                        <div>
+                          <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto DPI / Documento" capture />
+                          {fotosExpiradas.documento && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                        </div>
+                        <div>
+                          <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" capture />
+                          {fotosExpiradas.vehiculo && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                    <button onClick={handleRegistrarAcceso} disabled={regSaving}
+                      style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: regSaving ? 'not-allowed' : 'pointer', opacity: regSaving ? 0.7 : 1 }}>
+                      {regSaving ? 'Registrando...' : '✓ Registrar entrada'}
+                    </button>
+                    <button onClick={() => setShowRegForm(false)}
+                      style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

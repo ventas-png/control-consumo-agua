@@ -15,7 +15,9 @@ import type {
   ConversationPriority,
   ConversationStatus,
   ConversationAccessRule,
+  ConversationServiceType,
 } from '../../types'
+import { AGUA_CATEGORIES, CONDOMINIOS_CATEGORIES } from '../../types'
 
 interface Props {
   currentUser: UserSession
@@ -24,6 +26,7 @@ interface Props {
   unidades: Unidad[]
   canCreate: boolean
   canEdit: boolean
+  serviceType?: ConversationServiceType
 }
 
 // ── Modal: Nueva Conversación (empresa → cliente) ────────────────────────────
@@ -32,6 +35,7 @@ function NuevaConversacionModal({
   onClose,
   onConfirm,
   sending,
+  serviceType = 'agua',
 }: {
   clientes: Cliente[]
   onClose: () => void
@@ -44,6 +48,7 @@ function NuevaConversacionModal({
     firstMessage: string
   }) => Promise<void>
   sending: boolean
+  serviceType?: ConversationServiceType
 }) {
   const [clienteId, setClienteId] = useState('')
   const [search, setSearch] = useState('')
@@ -147,10 +152,9 @@ function NuevaConversacionModal({
               <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Categoría</label>
               <select value={category} onChange={e => setCategory(e.target.value as ConversationCategory)}
                 style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
-                <option value="general">General</option>
-                <option value="pagos">Pagos</option>
-                <option value="tecnico">Técnico</option>
-                <option value="calidad">Calidad Agua</option>
+                {(serviceType === 'condominios' ? CONDOMINIOS_CATEGORIES : AGUA_CATEGORIES).map(k => (
+                  <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -199,6 +203,9 @@ const CATEGORY_LABELS: Record<ConversationCategory, string> = {
   pagos: 'Pagos',
   tecnico: 'Técnico',
   calidad: 'Calidad Agua',
+  mantenimiento: 'Mantenimiento',
+  finanzas: 'Finanzas',
+  convivencia: 'Convivencia',
 }
 
 const PRIORITY_LABELS: Record<ConversationPriority, string> = {
@@ -264,10 +271,12 @@ function NuevaDiscusionInternaModal({
   onClose,
   onConfirm,
   sending,
+  serviceType = 'agua',
 }: {
   onClose: () => void
   onConfirm: (data: { subject: string; category: ConversationCategory; firstMessage: string }) => Promise<void>
   sending: boolean
+  serviceType?: ConversationServiceType
 }) {
   const [subject, setSubject] = useState('')
   const [category, setCategory] = useState<ConversationCategory>('general')
@@ -306,10 +315,9 @@ function NuevaDiscusionInternaModal({
             <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>Categoría</label>
             <select value={category} onChange={e => setCategory(e.target.value as ConversationCategory)}
               style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
-              <option value="general">General</option>
-              <option value="pagos">Finanzas / Cobros</option>
-              <option value="tecnico">Técnico / Operaciones</option>
-              <option value="calidad">Calidad del Servicio</option>
+              {(serviceType === 'condominios' ? CONDOMINIOS_CATEGORIES : AGUA_CATEGORIES).map(k => (
+                <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
+              ))}
             </select>
           </div>
           <div>
@@ -593,19 +601,38 @@ function ConversationList({
 }
 
 // ── Sub-componente: Panel de configuración de acceso ────────────────────────
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Administrador',
+  operator: 'Operador',
+  collector: 'Gestor de Cobros',
+  viewer: 'Visualizador',
+  administrador_general: 'Administrador General',
+  junta_directiva: 'Junta Directiva',
+  finanzas: 'Finanzas / Contador',
+  operaciones: 'Operaciones',
+  seguridad: 'Seguridad',
+  comunidad: 'Comunidad',
+  recepcion: 'Recepción',
+  visualizador: 'Visualizador',
+}
+
 function AccessRulesPanel({
   companyId,
   accessRules,
   onSave,
   canEdit,
+  serviceType = 'agua',
 }: {
   companyId: string
   accessRules: ConversationAccessRule[]
   onSave: (rule: Omit<ConversationAccessRule, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
   canEdit: boolean
+  serviceType?: ConversationServiceType
 }) {
-  const roles = ['admin', 'operator', 'collector', 'viewer'] as const
-  const allCategories = ['general', 'pagos', 'tecnico', 'calidad']
+  const roles = serviceType === 'condominios'
+    ? ['administrador_general', 'junta_directiva', 'finanzas', 'operaciones', 'seguridad', 'comunidad', 'recepcion', 'visualizador']
+    : ['admin', 'operator', 'collector', 'viewer']
+  const allCategories = serviceType === 'condominios' ? CONDOMINIOS_CATEGORIES : AGUA_CATEGORIES
 
   const getRuleForRole = (role: string): ConversationAccessRule | undefined =>
     accessRules.find(r => r.role === role)
@@ -619,6 +646,7 @@ function AccessRulesPanel({
       await onSave({
         company_id: companyId,
         role,
+        service_type: serviceType,
         can_view_all: field === 'can_view_all' ? !current : (existing?.can_view_all ?? false),
         can_respond: field === 'can_respond' ? !current : (existing?.can_respond ?? false),
         can_assign: field === 'can_assign' ? !current : (existing?.can_assign ?? false),
@@ -649,6 +677,7 @@ function AccessRulesPanel({
       await onSave({
         company_id: companyId,
         role,
+        service_type: serviceType,
         can_view_all: existing?.can_view_all ?? false,
         can_respond: existing?.can_respond ?? false,
         can_assign: existing?.can_assign ?? false,
@@ -691,8 +720,8 @@ function AccessRulesPanel({
               background: 'white',
               opacity: isBusy ? 0.7 : 1,
             }}>
-              <div style={{ fontWeight: 600, fontSize: '13px', color: '#374151', marginBottom: '10px', textTransform: 'capitalize' }}>
-                {role === 'collector' ? 'Gestor de Cobros' : role === 'operator' ? 'Operador' : role === 'viewer' ? 'Visualizador' : 'Administrador'}
+              <div style={{ fontWeight: 600, fontSize: '13px', color: '#374151', marginBottom: '10px' }}>
+                {ROLE_LABELS[role] ?? role}
               </div>
               <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '10px' }}>
                 {(['can_view_all', 'can_respond', 'can_assign'] as const).map(field => {
@@ -748,7 +777,7 @@ function AccessRulesPanel({
 }
 
 // ── Componente principal ─────────────────────────────────────────────────────
-export function ComunicacionSection({ currentUser, clientes, proyectos, unidades, canCreate, canEdit }: Props) {
+export function ComunicacionSection({ currentUser, clientes, proyectos, unidades, canCreate, canEdit, serviceType = 'agua' }: Props) {
   const {
     conversations,
     messages,
@@ -773,6 +802,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
     companyId: currentUser.company_id,
     userId: currentUser.user_id,
     isCliente: false,
+    serviceType,
   })
 
   const [mainTab, setMainTab] = useState<'conversaciones' | 'difusion'>('conversaciones')
@@ -790,8 +820,13 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
   const [teamUsers, setTeamUsers] = useState<{ id: string; full_name: string; role: string }[]>([])
   const teamUsersLoadedRef = useRef(false)
 
+  const clientesTabLabel = serviceType === 'condominios' ? 'Residentes' : 'Clientes'
+  const showDifusion = serviceType !== 'condominios'
+
   // isAdmin: puede VER el panel de configuración
-  const isAdmin = ['super_admin', 'company_owner', 'admin'].includes(currentUser.role)
+  const isAdmin = serviceType === 'condominios'
+    ? ['super_admin', 'company_owner'].includes(currentUser.role) || currentUser.condominios_role === 'administrador_general'
+    : ['super_admin', 'company_owner', 'admin'].includes(currentUser.role)
   // canEditRules: puede GUARDAR cambios en conversation_access_rules (coincide con RLS)
   const canEditRules = ['super_admin', 'company_owner'].includes(currentUser.role)
 
@@ -1003,7 +1038,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* ── Main tabs: Conversaciones / Difusión ── */}
       <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #e2e8f0', paddingBottom: '0' }}>
-        {(['conversaciones', 'difusion'] as const).map(tab => {
+        {(['conversaciones', ...(showDifusion ? ['difusion'] : [])] as ('conversaciones' | 'difusion')[]).map(tab => {
           const active = mainTab === tab
           return (
             <button
@@ -1131,6 +1166,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
             accessRules={accessRules}
             onSave={saveAccessRule}
             canEdit={canEditRules}
+            serviceType={serviceType}
           />
         </div>
       )}
@@ -1155,7 +1191,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
           }}>
             {/* Tabs: Clientes / Equipo */}
             <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9' }}>
-              {([['clientes', '👥 Clientes', clientConvs.length], ['equipo', '🏢 Equipo', teamConvs.length]] as const).map(([tab, label, count]) => (
+              {([['clientes', `👥 ${clientesTabLabel}`, clientConvs.length], ['equipo', '🏢 Equipo', teamConvs.length]] as const).map(([tab, label, count]) => (
                 <button key={tab} onClick={() => { setConvTab(tab); setView('list') }}
                   style={{
                     flex: 1, padding: '10px 8px', border: 'none', borderBottom: `2px solid ${convTab === tab ? (tab === 'equipo' ? '#7c3aed' : '#0ea5e9') : 'transparent'}`,
@@ -1206,8 +1242,8 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                   style={{ flex: 1, padding: '5px 8px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '11.5px', outline: 'none' }}
                 >
                   <option value="todas">Todas las categorías</option>
-                  {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
+                  {(serviceType === 'condominios' ? CONDOMINIOS_CATEGORIES : AGUA_CATEGORIES).map(k => (
+                    <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
                   ))}
                 </select>
               </div>
@@ -1595,6 +1631,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
           sending={sending}
           onClose={() => setShowNuevaModal(false)}
           onConfirm={handleCrearConversacion}
+          serviceType={serviceType}
         />
       )}
 
@@ -1604,6 +1641,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
           sending={sending}
           onClose={() => setShowNuevaInternaModal(false)}
           onConfirm={handleCrearDiscusionInterna}
+          serviceType={serviceType}
         />
       )}
 

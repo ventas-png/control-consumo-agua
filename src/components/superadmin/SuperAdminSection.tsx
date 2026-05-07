@@ -12,6 +12,8 @@ interface Empresa {
   activa: boolean
   max_projects: number
   max_units: number
+  servicio_agua: boolean
+  servicio_condominios: boolean
   project_count?: number
   user_count?: number
   unit_count?: number
@@ -31,20 +33,28 @@ export function SuperAdminSection() {
     let companiesData: Empresa[] | null = null
     const { data: fullData, error: fullError } = await supabase
       .from('companies')
-      .select('id, nombre, nit, email, telefono, plan, activa, max_projects, max_units')
+      .select('id, nombre, nit, email, telefono, plan, activa, max_projects, max_units, servicio_agua, servicio_condominios')
       .order('nombre')
 
+    type RawEmpresa = Omit<Empresa, 'servicio_agua' | 'servicio_condominios'> & { servicio_agua?: boolean; servicio_condominios?: boolean }
+    const normalizeFlags = (c: RawEmpresa): Empresa => ({
+      ...c,
+      servicio_agua: c.servicio_agua ?? true,
+      servicio_condominios: c.servicio_condominios ?? true,
+    })
+
     if (!fullError && fullData) {
-      companiesData = fullData as Empresa[]
+      companiesData = (fullData as RawEmpresa[]).map(normalizeFlags)
       setMaxUnitsSupported(true)
     } else {
       // Column max_units may not exist yet — fetch without it
       const { data: fallbackData } = await supabase
         .from('companies')
-        .select('id, nombre, nit, email, telefono, plan, activa, max_projects')
+        .select('id, nombre, nit, email, telefono, plan, activa, max_projects, servicio_agua, servicio_condominios')
         .order('nombre')
       if (fallbackData) {
-        companiesData = (fallbackData as Omit<Empresa, 'max_units'>[]).map(c => ({ ...c, max_units: 50 }))
+        companiesData = (fallbackData as (Omit<Empresa, 'max_units'> & { servicio_agua?: boolean; servicio_condominios?: boolean })[])
+          .map(c => ({ ...normalizeFlags(c), max_units: 50 }))
       }
       setMaxUnitsSupported(false)
     }
@@ -112,6 +122,15 @@ export function SuperAdminSection() {
       void Swal.fire({ icon: 'success', title: 'Actualizado', timer: 1200, showConfirmButton: false })
       setEditingMaxUnits(prev => { const n = { ...prev }; delete n[empresaId]; return n })
       void cargar()
+    }
+  }
+
+  async function toggleServicio(empresaId: string, campo: 'servicio_agua' | 'servicio_condominios', nuevoValor: boolean) {
+    const { error } = await supabase.from('companies').update({ [campo]: nuevoValor }).eq('id', empresaId)
+    if (error) {
+      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el servicio.' })
+    } else {
+      setEmpresas(prev => prev.map(e => e.id === empresaId ? { ...e, [campo]: nuevoValor } : e))
     }
   }
 
@@ -435,6 +454,81 @@ export function SuperAdminSection() {
                       </>
                     )}
                   </div>
+                </div>
+
+                {/* Líneas de servicio */}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ color: '#475569', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>Servicios:</span>
+
+                  {/* Toggle Control Agua */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+                    <span style={{
+                      position: 'relative', display: 'inline-block',
+                      width: '36px', height: '20px', flexShrink: 0,
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={e.servicio_agua}
+                        onChange={ev => void toggleServicio(e.id, 'servicio_agua', ev.target.checked)}
+                        style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                      />
+                      <span style={{
+                        position: 'absolute', inset: 0,
+                        background: e.servicio_agua ? 'linear-gradient(135deg,#0ea5e9,#0284c7)' : 'rgba(255,255,255,0.1)',
+                        borderRadius: '20px',
+                        transition: 'background 0.2s',
+                        boxShadow: e.servicio_agua ? '0 0 8px rgba(14,165,233,0.4)' : 'none',
+                      }} />
+                      <span style={{
+                        position: 'absolute',
+                        top: '3px',
+                        left: e.servicio_agua ? '19px' : '3px',
+                        width: '14px', height: '14px',
+                        background: 'white',
+                        borderRadius: '50%',
+                        transition: 'left 0.2s',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                      }} />
+                    </span>
+                    <span style={{ fontSize: '12px', color: e.servicio_agua ? '#38bdf8' : '#475569', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                      Control Agua
+                    </span>
+                  </label>
+
+                  {/* Toggle Condominios */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+                    <span style={{
+                      position: 'relative', display: 'inline-block',
+                      width: '36px', height: '20px', flexShrink: 0,
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={e.servicio_condominios}
+                        onChange={ev => void toggleServicio(e.id, 'servicio_condominios', ev.target.checked)}
+                        style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                      />
+                      <span style={{
+                        position: 'absolute', inset: 0,
+                        background: e.servicio_condominios ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : 'rgba(255,255,255,0.1)',
+                        borderRadius: '20px',
+                        transition: 'background 0.2s',
+                        boxShadow: e.servicio_condominios ? '0 0 8px rgba(167,139,250,0.4)' : 'none',
+                      }} />
+                      <span style={{
+                        position: 'absolute',
+                        top: '3px',
+                        left: e.servicio_condominios ? '19px' : '3px',
+                        width: '14px', height: '14px',
+                        background: 'white',
+                        borderRadius: '50%',
+                        transition: 'left 0.2s',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                      }} />
+                    </span>
+                    <span style={{ fontSize: '12px', color: e.servicio_condominios ? '#a78bfa' : '#475569', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                      Condominios
+                    </span>
+                  </label>
                 </div>
               </div>
             )

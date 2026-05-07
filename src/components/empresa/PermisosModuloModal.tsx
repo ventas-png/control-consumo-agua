@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { ModulePermission } from '../../types'
-import { CONFIGURABLE_MODULES, ROLE_DEFAULT_TEMPLATES } from '../../lib/moduleConfig'
+import { CONFIGURABLE_MODULES, ROLE_DEFAULT_TEMPLATES, WATER_MODULE_KEYS, CONDOMINIOS_MODULE_KEYS } from '../../lib/moduleConfig'
 import type { ModuleAction } from '../../lib/moduleConfig'
 
 interface Usuario {
@@ -12,6 +12,8 @@ interface Usuario {
 
 interface Props {
   usuario: Usuario
+  servicioAgua: boolean
+  servicioCondominios: boolean
   onClose: () => void
   onSaved: () => void
 }
@@ -43,9 +45,9 @@ const ROLE_LABELS: Record<string, string> = {
   collector: 'Gestor de Cobros',
 }
 
-function emptyPermsMap(): Record<string, ModulePermission> {
+function emptyPermsMap(modules: typeof CONFIGURABLE_MODULES): Record<string, ModulePermission> {
   const map: Record<string, ModulePermission> = {}
-  for (const mod of CONFIGURABLE_MODULES) {
+  for (const mod of modules) {
     map[mod.key] = {
       module_key: mod.key,
       can_view: false,
@@ -57,13 +59,13 @@ function emptyPermsMap(): Record<string, ModulePermission> {
   return map
 }
 
-function defaultPermsForRole(role: string): Record<string, ModulePermission> {
-  const map = emptyPermsMap()
+function defaultPermsForRole(role: string, modules: typeof CONFIGURABLE_MODULES): Record<string, ModulePermission> {
+  const map = emptyPermsMap(modules)
   const normalizedRole = role === 'operador' ? 'operator' : role === 'visor' ? 'viewer' : role
   const template = ROLE_DEFAULT_TEMPLATES[normalizedRole]
   if (template) {
     for (const p of template) {
-      map[p.module_key] = { ...p }
+      if (p.module_key in map) map[p.module_key] = { ...p }
     }
   }
   return map
@@ -77,8 +79,13 @@ function moduleSupportsAction(moduleKey: string, flag: PermFlag): boolean {
   return (mod.actions as readonly string[]).includes(action)
 }
 
-export function PermisosModuloModal({ usuario, onClose, onSaved }: Props) {
-  const [perms, setPerms] = useState<Record<string, ModulePermission>>(emptyPermsMap)
+export function PermisosModuloModal({ usuario, servicioAgua, servicioCondominios, onClose, onSaved }: Props) {
+  const activeModules = CONFIGURABLE_MODULES.filter(mod => {
+    if (WATER_MODULE_KEYS.has(mod.key)) return servicioAgua
+    if (CONDOMINIOS_MODULE_KEYS.has(mod.key)) return servicioCondominios
+    return true
+  })
+  const [perms, setPerms] = useState<Record<string, ModulePermission>>(() => emptyPermsMap(activeModules))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [hoveredRestore, setHoveredRestore] = useState(false)
@@ -91,7 +98,7 @@ export function PermisosModuloModal({ usuario, onClose, onSaved }: Props) {
         .eq('user_id', usuario.id)
 
       if (data && data.length > 0) {
-        const map = emptyPermsMap()
+        const map = emptyPermsMap(activeModules)
         for (const row of data) {
           map[row.module_key] = {
             module_key: row.module_key,
@@ -104,7 +111,7 @@ export function PermisosModuloModal({ usuario, onClose, onSaved }: Props) {
         setPerms(map)
       } else {
         // Sin permisos guardados → usar defaults del rol
-        setPerms(defaultPermsForRole(usuario.role))
+        setPerms(defaultPermsForRole(usuario.role, activeModules))
       }
       setLoading(false)
     }
@@ -129,7 +136,7 @@ export function PermisosModuloModal({ usuario, onClose, onSaved }: Props) {
   }
 
   function restoreDefaults() {
-    setPerms(defaultPermsForRole(usuario.role))
+    setPerms(defaultPermsForRole(usuario.role, activeModules))
   }
 
   async function guardar() {
@@ -142,9 +149,9 @@ export function PermisosModuloModal({ usuario, onClose, onSaved }: Props) {
         .eq('user_id', usuario.id)
       if (delError) throw delError
 
-      // Insertar todos los permisos (incluyendo los que tienen todo en false,
-      // para que quede explícito que el módulo fue desactivado)
-      const rows = Object.values(perms).map(p => ({
+      // Insertar permisos de los módulos activos (los del servicio desactivado no se persisten)
+      const activeKeys = new Set(activeModules.map(m => m.key))
+      const rows = Object.values(perms).filter(p => activeKeys.has(p.module_key)).map(p => ({
         user_id: usuario.id,
         module_key: p.module_key,
         can_view: p.can_view,
@@ -222,7 +229,7 @@ export function PermisosModuloModal({ usuario, onClose, onSaved }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {CONFIGURABLE_MODULES.map(mod => {
+                  {activeModules.map(mod => {
                     const p = perms[mod.key]
                     const viewEnabled = p?.can_view ?? false
                     return (

@@ -1,40 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// CORS utilities
-function getAllowedOrigins(): string[] {
-  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) {
-    return envOrigins.split(',').map(origin => origin.trim())
-  }
-  return [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:3000',
-  ]
-}
-
 function getCorsHeaders(origin: string | null) {
-  const allowedOrigins = getAllowedOrigins()
-  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
   return {
-    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Origin': origin ?? '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   }
 }
-
-function validateOrigin(origin: string | null, corsHeaders: ReturnType<typeof getCorsHeaders>) {
-  const allowedOrigins = getAllowedOrigins()
-  if (!origin || !allowedOrigins.includes(origin)) {
-    return new Response(
-      JSON.stringify({ error: 'Origin not allowed', origin }),
-      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
-  return null
-}
-
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin')
@@ -44,12 +16,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Validate origin
-  const originError = validateOrigin(origin, corsHeaders)
-  if (originError) return originError
-
   try {
-    // Validate caller using their JWT
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'No authorization header' }), {
@@ -57,7 +24,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Client with caller's JWT to check their role
+    // Client with caller's JWT to verify identity and role
     const callerClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -71,7 +38,6 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Get caller's role from app_users
     const { data: callerProfile } = await callerClient
       .from('app_users')
       .select('role, company_id')
@@ -83,8 +49,9 @@ Deno.serve(async (req) => {
 
     const isSuperAdmin = callerRole === 'super_admin' || callerRole === 'superadmin'
     const isCompanyOwner = callerRole === 'company_owner'
+    const isAdmin = callerRole === 'admin'
 
-    if (!isSuperAdmin && !isCompanyOwner) {
+    if (!isSuperAdmin && !isCompanyOwner && !isAdmin) {
       return new Response(JSON.stringify({ error: 'Insufficient permissions' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -106,22 +73,21 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Company owners can only create admins/operators/viewers/collectors in their own company
-    const allowedRolesForOwner = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
-    if (isCompanyOwner) {
-      if (!allowedRolesForOwner.includes(role)) {
-        return new Response(JSON.stringify({ error: 'Company owners can only create admin/operator/viewer/collector users' }), {
+    // Non-superadmins can only create users within their own company
+    const allowedRolesForNonSuper = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
+    if (!isSuperAdmin) {
+      if (!allowedRolesForNonSuper.includes(role)) {
+        return new Response(JSON.stringify({ error: 'Solo puedes crear usuarios con rol admin/operador/visualizador/cobros' }), {
           status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
       if (company_id !== callerCompanyId) {
-        return new Response(JSON.stringify({ error: 'Cannot create users for other companies' }), {
+        return new Response(JSON.stringify({ error: 'No puedes crear usuarios para otra empresa' }), {
           status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
     }
 
-    // Admin client with service role to create auth user
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -139,7 +105,6 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Insert app_users profile
     const { error: profileError } = await adminClient.from('app_users').insert({
       id: newUser.user.id,
       full_name,
@@ -149,21 +114,18 @@ Deno.serve(async (req) => {
     })
 
     if (profileError) {
-      // Rollback: delete the auth user we just created
       await adminClient.auth.admin.deleteUser(newUser.user.id)
       return new Response(JSON.stringify({ error: 'Failed to create user profile: ' + profileError.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // Poblar permisos de módulos por defecto según el rol
     const { error: permError } = await adminClient.rpc('populate_default_module_permissions', {
       p_user_id: newUser.user.id,
       p_role: role,
     })
     if (permError) {
       console.error('Warning: could not populate default module permissions:', permError.message)
-      // No rollback — permisos se pueden configurar después manualmente
     }
 
     return new Response(JSON.stringify({ user_id: newUser.user.id }), {

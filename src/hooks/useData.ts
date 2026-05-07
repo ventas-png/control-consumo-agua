@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import Swal from 'sweetalert2'
 import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../types'
 import { supabase } from '../lib/supabase'
@@ -79,8 +79,18 @@ const INITIAL_DATA: AppData = {
   facturasEnergia: [],
 }
 
-export function useData(companyId?: string) {
+const PROJECT_EXEMPT_ROLES = new Set(['super_admin', 'company_owner', 'admin'])
+
+export function useData(companyId?: string, userId?: string, userRole?: string, condominiosRole?: string) {
   const [data, setData] = useState<AppData>(() => loadCache() ?? INITIAL_DATA)
+
+  // Refs so the stable cargarDatos closure always reads the latest values
+  const userIdRef = useRef(userId)
+  const userRoleRef = useRef(userRole)
+  const condominiosRoleRef = useRef(condominiosRole)
+  userIdRef.current = userId
+  userRoleRef.current = userRole
+  condominiosRoleRef.current = condominiosRole
 
   const fetchAllData = async () => {
     // Defense-in-depth: add company_id filters where columns exist.
@@ -186,6 +196,38 @@ export function useData(companyId?: string) {
     return next
   }
 
+  const filterProyectosByAssignment = async (appData: AppData): Promise<AppData> => {
+    const uid = userIdRef.current
+    const role = userRoleRef.current
+    const condRole = condominiosRoleRef.current
+    // Exempt only if agua role is exempt AND user has no restricted condominios role
+    const hasRestrictedCondRole = condRole && condRole !== 'administrador_general'
+    if (!uid || !role || (PROJECT_EXEMPT_ROLES.has(role) && !hasRestrictedCondRole)) return appData
+    const { data: assignments } = await supabase
+      .from('user_project_assignments')
+      .select('project_id')
+      .eq('user_id', uid)
+    if (!assignments) return appData
+    const allowed = new Set(assignments.map((a: { project_id: string }) => a.project_id))
+    const filtered = appData.proyectos.filter(p => allowed.has(p.id))
+    if (filtered.length === appData.proyectos.length) return appData
+    const first = filtered[0]
+    return {
+      ...appData,
+      proyectos: filtered,
+      moneda: first?.moneda ?? appData.moneda,
+      maxUnidadesPorTipo: first ? {
+        apartamento:     first.max_unidades_apartamento ?? null,
+        casa:            first.max_unidades_casa ?? null,
+        bodega:          first.max_unidades_bodega ?? null,
+        local_comercial: first.max_unidades_local_comercial ?? null,
+        oficina:         first.max_unidades_oficina ?? null,
+        parqueadero:     first.max_unidades_parqueadero ?? null,
+        otro:            first.max_unidades_otro ?? null,
+      } : appData.maxUnidadesPorTipo,
+    }
+  }
+
   const hasErrors = (results: Awaited<ReturnType<typeof fetchAllData>>) => {
     const [clRes, regRes, , , , , , contadoresRes, unidadesRes] = results
     return (
@@ -204,7 +246,7 @@ export function useData(companyId?: string) {
     const base = loadCache() ?? INITIAL_DATA
 
     let results = await fetchAllData()
-    const freshData = applyResults(base, results)
+    const freshData = await filterProyectosByAssignment(applyResults(base, results))
     setData(freshData)
 
     if (!hasErrors(results)) {
@@ -215,7 +257,7 @@ export function useData(companyId?: string) {
     // Retry 1: wait 1.5 s to handle cold-start timeouts on the DB connection pool
     await new Promise(resolve => setTimeout(resolve, 1500))
     results = await fetchAllData()
-    const retryData = applyResults(base, results)
+    const retryData = await filterProyectosByAssignment(applyResults(base, results))
     setData(retryData)
 
     if (!hasErrors(results)) {
@@ -226,7 +268,7 @@ export function useData(companyId?: string) {
     // Retry 2: wait an additional 3 s for slow Supabase cold starts
     await new Promise(resolve => setTimeout(resolve, 3000))
     results = await fetchAllData()
-    const retryData2 = applyResults(base, results)
+    const retryData2 = await filterProyectosByAssignment(applyResults(base, results))
     setData(retryData2)
 
     if (!hasErrors(results)) {

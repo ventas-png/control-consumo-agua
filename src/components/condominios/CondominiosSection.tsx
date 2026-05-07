@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
+import { canViewCondominiosTab } from '../../lib/condominiosRoles'
 import type {
   UserSession, Proyecto, Unidad,
   OrdenCompra, AsambleaDigital, Proforma,
@@ -223,6 +224,7 @@ import BitacoraActividadTab from './tabs/BitacoraActividadTab'
 import PanelDirectivoTab from './tabs/PanelDirectivoTab'
 import GestionConflictosTab from './tabs/GestionConflictosTab'
 import DirectorioComunidadTab from './tabs/DirectorioComunidadTab'
+import { ComunicacionSection } from '../comunicacion/ComunicacionSection'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -269,7 +271,7 @@ type CondominioTab =
   | 'bitacora_actividad' | 'panel_directivo' | 'gestion_conflictos' | 'directorio_comunidad'
   | 'centro_notificaciones' | 'cumpleanos' | 'rutas_ronda'
   | 'plantillas_cargo' | 'tareas_personal' | 'revision_tareas'
-  | 'desempeno_personal' | 'reporte_consolidado'
+  | 'desempeno_personal' | 'reporte_consolidado' | 'comunicacion_condominios'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -328,6 +330,7 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'junta',         label: 'Junta Directiva',icon: '👑' },
   { id: 'prestamos',     label: 'Préstamo Equip.',icon: '🪑' },
   { id: 'comunicados',   label: 'Comunicados',    icon: '✉️' },
+  { id: 'comunicacion_condominios', label: 'Comunicación', icon: '💬' },
   { id: 'actas',         label: 'Actas',          icon: '📝' },
   { id: 'cierres',       label: 'Cierres',        icon: '🔒' },
   { id: 'notificaciones',label: 'Notificaciones', icon: '🔔' },
@@ -502,7 +505,7 @@ const SECTIONS: SectionDef[] = [
     'comunidad', 'infracciones', 'sanciones', 'gestion_conflictos', 'asambleas',
     'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos', 'eventos_comunidad',
     'agenda', 'cumpleanos', 'programa_actividades', 'buzon_sugerencias', 'encuestas', 'encuesta_dashboard',
-    'comunicados', 'recordatorios',
+    'comunicados', 'recordatorios', 'comunicacion_condominios',
   ]},
   { id: 'administracion', label: 'Administración', icon: '📋', tabs: [
     'documentos', 'reglamento', 'firmas', 'personal', 'capacitacion_personal',
@@ -526,6 +529,21 @@ interface Props {
 }
 
 export function CondominiosSection({ proyectos, unidades, currentUser, canCreate, canEdit }: Props) {
+  // Roles exentos siempre ven todo; los demás respetan condominios_role
+  const condominiosRole = (['super_admin', 'company_owner'] as string[]).includes(currentUser.role)
+    ? null
+    : (currentUser.condominios_role ?? null)
+
+  const visibleSections = useMemo(() =>
+    SECTIONS
+      .map(sec => ({
+        ...sec,
+        tabs: sec.tabs.filter(tid => canViewCondominiosTab(tid, condominiosRole)),
+      }))
+      .filter(sec => sec.tabs.length > 0),
+    [condominiosRole]
+  )
+
   const [activeTab, setActiveTab] = useState<CondominioTab>('panel')
   const [activeSection, setActiveSection] = useState<SectionKey>('panel')
   const [selectedProyectoId, setSelectedProyectoId] = useState<string>('')
@@ -1197,7 +1215,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
         {/* Barra de secciones (nivel 1) */}
         <div style={{ display: 'flex', gap: 1, overflowX: 'auto', marginTop: 8, borderBottom: '2px solid #e2e8f0' }}>
-          {SECTIONS.map(sec => {
+          {visibleSections.map(sec => {
             const activa = activeSection === sec.id
             return (
               <button key={sec.id} onClick={() => {
@@ -1224,7 +1242,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
         {/* Barra de sub-tabs (nivel 2) */}
         <div style={{ display: 'flex', gap: 1, overflowX: 'auto', background: '#f8fafc', padding: '0 2px', borderBottom: '1px solid #e2e8f0' }}>
-          {SECTIONS.find(s => s.id === activeSection)?.tabs
+          {visibleSections.find(s => s.id === activeSection)?.tabs
             .map(tid => TABS.find(t => t.id === tid))
             .filter(Boolean)
             .map(tab => tab && (
@@ -1265,7 +1283,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
         {activeTab === 'infracciones' && <InfraccionesTab infracciones={infracciones} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
-        {activeTab === 'seguridad' && <SeguridadTab rondas={rondas} novedades={novedades} rutas={rutas} puntosControl={puntosControl} visitasControl={visitasControl} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'seguridad' && <SeguridadTab rondas={rondas} novedades={novedades} rutas={rutas} puntosControl={puntosControl} visitasControl={visitasControl} visitantes={visitantes} unidades={unidadesProyecto} reservasSTR={reservasSTR} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
         {activeTab === 'rutas_ronda' && <RutasRondaTab areas={areas} rutas={rutas} puntosControl={puntosControl} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
@@ -1398,6 +1416,17 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'camaras' && <ControlCamarasTab camaras={camarasSeguridad} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'gas' && <LecturasMedidorGasTab lecturas={lecturasGas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'recordatorios' && <RecordatoriosTab recordatorios={recordatorios} proyectoId={selectedProyectoId} companyId={cid} userId={uid} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'comunicacion_condominios' && (
+          <ComunicacionSection
+            currentUser={currentUser}
+            clientes={[]}
+            proyectos={proyectosActivos}
+            unidades={unidadesProyecto}
+            canCreate={canCreate('condominios')}
+            canEdit={canEdit('condominios')}
+            serviceType="condominios"
+          />
+        )}
         {activeTab === 'plantillas_cuota' && <PlantillasCuotaTab plantillas={plantillasCuota} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'bitacora_acciones' && <BitacoraAccionesTab bitacora={bitacoraAcciones} />}
         {activeTab === 'recargos_mora' && <RecargosTab recargos={recargosMora} cuotas={cuotas} reglas={reglasMora} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}

@@ -7,6 +7,7 @@ import type {
   ConversationAssignment,
   ConversationCategory,
   ConversationPriority,
+  ConversationServiceType,
 } from '../types'
 
 interface UseConversationsOptions {
@@ -14,9 +15,10 @@ interface UseConversationsOptions {
   clienteId?: string   // si es rol 'cliente'
   userId?: string      // auth.uid()
   isCliente?: boolean
+  serviceType?: ConversationServiceType
 }
 
-export function useConversations({ companyId, clienteId, userId, isCliente = false }: UseConversationsOptions) {
+export function useConversations({ companyId, clienteId, userId, isCliente = false, serviceType = 'agua' }: UseConversationsOptions) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [accessRules, setAccessRules] = useState<ConversationAccessRule[]>([])
@@ -41,6 +43,8 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
       } else if (companyId) {
         query = query.eq('company_id', companyId)
       }
+
+      query = query.eq('service_type', serviceType)
 
       const { data, error } = await query
       if (error) throw error
@@ -69,9 +73,10 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
       .from('conversation_access_rules')
       .select('*')
       .eq('company_id', companyId)
+      .eq('service_type', serviceType)
     if (error) throw error
     setAccessRules(data ?? [])
-  }, [companyId])
+  }, [companyId, serviceType])
 
   // ── Crear nueva conversación ──────────────────────────────────────────────
   const createConversation = useCallback(async (params: {
@@ -98,6 +103,7 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
           category: params.category,
           priority: params.priority,
           status: 'abierta',
+          service_type: serviceType,
         })
         .select()
         .single()
@@ -142,6 +148,7 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
           priority: 'media',
           status: 'abierta',
           is_internal: true,
+          service_type: serviceType,
         })
         .select()
         .single()
@@ -300,7 +307,7 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
   const saveAccessRule = useCallback(async (rule: Omit<ConversationAccessRule, 'id' | 'created_at' | 'updated_at'>): Promise<void> => {
     const { error } = await supabase
       .from('conversation_access_rules')
-      .upsert(rule, { onConflict: 'company_id,role' })
+      .upsert(rule, { onConflict: 'company_id,role,service_type' })
     if (error) throw error
     await loadAccessRules()
   }, [loadAccessRules])
@@ -344,7 +351,7 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
     if (!companyId && !clienteId) return
 
     const channel = supabase
-      .channel(`conv-list-${companyId ?? clienteId}`)
+      .channel(`conv-list-${companyId ?? clienteId}-${serviceType}`)
       .on(
         'postgres_changes',
         {

@@ -445,6 +445,7 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
             placeholder="Buscar por nombre, código o CUI/DUI..."
             value={search}
             onChange={e => setSearch(e.target.value)}
+            autoComplete="off"
             style={{ ...inputStyle, width: '280px' }}
           />
           {canEdit && (

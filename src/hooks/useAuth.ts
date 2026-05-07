@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { UserSession, UserRole, ModulePermissionsMap } from '../types'
+import type { UserSession, UserRole, ModulePermissionsMap, CondominiosRole, AguaRole } from '../types'
 import { supabase } from '../lib/supabase'
 import { APP_CONFIG } from '../lib/config'
 import { sanitizeInput, validateEmail } from '../lib/validation'
@@ -76,7 +76,7 @@ async function buildSessionFromSupabase(
 ): Promise<UserSession> {
   const profileQuery = supabase
     .from('app_users')
-    .select('full_name, role, company_id, cliente_id, activo')
+    .select('full_name, role, company_id, cliente_id, activo, condominios_role, agua_role')
     .eq('id', userId)
     .single()
 
@@ -86,7 +86,7 @@ async function buildSessionFromSupabase(
 
   const { data: profile } = await Promise.race([profileQuery, timeout])
 
-  type ProfileRow = { full_name?: string; role?: string; company_id?: string; cliente_id?: string; activo?: boolean } | null
+  type ProfileRow = { full_name?: string; role?: string; company_id?: string; cliente_id?: string; activo?: boolean; condominios_role?: string; agua_role?: string } | null
   const prof = profile as ProfileRow
 
   if (prof?.activo === false) {
@@ -95,6 +95,8 @@ async function buildSessionFromSupabase(
   const dbRole: string = prof?.role ?? ''
   const companyId: string | undefined = prof?.company_id ?? undefined
   const clienteId: string | undefined = prof?.cliente_id ?? undefined
+  const condominiosRole: CondominiosRole | undefined = (prof?.condominios_role ?? undefined) as CondominiosRole | undefined
+  const aguaRole: AguaRole | undefined = (prof?.agua_role ?? undefined) as AguaRole | undefined
   let uiRole: UserRole = 'viewer'
   if (dbRole === 'super_admin' || dbRole === 'superadmin') uiRole = 'super_admin'
   else if (dbRole === 'company_owner') uiRole = 'company_owner'
@@ -149,6 +151,22 @@ async function buildSessionFromSupabase(
     }
   }
 
+  // Cargar flags de líneas de servicio
+  let servicio_agua: boolean | undefined
+  let servicio_condominios: boolean | undefined
+  if (companyId) {
+    const { data: companyFlags } = await supabase
+      .from('companies')
+      .select('servicio_agua, servicio_condominios')
+      .eq('id', companyId)
+      .single()
+    if (companyFlags) {
+      const flags = companyFlags as { servicio_agua: boolean; servicio_condominios: boolean }
+      servicio_agua = flags.servicio_agua
+      servicio_condominios = flags.servicio_condominios
+    }
+  }
+
   return {
     user_id: userId,
     email,
@@ -161,6 +179,10 @@ async function buildSessionFromSupabase(
       ? new Date(expiresAt * 1000).toISOString()
       : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString(),
     module_permissions: modulePermissions,
+    servicio_agua,
+    servicio_condominios,
+    agua_role: aguaRole,
+    condominios_role: condominiosRole,
   }
 }
 
