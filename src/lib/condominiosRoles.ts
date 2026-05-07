@@ -113,7 +113,7 @@ const TODA_COMUNIDAD = [
   'comunidad', 'infracciones', 'sanciones', 'gestion_conflictos', 'asambleas',
   'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos', 'eventos_comunidad',
   'agenda', 'cumpleanos', 'programa_actividades', 'buzon_sugerencias', 'encuestas',
-  'encuesta_dashboard', 'comunicados', 'recordatorios',
+  'encuesta_dashboard', 'comunicados', 'recordatorios', 'comunicacion_condominios',
 ]
 
 export const CONDOMINIOS_TAB_ACCESS: Record<CondominiosRole, Set<string> | null> = {
@@ -141,6 +141,7 @@ export const CONDOMINIOS_TAB_ACCESS: Record<CondominiosRole, Set<string> | null>
     ...TODAS_FINANZAS,
     // Administración: documentos y config financiera
     'documentos', 'correspondencia', 'bitacora_acciones', 'configuracion_cond', 'notificaciones',
+    'comunicacion_condominios',
   ]),
 
   operaciones: new Set([
@@ -150,6 +151,7 @@ export const CONDOMINIOS_TAB_ACCESS: Record<CondominiosRole, Set<string> | null>
     // Administración: técnica
     'documentos', 'bitacora_acciones', 'vencimientos_criticos', 'polizas',
     'inspecciones', 'automatizaciones', 'personal', 'capacitacion_personal',
+    'comunicacion_condominios',
   ]),
 
   seguridad: new Set([

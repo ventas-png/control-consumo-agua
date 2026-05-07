@@ -224,6 +224,7 @@ import BitacoraActividadTab from './tabs/BitacoraActividadTab'
 import PanelDirectivoTab from './tabs/PanelDirectivoTab'
 import GestionConflictosTab from './tabs/GestionConflictosTab'
 import DirectorioComunidadTab from './tabs/DirectorioComunidadTab'
+import { ComunicacionSection } from '../comunicacion/ComunicacionSection'
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -270,7 +271,7 @@ type CondominioTab =
   | 'bitacora_actividad' | 'panel_directivo' | 'gestion_conflictos' | 'directorio_comunidad'
   | 'centro_notificaciones' | 'cumpleanos' | 'rutas_ronda'
   | 'plantillas_cargo' | 'tareas_personal' | 'revision_tareas'
-  | 'desempeno_personal' | 'reporte_consolidado'
+  | 'desempeno_personal' | 'reporte_consolidado' | 'comunicacion_condominios'
 
 const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'panel',          label: 'Panel',          icon: '📊' },
@@ -329,6 +330,7 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'junta',         label: 'Junta Directiva',icon: '👑' },
   { id: 'prestamos',     label: 'Préstamo Equip.',icon: '🪑' },
   { id: 'comunicados',   label: 'Comunicados',    icon: '✉️' },
+  { id: 'comunicacion_condominios', label: 'Comunicación', icon: '💬' },
   { id: 'actas',         label: 'Actas',          icon: '📝' },
   { id: 'cierres',       label: 'Cierres',        icon: '🔒' },
   { id: 'notificaciones',label: 'Notificaciones', icon: '🔔' },
@@ -503,7 +505,7 @@ const SECTIONS: SectionDef[] = [
     'comunidad', 'infracciones', 'sanciones', 'gestion_conflictos', 'asambleas',
     'asamblea_digital', 'votaciones', 'junta', 'actas', 'acuerdos', 'eventos_comunidad',
     'agenda', 'cumpleanos', 'programa_actividades', 'buzon_sugerencias', 'encuestas', 'encuesta_dashboard',
-    'comunicados', 'recordatorios',
+    'comunicados', 'recordatorios', 'comunicacion_condominios',
   ]},
   { id: 'administracion', label: 'Administración', icon: '📋', tabs: [
     'documentos', 'reglamento', 'firmas', 'personal', 'capacitacion_personal',
@@ -1414,6 +1416,17 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'camaras' && <ControlCamarasTab camaras={camarasSeguridad} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'gas' && <LecturasMedidorGasTab lecturas={lecturasGas} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'recordatorios' && <RecordatoriosTab recordatorios={recordatorios} proyectoId={selectedProyectoId} companyId={cid} userId={uid} autorNombre={currentUser.name ?? ''} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'comunicacion_condominios' && (
+          <ComunicacionSection
+            currentUser={currentUser}
+            clientes={[]}
+            proyectos={proyectosActivos}
+            unidades={unidadesProyecto}
+            canCreate={canCreate('condominios')}
+            canEdit={canEdit('condominios')}
+            serviceType="condominios"
+          />
+        )}
         {activeTab === 'plantillas_cuota' && <PlantillasCuotaTab plantillas={plantillasCuota} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'bitacora_acciones' && <BitacoraAccionesTab bitacora={bitacoraAcciones} />}
         {activeTab === 'recargos_mora' && <RecargosTab recargos={recargosMora} cuotas={cuotas} reglas={reglasMora} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}

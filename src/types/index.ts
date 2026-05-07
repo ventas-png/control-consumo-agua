@@ -834,8 +834,14 @@ export type ConversationStatus =
   | 'resuelta'
   | 'cerrada';
 
-export type ConversationCategory = 'general' | 'pagos' | 'tecnico' | 'calidad';
+export type ConversationServiceType = 'agua' | 'condominios';
+export type ConversationCategory =
+  | 'general' | 'pagos' | 'tecnico' | 'calidad'        // agua
+  | 'mantenimiento' | 'finanzas' | 'convivencia';       // condominios
 export type ConversationPriority = 'baja' | 'media' | 'alta' | 'urgente';
+
+export const AGUA_CATEGORIES: ConversationCategory[] = ['general', 'pagos', 'tecnico', 'calidad'];
+export const CONDOMINIOS_CATEGORIES: ConversationCategory[] = ['general', 'mantenimiento', 'finanzas', 'convivencia'];
 
 export interface Conversation {
   id: string;
@@ -844,6 +850,7 @@ export interface Conversation {
   cliente_id?: string | null;
   cliente_nombre?: string | null;
   is_internal?: boolean;
+  service_type?: ConversationServiceType;
   subject: string;
   category: ConversationCategory;
   priority: ConversationPriority;
@@ -879,6 +886,7 @@ export interface ConversationAccessRule {
   id: string;
   company_id: string;
   role: string;
+  service_type: ConversationServiceType;
   can_view_all: boolean;
   can_respond: boolean;
   can_assign: boolean;
