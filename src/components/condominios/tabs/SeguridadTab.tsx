@@ -668,7 +668,7 @@ export function SeguridadTab({
           <div onClick={() => setNovedadDetalle(null)}
             style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
             <div onClick={e => e.stopPropagation()}
-              style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '520px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+              style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '520px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
               {/* Header con color de prioridad */}
               <div style={{ height: '6px', background: accentColor }} />
               <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'flex-start', gap: '12px', justifyContent: 'space-between' }}>
@@ -690,7 +690,7 @@ export function SeguridadTab({
                 </button>
               </div>
 
-              <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
                 {/* Fotos de evidencia */}
                 {((novedadDetalle.fotos && novedadDetalle.fotos.length > 0) || novedadDetalle.foto_url) && (() => {
                   const todas = novedadDetalle.fotos && novedadDetalle.fotos.length > 0
@@ -713,13 +713,36 @@ export function SeguridadTab({
                   )
                 })()}
 
-                {/* Descripción */}
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Descripción</div>
-                  <p style={{ margin: 0, fontSize: '14.5px', color: '#0f172a', lineHeight: 1.6, background: '#f8fafc', padding: '12px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    {novedadDetalle.descripcion}
-                  </p>
-                </div>
+                {/* Descripción: separar datos del registro vs comentario del guardia */}
+                {(() => {
+                  const partes = novedadDetalle.descripcion.split('\n\n')
+                  const tieneDatos = partes.length >= 2
+                  const datosRegistro = tieneDatos ? partes[0] : null
+                  const comentario = tieneDatos ? partes.slice(1).join('\n\n') : novedadDetalle.descripcion
+                  return (
+                    <>
+                      {datosRegistro && (
+                        <div>
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Datos del registro</div>
+                          <div style={{ fontSize: '12.5px', color: '#64748b', background: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', lineHeight: 1.7 }}>
+                            {datosRegistro.split(' | ').map((item, i) => (
+                              <span key={i} style={{ display: 'inline-block', marginRight: '6px' }}>
+                                {i > 0 && <span style={{ color: '#cbd5e1', marginRight: '6px' }}>·</span>}
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Comentarios</div>
+                        <p style={{ margin: 0, fontSize: '14.5px', color: '#0f172a', lineHeight: 1.6, background: '#fffbeb', padding: '12px 14px', borderRadius: '10px', border: '1px solid #fde68a', whiteSpace: 'pre-wrap' }}>
+                          {comentario}
+                        </p>
+                      </div>
+                    </>
+                  )
+                })()}
 
                 {/* Metadatos en grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
