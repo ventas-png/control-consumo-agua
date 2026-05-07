@@ -13,35 +13,10 @@ type NavEntry =
   | { kind: 'tab'; tab: Tab }
   | { kind: 'group'; id: string; label: string; tabs: Tab[] }
 
-const STORAGE_KEY = 'aquacontrol:sidebar:groups'
+const STORAGE_KEY = 'aquacontrol:sidebar:groups:v2'
 
 const NAV: NavEntry[] = [
-  {
-    kind: 'tab',
-    tab: {
-      id: 'admin_dashboard',
-      label: 'Dashboard',
-      roles: ['company_owner'],
-      icon: (
-        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-    },
-  },
-  {
-    kind: 'tab',
-    tab: {
-      id: 'dashboard',
-      label: 'Dashboard',
-      roles: ['admin', 'super_admin', 'operator', 'viewer'],
-      icon: (
-        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-    },
-  },
+  // ── Super admin ──────────────────────────────────────────────────────────────
   {
     kind: 'tab',
     tab: {
@@ -55,11 +30,22 @@ const NAV: NavEntry[] = [
       ),
     },
   },
+  // ── Grupo 1: Administración Plataforma ───────────────────────────────────────
   {
     kind: 'group',
-    id: 'administracion',
-    label: 'Administración',
+    id: 'plataforma',
+    label: 'Administración Plataforma',
     tabs: [
+      {
+        id: 'empresa_proyectos',
+        label: 'Mis Proyectos',
+        roles: ['company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+          </svg>
+        ),
+      },
       {
         id: 'clientes',
         label: 'Clientes',
@@ -77,6 +63,54 @@ const NAV: NavEntry[] = [
         icon: (
           <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+        ),
+      },
+      {
+        id: 'perfil',
+        label: 'Mi Cuenta',
+        roles: ['admin', 'super_admin', 'operator', 'viewer'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        ),
+      },
+    ],
+  },
+  // ── Grupo 2: Manejo Agua ─────────────────────────────────────────────────────
+  {
+    kind: 'group',
+    id: 'agua',
+    label: 'Manejo Agua',
+    tabs: [
+      {
+        id: 'admin_dashboard',
+        label: 'Dashboard',
+        roles: ['company_owner'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        ),
+      },
+      {
+        id: 'dashboard',
+        label: 'Dashboard',
+        roles: ['admin', 'super_admin', 'operator', 'viewer'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        ),
+      },
+      {
+        id: 'comunicacion',
+        label: 'Comunicación',
+        roles: ['admin', 'super_admin', 'company_owner', 'operator', 'collector', 'viewer'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
         ),
       },
@@ -100,13 +134,6 @@ const NAV: NavEntry[] = [
           </svg>
         ),
       },
-    ],
-  },
-  {
-    kind: 'group',
-    id: 'gestion',
-    label: 'Gestión',
-    tabs: [
       {
         id: 'cobros',
         label: 'Cobros',
@@ -137,13 +164,6 @@ const NAV: NavEntry[] = [
           </svg>
         ),
       },
-    ],
-  },
-  {
-    kind: 'group',
-    id: 'control',
-    label: 'Control',
-    tabs: [
       {
         id: 'calidad',
         label: 'Calidad Agua',
@@ -186,10 +206,11 @@ const NAV: NavEntry[] = [
       },
     ],
   },
+  // ── Grupo 3: Manejo Condominios ──────────────────────────────────────────────
   {
     kind: 'group',
-    id: 'condominios',
-    label: 'Condominios',
+    id: 'condominios_grp',
+    label: 'Manejo Condominios',
     tabs: [
       {
         id: 'condominios',
@@ -203,50 +224,7 @@ const NAV: NavEntry[] = [
       },
     ],
   },
-  {
-    kind: 'group',
-    id: 'comunicacion',
-    label: 'Comunicación',
-    tabs: [
-      {
-        id: 'comunicacion',
-        label: 'Comunicación',
-        roles: ['admin', 'super_admin', 'company_owner', 'operator', 'collector', 'viewer'],
-        icon: (
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
-    kind: 'group',
-    id: 'config',
-    label: 'Configuración',
-    tabs: [
-      {
-        id: 'empresa_proyectos',
-        label: 'Mis Proyectos',
-        roles: ['company_owner'],
-        icon: (
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-          </svg>
-        ),
-      },
-      {
-        id: 'perfil',
-        label: 'Mi Cuenta',
-        roles: ['admin', 'super_admin', 'operator', 'viewer'],
-        icon: (
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-        ),
-      },
-    ],
-  },
+  // ── Config. del sistema (standalone) ────────────────────────────────────────
   {
     kind: 'tab',
     tab: {
