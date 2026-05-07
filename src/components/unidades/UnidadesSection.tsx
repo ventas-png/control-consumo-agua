@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Swal from 'sweetalert2'
 import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, UserSession, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
@@ -136,6 +136,46 @@ export function UnidadesSection({
   const [filterProyecto, setFilterProyecto] = useState<string>('')
   const [showImportModal, setShowImportModal] = useState(false)
 
+  // Compute effective max per type based on the selected project filter.
+  // When a specific project is selected use its limits; when showing all projects
+  // sum the limits across all active projects so the counter is accurate.
+  const effectiveMax = useMemo((): MaxUnidadesPorTipo | null => {
+    const activeProyectos = proyectos.filter(p => p.estado === 'activo')
+    if (activeProyectos.length === 0) return maxUnidadesPorTipo ?? null
+    if (filterProyecto) {
+      const p = activeProyectos.find(pr => pr.id === filterProyecto)
+      if (!p) return null
+      return {
+        apartamento: p.max_unidades_apartamento,
+        casa: p.max_unidades_casa,
+        bodega: p.max_unidades_bodega,
+        local_comercial: p.max_unidades_local_comercial,
+        oficina: p.max_unidades_oficina,
+        parqueadero: p.max_unidades_parqueadero,
+        otro: p.max_unidades_otro,
+      }
+    }
+    // All projects: sum each type's limits (null means unlimited, any null makes the total null)
+    const sumField = (field: 'max_unidades_apartamento' | 'max_unidades_casa' | 'max_unidades_bodega' | 'max_unidades_local_comercial' | 'max_unidades_oficina' | 'max_unidades_parqueadero' | 'max_unidades_otro'): number | null => {
+      let total: number | null = 0
+      for (const p of activeProyectos) {
+        const v = p[field]
+        if (v === null) return null
+        total += v
+      }
+      return total
+    }
+    return {
+      apartamento: sumField('max_unidades_apartamento'),
+      casa: sumField('max_unidades_casa'),
+      bodega: sumField('max_unidades_bodega'),
+      local_comercial: sumField('max_unidades_local_comercial'),
+      oficina: sumField('max_unidades_oficina'),
+      parqueadero: sumField('max_unidades_parqueadero'),
+      otro: sumField('max_unidades_otro'),
+    }
+  }, [filterProyecto, proyectos, maxUnidadesPorTipo])
+
   const canEdit = !['viewer', 'visor', 'cliente'].includes(userRole)
 
   function startCreate() {
@@ -218,10 +258,10 @@ export function UnidadesSection({
     }
 
     // Check per-type unit limit (only for new units, not edits)
-    if (!editingId && maxUnidadesPorTipo) {
-      const max = maxUnidadesPorTipo[form.tipo as TipoUnidad]
+    if (!editingId && effectiveMax) {
+      const max = effectiveMax[form.tipo as TipoUnidad]
       if (max !== null && max !== undefined) {
-        const currentCount = unidades.filter(u => u.tipo === form.tipo).length
+        const currentCount = unidades.filter(u => u.project_id === form.project_id && u.tipo === form.tipo).length
         if (currentCount >= max) {
           const tipoLabel = TIPOS_UNIDAD.find(t => t.value === form.tipo)?.label ?? form.tipo
           Swal.fire({
@@ -421,7 +461,7 @@ export function UnidadesSection({
   const resumen = TIPOS_UNIDAD.map(t => ({
     ...t,
     total: baseUnidades.filter(u => u.tipo === t.value).length,
-    max: maxUnidadesPorTipo?.[t.value as TipoUnidad] ?? null,
+    max: effectiveMax?.[t.value as TipoUnidad] ?? null,
   })).filter(t => t.total > 0 || (t.max !== null))
 
   const inputStyle: React.CSSProperties = {
