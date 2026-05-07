@@ -28,10 +28,8 @@ const TIPOLOGIA_META: Record<TipoAgua, { label: string; icon: string; from: stri
 
 function getMesActual(registros: Registro[]) {
   const hoy = new Date()
-  return registros.filter(r => {
-    const d = new Date(r.fecha)
-    return d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear()
-  })
+  // Match AdminDashboardStats: filter by month only (no year) to stay consistent
+  return registros.filter(r => new Date(r.fecha).getMonth() === hoy.getMonth())
 }
 
 export function AdminConsumoTipologia({ registros, contadores, proyectos, moneda, selectedProjectId, unidades }: Props) {
@@ -74,8 +72,6 @@ export function AdminConsumoTipologia({ registros, contadores, proyectos, moneda
 
   const activeTipos = Array.from(byTipologia.entries()).filter(([, s]) => s.consumo > 0 || s.monto > 0)
 
-  if (activeTipos.length === 0) return null
-
   const activeProjects = proyectos.filter(p => p.estado === 'activo' && byProject.has(p.id))
   const allTipos = Array.from(new Set(activeTipos.map(([t]) => t)))
   const showProjectTable = !selectedProjectId && activeProjects.length > 1
@@ -97,6 +93,11 @@ export function AdminConsumoTipologia({ registros, contadores, proyectos, moneda
       </h3>
 
       {/* Cards por tipología */}
+      {activeTipos.length === 0 ? (
+        <div style={{ color: '#94a3b8', fontSize: '13px', padding: '12px 0' }}>
+          Sin consumo registrado este mes.
+        </div>
+      ) : (
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
@@ -138,6 +139,7 @@ export function AdminConsumoTipologia({ registros, contadores, proyectos, moneda
           )
         })}
       </div>
+      )}
 
       {/* Desglose por proyecto cuando se ven todos */}
       {showProjectTable && (
