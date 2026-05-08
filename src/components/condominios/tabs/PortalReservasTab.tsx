@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
-import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSemana } from './AmenidadesTab'
+import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSemana, addMinutosToTime } from './AmenidadesTab'
 
 interface Props {
   amenidades: Amenidad[]
@@ -55,13 +55,21 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
     if (amenidadSel?.reglamento && !form.reglamento_aceptado) {
       Swal.fire('Reglamento', 'Debes leer y aceptar el reglamento antes de continuar.', 'warning'); return
     }
-    // Conflict check (sólo contra reservas confirmadas)
-    const conflicto = reservas.find(r =>
-      r.amenidad_id === form.amenidad_id && r.fecha === form.fecha &&
-      r.estado === 'confirmada' &&
-      form.hora_inicio < r.hora_fin && form.hora_fin > r.hora_inicio
-    )
-    if (conflicto) { Swal.fire('Horario ocupado', 'Esa amenidad ya está reservada en ese horario. Elija otro.', 'warning'); return }
+    // Conflict check (sólo contra reservas confirmadas, incluyendo tiempos de preparación)
+    const conflicto = reservas.find(r => {
+      if (r.amenidad_id !== form.amenidad_id) return false
+      if (r.fecha !== form.fecha) return false
+      if (r.estado !== 'confirmada') return false
+      const amenR = amenidades.find(a => a.id === r.amenidad_id)
+      const efectivoInicio = (amenR?.minutos_preparacion_previa ?? 0) > 0
+        ? addMinutosToTime(r.hora_inicio, -(amenR!.minutos_preparacion_previa!))
+        : r.hora_inicio
+      const efectivoFin = (amenR?.minutos_preparacion_posterior ?? 0) > 0
+        ? addMinutosToTime(r.hora_fin, amenR!.minutos_preparacion_posterior!)
+        : r.hora_fin
+      return form.hora_inicio < efectivoFin && form.hora_fin > efectivoInicio
+    })
+    if (conflicto) { Swal.fire('Horario ocupado', 'Esa amenidad ya está reservada en ese horario (o en su tiempo de preparación). Elija otro.', 'warning'); return }
 
     const bloqueo = bloqueos.find(b =>
       b.amenidad_id === form.amenidad_id &&

@@ -56,6 +56,14 @@ function diferenciaHoras(hi: string, hf: string): number {
   return ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60
 }
 
+export function addMinutosToTime(hhmm: string, minutos: number): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  const total = h * 60 + m + minutos
+  const hh = Math.floor(Math.max(0, total) / 60) % 24
+  const mm = Math.max(0, total) % 60
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+}
+
 export function validarReglasAmenidad(
   amen: Amenidad,
   fecha: string,
@@ -195,7 +203,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   const [showBloqueoForm, setShowBloqueoForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [amenidadFotoUrl, setAmenidadFotoUrl] = useState<string | null>(null)
-  const [amenidadForm, setAmenidadForm] = useState({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', requiere_aprobacion: false, reglamento: '' })
+  const [amenidadForm, setAmenidadForm] = useState({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', minutos_preparacion_previa: '', minutos_preparacion_posterior: '', requiere_aprobacion: false, reglamento: '' })
   const [reservaForm, setReservaForm] = useState({ amenidad_id: '', unidad_id: '', fecha: '', hora_inicio: '', hora_fin: '', num_invitados: '0', notas: '', metodo_pago_tarifa: 'cargar_unidad' as 'cargar_unidad' | 'pagar_momento', tarifa_pagada: false })
   const [bloqueoForm, setBloqueoForm] = useState({ amenidad_id: '', fecha_inicio: '', fecha_fin: '', dia_completo: true, hora_inicio: '', hora_fin: '', motivo: 'mantenimiento' as MotivoBloqueoAmenidad, notas: '' })
   const [semana, setSemana] = useState<Date>(() => lunesDeSemana(new Date()))
@@ -231,13 +239,15 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       max_reservas_mes_unidad: amenidadForm.max_reservas_mes_unidad ? Number(amenidadForm.max_reservas_mes_unidad) : null,
       horas_minimas_antelacion: amenidadForm.horas_minimas_antelacion ? Number(amenidadForm.horas_minimas_antelacion) : null,
       duracion_max_horas: amenidadForm.duracion_max_horas ? Number(amenidadForm.duracion_max_horas) : null,
+      minutos_preparacion_previa: amenidadForm.minutos_preparacion_previa ? Number(amenidadForm.minutos_preparacion_previa) : 0,
+      minutos_preparacion_posterior: amenidadForm.minutos_preparacion_posterior ? Number(amenidadForm.minutos_preparacion_posterior) : 0,
       requiere_aprobacion: amenidadForm.requiere_aprobacion,
       reglamento: amenidadForm.reglamento.trim() || null,
       foto_url: amenidadFotoUrl,
     })
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
-    setAmenidadForm({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', requiere_aprobacion: false, reglamento: '' })
+    setAmenidadForm({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', minutos_preparacion_previa: '', minutos_preparacion_posterior: '', requiere_aprobacion: false, reglamento: '' })
     setAmenidadFotoUrl(null)
     setShowAmenidadForm(false)
     onRefresh()
@@ -289,14 +299,20 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     if (!reservaForm.amenidad_id || !reservaForm.unidad_id || !reservaForm.fecha || !reservaForm.hora_inicio || !reservaForm.hora_fin) {
       Swal.fire('Error', 'Complete todos los campos requeridos.', 'error'); return
     }
-    const conflict = reservas.find(r =>
-      r.amenidad_id === reservaForm.amenidad_id &&
-      r.fecha === reservaForm.fecha &&
-      r.estado === 'confirmada' &&
-      r.hora_inicio < reservaForm.hora_fin &&
-      r.hora_fin > reservaForm.hora_inicio
-    )
-    if (conflict) { Swal.fire('Conflicto', 'Ya existe una reserva confirmada en ese horario para esta amenidad.', 'warning'); return }
+    const conflict = reservas.find(r => {
+      if (r.amenidad_id !== reservaForm.amenidad_id) return false
+      if (r.fecha !== reservaForm.fecha) return false
+      if (r.estado !== 'confirmada') return false
+      const amenR = amenidades.find(a => a.id === r.amenidad_id)
+      const efectivoInicio = (amenR?.minutos_preparacion_previa ?? 0) > 0
+        ? addMinutosToTime(r.hora_inicio, -(amenR!.minutos_preparacion_previa!))
+        : r.hora_inicio
+      const efectivoFin = (amenR?.minutos_preparacion_posterior ?? 0) > 0
+        ? addMinutosToTime(r.hora_fin, amenR!.minutos_preparacion_posterior!)
+        : r.hora_fin
+      return reservaForm.hora_inicio < efectivoFin && reservaForm.hora_fin > efectivoInicio
+    })
+    if (conflict) { Swal.fire('Conflicto', 'Ya existe una reserva confirmada en ese horario para esta amenidad (incluyendo tiempos de preparación).', 'warning'); return }
 
     const bloqueo = bloqueos.find(b =>
       b.amenidad_id === reservaForm.amenidad_id &&
@@ -575,17 +591,23 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   async function aprobarReserva(r: ReservaAmenidad) {
-    // Detectar conflicto con otra reserva ya confirmada
-    const conflict = reservas.find(x =>
-      x.id !== r.id &&
-      x.amenidad_id === r.amenidad_id &&
-      x.fecha === r.fecha &&
-      x.estado === 'confirmada' &&
-      x.hora_inicio < r.hora_fin &&
-      x.hora_fin > r.hora_inicio
-    )
+    // Detectar conflicto con otra reserva ya confirmada (incluyendo tiempos de preparación)
+    const amenAprov = amenidades.find(a => a.id === r.amenidad_id)
+    const conflict = reservas.find(x => {
+      if (x.id === r.id) return false
+      if (x.amenidad_id !== r.amenidad_id) return false
+      if (x.fecha !== r.fecha) return false
+      if (x.estado !== 'confirmada') return false
+      const efectivoInicio = (amenAprov?.minutos_preparacion_previa ?? 0) > 0
+        ? addMinutosToTime(x.hora_inicio, -(amenAprov!.minutos_preparacion_previa!))
+        : x.hora_inicio
+      const efectivoFin = (amenAprov?.minutos_preparacion_posterior ?? 0) > 0
+        ? addMinutosToTime(x.hora_fin, amenAprov!.minutos_preparacion_posterior!)
+        : x.hora_fin
+      return r.hora_inicio < efectivoFin && r.hora_fin > efectivoInicio
+    })
     if (conflict) {
-      Swal.fire('Conflicto', 'Otra reserva ya confirmada ocupa ese horario. No es posible aprobar.', 'warning')
+      Swal.fire('Conflicto', 'Otra reserva ya confirmada ocupa ese horario (incluyendo tiempos de preparación). No es posible aprobar.', 'warning')
       return
     }
     const amen = amenidades.find(a => a.id === r.amenidad_id)
@@ -816,6 +838,16 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                       <input type="number" min={0.5} step={0.5} value={amenidadForm.duracion_max_horas} onChange={e => setAmenidadForm(f => ({ ...f, duracion_max_horas: e.target.value }))} placeholder="sin tope"
                         style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
                     </div>
+                    <div>
+                      <label style={{ fontSize: 11.5, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Preparación previa (min)</label>
+                      <input type="number" min={0} step={5} value={amenidadForm.minutos_preparacion_previa} onChange={e => setAmenidadForm(f => ({ ...f, minutos_preparacion_previa: e.target.value }))} placeholder="0"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11.5, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Preparación posterior (min)</label>
+                      <input type="number" min={0} step={5} value={amenidadForm.minutos_preparacion_posterior} onChange={e => setAmenidadForm(f => ({ ...f, minutos_preparacion_posterior: e.target.value }))} placeholder="0"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                    </div>
                   </div>
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
@@ -899,6 +931,9 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                       {a.max_reservas_mes_unidad != null && <span style={pillStyle('#f0f9ff', '#bae6fd', '#0369a1')}>📅 Máx {a.max_reservas_mes_unidad}/mes</span>}
                       {a.horas_minimas_antelacion != null && a.horas_minimas_antelacion > 0 && <span style={pillStyle('#f0f9ff', '#bae6fd', '#0369a1')}>⏱ {a.horas_minimas_antelacion}h</span>}
                       {a.duracion_max_horas != null && <span style={pillStyle('#f0f9ff', '#bae6fd', '#0369a1')}>⌛ {a.duracion_max_horas}h máx</span>}
+                      {((a.minutos_preparacion_previa ?? 0) > 0 || (a.minutos_preparacion_posterior ?? 0) > 0) && (
+                        <span style={pillStyle('#f5f3ff', '#ddd6fe', '#6d28d9')}>🔧 {(a.minutos_preparacion_previa ?? 0) > 0 ? `${a.minutos_preparacion_previa}min prev.` : ''}{(a.minutos_preparacion_previa ?? 0) > 0 && (a.minutos_preparacion_posterior ?? 0) > 0 ? ' · ' : ''}{(a.minutos_preparacion_posterior ?? 0) > 0 ? `${a.minutos_preparacion_posterior}min post.` : ''}</span>
+                      )}
                       {a.requiere_aprobacion && <span style={pillStyle('#fff7ed', '#fed7aa', '#9a3412')}>👤 Aprobación</span>}
                       {a.reglamento && <span style={pillStyle('#f5f3ff', '#ddd6fe', '#6d28d9')}>📜 Reglamento</span>}
                     </div>
@@ -1204,25 +1239,41 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                               const pend = r.estado === 'pendiente'
                               const top = toPct(r.hora_inicio)
                               const bottom = toPct(r.hora_fin)
+                              const prepPrevia = a.minutos_preparacion_previa ?? 0
+                              const prepPost = a.minutos_preparacion_posterior ?? 0
+                              const topPrevia = prepPrevia > 0 ? toPct(addMinutosToTime(r.hora_inicio, -prepPrevia)) : null
+                              const bottomPost = prepPost > 0 ? toPct(addMinutosToTime(r.hora_fin, prepPost)) : null
                               return (
-                                <div key={r.id} data-role="reserva"
-                                  onClick={(e) => { e.stopPropagation(); setSelectedReserva(selectedReserva?.id === r.id ? null : r) }}
-                                  title={`${r.unidad_nombre} · ${r.hora_inicio}–${r.hora_fin}${pend ? ' (pendiente)' : ''}`}
-                                  style={{
-                                    position: 'absolute', left: 6, right: 6,
-                                    top: `${top}%`, height: `${Math.max(bottom - top, 4)}%`,
-                                    borderRadius: 8, padding: '4px 8px',
-                                    background: pend ? 'white' : `linear-gradient(135deg, ${paleta.bg}, ${paleta.border})`,
-                                    border: `${pend ? '1.5px dashed' : '1px solid'} ${paleta.border}`,
-                                    color: paleta.color, cursor: 'pointer',
-                                    boxShadow: pend ? 'none' : '0 2px 6px -2px rgba(0,0,0,0.15)',
-                                    overflow: 'hidden', transition: 'transform 0.12s ease',
-                                  }}
-                                  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.03)' }}
-                                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}>
-                                  <div style={{ fontSize: 10.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pend && '⏳ '}{r.unidad_nombre}</div>
-                                  <div style={{ fontSize: 9.5, opacity: 0.85, fontWeight: 600 }}>{r.hora_inicio}–{r.hora_fin}</div>
-                                </div>
+                                <React.Fragment key={r.id}>
+                                  {topPrevia !== null && (
+                                    <div title={`Preparación previa: ${prepPrevia} min`} style={{ position: 'absolute', left: 6, right: 6, top: `${topPrevia}%`, height: `${top - topPrevia}%`, borderRadius: '6px 6px 0 0', background: `${paleta.color}22`, border: `1px dashed ${paleta.border}`, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: paleta.color, fontWeight: 700 }}>
+                                      🔧 {prepPrevia}m
+                                    </div>
+                                  )}
+                                  <div data-role="reserva"
+                                    onClick={(e) => { e.stopPropagation(); setSelectedReserva(selectedReserva?.id === r.id ? null : r) }}
+                                    title={`${r.unidad_nombre} · ${r.hora_inicio}–${r.hora_fin}${pend ? ' (pendiente)' : ''}`}
+                                    style={{
+                                      position: 'absolute', left: 6, right: 6,
+                                      top: `${top}%`, height: `${Math.max(bottom - top, 4)}%`,
+                                      borderRadius: 8, padding: '4px 8px',
+                                      background: pend ? 'white' : `linear-gradient(135deg, ${paleta.bg}, ${paleta.border})`,
+                                      border: `${pend ? '1.5px dashed' : '1px solid'} ${paleta.border}`,
+                                      color: paleta.color, cursor: 'pointer',
+                                      boxShadow: pend ? 'none' : '0 2px 6px -2px rgba(0,0,0,0.15)',
+                                      overflow: 'hidden', transition: 'transform 0.12s ease',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.03)' }}
+                                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}>
+                                    <div style={{ fontSize: 10.5, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pend && '⏳ '}{r.unidad_nombre}</div>
+                                    <div style={{ fontSize: 9.5, opacity: 0.85, fontWeight: 600 }}>{r.hora_inicio}–{r.hora_fin}</div>
+                                  </div>
+                                  {bottomPost !== null && (
+                                    <div title={`Preparación posterior: ${prepPost} min`} style={{ position: 'absolute', left: 6, right: 6, top: `${bottom}%`, height: `${bottomPost - bottom}%`, borderRadius: '0 0 6px 6px', background: `${paleta.color}22`, border: `1px dashed ${paleta.border}`, borderTop: 'none', pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: paleta.color, fontWeight: 700 }}>
+                                      🔧 {prepPost}m
+                                    </div>
+                                  )}
+                                </React.Fragment>
                               )
                             })}
                             {/* Hover para crear */}
@@ -1246,6 +1297,9 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 14, height: 10, borderRadius: 4, background: 'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 3px,#fde68a 3px,#fde68a 6px)', border: '1px solid #fcd34d' }} /> Bloqueado
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 14, height: 10, borderRadius: 4, background: '#c4b5fd44', border: '1px dashed #a78bfa' }} /> Preparación
                   </span>
                 </div>
               </div>
