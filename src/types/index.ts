@@ -459,6 +459,8 @@ export interface Amenidad {
   max_reservas_mes_unidad?: number | null
   horas_minimas_antelacion?: number | null
   duracion_max_horas?: number | null
+  minutos_preparacion_previa?: number | null
+  minutos_preparacion_posterior?: number | null
   requiere_aprobacion: boolean
   reglamento?: string | null
   activo: boolean
