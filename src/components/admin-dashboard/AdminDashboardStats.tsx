@@ -5,11 +5,15 @@ interface Props {
   registros: Registro[]
   moneda: string
   clientes: Cliente[]
+  fechaDesde?: string
+  fechaHasta?: string
 }
 
-export function AdminDashboardStats({ registros, moneda, clientes }: Props) {
-  const hoy = new Date()
-  const mesActual = registros.filter(r => { const d = new Date(r.fecha); return d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear() })
+export function AdminDashboardStats({ registros, moneda, clientes, fechaDesde, fechaHasta }: Props) {
+  const mesActual = registros.filter(r => {
+    const f = r.fecha.slice(0, 10)
+    return (!fechaDesde || f >= fechaDesde) && (!fechaHasta || f <= fechaHasta)
+  })
 
   const consumoTotal = mesActual.reduce((acc, r) => acc + (parseFloat(String(r.consumo)) || 0), 0)
 

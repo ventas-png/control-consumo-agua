@@ -6,6 +6,8 @@ interface Props {
   proyectos: Proyecto[]
   unidades: any[]
   moneda: string
+  fechaDesde?: string
+  fechaHasta?: string
 }
 
 const TIPOLOGIA_META: Partial<Record<TipoAgua, { label: string; icon: string; color: string }>> = {
@@ -26,9 +28,12 @@ interface ProyectoStats {
   byTipo: Map<TipoAgua, number>
 }
 
-export function AdminResumenProyectos({ registros, contadores, proyectos, unidades, moneda }: Props) {
+export function AdminResumenProyectos({ registros, contadores, proyectos, unidades, moneda, fechaDesde, fechaHasta }: Props) {
   const hoy = new Date()
-  const mesActual = registros.filter(r => { const d = new Date(r.fecha); return d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear() })
+  const mesActual = registros.filter(r => {
+    const f = r.fecha.slice(0, 10)
+    return (!fechaDesde || f >= fechaDesde) && (!fechaHasta || f <= fechaHasta)
+  })
 
   // contador_id → tipo_agua (for typology breakdown)
   const contadorTipoMap = new Map<string, TipoAgua>()
@@ -84,7 +89,10 @@ export function AdminResumenProyectos({ registros, contadores, proyectos, unidad
     }
   }
 
-  const mesNombre = hoy.toLocaleString('es', { month: 'long', year: 'numeric' })
+  const fmtDate = (s?: string) => s ? new Date(s + 'T12:00:00').toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+  const rangoLabel = fechaDesde && fechaHasta
+    ? `${fmtDate(fechaDesde)} — ${fmtDate(fechaHasta)}`
+    : hoy.toLocaleString('es', { month: 'long', year: 'numeric' })
 
   const th = (color?: string, center = true) => ({
     padding: '10px 12px',
@@ -116,7 +124,7 @@ export function AdminResumenProyectos({ registros, contadores, proyectos, unidad
         textTransform: 'uppercase',
         letterSpacing: '0.08em',
       }}>
-        📋 Consumo por Proyecto — {mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1)}
+        📋 Consumo por Proyecto — {rangoLabel.charAt(0).toUpperCase() + rangoLabel.slice(1)}
       </h3>
 
       <div style={{ overflowX: 'auto' }}>

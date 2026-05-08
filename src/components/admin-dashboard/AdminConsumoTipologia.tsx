@@ -7,6 +7,8 @@ interface Props {
   moneda: string
   selectedProjectId: string
   unidades: any[]
+  fechaDesde?: string
+  fechaHasta?: string
 }
 
 interface TipologiaStat {
@@ -26,13 +28,7 @@ const TIPOLOGIA_META: Record<TipoAgua, { label: string; icon: string; from: stri
   residuales_tratadas: { label: 'Residuales Tratadas', icon: '🔄', from: '#f97316', to: '#ea580c' },
 }
 
-function getMesActual(registros: Registro[]) {
-  const hoy = new Date()
-  // Filter by month AND year to avoid matching same month from previous years
-  return registros.filter(r => { const d = new Date(r.fecha); return d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear() })
-}
-
-export function AdminConsumoTipologia({ registros, contadores, proyectos, moneda, selectedProjectId, unidades }: Props) {
+export function AdminConsumoTipologia({ registros, contadores, proyectos, moneda, selectedProjectId, unidades, fechaDesde, fechaHasta }: Props) {
   const contadorMap = new Map<string, { tipo_agua: TipoAgua; project_id: string }>()
   for (const c of contadores) {
     contadorMap.set(c.id, { tipo_agua: c.tipo_agua, project_id: c.project_id })
@@ -44,7 +40,10 @@ export function AdminConsumoTipologia({ registros, contadores, proyectos, moneda
     if (u.cliente_id && u.project_id) clienteProyectoMap.set(u.cliente_id, u.project_id)
   }
 
-  const mesActual = getMesActual(registros)
+  const mesActual = registros.filter(r => {
+    const f = r.fecha.slice(0, 10)
+    return (!fechaDesde || f >= fechaDesde) && (!fechaHasta || f <= fechaHasta)
+  })
 
   // Aggregate by tipología
   const byTipologia = new Map<TipoAgua, TipologiaStat>()
@@ -77,7 +76,10 @@ export function AdminConsumoTipologia({ registros, contadores, proyectos, moneda
   const showProjectTable = !selectedProjectId && activeProjects.length > 1
 
   const hoy = new Date()
-  const mesNombre = hoy.toLocaleString('es', { month: 'long', year: 'numeric' })
+  const fmtDate = (s?: string) => s ? new Date(s + 'T12:00:00').toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+  const rangoLabel = fechaDesde && fechaHasta
+    ? `${fmtDate(fechaDesde)} — ${fmtDate(fechaHasta)}`
+    : hoy.toLocaleString('es', { month: 'long', year: 'numeric' })
 
   return (
     <div style={{ marginBottom: '32px' }}>
@@ -89,7 +91,7 @@ export function AdminConsumoTipologia({ registros, contadores, proyectos, moneda
         textTransform: 'uppercase',
         letterSpacing: '0.08em',
       }}>
-        💧 Consumo por Tipología — {mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1)}
+        💧 Consumo por Tipología — {rangoLabel.charAt(0).toUpperCase() + rangoLabel.slice(1)}
       </h3>
 
       {/* Cards por tipología */}
