@@ -250,14 +250,18 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
                 moneda={moneda}
               />
             )}
-            <AdminConsumoTipologia
-              registros={registrosFiltrados}
-              contadores={contadoresFiltrados}
-              proyectos={data.proyectos}
-              moneda={moneda}
-              selectedProjectId={selectedProjectId}
-              unidades={data.unidades || []}
-            />
+            {/* Cards de tipología solo cuando hay un proyecto seleccionado;
+                cuando se ven todos, la tabla de AdminResumenProyectos las reemplaza */}
+            {selectedProjectId && (
+              <AdminConsumoTipologia
+                registros={registrosFiltrados}
+                contadores={contadoresFiltrados}
+                proyectos={data.proyectos}
+                moneda={moneda}
+                selectedProjectId={selectedProjectId}
+                unidades={data.unidades || []}
+              />
+            )}
             {onNavigateSection && (
               <AdminQuickActions
                 onNavigate={(section) => onNavigateSection(section as AppSection)}

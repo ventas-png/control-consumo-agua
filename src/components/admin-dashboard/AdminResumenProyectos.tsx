@@ -30,46 +30,52 @@ export function AdminResumenProyectos({ registros, contadores, proyectos, unidad
   const hoy = new Date()
   const mesActual = registros.filter(r => new Date(r.fecha).getMonth() === hoy.getMonth())
 
-  const contadorMap = new Map<string, { tipo_agua: TipoAgua; project_id: string }>()
+  // contador_id → tipo_agua (for typology breakdown)
+  const contadorTipoMap = new Map<string, TipoAgua>()
   for (const c of contadores) {
-    contadorMap.set(c.id, { tipo_agua: c.tipo_agua, project_id: c.project_id })
+    contadorTipoMap.set(c.id, c.tipo_agua)
   }
 
-  const clienteProyectoMap = new Map<string, string>()
-  for (const u of unidades) {
-    if (u.cliente_id && u.project_id) clienteProyectoMap.set(u.cliente_id, u.project_id)
-  }
+  const activeProyectos = proyectos.filter(p => p.estado === 'activo')
 
+  // Per-project stats using the same reliable approach as AdminClientDashboard:
+  // filter registros by client IDs linked to each project via unidades
   const byProject = new Map<string, ProyectoStats>()
 
-  for (const r of mesActual) {
-    const info = r.contador_id ? contadorMap.get(r.contador_id) : undefined
-    const tipo: TipoAgua = info?.tipo_agua ?? 'potable'
-    const projectId = info?.project_id ?? clienteProyectoMap.get(r.cliente_id) ?? ''
-    if (!projectId) continue
+  for (const p of activeProyectos) {
+    const clienteIds = new Set(
+      unidades
+        .filter((u: any) => u.project_id === p.id && u.cliente_id)
+        .map((u: any) => u.cliente_id as string)
+    )
+    if (clienteIds.size === 0) continue
 
-    if (!byProject.has(projectId)) {
-      byProject.set(projectId, { totalM3: 0, totalMonto: 0, byTipo: new Map() })
+    const regs = mesActual.filter(r => clienteIds.has(r.cliente_id))
+    if (regs.length === 0) continue
+
+    const stats: ProyectoStats = { totalM3: 0, totalMonto: 0, byTipo: new Map() }
+    for (const r of regs) {
+      const consumo = parseFloat(String(r.consumo)) || 0
+      const monto = r.monto_calculado ?? 0
+      const tipo: TipoAgua = (r.contador_id ? contadorTipoMap.get(r.contador_id) : undefined) ?? 'potable'
+      stats.totalM3 += consumo
+      stats.totalMonto += monto
+      stats.byTipo.set(tipo, (stats.byTipo.get(tipo) ?? 0) + consumo)
     }
-    const ps = byProject.get(projectId)!
-    const consumo = parseFloat(String(r.consumo)) || 0
-    const monto = r.monto_calculado ?? 0
-    ps.totalM3 += consumo
-    ps.totalMonto += monto
-    ps.byTipo.set(tipo, (ps.byTipo.get(tipo) ?? 0) + consumo)
+    byProject.set(p.id, stats)
   }
 
-  const activeProjects = proyectos.filter(p => p.estado === 'activo' && byProject.has(p.id))
-  if (activeProjects.length < 2) return null
+  const proyectosConDatos = activeProyectos.filter(p => byProject.has(p.id))
+  if (proyectosConDatos.length < 2) return null
 
-  // Dynamic tipo columns: only tipos with any m³
+  // Dynamic columns: tipologías with data in any project
   const activeTipos = Array.from(
-    new Set(activeProjects.flatMap(p => Array.from(byProject.get(p.id)!.byTipo.keys())))
+    new Set(proyectosConDatos.flatMap(p => Array.from(byProject.get(p.id)!.byTipo.keys())))
   ) as TipoAgua[]
 
   // Totals row
   const totals: ProyectoStats = { totalM3: 0, totalMonto: 0, byTipo: new Map() }
-  for (const p of activeProjects) {
+  for (const p of proyectosConDatos) {
     const ps = byProject.get(p.id)!
     totals.totalM3 += ps.totalM3
     totals.totalMonto += ps.totalMonto
@@ -80,21 +86,22 @@ export function AdminResumenProyectos({ registros, contadores, proyectos, unidad
 
   const mesNombre = hoy.toLocaleString('es', { month: 'long', year: 'numeric' })
 
-  const thStyle = (color?: string) => ({
-    padding: '10px 10px',
-    textAlign: 'center' as const,
+  const th = (color?: string, center = true) => ({
+    padding: '10px 12px',
+    textAlign: center ? ('center' as const) : ('left' as const),
     fontWeight: 700,
     color: color ?? '#475569',
     borderBottom: '2px solid #e2e8f0',
     whiteSpace: 'nowrap' as const,
     fontSize: '12px',
+    background: '#f8fafc',
   })
 
-  const tdNum = (val: number | undefined, bold?: boolean, color?: string) => ({
-    padding: '9px 10px',
+  const tdVal = (val: number | undefined, color?: string) => ({
+    padding: '10px 12px',
     textAlign: 'center' as const,
     borderBottom: '1px solid #f1f5f9',
-    fontWeight: bold || (val && val > 0) ? 600 : 400,
+    fontWeight: val && val > 0 ? 600 : 400,
     color: val && val > 0 ? (color ?? '#0f172a') : '#cbd5e1',
     fontSize: '12px',
   })
@@ -109,74 +116,78 @@ export function AdminResumenProyectos({ registros, contadores, proyectos, unidad
         textTransform: 'uppercase',
         letterSpacing: '0.08em',
       }}>
-        📋 Resumen por Proyecto — {mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1)}
+        📋 Consumo por Proyecto — {mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1)}
       </h3>
 
-      <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
-            <tr style={{ background: '#f8fafc' }}>
-              <th style={{ ...thStyle(), textAlign: 'left', padding: '10px 14px' }}>Proyecto</th>
-              <th style={thStyle('#0f172a')}>Total m³</th>
+            <tr>
+              <th style={th(undefined, false)}>Proyecto</th>
+              <th style={th('#0ea5e9')}>💧 Total m³</th>
               {activeTipos.map(tipo => {
                 const meta = TIPOLOGIA_META[tipo]
                 return (
-                  <th key={tipo} style={thStyle(meta?.color)}>
+                  <th key={tipo} style={th(meta?.color)}>
                     {meta?.icon} {meta?.label ?? tipo} m³
                   </th>
                 )
               })}
-              <th style={thStyle('#059669')}>Recaudo {moneda}</th>
+              <th style={th('#059669')}>Recaudo {moneda}</th>
             </tr>
           </thead>
           <tbody>
-            {activeProjects.map((p, i) => {
+            {proyectosConDatos.map((p, i) => {
               const ps = byProject.get(p.id)!
               return (
                 <tr
                   key={p.id}
                   style={{ background: i % 2 === 0 ? 'white' : '#f8fafc' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#eff6ff'}
+                  onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'white' : '#f8fafc'}
                 >
-                  <td style={{ padding: '9px 14px', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
                     {p.nombre}
                   </td>
-                  <td style={tdNum(ps.totalM3, true, '#0ea5e9')}>
+                  <td style={tdVal(ps.totalM3, '#0ea5e9')}>
                     {ps.totalM3 > 0 ? ps.totalM3.toFixed(1) : '—'}
                   </td>
                   {activeTipos.map(tipo => {
                     const m3 = ps.byTipo.get(tipo)
                     const meta = TIPOLOGIA_META[tipo]
                     return (
-                      <td key={tipo} style={tdNum(m3, false, meta?.color)}>
+                      <td key={tipo} style={tdVal(m3, meta?.color)}>
                         {m3 && m3 > 0 ? m3.toFixed(1) : '—'}
                       </td>
                     )
                   })}
-                  <td style={tdNum(ps.totalMonto, true, '#059669')}>
-                    {ps.totalMonto > 0 ? ps.totalMonto.toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+                  <td style={tdVal(ps.totalMonto, '#059669')}>
+                    {ps.totalMonto > 0
+                      ? ps.totalMonto.toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : '—'}
                   </td>
                 </tr>
               )
             })}
 
-            {/* Fila de totales */}
+            {/* Totals row */}
             <tr style={{ background: '#f1f5f9', borderTop: '2px solid #e2e8f0' }}>
-              <td style={{ padding: '10px 14px', fontWeight: 700, color: '#0f172a', fontSize: '12px' }}>
+              <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>
                 Total
               </td>
-              <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, color: '#0ea5e9', fontSize: '13px' }}>
+              <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: '#0ea5e9', fontSize: '13px' }}>
                 {totals.totalM3.toFixed(1)}
               </td>
               {activeTipos.map(tipo => {
                 const m3 = totals.byTipo.get(tipo)
                 const meta = TIPOLOGIA_META[tipo]
                 return (
-                  <td key={tipo} style={{ padding: '10px', textAlign: 'center', fontWeight: 700, color: meta?.color ?? '#0f172a', fontSize: '12px' }}>
+                  <td key={tipo} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: meta?.color ?? '#0f172a', fontSize: '12px' }}>
                     {m3 && m3 > 0 ? m3.toFixed(1) : '—'}
                   </td>
                 )
               })}
-              <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, color: '#059669', fontSize: '13px' }}>
+              <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: '#059669', fontSize: '13px' }}>
                 {totals.totalMonto.toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </td>
             </tr>
