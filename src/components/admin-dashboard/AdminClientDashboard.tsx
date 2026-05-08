@@ -8,6 +8,7 @@ import { LecturasSection } from '../lecturas/LecturasSection'
 import { AdminHistoryTab } from './AdminHistoryTab'
 import { AdminQuickActions } from './AdminQuickActions'
 import { AdminConsumoTipologia } from './AdminConsumoTipologia'
+import { AdminResumenProyectos } from './AdminResumenProyectos'
 
 interface AdminDashboardData {
   clientes: Cliente[]
@@ -240,6 +241,15 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
               moneda={moneda}
               clientes={clientesEnProyecto}
             />
+            {!selectedProjectId && data.proyectos.length > 1 && (
+              <AdminResumenProyectos
+                registros={data.registros}
+                contadores={data.contadores}
+                proyectos={data.proyectos}
+                unidades={data.unidades || []}
+                moneda={moneda}
+              />
+            )}
             <AdminConsumoTipologia
               registros={registrosFiltrados}
               contadores={contadoresFiltrados}
