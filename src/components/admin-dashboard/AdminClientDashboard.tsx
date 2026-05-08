@@ -7,6 +7,8 @@ import { AdminClientsList } from './AdminClientsList'
 import { LecturasSection } from '../lecturas/LecturasSection'
 import { AdminHistoryTab } from './AdminHistoryTab'
 import { AdminQuickActions } from './AdminQuickActions'
+import { AdminConsumoTipologia } from './AdminConsumoTipologia'
+import { AdminResumenProyectos } from './AdminResumenProyectos'
 
 interface AdminDashboardData {
   clientes: Cliente[]
@@ -42,6 +44,11 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [projectInitialized, setProjectInitialized] = useState(false)
+
+  const defaultDesde = (() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10) })()
+  const defaultHasta = new Date().toISOString().slice(0, 10)
+  const [fechaDesde, setFechaDesde] = useState(defaultDesde)
+  const [fechaHasta, setFechaHasta] = useState(defaultHasta)
   const [convStats, setConvStats] = useState<ConvStats>({ sinAsignar: 0, cerradasHoy: 0, criticas: 0, urgentes: 0, enProceso: 0 })
   const [perProjectStats, setPerProjectStats] = useState<Record<string, ConvStats>>({})
 
@@ -203,6 +210,35 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
           </div>
         )}
 
+        {/* Selector de Rango de Fechas */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <label style={{ fontSize: '14px', fontWeight: '600', color: '#475569' }}>Período:</label>
+          <input
+            type="date"
+            value={fechaDesde}
+            onChange={e => setFechaDesde(e.target.value)}
+            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', background: 'white' }}
+          />
+          <span style={{ fontSize: '13px', color: '#94a3b8' }}>—</span>
+          <input
+            type="date"
+            value={fechaHasta}
+            onChange={e => setFechaHasta(e.target.value)}
+            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', background: 'white' }}
+          />
+          {/* Quick presets */}
+          {[
+            { label: 'Últ. 30 días', onClick: () => { const d = new Date(); const d30 = new Date(); d30.setDate(d.getDate() - 30); setFechaDesde(d30.toISOString().slice(0, 10)); setFechaHasta(d.toISOString().slice(0, 10)) } },
+            { label: 'Este mes', onClick: () => { const d = new Date(); setFechaDesde(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`); setFechaHasta(d.toISOString().slice(0,10)) } },
+            { label: 'Mes anterior', onClick: () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); const y = d.getFullYear(); const m = d.getMonth(); const last = new Date(y, m+1, 0); setFechaDesde(`${y}-${String(m+1).padStart(2,'0')}-01`); setFechaHasta(last.toISOString().slice(0,10)) } },
+            { label: 'Últ. 3 meses', onClick: () => { const d = new Date(); const d90 = new Date(); d90.setDate(d.getDate() - 90); setFechaDesde(d90.toISOString().slice(0, 10)); setFechaHasta(d.toISOString().slice(0, 10)) } },
+          ].map(p => (
+            <button key={p.label} onClick={p.onClick} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', background: 'white', fontSize: '12px', fontWeight: 500, color: '#475569', cursor: 'pointer' }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+
         {/* Tabs de navegación */}
         <div style={{
           display: 'flex',
@@ -243,7 +279,34 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
               registros={registrosFiltrados}
               moneda={moneda}
               clientes={clientesEnProyecto}
+              fechaDesde={fechaDesde}
+              fechaHasta={fechaHasta}
             />
+            {!selectedProjectId && data.proyectos.length > 1 && (
+              <AdminResumenProyectos
+                registros={data.registros}
+                contadores={data.contadores}
+                proyectos={data.proyectos}
+                unidades={data.unidades || []}
+                moneda={moneda}
+                fechaDesde={fechaDesde}
+                fechaHasta={fechaHasta}
+              />
+            )}
+            {/* Cards de tipología solo cuando hay un proyecto seleccionado;
+                cuando se ven todos, la tabla de AdminResumenProyectos las reemplaza */}
+            {selectedProjectId && (
+              <AdminConsumoTipologia
+                registros={registrosFiltrados}
+                contadores={contadoresFiltrados}
+                proyectos={data.proyectos}
+                moneda={moneda}
+                selectedProjectId={selectedProjectId}
+                unidades={data.unidades || []}
+                fechaDesde={fechaDesde}
+                fechaHasta={fechaHasta}
+              />
+            )}
             {onNavigateSection && (
               <AdminQuickActions
                 onNavigate={(section) => onNavigateSection(section as AppSection)}

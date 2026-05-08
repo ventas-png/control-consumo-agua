@@ -5,11 +5,15 @@ interface Props {
   registros: Registro[]
   moneda: string
   clientes: Cliente[]
+  fechaDesde?: string
+  fechaHasta?: string
 }
 
-export function AdminDashboardStats({ registros, moneda, clientes }: Props) {
-  const hoy = new Date()
-  const mesActual = registros.filter(r => new Date(r.fecha).getMonth() === hoy.getMonth())
+export function AdminDashboardStats({ registros, moneda, clientes, fechaDesde, fechaHasta }: Props) {
+  const mesActual = registros.filter(r => {
+    const f = r.fecha.slice(0, 10)
+    return (!fechaDesde || f >= fechaDesde) && (!fechaHasta || f <= fechaHasta)
+  })
 
   const consumoTotal = mesActual.reduce((acc, r) => acc + (parseFloat(String(r.consumo)) || 0), 0)
 
@@ -29,16 +33,16 @@ export function AdminDashboardStats({ registros, moneda, clientes }: Props) {
     return acc + monto
   }, 0)
 
-  const pendientes = registros.filter(r => r.estado === 'pendiente').length
-  const pagados = registros.filter(r => r.estado === 'pagado').length
-  const enMora = registros.filter(r => r.estado === 'mora').length
+  const pendientes = mesActual.filter(r => r.estado === 'pendiente').length
+  const pagados = mesActual.filter(r => r.estado === 'pagado').length
+  const enMora = mesActual.filter(r => r.estado === 'mora').length
 
   const totalClientes = clientes.length
-  const clientesConLectura = new Set(registros.map(r => r.cliente_id)).size
+  const clientesConLectura = new Set(mesActual.map(r => r.cliente_id)).size
 
   const stats = [
     {
-      label: 'Consumo Este Mes',
+      label: 'Consumo del Período',
       value: `${consumoTotal.toFixed(2)}`,
       unit: 'm³',
       icon: '💧',
