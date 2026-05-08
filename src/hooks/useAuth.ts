@@ -222,6 +222,8 @@ export function useAuth() {
       return
     }
 
+    // If browser is online, clear any stale offline flag from a previous disconnection
+    if (navigator.onLine) localStorage.removeItem('offline_mode')
     const offline = !navigator.onLine || localStorage.getItem('offline_mode') === 'true'
     if (offline) {
       // In offline mode, rely on sessionStorage only (no localStorage session)
