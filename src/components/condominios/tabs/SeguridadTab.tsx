@@ -66,7 +66,7 @@ const VISITA_CONFIG: Record<EstadoVisitaControl, { label: string; icon: string; 
 
 export function SeguridadTab({
   rondas, novedades, rutas, puntosControl, visitasControl,
-  visitantes, unidades, reservasSTR,
+  visitantes: _visitantes, unidades, reservasSTR,
   proyectoId, companyId, userId, canCreate, canEdit, onRefresh,
 }: Props) {
   const [vista, setVista] = useState<'novedades' | 'rondas'>('novedades')

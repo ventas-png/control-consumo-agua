@@ -657,13 +657,6 @@ export function EmpresaSection({ currentUser }: Props) {
     void cargar()
   }
 
-  const roleLabel: Record<string, string> = {
-    admin: 'Administrador',
-    operator: 'Operador', operador: 'Operador',
-    viewer: 'Visualizador', visor: 'Visualizador',
-    collector: 'Gestor de Cobros',
-  }
-
   const roleBadgeColor: Record<string, string> = {
     admin: '#0ea5e9',
     operator: '#10b981', operador: '#10b981',

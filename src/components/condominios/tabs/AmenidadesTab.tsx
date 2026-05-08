@@ -1712,22 +1712,6 @@ function EmptyState({ icon, title, hint, action }: { icon: string; title: string
   )
 }
 
-function SkeletonCard() {
-  return (
-    <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: 18, overflow: 'hidden' }}>
-      <div style={{ height: 140, background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear' }} />
-      <div style={{ padding: 18 }}>
-        <div style={{ height: 14, width: '60%', borderRadius: 6, background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear', marginBottom: 8 }} />
-        <div style={{ height: 10, width: '90%', borderRadius: 6, background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear', marginBottom: 12 }} />
-        <div style={{ display: 'flex', gap: 6 }}>
-          <div style={{ height: 18, width: 60, borderRadius: 999, background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear' }} />
-          <div style={{ height: 18, width: 80, borderRadius: 999, background: 'linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear' }} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
 const SHIMMER_KEYFRAMES = `@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`
 
 function CheckoutForm({ onSave }: { onSave: (foto: string | null, obs: string) => void }) {

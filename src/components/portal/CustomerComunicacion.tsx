@@ -36,6 +36,9 @@ const CATEGORY_LABELS: Record<ConversationCategory, string> = {
   pagos: 'Pagos',
   tecnico: 'Técnico',
   calidad: 'Calidad del Agua',
+  mantenimiento: 'Mantenimiento',
+  finanzas: 'Finanzas',
+  convivencia: 'Convivencia',
 }
 
 const CATEGORY_ICONS: Record<ConversationCategory, string> = {
@@ -43,6 +46,9 @@ const CATEGORY_ICONS: Record<ConversationCategory, string> = {
   pagos: '💳',
   tecnico: '🔧',
   calidad: '💧',
+  mantenimiento: '🔨',
+  finanzas: '💰',
+  convivencia: '🤝',
 }
 
 const STATUS_LABELS: Record<ConversationStatus, string> = {
