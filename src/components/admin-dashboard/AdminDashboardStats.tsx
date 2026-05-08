@@ -22,16 +22,16 @@ export function AdminDashboardStats({ registros, moneda, clientes, fechaDesde, f
     return acc + monto
   }, 0)
 
-  const pendientes = registros.filter(r => r.estado === 'pendiente').length
-  const pagados = registros.filter(r => r.estado === 'pagado').length
-  const enMora = registros.filter(r => r.estado === 'mora').length
+  const pendientes = mesActual.filter(r => r.estado === 'pendiente').length
+  const pagados = mesActual.filter(r => r.estado === 'pagado').length
+  const enMora = mesActual.filter(r => r.estado === 'mora').length
 
   const totalClientes = clientes.length
-  const clientesConLectura = new Set(registros.map(r => r.cliente_id)).size
+  const clientesConLectura = new Set(mesActual.map(r => r.cliente_id)).size
 
   const stats = [
     {
-      label: 'Consumo Este Mes',
+      label: 'Consumo del Período',
       value: `${consumoTotal.toFixed(2)}`,
       unit: 'm³',
       icon: '💧',
