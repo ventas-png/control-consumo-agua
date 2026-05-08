@@ -5,33 +5,40 @@ interface Props {
   registros: Registro[]
   moneda: string
   clientes: Cliente[]
-  fechaDesde?: string
-  fechaHasta?: string
 }
 
-export function AdminDashboardStats({ registros, moneda, clientes, fechaDesde, fechaHasta }: Props) {
-  const mesActual = registros.filter(r => {
-    const f = r.fecha.slice(0, 10)
-    return (!fechaDesde || f >= fechaDesde) && (!fechaHasta || f <= fechaHasta)
-  })
+export function AdminDashboardStats({ registros, moneda, clientes }: Props) {
+  const hoy = new Date()
+  const mesActual = registros.filter(r => new Date(r.fecha).getMonth() === hoy.getMonth())
 
   const consumoTotal = mesActual.reduce((acc, r) => acc + (parseFloat(String(r.consumo)) || 0), 0)
 
   const recaudoTotal = mesActual.reduce((acc, r) => {
-    const monto = r.monto_calculado ?? calcularTotalPagar(r.consumo, r.tarifa_aplicada, r.canon_aplicado ?? 20).total
+    const monto =
+      r.monto_calculado > 0
+        ? r.monto_calculado
+        : (r.tarifa_aplicada > 0 || r.canon_aplicado > 0)
+          ? calcularTotalPagar(
+              r.consumo,
+              r.tarifa_aplicada,
+              r.canon_aplicado ?? 0,
+              0,
+              r.tarifa_exceso_aplicada ?? 0
+            ).total
+          : 0
     return acc + monto
   }, 0)
 
-  const pendientes = mesActual.filter(r => r.estado === 'pendiente').length
-  const pagados = mesActual.filter(r => r.estado === 'pagado').length
-  const enMora = mesActual.filter(r => r.estado === 'mora').length
+  const pendientes = registros.filter(r => r.estado === 'pendiente').length
+  const pagados = registros.filter(r => r.estado === 'pagado').length
+  const enMora = registros.filter(r => r.estado === 'mora').length
 
   const totalClientes = clientes.length
-  const clientesConLectura = new Set(mesActual.map(r => r.cliente_id)).size
+  const clientesConLectura = new Set(registros.map(r => r.cliente_id)).size
 
   const stats = [
     {
-      label: 'Consumo del Período',
+      label: 'Consumo Este Mes',
       value: `${consumoTotal.toFixed(2)}`,
       unit: 'm³',
       icon: '💧',

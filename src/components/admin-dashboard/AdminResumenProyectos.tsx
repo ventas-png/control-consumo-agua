@@ -53,9 +53,11 @@ export function AdminResumenProyectos({ registros, contadores, proyectos, unidad
         .filter((u: any) => u.project_id === p.id && u.cliente_id)
         .map((u: any) => u.cliente_id as string)
     )
-    if (clienteIds.size === 0) continue
-
-    const regs = mesActual.filter(r => clienteIds.has(r.cliente_id))
+    const regs = mesActual.filter(r =>
+      r.project_id
+        ? r.project_id === p.id
+        : clienteIds.has(r.cliente_id)
+    )
     if (regs.length === 0) continue
 
     const stats: ProyectoStats = { totalM3: 0, totalMonto: 0, byTipo: new Map() }
