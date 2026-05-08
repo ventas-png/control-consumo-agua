@@ -28,8 +28,8 @@ const TIPOLOGIA_META: Record<TipoAgua, { label: string; icon: string; from: stri
 
 function getMesActual(registros: Registro[]) {
   const hoy = new Date()
-  // Match AdminDashboardStats: filter by month only (no year) to stay consistent
-  return registros.filter(r => new Date(r.fecha).getMonth() === hoy.getMonth())
+  // Filter by month AND year to avoid matching same month from previous years
+  return registros.filter(r => { const d = new Date(r.fecha); return d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear() })
 }
 
 export function AdminConsumoTipologia({ registros, contadores, proyectos, moneda, selectedProjectId, unidades }: Props) {
