@@ -47,6 +47,7 @@ export interface Registro {
   cliente_id: string;
   cliente_nombre: string;
   contador_id?: string | null;
+  project_id?: string | null;
   fecha: string;
   lectura_anterior: number;
   lectura_actual: number;
