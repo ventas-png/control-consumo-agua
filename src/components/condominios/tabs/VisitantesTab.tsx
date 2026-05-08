@@ -77,11 +77,14 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
   const estaSemana = visitantes.filter(v => v.hora_entrada.slice(0, 10) >= inicioSemana).length
   const totalHistorico = visitantes.length
 
-  // Deduped frequent visitor suggestions — sorted by most recent first
-  const sugerencias = form.nombre.length >= 3
+  // Deduped frequent visitor suggestions — sorted by most recent first, matches name OR DPI
+  const sugerencias = (form.nombre.length >= 3 || form.identificacion.length >= 3)
     ? [...visitantes]
         .sort((a, b) => b.hora_entrada.localeCompare(a.hora_entrada))
-        .filter(v => v.nombre.toLowerCase().includes(form.nombre.toLowerCase()))
+        .filter(v =>
+          (form.nombre.length >= 3 && v.nombre.toLowerCase().includes(form.nombre.toLowerCase())) ||
+          (form.identificacion.length >= 3 && (v.identificacion ?? '').includes(form.identificacion))
+        )
         .reduce<Visitante[]>((acc, v) => {
           if (!acc.some(a => a.nombre === v.nombre && a.identificacion === v.identificacion)) acc.push(v)
           return acc
@@ -478,6 +481,17 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                 <input value={form.identificacion} onChange={e => setForm(f => ({ ...f, identificacion: e.target.value }))}
                   placeholder="Número de documento"
                   style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                {sugerencias.length > 0 && form.nombre.length < 3 && (
+                  <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>Frecuente:</span>
+                    {sugerencias.map((v, i) => (
+                      <button key={i} type="button" onClick={() => autocompletar(v)}
+                        style={{ padding: '3px 10px', background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        {v.nombre}{v.identificacion ? ` · ${v.identificacion}` : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
