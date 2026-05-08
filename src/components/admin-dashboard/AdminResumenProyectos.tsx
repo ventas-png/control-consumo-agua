@@ -1,10 +1,10 @@
-import type { Registro, Contador, Proyecto, TipoAgua } from '../../types'
+import type { Registro, Contador, Proyecto, Unidad, TipoAgua } from '../../types'
 
 interface Props {
   registros: Registro[]
   contadores: Contador[]
   proyectos: Proyecto[]
-  unidades: any[]
+  unidades: Unidad[]
   moneda: string
   fechaDesde?: string
   fechaHasta?: string
@@ -50,8 +50,8 @@ export function AdminResumenProyectos({ registros, contadores, proyectos, unidad
   for (const p of activeProyectos) {
     const clienteIds = new Set(
       unidades
-        .filter((u: any) => u.project_id === p.id && u.cliente_id)
-        .map((u: any) => u.cliente_id as string)
+        .filter(u => u.project_id === p.id && u.cliente_id)
+        .map(u => u.cliente_id as string)
     )
     const regs = mesActual.filter(r =>
       r.project_id

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 
@@ -411,7 +411,7 @@ export function SuperAdminSection() {
                     <input
                       type="number" min={1}
                       value={isEditingProj ? editingMax[e.id] : e.max_projects}
-                      onChange={(ev: React.ChangeEvent<HTMLInputElement>) => setEditingMax(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
+                      onChange={(ev: ChangeEvent<HTMLInputElement>) => setEditingMax(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
                       style={{
                         width: '60px', padding: '5px 7px', borderRadius: '6px',
                         border: `1px solid ${isEditingProj ? '#0ea5e9' : 'rgba(255,255,255,0.1)'}`,
@@ -436,7 +436,7 @@ export function SuperAdminSection() {
                     <input
                       type="number" min={1}
                       value={isEditingUnits ? editingMaxUnits[e.id] : e.max_units}
-                      onChange={(ev: React.ChangeEvent<HTMLInputElement>) => setEditingMaxUnits(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
+                      onChange={(ev: ChangeEvent<HTMLInputElement>) => setEditingMaxUnits(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
                       style={{
                         width: '60px', padding: '5px 7px', borderRadius: '6px',
                         border: `1px solid ${isEditingUnits ? '#34d399' : 'rgba(255,255,255,0.1)'}`,

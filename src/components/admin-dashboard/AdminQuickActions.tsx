@@ -47,7 +47,7 @@ export function AdminQuickActions({ onNavigate }: Props) {
         {actions.map(action => (
           <button
             key={action.id}
-            onClick={() => onNavigate(action.id as any)}
+            onClick={() => onNavigate(action.id as 'mapa' | 'rutas' | 'contadores' | 'calidad')}
             style={{
               padding: '16px',
               background: 'white',

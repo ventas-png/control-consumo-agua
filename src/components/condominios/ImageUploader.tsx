@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type DragEvent} from 'react'
 import { supabase } from '../../lib/supabase'
 
 const MAX_DIMENSION = 1280
@@ -72,7 +72,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
     }
   }
 
-  function onDrop(e: React.DragEvent) {
+  function onDrop(e: DragEvent) {
     e.preventDefault(); setDragOver(false)
     const file = e.dataTransfer.files[0]
     if (file) handleFile(file)
@@ -179,7 +179,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
     onChange(values.filter(u => u !== url))
   }
 
-  function onDrop(e: React.DragEvent) {
+  function onDrop(e: DragEvent) {
     e.preventDefault(); setDragOver(false)
     if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files)
   }

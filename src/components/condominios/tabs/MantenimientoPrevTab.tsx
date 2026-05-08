@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PlanMantenimiento, EjecucionMantenimiento } from '../../../types'
 import Swal from 'sweetalert2'
@@ -119,7 +119,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
   const vencidos = planesActivos.filter(p => getStatus(p) === 'vencido').length
   const proximos = planesActivos.filter(p => ['urgente', 'proximo'].includes(getStatus(p))).length
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>

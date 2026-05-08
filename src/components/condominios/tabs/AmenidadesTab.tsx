@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState, Fragment, type CSSProperties, type ReactNode } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
@@ -125,7 +125,7 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
   cancelada:  { bg: '#f1f5f9', color: '#94a3b8' },
 }
 
-function pillStyle(bg: string, border: string, color: string): React.CSSProperties {
+function pillStyle(bg: string, border: string, color: string): CSSProperties {
   return {
     padding: '3px 9px',
     borderRadius: 999,
@@ -147,7 +147,7 @@ const CHIP_STYLES: Record<string, { bg: string; border: string; color: string }>
   cobro_pendiente:   { bg: '#fed7aa', border: '#fb923c', color: '#9a3412' },
 }
 
-function chipStyle(estado: string): React.CSSProperties {
+function chipStyle(estado: string): CSSProperties {
   const c = CHIP_STYLES[estado] ?? CHIP_STYLES.cancelada
   return {
     padding: '3px 10px',
@@ -162,7 +162,7 @@ function chipStyle(estado: string): React.CSSProperties {
   }
 }
 
-function btnAction(bg: string, border: string, color: string): React.CSSProperties {
+function btnAction(bg: string, border: string, color: string): CSSProperties {
   return {
     padding: '6px 12px',
     background: bg,
@@ -176,7 +176,7 @@ function btnAction(bg: string, border: string, color: string): React.CSSProperti
   }
 }
 
-const btnHero: React.CSSProperties = {
+const btnHero: CSSProperties = {
   padding: '10px 18px',
   background: 'rgba(255,255,255,0.18)',
   color: 'white',
@@ -1244,7 +1244,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                               const topPrevia = prepPrevia > 0 ? toPct(addMinutosToTime(r.hora_inicio, -prepPrevia)) : null
                               const bottomPost = prepPost > 0 ? toPct(addMinutosToTime(r.hora_fin, prepPost)) : null
                               return (
-                                <React.Fragment key={r.id}>
+                                <Fragment key={r.id}>
                                   {topPrevia !== null && (
                                     <div title={`Preparación previa: ${prepPrevia} min`} style={{ position: 'absolute', left: 6, right: 6, top: `${topPrevia}%`, height: `${top - topPrevia}%`, borderRadius: '6px 6px 0 0', background: `${paleta.color}22`, border: `1px dashed ${paleta.border}`, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: paleta.color, fontWeight: 700 }}>
                                       🔧 {prepPrevia}m
@@ -1273,7 +1273,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                                       🔧 {prepPost}m
                                     </div>
                                   )}
-                                </React.Fragment>
+                                </Fragment>
                               )
                             })}
                             {/* Hover para crear */}
@@ -1453,7 +1453,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
         const r = reservaDetalle
         const amen = amenidades.find(a => a.id === r.amenidad_id)
         // Pasos del ciclo de la reserva
-        const steps: { id: string; label: string; done: boolean; current: boolean; meta?: string; render?: React.ReactNode }[] = []
+        const steps: { id: string; label: string; done: boolean; current: boolean; meta?: string; render?: ReactNode }[] = []
         steps.push({
           id: 'creada', label: 'Solicitud creada', done: true, current: false,
           meta: new Date(r.created_at).toLocaleString('es'),
@@ -1690,7 +1690,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   )
 }
 
-function EmptyState({ icon, title, hint, action }: { icon: string; title: string; hint?: string; action?: React.ReactNode }) {
+function EmptyState({ icon, title, hint, action }: { icon: string; title: string; hint?: string; action?: ReactNode }) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
 import { HistorialSaldoUnidad, Unidad, CuotaCondominio } from '../../../types'
@@ -70,7 +70,7 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
     onRefresh()
   }
 
-  const inp: React.CSSProperties = { padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 }
+  const inp: CSSProperties = { padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 }
 
   return (
     <div style={{ padding: 16 }}>

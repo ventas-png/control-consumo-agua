@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
 import type { Cliente, UserRole, UserSession, ClienteLookupResult } from '../../types'
 import { supabase } from '../../lib/supabase'
@@ -389,7 +389,7 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
     (c.cui_dui ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
-  const inputStyle: React.CSSProperties = {
+  const inputStyle: CSSProperties = {
     padding: '10px 14px',
     border: '2px solid #e2e8f0',
     borderRadius: '8px',
@@ -398,14 +398,14 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
     boxSizing: 'border-box',
     outline: 'none',
   }
-  const labelStyle: React.CSSProperties = {
+  const labelStyle: CSSProperties = {
     fontSize: '13px',
     fontWeight: 600,
     color: '#4a5568',
     marginBottom: '5px',
     display: 'block',
   }
-  const sectionHeaderStyle: React.CSSProperties = {
+  const sectionHeaderStyle: CSSProperties = {
     fontSize: '12px',
     fontWeight: 600,
     color: '#94a3b8',

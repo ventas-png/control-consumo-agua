@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { CuotaCondominio, TicketMantenimiento, Visitante, ContratoProveedor, GastoCondominio, PresupuestoCondominio } from '../../../types'
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
 
 function fmt(n: number) { return n.toLocaleString('es-CR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: '28px', pageBreakInside: 'avoid' }}>
       <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 800, color: '#0f172a', borderBottom: '2px solid #e2e8f0', paddingBottom: '6px' }}>{title}</h3>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { CajaChica, MovimientoCaja } from '../../../types'
 import Swal from 'sweetalert2'
@@ -81,7 +81,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
   const totalEgresos  = selectedMovs.filter(m => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0)
   const saldo = (selected ? Number(selected.monto_inicial) : 0) + totalIngresos - totalEgresos
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>

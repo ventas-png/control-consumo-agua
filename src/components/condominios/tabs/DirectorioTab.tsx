@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PersonalCondominio, ContactoEmergencia } from '../../../types'
 
@@ -76,12 +76,12 @@ export function DirectorioTab({ personal, contactosEmergencia, proyectoId }: Pro
     (c.telefono ?? '').includes(filterStr)
   )
 
-  const tabStyle = (t: DirectorioTab): React.CSSProperties => ({
+  const tabStyle = (t: DirectorioTab): CSSProperties => ({
     padding: '7px 16px', fontSize: '13px', fontWeight: 600, borderRadius: '8px', border: 'none',
     cursor: 'pointer', background: activeTab === t ? '#0ea5e9' : 'transparent', color: activeTab === t ? 'white' : '#64748b',
   })
 
-  const cardStyle: React.CSSProperties = {
+  const cardStyle: CSSProperties = {
     background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px',
     display: 'flex', gap: '12px', alignItems: 'flex-start',
   }

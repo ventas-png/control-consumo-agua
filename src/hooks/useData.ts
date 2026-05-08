@@ -26,8 +26,6 @@ function sanitizeForCache(payload: AppData): AppData {
 
 function loadCache(): AppData | null {
   try {
-    // Clean up old cache key
-    localStorage.removeItem('aquacontrol_data_v1')
     const raw = localStorage.getItem(CACHE_KEY)
     if (!raw) return null
     const { ts, payload }: { ts: number; payload: AppData } = JSON.parse(raw)

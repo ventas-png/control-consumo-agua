@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
 import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa, Contador, Unidad, Proyecto, UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
@@ -180,7 +180,7 @@ export function LecturasSection({
       ? calcularTotalPagar(consumo, tarifaDelContador.precio_m3, tarifaDelContador.canon_fijo, tarifaDelContador.consumo_minimo ?? 0, tarifaDelContador.precio_m3_exceso ?? 0, contadorSeleccionado?.cantidad_derecho_servicio_m3 ?? null)
       : null
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  function handlePhoto(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
     const reader = new FileReader()
@@ -392,8 +392,8 @@ export function LecturasSection({
     setContadoresLeidos(new Set())
   }
 
-  const inputStyle: React.CSSProperties = { padding: '12px 16px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
-  const labelStyle: React.CSSProperties = { fontSize: '14px', fontWeight: 600, color: '#4a5568', marginBottom: '6px', display: 'block' }
+  const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '14px', fontWeight: 600, color: '#4a5568', marginBottom: '6px', display: 'block' }
 
   const consumoInvalido = consumo !== null && consumo < 0
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 import { logSecurityEvent } from '../../lib/security'
@@ -69,7 +69,7 @@ export function PasswordResetPage({ token, onBack }: Props) {
     }
   }
 
-  const cardStyle: React.CSSProperties = {
+  const cardStyle: CSSProperties = {
     maxWidth: '500px', margin: '40px auto', background: 'white',
     borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
   }

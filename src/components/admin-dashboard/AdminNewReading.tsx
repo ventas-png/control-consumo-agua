@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ChangeEvent, type FormEvent} from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 import type { Cliente, Contador, Tarifa } from '../../types'
@@ -36,7 +36,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
     ? calcularTotalPagar(consumo, tariffPrice, canolFixed)
     : { total: 0, tipo_cobro: 'Sin datos' as const, desglose: {} }
 
-  const handleSelectImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelectImage = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       const reader = new FileReader()
@@ -50,7 +50,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
 
     if (!selectedClienteId || !lecturaAnterior || !lecturaActual) {

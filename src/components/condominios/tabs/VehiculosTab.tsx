@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { VehiculoResidente } from '../../../types'
 import type { Unidad } from '../../../types'
@@ -79,7 +79,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
   if (filtroTipo !== 'todos') filtered = filtered.filter(v => v.tipo === filtroTipo)
   if (soloActivos) filtered = filtered.filter(v => v.activo)
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
 
   const totalActivos = vehiculos.filter(v => v.activo).length
 

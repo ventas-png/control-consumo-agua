@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { DocumentoCondominio, CategoriaDocumento, VisibilidadDocumento } from '../../../types'
 import Swal from 'sweetalert2'
@@ -96,8 +96,8 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
   const catInfo = (c: CategoriaDocumento) => CATEGORIAS.find(x => x.value === c) ?? CATEGORIAS[CATEGORIAS.length - 1]
   const visInfo = (v: VisibilidadDocumento) => VISIBILIDAD.find(x => x.value === v) ?? VISIBILIDAD[0]
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
-  const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px', display: 'block' }
 
   // Group by category for display
   const grouped = filtered.reduce<Record<string, DocumentoCondominio[]>>((acc, d) => {

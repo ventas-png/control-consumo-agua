@@ -151,8 +151,8 @@ export default function TarifasTab({
       if (error) throw error
       onTarifaAdded(data as TarifaEnergia)
       Swal.fire({ icon: 'success', title: 'Tarifa creada', timer: 1500, showConfirmButton: false })
-    } catch (err: any) {
-      Swal.fire('Error', err.message ?? 'No se pudo crear la tarifa', 'error')
+    } catch (err: unknown) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo crear la tarifa', 'error')
     }
   }
 
@@ -172,8 +172,8 @@ export default function TarifasTab({
       onTarifaUpdated(editingId, editFormData)
       setEditingId(null)
       Swal.fire({ icon: 'success', title: 'Tarifa actualizada', timer: 1500, showConfirmButton: false })
-    } catch (err: any) {
-      Swal.fire('Error', err.message ?? 'No se pudo actualizar la tarifa', 'error')
+    } catch (err: unknown) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo actualizar la tarifa', 'error')
     }
   }
 
@@ -193,8 +193,8 @@ export default function TarifasTab({
       if (error) throw error
       onTarifaDeleted(id)
       Swal.fire({ icon: 'success', title: 'Tarifa eliminada', timer: 1500, showConfirmButton: false })
-    } catch (err: any) {
-      Swal.fire('Error', err.message ?? 'No se pudo eliminar la tarifa', 'error')
+    } catch (err: unknown) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo eliminar la tarifa', 'error')
     }
   }
 

@@ -267,7 +267,7 @@ export function SeguridadTab({
     setSearching(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
     if (data && data.length > 0) {
-      const mapped = data.map((v: any) => ({ ...v, unidad_nombre: v.unidades?.nombre }))
+      const mapped = data.map((v: Visitante & { unidades?: { nombre: string } }) => ({ ...v, unidad_nombre: v.unidades?.nombre }))
       setSearchResultVisitantes(mapped)
       setSearchResult('found')
       const latest = mapped[0]

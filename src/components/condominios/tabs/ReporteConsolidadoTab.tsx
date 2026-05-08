@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode} from 'react'
 import type {
   CuotaCondominio, GastoCondominio, TicketMantenimiento, PresupuestoCondominio,
   Visitante, NovedadSeguridad, RondaSeguridad, AnuncioComunidad,
@@ -38,7 +38,7 @@ function KpiBox({ label, value, sub, color = '#0f172a', bg = 'white', border = '
   )
 }
 
-function Section({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
+function Section({ title, icon, children }: { title: string; icon: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: '28px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', paddingBottom: '8px', borderBottom: '2px solid #e2e8f0' }}>

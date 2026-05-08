@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode, type FormEvent} from 'react'
 import type { UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 
@@ -47,7 +47,7 @@ function FeedbackMsg({ fb }: { fb: FeedbackState }) {
   )
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{
       background: 'white',
@@ -74,7 +74,7 @@ function InputField({
   onChange?: (v: string) => void
   placeholder?: string
   disabled?: boolean
-  rightEl?: React.ReactNode
+  rightEl?: ReactNode
 }) {
   return (
     <div style={{ marginBottom: '14px' }}>
@@ -148,7 +148,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   const [nameLoading, setNameLoading] = useState(false)
   const [nameFb, setNameFb] = useState<FeedbackState>(null)
 
-  async function handleNameSubmit(e: React.FormEvent) {
+  async function handleNameSubmit(e: FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
     setNameLoading(true)
@@ -166,7 +166,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   const [pwLoading, setPwLoading] = useState(false)
   const [pwFb, setPwFb] = useState<FeedbackState>(null)
 
-  async function handlePasswordSubmit(e: React.FormEvent) {
+  async function handlePasswordSubmit(e: FormEvent) {
     e.preventDefault()
     setPwFb(null)
     if (pwNew.length < 8) { setPwFb({ type: 'error', msg: 'La nueva contraseña debe tener al menos 8 caracteres' }); return }
@@ -197,7 +197,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   const [emailLoading, setEmailLoading] = useState(false)
   const [emailFb, setEmailFb] = useState<FeedbackState>(null)
 
-  async function handleEmailSubmit(e: React.FormEvent) {
+  async function handleEmailSubmit(e: FormEvent) {
     e.preventDefault()
     setEmailFb(null)
     if (!newEmail.trim() || !newEmail.includes('@')) { setEmailFb({ type: 'error', msg: 'Ingresa un correo electrónico válido' }); return }

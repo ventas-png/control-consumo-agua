@@ -57,7 +57,7 @@ export default function FacturasTab({
     setModalOpen(true)
   }
 
-  const handleSaveFactura = async (formData: any) => {
+  const handleSaveFactura = async (formData: Partial<FacturaEnergia>) => {
     try {
       if (editingFactura?.id) {
         const { error } = await supabase
@@ -84,8 +84,8 @@ export default function FacturasTab({
         if (data) onFacturaAdded(data[0] as FacturaEnergia)
         Swal.fire({ icon: 'success', title: 'Factura creada', timer: 1500, showConfirmButton: false })
       }
-    } catch (err: any) {
-      Swal.fire('Error', err.message || 'No se pudo guardar la factura', 'error')
+    } catch (err: unknown) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo guardar la factura', 'error')
     }
   }
 
@@ -106,8 +106,8 @@ export default function FacturasTab({
       if (error) throw error
       onFacturaDeleted(id)
       Swal.fire('Éxito', 'Factura eliminada', 'success')
-    } catch (err: any) {
-      Swal.fire('Error', err.message || 'No se pudo eliminar la factura', 'error')
+    } catch (err: unknown) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo eliminar la factura', 'error')
     }
   }
 

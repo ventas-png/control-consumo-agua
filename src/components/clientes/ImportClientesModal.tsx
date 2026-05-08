@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, type CSSProperties, type ChangeEvent, type DragEvent} from 'react'
 import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import type { Cliente } from '../../types'
@@ -278,12 +278,12 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
     reader.readAsArrayBuffer(file)
   }
 
-  function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileInput(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) processFile(file)
   }
 
-  function handleDrop(e: React.DragEvent) {
+  function handleDrop(e: DragEvent) {
     e.preventDefault()
     setDragOver(false)
     const file = e.dataTransfer.files?.[0]
@@ -367,39 +367,39 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
   }
 
   // ── Styles ───────────────────────────────────────────────────────────────────
-  const overlayStyle: React.CSSProperties = {
+  const overlayStyle: CSSProperties = {
     position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     zIndex: 1000, padding: '16px',
   }
-  const modalStyle: React.CSSProperties = {
+  const modalStyle: CSSProperties = {
     background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '860px',
     maxHeight: '90vh', display: 'flex', flexDirection: 'column',
     boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
   }
-  const headerStyle: React.CSSProperties = {
+  const headerStyle: CSSProperties = {
     padding: '24px 28px 20px', borderBottom: '1px solid #e2e8f0',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   }
-  const bodyStyle: React.CSSProperties = {
+  const bodyStyle: CSSProperties = {
     padding: '24px 28px', overflowY: 'auto', flex: 1,
   }
-  const footerStyle: React.CSSProperties = {
+  const footerStyle: CSSProperties = {
     padding: '16px 28px', borderTop: '1px solid #e2e8f0',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px',
     flexWrap: 'wrap',
   }
-  const btnPrimary: React.CSSProperties = {
+  const btnPrimary: CSSProperties = {
     padding: '10px 22px', background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
     color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600,
     fontSize: '14px', cursor: 'pointer',
   }
-  const btnSecondary: React.CSSProperties = {
+  const btnSecondary: CSSProperties = {
     padding: '10px 22px', background: '#f1f5f9', color: '#475569',
     border: '1px solid #e2e8f0', borderRadius: '8px', fontWeight: 600,
     fontSize: '14px', cursor: 'pointer',
   }
-  const btnDanger: React.CSSProperties = {
+  const btnDanger: CSSProperties = {
     padding: '10px 22px', background: '#fef2f2', color: '#b91c1c',
     border: '1px solid #fecaca', borderRadius: '8px', fontWeight: 600,
     fontSize: '14px', cursor: 'pointer',
@@ -407,7 +407,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
 
   const { yaExisten, nuevos, conErrores } = analyzed
 
-  const tabStyle = (active: boolean): React.CSSProperties => ({
+  const tabStyle = (active: boolean): CSSProperties => ({
     padding: '8px 16px',
     border: 'none',
     borderBottom: active ? '2px solid #0ea5e9' : '2px solid transparent',

@@ -125,7 +125,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
 
         <select
           value={filterEstado}
-          onChange={(e) => setFilterEstado(e.target.value as any)}
+          onChange={(e) => setFilterEstado(e.target.value as 'todos' | 'pagado' | 'pendiente' | 'mora')}
           style={{
             padding: '12px 16px',
             borderRadius: '8px',

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode} from 'react'
 import type { AppSection, UserRole, UserSession } from '../../types'
 import { WATER_MODULE_KEYS, CONDOMINIOS_MODULE_KEYS } from '../../lib/moduleConfig'
 
@@ -6,7 +6,7 @@ interface Tab {
   id: AppSection
   label: string
   roles: UserRole[]
-  icon: React.ReactNode
+  icon: ReactNode
 }
 
 type NavEntry =

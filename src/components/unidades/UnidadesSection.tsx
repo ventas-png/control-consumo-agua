@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
 import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, UserSession, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
@@ -467,7 +467,7 @@ export function UnidadesSection({
     max: effectiveMax?.[t.value as TipoUnidad] ?? null,
   })).filter(t => t.total > 0 || (t.max !== null))
 
-  const inputStyle: React.CSSProperties = {
+  const inputStyle: CSSProperties = {
     padding: '10px 14px',
     border: '2px solid #e2e8f0',
     borderRadius: '8px',
@@ -476,7 +476,7 @@ export function UnidadesSection({
     boxSizing: 'border-box',
     outline: 'none',
   }
-  const labelStyle: React.CSSProperties = {
+  const labelStyle: CSSProperties = {
     fontSize: '13px',
     fontWeight: 600,
     color: '#4a5568',

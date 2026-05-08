@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { MiembroJunta, CargoJunta, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
@@ -92,7 +92,7 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
     onRefresh()
   }
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
 
   const sortedActivos = [...activos].sort((a, b) => CARGO_ORDER.indexOf(a.cargo) - CARGO_ORDER.indexOf(b.cargo))
 

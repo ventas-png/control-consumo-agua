@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ConsumoEnergiaArea } from '../../../types'
 import Swal from 'sweetalert2'
@@ -20,7 +20,7 @@ const TIPO_STYLE: Record<string, { label: string; icon: string; bg: string; colo
   otro:         { label: 'Otro',         icon: '📊', bg: '#f3e8ff', color: '#7c3aed', unidadDefault: 'unidad' },
 }
 
-const inputStyle: React.CSSProperties = {
+const inputStyle: CSSProperties = {
   width: '100%', padding: '7px 10px', border: '1.5px solid #e2e8f0',
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }

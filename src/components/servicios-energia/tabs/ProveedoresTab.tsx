@@ -106,8 +106,8 @@ export default function ProveedoresTab({
       if (error) throw error
       onProveedorAdded(data as ProveedorEnergia)
       Swal.fire({ icon: 'success', title: 'Proveedor creado', timer: 1500, showConfirmButton: false })
-    } catch (err: any) {
-      Swal.fire('Error', err.message ?? 'No se pudo crear el proveedor', 'error')
+    } catch (err: unknown) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo crear el proveedor', 'error')
     }
   }
 
@@ -127,8 +127,8 @@ export default function ProveedoresTab({
       onProveedorUpdated(editingId, editFormData)
       setEditingId(null)
       Swal.fire({ icon: 'success', title: 'Proveedor actualizado', timer: 1500, showConfirmButton: false })
-    } catch (err: any) {
-      Swal.fire('Error', err.message ?? 'No se pudo actualizar el proveedor', 'error')
+    } catch (err: unknown) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo actualizar el proveedor', 'error')
     }
   }
 
@@ -148,8 +148,8 @@ export default function ProveedoresTab({
       if (error) throw error
       onProveedorDeleted(id)
       Swal.fire({ icon: 'success', title: 'Proveedor eliminado', timer: 1500, showConfirmButton: false })
-    } catch (err: any) {
-      Swal.fire('Error', err.message ?? 'No se pudo eliminar el proveedor', 'error')
+    } catch (err: unknown) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo eliminar el proveedor', 'error')
     }
   }
 

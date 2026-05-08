@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
 import type { FuenteAgua, RegistroCalidad, TipoAgua } from '../../types'
 import { supabase } from '../../lib/supabase'
@@ -172,7 +172,7 @@ export function CalidadSection({
     }
   }
 
-  function handleReporteFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleReporteFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 5 * 1024 * 1024) { Swal.fire('Archivo muy grande', 'El archivo no debe superar 5 MB.', 'error'); e.target.value = ''; return }
@@ -250,8 +250,8 @@ export function CalidadSection({
     link.click()
   }
 
-  const inputStyle: React.CSSProperties = { padding: '12px 16px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
-  const labelStyle: React.CSSProperties = { fontSize: '14px', fontWeight: 600, color: '#4a5568', marginBottom: '6px', display: 'block' }
+  const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '14px', fontWeight: 600, color: '#4a5568', marginBottom: '6px', display: 'block' }
 
   const cvl = cumplimientoEnVivo()
 

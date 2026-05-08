@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import type { FacturaEnergia, FuenteEnergia, TarifaEnergia, ProveedorEnergia } from '../../types'
 import Swal from 'sweetalert2'
 import { calcularFacturaEnergia } from '../../lib/businessEnergia'
@@ -11,7 +11,7 @@ interface FacturaEnergiaModalProps {
   proveedoresEnergia: ProveedorEnergia[]
   moneda: string
   onClose: () => void
-  onSave: (factura: any) => Promise<void>
+  onSave: (factura: Partial<FacturaEnergia>) => Promise<void>
   isEditing?: boolean
 }
 
@@ -64,7 +64,7 @@ export default function FacturaEnergiaModal({
     Swal.fire('Éxito', 'Montos calculados desde la tarifa', 'success')
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
@@ -82,7 +82,7 @@ export default function FacturaEnergiaModal({
         kwh_consumidos: parseFloat(String(formData.kwh_consumidos || 0)),
         kwh_generados: parseFloat(String(formData.kwh_generados || 0)),
         kwh_exportados: parseFloat(String(formData.kwh_exportados || 0)),
-        kw_demanda_max: formData.kw_demanda_max ? parseFloat(String(formData.kw_demanda_max)) : null,
+        kw_demanda_max: formData.kw_demanda_max ? parseFloat(String(formData.kw_demanda_max)) : undefined,
         monto_energia: parseFloat(String(formData.monto_energia || 0)),
         monto_potencia: parseFloat(String(formData.monto_potencia || 0)),
         monto_cargo_fijo: parseFloat(String(formData.monto_cargo_fijo || 0)),
@@ -95,8 +95,8 @@ export default function FacturaEnergiaModal({
 
       await onSave(dataToSave)
       onClose()
-    } catch (err: any) {
-      Swal.fire('Error', err.message || 'No se pudo guardar la factura', 'error')
+    } catch (err: unknown) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo guardar la factura', 'error')
     } finally {
       setLoading(false)
     }

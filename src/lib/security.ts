@@ -1,12 +1,17 @@
 import { supabase } from './supabase'
 
+const IP_CACHE_KEY = 'aq:client_ip'
+
 async function getClientIP(): Promise<string> {
+  const cached = sessionStorage.getItem(IP_CACHE_KEY)
+  if (cached) return cached
   try {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 3000)
     const response = await fetch('https://api.ipify.org?format=json', { signal: controller.signal })
     clearTimeout(timeoutId)
     const data = await response.json() as { ip: string }
+    sessionStorage.setItem(IP_CACHE_KEY, data.ip)
     return data.ip
   } catch {
     return 'unknown'

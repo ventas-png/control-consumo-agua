@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
@@ -114,7 +114,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     })
   }
 
-  function handleCSVFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleCSVFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()

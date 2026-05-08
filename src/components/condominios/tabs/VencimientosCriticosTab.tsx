@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import { useState, useMemo, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
 import {
@@ -134,8 +134,8 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
     onRefresh()
   }
 
-  const inp: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: React.CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
 
   const ORIGEN_LABEL = { todos: 'Todos', poliza: 'Pólizas', contrato: 'Contratos', inspeccion: 'Inspecciones', extra: 'Manuales' }
   const PLAZO_LABEL = { todos: 'Todos', vencido: 'Vencidos', '30': '≤ 30 días', '60': '≤ 60 días', '90': '≤ 90 días' }
