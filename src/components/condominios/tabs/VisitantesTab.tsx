@@ -25,7 +25,7 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   const [saving, setSaving] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [soloActivos, setSoloActivos] = useState(false)
-  const [filtroFecha, setFiltroFecha] = useState<FiltroFecha>('todos')
+  const [filtroFecha, setFiltroFecha] = useState<FiltroFecha>('hoy')
   const [salidaPendiente, setSalidaPendiente] = useState<Visitante | null>(null)
   const [modoSalida, setModoSalida] = useState<'idle' | 'sin_novedad' | 'con_novedad'>('idle')
   const [guardandoSalida, setGuardandoSalida] = useState(false)
