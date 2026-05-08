@@ -54,7 +54,7 @@ export function SuperAdminSection() {
         .order('nombre')
       if (fallbackData) {
         companiesData = (fallbackData as (Omit<Empresa, 'max_units'> & { servicio_agua?: boolean; servicio_condominios?: boolean })[])
-          .map(c => ({ ...normalizeFlags(c), max_units: 50 }))
+          .map(c => ({ ...normalizeFlags(c as unknown as RawEmpresa), max_units: 50 }))
       }
       setMaxUnitsSupported(false)
     }
