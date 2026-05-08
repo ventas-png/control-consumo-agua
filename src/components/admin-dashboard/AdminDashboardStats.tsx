@@ -14,7 +14,18 @@ export function AdminDashboardStats({ registros, moneda, clientes }: Props) {
   const consumoTotal = mesActual.reduce((acc, r) => acc + (parseFloat(String(r.consumo)) || 0), 0)
 
   const recaudoTotal = mesActual.reduce((acc, r) => {
-    const monto = r.monto_calculado ?? calcularTotalPagar(r.consumo, r.tarifa_aplicada, r.canon_aplicado ?? 20).total
+    const monto =
+      r.monto_calculado > 0
+        ? r.monto_calculado
+        : (r.tarifa_aplicada > 0 || r.canon_aplicado > 0)
+          ? calcularTotalPagar(
+              r.consumo,
+              r.tarifa_aplicada,
+              r.canon_aplicado ?? 0,
+              0,
+              r.tarifa_exceso_aplicada ?? 0
+            ).total
+          : 0
     return acc + monto
   }, 0)
 

@@ -133,9 +133,14 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
     ? data.clientes.filter(c => clienteIdsEnProyecto.has(c.id))
     : data.clientes
 
-  // Filtrar registros por proyecto
+  // Filtrar registros por proyecto — usa project_id directo cuando está disponible,
+  // con fallback a la cadena cliente→unidad para registros históricos sin project_id
   const registrosFiltrados = selectedProjectId
-    ? data.registros.filter(r => clienteIdsEnProyecto.has(r.cliente_id))
+    ? data.registros.filter(r =>
+        r.project_id
+          ? r.project_id === selectedProjectId
+          : clienteIdsEnProyecto.has(r.cliente_id)
+      )
     : data.registros
 
   // Filtrar unidades y contadores por proyecto
