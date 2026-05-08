@@ -1,13 +1,25 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import type { Visitante, Unidad } from '../../../types'
+import type { Visitante, Unidad, ReservaSTR } from '../../../types'
 import { ImageUploader, MultiImageUploader } from '../ImageUploader'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
+
+const PLATAFORMA_LABEL: Record<string, string> = {
+  airbnb: 'Airbnb', booking: 'Booking.com', vrbo: 'VRBO', directo: 'Directo', otro: 'Otro',
+}
+const PLATAFORMA_COLOR: Record<string, { bg: string; color: string }> = {
+  airbnb:  { bg: '#fff1f2', color: '#e11d48' },
+  booking: { bg: '#eff6ff', color: '#2563eb' },
+  vrbo:    { bg: '#f0fdf4', color: '#16a34a' },
+  directo: { bg: '#f5f3ff', color: '#7c3aed' },
+  otro:    { bg: '#f8fafc', color: '#475569' },
+}
 
 interface Props {
   visitantes: Visitante[]
   unidades: Unidad[]
+  reservasSTR: ReservaSTR[]
   proyectoId: string
   companyId: string
   userId: string
@@ -20,7 +32,7 @@ type FiltroFecha = 'hoy' | 'semana' | 'mes' | 'todos'
 type TipoNovedad = 'incidente' | 'observacion' | 'alarma' | 'acceso' | 'otro'
 type PrioridadNovedad = 'normal' | 'alta' | 'critica'
 
-export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, userId, proyectoNombre = 'Condominio', canCreate, onRefresh }: Props) {
+export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, companyId, userId, proyectoNombre = 'Condominio', canCreate, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [busqueda, setBusqueda] = useState('')
@@ -36,6 +48,9 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
   const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
   const [fotoVehiculoUrl, setFotoVehiculoUrl] = useState<string | null>(null)
   const [fotosExpiradas, setFotosExpiradas] = useState<{ foto: boolean; documento: boolean; vehiculo: boolean }>({ foto: false, documento: false, vehiculo: false })
+  const [showStrModal, setShowStrModal] = useState(false)
+  const [strSearch, setStrSearch] = useState('')
+  const [strIngresados, setStrIngresados] = useState<Set<string>>(new Set())
   const [form, setForm] = useState({
     unidad_id: '',
     nombre: '',
@@ -94,6 +109,26 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
     setFotoVehiculoUrl(null)
     setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
     setShowForm(false)
+  }
+
+  function precargarDesdeSTR(r: ReservaSTR) {
+    const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
+    setForm({
+      nombre: r.huesped_nombre,
+      unidad_id: r.unidad_id ?? '',
+      placa_vehiculo: '',
+      motivo: `Renta corta · ${PLATAFORMA_LABEL[r.plataforma] ?? r.plataforma}`,
+      notas: `Entrada: ${r.fecha_entrada} · Salida: ${r.fecha_salida} (${noches} noche${noches !== 1 ? 's' : ''})`,
+      identificacion: '',
+    })
+    setFotoUrl(null)
+    setFotoDocumentoUrl(null)
+    setFotoVehiculoUrl(null)
+    setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
+    setStrIngresados(prev => new Set([...prev, r.id]))
+    setShowStrModal(false)
+    setStrSearch('')
+    setShowForm(true)
   }
 
   function autocompletar(v: Visitante) {
@@ -262,6 +297,12 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
             style={{ padding: '9px 14px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             📊 Excel
           </button>
+          {canCreate && reservasSTR.some(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy) && (
+            <button onClick={() => setShowStrModal(true)}
+              style={{ padding: '10px 16px', background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              🏠 Renta corta
+            </button>
+          )}
           {canCreate && (
             <button onClick={() => setShowForm(true)}
               style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
@@ -309,6 +350,88 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
           Solo en premisas
         </label>
       </div>
+
+      {/* STR selection modal */}
+      {showStrModal && (
+        <div onClick={e => { if (e.target === e.currentTarget) { setShowStrModal(false); setStrSearch('') } }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '620px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '16px', overflow: 'hidden' }}>
+            <div style={{ background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Renta Corta</div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'white' }}>🏠 Registrar ingreso STR</h3>
+              </div>
+              <button onClick={() => { setShowStrModal(false); setStrSearch('') }}
+                style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', fontSize: 18, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                ×
+              </button>
+            </div>
+            <div style={{ padding: '20px 24px' }}>
+              <input value={strSearch} onChange={e => setStrSearch(e.target.value)}
+                placeholder="Buscar por nombre de huésped o unidad..."
+                autoFocus
+                style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', background: '#f8fafc', marginBottom: '14px' }} />
+              {(() => {
+                const reservasFiltradas = reservasSTR
+                  .filter(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy && !strIngresados.has(r.id))
+                  .filter(r => !strSearch || r.huesped_nombre.toLowerCase().includes(strSearch.toLowerCase()) || (r.unidad_nombre ?? '').toLowerCase().includes(strSearch.toLowerCase()))
+                  .sort((a, b) => {
+                    const aHoy = a.fecha_entrada <= hoy
+                    const bHoy = b.fecha_entrada <= hoy
+                    if (aHoy !== bHoy) return aHoy ? -1 : 1
+                    return a.fecha_entrada.localeCompare(b.fecha_entrada)
+                  })
+                if (reservasFiltradas.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94a3b8' }}>
+                      <div style={{ fontSize: '32px', marginBottom: '10px' }}>🏠</div>
+                      <p style={{ fontWeight: 600, color: '#64748b', margin: 0 }}>
+                        {strSearch ? 'No se encontraron reservas con ese nombre' : 'No hay reservas STR activas o próximas'}
+                      </p>
+                    </div>
+                  )
+                }
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto' }}>
+                    {reservasFiltradas.map(r => {
+                      const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
+                      const plat = PLATAFORMA_COLOR[r.plataforma] ?? PLATAFORMA_COLOR.otro
+                      const enCurso = r.estado === 'en_curso'
+                      const ingresoHabilitado = r.fecha_entrada <= hoy
+                      return (
+                        <div key={r.id} style={{ background: enCurso ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${enCurso ? '#86efac' : '#e2e8f0'}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{r.huesped_nombre}</span>
+                              <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: plat.bg, color: plat.color }}>
+                                {PLATAFORMA_LABEL[r.plataforma] ?? r.plataforma}
+                              </span>
+                              {enCurso && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#dcfce7', color: '#16a34a' }}>En curso</span>}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                              {r.unidad_nombre && <span>🏠 {r.unidad_nombre}</span>}
+                              <span>📅 {r.fecha_entrada} → {r.fecha_salida} · {noches} noche{noches !== 1 ? 's' : ''}</span>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                            <button onClick={() => ingresoHabilitado && precargarDesdeSTR(r)}
+                              title={!ingresoHabilitado ? `Ingreso habilitado desde: ${r.fecha_entrada}` : undefined}
+                              style={{ padding: '7px 14px', background: ingresoHabilitado ? 'linear-gradient(135deg,#7c3aed,#6d28d9)' : '#f1f5f9', color: ingresoHabilitado ? 'white' : '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: ingresoHabilitado ? 'pointer' : 'not-allowed', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                              Registrar ingreso
+                            </button>
+                            {!ingresoHabilitado && <span style={{ fontSize: 10, color: '#94a3b8' }}>Desde {r.fecha_entrada}</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Form modal */}
       {showForm && (
