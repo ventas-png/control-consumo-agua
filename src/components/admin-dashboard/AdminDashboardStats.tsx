@@ -9,7 +9,7 @@ interface Props {
 
 export function AdminDashboardStats({ registros, moneda, clientes }: Props) {
   const hoy = new Date()
-  const mesActual = registros.filter(r => new Date(r.fecha).getMonth() === hoy.getMonth())
+  const mesActual = registros.filter(r => { const d = new Date(r.fecha); return d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear() })
 
   const consumoTotal = mesActual.reduce((acc, r) => acc + (parseFloat(String(r.consumo)) || 0), 0)
 

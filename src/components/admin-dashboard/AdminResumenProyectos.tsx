@@ -28,7 +28,7 @@ interface ProyectoStats {
 
 export function AdminResumenProyectos({ registros, contadores, proyectos, unidades, moneda }: Props) {
   const hoy = new Date()
-  const mesActual = registros.filter(r => new Date(r.fecha).getMonth() === hoy.getMonth())
+  const mesActual = registros.filter(r => { const d = new Date(r.fecha); return d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear() })
 
   // contador_id → tipo_agua (for typology breakdown)
   const contadorTipoMap = new Map<string, TipoAgua>()
