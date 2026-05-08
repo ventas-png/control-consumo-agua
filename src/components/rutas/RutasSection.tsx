@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type CSSProperties, type DragEvent} from 'react'
 import Swal from 'sweetalert2'
 import type { Cliente, Contador, Unidad, Proyecto, Ruta, UserRole } from '../../types'
 import { supabase } from '../../lib/supabase'
@@ -77,7 +77,7 @@ export function RutasSection({
       })
   }, [])
 
-  const inputStyle: React.CSSProperties = {
+  const inputStyle: CSSProperties = {
     padding: '10px 14px',
     border: '2px solid #e2e8f0',
     borderRadius: '8px',
@@ -85,7 +85,7 @@ export function RutasSection({
     width: '100%',
     boxSizing: 'border-box',
   }
-  const labelStyle: React.CSSProperties = {
+  const labelStyle: CSSProperties = {
     fontSize: '13px',
     fontWeight: 600,
     color: '#4a5568',
@@ -200,7 +200,7 @@ export function RutasSection({
     setDraggingIdx(idx)
   }
 
-  function handleDragOver(e: React.DragEvent, idx: number) {
+  function handleDragOver(e: DragEvent, idx: number) {
     e.preventDefault()
     dragOver.current = idx
   }

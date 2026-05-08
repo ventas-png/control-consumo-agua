@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent} from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente, FormaPago, TipoAplicacion } from '../../types'
@@ -31,7 +31,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
   const nuevoAbonado = abonado + montoNum
   const esPagoCompleto = nuevoAbonado >= total
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (montoNum <= 0) {
       void Swal.fire({ icon: 'warning', title: 'Monto inválido', text: 'El monto debe ser mayor a 0' })

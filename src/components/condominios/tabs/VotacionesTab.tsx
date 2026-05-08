@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { Votacion, Voto, Unidad, Asamblea, TipoVotacion } from '../../../types'
 import Swal from 'sweetalert2'
@@ -99,7 +99,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
     onRefresh()
   }
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
 
   const totalVotos = votos.length
   const counts = votacion ? votacion.opciones.map(o => ({ id: o.id, texto: o.texto, count: votos.filter(v => v.opcion_id === o.id).length })) : []

@@ -1,33 +1,21 @@
 import { supabase } from './supabase'
 
-async function getClientIP(): Promise<string> {
-  try {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 3000)
-    const response = await fetch('https://api.ipify.org?format=json', { signal: controller.signal })
-    clearTimeout(timeoutId)
-    const data = await response.json() as { ip: string }
-    return data.ip
-  } catch {
-    return 'unknown'
-  }
-}
-
 export async function logSecurityEvent(
   eventType: string,
   details: Record<string, unknown>,
   userId?: string
 ): Promise<void> {
   try {
-    const clientIP = await getClientIP()
-    await supabase.from('security_logs').insert({
-      user_id: userId ?? null,
-      event_type: eventType,
-      details,
-      ip_address: clientIP,
-      user_agent: navigator.userAgent,
-      timestamp: new Date().toISOString(),
+    // IP is captured server-side from request headers — no client-side IP lookup needed
+    const { error } = await supabase.functions.invoke('log-security-event', {
+      body: {
+        event_type: eventType,
+        details,
+        user_id: userId ?? null,
+        user_agent: navigator.userAgent,
+      },
     })
+    if (error) throw error
   } catch (error) {
     console.error('Failed to log security event:', error)
   }

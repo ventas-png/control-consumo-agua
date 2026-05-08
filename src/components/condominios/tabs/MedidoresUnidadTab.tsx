@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { MedidorUnidad, Unidad, Contador } from '../../../types'
 import Swal from 'sweetalert2'
@@ -80,7 +80,7 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
     onRefresh()
   }
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
 
   const activosCount  = medidores.filter(m => m.activo).length
   const totalConsumo  = consumos.reduce((s, c) => s + c.consumo_total, 0)

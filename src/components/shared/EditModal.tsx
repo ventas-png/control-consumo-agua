@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, type ReactNode } from 'react'
+import { useEffect, useRef, useCallback, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 
 interface EditModalProps {
   title: string
@@ -11,7 +11,7 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
   const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
+    function handleKeyDown(e: globalThis.KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', handleKeyDown)
@@ -19,7 +19,7 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
   }, [onClose])
 
   // Focus trap: keep Tab cycling within the modal
-  const handleFocusTrap = useCallback((e: React.KeyboardEvent) => {
+  const handleFocusTrap = useCallback((e: ReactKeyboardEvent) => {
     if (e.key !== 'Tab' || !dialogRef.current) return
     const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'

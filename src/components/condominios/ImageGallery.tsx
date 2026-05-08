@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type KeyboardEvent} from 'react'
 
 interface Props {
   urls: string[]
@@ -16,7 +16,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
   function prev() { setLightbox(i => (i! > 0 ? i! - 1 : urls.length - 1)) }
   function next() { setLightbox(i => (i! < urls.length - 1 ? i! + 1 : 0)) }
 
-  function onKeyDown(e: React.KeyboardEvent) {
+  function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'ArrowLeft') prev()
     else if (e.key === 'ArrowRight') next()
     else if (e.key === 'Escape') setLightbox(null)

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactElement} from 'react'
 import { CuotaCondominio, GastoCondominio, Unidad } from '../../../types'
 
 interface Props {
@@ -206,7 +206,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
                 </tr>
               </thead>
               <tbody>
-                {proyeccion.reduce<{ rows: React.ReactElement[]; acum: number }>((acc, p, i) => {
+                {proyeccion.reduce<{ rows: ReactElement[]; acum: number }>((acc, p, i) => {
                   acc.acum += p.superavit
                   acc.rows.push(
                     <tr key={i} style={{ borderTop: '1px solid #f1f5f9', background: p.superavit < 0 ? '#fef2f2' : undefined }}>

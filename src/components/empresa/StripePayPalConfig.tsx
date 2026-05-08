@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 import type { CompanyPaymentConfig } from '../../types'
@@ -25,7 +25,7 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-  } as React.CSSProperties,
+  } as CSSProperties,
   subtitle: { fontSize: '13px', color: '#64748b', marginTop: '4px' },
   label: {
     display: 'block',
@@ -33,7 +33,7 @@ const s = {
     fontWeight: 700,
     color: '#475569',
     marginBottom: '8px',
-  } as React.CSSProperties,
+  } as CSSProperties,
   input: {
     width: '100%',
     padding: '12px',
@@ -52,7 +52,7 @@ const s = {
     fontFamily: 'monospace',
   },
   hint: { fontSize: '11px', color: '#94a3b8', marginTop: '6px' },
-  warning: { fontSize: '11px', color: '#ef4444', marginTop: '6px', fontWeight: 600 } as React.CSSProperties,
+  warning: { fontSize: '11px', color: '#ef4444', marginTop: '6px', fontWeight: 600 } as CSSProperties,
   link: { color: '#0ea5e9' },
   toggleSecretBtn: {
     position: 'absolute',
@@ -64,7 +64,7 @@ const s = {
     cursor: 'pointer',
     fontSize: '16px',
     color: '#64748b',
-  } as React.CSSProperties,
+  } as CSSProperties,
   editBtn: {
     fontSize: '13px',
     color: '#0ea5e9',
@@ -73,7 +73,7 @@ const s = {
     cursor: 'pointer',
     fontWeight: 600,
     marginBottom: '16px',
-  } as React.CSSProperties,
+  } as CSSProperties,
   fieldGroup: { marginBottom: '20px' },
   fieldGroupLast: { marginBottom: '24px' },
   validationError: { fontSize: '11px', color: '#ef4444', marginTop: '4px' },
@@ -87,7 +87,7 @@ function badge(configured: boolean) {
     fontWeight: 700,
     background: configured ? '#f0fdf4' : '#fee2e2',
     color: configured ? '#15803d' : '#991b1b',
-  } as React.CSSProperties
+  } as CSSProperties
 }
 
 function toggleBtn(active: boolean, saving: boolean) {
@@ -101,7 +101,7 @@ function toggleBtn(active: boolean, saving: boolean) {
     fontSize: '13px',
     cursor: saving ? 'not-allowed' : 'pointer',
     whiteSpace: 'nowrap',
-  } as React.CSSProperties
+  } as CSSProperties
 }
 
 function primaryBtn(disabled: boolean) {
@@ -115,7 +115,7 @@ function primaryBtn(disabled: boolean) {
     fontWeight: 700,
     fontSize: '14px',
     cursor: disabled ? 'not-allowed' : 'pointer',
-  } as React.CSSProperties
+  } as CSSProperties
 }
 
 // -- Validation helpers ------------------------------------------------------

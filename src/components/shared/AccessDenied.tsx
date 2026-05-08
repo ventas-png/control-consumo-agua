@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react'
 import type { UserRole } from '../../types'
 
 interface Props {
   userRole: UserRole
   allowedRoles: UserRole[]
-  children: React.ReactNode
+  children: ReactNode
 }
 
 export function RoleGuard({ userRole, allowedRoles, children }: Props) {

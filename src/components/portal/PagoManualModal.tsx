@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 import type { Registro, UserSession, FormaPago } from '../../types'
@@ -35,7 +35,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
   const abonado = registro.monto_pagado ?? 0
   const saldo = Math.max(0, total - abonado)
 
-  function handleSelectFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleSelectFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) {
       setAdjunto(file)

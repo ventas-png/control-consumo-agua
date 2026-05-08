@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent} from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente } from '../../types'
@@ -29,7 +29,7 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
   const [notas, setNotas] = useState('')
   const [saving, setSaving] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!numeroConvenio.trim()) return
 

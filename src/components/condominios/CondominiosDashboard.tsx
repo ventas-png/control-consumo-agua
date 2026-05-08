@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type CSSProperties} from 'react'
 import type { UserSession, Proyecto, Unidad, AppSection } from '../../types'
 import { supabase } from '../../lib/supabase'
 
@@ -136,7 +136,7 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
     { label: 'Módulo Completo', icon: '🏢', section: 'condominios' as AppSection },
   ]
 
-  const cardStyle = (from: string, to: string): React.CSSProperties => ({
+  const cardStyle = (from: string, to: string): CSSProperties => ({
     background: `linear-gradient(135deg, ${from}, ${to})`,
     borderRadius: '16px', padding: '24px', color: 'white',
     boxShadow: '0 10px 30px rgba(0,0,0,0.1)',

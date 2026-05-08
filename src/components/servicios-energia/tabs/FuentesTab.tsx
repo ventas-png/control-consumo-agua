@@ -136,7 +136,7 @@ export default function FuentesTab({
         if (!projectId || projectId === 'null') { Swal.showValidationMessage('Debe seleccionar un proyecto'); return null }
         if (!fuenteAguaId) { Swal.showValidationMessage('Debe seleccionar una fuente de agua'); return null }
 
-        const payload: any = {
+        const payload: Record<string, unknown> = {
           nombre: sanitizeInput(nombre),
           fuente_agua_id: fuenteAguaId,
           modo_suministro: modo,
@@ -172,8 +172,8 @@ export default function FuentesTab({
       if (error) throw error
       onFuenteAdded(data as FuenteEnergia)
       Swal.fire({ icon: 'success', title: 'Fuente de energía creada', timer: 1500, showConfirmButton: false })
-    } catch (err: any) {
-      Swal.fire('Error', err.message ?? 'No se pudo crear la fuente de energía', 'error')
+    } catch (err: unknown) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo crear la fuente de energía', 'error')
     }
   }
 
@@ -193,8 +193,8 @@ export default function FuentesTab({
       onFuenteUpdated(editingId, editFormData)
       setEditingId(null)
       Swal.fire({ icon: 'success', title: 'Fuente actualizada', timer: 1500, showConfirmButton: false })
-    } catch (err: any) {
-      Swal.fire('Error', err.message ?? 'No se pudo actualizar la fuente', 'error')
+    } catch (err: unknown) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo actualizar la fuente', 'error')
     }
   }
 
@@ -214,8 +214,8 @@ export default function FuentesTab({
       if (error) throw error
       onFuenteDeleted(id)
       Swal.fire({ icon: 'success', title: 'Fuente eliminada', timer: 1500, showConfirmButton: false })
-    } catch (err: any) {
-      Swal.fire('Error', err.message ?? 'No se pudo eliminar la fuente', 'error')
+    } catch (err: unknown) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo eliminar la fuente', 'error')
     }
   }
 

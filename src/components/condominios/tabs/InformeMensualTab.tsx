@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState, type ReactNode} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
 import { InformeMensual, EstadoInformeMensual, CuotaCondominio, GastoCondominio, TicketMantenimiento, Visitante, IncidenteSeguridad } from '../../../types'
@@ -158,7 +158,7 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
                 ['Visitantes', selected.num_visitantes],
                 ['Incidentes', selected.num_incidentes],
                 ['Firmado por', selected.firmado_por ?? '—'],
-              ] as [string, React.ReactNode][]).map(([k, v]) => (
+              ] as [string, ReactNode][]).map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, padding: '5px 0', borderBottom: '1px solid #f3f4f6' }}>
                   <span style={{ color: '#6b7280' }}>{k}</span>
                   <span style={{ fontWeight: 600, color: '#374151' }}>{v}</span>

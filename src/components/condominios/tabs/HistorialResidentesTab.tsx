@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { HistorialResidente, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
@@ -25,7 +25,7 @@ const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }>
   anterior: { bg: '#f1f5f9', color: '#64748b', label: 'Anterior' },
 }
 
-const inputStyle: React.CSSProperties = {
+const inputStyle: CSSProperties = {
   width: '100%', padding: '7px 10px', border: '1.5px solid #e2e8f0',
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }

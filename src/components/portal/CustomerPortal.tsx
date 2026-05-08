@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, type CSSProperties} from 'react'
 import { supabase } from '../../lib/supabase'
 import type { UserSession, Registro } from '../../types'
 import { Chart, registerables } from 'chart.js'
@@ -747,7 +747,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             const curYear = now.getFullYear()
             const years = Array.from({ length: curYear - 2018 + 2 }, (_, i) => 2018 + i)
             const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-            const selStyle: React.CSSProperties = { padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }
+            const selStyle: CSSProperties = { padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }
 
             function parseParts(val: string) {
               const [y, m] = (val || '').split('-')

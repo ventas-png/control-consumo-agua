@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ConfiguracionCondominio } from '../../../types'
 import Swal from 'sweetalert2'
@@ -103,7 +103,7 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
     Swal.fire({ icon: 'success', title: 'Configuración guardada', timer: 1500, showConfirmButton: false })
   }
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', color: '#1e293b', background: canEdit ? 'white' : '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', color: '#1e293b', background: canEdit ? 'white' : '#f8fafc', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>

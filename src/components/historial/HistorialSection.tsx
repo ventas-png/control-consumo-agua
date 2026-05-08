@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
 import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '../../types'
 import { supabase } from '../../lib/supabase'
@@ -152,7 +152,7 @@ export function HistorialSection({
     setSavingEstado(false)
   }
 
-  const pillStyle = (estado: string): React.CSSProperties => {
+  const pillStyle = (estado: string): CSSProperties => {
     const colors: Record<string, { bg: string; color: string }> = {
       pendiente: { bg: '#fef3c7', color: '#92400e' },
       pagado: { bg: '#d1fae5', color: '#065f46' },
@@ -529,7 +529,7 @@ export function HistorialSection({
 
       {/* Pagination */}
       {totalPages > 1 && (() => {
-        const btnStyle = (active: boolean, disabled = false): React.CSSProperties => ({
+        const btnStyle = (active: boolean, disabled = false): CSSProperties => ({
           minWidth: '36px', height: '36px', padding: '0 10px',
           background: active ? '#0ea5e9' : disabled ? '#f1f5f9' : '#f8fafc',
           color: active ? 'white' : disabled ? '#cbd5e0' : '#475569',

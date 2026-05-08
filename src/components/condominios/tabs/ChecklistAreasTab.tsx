@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ChecklistArea, ChecklistItem } from '../../../types'
 import Swal from 'sweetalert2'
@@ -28,7 +28,7 @@ const ITEMS_PREDEFINIDOS = [
 
 const BLANK_ITEM: ChecklistItem = { item: '', ok: false, observacion: '' }
 
-const inputStyle: React.CSSProperties = {
+const inputStyle: CSSProperties = {
   width: '100%', padding: '7px 10px', border: '1.5px solid #e2e8f0',
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }

@@ -62,10 +62,19 @@ export default function App() {
 
   const { canViewModule, canCreate, canEdit, canChangeStatus } = usePermissions(currentUser)
 
+  const [activeSection, setActiveSection] = useState<AppSection>('clientes')
   const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
   const [unreadComunicacion, setUnreadComunicacion] = useState(0)
+  const [showPasswordReset, setShowPasswordReset] = useState(false)
+  const [resetToken] = useState<string | null>(getResetToken)
+  const [dataLoaded, setDataLoaded] = useState(false)
+
+  const onEjecutarRuta = useCallback((ruta: Ruta) => {
+    setRutaActivaParaLecturas(ruta)
+    setActiveSection('lecturas')
+  }, [])
 
   const fetchUnreadComunicacion = useCallback(async () => {
     if (!currentUser?.company_id) return
@@ -83,15 +92,6 @@ export default function App() {
     return () => clearInterval(interval)
   }, [fetchUnreadComunicacion])
 
-  const defaultSection = (): AppSection => {
-    // Will be resolved after login when currentUser is available
-    return 'clientes'
-  }
-  const [activeSection, setActiveSection] = useState<AppSection>(defaultSection)
-  const [showPasswordReset, setShowPasswordReset] = useState(false)
-  const [resetToken] = useState<string | null>(getResetToken)
-  const [dataLoaded, setDataLoaded] = useState(false)
-
   // Set default section based on role after login
   useEffect(() => {
     if (currentUser) {
@@ -104,7 +104,7 @@ export default function App() {
       }
       // 'cliente' role is handled by its own portal render path — no section needed
     }
-  }, [currentUser?.user_id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentUser?.user_id, currentUser?.role])
 
   // Load data after login (skip for cliente — portal loads its own data)
   useEffect(() => {
@@ -181,11 +181,6 @@ export default function App() {
   // Cliente users get their own portal — no admin data needed
   if (currentUser.role === 'cliente') {
     return <CustomerPortal currentUser={currentUser} onLogout={logout} />
-  }
-
-  function onEjecutarRuta(ruta: Ruta) {
-    setRutaActivaParaLecturas(ruta)
-    setActiveSection('lecturas')
   }
 
   // Banner: rutas pendientes asignadas al usuario actual

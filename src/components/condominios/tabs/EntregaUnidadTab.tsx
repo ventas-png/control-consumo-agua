@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { EntregaUnidad } from '../../../types'
 import type { Unidad } from '../../../types'
@@ -107,7 +107,7 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Art√≠culo</th><th>Condici√
   if (filtroTipo !== 'todos') filtered = filtered.filter(e => e.tipo === filtroTipo)
   if (filtroUnidad) filtered = filtered.filter(e => e.unidad_id === filtroUnidad)
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
 import type { Tarifa, UserRole, UserSession, Proyecto } from '../../types'
 import { supabase } from '../../lib/supabase'
@@ -243,7 +243,7 @@ export function TarifasSection({
     return 'ok'
   }
 
-  const inputStyle: React.CSSProperties = {
+  const inputStyle: CSSProperties = {
     padding: '10px 14px',
     border: '2px solid #e2e8f0',
     borderRadius: '8px',
@@ -252,7 +252,7 @@ export function TarifasSection({
     boxSizing: 'border-box',
     outline: 'none',
   }
-  const labelStyle: React.CSSProperties = {
+  const labelStyle: CSSProperties = {
     fontSize: '13px',
     fontWeight: 600,
     color: '#4a5568',

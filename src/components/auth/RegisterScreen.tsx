@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type KeyboardEvent} from 'react'
 import { supabase } from '../../lib/supabase'
 import { validatePasswordStrength } from '../../lib/validation'
 
@@ -79,7 +79,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
+  function handleKeyDown(e: KeyboardEvent) {
     if (e.key === 'Enter' && !loading) handleRegister()
   }
 

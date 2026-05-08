@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties} from 'react'
 import type { Broadcast, BroadcastTargetType, Cliente, Proyecto, Unidad, UserSession } from '../../types'
 import { useBroadcasts } from '../../hooks/useBroadcasts'
 import Swal from 'sweetalert2'
@@ -153,16 +153,16 @@ function NuevoComunicadoModal({
     onClose()
   }
 
-  const labelStyle: React.CSSProperties = {
+  const labelStyle: CSSProperties = {
     display: 'block', fontWeight: 600, fontSize: '13px',
     color: '#374151', marginBottom: '4px',
   }
-  const inputStyle: React.CSSProperties = {
+  const inputStyle: CSSProperties = {
     width: '100%', padding: '9px 12px', border: '1px solid #d1d5db',
     borderRadius: '8px', fontSize: '13.5px', boxSizing: 'border-box',
     outline: 'none', color: '#111827',
   }
-  const chipStyle = (active: boolean): React.CSSProperties => ({
+  const chipStyle = (active: boolean): CSSProperties => ({
     padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px',
     fontWeight: 600, cursor: 'pointer', border: 'none',
     background: active ? '#0ea5e9' : '#f1f5f9',

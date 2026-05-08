@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode} from 'react'
 import {
   Visitante, TicketMantenimiento, TareaCondominio,
   ReservaAmenidad, PolizaSeguro, ContratoProveedor,
@@ -39,7 +39,7 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
     ...vencimientosExtra.filter(v => !v.renovado && v.fecha_vencimiento >= hoy && v.fecha_vencimiento <= en7).map(v => ({ titulo: v.titulo, fecha: v.fecha_vencimiento, icon: '⏳' })),
   ].sort((a, b) => a.fecha.localeCompare(b.fecha)), [polizas, contratosProveedores, inspecciones, vencimientosExtra, hoy, en7])
 
-  function Bloque({ titulo, icon, count, color, children }: { titulo: string; icon: string; count: number; color: string; children: React.ReactNode }) {
+  function Bloque({ titulo, icon, count, color, children }: { titulo: string; icon: string; count: number; color: string; children: ReactNode }) {
     return (
       <div style={{ background: '#fff', border: `1px solid ${color}33`, borderRadius: 12, padding: 14, borderLeft: `4px solid ${color}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>

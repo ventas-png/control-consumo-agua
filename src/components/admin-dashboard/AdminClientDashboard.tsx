@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad, UserSession, Ruta, AppSection } from '../../types'
+import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad, UserSession, Ruta, Tarifa, Unidad, AppSection } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { AdminDashboardStats } from './AdminDashboardStats'
 import { AdminDashboardCharts } from './AdminDashboardCharts'
@@ -18,8 +18,8 @@ interface AdminDashboardData {
   fuentesAgua: FuenteAgua[]
   registrosCalidad: RegistroCalidad[]
   rutas: Ruta[]
-  tarifas?: any[]
-  unidades?: any[]
+  tarifas?: Tarifa[]
+  unidades?: Unidad[]
 }
 
 interface Props {
@@ -152,7 +152,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
 
   // Filtrar unidades y contadores por proyecto
   const unidadesFiltradas = selectedProjectId
-    ? (data.unidades || []).filter((u: any) => u.project_id === selectedProjectId)
+    ? (data.unidades || []).filter(u => u.project_id === selectedProjectId)
     : (data.unidades || [])
 
   const contadoresFiltrados = selectedProjectId
@@ -160,7 +160,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
     : data.contadores
 
   const tarifasFiltradas = selectedProjectId
-    ? (data.tarifas || []).filter((t: any) => t.project_id === selectedProjectId)
+    ? (data.tarifas || []).filter(t => t.project_id === selectedProjectId)
     : (data.tarifas || [])
 
   const handleReadingAdded = async () => {
