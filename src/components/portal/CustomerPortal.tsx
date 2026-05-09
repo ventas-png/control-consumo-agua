@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, type CSSProperties} from 'react'
 import { supabase } from '../../lib/supabase'
+import { validateEmail, validatePhoneNumber, sanitizeInput } from '../../lib/validation'
 import type { UserSession, Registro } from '../../types'
 import { Chart, registerables } from 'chart.js'
 import { CustomerPaymentsTab } from './CustomerPaymentsTab'
@@ -516,15 +517,38 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
   async function guardarContacto() {
     if (!clienteId) return
+
+    const email = contactoEdit.email?.trim() || null
+    const telefono = contactoEdit.telefono?.trim() || null
+    const whatsapp = contactoEdit.whatsapp?.trim() || null
+    const telefonoAlt = contactoEdit.telefono_alterno?.trim() || null
+
+    if (email && !validateEmail(email)) {
+      setContactoMsg({ type: 'error', text: 'El correo electrónico no tiene un formato válido.' })
+      return
+    }
+    if (telefono && !validatePhoneNumber(telefono)) {
+      setContactoMsg({ type: 'error', text: 'El teléfono no tiene un formato válido.' })
+      return
+    }
+    if (whatsapp && !validatePhoneNumber(whatsapp)) {
+      setContactoMsg({ type: 'error', text: 'El WhatsApp no tiene un formato válido.' })
+      return
+    }
+    if (telefonoAlt && !validatePhoneNumber(telefonoAlt)) {
+      setContactoMsg({ type: 'error', text: 'El teléfono alterno no tiene un formato válido.' })
+      return
+    }
+
     setSavingContacto(true)
     setContactoMsg(null)
     const { error } = await supabase
       .from('clientes')
       .update({
-        email: contactoEdit.email?.trim() || null,
-        telefono: contactoEdit.telefono?.trim() || null,
-        whatsapp: contactoEdit.whatsapp?.trim() || null,
-        telefono_alterno: contactoEdit.telefono_alterno?.trim() || null,
+        email: email ? sanitizeInput(email) : null,
+        telefono: telefono ? sanitizeInput(telefono) : null,
+        whatsapp: whatsapp ? sanitizeInput(whatsapp) : null,
+        telefono_alterno: telefonoAlt ? sanitizeInput(telefonoAlt) : null,
       })
       .eq('id', clienteId)
 

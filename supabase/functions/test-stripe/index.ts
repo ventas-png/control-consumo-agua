@@ -98,8 +98,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Company owners can only test their own company
-    if (callerRole === 'company_owner' && companyId !== callerCompanyId) {
+    // company_owner and admin can only test their own company
+    if ((callerRole === 'company_owner' || callerRole === 'admin') && companyId !== callerCompanyId) {
       return new Response(JSON.stringify({ error: 'Cannot test Stripe for other companies' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -166,9 +166,9 @@ Deno.serve(async (req) => {
       })
     }
 
-  } catch (err: any) {
+  } catch (err) {
     console.error('Error testing Stripe:', err)
-    return new Response(JSON.stringify({ error: err.message || 'Failed to test Stripe' }), {
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

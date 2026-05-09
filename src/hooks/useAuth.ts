@@ -206,6 +206,7 @@ async function buildSessionFromSupabase(
 export function useAuth() {
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
 
   // On mount: restore session + handle OAuth redirect
   useEffect(() => {
@@ -222,11 +223,13 @@ export function useAuth() {
               session.user.email ?? '',
               session.expires_at
             )
+            const permissionsChanged = JSON.stringify(fresh.module_permissions) !== JSON.stringify(stored.module_permissions)
             if (
               fresh.role !== stored.role ||
               fresh.name !== stored.name ||
               fresh.company_id !== stored.company_id ||
-              fresh.cliente_id !== stored.cliente_id
+              fresh.cliente_id !== stored.cliente_id ||
+              permissionsChanged
             ) {
               storeSession(fresh)
               setCurrentUser(fresh)
@@ -264,11 +267,15 @@ export function useAuth() {
     })
   }, [])
 
-  // Listen for Supabase auth state changes (OAuth callback)
+  // Listen for Supabase auth state changes (OAuth callback + password recovery)
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         await applyOAuthSession(session.user, session.expires_at, 'oauth', setCurrentUser)
+      }
+      if (event === 'PASSWORD_RECOVERY') {
+        // Supabase has processed the recovery token — show the reset form
+        setIsPasswordRecovery(true)
       }
     })
     return () => subscription.unsubscribe()
@@ -466,5 +473,5 @@ export function useAuth() {
     return null
   }, [currentUser])
 
-  return { currentUser, loading, login, loginWithGoogle, logout, updateProfile }
+  return { currentUser, loading, isPasswordRecovery, login, loginWithGoogle, logout, updateProfile }
 }

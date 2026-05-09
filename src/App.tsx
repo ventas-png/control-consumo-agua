@@ -44,7 +44,7 @@ function getResetToken(): string | null {
 }
 
 export default function App() {
-  const { currentUser, loading, login, loginWithGoogle, logout, updateProfile } = useAuth()
+  const { currentUser, loading, isPasswordRecovery, login, loginWithGoogle, logout, updateProfile } = useAuth()
   const {
     clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores, unidades, proyectos,
     moneda, maxUnidadesPorTipo,
@@ -68,6 +68,7 @@ export default function App() {
   const [showRegister, setShowRegister] = useState(false)
   const [unreadComunicacion, setUnreadComunicacion] = useState(0)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
+  // Legacy: kept for backward compatibility with old reset links already sent
   const [resetToken] = useState<string | null>(getResetToken)
   const [dataLoaded, setDataLoaded] = useState(false)
 
@@ -125,9 +126,9 @@ export default function App() {
     }
   }, [currentUser, dataLoaded, cargarDatos])
 
-  // Password reset page (token in URL)
-  if (resetToken) {
-    return <PasswordResetPage token={resetToken} onBack={() => window.location.replace(window.location.pathname)} />
+  // Password recovery via Supabase native flow (PASSWORD_RECOVERY event)
+  if (isPasswordRecovery || resetToken) {
+    return <PasswordResetPage onBack={() => window.location.replace(window.location.pathname)} />
   }
 
   // Not authenticated
@@ -172,7 +173,7 @@ export default function App() {
           onRegister={() => setShowRegister(true)}
         />
         {showPasswordReset && (
-          <PasswordResetModal empresa={empresa} onClose={() => setShowPasswordReset(false)} />
+          <PasswordResetModal onClose={() => setShowPasswordReset(false)} />
         )}
       </>
     )

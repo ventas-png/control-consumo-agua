@@ -5,13 +5,11 @@ import { logSecurityEvent } from '../../lib/security'
 import { validatePasswordStrength } from '../../lib/validation'
 
 interface Props {
-  token: string
   onBack: () => void
 }
 
-export function PasswordResetPage({ token, onBack }: Props) {
-  const [resetEmail, setResetEmail] = useState<string | null>(null)
-  const [tokenValid, setTokenValid] = useState<boolean | null>(null)
+export function PasswordResetPage({ onBack }: Props) {
+  const [sessionReady, setSessionReady] = useState<boolean | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [newPassError, setNewPassError] = useState('')
@@ -20,17 +18,12 @@ export function PasswordResetPage({ token, onBack }: Props) {
   const [success, setSuccess] = useState(false)
 
   useEffect(() => {
-    async function validateToken() {
-      const { data, error } = await supabase.rpc('validate_reset_token', { token_input: token })
-      if (error || !(data as { valid?: boolean })?.valid) {
-        setTokenValid(false)
-      } else {
-        setTokenValid(true)
-        setResetEmail((data as { email?: string }).email ?? null)
-      }
-    }
-    validateToken()
-  }, [token])
+    // Supabase processes the recovery token from the URL automatically (detectSessionInUrl: true)
+    // and fires PASSWORD_RECOVERY — we just verify a recovery session exists
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSessionReady(!!session)
+    })
+  }, [])
 
   async function handleUpdate() {
     setNewPassError('')
@@ -48,19 +41,18 @@ export function PasswordResetPage({ token, onBack }: Props) {
 
     setLoading(true)
     try {
-      const { data, error } = await supabase.rpc('update_user_password', {
-        email_input: resetEmail,
-        new_password: newPassword,
-      })
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
 
-      if (error || !(data as { success?: boolean })?.success) {
+      if (error) {
         Swal.fire('Error', 'No se pudo actualizar la contraseña. Intenta de nuevo.', 'error')
         setLoading(false)
         return
       }
 
+      // Invalidate all sessions after password change
+      await supabase.auth.signOut({ scope: 'global' })
       window.history.replaceState({}, document.title, window.location.pathname)
-      await logSecurityEvent('password_reset_completed', { email: resetEmail, success: true })
+      await logSecurityEvent('password_reset_completed', { success: true })
       setSuccess(true)
     } catch {
       Swal.fire('Error', 'Error de conexión. Intenta de nuevo.', 'error')
@@ -74,7 +66,7 @@ export function PasswordResetPage({ token, onBack }: Props) {
     borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
   }
 
-  if (tokenValid === null) {
+  if (sessionReady === null) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #14b8a6 100%)' }}>
         <div style={cardStyle}><p style={{ textAlign: 'center' }}>Validando enlace...</p></div>
@@ -82,7 +74,7 @@ export function PasswordResetPage({ token, onBack }: Props) {
     )
   }
 
-  if (tokenValid === false) {
+  if (!sessionReady) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #14b8a6 100%)' }}>
         <div style={cardStyle}>

@@ -26,16 +26,16 @@ function sanitizeForCache(payload: AppData): AppData {
 
 function loadCache(): AppData | null {
   try {
-    const raw = localStorage.getItem(CACHE_KEY)
+    const raw = sessionStorage.getItem(CACHE_KEY)
     if (!raw) return null
     const { ts, payload }: { ts: number; payload: AppData } = JSON.parse(raw)
-    if (Date.now() - ts > CACHE_MAX_AGE) { localStorage.removeItem(CACHE_KEY); return null }
+    if (Date.now() - ts > CACHE_MAX_AGE) { sessionStorage.removeItem(CACHE_KEY); return null }
     return payload
   } catch { return null }
 }
 
 function saveCache(payload: AppData): void {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), payload: sanitizeForCache(payload) })) }
+  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), payload: sanitizeForCache(payload) })) }
   catch { /* storage full — ignore */ }
 }
 
