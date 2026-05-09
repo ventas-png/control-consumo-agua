@@ -106,6 +106,12 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
         @media (max-width: 640px) {
           .login-left-panel { display: none !important; }
         }
+        .login-right-panel {
+          padding: 48px 40px;
+        }
+        @media (max-width: 480px) {
+          .login-right-panel { padding: 32px 20px !important; }
+        }
       `}</style>
 
       <div style={{
@@ -223,10 +229,9 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
           </div>
 
           {/* RIGHT PANEL — Login form */}
-          <div style={{
+          <div className="login-right-panel" style={{
             flex: 1,
             background: 'rgba(255,255,255,0.98)',
-            padding: '48px 40px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',

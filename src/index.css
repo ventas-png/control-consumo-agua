@@ -181,6 +181,41 @@ button:focus:not(:focus-visible) {
   }
 }
 
+/* ─── Small Mobile (≤ 480px) ────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  /* Tighter main content padding on very small screens */
+  .app-main {
+    padding: 12px !important;
+  }
+
+  /* Reduce table font further */
+  table th, table td {
+    padding: 8px 6px !important;
+    font-size: 12px !important;
+  }
+
+  /* Ensure all buttons have a minimum touch target */
+  .btn-touch {
+    min-height: 40px !important;
+    min-width: 40px !important;
+  }
+
+  /* One-column grid for form fields that use two-col on desktop */
+  .reg-two-col {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Responsive card padding */
+  .reg-card {
+    padding: 24px 20px !important;
+  }
+
+  /* Responsive login right panel */
+  .login-right-panel {
+    padding: 32px 20px !important;
+  }
+}
+
 /* ─── Tablet Layout (768px - 1024px) ────────────────────────────────────── */
 @media (min-width: 768px) and (max-width: 1024px) {
   .app-sidebar {

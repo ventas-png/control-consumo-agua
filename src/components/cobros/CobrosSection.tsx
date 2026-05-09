@@ -336,8 +336,16 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                           onChange={toggleAll} style={{ cursor: 'pointer', width: '16px', height: '16px' }} />
                       </th>
                     )}
-                    {['Cliente','Fecha','Cargo ('+moneda+')','Abonado','Saldo','Estado','Acciones'].map(h => (
-                      <th scope="col" key={h} style={{ padding: '14px 16px', textAlign: h === 'Cargo ('+moneda+')' || h === 'Abonado' || h === 'Saldo' ? 'right' : 'left', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>{h}</th>
+                    {[
+                      { label: 'Cliente', secondary: false },
+                      { label: 'Fecha', secondary: true },
+                      { label: 'Cargo ('+moneda+')', secondary: false },
+                      { label: 'Abonado', secondary: true },
+                      { label: 'Saldo', secondary: false },
+                      { label: 'Estado', secondary: false },
+                      { label: 'Acciones', secondary: false },
+                    ].map(({ label: h, secondary }) => (
+                      <th scope="col" key={h} className={secondary ? 'table-col-secondary' : undefined} style={{ padding: '14px 16px', textAlign: h === 'Cargo ('+moneda+')' || h === 'Abonado' || h === 'Saldo' ? 'right' : 'left', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -366,13 +374,13 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                           <div style={{ fontWeight: 600, color: '#0f172a' }}>{cliente?.nombre ?? r.cliente_nombre}</div>
                           <div style={{ fontSize: '12px', color: '#94a3b8' }}>{cliente?.codigo}</div>
                         </td>
-                        <td style={{ padding: '14px 16px', color: '#475569', whiteSpace: 'nowrap' }}>
+                        <td className="table-col-secondary" style={{ padding: '14px 16px', color: '#475569', whiteSpace: 'nowrap' }}>
                           {new Date(r.fecha).toLocaleDateString('es-GT')}
                         </td>
                         <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
                           {total.toFixed(2)}
                         </td>
-                        <td style={{ padding: '14px 16px', textAlign: 'right', color: abonado > 0 ? '#10b981' : '#94a3b8' }}>
+                        <td className="table-col-secondary" style={{ padding: '14px 16px', textAlign: 'right', color: abonado > 0 ? '#10b981' : '#94a3b8' }}>
                           {abonado > 0 ? abonado.toFixed(2) : '—'}
                         </td>
                         <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: isMora ? '#dc2626' : '#f59e0b', fontSize: '15px' }}>
@@ -390,7 +398,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                         <td style={{ padding: '14px 16px' }}>
                           {canEdit && (
                             <button onClick={() => setPagoModal(r)} style={{
-                              padding: '8px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                              padding: '8px 14px', minHeight: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer',
                               background: 'linear-gradient(135deg,#0ea5e9,#0284c7)', color: 'white',
                               fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap',
                             }}>

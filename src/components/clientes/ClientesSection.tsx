@@ -446,7 +446,7 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
             value={search}
             onChange={e => setSearch(e.target.value)}
             autoComplete="off"
-            style={{ ...inputStyle, width: '280px' }}
+            style={{ ...inputStyle, flex: 1, minWidth: 0, maxWidth: '280px' }}
           />
           {canEdit && (
             <>
@@ -938,9 +938,9 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                 <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Cliente</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Código</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Identificación</th>
+                  <th scope="col" className="table-col-secondary" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Identificación</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Contacto</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Facturación</th>
+                  <th scope="col" className="table-col-secondary" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Facturación</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Cuenta</th>
                   {canEdit && (
                     <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
@@ -991,7 +991,7 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                     <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
                       {sanitizeHTML(c.codigo)}
                     </td>
-                    <td style={{ padding: '12px 16px', color: '#475569' }}>
+                    <td className="table-col-secondary" style={{ padding: '12px 16px', color: '#475569' }}>
                       {c.cui_dui ? (
                         <div style={{ fontSize: '13px', fontFamily: 'monospace' }}>{sanitizeHTML(c.cui_dui)}</div>
                       ) : null}
@@ -1031,7 +1031,7 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                       )}
                       {!c.email && !c.telefono && !c.telefono_alterno && !c.whatsapp && <span style={{ color: '#cbd5e1' }}>—</span>}
                     </td>
-                    <td style={{ padding: '12px 16px', color: '#475569' }}>
+                    <td className="table-col-secondary" style={{ padding: '12px 16px', color: '#475569' }}>
                       {c.numero_facturacion ? (
                         <div style={{ fontSize: '13px', fontFamily: 'monospace' }}>{sanitizeHTML(c.numero_facturacion)}</div>
                       ) : <span style={{ color: '#cbd5e1' }}>—</span>}

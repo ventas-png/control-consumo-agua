@@ -110,12 +110,21 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
         .reg-btn-back:hover {
           background: rgba(255,255,255,0.12) !important;
         }
+        .reg-card {
+          padding: 40px;
+        }
+        .reg-two-col {
+          grid-template-columns: 1fr 1fr;
+        }
+        @media (max-width: 480px) {
+          .reg-card { padding: 24px 20px !important; }
+          .reg-two-col { grid-template-columns: 1fr !important; }
+        }
       `}</style>
 
-      <div style={{
+      <div className="reg-card" style={{
         background: 'rgba(255,255,255,0.97)',
         borderRadius: '24px',
-        padding: '40px',
         width: '100%',
         maxWidth: '460px',
         boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
@@ -221,7 +230,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="reg-two-col" style={{ display: 'grid', gap: '12px' }}>
                 <div>
                   <label htmlFor="reg-cui" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
                     DPI / CUI
