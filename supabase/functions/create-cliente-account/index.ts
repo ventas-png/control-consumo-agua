@@ -1,12 +1,23 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+function getAllowedOrigins(): string[] {
+  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
+  if (envOrigins) return envOrigins.split(',').map(o => o.trim())
+  return ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000']
+}
+
 function getCorsHeaders(origin: string | null) {
+  const allowed = getAllowedOrigins()
+  const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0]
   return {
-    'Access-Control-Allow-Origin': origin ?? '*',
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   }
 }
+
+// Generic identity error — same message for "not found" and "already verified" to prevent enumeration
+const IDENTITY_ERROR = 'No se encontró un cliente con los datos proporcionados. Verifique su DPI/CUI, fecha de nacimiento y correo electrónico.'
 
 
 Deno.serve(async (req) => {
@@ -70,7 +81,7 @@ Deno.serve(async (req) => {
     const result = lookupResult as { match_count: number; cliente_id: string | null }
 
     if (result.match_count < 3 || !result.cliente_id) {
-      return err('No se encontró un cliente con los datos proporcionados. Verifique su DPI/CUI, fecha de nacimiento y correo electrónico.')
+      return err(IDENTITY_ERROR)
     }
 
     const clienteId = result.cliente_id
@@ -98,7 +109,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (existingUser) {
-      return err('Ya existe una cuenta asociada a este cliente. Si olvidó su contraseña, use la opción "Olvidé mi contraseña".')
+      return err(IDENTITY_ERROR)
     }
 
     // Step 4: Create Supabase Auth user

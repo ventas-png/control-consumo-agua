@@ -50,6 +50,10 @@ Deno.serve(async (req) => {
     return new Response('Method not allowed', { status: 405 })
   }
 
+  // Note: validateOrigin is intentionally skipped — Stripe webhook requests
+  // are server-to-server and do not include an Origin header.
+  // Authentication is performed via Stripe signature verification below.
+
   try {
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -198,9 +202,9 @@ Deno.serve(async (req) => {
       status: 200, headers: { 'Content-Type': 'application/json' },
     })
 
-  } catch (err: any) {
+  } catch (err) {
     console.error('Webhook error:', err)
-    return new Response(JSON.stringify({ error: err.message || 'Webhook processing failed' }), {
+    return new Response(JSON.stringify({ error: 'Webhook processing failed' }), {
       status: 500, headers: { 'Content-Type': 'application/json' },
     })
   }

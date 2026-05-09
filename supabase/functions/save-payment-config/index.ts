@@ -107,8 +107,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Company owners can only configure their own company
-    if (callerRole === 'company_owner' && companyId !== callerCompanyId) {
+    // company_owner and admin can only configure their own company
+    if ((callerRole === 'company_owner' || callerRole === 'admin') && companyId !== callerCompanyId) {
       return new Response(JSON.stringify({ error: 'Cannot configure payment for other companies' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -182,9 +182,9 @@ Deno.serve(async (req) => {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
-  } catch (err: any) {
+  } catch (err) {
     console.error('Error saving payment config:', err)
-    return new Response(JSON.stringify({ error: err.message || 'Failed to save payment config' }), {
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

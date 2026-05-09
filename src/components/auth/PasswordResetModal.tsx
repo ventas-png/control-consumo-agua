@@ -1,16 +1,13 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../lib/supabase'
-import { sendPasswordResetEmail } from '../../lib/email'
 import { sanitizeInput, validateEmail } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
-import type { Empresa } from '../../types'
 
 interface Props {
-  empresa: Empresa
   onClose: () => void
 }
 
-export function PasswordResetModal({ empresa, onClose }: Props) {
+export function PasswordResetModal({ onClose }: Props) {
   const [email, setEmail] = useState('')
   const [emailError, setEmailError] = useState('')
   const [sent, setSent] = useState(false)
@@ -26,24 +23,17 @@ export function PasswordResetModal({ empresa, onClose }: Props) {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase.rpc('request_password_reset', {
-        email_input: cleanEmail.toLowerCase(),
-        ip_address: 'unknown',
-        user_agent: navigator.userAgent,
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail.toLowerCase(), {
+        redirectTo: window.location.origin,
       })
 
-      if (error || !(data as { success?: boolean })?.success) {
+      if (error) {
         setEmailError('Error al solicitar restablecimiento. Intenta de nuevo.')
         setLoading(false)
         return
       }
 
-      const token = (data as { token?: string }).token
-      if (token) {
-        await sendPasswordResetEmail(cleanEmail, token, empresa)
-      }
-
-      await logSecurityEvent('password_reset_email_sent', { email: cleanEmail, success: true })
+      await logSecurityEvent('password_reset_requested', { email: cleanEmail })
       setSent(true)
     } catch {
       setEmailError('Error de conexión. Intenta de nuevo.')
