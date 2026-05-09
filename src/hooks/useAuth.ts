@@ -69,6 +69,23 @@ function getLoginLockoutMessage(): string | null {
   return null
 }
 
+async function applyOAuthSession(
+  user: { id: string; email?: string | null },
+  expiresAt: number | undefined,
+  provider: string,
+  setCurrentUser: (s: UserSession) => void
+): Promise<void> {
+  if (getStoredSession()) return
+  try {
+    const sessionData = await buildSessionFromSupabase(user.id, user.email ?? '', expiresAt)
+    storeSession(sessionData)
+    setCurrentUser(sessionData)
+    await logSecurityEvent('login_success', { email: user.email, provider }, user.id)
+  } catch {
+    // ignore
+  }
+}
+
 async function buildSessionFromSupabase(
   userId: string,
   email: string,
@@ -238,21 +255,7 @@ export function useAuth() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       clearTimeout(timeoutId)
       if (session?.user) {
-        const existing = getStoredSession()
-        if (!existing) {
-          try {
-            const sessionData = await buildSessionFromSupabase(
-              session.user.id,
-              session.user.email ?? '',
-              session.expires_at
-            )
-            storeSession(sessionData)
-            setCurrentUser(sessionData)
-            await logSecurityEvent('login_success', { email: session.user.email, provider: 'google' }, session.user.id)
-          } catch {
-            // ignore
-          }
-        }
+        await applyOAuthSession(session.user, session.expires_at, 'google', setCurrentUser)
       }
       setLoading(false)
     }).catch(() => {
@@ -264,22 +267,8 @@ export function useAuth() {
   // Listen for Supabase auth state changes (OAuth callback)
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN') && session?.user) {
-        const existing = getStoredSession()
-        if (!existing) {
-          try {
-            const sessionData = await buildSessionFromSupabase(
-              session.user.id,
-              session.user.email ?? '',
-              session.expires_at
-            )
-            storeSession(sessionData)
-            setCurrentUser(sessionData)
-            await logSecurityEvent('login_success', { email: session.user.email, provider: 'oauth' }, session.user.id)
-          } catch {
-            // ignore
-          }
-        }
+      if (event === 'SIGNED_IN' && session?.user) {
+        await applyOAuthSession(session.user, session.expires_at, 'oauth', setCurrentUser)
       }
     })
     return () => subscription.unsubscribe()
