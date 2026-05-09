@@ -401,7 +401,8 @@ export function HistorialSection({
                             onClick={() => setEditModal({ registroId: r.id, estado: r.estado })}
                             aria-label="Editar estado"
                             style={{
-                              padding: '6px 10px',
+                              padding: '8px 12px',
+                              minHeight: '36px',
                               background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                               color: 'white',
                               border: 'none',
@@ -418,7 +419,8 @@ export function HistorialSection({
                           onClick={() => enviarWhatsApp(r)}
                           aria-label="Enviar por WhatsApp"
                           style={{
-                            padding: '6px 10px',
+                            padding: '8px 12px',
+                            minHeight: '36px',
                             background: '#25D366',
                             color: 'white',
                             border: 'none',
@@ -530,7 +532,7 @@ export function HistorialSection({
       {/* Pagination */}
       {totalPages > 1 && (() => {
         const btnStyle = (active: boolean, disabled = false): CSSProperties => ({
-          minWidth: '36px', height: '36px', padding: '0 10px',
+          minWidth: '40px', height: '40px', padding: '0 10px',
           background: active ? '#0ea5e9' : disabled ? '#f1f5f9' : '#f8fafc',
           color: active ? 'white' : disabled ? '#cbd5e0' : '#475569',
           border: '1px solid', borderColor: active ? '#0ea5e9' : '#e2e8f0',

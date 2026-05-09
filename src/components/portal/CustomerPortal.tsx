@@ -601,7 +601,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       <div>
         {/* Filtro de proyecto */}
         {clienteProjects.length > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', background: 'white', borderRadius: '12px', padding: '12px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '20px', background: 'white', borderRadius: '12px', padding: '12px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>🏗️ Proyecto:</span>
             <select
               value={selectedProjectId ?? ''}
@@ -622,7 +622,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           ).filter(u => contadores.some(c => c.unidad_id === u.id && c.activo))
           if (visibleUnidades4Filter.length < 2) return null
           return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', background: 'white', borderRadius: '12px', padding: '12px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '20px', background: 'white', borderRadius: '12px', padding: '12px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>🏠 Unidad:</span>
               <select
                 value={selectedUnidadId ?? ''}
@@ -865,7 +865,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         {unidadBreakdown.length > 0 && (
           <div>
             <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '12px' }}>Desglose por Unidad</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(290px, 100%), 1fr))', gap: '14px' }}>
               {(unidadBreakdown as { unidad: UnidadInfo; meters: { contador: ContadorInfo; consumoMes: number; consumo12m: number; fotoActual: LecturaInfo | null; fotoAnterior: LecturaInfo | null }[] }[]).map(({ unidad, meters }) => {
                 const project = projects.find(p => p.id === unidad.project_id)
                 return (
