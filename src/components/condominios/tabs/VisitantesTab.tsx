@@ -252,9 +252,6 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Control de Visitantes</h2>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '13.5px' }}>
-            {visitasHoy} visitas hoy · <span style={{ color: '#16a34a', fontWeight: 600 }}>{enPremisas} en premisas</span>
-          </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={exportarPDF} disabled={filtrados.length === 0}
@@ -275,29 +272,31 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
       </div>
 
       {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', flexWrap: 'wrap' }}>
         {([
-          { label: 'Hoy', value: visitasHoy, icon: '📅', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-          { label: 'En premisas', value: enPremisas, icon: '🟢', color: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
-          { label: 'Esta semana', value: estaSemana, icon: '📆', color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd' },
-          { label: 'Total histórico', value: totalHistorico, icon: '📊', color: '#475569', bg: '#f8fafc', border: '#e2e8f0' },
-        ] as const).map(kpi => (
-          <div key={kpi.label} style={{ background: kpi.bg, border: `1.5px solid ${kpi.border}`, borderRadius: '12px', padding: '14px 16px' }}>
-            <div style={{ fontSize: '20px', marginBottom: '4px' }}>{kpi.icon}</div>
-            <div style={{ fontSize: '24px', fontWeight: 800, color: kpi.color }}>{kpi.value}</div>
-            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{kpi.label}</div>
+          { label: 'Hoy', value: visitasHoy, icon: '📅', color: '#2563eb' },
+          { label: 'En premisas', value: enPremisas, icon: '🟢', color: '#16a34a' },
+          { label: 'Esta semana', value: estaSemana, icon: '📆', color: '#7c3aed' },
+          { label: 'Total histórico', value: totalHistorico, icon: '📊', color: '#475569' },
+        ] as const).map((kpi, i) => (
+          <div key={kpi.label} style={{ flex: '1 1 120px', padding: '10px 16px', borderRight: i < 3 ? '1px solid #f1f5f9' : undefined, display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '18px' }}>{kpi.icon}</span>
+            <div>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: kpi.color, lineHeight: 1.1 }}>{kpi.value}</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8' }}>{kpi.label}</div>
+            </div>
           </div>
         ))}
       </div>
 
       {/* Filtros */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar visitante o DPI..."
           style={{ flex: 1, minWidth: '180px', padding: '9px 14px', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', background: '#f8fafc' }} />
         {(['hoy', 'semana', 'mes', 'todos'] as FiltroFecha[]).map(f => (
           <button key={f} onClick={() => setFiltroFecha(f)}
             style={{
-              padding: '8px 14px', borderRadius: '10px', border: '1.5px solid', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600,
+              padding: '6px 12px', borderRadius: '10px', border: '1.5px solid', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600,
               background: filtroFecha === f ? '#0f172a' : '#f8fafc',
               color: filtroFecha === f ? 'white' : '#374151',
               borderColor: filtroFecha === f ? '#0f172a' : '#e2e8f0',
@@ -410,9 +409,10 @@ export function VisitantesTab({ visitantes, unidades, proyectoId, companyId, use
 
       {/* Lista */}
       {filtrados.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🚪</div>
-          <p style={{ fontWeight: 600, color: '#64748b' }}>No hay visitantes registrados{filtroFecha !== 'todos' ? ' para este período' : ''}</p>
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+          <div style={{ fontSize: '36px', marginBottom: '8px' }}>🚪</div>
+          <div style={{ fontWeight: 600, color: '#475569' }}>Sin visitantes{filtroFecha !== 'todos' ? ' en este período' : ' registrados'}</div>
+          {canCreate && <div style={{ fontSize: '13px', marginTop: '4px' }}>Usa &quot;+ Registrar visita&quot; para añadir el primero</div>}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

@@ -547,6 +547,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
   const [activeTab, setActiveTab] = useState<CondominioTab>(initialTab ?? 'panel')
   const [activeSection, setActiveSection] = useState<SectionKey>('panel')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 768
+  )
   const [selectedProyectoId, setSelectedProyectoId] = useState<string>('')
   const [loading, setLoading] = useState(false)
 
@@ -1241,29 +1244,63 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
           })}
         </div>
 
-        {/* Barra de sub-tabs (nivel 2) */}
-        <div style={{ display: 'flex', gap: 1, overflowX: 'auto', background: '#f8fafc', padding: '0 2px', borderBottom: '1px solid #e2e8f0' }}>
-          {visibleSections.find(s => s.id === activeSection)?.tabs
-            .map(tid => TABS.find(t => t.id === tid))
-            .filter(Boolean)
-            .map(tab => tab && (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id as CondominioTab)}
-                style={{
-                  padding: '6px 12px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                  fontSize: 11, fontWeight: activeTab === tab.id ? 700 : 400,
-                  background: activeTab === tab.id ? '#fff' : 'transparent',
-                  color: activeTab === tab.id ? '#0ea5e9' : '#94a3b8',
-                  borderBottom: activeTab === tab.id ? '2px solid #0ea5e9' : '2px solid transparent',
-                  borderRadius: '4px 4px 0 0',
-                }}>
-                {tab.icon} {tab.label}
-              </button>
-            ))}
-        </div>
       </div>
 
-      {/* Tab content */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      {/* Body: sidebar + content */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+
+        {/* Sidebar de sub-tabs */}
+        <aside style={{
+          width: sidebarCollapsed ? 0 : 200,
+          minWidth: sidebarCollapsed ? 0 : 200,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          background: '#f8fafc',
+          borderRight: '1px solid #e2e8f0',
+          transition: 'width 0.18s ease, min-width 0.18s ease',
+          flexShrink: 0,
+        }}>
+          {!sidebarCollapsed && (
+            <nav style={{ padding: '6px 0' }}>
+              {visibleSections.find(s => s.id === activeSection)?.tabs
+                .map(tid => TABS.find(t => t.id === tid))
+                .filter(Boolean)
+                .map(tab => tab && (
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id as CondominioTab)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      width: '100%', padding: '7px 14px', border: 'none',
+                      background: activeTab === tab.id ? '#e0f2fe' : 'transparent',
+                      color: activeTab === tab.id ? '#0369a1' : '#475569',
+                      borderLeft: `3px solid ${activeTab === tab.id ? '#0ea5e9' : 'transparent'}`,
+                      cursor: 'pointer', fontSize: '12px',
+                      fontWeight: activeTab === tab.id ? 700 : 400,
+                      textAlign: 'left',
+                    }}>
+                    <span>{tab.icon}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {tab.label}
+                    </span>
+                  </button>
+                ))}
+            </nav>
+          )}
+        </aside>
+
+        {/* Toggle collapse */}
+        <button onClick={() => setSidebarCollapsed(p => !p)}
+          title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+          style={{
+            flexShrink: 0, width: '18px',
+            background: '#f1f5f9', border: 'none', borderRight: '1px solid #e2e8f0',
+            cursor: 'pointer', color: '#94a3b8', fontSize: '10px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+          {sidebarCollapsed ? '›' : '‹'}
+        </button>
+
+        {/* Tab content */}
+        <div style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
         {activeTab === 'panel' && <PanelGeneralTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} amenidades={amenidades} reservas={reservas} polizas={polizas} inspecciones={inspecciones} gastos={gastos} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
 
         {activeTab === 'cuotas' && <CuotasTab cuotas={cuotas} unidades={unidadesProyecto} proyectos={proyectosActivos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
@@ -1505,6 +1542,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
             onClose={() => setTicketSeleccionado(null)}
           />
         )}
+        </div>
       </div>
     </div>
   )
