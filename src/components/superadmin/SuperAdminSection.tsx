@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
+import { GoogleEmailConfig } from '../empresa/GoogleEmailConfig'
 
 interface Empresa {
   id: string
@@ -535,6 +536,17 @@ export function SuperAdminSection() {
           })}
         </div>
       )}
+
+      {/* Configuración de correo del superadministrador */}
+      <div style={{
+        background: '#ffffff',
+        borderRadius: '16px', padding: '28px',
+        border: '1px solid #e2e8f0',
+        marginTop: '32px',
+        boxShadow: '0 2px 12px rgba(0,0,0,.04)',
+      }}>
+        <GoogleEmailConfig isSuperadmin={true} />
+      </div>
     </div>
   )
 }

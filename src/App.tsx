@@ -43,6 +43,47 @@ function getResetToken(): string | null {
   return new URLSearchParams(window.location.search).get('reset_token')
 }
 
+// Detect Gmail OAuth callback: state must be base64 JSON with t === 'gmail_connect'
+interface GmailOAuthParams { code: string; state: string; stateData: { t: string; company_id: string | null; is_superadmin: boolean } }
+function detectGmailOAuthCallback(): GmailOAuthParams | null {
+  const p = new URLSearchParams(window.location.search)
+  const code = p.get('code')
+  const state = p.get('state')
+  if (!code || !state) return null
+  try {
+    const stateData = JSON.parse(atob(state)) as { t: string; company_id: string | null; is_superadmin: boolean }
+    if (stateData.t === 'gmail_connect') return { code, state, stateData }
+  } catch { /* not our callback */ }
+  return null
+}
+
+const SUPABASE_URL_FOR_FN = import.meta.env.VITE_SUPABASE_URL as string
+
+async function handleGmailOAuthCallback(params: GmailOAuthParams): Promise<void> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token ?? ''
+  const res = await fetch(`${SUPABASE_URL_FOR_FN}/functions/v1/google-oauth-callback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ code: params.code, state: params.state }),
+  })
+  // Clean the URL regardless of result
+  const cleanUrl = window.location.pathname
+  window.history.replaceState({}, '', cleanUrl)
+  if (res.ok) {
+    const json = await res.json() as { email?: string }
+    void Swal.fire({
+      icon: 'success',
+      title: '¡Cuenta de Google conectada!',
+      html: `Los correos se enviarán desde <strong>${json.email ?? 'tu cuenta de Google'}</strong>.`,
+      confirmButtonText: 'Entendido',
+    })
+  } else {
+    const err = await res.json() as { error?: string }
+    void Swal.fire({ icon: 'error', title: 'Error al conectar Google', text: err.error ?? 'Intenta nuevamente.' })
+  }
+}
+
 export default function App() {
   const { currentUser, loading, isPasswordRecovery, login, loginWithGoogle, logout, updateProfile } = useAuth()
   const {
@@ -71,6 +112,15 @@ export default function App() {
   // Legacy: kept for backward compatibility with old reset links already sent
   const [resetToken] = useState<string | null>(getResetToken)
   const [dataLoaded, setDataLoaded] = useState(false)
+
+  // Handle Gmail OAuth callback when Google redirects back to the app
+  useEffect(() => {
+    const gmailParams = detectGmailOAuthCallback()
+    if (gmailParams) {
+      void handleGmailOAuthCallback(gmailParams)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const onEjecutarRuta = useCallback((ruta: Ruta) => {
     setRutaActivaParaLecturas(ruta)
@@ -413,6 +463,7 @@ export default function App() {
                 proyectos={proyectos}
                 rutas={rutas}
                 userRole={currentUser.role}
+                companyId={currentUser.company_id}
                 onRutaAdded={addRuta}
                 onRutaUpdated={updateRuta}
                 onRutaDeleted={deleteRuta}

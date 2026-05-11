@@ -159,7 +159,8 @@ export function useBroadcasts() {
         if (clientesConEmail.length > 0) {
           const { sent, failed } = await enviarComunicadoBroadcast(
             clientesConEmail,
-            { title, body, sent_by_name: currentUser.name }
+            { title, body, sent_by_name: currentUser.name },
+            currentUser.company_id
           )
 
           emailsSent = sent.length
