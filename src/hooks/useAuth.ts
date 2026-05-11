@@ -70,13 +70,35 @@ function getLoginLockoutMessage(): string | null {
 }
 
 async function applyOAuthSession(
-  user: { id: string; email?: string | null },
+  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> },
   expiresAt: number | undefined,
   provider: string,
-  setCurrentUser: (s: UserSession) => void
+  setCurrentUser: (s: UserSession) => void,
+  setNeedsOnboarding: (v: boolean) => void,
+  setPendingOAuthUser: (v: { id: string; email: string; full_name: string } | null) => void,
+  setLoadingDone: () => void,
 ): Promise<void> {
   if (getStoredSession()) return
   try {
+    // Check if an app_users profile already exists for this auth user
+    const { data: profile } = await supabase
+      .from('app_users')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!profile) {
+      // New OAuth user without app_users — needs onboarding to link to a cliente record
+      const fullName: string =
+        (user.user_metadata?.full_name as string | undefined) ??
+        (user.user_metadata?.name as string | undefined) ??
+        user.email ?? ''
+      setPendingOAuthUser({ id: user.id, email: user.email ?? '', full_name: fullName })
+      setNeedsOnboarding(true)
+      setLoadingDone()
+      return
+    }
+
     const sessionData = await buildSessionFromSupabase(user.id, user.email ?? '', expiresAt)
     storeSession(sessionData)
     setCurrentUser(sessionData)
@@ -207,6 +229,8 @@ export function useAuth() {
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [pendingOAuthUser, setPendingOAuthUser] = useState<{ id: string; email: string; full_name: string } | null>(null)
 
   // On mount: restore session + handle OAuth redirect
   useEffect(() => {
@@ -258,7 +282,7 @@ export function useAuth() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       clearTimeout(timeoutId)
       if (session?.user) {
-        await applyOAuthSession(session.user, session.expires_at, 'google', setCurrentUser)
+        await applyOAuthSession(session.user, session.expires_at, 'google', setCurrentUser, setNeedsOnboarding, setPendingOAuthUser, () => setLoading(false))
       }
       setLoading(false)
     }).catch(() => {
@@ -271,7 +295,7 @@ export function useAuth() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        await applyOAuthSession(session.user, session.expires_at, 'oauth', setCurrentUser)
+        await applyOAuthSession(session.user, session.expires_at, 'oauth', setCurrentUser, setNeedsOnboarding, setPendingOAuthUser, () => setLoading(false))
       }
       if (event === 'PASSWORD_RECOVERY') {
         // Supabase has processed the recovery token — show the reset form
@@ -473,5 +497,20 @@ export function useAuth() {
     return null
   }, [currentUser])
 
-  return { currentUser, loading, isPasswordRecovery, login, loginWithGoogle, logout, updateProfile }
+  const completeOnboarding = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const session = await buildSessionFromSupabase(user.id, user.email ?? '', undefined)
+      storeSession(session)
+      setCurrentUser(session)
+      setNeedsOnboarding(false)
+      setPendingOAuthUser(null)
+      await logSecurityEvent('login_success', { email: user.email, provider: 'google_oauth_onboarding' }, user.id)
+    } catch {
+      // ignore — user will remain in onboarding state
+    }
+  }, [])
+
+  return { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile }
 }

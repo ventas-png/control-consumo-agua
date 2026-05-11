@@ -9,6 +9,7 @@ import { LoginScreen } from './components/auth/LoginScreen'
 import { PasswordResetModal } from './components/auth/PasswordResetModal'
 import { PasswordResetPage } from './components/auth/PasswordResetPage'
 import { RegisterScreen } from './components/auth/RegisterScreen'
+import OAuthOnboardingScreen from './components/auth/OAuthOnboardingScreen'
 import { CustomerPortal } from './components/portal/CustomerPortal'
 import { Sidebar } from './components/layout/Sidebar'
 import { Topbar } from './components/layout/Topbar'
@@ -44,7 +45,7 @@ function getResetToken(): string | null {
 }
 
 export default function App() {
-  const { currentUser, loading, isPasswordRecovery, login, loginWithGoogle, logout, updateProfile } = useAuth()
+  const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile } = useAuth()
   const {
     clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores, unidades, proyectos,
     moneda, maxUnidadesPorTipo,
@@ -129,6 +130,17 @@ export default function App() {
   // Password recovery via Supabase native flow (PASSWORD_RECOVERY event)
   if (isPasswordRecovery || resetToken) {
     return <PasswordResetPage onBack={() => window.location.replace(window.location.pathname)} />
+  }
+
+  // Google OAuth user without app_users profile — needs to complete onboarding
+  if (needsOnboarding && pendingOAuthUser) {
+    return (
+      <OAuthOnboardingScreen
+        googleUser={pendingOAuthUser}
+        onSuccess={completeOnboarding}
+        onCancel={() => window.location.replace(window.location.pathname)}
+      />
+    )
   }
 
   // Not authenticated
