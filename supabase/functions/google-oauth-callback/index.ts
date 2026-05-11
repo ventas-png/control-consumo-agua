@@ -1,11 +1,25 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
 
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? ''
 const APP_URL = Deno.env.get('APP_URL') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+
+function getAllowedOrigins(): string[] {
+  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
+  if (envOrigins) return envOrigins.split(',').map(o => o.trim())
+  return ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000']
+}
+
+function getCorsHeaders(origin: string | null) {
+  const allowed = getAllowedOrigins()
+  return {
+    'Access-Control-Allow-Origin': origin && allowed.includes(origin) ? origin : '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  }
+}
 
 interface TokenResponse {
   access_token: string
@@ -20,7 +34,6 @@ interface TokenResponse {
 interface GoogleUserInfo {
   email: string
   name: string
-  picture?: string
 }
 
 interface StatePayload {
@@ -31,11 +44,26 @@ interface StatePayload {
 }
 
 Deno.serve(async (req: Request) => {
+  const origin = req.headers.get('origin')
+  const corsHeaders = getCorsHeaders(origin)
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    // Verify the caller is authenticated
+    const authHeader = req.headers.get('authorization') ?? ''
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const { code, state } = await req.json() as { code: string; state: string }
 
     if (!code || !state) {
@@ -93,13 +121,11 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // Fetch user's Gmail address from Google
+    // Fetch Gmail address from Google
     const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     })
     const userInfo = await userInfoRes.json() as GoogleUserInfo
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
     const tokenExpiry = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
 
@@ -116,26 +142,15 @@ Deno.serve(async (req: Request) => {
         : { company_id: stateData.company_id, is_superadmin: false }),
     }
 
-    // Upsert by company_id (or superadmin flag)
     if (stateData.is_superadmin) {
-      // Delete existing superadmin config before insert (no compound upsert key)
-      await supabase
+      await supabase.from('company_email_configs').delete().eq('is_superadmin', true)
+      const { error: dbError } = await supabase.from('company_email_configs').insert(record)
+      if (dbError) throw new Error(dbError.message)
+    } else {
+      const { error: dbError } = await supabase
         .from('company_email_configs')
-        .delete()
-        .eq('is_superadmin', true)
-    }
-
-    const { error: dbError } = await supabase
-      .from('company_email_configs')
-      .upsert(record, {
-        onConflict: stateData.is_superadmin ? undefined : 'company_id',
-      })
-
-    if (dbError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to save credentials', details: dbError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+        .upsert(record, { onConflict: 'company_id' })
+      if (dbError) throw new Error(dbError.message)
     }
 
     return new Response(
