@@ -258,6 +258,33 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     onRefresh()
   }
 
+  async function eliminarAmenidad(id: string) {
+    const reservasActivas = reservas.filter(
+      r => r.amenidad_id === id && (r.estado === 'confirmada' || r.estado === 'pendiente')
+    )
+    if (reservasActivas.length > 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'No se puede eliminar',
+        text: `Esta amenidad tiene ${reservasActivas.length} reserva${reservasActivas.length !== 1 ? 's' : ''} activa${reservasActivas.length !== 1 ? 's' : ''}. Cancélalas primero.`,
+      })
+      return
+    }
+    const r = await Swal.fire({
+      title: '¿Eliminar amenidad?',
+      text: 'Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar',
+    })
+    if (!r.isConfirmed) return
+    const { error } = await supabase.from('amenidades').delete().eq('id', id)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    onRefresh()
+  }
+
   async function actualizarTarifa(a: Amenidad) {
     const result = await Swal.fire({
       title: `Tarifa por uso de ${a.nombre}`,
@@ -948,12 +975,20 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                         )}
                       </div>
                       {canEdit && (
-                        <button onClick={() => actualizarTarifa(a)} title="Actualizar tarifa por uso"
-                          style={{ padding: '5px 11px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
-                          onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe' }}
-                          onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff' }}>
-                          {a.requiere_tarifa && a.tarifa_uso != null ? '✎ Tarifa' : '+ Tarifa'}
-                        </button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => actualizarTarifa(a)} title="Actualizar tarifa por uso"
+                            style={{ padding: '5px 11px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff' }}>
+                            {a.requiere_tarifa && a.tarifa_uso != null ? '✎ Tarifa' : '+ Tarifa'}
+                          </button>
+                          <button onClick={() => eliminarAmenidad(a.id)} title="Eliminar amenidad"
+                            style={{ padding: '5px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = '#fef2f2' }}>
+                            🗑
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
