@@ -19,6 +19,7 @@ interface Props {
   proyectos: Proyecto[]
   rutas: Ruta[]
   userRole: UserRole
+  companyId?: string
   onRutaAdded: (ruta: Ruta) => void
   onRutaUpdated: (id: string, partial: Partial<Ruta>) => void
   onRutaDeleted: (id: string) => void
@@ -44,6 +45,7 @@ export function RutasSection({
   proyectos,
   rutas,
   userRole,
+  companyId,
   onRutaAdded,
   onRutaUpdated,
   onRutaDeleted,
@@ -298,7 +300,7 @@ export function RutasSection({
     // Email
     if (ruta.asignado_email) {
       promesas.push(
-        enviarNotificacionRuta(ruta).catch(() => {
+        enviarNotificacionRuta(ruta, companyId).catch(() => {
           /* silencioso si falla email */
         })
       )

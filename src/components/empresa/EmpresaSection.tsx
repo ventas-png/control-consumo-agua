@@ -6,6 +6,7 @@ import { MONEDAS } from '../../types'
 import { AsignacionModal } from './AsignacionModal'
 import { PermisosModuloModal } from './PermisosModuloModal'
 import { StripePayPalConfig } from './StripePayPalConfig'
+import { GoogleEmailConfig } from './GoogleEmailConfig'
 import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
 import { AGUA_ROLE_PERMISSIONS, WATER_MODULE_KEYS } from '../../lib/moduleConfig'
 
@@ -1126,6 +1127,19 @@ export function EmpresaSection({ currentUser }: Props) {
             companyId={currentUser.company_id}
             onConfigUpdated={() => void cargar()}
           />
+        </div>
+      )}
+
+      {/* Configuración de Correo Google */}
+      {currentUser.company_id && (
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '16px', padding: '28px',
+          border: '1px solid #e2e8f0',
+          marginTop: '24px',
+          boxShadow: '0 2px 12px rgba(0,0,0,.04)',
+        }}>
+          <GoogleEmailConfig companyId={currentUser.company_id} />
         </div>
       )}
 
