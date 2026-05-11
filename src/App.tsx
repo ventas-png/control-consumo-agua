@@ -44,16 +44,32 @@ function getResetToken(): string | null {
   return new URLSearchParams(window.location.search).get('reset_token')
 }
 
-// Detect Gmail OAuth callback: state must be base64 JSON with t === 'gmail_connect'
+// Detect Gmail OAuth callback.
+// supabase.ts intercepts the URL early and saves params to sessionStorage before
+// Supabase can try to process the Gmail code as its own PKCE callback.
 interface GmailOAuthParams { code: string; state: string; stateData: { t: string; company_id: string | null; is_superadmin: boolean } }
 function detectGmailOAuthCallback(): GmailOAuthParams | null {
+  // Primary: read from sessionStorage (set by supabase.ts before Supabase init)
+  const stored = sessionStorage.getItem('__gmail_callback')
+  if (stored) {
+    try {
+      sessionStorage.removeItem('__gmail_callback')
+      const { code, state } = JSON.parse(stored) as { code: string; state: string }
+      const stateData = JSON.parse(atob(state)) as { t: string; company_id: string | null; is_superadmin: boolean }
+      if (stateData.t === 'gmail_connect') return { code, state, stateData }
+    } catch { /* invalid stored data */ }
+  }
+  // Fallback: URL still has params (shouldn't happen after the fix, kept for safety)
   const p = new URLSearchParams(window.location.search)
   const code = p.get('code')
   const state = p.get('state')
   if (!code || !state) return null
   try {
     const stateData = JSON.parse(atob(state)) as { t: string; company_id: string | null; is_superadmin: boolean }
-    if (stateData.t === 'gmail_connect') return { code, state, stateData }
+    if (stateData.t === 'gmail_connect') {
+      window.history.replaceState({}, '', window.location.pathname)
+      return { code, state, stateData }
+    }
   } catch { /* not our callback */ }
   return null
 }
@@ -68,9 +84,6 @@ async function handleGmailOAuthCallback(params: GmailOAuthParams): Promise<void>
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ code: params.code, state: params.state }),
   })
-  // Clean the URL regardless of result
-  const cleanUrl = window.location.pathname
-  window.history.replaceState({}, '', cleanUrl)
   if (res.ok) {
     const json = await res.json() as { email?: string }
     void Swal.fire({
