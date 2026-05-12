@@ -104,6 +104,7 @@ export default function App() {
     clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores, unidades, proyectos,
     moneda, maxUnidadesPorTipo,
     proveedoresEnergia, tarifasEnergia, fuentesEnergia, facturasEnergia,
+    isLoading: dataLoading,
     cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado,
     setFuentesAgua, setRegistrosCalidad, addRuta, updateRuta, deleteRuta,
     addTarifa, updateTarifa, deleteTarifa,
@@ -468,6 +469,7 @@ export default function App() {
                   unidades,
                 }}
                 moneda={moneda}
+                isLoading={dataLoading}
                 onDataRefresh={cargarDatos}
                 onNavigateSection={setActiveSection}
               />
