@@ -267,8 +267,12 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     const curM = now.getMonth()
 
     // Three-level drill-down: project → unidad → tipo de agua
+    // Resolve project via unidad when counter's own project_id is stale/incorrect
     const filteredContadoresByProject = selectedProjectId
-      ? contadores.filter(c => c.project_id === selectedProjectId)
+      ? contadores.filter(c => {
+          const u = unidades.find(un => un.id === c.unidad_id)
+          return (u?.project_id ?? c.project_id) === selectedProjectId
+        })
       : contadores
     const filteredContadoresByUnidad = selectedUnidadId
       ? filteredContadoresByProject.filter(c => c.unidad_id === selectedUnidadId)
@@ -1238,7 +1242,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                   {/* Contadores for this company */}
                   {companyContadores.map(contador => {
                     const unidad = unidades.find(u => u.id === contador.unidad_id)
-                    const project = companyProjects.find(p => p.id === contador.project_id)
+                    const project = companyProjects.find(p => p.id === (unidad?.project_id ?? contador.project_id))
                     const moneda = project?.moneda ?? 'Q'
                     const contLecturas = lecturas
                       .filter(l => l.contador_id === contador.id)
