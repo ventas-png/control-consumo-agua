@@ -645,9 +645,18 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             { label: 'Contadores Activos', value: String(contadoresActivos), icon: '🔢', bg: 'linear-gradient(135deg, #6366f1, #4f46e5)' },
           ].map(card => (
             <div key={card.label} style={{ background: card.bg, borderRadius: '16px', padding: '20px', color: 'white', boxShadow: '0 6px 20px rgba(0,0,0,0.12)' }}>
-              <div style={{ fontSize: '22px', marginBottom: '10px' }}>{card.icon}</div>
-              <div style={{ fontSize: '22px', fontWeight: 700, lineHeight: 1, marginBottom: '4px' }}>{card.value}</div>
-              <div style={{ fontSize: '11.5px', opacity: 0.88 }}>{card.label}</div>
+              <div style={{ fontSize: '22px', marginBottom: '10px', opacity: loading ? 0.4 : 1 }}>{card.icon}</div>
+              {loading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '4px' }}>
+                  <div className="kpi-skeleton" style={{ height: '22px', width: '70%' }} />
+                  <div className="kpi-skeleton" style={{ height: '11px', width: '50%' }} />
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: '22px', fontWeight: 700, lineHeight: 1, marginBottom: '4px' }}>{card.value}</div>
+                  <div style={{ fontSize: '11.5px', opacity: 0.88 }}>{card.label}</div>
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -952,30 +961,8 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     )
   }
 
-  // ── Loading ──────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #0d9488 100%)',
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-          <div style={{
-            width: '44px', height: '44px',
-            border: '3px solid rgba(255,255,255,0.25)',
-            borderTop: '3px solid white',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-          }} />
-          <span style={{ color: 'white', fontSize: '15px', fontWeight: 500 }}>Cargando portal...</span>
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    )
-  }
-
   // ── No services screen ───────────────────────────────────
-  if (!hasServices) {
+  if (!loading && !hasServices) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -1026,6 +1013,20 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     <div style={{ minHeight: '100vh', background: '#f0f9ff' }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes shimmer {
+          0%   { background-position: -400px 0; }
+          100% { background-position: 400px 0; }
+        }
+        .kpi-skeleton {
+          background: linear-gradient(90deg,
+            rgba(255,255,255,0.18) 25%,
+            rgba(255,255,255,0.38) 50%,
+            rgba(255,255,255,0.18) 75%
+          );
+          background-size: 800px 100%;
+          animation: shimmer 1.4s infinite linear;
+          border-radius: 6px;
+        }
         .portal-tab:hover { background: rgba(14,165,233,0.08) !important; }
         .portal-tab.active { background: white !important; color: #0ea5e9 !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .portal-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.1) !important; transform: translateY(-1px); }
