@@ -414,9 +414,20 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           .sort((a, b) => parseFecha(b.fecha).getTime() - parseFecha(a.fecha).getTime())
         const consumoMes = cLec.filter(l => sameYM(l.fecha, curY, curM)).reduce((s, l) => s + (l.consumo || 0), 0)
         const consumo12m = cLec.filter(l => parseFecha(l.fecha) >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
+        const ultimaLectura = cLec[0] ?? null
+        // If current month has no reading yet, show the most recent month with data
+        let consumoMesLabel = 'Este mes'
+        let consumoMesDisplay = consumoMes
+        if (consumoMes === 0 && ultimaLectura) {
+          const lastD = parseFecha(ultimaLectura.fecha)
+          consumoMesDisplay = cLec
+            .filter(l => sameYM(l.fecha, lastD.getFullYear(), lastD.getMonth()))
+            .reduce((s, l) => s + (l.consumo || 0), 0)
+          consumoMesLabel = `${MESES_LABELS[lastD.getMonth()]} ${lastD.getFullYear()}`
+        }
         // Fotos: última y penúltima lectura con foto
         const withFoto = cLec.filter(l => l.foto)
-        return { contador, consumoMes, consumo12m, fotoActual: withFoto[0] ?? null, fotoAnterior: withFoto[1] ?? null }
+        return { contador, consumoMes, consumo12m, consumoMesDisplay, consumoMesLabel, ultimaLectura, fotoActual: withFoto[0] ?? null, fotoAnterior: withFoto[1] ?? null }
       })
       return { unidad, meters }
     })
@@ -875,7 +886,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           <div>
             <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '12px' }}>Desglose por Unidad</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(290px, 100%), 1fr))', gap: '14px' }}>
-              {(unidadBreakdown as { unidad: UnidadInfo; meters: { contador: ContadorInfo; consumoMes: number; consumo12m: number; fotoActual: LecturaInfo | null; fotoAnterior: LecturaInfo | null }[] }[]).map(({ unidad, meters }) => {
+              {(unidadBreakdown as { unidad: UnidadInfo; meters: { contador: ContadorInfo; consumoMes: number; consumo12m: number; consumoMesDisplay: number; consumoMesLabel: string; ultimaLectura: LecturaInfo | null; fotoActual: LecturaInfo | null; fotoAnterior: LecturaInfo | null }[] }[]).map(({ unidad, meters }) => {
                 const project = projects.find(p => p.id === unidad.project_id)
                 return (
                   <div key={unidad.id} style={{ background: 'white', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -891,7 +902,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                     <div style={{ padding: '14px 16px' }}>
                       {meters.length === 0 ? (
                         <div style={{ color: '#94a3b8', fontSize: '12.5px', textAlign: 'center', padding: '8px 0' }}>Sin contadores asignados</div>
-                      ) : meters.map(({ contador, consumoMes, consumo12m, fotoActual, fotoAnterior }) => (
+                      ) : meters.map(({ contador, consumo12m, consumoMesDisplay, consumoMesLabel, ultimaLectura, fotoActual, fotoAnterior }) => (
                         <div key={contador.id} style={{ borderRadius: '10px', background: '#f8fafc', padding: '11px', border: '1px solid #e2e8f0', marginBottom: '10px' }}>
                           {/* Info medidor */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
@@ -899,12 +910,17 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                             <div>
                               <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#0f172a' }}>#{contador.numero_serie}</div>
                               <div style={{ fontSize: '11px', color: '#64748b' }}>{TIPO_AGUA_LABELS[contador.tipo_agua] ?? contador.tipo_agua}</div>
+                              {ultimaLectura && (
+                                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '1px' }}>
+                                  Última lectura: {parseFecha(ultimaLectura.fecha).toLocaleDateString('es-GT')}
+                                </div>
+                              )}
                             </div>
                           </div>
                           {/* Stats */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', marginBottom: fotoActual || fotoAnterior ? '12px' : '0' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', marginBottom: '12px' }}>
                             {[
-                              { lbl: 'Este mes', val: consumoMes.toFixed(2), color: '#0ea5e9' },
+                              { lbl: consumoMesLabel, val: consumoMesDisplay.toFixed(2), color: '#0ea5e9' },
                               { lbl: 'Últimos 12m', val: consumo12m.toFixed(2), color: '#0d9488' },
                             ].map(s => (
                               <div key={s.lbl} style={{ background: 'white', borderRadius: '7px', padding: '7px 9px', border: '1px solid #e2e8f0' }}>
@@ -914,40 +930,38 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                               </div>
                             ))}
                           </div>
-                          {/* Fotos */}
-                          {(fotoActual || fotoAnterior) && (
-                            <div>
-                              <div style={{ fontSize: '10.5px', fontWeight: 600, color: '#64748b', marginBottom: '7px' }}>📷 Fotografías del Medidor</div>
-                              <div style={{ display: 'flex', gap: '8px' }}>
-                                {[
-                                  { lectura: fotoAnterior, label: 'Foto Anterior' },
-                                  { lectura: fotoActual, label: 'Foto Actual' },
-                                ].map(({ lectura, label }) => (
-                                  <div key={label} style={{ flex: 1 }}>
-                                    <div style={{ fontSize: '9.5px', color: '#94a3b8', marginBottom: '3px', textAlign: 'center' }}>{label}</div>
-                                    {lectura?.foto ? (
-                                      <img
-                                        src={lectura.foto}
-                                        alt={label}
-                                        onClick={() => setPhotoModal({ url: lectura.foto!, label: `${label} — #${contador.numero_serie} — ${parseFecha(lectura.fecha).toLocaleDateString('es-GT')}` })}
-                                        style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '7px', border: '1.5px solid #e2e8f0', cursor: 'zoom-in' }}
-                                      />
-                                    ) : (
-                                      <div style={{ width: '100%', aspectRatio: '1', background: '#f1f5f9', borderRadius: '7px', border: '1.5px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '3px', color: '#94a3b8', fontSize: '10px' }}>
-                                        <span style={{ fontSize: '18px' }}>📷</span>
-                                        <span>Sin foto</span>
-                                      </div>
-                                    )}
-                                    {lectura && (
-                                      <div style={{ fontSize: '9px', color: '#94a3b8', textAlign: 'center', marginTop: '2px' }}>
-                                        {parseFecha(lectura.fecha).toLocaleDateString('es-GT')}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
+                          {/* Fotos — always shown */}
+                          <div>
+                            <div style={{ fontSize: '10.5px', fontWeight: 600, color: '#64748b', marginBottom: '7px' }}>📷 Fotografías del Medidor</div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              {[
+                                { lectura: fotoAnterior, label: 'Foto Anterior' },
+                                { lectura: fotoActual, label: 'Foto Actual' },
+                              ].map(({ lectura, label }) => (
+                                <div key={label} style={{ flex: 1 }}>
+                                  <div style={{ fontSize: '9.5px', color: '#94a3b8', marginBottom: '3px', textAlign: 'center' }}>{label}</div>
+                                  {lectura?.foto ? (
+                                    <img
+                                      src={lectura.foto}
+                                      alt={label}
+                                      onClick={() => setPhotoModal({ url: lectura.foto!, label: `${label} — #${contador.numero_serie} — ${parseFecha(lectura.fecha).toLocaleDateString('es-GT')}` })}
+                                      style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '7px', border: '1.5px solid #e2e8f0', cursor: 'zoom-in' }}
+                                    />
+                                  ) : (
+                                    <div style={{ width: '100%', aspectRatio: '1', background: '#f1f5f9', borderRadius: '7px', border: '1.5px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '3px', color: '#94a3b8', fontSize: '10px' }}>
+                                      <span style={{ fontSize: '18px' }}>📷</span>
+                                      <span>Sin foto</span>
+                                    </div>
+                                  )}
+                                  {lectura && (
+                                    <div style={{ fontSize: '9px', color: '#94a3b8', textAlign: 'center', marginTop: '2px' }}>
+                                      {parseFecha(lectura.fecha).toLocaleDateString('es-GT')}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                          )}
+                          </div>
                         </div>
                       ))}
                     </div>
