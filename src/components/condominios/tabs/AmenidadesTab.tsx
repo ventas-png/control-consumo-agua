@@ -210,6 +210,19 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   const [selectedReserva, setSelectedReserva] = useState<ReservaAmenidad | null>(null)
   const [reservaDetalle, setReservaDetalle] = useState<ReservaAmenidad | null>(null)
 
+  // Carga masiva
+  type BulkRow = { nombre: string; descripcion: string; capacidad_max: string; horario_inicio: string; horario_fin: string }
+  const emptyBulkRow = (): BulkRow => ({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '' })
+  const [showBulkForm, setShowBulkForm] = useState(false)
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>([emptyBulkRow()])
+  const [savingBulk, setSavingBulk] = useState(false)
+
+  // Edición de amenidad existente
+  const [editingAmenidad, setEditingAmenidad] = useState<Amenidad | null>(null)
+  const [editAmenidadFotoUrl, setEditAmenidadFotoUrl] = useState<string | null>(null)
+  const [editAmenidadForm, setEditAmenidadForm] = useState({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '', requiere_deposito: false, monto_deposito: '', requiere_tarifa: false, tarifa_uso: '', tarifa_uso_finde: '', max_reservas_mes_unidad: '', horas_minimas_antelacion: '', duracion_max_horas: '', minutos_preparacion_previa: '', minutos_preparacion_posterior: '', requiere_aprobacion: false, reglamento: '' })
+  const [savingEdit, setSavingEdit] = useState(false)
+
   const hoy = new Date().toISOString().slice(0, 10)
   const amenidadesActivas = amenidades.filter(a => a.activo)
   const dias = diasDeSemana(semana)
@@ -253,6 +266,85 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     onRefresh()
   }
 
+  async function guardarBulk() {
+    const validas = bulkRows.filter(r => r.nombre.trim())
+    if (validas.length === 0) { Swal.fire('Error', 'Agrega al menos una amenidad con nombre.', 'error'); return }
+    setSavingBulk(true)
+    const { error } = await supabase.from('amenidades').insert(
+      validas.map(r => ({
+        company_id: companyId,
+        project_id: proyectoId,
+        nombre: r.nombre.trim(),
+        descripcion: r.descripcion.trim() || null,
+        capacidad_max: r.capacidad_max ? Number(r.capacidad_max) : null,
+        horario_inicio: r.horario_inicio || null,
+        horario_fin: r.horario_fin || null,
+      }))
+    )
+    setSavingBulk(false)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    setBulkRows([emptyBulkRow()])
+    setShowBulkForm(false)
+    onRefresh()
+  }
+
+  function abrirEdicion(a: Amenidad) {
+    setEditingAmenidad(a)
+    setEditAmenidadFotoUrl(a.foto_url ?? null)
+    setEditAmenidadForm({
+      nombre: a.nombre,
+      descripcion: a.descripcion ?? '',
+      capacidad_max: a.capacidad_max != null ? String(a.capacidad_max) : '',
+      horario_inicio: a.horario_inicio ?? '',
+      horario_fin: a.horario_fin ?? '',
+      requiere_deposito: a.requiere_deposito ?? false,
+      monto_deposito: a.monto_deposito != null ? String(a.monto_deposito) : '',
+      requiere_tarifa: a.requiere_tarifa ?? false,
+      tarifa_uso: a.tarifa_uso != null ? String(a.tarifa_uso) : '',
+      tarifa_uso_finde: a.tarifa_uso_finde != null ? String(a.tarifa_uso_finde) : '',
+      max_reservas_mes_unidad: a.max_reservas_mes_unidad != null ? String(a.max_reservas_mes_unidad) : '',
+      horas_minimas_antelacion: a.horas_minimas_antelacion != null ? String(a.horas_minimas_antelacion) : '',
+      duracion_max_horas: a.duracion_max_horas != null ? String(a.duracion_max_horas) : '',
+      minutos_preparacion_previa: a.minutos_preparacion_previa != null ? String(a.minutos_preparacion_previa) : '',
+      minutos_preparacion_posterior: a.minutos_preparacion_posterior != null ? String(a.minutos_preparacion_posterior) : '',
+      requiere_aprobacion: a.requiere_aprobacion ?? false,
+      reglamento: a.reglamento ?? '',
+    })
+    setShowAmenidadForm(false)
+    setShowBulkForm(false)
+  }
+
+  async function guardarEdicion() {
+    if (!editingAmenidad) return
+    if (!editAmenidadForm.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre.', 'error'); return }
+    if (editAmenidadForm.requiere_tarifa && !editAmenidadForm.tarifa_uso) { Swal.fire('Error', 'Indique el monto de la tarifa por uso.', 'error'); return }
+    setSavingEdit(true)
+    const { error } = await supabase.from('amenidades').update({
+      nombre: editAmenidadForm.nombre.trim(),
+      descripcion: editAmenidadForm.descripcion.trim() || null,
+      capacidad_max: editAmenidadForm.capacidad_max ? Number(editAmenidadForm.capacidad_max) : null,
+      horario_inicio: editAmenidadForm.horario_inicio || null,
+      horario_fin: editAmenidadForm.horario_fin || null,
+      requiere_deposito: editAmenidadForm.requiere_deposito,
+      monto_deposito: editAmenidadForm.monto_deposito ? Number(editAmenidadForm.monto_deposito) : null,
+      requiere_tarifa: editAmenidadForm.requiere_tarifa,
+      tarifa_uso: editAmenidadForm.requiere_tarifa && editAmenidadForm.tarifa_uso ? Number(editAmenidadForm.tarifa_uso) : null,
+      tarifa_uso_finde: editAmenidadForm.requiere_tarifa && editAmenidadForm.tarifa_uso_finde ? Number(editAmenidadForm.tarifa_uso_finde) : null,
+      max_reservas_mes_unidad: editAmenidadForm.max_reservas_mes_unidad ? Number(editAmenidadForm.max_reservas_mes_unidad) : null,
+      horas_minimas_antelacion: editAmenidadForm.horas_minimas_antelacion ? Number(editAmenidadForm.horas_minimas_antelacion) : null,
+      duracion_max_horas: editAmenidadForm.duracion_max_horas ? Number(editAmenidadForm.duracion_max_horas) : null,
+      minutos_preparacion_previa: editAmenidadForm.minutos_preparacion_previa ? Number(editAmenidadForm.minutos_preparacion_previa) : 0,
+      minutos_preparacion_posterior: editAmenidadForm.minutos_preparacion_posterior ? Number(editAmenidadForm.minutos_preparacion_posterior) : 0,
+      requiere_aprobacion: editAmenidadForm.requiere_aprobacion,
+      reglamento: editAmenidadForm.reglamento.trim() || null,
+      foto_url: editAmenidadFotoUrl,
+    }).eq('id', editingAmenidad.id)
+    setSavingEdit(false)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    setEditingAmenidad(null)
+    onRefresh()
+  }
+
   async function toggleAmenidad(a: Amenidad) {
     await supabase.from('amenidades').update({ activo: !a.activo }).eq('id', a.id)
     onRefresh()
@@ -281,43 +373,6 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('amenidades').delete().eq('id', id)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
-    onRefresh()
-  }
-
-  async function actualizarTarifa(a: Amenidad) {
-    const result = await Swal.fire({
-      title: `Tarifa por uso de ${a.nombre}`,
-      html:
-        `<p style="font-size:13px;color:#64748b;margin:0 0 12px">Monto en ${moneda}. Deja vacío para desactivar.</p>` +
-        `<label style="display:block;text-align:left;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">Entre semana (L–V)</label>` +
-        `<input id="swal-tarifa" type="number" min="0" step="0.01" class="swal2-input" style="margin:0 0 10px" value="${a.tarifa_uso ?? ''}">` +
-        `<label style="display:block;text-align:left;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">Fin de semana (S–D, opcional)</label>` +
-        `<input id="swal-tarifa-finde" type="number" min="0" step="0.01" class="swal2-input" style="margin:0" placeholder="Igual que entre semana" value="${a.tarifa_uso_finde ?? ''}">`,
-      focusConfirm: false,
-      showCancelButton: true,
-      confirmButtonText: 'Guardar',
-      cancelButtonText: 'Cancelar',
-      preConfirm: () => {
-        const base = (document.getElementById('swal-tarifa') as HTMLInputElement | null)?.value ?? ''
-        const finde = (document.getElementById('swal-tarifa-finde') as HTMLInputElement | null)?.value ?? ''
-        return { base, finde }
-      },
-    })
-    if (!result.isConfirmed || !result.value) return
-    const baseStr = result.value.base as string
-    const findeStr = result.value.finde as string
-    const monto = baseStr === '' ? null : Number(baseStr)
-    const montoFinde = findeStr === '' ? null : Number(findeStr)
-    if (monto !== null && (Number.isNaN(monto) || monto < 0)) { Swal.fire('Error', 'Monto entre semana inválido.', 'error'); return }
-    if (montoFinde !== null && (Number.isNaN(montoFinde) || montoFinde < 0)) { Swal.fire('Error', 'Monto fin de semana inválido.', 'error'); return }
-    const { error } = await supabase.from('amenidades')
-      .update({
-        tarifa_uso: monto,
-        tarifa_uso_finde: montoFinde,
-        requiere_tarifa: monto !== null && monto > 0,
-      })
-      .eq('id', a.id)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
     onRefresh()
   }
@@ -724,7 +779,12 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           <p style={{ margin: '4px 0 0', fontSize: 13.5, opacity: 0.9 }}>Gestiona el ciclo completo: configuración, reservas, cobros, check-in y depósitos.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {canCreate && vista === 'amenidades' && <button onClick={() => setShowAmenidadForm(true)} style={btnHero}>+ Amenidad</button>}
+          {canCreate && vista === 'amenidades' && (
+            <>
+              <button onClick={() => { setShowAmenidadForm(true); setShowBulkForm(false); setEditingAmenidad(null) }} style={btnHero}>+ Amenidad</button>
+              <button onClick={() => { setShowBulkForm(true); setShowAmenidadForm(false); setEditingAmenidad(null) }} style={{ ...btnHero, background: 'rgba(255,255,255,0.12)', border: '1.5px solid rgba(255,255,255,0.35)' }}>⬆ Carga masiva</button>
+            </>
+          )}
           {(vista === 'reservas' || vista === 'calendario') && canCreate && <button onClick={() => { setVista('reservas'); setShowReservaForm(true) }} style={btnHero}>+ Reserva</button>}
           {vista === 'bloqueos' && canEdit && <button onClick={() => setShowBloqueoForm(true)} style={btnHero}>+ Bloqueo</button>}
         </div>
@@ -889,6 +949,181 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               </div>
             </div>
           )}
+          {/* Formulario carga masiva */}
+          {showBulkForm && (
+            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 16, padding: 20, marginBottom: 20 }}>
+              <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>Carga masiva de amenidades</h3>
+              <p style={{ margin: '0 0 16px', fontSize: 12.5, color: '#64748b' }}>Ingresa varias amenidades a la vez. Puedes agregar las fotografías editando cada una después.</p>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc' }}>
+                      {['Nombre *', 'Descripción', 'Capacidad máx.', 'Horario inicio', 'Horario fin', ''].map(h => (
+                        <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#374151', borderBottom: '1.5px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkRows.map((row, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '6px 8px' }}>
+                          <input value={row.nombre} onChange={e => setBulkRows(rows => rows.map((r, j) => j === i ? { ...r, nombre: e.target.value } : r))}
+                            placeholder="Ej. Piscina" style={{ width: 160, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 12.5, background: '#f8fafc' }} />
+                        </td>
+                        <td style={{ padding: '6px 8px' }}>
+                          <input value={row.descripcion} onChange={e => setBulkRows(rows => rows.map((r, j) => j === i ? { ...r, descripcion: e.target.value } : r))}
+                            placeholder="Opcional" style={{ width: 160, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 12.5, background: '#f8fafc' }} />
+                        </td>
+                        <td style={{ padding: '6px 8px' }}>
+                          <input type="number" min={1} value={row.capacidad_max} onChange={e => setBulkRows(rows => rows.map((r, j) => j === i ? { ...r, capacidad_max: e.target.value } : r))}
+                            placeholder="—" style={{ width: 80, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 12.5, background: '#f8fafc' }} />
+                        </td>
+                        <td style={{ padding: '6px 8px' }}>
+                          <input type="time" value={row.horario_inicio} onChange={e => setBulkRows(rows => rows.map((r, j) => j === i ? { ...r, horario_inicio: e.target.value } : r))}
+                            style={{ width: 110, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 12.5, background: '#f8fafc' }} />
+                        </td>
+                        <td style={{ padding: '6px 8px' }}>
+                          <input type="time" value={row.horario_fin} onChange={e => setBulkRows(rows => rows.map((r, j) => j === i ? { ...r, horario_fin: e.target.value } : r))}
+                            style={{ width: 110, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 12.5, background: '#f8fafc' }} />
+                        </td>
+                        <td style={{ padding: '6px 8px' }}>
+                          {bulkRows.length > 1 && (
+                            <button onClick={() => setBulkRows(rows => rows.filter((_, j) => j !== i))}
+                              style={{ padding: '5px 9px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>×</button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+                <button onClick={() => setBulkRows(rows => [...rows, emptyBulkRow()])}
+                  style={{ padding: '8px 16px', background: '#f1f5f9', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 700 }}>
+                  + Agregar fila
+                </button>
+                <button onClick={guardarBulk} disabled={savingBulk}
+                  style={{ padding: '8px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontSize: 12.5 }}>
+                  {savingBulk ? 'Guardando...' : `Guardar ${bulkRows.filter(r => r.nombre.trim()).length} amenidad${bulkRows.filter(r => r.nombre.trim()).length !== 1 ? 'es' : ''}`}
+                </button>
+                <button onClick={() => { setShowBulkForm(false); setBulkRows([emptyBulkRow()]) }}
+                  style={{ padding: '8px 16px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12.5 }}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Formulario edición de amenidad */}
+          {editingAmenidad && (
+            <div style={{ background: 'white', border: '2px solid #0ea5e9', borderRadius: 16, padding: 20, marginBottom: 20 }}>
+              <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>Editar amenidad: <span style={{ color: '#0ea5e9' }}>{editingAmenidad.nombre}</span></h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Nombre *</label>
+                  <input value={editAmenidadForm.nombre} onChange={e => setEditAmenidadForm(f => ({ ...f, nombre: e.target.value }))}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Capacidad máxima</label>
+                  <input type="number" value={editAmenidadForm.capacidad_max} onChange={e => setEditAmenidadForm(f => ({ ...f, capacidad_max: e.target.value }))} placeholder="Personas"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Descripción</label>
+                  <input value={editAmenidadForm.descripcion} onChange={e => setEditAmenidadForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Opcional"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Horario inicio</label>
+                  <input type="time" value={editAmenidadForm.horario_inicio} onChange={e => setEditAmenidadForm(f => ({ ...f, horario_inicio: e.target.value }))}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Horario fin</label>
+                  <input type="time" value={editAmenidadForm.horario_fin} onChange={e => setEditAmenidadForm(f => ({ ...f, horario_fin: e.target.value }))}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" id="edit-deposito" checked={editAmenidadForm.requiere_deposito} onChange={e => setEditAmenidadForm(f => ({ ...f, requiere_deposito: e.target.checked }))} />
+                  <label htmlFor="edit-deposito" style={{ fontSize: 13.5, fontWeight: 600, color: '#374151', cursor: 'pointer' }}>Requiere depósito</label>
+                </div>
+                {editAmenidadForm.requiere_deposito && (
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Monto depósito ({moneda})</label>
+                    <input type="number" value={editAmenidadForm.monto_deposito} onChange={e => setEditAmenidadForm(f => ({ ...f, monto_deposito: e.target.value }))} min="0" step="0.01"
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" id="edit-tarifa" checked={editAmenidadForm.requiere_tarifa} onChange={e => setEditAmenidadForm(f => ({ ...f, requiere_tarifa: e.target.checked }))} />
+                  <label htmlFor="edit-tarifa" style={{ fontSize: 13.5, fontWeight: 600, color: '#374151', cursor: 'pointer' }}>Tarifa por uso</label>
+                </div>
+                {editAmenidadForm.requiere_tarifa && (
+                  <>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Tarifa entre semana ({moneda})</label>
+                      <input type="number" value={editAmenidadForm.tarifa_uso} onChange={e => setEditAmenidadForm(f => ({ ...f, tarifa_uso: e.target.value }))} min="0" step="0.01"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Tarifa fin de semana ({moneda})</label>
+                      <input type="number" value={editAmenidadForm.tarifa_uso_finde} onChange={e => setEditAmenidadForm(f => ({ ...f, tarifa_uso_finde: e.target.value }))} min="0" step="0.01" placeholder="Igual que entre semana"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                    </div>
+                  </>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" id="edit-aprobacion" checked={editAmenidadForm.requiere_aprobacion} onChange={e => setEditAmenidadForm(f => ({ ...f, requiere_aprobacion: e.target.checked }))} />
+                  <label htmlFor="edit-aprobacion" style={{ fontSize: 13.5, fontWeight: 600, color: '#374151', cursor: 'pointer' }}>Requiere aprobación del administrador</label>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Reglamento (opcional)</label>
+                  <textarea value={editAmenidadForm.reglamento} onChange={e => setEditAmenidadForm(f => ({ ...f, reglamento: e.target.value }))}
+                    placeholder="Texto del reglamento"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13.5, background: '#f8fafc', minHeight: 60, resize: 'vertical' }} />
+                </div>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #e2e8f0', paddingTop: 12, marginTop: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 8 }}>Reglas de reserva (opcional)</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 11.5, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Máx. reservas/mes por unidad</label>
+                      <input type="number" min={1} value={editAmenidadForm.max_reservas_mes_unidad} onChange={e => setEditAmenidadForm(f => ({ ...f, max_reservas_mes_unidad: e.target.value }))} placeholder="sin límite"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11.5, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Antelación mínima (horas)</label>
+                      <input type="number" min={0} value={editAmenidadForm.horas_minimas_antelacion} onChange={e => setEditAmenidadForm(f => ({ ...f, horas_minimas_antelacion: e.target.value }))} placeholder="sin restricción"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11.5, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Duración máx. (horas)</label>
+                      <input type="number" min={0.5} step={0.5} value={editAmenidadForm.duracion_max_horas} onChange={e => setEditAmenidadForm(f => ({ ...f, duracion_max_horas: e.target.value }))} placeholder="sin tope"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11.5, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Preparación previa (min)</label>
+                      <input type="number" min={0} step={5} value={editAmenidadForm.minutos_preparacion_previa} onChange={e => setEditAmenidadForm(f => ({ ...f, minutos_preparacion_previa: e.target.value }))} placeholder="0"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11.5, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Preparación posterior (min)</label>
+                      <input type="number" min={0} step={5} value={editAmenidadForm.minutos_preparacion_posterior} onChange={e => setEditAmenidadForm(f => ({ ...f, minutos_preparacion_posterior: e.target.value }))} placeholder="0"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 14, background: '#f8fafc' }} />
+                    </div>
+                  </div>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <ImageUploader value={editAmenidadFotoUrl} onChange={setEditAmenidadFotoUrl} folder="amenidades" label="Foto de la amenidad" />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                <button onClick={guardarEdicion} disabled={savingEdit} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
+                  {savingEdit ? 'Guardando...' : 'Guardar cambios'}
+                </button>
+                <button onClick={() => setEditingAmenidad(null)} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
           {amenidades.length === 0 ? (
             <EmptyState
               icon="🏊"
@@ -976,11 +1211,11 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                       </div>
                       {canEdit && (
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={() => actualizarTarifa(a)} title="Actualizar tarifa por uso"
-                            style={{ padding: '5px 11px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff' }}>
-                            {a.requiere_tarifa && a.tarifa_uso != null ? '✎ Tarifa' : '+ Tarifa'}
+                          <button onClick={() => abrirEdicion(a)} title="Editar amenidad"
+                            style={{ padding: '5px 11px', background: editingAmenidad?.id === a.id ? '#e0f2fe' : '#f0f9ff', color: '#0369a1', border: `1px solid ${editingAmenidad?.id === a.id ? '#7dd3fc' : '#bae6fd'}`, borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#e0f2fe' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = editingAmenidad?.id === a.id ? '#e0f2fe' : '#f0f9ff' }}>
+                            ✎ Editar
                           </button>
                           <button onClick={() => eliminarAmenidad(a.id)} title="Eliminar amenidad"
                             style={{ padding: '5px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
