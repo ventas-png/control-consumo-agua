@@ -306,9 +306,15 @@ export function UnidadesSection({
     }
 
     if (editingId) {
+      // Keep company_id in sync when project changes
+      const selectedProject = proyectos.find(p => p.id === form.project_id)
       const { data, error } = await supabase
         .from('unidades')
-        .update({ ...payload, ...(form.project_id && { project_id: form.project_id }) })
+        .update({
+          ...payload,
+          ...(form.project_id && { project_id: form.project_id }),
+          ...(selectedProject?.company_id && { company_id: selectedProject.company_id }),
+        })
         .eq('id', editingId)
         .select()
         .single()
