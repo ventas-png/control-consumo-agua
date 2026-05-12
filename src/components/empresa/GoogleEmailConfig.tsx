@@ -59,33 +59,33 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
 
   const loadConfig = useCallback(async () => {
     setLoading(true)
-    const query = supabase
-      .from('company_email_configs')
-      .select('id, email, is_active, updated_at')
 
-    if (isSuperadmin) {
-      query.eq('is_superadmin', true)
-    } else if (companyId) {
-      query.eq('company_id', companyId)
-    } else {
+    if (!isSuperadmin && !companyId) {
       setLoading(false)
       return
     }
 
-    const { data } = await query.maybeSingle()
+    // Supabase query builder is immutable — apply ownership filter via ternary
+    const { data } = await (
+      isSuperadmin
+        ? supabase.from('company_email_configs')
+            .select('id, email, is_active, updated_at')
+            .eq('is_superadmin', true)
+        : supabase.from('company_email_configs')
+            .select('id, email, is_active, updated_at')
+            .eq('company_id', companyId!)
+    ).maybeSingle()
     setConfig(data as EmailConfig | null)
 
-    const tplQuery = supabase
-      .from('email_templates')
-      .select('id, template_key, subject, html_body, is_active')
-
-    if (isSuperadmin) {
-      tplQuery.eq('is_superadmin', true)
-    } else if (companyId) {
-      tplQuery.eq('company_id', companyId)
-    }
-
-    const { data: tplData } = await tplQuery
+    const { data: tplData } = await (
+      isSuperadmin
+        ? supabase.from('email_templates')
+            .select('id, template_key, subject, html_body, is_active')
+            .eq('is_superadmin', true)
+        : supabase.from('email_templates')
+            .select('id, template_key, subject, html_body, is_active')
+            .eq('company_id', companyId!)
+    )
     setTemplates((tplData as EmailTemplate[]) ?? [])
     setLoading(false)
   }, [companyId, isSuperadmin])

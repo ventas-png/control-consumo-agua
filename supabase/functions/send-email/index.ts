@@ -332,24 +332,26 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // Fetch Gmail config
-    const configQuery = supabase
-      .from('company_email_configs')
-      .select('id, email, access_token, refresh_token, token_expiry')
-      .eq('is_active', true)
-
-    if (is_superadmin) {
-      configQuery.eq('is_superadmin', true)
-    } else if (company_id) {
-      configQuery.eq('company_id', company_id)
-    } else {
+    if (!is_superadmin && !company_id) {
       return new Response(
         JSON.stringify({ error: 'company_id or is_superadmin required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const { data: config } = await configQuery.maybeSingle()
+    // Fetch Gmail config — Supabase query builder is immutable so we apply the
+    // ownership filter in a ternary to ensure it's always chained properly.
+    const { data: config } = await (
+      is_superadmin
+        ? supabase.from('company_email_configs')
+            .select('id, email, access_token, refresh_token, token_expiry')
+            .eq('is_active', true)
+            .eq('is_superadmin', true)
+        : supabase.from('company_email_configs')
+            .select('id, email, access_token, refresh_token, token_expiry')
+            .eq('is_active', true)
+            .eq('company_id', company_id!)
+    ).maybeSingle()
 
     if (!config) {
       return new Response(
@@ -360,20 +362,20 @@ Deno.serve(async (req: Request) => {
 
     const mergedVars: Record<string, string> = { to_name: to_name ?? '', ...vars }
 
-    // Check for custom template override in DB
-    const tplQuery = supabase
-      .from('email_templates')
-      .select('subject, html_body')
-      .eq('template_key', template_key)
-      .eq('is_active', true)
-
-    if (is_superadmin) {
-      tplQuery.eq('is_superadmin', true)
-    } else {
-      tplQuery.eq('company_id', company_id)
-    }
-
-    const { data: customTpl } = await tplQuery.maybeSingle()
+    // Check for custom template override in DB (immutable builder — use ternary)
+    const { data: customTpl } = await (
+      is_superadmin
+        ? supabase.from('email_templates')
+            .select('subject, html_body')
+            .eq('template_key', template_key)
+            .eq('is_active', true)
+            .eq('is_superadmin', true)
+        : supabase.from('email_templates')
+            .select('subject, html_body')
+            .eq('template_key', template_key)
+            .eq('is_active', true)
+            .eq('company_id', company_id!)
+    ).maybeSingle()
 
     let subject: string
     let htmlBody: string
