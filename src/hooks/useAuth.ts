@@ -255,6 +255,8 @@ export function useAuth() {
               fresh.name !== stored.name ||
               fresh.company_id !== stored.company_id ||
               fresh.cliente_id !== stored.cliente_id ||
+              fresh.servicio_condominios !== stored.servicio_condominios ||
+              fresh.servicio_agua !== stored.servicio_agua ||
               permissionsChanged
             ) {
               storeSession(fresh)
