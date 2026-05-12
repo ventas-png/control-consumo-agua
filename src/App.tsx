@@ -11,6 +11,7 @@ import { PasswordResetPage } from './components/auth/PasswordResetPage'
 import { RegisterScreen } from './components/auth/RegisterScreen'
 import OAuthOnboardingScreen from './components/auth/OAuthOnboardingScreen'
 import { CustomerPortal } from './components/portal/CustomerPortal'
+import { CondominiosClientPortal } from './components/portal/CondominiosClientPortal'
 import { Sidebar } from './components/layout/Sidebar'
 import { Topbar } from './components/layout/Topbar'
 import { ClientesSection } from './components/clientes/ClientesSection'
@@ -257,6 +258,9 @@ export default function App() {
 
   // Cliente users get their own portal — no admin data needed
   if (currentUser.role === 'cliente') {
+    if (currentUser.servicio_condominios) {
+      return <CondominiosClientPortal currentUser={currentUser} onLogout={logout} />
+    }
     return <CustomerPortal currentUser={currentUser} onLogout={logout} />
   }
 
