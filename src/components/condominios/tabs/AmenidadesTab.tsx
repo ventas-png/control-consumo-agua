@@ -1,4 +1,5 @@
 import { useState, Fragment, type CSSProperties, type ReactNode } from 'react'
+import { ImportAmenidadesModal } from '../ImportAmenidadesModal'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
@@ -210,12 +211,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   const [selectedReserva, setSelectedReserva] = useState<ReservaAmenidad | null>(null)
   const [reservaDetalle, setReservaDetalle] = useState<ReservaAmenidad | null>(null)
 
-  // Carga masiva
-  type BulkRow = { nombre: string; descripcion: string; capacidad_max: string; horario_inicio: string; horario_fin: string }
-  const emptyBulkRow = (): BulkRow => ({ nombre: '', descripcion: '', capacidad_max: '', horario_inicio: '', horario_fin: '' })
-  const [showBulkForm, setShowBulkForm] = useState(false)
-  const [bulkRows, setBulkRows] = useState<BulkRow[]>([emptyBulkRow()])
-  const [savingBulk, setSavingBulk] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   // Edición de amenidad existente
   const [editingAmenidad, setEditingAmenidad] = useState<Amenidad | null>(null)
@@ -266,28 +262,6 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     onRefresh()
   }
 
-  async function guardarBulk() {
-    const validas = bulkRows.filter(r => r.nombre.trim())
-    if (validas.length === 0) { Swal.fire('Error', 'Agrega al menos una amenidad con nombre.', 'error'); return }
-    setSavingBulk(true)
-    const { error } = await supabase.from('amenidades').insert(
-      validas.map(r => ({
-        company_id: companyId,
-        project_id: proyectoId,
-        nombre: r.nombre.trim(),
-        descripcion: r.descripcion.trim() || null,
-        capacidad_max: r.capacidad_max ? Number(r.capacidad_max) : null,
-        horario_inicio: r.horario_inicio || null,
-        horario_fin: r.horario_fin || null,
-      }))
-    )
-    setSavingBulk(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
-    setBulkRows([emptyBulkRow()])
-    setShowBulkForm(false)
-    onRefresh()
-  }
-
   function abrirEdicion(a: Amenidad) {
     setEditingAmenidad(a)
     setEditAmenidadFotoUrl(a.foto_url ?? null)
@@ -311,7 +285,6 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       reglamento: a.reglamento ?? '',
     })
     setShowAmenidadForm(false)
-    setShowBulkForm(false)
   }
 
   async function guardarEdicion() {
@@ -781,8 +754,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {canCreate && vista === 'amenidades' && (
             <>
-              <button onClick={() => { setShowAmenidadForm(true); setShowBulkForm(false); setEditingAmenidad(null) }} style={btnHero}>+ Amenidad</button>
-              <button onClick={() => { setShowBulkForm(true); setShowAmenidadForm(false); setEditingAmenidad(null) }} style={{ ...btnHero, background: 'rgba(255,255,255,0.12)', border: '1.5px solid rgba(255,255,255,0.35)' }}>⬆ Carga masiva</button>
+              <button onClick={() => { setShowAmenidadForm(true); setEditingAmenidad(null) }} style={btnHero}>+ Amenidad</button>
+              <button onClick={() => setShowImportModal(true)} style={{ ...btnHero, background: 'rgba(255,255,255,0.12)', border: '1.5px solid rgba(255,255,255,0.35)' }}>⬆ Carga masiva</button>
             </>
           )}
           {(vista === 'reservas' || vista === 'calendario') && canCreate && <button onClick={() => { setVista('reservas'); setShowReservaForm(true) }} style={btnHero}>+ Reserva</button>}
@@ -949,69 +922,6 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               </div>
             </div>
           )}
-          {/* Formulario carga masiva */}
-          {showBulkForm && (
-            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 16, padding: 20, marginBottom: 20 }}>
-              <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>Carga masiva de amenidades</h3>
-              <p style={{ margin: '0 0 16px', fontSize: 12.5, color: '#64748b' }}>Ingresa varias amenidades a la vez. Puedes agregar las fotografías editando cada una después.</p>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc' }}>
-                      {['Nombre *', 'Descripción', 'Capacidad máx.', 'Horario inicio', 'Horario fin', ''].map(h => (
-                        <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#374151', borderBottom: '1.5px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bulkRows.map((row, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '6px 8px' }}>
-                          <input value={row.nombre} onChange={e => setBulkRows(rows => rows.map((r, j) => j === i ? { ...r, nombre: e.target.value } : r))}
-                            placeholder="Ej. Piscina" style={{ width: 160, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 12.5, background: '#f8fafc' }} />
-                        </td>
-                        <td style={{ padding: '6px 8px' }}>
-                          <input value={row.descripcion} onChange={e => setBulkRows(rows => rows.map((r, j) => j === i ? { ...r, descripcion: e.target.value } : r))}
-                            placeholder="Opcional" style={{ width: 160, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 12.5, background: '#f8fafc' }} />
-                        </td>
-                        <td style={{ padding: '6px 8px' }}>
-                          <input type="number" min={1} value={row.capacidad_max} onChange={e => setBulkRows(rows => rows.map((r, j) => j === i ? { ...r, capacidad_max: e.target.value } : r))}
-                            placeholder="—" style={{ width: 80, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 12.5, background: '#f8fafc' }} />
-                        </td>
-                        <td style={{ padding: '6px 8px' }}>
-                          <input type="time" value={row.horario_inicio} onChange={e => setBulkRows(rows => rows.map((r, j) => j === i ? { ...r, horario_inicio: e.target.value } : r))}
-                            style={{ width: 110, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 12.5, background: '#f8fafc' }} />
-                        </td>
-                        <td style={{ padding: '6px 8px' }}>
-                          <input type="time" value={row.horario_fin} onChange={e => setBulkRows(rows => rows.map((r, j) => j === i ? { ...r, horario_fin: e.target.value } : r))}
-                            style={{ width: 110, padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: 7, fontSize: 12.5, background: '#f8fafc' }} />
-                        </td>
-                        <td style={{ padding: '6px 8px' }}>
-                          {bulkRows.length > 1 && (
-                            <button onClick={() => setBulkRows(rows => rows.filter((_, j) => j !== i))}
-                              style={{ padding: '5px 9px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>×</button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-                <button onClick={() => setBulkRows(rows => [...rows, emptyBulkRow()])}
-                  style={{ padding: '8px 16px', background: '#f1f5f9', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 700 }}>
-                  + Agregar fila
-                </button>
-                <button onClick={guardarBulk} disabled={savingBulk}
-                  style={{ padding: '8px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontSize: 12.5 }}>
-                  {savingBulk ? 'Guardando...' : `Guardar ${bulkRows.filter(r => r.nombre.trim()).length} amenidad${bulkRows.filter(r => r.nombre.trim()).length !== 1 ? 'es' : ''}`}
-                </button>
-                <button onClick={() => { setShowBulkForm(false); setBulkRows([emptyBulkRow()]) }}
-                  style={{ padding: '8px 16px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12.5 }}>Cancelar</button>
-              </div>
-            </div>
-          )}
-
           {/* Formulario edición de amenidad */}
           {editingAmenidad && (
             <div style={{ background: 'white', border: '2px solid #0ea5e9', borderRadius: 16, padding: 20, marginBottom: 20 }}>
@@ -1956,6 +1866,16 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           </>
         )
       })()}
+
+      {/* Modal de carga masiva */}
+      {showImportModal && (
+        <ImportAmenidadesModal
+          proyectoId={proyectoId}
+          companyId={companyId}
+          onClose={() => setShowImportModal(false)}
+          onImportado={() => { setShowImportModal(false); onRefresh() }}
+        />
+      )}
     </div>
   )
 }
