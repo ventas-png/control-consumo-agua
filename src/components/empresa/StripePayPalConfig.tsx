@@ -151,7 +151,7 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
     const { data } = await supabase
       .from('companies')
       .select(
-        'stripe_public_key,stripe_configured,stripe_activo,paypal_client_id,paypal_configured,paypal_activo'
+        'stripe_public_key,stripe_configured,stripe_activo,paypal_client_id,paypal_currency_code,paypal_configured,paypal_activo'
       )
       .eq('id', companyId)
       .single()
@@ -162,6 +162,7 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
         stripe_configured: data.stripe_configured || false,
         stripe_activo: data.stripe_activo !== false,
         paypal_client_id: data.paypal_client_id || '',
+        paypal_currency_code: (data as any).paypal_currency_code || 'USD',
         paypal_configured: data.paypal_configured || false,
         paypal_activo: data.paypal_activo !== false,
       })
@@ -287,21 +288,27 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
     void cargarConfig()
   }
 
-  async function guardarPayPal(clientId: string, clientSecret: string) {
-    if (!clientId || !clientSecret) {
-      void Swal.fire({ icon: 'warning', title: 'Campos requeridos' })
+  async function guardarPayPal(clientId: string, currencyCode: string) {
+    if (!clientId.trim()) {
+      void Swal.fire({ icon: 'warning', title: 'Ingresa el Client ID de PayPal' })
       return
     }
 
     setSavingPaypal(true)
 
-    const { error: fnError } = await supabase.functions.invoke('save-payment-config', {
-      body: { companyId, provider: 'paypal', publicKey: clientId, secretKey: clientSecret },
-    })
+    const { error } = await supabase
+      .from('companies')
+      .update({
+        paypal_client_id: clientId.trim(),
+        paypal_currency_code: (currencyCode.trim().toUpperCase() || 'USD'),
+        paypal_configured: true,
+        paypal_activo: true,
+      })
+      .eq('id', companyId)
 
     setSavingPaypal(false)
 
-    if (fnError) {
+    if (error) {
       void Swal.fire({
         icon: 'error',
         title: 'Error al guardar',
@@ -437,7 +444,7 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
 
         {(showPaypalForm || !config.paypal_configured) && (
           <PayPalConfigForm
-            config={config}
+            config={config as CompanyPaymentConfig & { paypal_currency_code?: string }}
             saving={savingPaypal}
             onSave={guardarPayPal}
           />
@@ -565,67 +572,76 @@ function StripeConfigForm({ config, saving, testing, onSave, onTest }: StripeFor
 }
 
 // -- PayPal Config Form ------------------------------------------------------
+const PAYPAL_CURRENCIES = [
+  { code: 'USD', label: 'USD — Dólar estadounidense' },
+  { code: 'EUR', label: 'EUR — Euro' },
+  { code: 'GBP', label: 'GBP — Libra esterlina' },
+  { code: 'CAD', label: 'CAD — Dólar canadiense' },
+  { code: 'AUD', label: 'AUD — Dólar australiano' },
+  { code: 'MXN', label: 'MXN — Peso mexicano' },
+  { code: 'BRL', label: 'BRL — Real brasileño' },
+  { code: 'COP', label: 'COP — Peso colombiano' },
+]
+
 interface PayPalFormProps {
-  config: CompanyPaymentConfig
+  config: CompanyPaymentConfig & { paypal_currency_code?: string }
   saving: boolean
-  onSave: (clientId: string, clientSecret: string) => void
+  onSave: (clientId: string, currencyCode: string) => void
 }
 
 function PayPalConfigForm({ config, saving, onSave }: PayPalFormProps) {
   const [clientId, setClientId] = useState(config.paypal_client_id || '')
-  const [clientSecret, setClientSecret] = useState('')
-  const [showSecret, setShowSecret] = useState(false)
+  const [currencyCode, setCurrencyCode] = useState(config.paypal_currency_code || 'USD')
 
   return (
     <div>
+      <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#1d4ed8', marginBottom: '18px' }}>
+        Solo necesitas tu <strong>Client ID</strong> público de PayPal. No se requiere ningún secreto.
+      </div>
+
       <div style={s.fieldGroup}>
         <label htmlFor="paypal-client-id" style={s.label}>
-          Client ID *
+          Client ID de PayPal *
         </label>
         <input
           id="paypal-client-id"
           type="text"
           value={clientId}
           onChange={e => setClientId(e.target.value)}
-          placeholder="AVG3..."
+          placeholder="AXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
           style={s.input}
         />
         <div style={s.hint}>
-          Obtén esta key en tu dashboard de PayPal →{' '}
-          <a href="https://developer.paypal.com/dashboard" target="_blank" rel="noopener noreferrer" style={s.link}>
-            PayPal Developer Dashboard
+          Encuéntralo en{' '}
+          <a href="https://developer.paypal.com/dashboard/applications" target="_blank" rel="noopener noreferrer" style={s.link}>
+            PayPal Developer → My Apps &amp; Credentials
           </a>
         </div>
       </div>
 
       <div style={s.fieldGroupLast}>
-        <label htmlFor="paypal-client-secret" style={s.label}>
-          Client Secret *
+        <label htmlFor="paypal-currency" style={s.label}>
+          Moneda para cobros PayPal *
         </label>
-        <div style={{ position: 'relative' }}>
-          <input
-            id="paypal-client-secret"
-            type={showSecret ? 'text' : 'password'}
-            value={clientSecret}
-            onChange={e => setClientSecret(e.target.value)}
-            placeholder="Secret..."
-            style={s.secretInput}
-          />
-          <button type="button" onClick={() => setShowSecret(!showSecret)} style={s.toggleSecretBtn}>
-            {showSecret ? '🙈' : '👁️'}
-          </button>
-        </div>
-        <div style={s.warning}>
-          Nunca compartas tu Client Secret. Se almacena de forma segura y solo es accesible por el servidor.
-        </div>
+        <select
+          id="paypal-currency"
+          value={currencyCode}
+          onChange={e => setCurrencyCode(e.target.value)}
+          style={{ ...s.input, background: 'white', cursor: 'pointer' }}
+        >
+          {PAYPAL_CURRENCIES.map(c => (
+            <option key={c.code} value={c.code}>{c.label}</option>
+          ))}
+        </select>
+        <div style={s.hint}>PayPal procesa el cobro en esta moneda.</div>
       </div>
 
       <button
-        onClick={() => onSave(clientId, clientSecret)}
-        disabled={saving || !clientId || !clientSecret}
-        style={{ ...primaryBtn(saving || !clientId || !clientSecret), width: '100%' }}
+        onClick={() => onSave(clientId, currencyCode)}
+        disabled={saving || !clientId.trim()}
+        style={{ ...primaryBtn(saving || !clientId.trim()), width: '100%', background: saving || !clientId.trim() ? '#cbd5e1' : 'linear-gradient(135deg,#0070ba,#003d7a)' }}
       >
-        {saving ? 'Guardando...' : 'Guardar Configuración'}
+        {saving ? 'Guardando...' : 'Guardar configuración PayPal'}
       </button>
     </div>
   )

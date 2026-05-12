@@ -5,6 +5,7 @@ import type { Registro, Cliente, UserSession } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 import { StripeCheckoutModal } from './StripeCheckoutModal'
 import { PagoManualModal } from './PagoManualModal'
+import { PayPalCheckoutModal } from './PayPalCheckoutModal'
 
 interface Props {
   registros: Registro[]
@@ -19,14 +20,19 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
     stripe_activo: boolean
     paypal_configured: boolean
     paypal_activo: boolean
+    paypal_client_id: string
+    paypal_currency_code: string
   }>({
     stripe_configured: false,
     stripe_activo: false,
     paypal_configured: false,
     paypal_activo: false,
+    paypal_client_id: '',
+    paypal_currency_code: 'USD',
   })
   const [loading, setLoading] = useState(true)
   const [stripeModal, setStripeModal] = useState<Registro | null>(null)
+  const [paypalModal, setPaypalModal] = useState<Registro | null>(null)
   const [manualModal, setManualModal] = useState<Registro | null>(null)
 
   useEffect(() => {
@@ -37,7 +43,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
     if (!currentUser.company_id) return
     const { data } = await supabase
       .from('companies')
-      .select('stripe_configured,stripe_activo,paypal_configured,paypal_activo')
+      .select('stripe_configured,stripe_activo,paypal_configured,paypal_activo,paypal_client_id,paypal_currency_code')
       .eq('id', currentUser.company_id)
       .single()
     if (data) {
@@ -46,6 +52,8 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
         stripe_activo: data.stripe_activo !== false,
         paypal_configured: data.paypal_configured || false,
         paypal_activo: data.paypal_activo !== false,
+        paypal_client_id: (data as any).paypal_client_id || '',
+        paypal_currency_code: (data as any).paypal_currency_code || 'USD',
       })
     }
     setLoading(false)
@@ -186,15 +194,9 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                       💳 Pagar Stripe
                     </button>
                   )}
-                  {paymentConfig.paypal_activo && (
+                  {paymentConfig.paypal_activo && paymentConfig.paypal_client_id && (
                     <button
-                      onClick={() => {
-                        void Swal.fire({
-                          icon: 'info',
-                          title: 'PayPal',
-                          text: 'Integración de PayPal disponible próximamente',
-                        })
-                      }}
+                      onClick={() => setPaypalModal(registro)}
                       style={{
                         padding: '10px',
                         borderRadius: '8px',
@@ -242,6 +244,21 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
           onClose={() => setStripeModal(null)}
           onSuccess={() => {
             setStripeModal(null)
+            void cargarConfig()
+          }}
+        />
+      )}
+
+      {paypalModal && (
+        <PayPalCheckoutModal
+          registro={paypalModal}
+          moneda={moneda}
+          paypalClientId={paymentConfig.paypal_client_id}
+          paypalCurrencyCode={paymentConfig.paypal_currency_code}
+          currentUser={currentUser}
+          onClose={() => setPaypalModal(null)}
+          onSuccess={() => {
+            setPaypalModal(null)
             void cargarConfig()
           }}
         />
