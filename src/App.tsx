@@ -449,7 +449,7 @@ export default function App() {
           )}
           {activeSection === 'dashboard' && (
             <ErrorBoundary sectionName="dashboard">
-              <DashboardSection registros={registros} moneda={moneda} />
+              <DashboardSection registros={registros} moneda={moneda} isLoading={dataLoading} />
             </ErrorBoundary>
           )}
           {activeSection === 'admin_dashboard' && (
