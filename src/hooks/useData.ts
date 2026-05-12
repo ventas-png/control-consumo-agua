@@ -3,6 +3,14 @@ import Swal from 'sweetalert2'
 import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../types'
 import { supabase } from '../lib/supabase'
 
+async function ensureSupabaseSession(): Promise<boolean> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session) return true
+  // Try refreshing — handles expired JWT with valid refresh_token
+  const { data: { session: refreshed } } = await supabase.auth.refreshSession()
+  return !!refreshed
+}
+
 const CACHE_KEY = 'aquacontrol_data_v2'
 const CACHE_MAX_AGE = 10 * 60 * 1000 // 10 minutes
 
@@ -81,16 +89,20 @@ const PROJECT_EXEMPT_ROLES = new Set(['super_admin', 'company_owner', 'admin'])
 
 export function useData(companyId?: string, userId?: string, userRole?: string, condominiosRole?: string) {
   const [data, setData] = useState<AppData>(() => loadCache() ?? INITIAL_DATA)
+  const [isLoading, setIsLoading] = useState(false)
 
   // Refs so the stable cargarDatos closure always reads the latest values
   const userIdRef = useRef(userId)
   const userRoleRef = useRef(userRole)
   const condominiosRoleRef = useRef(condominiosRole)
+  const companyIdRef = useRef(companyId)
   userIdRef.current = userId
   userRoleRef.current = userRole
   condominiosRoleRef.current = condominiosRole
+  companyIdRef.current = companyId
 
   const fetchAllData = async () => {
+    const cid = companyIdRef.current
     // Defense-in-depth: add company_id filters where columns exist.
     // RLS is the primary enforcement, these are secondary safeguards.
     const tarifasQ = supabase.from('tarifas').select('*').order('created_at', { ascending: false })
@@ -103,16 +115,16 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     const fuentesEnergiaQ = supabase.from('fuentes_energia').select('*').order('created_at', { ascending: false })
     const facturasEnergiaQ = supabase.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
 
-    if (companyId) {
-      tarifasQ.eq('company_id', companyId)
-      contadoresQ.eq('company_id', companyId)
-      unidadesQ.eq('company_id', companyId)
-      fuentesQ.eq('company_id', companyId)
-      rcalQ.eq('company_id', companyId)
-      proveedoresEnergiaQ.eq('company_id', companyId)
-      tarifasEnergiaQ.eq('company_id', companyId)
-      fuentesEnergiaQ.eq('company_id', companyId)
-      facturasEnergiaQ.eq('company_id', companyId)
+    if (cid) {
+      tarifasQ.eq('company_id', cid)
+      contadoresQ.eq('company_id', cid)
+      unidadesQ.eq('company_id', cid)
+      fuentesQ.eq('company_id', cid)
+      rcalQ.eq('company_id', cid)
+      proveedoresEnergiaQ.eq('company_id', cid)
+      tarifasEnergiaQ.eq('company_id', cid)
+      fuentesEnergiaQ.eq('company_id', cid)
+      facturasEnergiaQ.eq('company_id', cid)
     }
 
     return Promise.allSettled([
@@ -237,42 +249,58 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
   }
 
   const cargarDatos = useCallback(async () => {
-    // Auto-desactivar tarifas cuya fecha_revision ya pasó — fire-and-forget, no bloquea la carga
-    void Promise.resolve(supabase.rpc('deactivate_expired_tarifas')).catch(() => { /* silencioso */ })
+    setIsLoading(true)
+    try {
+      // Ensure the Supabase JWT is valid before querying — handles expired tokens
+      // that would cause RLS to silently return empty arrays
+      const hasSession = await ensureSupabaseSession()
+      if (!hasSession) {
+        Swal.fire('Sesión expirada', 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.', 'warning')
+        setIsLoading(false)
+        return
+      }
 
-    // Use cached data as base so partial query failures keep cached values for failed tables
-    const base = loadCache() ?? INITIAL_DATA
+      // Auto-desactivar tarifas cuya fecha_revision ya pasó — fire-and-forget, no bloquea la carga
+      void Promise.resolve(supabase.rpc('deactivate_expired_tarifas')).catch(() => { /* silencioso */ })
 
-    let results = await fetchAllData()
-    const freshData = await filterProyectosByAssignment(applyResults(base, results))
-    setData(freshData)
+      // Use cached data as base so partial query failures keep cached values for failed tables
+      const base = loadCache() ?? INITIAL_DATA
 
-    if (!hasErrors(results)) {
-      saveCache(freshData)
-      return
-    }
+      let results = await fetchAllData()
+      const freshData = await filterProyectosByAssignment(applyResults(base, results))
+      setData(freshData)
 
-    // Retry 1: wait 1.5 s to handle cold-start timeouts on the DB connection pool
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    results = await fetchAllData()
-    const retryData = await filterProyectosByAssignment(applyResults(base, results))
-    setData(retryData)
+      if (!hasErrors(results)) {
+        saveCache(freshData)
+        setIsLoading(false)
+        return
+      }
 
-    if (!hasErrors(results)) {
-      saveCache(retryData)
-      return
-    }
+      // Retry 1: wait 1.5 s to handle cold-start timeouts on the DB connection pool
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      results = await fetchAllData()
+      const retryData = await filterProyectosByAssignment(applyResults(base, results))
+      setData(retryData)
 
-    // Retry 2: wait an additional 3 s for slow Supabase cold starts
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    results = await fetchAllData()
-    const retryData2 = await filterProyectosByAssignment(applyResults(base, results))
-    setData(retryData2)
+      if (!hasErrors(results)) {
+        saveCache(retryData)
+        setIsLoading(false)
+        return
+      }
 
-    if (!hasErrors(results)) {
-      saveCache(retryData2)
-    } else {
-      Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
+      // Retry 2: wait an additional 3 s for slow Supabase cold starts
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      results = await fetchAllData()
+      const retryData2 = await filterProyectosByAssignment(applyResults(base, results))
+      setData(retryData2)
+
+      if (!hasErrors(results)) {
+        saveCache(retryData2)
+      } else {
+        Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
+      }
+    } finally {
+      setIsLoading(false)
     }
   }, [])
 
@@ -452,6 +480,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
 
   return {
     ...data,
+    isLoading,
     cargarDatos,
     addCliente,
     updateCliente,

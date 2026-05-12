@@ -26,6 +26,7 @@ interface Props {
   currentUser: UserSession
   data: AdminDashboardData
   moneda: string
+  isLoading?: boolean
   onDataRefresh: () => Promise<void>
   onNavigateSection?: (section: AppSection) => void
 }
@@ -40,7 +41,7 @@ interface ConvStats {
   enProceso: number
 }
 
-export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh, onNavigateSection }: Props) {
+export function AdminClientDashboard({ currentUser, data, moneda, isLoading = false, onDataRefresh, onNavigateSection }: Props) {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [projectInitialized, setProjectInitialized] = useState(false)
@@ -281,6 +282,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, onDataRefresh,
               clientes={clientesEnProyecto}
               fechaDesde={fechaDesde}
               fechaHasta={fechaHasta}
+              isLoading={isLoading}
             />
             {!selectedProjectId && data.proyectos.length > 1 && (
               <AdminResumenProyectos

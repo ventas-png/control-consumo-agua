@@ -113,20 +113,29 @@ async function buildSessionFromSupabase(
   email: string,
   expiresAt: number | undefined
 ): Promise<UserSession> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+  )
+
+  // Batch 1: profile + permissions in parallel
   const profileQuery = supabase
     .from('app_users')
     .select('full_name, role, company_id, cliente_id, activo, condominios_role, agua_role')
     .eq('id', userId)
     .single()
 
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
-  )
+  const permsQuery = supabase
+    .from('user_module_permissions')
+    .select('module_key, can_view, can_create, can_edit, can_change_status')
+    .eq('user_id', userId)
 
-  const { data: profile } = await Promise.race([profileQuery, timeout])
+  const [profileResult, permsResult] = await Promise.race([
+    Promise.all([profileQuery, permsQuery]),
+    timeout,
+  ])
 
   type ProfileRow = { full_name?: string; role?: string; company_id?: string; cliente_id?: string; activo?: boolean; condominios_role?: string; agua_role?: string } | null
-  const prof = profile as ProfileRow
+  const prof = profileResult.data as ProfileRow
 
   if (prof?.activo === false) {
     throw new Error('Cuenta desactivada. Comuníquese con su empresa de servicios.')
@@ -147,15 +156,11 @@ async function buildSessionFromSupabase(
 
   const displayName = prof?.full_name ?? email
 
-  // Cargar permisos de módulos para roles configurables
+  // Apply module permissions from batch 1 result
   let modulePermissions: ModulePermissionsMap | undefined
   if (!EXEMPT_ROLES.includes(uiRole)) {
     try {
-      const { data: perms } = await supabase
-        .from('user_module_permissions')
-        .select('module_key, can_view, can_create, can_edit, can_change_status')
-        .eq('user_id', userId)
-
+      const perms = permsResult.data
       if (perms && perms.length > 0) {
         modulePermissions = {}
         for (const p of perms) {
@@ -168,8 +173,6 @@ async function buildSessionFromSupabase(
           }
         }
       } else {
-        // Sin filas en DB (usuario sin permisos configurados aún, o fallo de conexión)
-        // Usar template del rol como fallback para no dejar el sidebar vacío
         const defaults = ROLE_DEFAULT_TEMPLATES[uiRole]
         if (defaults && defaults.length > 0) {
           modulePermissions = {}
@@ -179,7 +182,6 @@ async function buildSessionFromSupabase(
         }
       }
     } catch {
-      // Si falla la carga de permisos, usar template del rol como fallback
       const defaults = ROLE_DEFAULT_TEMPLATES[uiRole]
       if (defaults && defaults.length > 0) {
         modulePermissions = {}
@@ -190,7 +192,7 @@ async function buildSessionFromSupabase(
     }
   }
 
-  // Cargar flags de líneas de servicio
+  // Batch 2: company flags (needs companyId from batch 1)
   let servicio_agua: boolean | undefined
   let servicio_condominios: boolean | undefined
   if (companyId) {
