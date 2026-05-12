@@ -274,24 +274,6 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
 
       {/* Contenido de pestañas */}
       <div style={{ minHeight: 'calc(100vh - 300px)' }}>
-        {isLoading && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '10px',
-            padding: '14px 20px', marginBottom: '20px',
-            background: 'linear-gradient(90deg, #e0f2fe, #f0fdf4)',
-            borderRadius: '12px', border: '1px solid #bae6fd',
-          }}>
-            <div style={{
-              width: '18px', height: '18px', flexShrink: 0,
-              border: '2px solid #0ea5e9', borderTop: '2px solid transparent',
-              borderRadius: '50%', animation: 'spin 0.8s linear infinite',
-            }} />
-            <span style={{ fontSize: '14px', color: '#0369a1', fontWeight: 500 }}>
-              Cargando datos…
-            </span>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          </div>
-        )}
         {activeTab === 'dashboard' && (
           <div>
             <AdminDashboardStats
@@ -300,6 +282,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
               clientes={clientesEnProyecto}
               fechaDesde={fechaDesde}
               fechaHasta={fechaHasta}
+              isLoading={isLoading}
             />
             {!selectedProjectId && data.proyectos.length > 1 && (
               <AdminResumenProyectos
