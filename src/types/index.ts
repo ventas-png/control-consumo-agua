@@ -324,6 +324,7 @@ export type MaxUnidadesPorTipo = {
 export interface Proyecto {
   id: string
   nombre: string
+  company_id: string
   logo_url: string | null
   descripcion: string | null
   direccion: string | null
