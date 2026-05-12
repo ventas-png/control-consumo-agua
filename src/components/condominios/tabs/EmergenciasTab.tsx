@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ContactoEmergencia, TipoContactoEmergencia } from '../../../types'
 import Swal from 'sweetalert2'
+import { ImportEmergenciasModal } from '../ImportEmergenciasModal'
 
 interface Props {
   contactos: ContactoEmergencia[]
@@ -35,6 +36,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState<TipoContactoEmergencia | 'todos'>('todos')
+  const [showImportModal, setShowImportModal] = useState(false)
 
   const sorted = [...contactos]
     .filter(c => filtroTipo === 'todos' || c.tipo === filtroTipo)
@@ -120,9 +122,14 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Gestión de Contactos</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-            + Agregar Contacto
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => setShowImportModal(true)} style={{ padding: '8px 14px', background: '#f0f9ff', color: '#0369a1', border: '1.5px solid #bae6fd', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              ⬆ Carga masiva
+            </button>
+            <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              + Agregar Contacto
+            </button>
+          </div>
         )}
       </div>
 
@@ -229,6 +236,15 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
             )
           })}
         </div>
+      )}
+
+      {showImportModal && (
+        <ImportEmergenciasModal
+          proyectoId={proyectoId}
+          companyId={companyId}
+          onClose={() => setShowImportModal(false)}
+          onImportado={() => { setShowImportModal(false); onRefresh() }}
+        />
       )}
     </div>
   )
