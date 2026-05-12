@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { AppSection, Ruta } from './types'
+import type { AppSection, Ruta, UserSession } from './types'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
@@ -39,6 +39,48 @@ import { RoleGuard } from './components/shared/AccessDenied'
 import { usePermissions } from './hooks/usePermissions'
 
 initEmailJS()
+
+// Shown when a client has both servicio_agua and servicio_condominios active
+function DualServicePortal({ currentUser, onLogout }: { currentUser: UserSession; onLogout: () => void }) {
+  const [activeService, setActiveService] = useState<'condominios' | 'agua'>('condominios')
+  return (
+    <div>
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 200,
+        background: 'white',
+        borderBottom: '2px solid #e2e8f0',
+        display: 'flex', justifyContent: 'center', gap: '6px',
+        padding: '8px 16px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      }}>
+        <button
+          onClick={() => setActiveService('condominios')}
+          style={{
+            padding: '7px 22px', borderRadius: '20px', border: 'none',
+            background: activeService === 'condominios' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#f1f5f9',
+            color: activeService === 'condominios' ? 'white' : '#64748b',
+            fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+            transition: 'all 0.18s',
+          }}
+        >🏢 Condominios</button>
+        <button
+          onClick={() => setActiveService('agua')}
+          style={{
+            padding: '7px 22px', borderRadius: '20px', border: 'none',
+            background: activeService === 'agua' ? 'linear-gradient(135deg, #0ea5e9, #0d9488)' : '#f1f5f9',
+            color: activeService === 'agua' ? 'white' : '#64748b',
+            fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+            transition: 'all 0.18s',
+          }}
+        >💧 Agua</button>
+      </div>
+      {activeService === 'condominios'
+        ? <CondominiosClientPortal currentUser={currentUser} onLogout={onLogout} />
+        : <CustomerPortal currentUser={currentUser} onLogout={onLogout} />
+      }
+    </div>
+  )
+}
 
 // Detect password reset token in URL
 function getResetToken(): string | null {
@@ -258,7 +300,12 @@ export default function App() {
 
   // Cliente users get their own portal — no admin data needed
   if (currentUser.role === 'cliente') {
-    if (currentUser.servicio_condominios) {
+    const tieneCondominios = !!currentUser.servicio_condominios
+    const tieneAgua = currentUser.servicio_agua !== false
+    if (tieneCondominios && tieneAgua) {
+      return <DualServicePortal currentUser={currentUser} onLogout={logout} />
+    }
+    if (tieneCondominios) {
       return <CondominiosClientPortal currentUser={currentUser} onLogout={logout} />
     }
     return <CustomerPortal currentUser={currentUser} onLogout={logout} />

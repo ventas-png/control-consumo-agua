@@ -206,6 +206,23 @@ async function buildSessionFromSupabase(
       servicio_agua = flags.servicio_agua
       servicio_condominios = flags.servicio_condominios
     }
+  } else if (clienteId) {
+    // Client without company_id: resolve service flags via unidades → projects → companies
+    // This covers condominios residents who are linked only through their units
+    type UnidadRow = { projects: { companies: { servicio_agua: boolean; servicio_condominios: boolean } | null } | null }
+    const { data: unidadesFlags } = await supabase
+      .from('unidades')
+      .select('projects(companies(servicio_agua, servicio_condominios))')
+      .eq('cliente_id', clienteId)
+      .eq('activo', true)
+    if (unidadesFlags) {
+      for (const u of (unidadesFlags as unknown as UnidadRow[])) {
+        const flags = u.projects?.companies
+        if (!flags) continue
+        if (flags.servicio_condominios) servicio_condominios = true
+        if (flags.servicio_agua) servicio_agua = true
+      }
+    }
   }
 
   return {
@@ -255,6 +272,8 @@ export function useAuth() {
               fresh.name !== stored.name ||
               fresh.company_id !== stored.company_id ||
               fresh.cliente_id !== stored.cliente_id ||
+              fresh.servicio_condominios !== stored.servicio_condominios ||
+              fresh.servicio_agua !== stored.servicio_agua ||
               permissionsChanged
             ) {
               storeSession(fresh)
