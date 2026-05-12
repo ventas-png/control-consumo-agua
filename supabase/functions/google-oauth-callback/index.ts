@@ -147,9 +147,10 @@ Deno.serve(async (req: Request) => {
       const { error: dbError } = await supabase.from('company_email_configs').insert(record)
       if (dbError) throw new Error(dbError.message)
     } else {
-      const { error: dbError } = await supabase
-        .from('company_email_configs')
-        .upsert(record, { onConflict: 'company_id' })
+      // Partial unique index on company_id (WHERE company_id IS NOT NULL) doesn't
+      // support ON CONFLICT upsert — use delete+insert instead.
+      await supabase.from('company_email_configs').delete().eq('company_id', stateData.company_id)
+      const { error: dbError } = await supabase.from('company_email_configs').insert(record)
       if (dbError) throw new Error(dbError.message)
     }
 
