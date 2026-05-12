@@ -203,9 +203,19 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     if (!newEmail.trim() || !newEmail.includes('@')) { setEmailFb({ type: 'error', msg: 'Ingresa un correo electrónico válido' }); return }
     if (newEmail.trim().toLowerCase() === currentUser.email.toLowerCase()) { setEmailFb({ type: 'error', msg: 'El nuevo correo debe ser diferente al actual' }); return }
     setEmailLoading(true)
-    const { error } = await supabase.auth.updateUser({ email: newEmail.trim().toLowerCase() })
+    const { error } = await supabase.auth.updateUser(
+      { email: newEmail.trim().toLowerCase() },
+      { emailRedirectTo: window.location.origin }
+    )
     if (error) {
-      setEmailFb({ type: 'error', msg: 'Error al solicitar el cambio de correo. Intente de nuevo.' })
+      const msg = error.message?.toLowerCase() ?? ''
+      if (msg.includes('rate limit') || msg.includes('too many')) {
+        setEmailFb({ type: 'error', msg: 'Demasiados intentos. Espera unos minutos e intenta de nuevo.' })
+      } else if (msg.includes('email') && (msg.includes('taken') || msg.includes('already') || msg.includes('registered'))) {
+        setEmailFb({ type: 'error', msg: 'Ese correo electrónico ya está en uso por otra cuenta.' })
+      } else {
+        setEmailFb({ type: 'error', msg: error.message ?? 'Error al solicitar el cambio de correo. Intente de nuevo.' })
+      }
     } else {
       setEmailFb({ type: 'success', msg: `Revisa tu bandeja en ${newEmail} y confirma el cambio desde el enlace enviado` })
       setNewEmail('')
