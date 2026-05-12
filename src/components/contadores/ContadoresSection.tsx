@@ -187,6 +187,11 @@ export function ContadoresSection({
     setLoading(true)
 
     if (editingId) {
+      // Re-derive project/company from the (possibly changed) unit so they stay in sync
+      const selectedUnidad = unidades.find(u => u.id === form.unidad_id)
+      const updatedProjectId = selectedUnidad?.project_id ?? null
+      const updatedCompanyId = selectedUnidad?.company_id ?? null
+
       const { data, error } = await supabase
         .from('contadores')
         .update({
@@ -200,6 +205,8 @@ export function ContadoresSection({
           activo: form.activo,
           tarifa_id: form.tarifa_id || null,
           unidad_id: form.unidad_id || null,
+          ...(updatedProjectId && { project_id: updatedProjectId }),
+          ...(updatedCompanyId && { company_id: updatedCompanyId }),
           medida: form.medida || null,
           material: form.material || null,
           tipo_contador: form.tipo_contador || null,
