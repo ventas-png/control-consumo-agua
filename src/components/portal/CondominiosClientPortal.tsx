@@ -182,13 +182,18 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const visitantesU = visitantes.filter(v => v.unidad_id === selectedUnidadId)
   const mensajesU   = mensajes.filter(m => m.unidad_id === selectedUnidadId)
 
+  // Data filtered to selected unit's project
+  const amenidadesP = amenidades.filter(a => a.project_id === proyectoId)
+  const bloqueosP   = bloqueos.filter(b => b.project_id === proyectoId)
+  const anunciosP   = anuncios.filter(a => a.project_id === proyectoId)
+
   // KPI values
   const cuotasPendientes = cuotasU.filter(c => c.estado === 'pendiente' || c.estado === 'moroso')
   const deudaTotal       = cuotasPendientes.reduce((s, c) => s + c.monto, 0)
   const ticketsAbiertos  = ticketsU.filter(t => t.estado === 'abierto' || t.estado === 'en_proceso').length
   const misReservas      = reservas.filter(r => r.unidad_id === selectedUnidadId)
   const reservasProx     = misReservas.filter(r => r.estado === 'confirmada' || r.estado === 'pendiente').length
-  const anunciosNuevos   = anuncios.filter(a => {
+  const anunciosNuevos   = anunciosP.filter(a => {
     const hace7 = new Date(); hace7.setDate(hace7.getDate() - 7)
     return new Date(a.created_at) >= hace7
   }).length
@@ -339,13 +344,13 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               />
             )}
             {tab === 'reservas' && (
-              amenidades.length === 0 ? (
+              amenidadesP.length === 0 ? (
                 <EmptyState icon="🏊" title="Sin amenidades disponibles" text="Este condominio no tiene amenidades configuradas para reservar." />
               ) : (
                 <PortalReservasTab
-                  amenidades={amenidades}
-                  reservas={reservas}
-                  bloqueos={bloqueos}
+                  amenidades={amenidadesP}
+                  reservas={misReservas}
+                  bloqueos={bloqueosP}
                   unidadId={selectedUnidadId}
                   proyectoId={proyectoId}
                   companyId={resolvedCompanyId}
@@ -380,10 +385,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               />
             )}
             {tab === 'anuncios' && (
-              anuncios.length === 0 ? (
+              anunciosP.length === 0 ? (
                 <EmptyState icon="📢" title="Sin anuncios" text="No hay anuncios publicados en este momento." />
               ) : (
-                <PortalAnunciosTab anuncios={anuncios} />
+                <PortalAnunciosTab anuncios={anunciosP} />
               )
             )}
           </div>
