@@ -50,12 +50,12 @@ const PORTAL_CSS = `
 
 export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const clienteId = currentUser.cliente_id ?? ''
-  const companyId = currentUser.company_id ?? ''
 
   const [loading, setLoading]                     = useState(true)
   const [tab, setTab]                             = useState<PortalTab>('mi_unidad')
   const [unidades, setUnidades]                   = useState<Unidad[]>([])
   const [selectedUnidadId, setSelectedUnidadId]   = useState('')
+  const [resolvedCompanyId, setResolvedCompanyId] = useState(currentUser.company_id ?? '')
   const [moneda, setMoneda]                       = useState('Q')
   const [cuotas, setCuotas]                       = useState<CuotaCondominio[]>([])
   const [amenidades, setAmenidades]               = useState<Amenidad[]>([])
@@ -99,10 +99,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         { data: visitantesData },
         { data: mensajesData },
       ] = await Promise.all([
-        supabase.from('projects').select('id, moneda_condominios, moneda').in('id', projectIds),
+        supabase.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
         supabase.from('amenidades').select('*').in('project_id', projectIds).eq('activo', true),
         supabase.from('cuotas_condominio').select('*').in('unidad_id', unidadIds).order('fecha_vencimiento', { ascending: false }),
-        supabase.from('reservas_amenidades').select('*').eq('company_id', companyId).gte('fecha', today).order('fecha'),
+        supabase.from('reservas_amenidades').select('*').in('unidad_id', unidadIds).gte('fecha', today).order('fecha'),
         supabase.from('amenidades_bloqueos').select('*').in('project_id', projectIds),
         supabase.from('tickets_mantenimiento').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }),
         supabase.from('anuncios_comunidad').select('*').in('project_id', projectIds).eq('activo', true).order('created_at', { ascending: false }),
@@ -110,8 +110,14 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         supabase.from('mensajes_portal').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }),
       ])
 
-      const proj = (projData as { id: string; moneda_condominios: string | null; moneda: string }[] | null)?.[0]
-      if (proj) setMoneda(proj.moneda_condominios ?? proj.moneda ?? 'Q')
+      const proj = (projData as { id: string; company_id: string; moneda_condominios: string | null; moneda: string }[] | null)?.[0]
+      if (proj) {
+        setMoneda(proj.moneda_condominios ?? proj.moneda ?? 'Q')
+        // Resolve company_id from project when client doesn't have one set directly
+        if (!currentUser.company_id && proj.company_id) {
+          setResolvedCompanyId(proj.company_id)
+        }
+      }
 
       setAmenidades((amenidadesData as Amenidad[]) ?? [])
       setCuotas((cuotasData as CuotaCondominio[]) ?? [])
@@ -124,7 +130,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [clienteId, companyId])
+  }, [clienteId, currentUser.company_id])
 
   useEffect(() => { cargarDatos() }, [cargarDatos])
 
@@ -326,7 +332,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 unidad={unidad}
                 mensajes={mensajesU}
                 proyectoId={proyectoId}
-                companyId={companyId}
+                companyId={resolvedCompanyId}
                 isAdmin={false}
                 onRefresh={cargarDatos}
                 onGenerarToken={() => {}}
@@ -342,7 +348,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                   bloqueos={bloqueos}
                   unidadId={selectedUnidadId}
                   proyectoId={proyectoId}
-                  companyId={companyId}
+                  companyId={resolvedCompanyId}
                   moneda={moneda}
                   onRefresh={cargarDatos}
                 />
@@ -360,7 +366,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 tickets={ticketsU}
                 unidadId={selectedUnidadId}
                 proyectoId={proyectoId}
-                companyId={companyId}
+                companyId={resolvedCompanyId}
                 onRefresh={cargarDatos}
               />
             )}
@@ -369,7 +375,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 visitantes={visitantesU}
                 unidadId={selectedUnidadId}
                 proyectoId={proyectoId}
-                companyId={companyId}
+                companyId={resolvedCompanyId}
                 onRefresh={cargarDatos}
               />
             )}
