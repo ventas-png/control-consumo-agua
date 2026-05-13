@@ -874,6 +874,32 @@ export interface SolicitudRentaUnidad {
   unidad_nombre?: string
 }
 
+// ── Autorización de Mudanza por Unidad ────────────────────────────────────
+
+export type TipoSolicitudMudanza = 'nueva_mudanza' | 'ingreso_articulos' | 'egreso_articulos' | 'mudanza_salida'
+export type EstadoSolicitudMudanza = 'pendiente' | 'aprobada' | 'rechazada'
+
+export interface SolicitudMudanzaUnidad {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  cliente_id?: string | null
+  tipo_mudanza: TipoSolicitudMudanza
+  fecha_solicitada?: string | null
+  hora_solicitada?: string | null
+  descripcion?: string | null
+  estado: EstadoSolicitudMudanza
+  comentario_admin?: string | null
+  fecha_autorizada?: string | null
+  hora_autorizada?: string | null
+  aprobado_por?: string | null
+  fecha_resolucion?: string | null
+  created_at: string
+  // joined
+  unidad_nombre?: string
+}
+
 // ── Centro de Comunicación ─────────────────────────────────────────────────
 
 export type ConversationStatus =
