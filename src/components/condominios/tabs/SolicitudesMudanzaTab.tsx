@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { SolicitudMudanzaUnidad, TipoSolicitudMudanza, EstadoSolicitudMudanza, Unidad } from '../../../types'
@@ -26,12 +26,70 @@ const ESTADO_CFG: Record<EstadoSolicitudMudanza, { label: string; color: string;
   rechazada: { label: 'Rechazada', color: '#dc2626', bg: '#fef2f2', icon: '❌' },
 }
 
-export function SolicitudesMudanzaTab({ solicitudes, unidades, autorNombre, canEdit, onRefresh }: Props) {
+export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, companyId, autorNombre, canEdit, onRefresh }: Props) {
   const [filtroEstado, setFiltroEstado] = useState<EstadoSolicitudMudanza | 'all'>('pendiente')
   const [expandedId, setExpandedId]     = useState<string | null>(null)
   const [fechaAut, setFechaAut]         = useState('')
   const [horaAut, setHoraAut]           = useState('')
   const [saving, setSaving]             = useState(false)
+
+  // Terms state
+  const [terminosMudanza, setTerminosMudanza] = useState<string>('')
+  const [terminosId, setTerminosId]           = useState<string | null>(null)
+  const [terminosText, setTerminosText]       = useState<string>('')
+  const [terminosOpen, setTerminosOpen]       = useState(false)
+  const [savingTerminos, setSavingTerminos]   = useState(false)
+
+  const cargarTerminos = useCallback(async () => {
+    const { data } = await supabase
+      .from('config_condominio')
+      .select('id, valor')
+      .eq('project_id', proyectoId)
+      .eq('company_id', companyId)
+      .eq('clave', 'terminos_mudanza')
+      .maybeSingle()
+
+    if (data) {
+      setTerminosMudanza(data.valor ?? '')
+      setTerminosId(data.id)
+      setTerminosText(data.valor ?? '')
+    } else {
+      setTerminosMudanza('')
+      setTerminosId(null)
+      setTerminosText('')
+    }
+  }, [proyectoId, companyId])
+
+  useEffect(() => { cargarTerminos() }, [cargarTerminos])
+
+  // Collapse section by default when terms are already set
+  useEffect(() => {
+    setTerminosOpen(!terminosMudanza)
+  }, [terminosMudanza])
+
+  async function guardarTerminos() {
+    if (!terminosText.trim()) {
+      Swal.fire('Error', 'El texto de los términos no puede estar vacío.', 'error')
+      return
+    }
+    setSavingTerminos(true)
+    if (terminosId) {
+      const { error } = await supabase
+        .from('config_condominio')
+        .update({ valor: terminosText.trim(), updated_at: new Date().toISOString() })
+        .eq('id', terminosId)
+      setSavingTerminos(false)
+      if (error) { Swal.fire('Error', error.message, 'error'); return }
+    } else {
+      const { error } = await supabase
+        .from('config_condominio')
+        .insert({ company_id: companyId, project_id: proyectoId, clave: 'terminos_mudanza', valor: terminosText.trim(), tipo: 'texto' })
+      setSavingTerminos(false)
+      if (error) { Swal.fire('Error', error.message, 'error'); return }
+    }
+    Swal.fire({ icon: 'success', title: 'Términos guardados', timer: 1400, showConfirmButton: false })
+    await cargarTerminos()
+  }
 
   const filtered = solicitudes.filter(s => filtroEstado === 'all' || s.estado === filtroEstado)
 
@@ -107,6 +165,62 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, autorNombre, canE
         </p>
       </div>
 
+      {/* Terms configuration section */}
+      <div style={{ marginBottom: '20px', border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+        <button
+          onClick={() => setTerminosOpen(o => !o)}
+          style={{
+            width: '100%', padding: '12px 16px', background: '#f8fafc',
+            border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '15px' }}>📋</span>
+            <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#0f172a' }}>Términos de mudanza</span>
+            {terminosMudanza && !terminosOpen && (
+              <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 400, maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                — {terminosMudanza.slice(0, 80)}{terminosMudanza.length > 80 ? '…' : ''}
+              </span>
+            )}
+          </div>
+          <span style={{ color: '#94a3b8', fontSize: '14px' }}>{terminosOpen ? '▲' : '▼'}</span>
+        </button>
+
+        {terminosOpen && (
+          <div style={{ padding: '16px', borderTop: '1px solid #e2e8f0' }}>
+            <p style={{ margin: '0 0 10px', fontSize: '12.5px', color: '#64748b' }}>
+              Este texto se mostrará al cliente cuando solicite una mudanza. Si está configurado, el cliente deberá aceptarlo para poder enviar la solicitud.
+            </p>
+            <textarea
+              value={terminosText}
+              onChange={e => setTerminosText(e.target.value)}
+              placeholder="Escribe aquí los términos y condiciones para autorización de mudanzas…"
+              style={{
+                width: '100%', minHeight: '120px', padding: '10px 12px',
+                fontSize: '13px', borderRadius: '8px', border: '1.5px solid #e2e8f0',
+                resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit',
+                lineHeight: 1.6, color: '#334155',
+              }}
+            />
+            <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={guardarTerminos}
+                disabled={savingTerminos}
+                style={{
+                  padding: '8px 20px', background: '#4f46e5', color: 'white',
+                  border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13px',
+                  cursor: savingTerminos ? 'not-allowed' : 'pointer',
+                  opacity: savingTerminos ? 0.7 : 1,
+                }}
+              >
+                {savingTerminos ? 'Guardando…' : '💾 Guardar términos'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* KPIs */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {[
@@ -173,6 +287,39 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, autorNombre, canE
                 {s.descripcion && (
                   <div style={{ marginTop: '12px', background: '#f8fafc', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#334155' }}>
                     <strong>Descripción:</strong> {s.descripcion}
+                  </div>
+                )}
+
+                {/* Attached images */}
+                {s.imagenes && s.imagenes.length > 0 && (
+                  <div style={{ marginTop: '12px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
+                      🖼️ Imágenes adjuntas:
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {s.imagenes.map((url, idx) => (
+                        <a
+                          key={idx}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Ver imagen completa"
+                          style={{ display: 'block', flexShrink: 0 }}
+                        >
+                          <img
+                            src={url}
+                            alt={`Imagen ${idx + 1}`}
+                            style={{
+                              width: '72px', height: '72px', objectFit: 'cover',
+                              borderRadius: '8px', border: '1.5px solid #e2e8f0',
+                              cursor: 'pointer', transition: 'opacity 0.15s',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
+                            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                          />
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
 
