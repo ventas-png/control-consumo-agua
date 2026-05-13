@@ -11,13 +11,14 @@ import { PortalMisTicketsTab } from '../condominios/tabs/PortalMisTicketsTab'
 import { PortalMiUnidadTab }   from '../condominios/tabs/PortalMiUnidadTab'
 import { PortalVisitantesTab } from '../condominios/tabs/PortalVisitantesTab'
 import { PortalAnunciosTab }   from '../condominios/tabs/PortalAnunciosTab'
+import { PortalRentasTab }     from '../condominios/tabs/PortalRentasTab'
 
 interface Props {
   currentUser: UserSession
   onLogout: () => void
 }
 
-type PortalTab = 'mi_unidad' | 'reservas' | 'cuenta' | 'tickets' | 'visitantes' | 'anuncios'
+type PortalTab = 'mi_unidad' | 'reservas' | 'cuenta' | 'tickets' | 'visitantes' | 'anuncios' | 'rentas'
 
 const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
   { id: 'mi_unidad',  label: 'Mi Unidad',    icon: '🏠' },
@@ -26,6 +27,7 @@ const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
   { id: 'tickets',    label: 'Mantenimiento', icon: '🔧' },
   { id: 'visitantes', label: 'Visitantes',    icon: '🚪' },
   { id: 'anuncios',   label: 'Anuncios',      icon: '📢' },
+  { id: 'rentas',     label: 'Rentas',        icon: '🏨' },
 ]
 
 const PORTAL_CSS = `
@@ -390,6 +392,14 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               ) : (
                 <PortalAnunciosTab anuncios={anunciosP} />
               )
+            )}
+            {tab === 'rentas' && (
+              <PortalRentasTab
+                unidadId={selectedUnidadId}
+                unidadNombre={unidad.nombre}
+                proyectoId={proyectoId}
+                companyId={resolvedCompanyId}
+              />
             )}
           </div>
         )}

@@ -1,15 +1,17 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, UserRole, UserSession, ClienteLookupResult } from '../../types'
+import type { Cliente, UserRole, UserSession, ClienteLookupResult, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber, formatPhoneForWa } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
 import { ImportClientesModal } from './ImportClientesModal'
 import { EditModal } from '../shared/EditModal'
 import { getEditedTagInfo } from '../../lib/timeUtils'
+import { ClienteRentasModal } from './ClienteRentasModal'
 
 interface Props {
   clientes: Cliente[]
+  unidades?: Unidad[]
   userRole: UserRole
   userId: string
   currentUser: UserSession
@@ -52,13 +54,14 @@ interface LookupForm {
 
 const EMPTY_LOOKUP: LookupForm = { cui_dui: '', fecha_nacimiento: '', email: '' }
 
-export function ClientesSection({ clientes, userRole, userId, currentUser, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted, canCreate: canCreateProp = true, canEdit: canEditProp = true, canChangeStatus: _canChangeStatus = true }: Props) {
+export function ClientesSection({ clientes, unidades = [], userRole, userId, currentUser, companyId, onClienteAdded, onClienteUpdated, onClienteDeleted, canCreate: canCreateProp = true, canEdit: canEditProp = true, canChangeStatus: _canChangeStatus = true }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [showImportModal, setShowImportModal] = useState(false)
+  const [rentasClienteId, setRentasClienteId] = useState<string | null>(null)
 
   // Onboarding state
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('idle')
@@ -942,6 +945,7 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Contacto</th>
                   <th scope="col" className="table-col-secondary" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Facturación</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Cuenta</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Rentas</th>
                   {canEdit && (
                     <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
                   )}
@@ -1072,6 +1076,31 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
                         )}
                       </div>
                     </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      {(() => {
+                        const clienteUnidades = unidades.filter(u => u.cliente_id === c.id && u.activo)
+                        const count = clienteUnidades.length
+                        return (
+                          <button
+                            onClick={() => setRentasClienteId(c.id)}
+                            title={count > 0 ? `${count} unidad${count !== 1 ? 'es' : ''} asignada${count !== 1 ? 's' : ''}` : 'Sin unidades asignadas'}
+                            style={{
+                              padding: '4px 12px',
+                              background: count > 0 ? '#f0fdf4' : '#f8fafc',
+                              color: count > 0 ? '#16a34a' : '#94a3b8',
+                              border: `1px solid ${count > 0 ? '#bbf7d0' : '#e2e8f0'}`,
+                              borderRadius: '20px',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              fontSize: '12px',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            🏠 {count > 0 ? `${count} unidad${count !== 1 ? 'es' : ''}` : 'Sin unidades'}
+                          </button>
+                        )
+                      })()}
+                    </td>
                     {canEdit && (
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
@@ -1129,6 +1158,16 @@ export function ClientesSection({ clientes, userRole, userId, currentUser, compa
             nuevos.forEach(c => onClienteAdded(c))
             setShowImportModal(false)
           }}
+        />
+      )}
+
+      {rentasClienteId && companyId && (
+        <ClienteRentasModal
+          cliente={clientes.find(c => c.id === rentasClienteId)!}
+          unidades={unidades}
+          companyId={companyId}
+          canEdit={canEdit}
+          onClose={() => setRentasClienteId(null)}
         />
       )}
     </div>
