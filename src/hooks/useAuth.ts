@@ -192,37 +192,46 @@ async function buildSessionFromSupabase(
     }
   }
 
-  // Batch 2: company flags (needs companyId from batch 1)
+  // Batch 2: company flags (needs companyId from batch 1) — wrapped in 4s timeout
+  // to prevent login from hanging if Supabase is slow or the nested join stalls
   let servicio_agua: boolean | undefined
   let servicio_condominios: boolean | undefined
-  if (companyId) {
-    const { data: companyFlags } = await supabase
-      .from('companies')
-      .select('servicio_agua, servicio_condominios')
-      .eq('id', companyId)
-      .single()
-    if (companyFlags) {
-      const flags = companyFlags as { servicio_agua: boolean; servicio_condominios: boolean }
-      servicio_agua = flags.servicio_agua
-      servicio_condominios = flags.servicio_condominios
-    }
-  } else if (clienteId) {
-    // Client without company_id: resolve service flags via unidades → projects → companies
-    // This covers condominios residents who are linked only through their units
-    type UnidadRow = { projects: { companies: { servicio_agua: boolean; servicio_condominios: boolean } | null } | null }
-    const { data: unidadesFlags } = await supabase
-      .from('unidades')
-      .select('projects(companies(servicio_agua, servicio_condominios))')
-      .eq('cliente_id', clienteId)
-      .eq('activo', true)
-    if (unidadesFlags) {
-      for (const u of (unidadesFlags as unknown as UnidadRow[])) {
-        const flags = u.projects?.companies
-        if (!flags) continue
-        if (flags.servicio_condominios) servicio_condominios = true
-        if (flags.servicio_agua) servicio_agua = true
-      }
-    }
+  try {
+    const batch2: Promise<void> = companyId
+      ? supabase
+          .from('companies')
+          .select('servicio_agua, servicio_condominios')
+          .eq('id', companyId)
+          .single()
+          .then(({ data }) => {
+            if (data) {
+              const flags = data as { servicio_agua: boolean; servicio_condominios: boolean }
+              servicio_agua = flags.servicio_agua
+              servicio_condominios = flags.servicio_condominios
+            }
+          })
+      : clienteId
+      ? (async () => {
+          type UnidadRow = { projects: { companies: { servicio_agua: boolean; servicio_condominios: boolean } | null } | null }
+          const { data: unidadesFlags } = await supabase
+            .from('unidades')
+            .select('projects(companies(servicio_agua, servicio_condominios))')
+            .eq('cliente_id', clienteId)
+            .eq('activo', true)
+          if (unidadesFlags) {
+            for (const u of (unidadesFlags as unknown as UnidadRow[])) {
+              const flags = u.projects?.companies
+              if (!flags) continue
+              if (flags.servicio_condominios) servicio_condominios = true
+              if (flags.servicio_agua) servicio_agua = true
+            }
+          }
+        })()
+      : Promise.resolve()
+
+    await Promise.race([batch2, new Promise<void>(resolve => setTimeout(resolve, 4000))])
+  } catch {
+    // service flags remain undefined — portal falls back to agua portal safely
   }
 
   return {
