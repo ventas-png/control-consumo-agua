@@ -18,6 +18,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
   const [paymentConfig, setPaymentConfig] = useState<{
     stripe_configured: boolean
     stripe_activo: boolean
+    stripe_public_key: string
     paypal_configured: boolean
     paypal_activo: boolean
     paypal_client_id: string
@@ -25,6 +26,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
   }>({
     stripe_configured: false,
     stripe_activo: false,
+    stripe_public_key: '',
     paypal_configured: false,
     paypal_activo: false,
     paypal_client_id: '',
@@ -43,13 +45,14 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
     if (!currentUser.company_id) return
     const { data } = await supabase
       .from('companies')
-      .select('stripe_configured,stripe_activo,paypal_configured,paypal_activo,paypal_client_id,paypal_currency_code')
+      .select('stripe_configured,stripe_activo,stripe_public_key,paypal_configured,paypal_activo,paypal_client_id,paypal_currency_code')
       .eq('id', currentUser.company_id)
       .single()
     if (data) {
       setPaymentConfig({
         stripe_configured: data.stripe_configured || false,
         stripe_activo: data.stripe_activo !== false,
+        stripe_public_key: (data as any).stripe_public_key || '',
         paypal_configured: data.paypal_configured || false,
         paypal_activo: data.paypal_activo !== false,
         paypal_client_id: (data as any).paypal_client_id || '',
@@ -240,6 +243,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
         <StripeCheckoutModal
           registro={stripeModal}
           moneda={moneda}
+          stripePublicKey={paymentConfig.stripe_public_key}
           currentUser={currentUser}
           onClose={() => setStripeModal(null)}
           onSuccess={() => {
