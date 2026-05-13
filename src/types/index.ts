@@ -889,6 +889,7 @@ export interface SolicitudMudanzaUnidad {
   fecha_solicitada?: string | null
   hora_solicitada?: string | null
   descripcion?: string | null
+  imagenes?: string[] | null
   estado: EstadoSolicitudMudanza
   comentario_admin?: string | null
   fecha_autorizada?: string | null
