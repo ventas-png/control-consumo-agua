@@ -105,31 +105,37 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     const cid = companyIdRef.current
     // Defense-in-depth: add company_id filters where columns exist.
     // RLS is the primary enforcement, these are secondary safeguards.
-    const tarifasQ = supabase.from('tarifas').select('*').order('created_at', { ascending: false })
-    const contadoresQ = supabase.from('contadores').select('*').order('created_at', { ascending: false })
-    const unidadesQ = supabase.from('unidades').select('*').order('nombre', { ascending: true })
-    const fuentesQ = supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false })
-    const rcalQ = supabase.from('registros_calidad').select('*, fuentes_agua(identificador, nombre, tipo_agua)').order('fecha', { ascending: false })
-    const proveedoresEnergiaQ = supabase.from('proveedores_energia').select('*').order('created_at', { ascending: false })
-    const tarifasEnergiaQ = supabase.from('tarifas_energia').select('*').order('created_at', { ascending: false })
-    const fuentesEnergiaQ = supabase.from('fuentes_energia').select('*').order('created_at', { ascending: false })
-    const facturasEnergiaQ = supabase.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
+    // NOTE: Supabase query builder is immutable — .eq() returns a new builder,
+    // so we must reassign (use let) to actually apply the filter.
+    let tarifasQ = supabase.from('tarifas').select('*').order('created_at', { ascending: false })
+    let contadoresQ = supabase.from('contadores').select('*').order('created_at', { ascending: false })
+    let unidadesQ = supabase.from('unidades').select('*').order('nombre', { ascending: true })
+    let fuentesQ = supabase.from('fuentes_agua').select('*').order('created_at', { ascending: false })
+    let rcalQ = supabase.from('registros_calidad').select('*, fuentes_agua(identificador, nombre, tipo_agua)').order('fecha', { ascending: false })
+    let proveedoresEnergiaQ = supabase.from('proveedores_energia').select('*').order('created_at', { ascending: false })
+    let tarifasEnergiaQ = supabase.from('tarifas_energia').select('*').order('created_at', { ascending: false })
+    let fuentesEnergiaQ = supabase.from('fuentes_energia').select('*').order('created_at', { ascending: false })
+    let facturasEnergiaQ = supabase.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
+    let registrosQ = supabase.from('registros').select('*').order('fecha', { ascending: false }).limit(2000)
+    let clientesQ = supabase.from('clientes').select('*')
 
     if (cid) {
-      tarifasQ.eq('company_id', cid)
-      contadoresQ.eq('company_id', cid)
-      unidadesQ.eq('company_id', cid)
-      fuentesQ.eq('company_id', cid)
-      rcalQ.eq('company_id', cid)
-      proveedoresEnergiaQ.eq('company_id', cid)
-      tarifasEnergiaQ.eq('company_id', cid)
-      fuentesEnergiaQ.eq('company_id', cid)
-      facturasEnergiaQ.eq('company_id', cid)
+      tarifasQ         = tarifasQ.eq('company_id', cid)
+      contadoresQ      = contadoresQ.eq('company_id', cid)
+      unidadesQ        = unidadesQ.eq('company_id', cid)
+      fuentesQ         = fuentesQ.eq('company_id', cid)
+      rcalQ            = rcalQ.eq('company_id', cid)
+      proveedoresEnergiaQ = proveedoresEnergiaQ.eq('company_id', cid)
+      tarifasEnergiaQ  = tarifasEnergiaQ.eq('company_id', cid)
+      fuentesEnergiaQ  = fuentesEnergiaQ.eq('company_id', cid)
+      facturasEnergiaQ = facturasEnergiaQ.eq('company_id', cid)
+      registrosQ       = registrosQ.eq('company_id', cid)
+      clientesQ        = clientesQ.eq('company_id', cid)
     }
 
     return Promise.allSettled([
-      supabase.from('clientes').select('*'),          // filtered via RLS + company_clientes junction
-      supabase.from('registros').select('*').order('fecha', { ascending: false }),          // filtered via RLS + project assignments
+      clientesQ,
+      registrosQ,
       supabase.from('empresa').select('*').limit(1),
       fuentesQ,
       rcalQ,
