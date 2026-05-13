@@ -17,7 +17,7 @@ import type {
   FirmaDigital, SolicitudConcierge, LlaveCondominio, Encuesta, RespuestaEncuesta,
   GastoCondominio, PresupuestoCondominio, AlertaCondominio,
   EventoCalendario, ConfiguracionCondominio,
-  SolicitudResidente, SolicitudRentaUnidad, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
+  SolicitudResidente, SolicitudRentaUnidad, SolicitudMudanzaUnidad, MiembroJunta, PrestamoEquipo, ComunicadoCondominio,
   ActaReunion, CierreMensual, ReglaNotificacion, MedidorUnidad,
   Votacion, SancionCondominio, PlanMantenimiento,
   CorrespondenciaCondominio, LibroNovedad, SeguimientoAcuerdo,
@@ -98,6 +98,7 @@ import { DirectorioTab } from './tabs/DirectorioTab'
 import { ConfiguracionTab } from './tabs/ConfiguracionTab'
 import { SolicitudesTab } from './tabs/SolicitudesTab'
 import { SolicitudesRentaTab } from './tabs/SolicitudesRentaTab'
+import { SolicitudesMudanzaTab } from './tabs/SolicitudesMudanzaTab'
 import { JuntaTab } from './tabs/JuntaTab'
 import { PrestamoEquiposTab } from './tabs/PrestamoEquiposTab'
 import { ComunicadosTab } from './tabs/ComunicadosTab'
@@ -238,7 +239,7 @@ type CondominioTab =
   | 'firmas' | 'concierge' | 'llaves' | 'encuestas'
   | 'contabilidad' | 'presupuesto' | 'alertas' | 'reportes'
   | 'estadocuenta' | 'calendario' | 'directorio' | 'configuracion'
-  | 'solicitudes' | 'solicitudes_renta' | 'junta' | 'prestamos' | 'comunicados'
+  | 'solicitudes' | 'solicitudes_renta' | 'solicitudes_mudanza' | 'junta' | 'prestamos' | 'comunicados'
   | 'actas' | 'cierres' | 'notificaciones' | 'medidores_unidad'
   | 'votaciones' | 'sanciones' | 'mant_preventivo' | 'portal'
   | 'correspondencia' | 'libro_novedades' | 'acuerdos' | 'dashboard_ejecutivo'
@@ -328,7 +329,8 @@ const TABS: { id: CondominioTab; label: string; icon: string }[] = [
   { id: 'directorio',    label: 'Directorio',     icon: '📒' },
   { id: 'configuracion', label: 'Configuración',  icon: '⚙️' },
   { id: 'solicitudes',       label: 'Solicitudes',     icon: '📥' },
-  { id: 'solicitudes_renta', label: 'Autorizac. Renta', icon: '🔑' },
+  { id: 'solicitudes_renta',   label: 'Autorizac. Renta',   icon: '🔑' },
+  { id: 'solicitudes_mudanza', label: 'Autorizac. Mudanza', icon: '🚛' },
   { id: 'junta',         label: 'Junta Directiva',icon: '👑' },
   { id: 'prestamos',     label: 'Préstamo Equip.',icon: '🪑' },
   { id: 'comunicados',   label: 'Comunicados',    icon: '✉️' },
@@ -481,7 +483,7 @@ const SECTIONS: SectionDef[] = [
   ]},
   { id: 'residentes', label: 'Residentes', icon: '🏠', tabs: [
     'tablero_ocupacion', 'directorio_comunidad', 'directorio', 'arrendamientos', 'onboarding',
-    'entrega_unidad', 'portal', 'resumen_residente', 'solicitudes', 'solicitudes_renta', 'vehiculos', 'mascotas',
+    'entrega_unidad', 'portal', 'resumen_residente', 'solicitudes', 'solicitudes_renta', 'solicitudes_mudanza', 'vehiculos', 'mascotas',
     'accesos_res', 'control_accesos_qr', 'certificados', 'manual_residente', 'mapa_unidades',
     'scoring_unidades',
   ]},
@@ -620,6 +622,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   // Fase 11
   const [solicitudes, setSolicitudes] = useState<SolicitudResidente[]>([])
   const [solicitudesRenta, setSolicitudesRenta] = useState<SolicitudRentaUnidad[]>([])
+  const [solicitudesMudanza, setSolicitudesMudanza] = useState<SolicitudMudanzaUnidad[]>([])
   const [junta, setJunta] = useState<MiembroJunta[]>([])
   const [prestamos, setPrestamos] = useState<PrestamoEquipo[]>([])
   const [comunicados, setComunicados] = useState<ComunicadoCondominio[]>([])
@@ -792,6 +795,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       fondoReservaMovsRes,
       configCondominioRes,
       solicitudesRentaRes,
+      solicitudesMudanzaRes,
     ] = await Promise.all([
       supabase.from('cuotas_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('visitantes').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_entrada', { ascending: false }).limit(200),
@@ -936,6 +940,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('fondo_reserva').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
       supabase.from('config_condominio').select('*').eq('project_id', pid).eq('company_id', cid).maybeSingle(),
       supabase.from('solicitud_renta_unidad').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('solicitud_mudanza_unidad').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     ])
 
     // Fase 57 — Rutas de ronda (separate to avoid giant Promise.all size limit)
@@ -1091,6 +1096,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setConfiguracion((configuracionRes.data ?? []) as ConfiguracionCondominio[])
     setSolicitudes(mapUnidad<SolicitudResidente>(solicitudesRes.data ?? []))
     setSolicitudesRenta((solicitudesRentaRes.data ?? []) as SolicitudRentaUnidad[])
+    setSolicitudesMudanza((solicitudesMudanzaRes.data ?? []) as SolicitudMudanzaUnidad[])
     setJunta(mapUnidad<MiembroJunta>(juntaRes.data ?? []))
     setPrestamos(mapUnidad<PrestamoEquipo>(prestamosRes.data ?? []))
     setComunicados(mapUnidad<ComunicadoCondominio>(comunicadosRes.data ?? []))
@@ -1402,6 +1408,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         {activeTab === 'configuracion' && <ConfiguracionTab configuracion={configuracion} proyectoId={selectedProyectoId} companyId={cid} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'solicitudes' && <SolicitudesTab solicitudes={solicitudes} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'solicitudes_renta' && <SolicitudesRentaTab solicitudes={solicitudesRenta} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} autorNombre={currentUser.name ?? ''} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'solicitudes_mudanza' && <SolicitudesMudanzaTab solicitudes={solicitudesMudanza} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} autorNombre={currentUser.name ?? ''} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'junta' && <JuntaTab junta={junta} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'prestamos' && <PrestamoEquiposTab prestamos={prestamos} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
         {activeTab === 'comunicados' && <ComunicadosTab comunicados={comunicados} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}

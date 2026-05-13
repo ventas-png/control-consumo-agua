@@ -12,13 +12,14 @@ import { PortalMiUnidadTab }   from '../condominios/tabs/PortalMiUnidadTab'
 import { PortalVisitantesTab } from '../condominios/tabs/PortalVisitantesTab'
 import { PortalAnunciosTab }   from '../condominios/tabs/PortalAnunciosTab'
 import { PortalRentasTab }     from '../condominios/tabs/PortalRentasTab'
+import { PortalMudanzaTab }    from '../condominios/tabs/PortalMudanzaTab'
 
 interface Props {
   currentUser: UserSession
   onLogout: () => void
 }
 
-type PortalTab = 'mi_unidad' | 'reservas' | 'cuenta' | 'tickets' | 'visitantes' | 'anuncios' | 'rentas'
+type PortalTab = 'mi_unidad' | 'reservas' | 'cuenta' | 'tickets' | 'visitantes' | 'anuncios' | 'rentas' | 'mudanza'
 
 const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
   { id: 'mi_unidad',  label: 'Mi Unidad',    icon: '🏠' },
@@ -28,6 +29,7 @@ const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
   { id: 'visitantes', label: 'Visitantes',    icon: '🚪' },
   { id: 'anuncios',   label: 'Anuncios',      icon: '📢' },
   { id: 'rentas',     label: 'Rentas',        icon: '🏨' },
+  { id: 'mudanza',    label: 'Mudanzas',      icon: '🚛' },
 ]
 
 const PORTAL_CSS = `
@@ -408,6 +410,15 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 clienteId={clienteId}
                 solicitudRenta={solicitudRentaU}
                 onSolicitudChange={cargarDatos}
+              />
+            )}
+            {tab === 'mudanza' && (
+              <PortalMudanzaTab
+                unidadId={selectedUnidadId}
+                unidadNombre={unidad.nombre}
+                proyectoId={proyectoId}
+                companyId={resolvedCompanyId}
+                clienteId={clienteId}
               />
             )}
           </div>
