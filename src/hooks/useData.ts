@@ -134,14 +134,31 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       fuentesEnergiaQ  = fuentesEnergiaQ.eq('company_id', cid)
       facturasEnergiaQ = facturasEnergiaQ.eq('company_id', cid)
 
-      // Pre-fetch project IDs so registros can be filtered by company's own projects.
-      // This runs sequentially (small query, < 50ms) before the main parallel batch.
-      const { data: proyIds } = await supabase
-        .from('projects').select('id').eq('company_id', cid)
-      if (proyIds && proyIds.length > 0) {
+      // Pre-fetch project IDs and client IDs so registros can be filtered to only this
+      // company's data. The RLS policy for 'company_owner' grants access to ALL registros
+      // regardless of company, so we need an explicit application-level filter.
+      // Many historical registros have project_id = NULL and are linked via cliente_id, so
+      // we include both: project-linked AND (null project, company-client-linked) registros.
+      const [{ data: proyIds }, { data: companyClientRows }] = await Promise.all([
+        supabase.from('projects').select('id').eq('company_id', cid),
+        supabase.from('company_clientes').select('cliente_id').eq('company_id', cid),
+      ])
+
+      const proyIdList = proyIds?.map((p: { id: string }) => p.id) ?? []
+      const clientIdList = companyClientRows?.map((c: { cliente_id: string }) => c.cliente_id) ?? []
+
+      if (proyIdList.length > 0 || clientIdList.length > 0) {
+        const parts: string[] = []
+        if (proyIdList.length > 0) {
+          parts.push(`project_id.in.(${proyIdList.join(',')})`)
+        }
+        if (clientIdList.length > 0) {
+          // Historical registros with no project assigned — filter by company's clients
+          parts.push(`and(project_id.is.null,cliente_id.in.(${clientIdList.join(',')}))`)
+        }
         registrosQ = supabase
           .from('registros').select('*').order('fecha', { ascending: false })
-          .in('project_id', proyIds.map((p: { id: string }) => p.id))
+          .or(parts.join(','))
       }
     }
 
