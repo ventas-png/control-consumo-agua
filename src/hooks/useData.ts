@@ -116,10 +116,12 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     let tarifasEnergiaQ = supabase.from('tarifas_energia').select('*').order('created_at', { ascending: false })
     let fuentesEnergiaQ = supabase.from('fuentes_energia').select('*').order('created_at', { ascending: false })
     let facturasEnergiaQ = supabase.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
-    // registros uses project_id (not company_id) — filtered via RLS
     // clientes has no company_id column — linked via company_clientes junction, filtered via RLS
-    const registrosQ = supabase.from('registros').select('*').order('fecha', { ascending: false }).limit(2000)
     const clientesQ = supabase.from('clientes').select('*')
+    // registros uses project_id (not company_id). The RLS policy grants company_owner access
+    // to ALL registros regardless of company, so we pre-fetch the company's project IDs and
+    // filter explicitly — this ensures correct data isolation and avoids the global LIMIT 2000.
+    let registrosQ = supabase.from('registros').select('*').order('fecha', { ascending: false }).limit(2000)
 
     if (cid) {
       tarifasQ         = tarifasQ.eq('company_id', cid)
@@ -131,6 +133,16 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       tarifasEnergiaQ  = tarifasEnergiaQ.eq('company_id', cid)
       fuentesEnergiaQ  = fuentesEnergiaQ.eq('company_id', cid)
       facturasEnergiaQ = facturasEnergiaQ.eq('company_id', cid)
+
+      // Pre-fetch project IDs so registros can be filtered by company's own projects.
+      // This runs sequentially (small query, < 50ms) before the main parallel batch.
+      const { data: proyIds } = await supabase
+        .from('projects').select('id').eq('company_id', cid)
+      if (proyIds && proyIds.length > 0) {
+        registrosQ = supabase
+          .from('registros').select('*').order('fecha', { ascending: false })
+          .in('project_id', proyIds.map((p: { id: string }) => p.id))
+      }
     }
 
     return Promise.allSettled([
@@ -290,10 +302,12 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       let results = await fetchWithTimeout()
       const freshData = await filterProyectosByAssignment(applyResults(base, results))
       setData(freshData)
+      // Hide skeleton as soon as the first fetch completes — data is visible even if
+      // some secondary queries failed. Retries continue silently in the background.
+      setIsLoading(false)
 
       if (!hasErrors(results)) {
         saveCache(freshData)
-        setIsLoading(false)
         return
       }
 
@@ -307,19 +321,18 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       // Retry 1: wait 1.5 s to handle cold-start timeouts on the DB connection pool
       await new Promise(resolve => setTimeout(resolve, 1500))
       results = await fetchWithTimeout()
-      const retryData = await filterProyectosByAssignment(applyResults(base, results))
+      const retryData = await filterProyectosByAssignment(applyResults(freshData, results))
       setData(retryData)
 
       if (!hasErrors(results)) {
         saveCache(retryData)
-        setIsLoading(false)
         return
       }
 
       // Retry 2: wait an additional 3 s for slow Supabase cold starts
       await new Promise(resolve => setTimeout(resolve, 3000))
       results = await fetchWithTimeout()
-      const retryData2 = await filterProyectosByAssignment(applyResults(base, results))
+      const retryData2 = await filterProyectosByAssignment(applyResults(retryData, results))
       setData(retryData2)
 
       const finalErrors = getQueryErrors(results)
