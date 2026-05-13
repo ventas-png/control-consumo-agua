@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import Swal from 'sweetalert2'
 import type { AppSection, Ruta, UserSession } from './types'
 import { supabase } from './lib/supabase'
@@ -14,29 +14,30 @@ import { CustomerPortal } from './components/portal/CustomerPortal'
 import { CondominiosClientPortal } from './components/portal/CondominiosClientPortal'
 import { Sidebar } from './components/layout/Sidebar'
 import { Topbar } from './components/layout/Topbar'
-import { ClientesSection } from './components/clientes/ClientesSection'
-import { LecturasSection } from './components/lecturas/LecturasSection'
-import { HistorialSection } from './components/historial/HistorialSection'
-import { DashboardSection } from './components/dashboard/DashboardSection'
-import { AdminClientDashboard } from './components/admin-dashboard/AdminClientDashboard'
-import { MapaSection } from './components/mapa/MapaSection'
-import { CalidadSection } from './components/calidad/CalidadSection'
-import { RutasSection } from './components/rutas/RutasSection'
-import { ConfiguracionSection } from './components/configuracion/ConfiguracionSection'
-import { PerfilSection } from './components/perfil/PerfilSection'
-import { EmpresaSection } from './components/empresa/EmpresaSection'
-import { SuperAdminSection } from './components/superadmin/SuperAdminSection'
-import { TarifasSection } from './components/tarifas/TarifasSection'
-import { ContadoresSection } from './components/contadores/ContadoresSection'
-import { UnidadesSection } from './components/unidades/UnidadesSection'
-import { CobrosSection } from './components/cobros/CobrosSection'
-import { ComunicacionSection } from './components/comunicacion/ComunicacionSection'
-import ServiciosEnergiaSection from './components/servicios-energia/ServiciosEnergiaSection'
-import { CondominiosSection } from './components/condominios/CondominiosSection'
-import { CondominiosDashboard } from './components/condominios/CondominiosDashboard'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RoleGuard } from './components/shared/AccessDenied'
 import { usePermissions } from './hooks/usePermissions'
+
+const ClientesSection = lazy(() => import('./components/clientes/ClientesSection').then(m => ({ default: m.ClientesSection })))
+const LecturasSection = lazy(() => import('./components/lecturas/LecturasSection').then(m => ({ default: m.LecturasSection })))
+const HistorialSection = lazy(() => import('./components/historial/HistorialSection').then(m => ({ default: m.HistorialSection })))
+const DashboardSection = lazy(() => import('./components/dashboard/DashboardSection').then(m => ({ default: m.DashboardSection })))
+const AdminClientDashboard = lazy(() => import('./components/admin-dashboard/AdminClientDashboard').then(m => ({ default: m.AdminClientDashboard })))
+const MapaSection = lazy(() => import('./components/mapa/MapaSection').then(m => ({ default: m.MapaSection })))
+const CalidadSection = lazy(() => import('./components/calidad/CalidadSection').then(m => ({ default: m.CalidadSection })))
+const RutasSection = lazy(() => import('./components/rutas/RutasSection').then(m => ({ default: m.RutasSection })))
+const ConfiguracionSection = lazy(() => import('./components/configuracion/ConfiguracionSection').then(m => ({ default: m.ConfiguracionSection })))
+const PerfilSection = lazy(() => import('./components/perfil/PerfilSection').then(m => ({ default: m.PerfilSection })))
+const EmpresaSection = lazy(() => import('./components/empresa/EmpresaSection').then(m => ({ default: m.EmpresaSection })))
+const SuperAdminSection = lazy(() => import('./components/superadmin/SuperAdminSection').then(m => ({ default: m.SuperAdminSection })))
+const TarifasSection = lazy(() => import('./components/tarifas/TarifasSection').then(m => ({ default: m.TarifasSection })))
+const ContadoresSection = lazy(() => import('./components/contadores/ContadoresSection').then(m => ({ default: m.ContadoresSection })))
+const UnidadesSection = lazy(() => import('./components/unidades/UnidadesSection').then(m => ({ default: m.UnidadesSection })))
+const CobrosSection = lazy(() => import('./components/cobros/CobrosSection').then(m => ({ default: m.CobrosSection })))
+const ComunicacionSection = lazy(() => import('./components/comunicacion/ComunicacionSection').then(m => ({ default: m.ComunicacionSection })))
+const ServiciosEnergiaSection = lazy(() => import('./components/servicios-energia/ServiciosEnergiaSection'))
+const CondominiosSection = lazy(() => import('./components/condominios/CondominiosSection').then(m => ({ default: m.CondominiosSection })))
+const CondominiosDashboard = lazy(() => import('./components/condominios/CondominiosDashboard').then(m => ({ default: m.CondominiosDashboard })))
 
 initEmailJS()
 
@@ -423,6 +424,7 @@ export default function App() {
         )}
         <Topbar activeSection={activeSection} currentUser={currentUser} onMenuToggle={() => setSidebarOpen(prev => !prev)} />
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+          <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}><div style={{ width: 36, height: 36, border: '3px solid #e2e8f0', borderTop: '3px solid #0ea5e9', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>}>
           {activeSection === 'clientes' && (
             <ErrorBoundary sectionName="clientes">
               <ClientesSection
@@ -718,6 +720,7 @@ export default function App() {
               />
             </ErrorBoundary>
           )}
+          </Suspense>
         </main>
       </div>
     </div>

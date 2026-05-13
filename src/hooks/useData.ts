@@ -266,7 +266,15 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       // Use cached data as base so partial query failures keep cached values for failed tables
       const base = loadCache() ?? INITIAL_DATA
 
-      let results = await fetchAllData()
+      // Each fetchAllData() call is capped at 10 s — Supabase cold starts can stall indefinitely
+      const fetchWithTimeout = () => Promise.race([
+        fetchAllData(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('fetch_timeout')), 10000)
+        ),
+      ])
+
+      let results = await fetchWithTimeout()
       const freshData = await filterProyectosByAssignment(applyResults(base, results))
       setData(freshData)
 
@@ -278,7 +286,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
 
       // Retry 1: wait 1.5 s to handle cold-start timeouts on the DB connection pool
       await new Promise(resolve => setTimeout(resolve, 1500))
-      results = await fetchAllData()
+      results = await fetchWithTimeout()
       const retryData = await filterProyectosByAssignment(applyResults(base, results))
       setData(retryData)
 
@@ -290,12 +298,19 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
 
       // Retry 2: wait an additional 3 s for slow Supabase cold starts
       await new Promise(resolve => setTimeout(resolve, 3000))
-      results = await fetchAllData()
+      results = await fetchWithTimeout()
       const retryData2 = await filterProyectosByAssignment(applyResults(base, results))
       setData(retryData2)
 
       if (!hasErrors(results)) {
         saveCache(retryData2)
+      } else {
+        Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg === 'fetch_timeout') {
+        Swal.fire('Tiempo de espera agotado', 'El servidor tardó demasiado. Verifique su conexión e intente de nuevo.', 'warning')
       } else {
         Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
       }
