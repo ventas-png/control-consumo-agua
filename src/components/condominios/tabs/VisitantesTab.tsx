@@ -16,6 +16,20 @@ const PLATAFORMA_COLOR: Record<string, { bg: string; color: string }> = {
   otro:    { bg: '#f8fafc', color: '#475569' },
 }
 
+interface AcompananteForm {
+  tempId: string
+  nombre: string
+  identificacion: string
+  es_menor: boolean
+  fecha_nacimiento: string
+  notas: string
+  foto_url: string | null
+}
+
+const defaultAcompForm = (): Omit<AcompananteForm, 'tempId'> => ({
+  nombre: '', identificacion: '', es_menor: false, fecha_nacimiento: '', notas: '', foto_url: null,
+})
+
 interface Props {
   visitantes: Visitante[]
   unidades: Unidad[]
@@ -51,14 +65,15 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
   const [showStrModal, setShowStrModal] = useState(false)
   const [strSearch, setStrSearch] = useState('')
   const [strIngresados, setStrIngresados] = useState<Set<string>>(new Set())
-  const [form, setForm] = useState({
-    unidad_id: '',
-    nombre: '',
-    identificacion: '',
-    placa_vehiculo: '',
-    motivo: '',
-    notas: '',
-  })
+  const [form, setForm] = useState({ unidad_id: '', nombre: '', identificacion: '', placa_vehiculo: '', motivo: '', notas: '' })
+
+  // Minor & companions state
+  const [formEsMenor, setFormEsMenor] = useState(false)
+  const [formFechaNacimiento, setFormFechaNacimiento] = useState('')
+  const [acompanantes, setAcompanantes] = useState<AcompananteForm[]>([])
+  const [showAcompForm, setShowAcompForm] = useState(false)
+  const [acompForm, setAcompForm] = useState(defaultAcompForm())
+  const [salidaConAcomp, setSalidaConAcomp] = useState(true)
 
   const hoy = new Date().toISOString().slice(0, 10)
 
@@ -71,15 +86,17 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
 
   const inicioMes = hoy.slice(0, 7) + '-01'
 
-  // KPIs
-  const visitasHoy = visitantes.filter(v => v.hora_entrada.startsWith(hoy)).length
+  // KPIs — exclude companions to avoid double-counting
+  const principales = visitantes.filter(v => !v.visitante_principal_id)
+  const visitasHoy = principales.filter(v => v.hora_entrada.startsWith(hoy)).length
   const enPremisas = visitantes.filter(v => !v.hora_salida).length
-  const estaSemana = visitantes.filter(v => v.hora_entrada.slice(0, 10) >= inicioSemana).length
-  const totalHistorico = visitantes.length
+  const estaSemana = principales.filter(v => v.hora_entrada.slice(0, 10) >= inicioSemana).length
+  const totalHistorico = principales.length
 
   // Deduped frequent visitor suggestions — sorted by most recent first, matches name OR DPI
   const sugerencias = (form.nombre.length >= 3 || form.identificacion.length >= 3)
     ? [...visitantes]
+        .filter(v => !v.visitante_principal_id)
         .sort((a, b) => b.hora_entrada.localeCompare(a.hora_entrada))
         .filter(v =>
           (form.nombre.length >= 3 && v.nombre.toLowerCase().includes(form.nombre.toLowerCase())) ||
@@ -111,6 +128,11 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     setFotoDocumentoUrl(null)
     setFotoVehiculoUrl(null)
     setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
+    setFormEsMenor(false)
+    setFormFechaNacimiento('')
+    setAcompanantes([])
+    setShowAcompForm(false)
+    setAcompForm(defaultAcompForm())
     setShowForm(false)
   }
 
@@ -128,6 +150,10 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     setFotoDocumentoUrl(null)
     setFotoVehiculoUrl(null)
     setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
+    setFormEsMenor(false)
+    setFormFechaNacimiento('')
+    setAcompanantes([])
+    setShowAcompForm(false)
     setStrIngresados(prev => new Set([...prev, r.id]))
     setShowStrModal(false)
     setStrSearch('')
@@ -135,11 +161,9 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
   }
 
   function autocompletar(v: Visitante) {
-    // Collect all records for this exact visitor (same name + DPI), sorted recent first
     const mismoVisitante = [...visitantes]
       .filter(r => r.nombre === v.nombre && r.identificacion === v.identificacion)
       .sort((a, b) => b.hora_entrada.localeCompare(a.hora_entrada))
-    // Pick the most recent non-null URL for each photo slot
     const registroFoto     = mismoVisitante.find(r => r.foto_url)
     const registroDoc      = mismoVisitante.find(r => r.foto_documento_url)
     const registroVehiculo = mismoVisitante.find(r => r.foto_vehiculo_url)
@@ -164,11 +188,30 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     setFotoVehiculoUrl(registroVehiculo?.foto_vehiculo_url ?? null)
   }
 
+  function agregarAcompanante() {
+    if (!acompForm.nombre.trim()) {
+      Swal.fire('Error', 'Ingrese el nombre del acompañante.', 'error')
+      return
+    }
+    setAcompanantes(prev => [...prev, {
+      ...acompForm,
+      nombre: acompForm.nombre.trim(),
+      tempId: crypto.randomUUID(),
+    }])
+    setAcompForm(defaultAcompForm())
+    setShowAcompForm(false)
+  }
+
+  function quitarAcompanante(tempId: string) {
+    setAcompanantes(prev => prev.filter(a => a.tempId !== tempId))
+  }
+
   async function handleRegistrar() {
     if (!form.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre del visitante.', 'error'); return }
     if (!form.unidad_id) { Swal.fire('Error', 'Seleccione la unidad a visitar.', 'error'); return }
     setSaving(true)
-    const { error } = await supabase.from('visitantes').insert({
+    const horaEntrada = new Date().toISOString()
+    const { data, error } = await supabase.from('visitantes').insert({
       company_id: companyId,
       project_id: proyectoId,
       unidad_id: form.unidad_id,
@@ -181,11 +224,45 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
       foto_documento_url: fotoDocumentoUrl,
       foto_vehiculo_url: fotoVehiculoUrl,
       registrado_por: userId,
-      hora_entrada: new Date().toISOString(),
-    })
+      hora_entrada: horaEntrada,
+      es_menor: formEsMenor,
+      fecha_nacimiento: formEsMenor && formFechaNacimiento ? formFechaNacimiento : null,
+    }).select('id').single()
+
+    if (error) { setSaving(false); Swal.fire('Error', error.message, 'error'); return }
+
+    if (acompanantes.length > 0 && data) {
+      const acompRows = acompanantes.map(a => ({
+        company_id: companyId,
+        project_id: proyectoId,
+        unidad_id: form.unidad_id,
+        nombre: a.nombre,
+        identificacion: a.es_menor ? null : (a.identificacion.trim() || null),
+        placa_vehiculo: form.placa_vehiculo.trim() || null,
+        motivo: form.motivo.trim() || null,
+        notas: a.notas.trim() || null,
+        foto_url: a.foto_url,
+        registrado_por: userId,
+        hora_entrada: horaEntrada,
+        es_menor: a.es_menor,
+        fecha_nacimiento: a.es_menor && a.fecha_nacimiento ? a.fecha_nacimiento : null,
+        visitante_principal_id: data.id,
+      }))
+      const { error: ae } = await supabase.from('visitantes').insert(acompRows)
+      if (ae) {
+        setSaving(false)
+        Swal.fire('Visitante registrado', `Acompañantes no guardados: ${ae.message}`, 'warning')
+        resetForm()
+        onRefresh()
+        return
+      }
+    }
+
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: 'Visita registrada', timer: 1500, showConfirmButton: false })
+    const msg = acompanantes.length > 0
+      ? `Visita registrada con ${acompanantes.length} acompañante${acompanantes.length > 1 ? 's' : ''}`
+      : 'Visita registrada'
+    Swal.fire({ icon: 'success', title: msg, timer: 1500, showConfirmButton: false })
     resetForm()
     onRefresh()
   }
@@ -195,6 +272,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     setModoSalida('idle')
     setNovedadForm({ tipo: 'incidente', comentarios: '', ubicacion: v.unidad_nombre ?? '', prioridad: 'normal' })
     setFotosNovedad([])
+    setSalidaConAcomp(true)
   }
 
   function cancelarSalida() {
@@ -212,6 +290,15 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     const horaSalida = new Date().toISOString()
     const { error } = await supabase.from('visitantes').update({ hora_salida: horaSalida }).eq('id', salidaPendiente.id)
     if (error) { setGuardandoSalida(false); Swal.fire('Error', error.message, 'error'); return }
+
+    // Also exit active companions if requested
+    if (salidaConAcomp) {
+      const acompsActivos = visitantes.filter(v => v.visitante_principal_id === salidaPendiente.id && !v.hora_salida)
+      if (acompsActivos.length > 0) {
+        await supabase.from('visitantes').update({ hora_salida: horaSalida }).in('id', acompsActivos.map(a => a.id))
+      }
+    }
+
     if (modoSalida === 'con_novedad') {
       const partes: string[] = []
       partes.push(`Visitante: ${salidaPendiente.nombre}`)
@@ -255,12 +342,12 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
       proyectoNombre,
       headers: ['Nombre', 'Unidad', 'Entrada', 'Salida', 'Motivo', 'ID/DPI', 'Placa'],
       rows: filtrados.map(v => [
-        v.nombre,
+        v.nombre + (v.es_menor ? ' (Menor)' : '') + (v.visitante_principal_id ? ' [Acomp.]' : ''),
         v.unidad_nombre ?? '—',
         new Date(v.hora_entrada).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
         v.hora_salida ? new Date(v.hora_salida).toLocaleString('es', { hour: '2-digit', minute: '2-digit' }) : 'En premisas',
         v.motivo ?? '—',
-        v.identificacion ?? '—',
+        v.es_menor ? 'Menor de edad' : (v.identificacion ?? '—'),
         v.placa_vehiculo ?? '—',
       ]),
       filename: `visitantes-${hoy}`,
@@ -271,14 +358,15 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
   function exportarXlsx() {
     exportarExcel(`visitantes-${hoy}`, [{
       name: 'Visitantes',
-      headers: ['Nombre', 'Unidad', 'Hora entrada', 'Hora salida', 'Motivo', 'Identificación', 'Placa'],
+      headers: ['Nombre', 'Tipo', 'Unidad', 'Hora entrada', 'Hora salida', 'Motivo', 'Identificación', 'Placa'],
       rows: filtrados.map(v => [
         v.nombre,
+        v.visitante_principal_id ? 'Acompañante' : (v.es_menor ? 'Menor' : 'Principal'),
         v.unidad_nombre ?? '',
         v.hora_entrada,
         v.hora_salida ?? '',
         v.motivo ?? '',
-        v.identificacion ?? '',
+        v.es_menor ? 'Menor de edad' : (v.identificacion ?? ''),
         v.placa_vehiculo ?? '',
       ]),
     }])
@@ -477,19 +565,39 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
-                <input value={form.identificacion} onChange={e => setForm(f => ({ ...f, identificacion: e.target.value }))}
-                  placeholder="Número de documento"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-                {sugerencias.length > 0 && form.nombre.length < 3 && (
-                  <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>Frecuente:</span>
-                    {sugerencias.map((v, i) => (
-                      <button key={i} type="button" onClick={() => autocompletar(v)}
-                        style={{ padding: '3px 10px', background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                        {v.nombre}{v.identificacion ? ` · ${v.identificacion}` : ''}
-                      </button>
-                    ))}
+                {/* Minor toggle + conditional fields */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={formEsMenor} onChange={e => setFormEsMenor(e.target.checked)} />
+                    Es menor de edad
+                  </label>
+                  {formEsMenor && (
+                    <span style={{ padding: '2px 8px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>
+                  )}
+                </div>
+                {formEsMenor ? (
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Fecha de nacimiento (opcional)</label>
+                    <input type="date" value={formFechaNacimiento} onChange={e => setFormFechaNacimiento(e.target.value)}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                  </div>
+                ) : (
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
+                    <input value={form.identificacion} onChange={e => setForm(f => ({ ...f, identificacion: e.target.value }))}
+                      placeholder="Número de documento"
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                    {sugerencias.length > 0 && form.nombre.length < 3 && (
+                      <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>Frecuente:</span>
+                        {sugerencias.map((v, i) => (
+                          <button key={i} type="button" onClick={() => autocompletar(v)}
+                            style={{ padding: '3px 10px', background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                            {v.nombre}{v.identificacion ? ` · ${v.identificacion}` : ''}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -523,8 +631,12 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                     {fotosExpiradas.foto && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
                   </div>
                   <div>
-                    <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" capture />
-                    {fotosExpiradas.documento && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                    {!formEsMenor && (
+                      <>
+                        <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" capture />
+                        {fotosExpiradas.documento && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                      </>
+                    )}
                   </div>
                   <div>
                     <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" capture />
@@ -533,10 +645,102 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                 </div>
               </div>
             </div>
+
+            {/* Companions section */}
+            <div style={{ marginTop: '20px', borderTop: '1.5px solid #f1f5f9', paddingTop: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  👥 Acompañantes
+                  {acompanantes.length > 0 && (
+                    <span style={{ padding: '2px 8px', background: '#eff6ff', color: '#2563eb', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>
+                      {acompanantes.length}
+                    </span>
+                  )}
+                </div>
+                {!showAcompForm && (
+                  <button type="button" onClick={() => setShowAcompForm(true)}
+                    style={{ padding: '5px 12px', background: '#f8fafc', color: '#374151', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                    + Agregar acompañante
+                  </button>
+                )}
+              </div>
+
+              {/* Companion list */}
+              {acompanantes.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+                  {acompanantes.map(a => (
+                    <div key={a.tempId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: a.es_menor ? '#fef9c3' : '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', flexShrink: 0 }}>
+                        {a.es_menor ? '👶' : '👤'}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{a.nombre}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>
+                          {a.es_menor
+                            ? `Menor${a.fecha_nacimiento ? ` · Nac. ${a.fecha_nacimiento}` : ''}`
+                            : a.identificacion ? `DPI: ${a.identificacion}` : 'Sin documento'}
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => quitarAcompanante(a.tempId)}
+                        style={{ width: 22, height: 22, borderRadius: '50%', background: '#fee2e2', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Inline companion form */}
+              {showAcompForm && (
+                <div style={{ padding: '14px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>Datos del acompañante</div>
+                  <div>
+                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '3px' }}>Nombre *</label>
+                    <input value={acompForm.nombre} onChange={e => setAcompForm(f => ({ ...f, nombre: e.target.value }))}
+                      placeholder="Nombre completo"
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151', cursor: 'pointer', fontWeight: 600 }}>
+                    <input type="checkbox" checked={acompForm.es_menor} onChange={e => setAcompForm(f => ({ ...f, es_menor: e.target.checked, identificacion: '' }))} />
+                    Es menor de edad
+                    {acompForm.es_menor && <span style={{ padding: '2px 8px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '11px' }}>Menor</span>}
+                  </label>
+                  {acompForm.es_menor ? (
+                    <div>
+                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '3px' }}>Fecha de nacimiento (opcional)</label>
+                      <input type="date" value={acompForm.fecha_nacimiento} onChange={e => setAcompForm(f => ({ ...f, fecha_nacimiento: e.target.value }))}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '3px' }}>DPI / Identificación (opcional)</label>
+                      <input value={acompForm.identificacion} onChange={e => setAcompForm(f => ({ ...f, identificacion: e.target.value }))}
+                        placeholder="Número de documento"
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+                    </div>
+                  )}
+                  <div>
+                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '3px' }}>Foto (opcional)</label>
+                    <ImageUploader value={acompForm.foto_url} onChange={v => setAcompForm(f => ({ ...f, foto_url: v }))} folder="visitantes" label="Foto" capture />
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" onClick={agregarAcompanante}
+                      style={{ padding: '7px 16px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
+                      + Agregar
+                    </button>
+                    <button type="button" onClick={() => { setShowAcompForm(false); setAcompForm(defaultAcompForm()) }}
+                      style={{ padding: '7px 14px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button onClick={handleRegistrar} disabled={saving}
                 style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
-                {saving ? 'Registrando...' : '✓ Registrar entrada'}
+                {saving ? 'Registrando...' : `✓ Registrar entrada${acompanantes.length > 0 ? ` (+${acompanantes.length})` : ''}`}
               </button>
               <button onClick={resetForm} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
             </div>
@@ -558,23 +762,60 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
             const esSTR = v.motivo?.startsWith('Renta corta')
             const fechaSalidaSTR = esSTR ? (v.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
             const salidaHabilitada = !fechaSalidaSTR || hoy >= fechaSalidaSTR
+            const esAcompanante = !!v.visitante_principal_id
+            const principal = esAcompanante ? visitantes.find(p => p.id === v.visitante_principal_id) : null
+            const acompsActivos = !esAcompanante ? visitantes.filter(a => a.visitante_principal_id === v.id && !a.hora_salida) : []
+
             return (
-              <div key={v.id} style={{ background: 'white', border: `1.5px solid ${enPremisa ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: '12px', padding: '12px 14px' }}>
-                {/* Fila superior: avatar + nombre + info */}
+              <div key={v.id}
+                style={{
+                  background: 'white',
+                  border: `1.5px solid ${enPremisa ? (esAcompanante ? '#bfdbfe' : '#bbf7d0') : '#e2e8f0'}`,
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  marginLeft: esAcompanante ? '20px' : 0,
+                  borderLeft: esAcompanante ? '4px solid #93c5fd' : undefined,
+                }}>
+                {/* Fila superior: avatar + nombre + badges + info */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                   {v.foto_url
-                    ? <img src={v.foto_url} alt={v.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `2px solid ${enPremisa ? '#10b981' : '#e2e8f0'}` }} />
-                    : <div style={{ width: 40, height: 40, borderRadius: '50%', background: enPremisa ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: enPremisa ? 'white' : '#94a3b8', fontWeight: 700, fontSize: '15px', flexShrink: 0 }}>
-                        {v.nombre.charAt(0).toUpperCase()}
+                    ? <img src={v.foto_url} alt={v.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `2px solid ${enPremisa ? (esAcompanante ? '#3b82f6' : '#10b981') : '#e2e8f0'}` }} />
+                    : <div style={{
+                        width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                        background: v.es_menor
+                          ? (enPremisa ? '#fef9c3' : '#fef3c7')
+                          : esAcompanante
+                            ? (enPremisa ? 'linear-gradient(135deg,#3b82f6,#2563eb)' : '#e0e7ff')
+                            : (enPremisa ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0'),
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: v.es_menor ? '#854d0e' : (enPremisa ? 'white' : '#94a3b8'),
+                        fontWeight: 700, fontSize: '15px',
+                      }}>
+                        {v.es_menor ? '👶' : v.nombre.charAt(0).toUpperCase()}
                       </div>
                   }
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{v.nombre}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{v.nombre}</span>
+                      {v.es_menor && (
+                        <span style={{ padding: '2px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Menor</span>
+                      )}
+                      {esAcompanante && (
+                        <span style={{ padding: '2px 7px', background: '#eff6ff', color: '#1d4ed8', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Acompañante</span>
+                      )}
+                    </div>
                     <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '3px' }}>
                       {v.unidad_nombre && <span>📍 {v.unidad_nombre}</span>}
                       {v.motivo && <span>· {v.motivo}</span>}
-                      {v.identificacion && <span>· ID: {v.identificacion}</span>}
+                      {!v.es_menor && v.identificacion && <span>· ID: {v.identificacion}</span>}
+                      {v.es_menor && v.fecha_nacimiento && <span>· Nac. {v.fecha_nacimiento}</span>}
                       {v.placa_vehiculo && <span>· 🚗 {v.placa_vehiculo}</span>}
+                      {esAcompanante && principal && (
+                        <span style={{ color: '#3b82f6' }}>· De: {principal.nombre}</span>
+                      )}
+                      {!esAcompanante && acompsActivos.length > 0 && (
+                        <span style={{ color: '#2563eb', fontWeight: 600 }}>· {acompsActivos.length} acomp. en premisas</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -584,7 +825,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                   <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span>Entrada: {new Date(v.hora_entrada).toLocaleString('es', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</span>
                     {v.hora_salida && <span style={{ color: '#94a3b8' }}>· Salida: {new Date(v.hora_salida).toLocaleString('es', { hour: '2-digit', minute: '2-digit' })}</span>}
-                    {enPremisa && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: '#dcfce7', color: '#16a34a', fontWeight: 700 }}>En premisas</span>}
+                    {enPremisa && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: esAcompanante ? '#dbeafe' : '#dcfce7', color: esAcompanante ? '#1d4ed8' : '#16a34a', fontWeight: 700 }}>En premisas</span>}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                     <button onClick={() => setVisitanteDetalle(v)}
@@ -621,11 +862,19 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
               {visitanteDetalle.foto_url
                 ? <img src={visitanteDetalle.foto_url} alt={visitanteDetalle.nombre} style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', flexShrink: 0 }} />
                 : <div style={{ width: 52, height: 52, borderRadius: '50%', background: !visitanteDetalle.hora_salida ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: !visitanteDetalle.hora_salida ? 'white' : '#94a3b8', fontWeight: 800, fontSize: '20px', flexShrink: 0 }}>
-                    {visitanteDetalle.nombre.charAt(0).toUpperCase()}
+                    {visitanteDetalle.es_menor ? '👶' : visitanteDetalle.nombre.charAt(0).toUpperCase()}
                   </div>
               }
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>{visitanteDetalle.nombre}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>{visitanteDetalle.nombre}</span>
+                  {visitanteDetalle.es_menor && (
+                    <span style={{ padding: '2px 8px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>
+                  )}
+                  {visitanteDetalle.visitante_principal_id && (
+                    <span style={{ padding: '2px 8px', background: '#eff6ff', color: '#1d4ed8', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Acompañante</span>
+                  )}
+                </div>
                 {visitanteDetalle.unidad_nombre && <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>📍 {visitanteDetalle.unidad_nombre}</div>}
               </div>
               <button onClick={() => setVisitanteDetalle(null)}
@@ -640,10 +889,17 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                 {[
                   { label: 'Entrada', value: new Date(visitanteDetalle.hora_entrada).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) },
                   { label: 'Salida', value: visitanteDetalle.hora_salida ? new Date(visitanteDetalle.hora_salida).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '— En premisas' },
-                  ...(visitanteDetalle.identificacion ? [{ label: 'DPI / ID', value: visitanteDetalle.identificacion }] : []),
+                  ...(visitanteDetalle.es_menor
+                    ? [{ label: 'Tipo', value: 'Menor de edad' }]
+                    : visitanteDetalle.identificacion ? [{ label: 'DPI / ID', value: visitanteDetalle.identificacion }] : []),
+                  ...(visitanteDetalle.fecha_nacimiento ? [{ label: 'Fecha nac.', value: visitanteDetalle.fecha_nacimiento }] : []),
                   ...(visitanteDetalle.placa_vehiculo ? [{ label: 'Vehículo', value: `🚗 ${visitanteDetalle.placa_vehiculo}` }] : []),
                   ...(visitanteDetalle.motivo ? [{ label: 'Motivo', value: visitanteDetalle.motivo }] : []),
                   ...(visitanteDetalle.notas ? [{ label: 'Notas', value: visitanteDetalle.notas }] : []),
+                  ...(visitanteDetalle.visitante_principal_id ? (() => {
+                    const p = visitantes.find(x => x.id === visitanteDetalle.visitante_principal_id)
+                    return p ? [{ label: 'Acompañante de', value: p.nombre }] : []
+                  })() : []),
                 ].map(({ label, value }) => (
                   <div key={label} style={{ background: '#f8fafc', borderRadius: '10px', padding: '10px 12px', border: '1px solid #e2e8f0' }}>
                     <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>{label}</div>
@@ -695,112 +951,132 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
       )}
 
       {/* Modal salida */}
-      {salidaPendiente && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
-            {/* Header */}
-            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f1f5f9' }}>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>Registrar salida</div>
-              <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-                {salidaPendiente.nombre}
-                {salidaPendiente.unidad_nombre ? ` · ${salidaPendiente.unidad_nombre}` : ''}
-              </div>
-            </div>
-
-            <div style={{ padding: '20px 24px' }}>
-              {/* Opciones principales */}
-              <p style={{ margin: '0 0 14px', fontSize: '13.5px', color: '#374151', fontWeight: 600 }}>¿Cómo fue la salida?</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
-                <button
-                  onClick={() => setModoSalida('sin_novedad')}
-                  style={{ padding: '14px 12px', borderRadius: '10px', border: `2px solid ${modoSalida === 'sin_novedad' ? '#16a34a' : '#e2e8f0'}`, background: modoSalida === 'sin_novedad' ? '#f0fdf4' : '#f8fafc', color: modoSalida === 'sin_novedad' ? '#15803d' : '#374151', fontWeight: 700, fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
-                  ✅ Sin novedad
-                  <div style={{ fontSize: '11px', fontWeight: 400, marginTop: '4px', color: modoSalida === 'sin_novedad' ? '#16a34a' : '#94a3b8' }}>Todo en orden</div>
-                </button>
-                <button
-                  onClick={() => setModoSalida('con_novedad')}
-                  style={{ padding: '14px 12px', borderRadius: '10px', border: `2px solid ${modoSalida === 'con_novedad' ? '#dc2626' : '#e2e8f0'}`, background: modoSalida === 'con_novedad' ? '#fff1f2' : '#f8fafc', color: modoSalida === 'con_novedad' ? '#dc2626' : '#374151', fontWeight: 700, fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
-                  ⚠️ Con novedad
-                  <div style={{ fontSize: '11px', fontWeight: 400, marginTop: '4px', color: modoSalida === 'con_novedad' ? '#ef4444' : '#94a3b8' }}>Registrar incidencia</div>
-                </button>
-              </div>
-
-              {/* Formulario de novedad */}
-              {modoSalida === 'con_novedad' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: '10px', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#c2410c' }}>Detalle de la novedad</div>
-
-                  {/* Resumen automático del visitante */}
-                  <div style={{ background: 'white', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px' }}>
-                    <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Datos del registro (se incluyen automáticamente)</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
-                      <span style={{ fontSize: '12px', color: '#374151' }}>👤 <b>{salidaPendiente.nombre}</b></span>
-                      {salidaPendiente.identificacion && <span style={{ fontSize: '12px', color: '#374151' }}>🪪 {salidaPendiente.identificacion}</span>}
-                      {salidaPendiente.unidad_nombre && <span style={{ fontSize: '12px', color: '#374151' }}>📍 {salidaPendiente.unidad_nombre}</span>}
-                      {salidaPendiente.placa_vehiculo && <span style={{ fontSize: '12px', color: '#374151' }}>🚗 {salidaPendiente.placa_vehiculo}</span>}
-                      {salidaPendiente.motivo && <span style={{ fontSize: '12px', color: '#374151' }}>· {salidaPendiente.motivo}</span>}
-                      <span style={{ fontSize: '12px', color: '#64748b' }}>
-                        Entrada: {new Date(salidaPendiente.hora_entrada).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Tipo</label>
-                      <select value={novedadForm.tipo} onChange={e => setNovedadForm(f => ({ ...f, tipo: e.target.value as TipoNovedad }))}
-                        style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
-                        <option value="incidente">Incidente</option>
-                        <option value="observacion">Observación</option>
-                        <option value="alarma">Alarma</option>
-                        <option value="acceso">Acceso</option>
-                        <option value="otro">Otro</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Prioridad</label>
-                      <select value={novedadForm.prioridad} onChange={e => setNovedadForm(f => ({ ...f, prioridad: e.target.value as PrioridadNovedad }))}
-                        style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
-                        <option value="normal">Normal</option>
-                        <option value="alta">Alta</option>
-                        <option value="critica">Crítica</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Ubicación</label>
-                    <input value={novedadForm.ubicacion} onChange={e => setNovedadForm(f => ({ ...f, ubicacion: e.target.value }))}
-                      placeholder={`Ej. ${salidaPendiente.unidad_nombre ?? 'Entrada principal'}`}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Comentarios / descripción de la novedad *</label>
-                    <textarea value={novedadForm.comentarios} onChange={e => setNovedadForm(f => ({ ...f, comentarios: e.target.value }))}
-                      placeholder="Describe con detalle lo ocurrido durante la salida..."
-                      rows={3}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white', resize: 'vertical' }} />
-                  </div>
-                  <div>
-                    <MultiImageUploader values={fotosNovedad} onChange={setFotosNovedad} folder="novedades" label="Fotografías de evidencia" capture maxFiles={10} />
-                  </div>
+      {salidaPendiente && (() => {
+        const acompsActivos = visitantes.filter(v => v.visitante_principal_id === salidaPendiente.id && !v.hora_salida)
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+            <div style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
+              {/* Header */}
+              <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>Registrar salida</div>
+                <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
+                  {salidaPendiente.nombre}
+                  {salidaPendiente.unidad_nombre ? ` · ${salidaPendiente.unidad_nombre}` : ''}
+                  {salidaPendiente.es_menor && <span style={{ marginLeft: 6, padding: '1px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>}
+                  {salidaPendiente.visitante_principal_id && <span style={{ marginLeft: 6, padding: '1px 7px', background: '#eff6ff', color: '#1d4ed8', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Acompañante</span>}
                 </div>
-              )}
+              </div>
 
-              {/* Acciones */}
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button onClick={cancelarSalida} disabled={guardandoSalida}
-                  style={{ padding: '9px 18px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
-                  Cancelar
-                </button>
-                <button onClick={confirmarSalida} disabled={guardandoSalida || modoSalida === 'idle'}
-                  style={{ padding: '9px 20px', background: modoSalida === 'idle' ? '#e2e8f0' : modoSalida === 'sin_novedad' ? 'linear-gradient(135deg,#16a34a,#15803d)' : 'linear-gradient(135deg,#dc2626,#b91c1c)', color: modoSalida === 'idle' ? '#94a3b8' : 'white', border: 'none', borderRadius: '8px', cursor: modoSalida === 'idle' ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '13px' }}>
-                  {guardandoSalida ? 'Registrando...' : modoSalida === 'con_novedad' ? '⚠️ Registrar salida y novedad' : '✓ Confirmar salida'}
-                </button>
+              <div style={{ padding: '20px 24px' }}>
+                {/* Opciones principales */}
+                <p style={{ margin: '0 0 14px', fontSize: '13.5px', color: '#374151', fontWeight: 600 }}>¿Cómo fue la salida?</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                  <button
+                    onClick={() => setModoSalida('sin_novedad')}
+                    style={{ padding: '14px 12px', borderRadius: '10px', border: `2px solid ${modoSalida === 'sin_novedad' ? '#16a34a' : '#e2e8f0'}`, background: modoSalida === 'sin_novedad' ? '#f0fdf4' : '#f8fafc', color: modoSalida === 'sin_novedad' ? '#15803d' : '#374151', fontWeight: 700, fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
+                    ✅ Sin novedad
+                    <div style={{ fontSize: '11px', fontWeight: 400, marginTop: '4px', color: modoSalida === 'sin_novedad' ? '#16a34a' : '#94a3b8' }}>Todo en orden</div>
+                  </button>
+                  <button
+                    onClick={() => setModoSalida('con_novedad')}
+                    style={{ padding: '14px 12px', borderRadius: '10px', border: `2px solid ${modoSalida === 'con_novedad' ? '#dc2626' : '#e2e8f0'}`, background: modoSalida === 'con_novedad' ? '#fff1f2' : '#f8fafc', color: modoSalida === 'con_novedad' ? '#dc2626' : '#374151', fontWeight: 700, fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
+                    ⚠️ Con novedad
+                    <div style={{ fontSize: '11px', fontWeight: 400, marginTop: '4px', color: modoSalida === 'con_novedad' ? '#ef4444' : '#94a3b8' }}>Registrar incidencia</div>
+                  </button>
+                </div>
+
+                {/* Companions exit option */}
+                {acompsActivos.length > 0 && (
+                  <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: '10px' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#1d4ed8', fontWeight: 600 }}>
+                      <input type="checkbox" checked={salidaConAcomp} onChange={e => setSalidaConAcomp(e.target.checked)} style={{ marginTop: '2px' }} />
+                      <span>
+                        También dar salida a {acompsActivos.length} acompañante{acompsActivos.length > 1 ? 's' : ''} en premisas
+                        <div style={{ fontWeight: 400, fontSize: '11.5px', color: '#3b82f6', marginTop: '2px' }}>
+                          {acompsActivos.map(a => a.nombre + (a.es_menor ? ' (menor)' : '')).join(', ')}
+                        </div>
+                      </span>
+                    </label>
+                  </div>
+                )}
+
+                {/* Formulario de novedad */}
+                {modoSalida === 'con_novedad' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: '10px', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#c2410c' }}>Detalle de la novedad</div>
+
+                    {/* Resumen automático del visitante */}
+                    <div style={{ background: 'white', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px' }}>
+                      <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Datos del registro (se incluyen automáticamente)</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+                        <span style={{ fontSize: '12px', color: '#374151' }}>👤 <b>{salidaPendiente.nombre}</b></span>
+                        {salidaPendiente.identificacion && <span style={{ fontSize: '12px', color: '#374151' }}>🪪 {salidaPendiente.identificacion}</span>}
+                        {salidaPendiente.unidad_nombre && <span style={{ fontSize: '12px', color: '#374151' }}>📍 {salidaPendiente.unidad_nombre}</span>}
+                        {salidaPendiente.placa_vehiculo && <span style={{ fontSize: '12px', color: '#374151' }}>🚗 {salidaPendiente.placa_vehiculo}</span>}
+                        {salidaPendiente.motivo && <span style={{ fontSize: '12px', color: '#374151' }}>· {salidaPendiente.motivo}</span>}
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>
+                          Entrada: {new Date(salidaPendiente.hora_entrada).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Tipo</label>
+                        <select value={novedadForm.tipo} onChange={e => setNovedadForm(f => ({ ...f, tipo: e.target.value as TipoNovedad }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
+                          <option value="incidente">Incidente</option>
+                          <option value="observacion">Observación</option>
+                          <option value="alarma">Alarma</option>
+                          <option value="acceso">Acceso</option>
+                          <option value="otro">Otro</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Prioridad</label>
+                        <select value={novedadForm.prioridad} onChange={e => setNovedadForm(f => ({ ...f, prioridad: e.target.value as PrioridadNovedad }))}
+                          style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
+                          <option value="normal">Normal</option>
+                          <option value="alta">Alta</option>
+                          <option value="critica">Crítica</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Ubicación</label>
+                      <input value={novedadForm.ubicacion} onChange={e => setNovedadForm(f => ({ ...f, ubicacion: e.target.value }))}
+                        placeholder={`Ej. ${salidaPendiente.unidad_nombre ?? 'Entrada principal'}`}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Comentarios / descripción de la novedad *</label>
+                      <textarea value={novedadForm.comentarios} onChange={e => setNovedadForm(f => ({ ...f, comentarios: e.target.value }))}
+                        placeholder="Describe con detalle lo ocurrido durante la salida..."
+                        rows={3}
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white', resize: 'vertical' }} />
+                    </div>
+                    <div>
+                      <MultiImageUploader values={fotosNovedad} onChange={setFotosNovedad} folder="novedades" label="Fotografías de evidencia" capture maxFiles={10} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Acciones */}
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button onClick={cancelarSalida} disabled={guardandoSalida}
+                    style={{ padding: '9px 18px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                    Cancelar
+                  </button>
+                  <button onClick={confirmarSalida} disabled={guardandoSalida || modoSalida === 'idle'}
+                    style={{ padding: '9px 20px', background: modoSalida === 'idle' ? '#e2e8f0' : modoSalida === 'sin_novedad' ? 'linear-gradient(135deg,#16a34a,#15803d)' : 'linear-gradient(135deg,#dc2626,#b91c1c)', color: modoSalida === 'idle' ? '#94a3b8' : 'white', border: 'none', borderRadius: '8px', cursor: modoSalida === 'idle' ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                    {guardandoSalida ? 'Registrando...' : modoSalida === 'con_novedad' ? '⚠️ Registrar salida y novedad' : '✓ Confirmar salida'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

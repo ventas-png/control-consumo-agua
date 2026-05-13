@@ -440,6 +440,9 @@ export interface Visitante {
   qr_token?: string | null
   valido_hasta?: string | null
   created_at: string
+  es_menor?: boolean
+  fecha_nacimiento?: string | null
+  visitante_principal_id?: string | null
   // joins opcionales
   unidad_nombre?: string
 }
