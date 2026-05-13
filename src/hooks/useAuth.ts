@@ -426,10 +426,18 @@ export function useAuth() {
     if (!validateEmail(cleanEmail)) return 'Formato de email inválido'
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail.toLowerCase(),
-        password,
-      })
+      // signInWithPassword has no built-in timeout — wrap it so a stalled
+      // network connection doesn't keep "Autenticando..." on screen forever
+      const authResult = await Promise.race([
+        supabase.auth.signInWithPassword({
+          email: cleanEmail.toLowerCase(),
+          password,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('auth_timeout')), 12000)
+        ),
+      ])
+      const { data, error } = authResult
 
       if (error || !data?.session || !data?.user) {
         recordLoginFailure()
@@ -459,6 +467,9 @@ export function useAuth() {
       const msg = error instanceof Error ? error.message : 'unknown'
       logSecurityEvent('login_error', { email: cleanEmail, error: msg }).catch(console.error)
 
+      if (msg === 'auth_timeout') {
+        return 'El servidor tardó demasiado en responder. Verifique su conexión e intente de nuevo.'
+      }
       const isNetworkError = msg.toLowerCase().includes('fetch') ||
         msg.toLowerCase().includes('network') ||
         msg.toLowerCase().includes('failed to fetch') ||
