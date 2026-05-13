@@ -1118,10 +1118,11 @@ export function EmpresaSection({ currentUser }: Props) {
       {/* Configuración de Pagos Online */}
       {currentUser.company_id && (
         <div style={{
-          background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-          borderRadius: '16px', padding: '24px',
-          border: '1px solid rgba(255,255,255,0.06)',
+          background: '#ffffff',
+          borderRadius: '16px', padding: '28px',
+          border: '1px solid #e2e8f0',
           marginTop: '24px',
+          boxShadow: '0 2px 12px rgba(0,0,0,.04)',
         }}>
           <StripePayPalConfig
             companyId={currentUser.company_id}
