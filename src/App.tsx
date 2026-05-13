@@ -427,6 +427,7 @@ export default function App() {
             <ErrorBoundary sectionName="clientes">
               <ClientesSection
                 clientes={clientes}
+                unidades={unidades}
                 userRole={currentUser.role}
                 userId={currentUser.user_id}
                 currentUser={currentUser}
