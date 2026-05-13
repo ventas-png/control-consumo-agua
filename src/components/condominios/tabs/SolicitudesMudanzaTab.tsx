@@ -43,16 +43,15 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
   const cargarTerminos = useCallback(async () => {
     const { data } = await supabase
       .from('config_condominio')
-      .select('id, valor')
+      .select('id, terminos_mudanza')
       .eq('project_id', proyectoId)
       .eq('company_id', companyId)
-      .eq('clave', 'terminos_mudanza')
       .maybeSingle()
 
     if (data) {
-      setTerminosMudanza(data.valor ?? '')
+      setTerminosMudanza(data.terminos_mudanza ?? '')
       setTerminosId(data.id)
-      setTerminosText(data.valor ?? '')
+      setTerminosText(data.terminos_mudanza ?? '')
     } else {
       setTerminosMudanza('')
       setTerminosId(null)
@@ -76,14 +75,14 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
     if (terminosId) {
       const { error } = await supabase
         .from('config_condominio')
-        .update({ valor: terminosText.trim(), updated_at: new Date().toISOString() })
+        .update({ terminos_mudanza: terminosText.trim(), updated_at: new Date().toISOString() })
         .eq('id', terminosId)
       setSavingTerminos(false)
       if (error) { Swal.fire('Error', error.message, 'error'); return }
     } else {
       const { error } = await supabase
         .from('config_condominio')
-        .insert({ company_id: companyId, project_id: proyectoId, clave: 'terminos_mudanza', valor: terminosText.trim(), tipo: 'texto' })
+        .upsert({ company_id: companyId, project_id: proyectoId, terminos_mudanza: terminosText.trim() }, { onConflict: 'project_id' })
       setSavingTerminos(false)
       if (error) { Swal.fire('Error', error.message, 'error'); return }
     }

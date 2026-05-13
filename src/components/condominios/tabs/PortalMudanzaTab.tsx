@@ -57,14 +57,13 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
         .order('created_at', { ascending: false }),
       supabase
         .from('config_condominio')
-        .select('valor')
+        .select('terminos_mudanza')
         .eq('project_id', proyectoId)
-        .eq('clave', 'terminos_mudanza')
         .maybeSingle(),
     ])
 
     setSolicitudes((solData as SolicitudMudanzaUnidad[]) ?? [])
-    setTerminosMudanza(termData?.valor ?? '')
+    setTerminosMudanza(termData?.terminos_mudanza ?? '')
     setLoading(false)
   }, [unidadId, proyectoId])
 
