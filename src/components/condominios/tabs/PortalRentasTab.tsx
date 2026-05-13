@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/supabase'
 import type {
   ContratoArrendamiento, ReservaSTR,
   EstadoContrato, EstadoSTR, PlataformaSTR,
+  SolicitudRentaUnidad, TipoRenta,
 } from '../../../types'
 
 interface Props {
@@ -11,11 +12,14 @@ interface Props {
   unidadNombre: string
   proyectoId: string
   companyId: string
+  clienteId: string
+  solicitudRenta: SolicitudRentaUnidad | null
+  onSolicitudChange: () => void
 }
 
 type SubTab = 'arrendamiento' | 'str'
 
-// ── Arrendamiento ────────────────────────────────────────────────────────────
+// ── Configs ───────────────────────────────────────────────────────────────────
 
 const ESTADO_CONTRATO: Record<EstadoContrato, { label: string; bg: string; color: string }> = {
   activo:    { label: 'Activo',    bg: '#f0fdf4', color: '#16a34a' },
@@ -38,6 +42,12 @@ const PLATAFORMAS: Record<PlataformaSTR, string> = {
   otro:    'Otro',
 }
 
+const TIPO_RENTA_LABEL: Record<TipoRenta, string> = {
+  arrendamiento: 'Arrendamiento (largo plazo)',
+  str:           'STR / Corto Plazo',
+  ambas:         'Arrendamiento + STR',
+}
+
 function blankContrato(): Partial<ContratoArrendamiento> {
   return {
     arrendatario_nombre: '', arrendatario_identificacion: '',
@@ -58,11 +68,120 @@ function blankReserva(): Partial<ReservaSTR> {
   }
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+// ── Authorization request form ────────────────────────────────────────────────
 
-export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId }: Props) {
+function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitudChange, prevRechazada }: {
+  unidadId: string; proyectoId: string; companyId: string; clienteId: string
+  onSolicitudChange: () => void; prevRechazada: SolicitudRentaUnidad | null
+}) {
+  const [tipo, setTipo]       = useState<TipoRenta>('arrendamiento')
+  const [motivo, setMotivo]   = useState('')
+  const [saving, setSaving]   = useState(false)
+
+  const fieldStyle: React.CSSProperties = {
+    width: '100%', padding: '9px 12px', fontSize: '13.5px',
+    border: '1.5px solid #e2e8f0', borderRadius: '8px', outline: 'none',
+    boxSizing: 'border-box',
+  }
+
+  async function submit() {
+    setSaving(true)
+    const { error } = await supabase.from('solicitud_renta_unidad').insert({
+      company_id: companyId,
+      project_id: proyectoId,
+      unidad_id: unidadId,
+      cliente_id: clienteId || null,
+      tipo_renta: tipo,
+      motivo: motivo.trim() || null,
+    })
+    setSaving(false)
+    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    Swal.fire({ icon: 'success', title: '¡Solicitud enviada!', text: 'La administración revisará tu solicitud pronto.', timer: 2000, showConfirmButton: false })
+    onSolicitudChange()
+  }
+
+  return (
+    <div style={{ maxWidth: '520px' }}>
+      <div style={{ marginBottom: '20px' }}>
+        <h3 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>
+          🔑 Solicitar autorización de renta
+        </h3>
+        <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+          Para gestionar contratos o reservas en tu unidad, primero debes solicitar autorización a la administración.
+        </p>
+      </div>
+
+      {prevRechazada && (
+        <div style={{
+          background: '#fef2f2', border: '1px solid #fecaca',
+          borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px',
+        }}>
+          <div style={{ fontWeight: 700, color: '#dc2626', marginBottom: '4px' }}>❌ Solicitud anterior rechazada</div>
+          {prevRechazada.comentario_admin && (
+            <div style={{ color: '#7f1d1d' }}>Motivo: {prevRechazada.comentario_admin}</div>
+          )}
+          <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>Puedes enviar una nueva solicitud.</div>
+        </div>
+      )}
+
+      <div style={{ marginBottom: '14px' }}>
+        <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+          Tipo de renta que deseas operar *
+        </label>
+        {(['arrendamiento', 'str', 'ambas'] as TipoRenta[]).map(t => (
+          <label key={t} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', cursor: 'pointer' }}>
+            <input
+              type="radio" name="tipo_renta" value={t} checked={tipo === t}
+              onChange={() => setTipo(t)}
+              style={{ accentColor: '#4f46e5', width: '16px', height: '16px' }}
+            />
+            <span style={{ fontSize: '13.5px', color: '#334155' }}>{TIPO_RENTA_LABEL[t]}</span>
+          </label>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: '18px' }}>
+        <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+          Motivo / descripción (opcional)
+        </label>
+        <textarea
+          style={{ ...fieldStyle, minHeight: '80px', resize: 'vertical' }}
+          value={motivo}
+          onChange={e => setMotivo(e.target.value)}
+          placeholder="Describe brevemente cómo planeas operar la renta…"
+        />
+      </div>
+
+      <button
+        onClick={submit}
+        disabled={saving}
+        style={{
+          padding: '10px 24px', background: '#4f46e5', color: 'white',
+          border: 'none', borderRadius: '9px', fontWeight: 600, fontSize: '14px',
+          cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
+        }}
+      >{saving ? 'Enviando…' : 'Enviar solicitud'}</button>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId, clienteId, solicitudRenta, onSolicitudChange }: Props) {
+
+  // Determine allowed sub-tabs based on authorization
+  const tipoAprobado = solicitudRenta?.estado === 'aprobada'
+    ? (solicitudRenta.tipo_aprobado ?? solicitudRenta.tipo_renta)
+    : null
+
+  const allowedSubTabs: SubTab[] = tipoAprobado === 'ambas'
+    ? ['arrendamiento', 'str']
+    : tipoAprobado === 'arrendamiento' ? ['arrendamiento']
+    : tipoAprobado === 'str'           ? ['str']
+    : []
+
   const [subTab, setSubTab]       = useState<SubTab>('arrendamiento')
-  const [loading, setLoading]     = useState(true)
+  const [loading, setLoading]     = useState(false)
   const [contratos, setContratos] = useState<ContratoArrendamiento[]>([])
   const [reservas, setReservas]   = useState<ReservaSTR[]>([])
 
@@ -79,7 +198,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
   const [savingSTR, setSavingSTR] = useState(false)
 
   const cargar = useCallback(async () => {
-    if (!unidadId) return
+    if (!unidadId || solicitudRenta?.estado !== 'aprobada') return
     setLoading(true)
     const [{ data: cd }, { data: rd }] = await Promise.all([
       supabase.from('contratos_arrendamiento').select('*').eq('unidad_id', unidadId).order('created_at', { ascending: false }),
@@ -88,26 +207,28 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
     setContratos((cd as ContratoArrendamiento[]) ?? [])
     setReservas((rd as ReservaSTR[]) ?? [])
     setLoading(false)
-  }, [unidadId])
+  }, [unidadId, solicitudRenta?.estado])
 
-  useEffect(() => { cargar() }, [cargar])
+  useEffect(() => {
+    if (solicitudRenta?.estado === 'aprobada') cargar()
+    else setLoading(false)
+  }, [cargar, solicitudRenta?.estado])
+
+  // Ensure subTab is one of the allowed ones
+  useEffect(() => {
+    if (allowedSubTabs.length > 0 && !allowedSubTabs.includes(subTab)) {
+      setSubTab(allowedSubTabs[0])
+    }
+  }, [allowedSubTabs, subTab])
 
   // ── Contrato helpers ────────────────────────────────────────────────────────
 
-  function openNewCA() {
-    setEditCA(null); setFormCA(blankContrato()); setShowCA(true)
-  }
-  function openEditCA(c: ContratoArrendamiento) {
-    setEditCA(c); setFormCA({ ...c }); setShowCA(true)
-  }
+  function openNewCA() { setEditCA(null); setFormCA(blankContrato()); setShowCA(true) }
+  function openEditCA(c: ContratoArrendamiento) { setEditCA(c); setFormCA({ ...c }); setShowCA(true) }
 
   async function saveCA() {
-    if (!formCA.arrendatario_nombre?.trim()) {
-      Swal.fire('Error', 'El nombre del arrendatario es requerido.', 'error'); return
-    }
-    if (!formCA.fecha_inicio) {
-      Swal.fire('Error', 'La fecha de inicio es requerida.', 'error'); return
-    }
+    if (!formCA.arrendatario_nombre?.trim()) { Swal.fire('Error', 'El nombre del arrendatario es requerido.', 'error'); return }
+    if (!formCA.fecha_inicio) { Swal.fire('Error', 'La fecha de inicio es requerida.', 'error'); return }
     setSavingCA(true)
     const payload = {
       company_id: companyId, project_id: proyectoId, unidad_id: unidadId,
@@ -135,12 +256,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
   }
 
   async function deleteCA(c: ContratoArrendamiento) {
-    const r = await Swal.fire({
-      title: '¿Eliminar contrato?',
-      text: `Arrendatario: ${c.arrendatario_nombre}`,
-      icon: 'warning', showCancelButton: true,
-      confirmButtonColor: '#dc2626', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar',
-    })
+    const r = await Swal.fire({ title: '¿Eliminar contrato?', text: `Arrendatario: ${c.arrendatario_nombre}`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('contratos_arrendamiento').delete().eq('id', c.id)
     setContratos((prev: ContratoArrendamiento[]) => prev.filter((x: ContratoArrendamiento) => x.id !== c.id))
@@ -149,12 +265,8 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
 
   // ── STR helpers ─────────────────────────────────────────────────────────────
 
-  function openNewSTR() {
-    setEditSTR(null); setFormSTR(blankReserva()); setShowSTR(true)
-  }
-  function openEditSTR(r: ReservaSTR) {
-    setEditSTR(r); setFormSTR({ ...r }); setShowSTR(true)
-  }
+  function openNewSTR() { setEditSTR(null); setFormSTR(blankReserva()); setShowSTR(true) }
+  function openEditSTR(r: ReservaSTR) { setEditSTR(r); setFormSTR({ ...r }); setShowSTR(true) }
 
   function calcNights(entrada: string, salida: string) {
     if (!entrada || !salida) return 0
@@ -163,12 +275,8 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
   }
 
   async function saveSTR() {
-    if (!formSTR.huesped_nombre?.trim()) {
-      Swal.fire('Error', 'El nombre del huésped es requerido.', 'error'); return
-    }
-    if (!formSTR.fecha_entrada || !formSTR.fecha_salida) {
-      Swal.fire('Error', 'Las fechas de entrada y salida son requeridas.', 'error'); return
-    }
+    if (!formSTR.huesped_nombre?.trim()) { Swal.fire('Error', 'El nombre del huésped es requerido.', 'error'); return }
+    if (!formSTR.fecha_entrada || !formSTR.fecha_salida) { Swal.fire('Error', 'Las fechas de entrada y salida son requeridas.', 'error'); return }
     setSavingSTR(true)
     const nights = calcNights(formSTR.fecha_entrada!, formSTR.fecha_salida!)
     const total  = nights * (Number(formSTR.monto_noche) || 0)
@@ -199,12 +307,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
   }
 
   async function deleteSTR(r: ReservaSTR) {
-    const res = await Swal.fire({
-      title: '¿Eliminar reserva?',
-      text: `Huésped: ${r.huesped_nombre}`,
-      icon: 'warning', showCancelButton: true,
-      confirmButtonColor: '#dc2626', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar',
-    })
+    const res = await Swal.fire({ title: '¿Eliminar reserva?', text: `Huésped: ${r.huesped_nombre}`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!res.isConfirmed) return
     await supabase.from('reservas_str').delete().eq('id', r.id)
     setReservas((prev: ReservaSTR[]) => prev.filter((x: ReservaSTR) => x.id !== r.id))
@@ -221,21 +324,83 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
   const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px', display: 'block' }
   const rowStyle: React.CSSProperties   = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }
 
+  // ── Header (always shown) ────────────────────────────────────────────────────
+
+  const header = (
+    <div style={{ marginBottom: '20px' }}>
+      <h3 style={{ margin: '0 0 4px', fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>
+        🏠 Rentas — {unidadNombre}
+      </h3>
+      <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+        Administra los contratos de arrendamiento y reservas de corto plazo de tu unidad.
+      </p>
+    </div>
+  )
+
+  // ── State: no authorization or rejected ─────────────────────────────────────
+
+  if (!solicitudRenta || solicitudRenta.estado === 'rechazada') {
+    return (
+      <div>
+        {header}
+        <SolicitudForm
+          unidadId={unidadId}
+          proyectoId={proyectoId}
+          companyId={companyId}
+          clienteId={clienteId}
+          onSolicitudChange={onSolicitudChange}
+          prevRechazada={solicitudRenta?.estado === 'rechazada' ? solicitudRenta : null}
+        />
+      </div>
+    )
+  }
+
+  // ── State: pending ───────────────────────────────────────────────────────────
+
+  if (solicitudRenta.estado === 'pendiente') {
+    const fechaSol = new Date(solicitudRenta.created_at).toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })
+    return (
+      <div>
+        {header}
+        <div style={{
+          background: '#fef3c7', border: '1.5px solid #fde68a',
+          borderRadius: '14px', padding: '24px 28px', maxWidth: '520px',
+        }}>
+          <div style={{ fontSize: '32px', marginBottom: '12px' }}>⏳</div>
+          <div style={{ fontWeight: 700, fontSize: '16px', color: '#92400e', marginBottom: '6px' }}>
+            Solicitud en revisión
+          </div>
+          <div style={{ fontSize: '13px', color: '#78350f', lineHeight: 1.6 }}>
+            Tu solicitud para operar <strong>{TIPO_RENTA_LABEL[solicitudRenta.tipo_renta]}</strong> fue enviada el {fechaSol} y está siendo revisada por la administración.
+          </div>
+          <div style={{ marginTop: '12px', fontSize: '12.5px', color: '#a16207' }}>
+            Te notificaremos cuando haya una respuesta.
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── State: approved — show authorized sub-tabs ───────────────────────────────
+
   return (
     <div>
-      {/* Header */}
-      <div style={{ marginBottom: '20px' }}>
-        <h3 style={{ margin: '0 0 4px', fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>
-          🏠 Rentas — {unidadNombre}
-        </h3>
-        <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-          Administra los contratos de arrendamiento y reservas de corto plazo de tu unidad.
-        </p>
+      {header}
+
+      {/* Authorization badge */}
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: '6px',
+        background: '#f0fdf4', border: '1px solid #bbf7d0',
+        borderRadius: '20px', padding: '4px 14px', marginBottom: '16px',
+        fontSize: '12px', fontWeight: 600, color: '#16a34a',
+      }}>
+        ✅ Autorizado: {TIPO_RENTA_LABEL[tipoAprobado!]}
+        {solicitudRenta.aprobado_por && <span style={{ fontWeight: 400, opacity: 0.8 }}>— {solicitudRenta.aprobado_por}</span>}
       </div>
 
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '2px solid #f1f5f9', paddingBottom: '0' }}>
-        {([['arrendamiento', '📄 Arrendamiento'], ['str', '🏨 STR / Corto Plazo']] as [SubTab, string][]).map(([id, label]) => (
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '2px solid #f1f5f9' }}>
+        {allowedSubTabs.map(id => (
           <button
             key={id}
             onClick={() => setSubTab(id)}
@@ -247,25 +412,16 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
               borderBottom: subTab === id ? '2px solid #4f46e5' : '2px solid transparent',
               marginBottom: '-2px',
             }}
-          >{label}</button>
+          >{id === 'arrendamiento' ? '📄 Arrendamiento' : '🏨 STR / Corto Plazo'}</button>
         ))}
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>
-          Cargando…
-        </div>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>Cargando…</div>
       ) : subTab === 'arrendamiento' ? (
         <>
-          {/* Arrendamiento list */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
-            <button
-              onClick={openNewCA}
-              style={{
-                padding: '8px 18px', background: '#4f46e5', color: 'white',
-                border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-              }}
-            >+ Nuevo contrato</button>
+            <button onClick={openNewCA} style={{ padding: '8px 18px', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo contrato</button>
           </div>
 
           {contratos.length === 0 ? (
@@ -276,63 +432,34 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
           ) : contratos.map(c => {
             const cfg = ESTADO_CONTRATO[c.estado]
             return (
-              <div key={c.id} style={{
-                border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px',
-                marginBottom: '10px', background: 'white',
-              }}>
+              <div key={c.id} style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>
-                      👤 {c.arrendatario_nombre}
-                    </div>
-                    {c.arrendatario_telefono && (
-                      <div style={{ fontSize: '12.5px', color: '#475569' }}>📞 {c.arrendatario_telefono}</div>
-                    )}
-                    {c.arrendatario_email && (
-                      <div style={{ fontSize: '12.5px', color: '#475569' }}>✉️ {c.arrendatario_email}</div>
-                    )}
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>👤 {c.arrendatario_nombre}</div>
+                    {c.arrendatario_telefono && <div style={{ fontSize: '12.5px', color: '#475569' }}>📞 {c.arrendatario_telefono}</div>}
+                    {c.arrendatario_email && <div style={{ fontSize: '12.5px', color: '#475569' }}>✉️ {c.arrendatario_email}</div>}
                     <div style={{ fontSize: '12.5px', color: '#475569', marginTop: '4px' }}>
-                      📅 {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' (indefinido)'}
-                      {'  '}|{'  '}💰 Renta: {c.monto_renta.toLocaleString()} · Día {c.dia_pago}
+                      📅 {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' (indefinido)'}{'  '}|{'  '}💰 Renta: {c.monto_renta.toLocaleString()} · Día {c.dia_pago}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 600,
-                      background: cfg.bg, color: cfg.color,
-                    }}>{cfg.label}</span>
+                    <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 600, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
                     <button onClick={() => openEditCA(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px' }} title="Editar">✏️</button>
                     <button onClick={() => deleteCA(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px' }} title="Eliminar">🗑️</button>
                   </div>
                 </div>
-                {c.notas && (
-                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#64748b', background: '#f8fafc', borderRadius: '6px', padding: '8px' }}>
-                    {c.notas}
-                  </div>
-                )}
+                {c.notas && <div style={{ marginTop: '8px', fontSize: '12px', color: '#64748b', background: '#f8fafc', borderRadius: '6px', padding: '8px' }}>{c.notas}</div>}
               </div>
             )
           })}
 
-          {/* Contrato modal */}
           {showCA && (
-            <div style={{
-              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              zIndex: 9999, padding: '16px',
-            }}>
-              <div style={{
-                background: 'white', borderRadius: '16px', padding: '28px',
-                width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto',
-                boxShadow: '0 24px 64px rgba(0,0,0,0.2)',
-              }}>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
+              <div style={{ background: 'white', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
-                    {editCA ? 'Editar contrato' : 'Nuevo contrato de arrendamiento'}
-                  </h3>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>{editCA ? 'Editar contrato' : 'Nuevo contrato de arrendamiento'}</h3>
                   <button onClick={() => setShowCA(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#94a3b8' }}>✕</button>
                 </div>
-
                 <div style={rowStyle}>
                   <div style={{ gridColumn: '1/-1' }}>
                     <label style={labelStyle}>Nombre del arrendatario *</label>
@@ -383,7 +510,6 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
                     <textarea style={{ ...fieldStyle, minHeight: '72px', resize: 'vertical' }} value={formCA.notas ?? ''} onChange={e => setFormCA(p => ({ ...p, notas: e.target.value }))} placeholder="Observaciones opcionales…" />
                   </div>
                 </div>
-
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                   <button onClick={() => setShowCA(false)} style={{ padding: '9px 20px', background: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: '#475569' }}>Cancelar</button>
                   <button onClick={saveCA} disabled={savingCA} style={{ padding: '9px 22px', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '8px', cursor: savingCA ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px', opacity: savingCA ? 0.7 : 1 }}>
@@ -396,15 +522,8 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
         </>
       ) : (
         <>
-          {/* STR list */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
-            <button
-              onClick={openNewSTR}
-              style={{
-                padding: '8px 18px', background: '#0ea5e9', color: 'white',
-                border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-              }}
-            >+ Nueva reserva</button>
+            <button onClick={openNewSTR} style={{ padding: '8px 18px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva reserva</button>
           </div>
 
           {reservas.length === 0 ? (
@@ -416,62 +535,35 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
             const cfg    = ESTADO_STR[r.estado]
             const nights = calcNights(r.fecha_entrada, r.fecha_salida)
             return (
-              <div key={r.id} style={{
-                border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px',
-                marginBottom: '10px', background: 'white',
-              }}>
+              <div key={r.id} style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>
-                      👤 {r.huesped_nombre}
-                    </div>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>👤 {r.huesped_nombre}</div>
                     <div style={{ fontSize: '12.5px', color: '#475569' }}>
-                      📅 {r.fecha_entrada} → {r.fecha_salida}
-                      {nights > 0 && ` (${nights} noche${nights !== 1 ? 's' : ''})`}
+                      📅 {r.fecha_entrada} → {r.fecha_salida}{nights > 0 && ` (${nights} noche${nights !== 1 ? 's' : ''})`}
                     </div>
                     <div style={{ fontSize: '12.5px', color: '#475569', marginTop: '2px' }}>
-                      👥 {r.num_adultos} adulto{r.num_adultos !== 1 ? 's' : ''}{r.num_ninos > 0 ? `, ${r.num_ninos} niño${r.num_ninos !== 1 ? 's' : ''}` : ''}
-                      {'  ·  '}🌐 {PLATAFORMAS[r.plataforma]}
-                      {r.monto_total ? `  ·  💰 ${r.monto_total.toLocaleString()}` : ''}
+                      👥 {r.num_adultos} adulto{r.num_adultos !== 1 ? 's' : ''}{r.num_ninos > 0 ? `, ${r.num_ninos} niño${r.num_ninos !== 1 ? 's' : ''}` : ''}{'  ·  '}🌐 {PLATAFORMAS[r.plataforma]}{r.monto_total ? `  ·  💰 ${r.monto_total.toLocaleString()}` : ''}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 600,
-                      background: cfg.bg, color: cfg.color,
-                    }}>{cfg.label}</span>
+                    <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 600, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
                     <button onClick={() => openEditSTR(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px' }} title="Editar">✏️</button>
                     <button onClick={() => deleteSTR(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px' }} title="Eliminar">🗑️</button>
                   </div>
                 </div>
-                {r.notas && (
-                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#64748b', background: '#f8fafc', borderRadius: '6px', padding: '8px' }}>
-                    {r.notas}
-                  </div>
-                )}
+                {r.notas && <div style={{ marginTop: '8px', fontSize: '12px', color: '#64748b', background: '#f8fafc', borderRadius: '6px', padding: '8px' }}>{r.notas}</div>}
               </div>
             )
           })}
 
-          {/* STR modal */}
           {showSTR && (
-            <div style={{
-              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              zIndex: 9999, padding: '16px',
-            }}>
-              <div style={{
-                background: 'white', borderRadius: '16px', padding: '28px',
-                width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto',
-                boxShadow: '0 24px 64px rgba(0,0,0,0.2)',
-              }}>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
+              <div style={{ background: 'white', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
-                    {editSTR ? 'Editar reserva STR' : 'Nueva reserva STR'}
-                  </h3>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>{editSTR ? 'Editar reserva STR' : 'Nueva reserva STR'}</h3>
                   <button onClick={() => setShowSTR(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#94a3b8' }}>✕</button>
                 </div>
-
                 <div style={rowStyle}>
                   <div style={{ gridColumn: '1/-1' }}>
                     <label style={labelStyle}>Nombre del huésped *</label>
@@ -513,9 +605,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
                     <label style={labelStyle}>
                       Tarifa por noche
                       {formSTR.fecha_entrada && formSTR.fecha_salida && (
-                        <span style={{ fontWeight: 400, color: '#94a3b8' }}>
-                          {' '}({calcNights(formSTR.fecha_entrada, formSTR.fecha_salida)} noches = {(calcNights(formSTR.fecha_entrada, formSTR.fecha_salida) * (Number(formSTR.monto_noche) || 0)).toLocaleString()})
-                        </span>
+                        <span style={{ fontWeight: 400, color: '#94a3b8' }}>{' '}({calcNights(formSTR.fecha_entrada, formSTR.fecha_salida)} noches = {(calcNights(formSTR.fecha_entrada, formSTR.fecha_salida) * (Number(formSTR.monto_noche) || 0)).toLocaleString()})</span>
                       )}
                     </label>
                     <input style={fieldStyle} type="number" min={0} value={formSTR.monto_noche ?? 0} onChange={e => setFormSTR(p => ({ ...p, monto_noche: Number(e.target.value) }))} />
@@ -534,7 +624,6 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId 
                     <textarea style={{ ...fieldStyle, minHeight: '72px', resize: 'vertical' }} value={formSTR.notas ?? ''} onChange={e => setFormSTR(p => ({ ...p, notas: e.target.value }))} placeholder="Observaciones opcionales…" />
                   </div>
                 </div>
-
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                   <button onClick={() => setShowSTR(false)} style={{ padding: '9px 20px', background: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: '#475569' }}>Cancelar</button>
                   <button onClick={saveSTR} disabled={savingSTR} style={{ padding: '9px 22px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', cursor: savingSTR ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px', opacity: savingSTR ? 0.7 : 1 }}>

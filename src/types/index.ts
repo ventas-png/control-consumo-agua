@@ -851,6 +851,29 @@ export interface ContratoArrendamiento {
   unidad_nombre?: string
 }
 
+// ── Autorización de Renta por Unidad ──────────────────────────────────────
+
+export type TipoRenta = 'arrendamiento' | 'str' | 'ambas'
+export type EstadoSolicitudRenta = 'pendiente' | 'aprobada' | 'rechazada'
+
+export interface SolicitudRentaUnidad {
+  id: string
+  company_id: string
+  project_id: string
+  unidad_id: string
+  cliente_id?: string | null
+  tipo_renta: TipoRenta
+  motivo?: string | null
+  estado: EstadoSolicitudRenta
+  tipo_aprobado?: TipoRenta | null
+  comentario_admin?: string | null
+  aprobado_por?: string | null
+  fecha_resolucion?: string | null
+  created_at: string
+  // joined
+  unidad_nombre?: string
+}
+
 // ── Centro de Comunicación ─────────────────────────────────────────────────
 
 export type ConversationStatus =

@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import type {
   UserSession, Unidad, CuotaCondominio, Amenidad,
   ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento,
-  AnuncioComunidad, Visitante, MensajePortal,
+  AnuncioComunidad, Visitante, MensajePortal, SolicitudRentaUnidad,
 } from '../../types'
 import { PortalReservasTab }   from '../condominios/tabs/PortalReservasTab'
 import { PortalMiCuentaTab }   from '../condominios/tabs/PortalMiCuentaTab'
@@ -67,6 +67,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const [anuncios, setAnuncios]                   = useState<AnuncioComunidad[]>([])
   const [visitantes, setVisitantes]               = useState<Visitante[]>([])
   const [mensajes, setMensajes]                   = useState<MensajePortal[]>([])
+  const [solicitudesRenta, setSolicitudesRenta]   = useState<SolicitudRentaUnidad[]>([])
 
   const cargarDatos = useCallback(async () => {
     if (!clienteId) { setLoading(false); return }
@@ -100,6 +101,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         { data: anunciosData },
         { data: visitantesData },
         { data: mensajesData },
+        { data: solicitudesRentaData },
       ] = await Promise.all([
         supabase.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
         supabase.from('amenidades').select('*').in('project_id', projectIds).eq('activo', true),
@@ -110,6 +112,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         supabase.from('anuncios_comunidad').select('*').in('project_id', projectIds).eq('activo', true).order('created_at', { ascending: false }),
         supabase.from('visitantes').select('*').in('unidad_id', unidadIds).order('hora_entrada', { ascending: false }).limit(200),
         supabase.from('mensajes_portal').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }),
+        supabase.from('solicitud_renta_unidad').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }).limit(50),
       ])
 
       const proj = (projData as { id: string; company_id: string; moneda_condominios: string | null; moneda: string }[] | null)?.[0]
@@ -129,6 +132,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       setAnuncios((anunciosData as AnuncioComunidad[]) ?? [])
       setVisitantes((visitantesData as Visitante[]) ?? [])
       setMensajes((mensajesData as MensajePortal[]) ?? [])
+      setSolicitudesRenta((solicitudesRentaData as SolicitudRentaUnidad[]) ?? [])
     } finally {
       setLoading(false)
     }
@@ -179,10 +183,12 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const proyectoId = unidad?.project_id ?? ''
 
   // Data filtered to selected unit
-  const cuotasU     = cuotas.filter(c => c.unidad_id === selectedUnidadId)
-  const ticketsU    = tickets.filter(t => t.unidad_id === selectedUnidadId)
-  const visitantesU = visitantes.filter(v => v.unidad_id === selectedUnidadId)
-  const mensajesU   = mensajes.filter(m => m.unidad_id === selectedUnidadId)
+  const cuotasU        = cuotas.filter(c => c.unidad_id === selectedUnidadId)
+  const ticketsU       = tickets.filter(t => t.unidad_id === selectedUnidadId)
+  const visitantesU    = visitantes.filter(v => v.unidad_id === selectedUnidadId)
+  const mensajesU      = mensajes.filter(m => m.unidad_id === selectedUnidadId)
+  // Most recent rental authorization for the selected unit (null = none submitted)
+  const solicitudRentaU = solicitudesRenta.find(s => s.unidad_id === selectedUnidadId) ?? null
 
   // Data filtered to selected unit's project
   const amenidadesP = amenidades.filter(a => a.project_id === proyectoId)
@@ -399,6 +405,9 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 unidadNombre={unidad.nombre}
                 proyectoId={proyectoId}
                 companyId={resolvedCompanyId}
+                clienteId={clienteId}
+                solicitudRenta={solicitudRentaU}
+                onSolicitudChange={cargarDatos}
               />
             )}
           </div>
