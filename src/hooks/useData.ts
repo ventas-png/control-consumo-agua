@@ -244,15 +244,22 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     }
   }
 
-  const hasErrors = (results: Awaited<ReturnType<typeof fetchAllData>>) => {
+  const getQueryErrors = (results: Awaited<ReturnType<typeof fetchAllData>>) => {
     const [clRes, regRes, , , , , , contadoresRes, unidadesRes] = results
-    return (
-      (clRes.status === 'fulfilled' && !!clRes.value.error) ||
-      (regRes.status === 'fulfilled' && !!regRes.value.error) ||
-      (contadoresRes.status === 'fulfilled' && !!contadoresRes.value.error) ||
-      (unidadesRes.status === 'fulfilled' && !!unidadesRes.value.error)
-    )
+    const errs: string[] = []
+    if (clRes.status === 'fulfilled' && clRes.value.error)
+      errs.push(`clientes: ${clRes.value.error.message}`)
+    if (regRes.status === 'fulfilled' && regRes.value.error)
+      errs.push(`registros: ${regRes.value.error.message}`)
+    if (contadoresRes.status === 'fulfilled' && contadoresRes.value.error)
+      errs.push(`contadores: ${contadoresRes.value.error.message}`)
+    if (unidadesRes.status === 'fulfilled' && unidadesRes.value.error)
+      errs.push(`unidades: ${unidadesRes.value.error.message}`)
+    return errs
   }
+
+  const hasErrors = (results: Awaited<ReturnType<typeof fetchAllData>>) =>
+    getQueryErrors(results).length > 0
 
   const cargarDatos = useCallback(async () => {
     setIsLoading(true)
@@ -272,11 +279,11 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       // Use cached data as base so partial query failures keep cached values for failed tables
       const base = loadCache() ?? INITIAL_DATA
 
-      // Each fetchAllData() call is capped at 10 s — Supabase cold starts can stall indefinitely
+      // Each fetchAllData() call is capped at 15 s — Supabase cold starts can stall indefinitely
       const fetchWithTimeout = () => Promise.race([
         fetchAllData(),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('fetch_timeout')), 10000)
+          setTimeout(() => reject(new Error('fetch_timeout')), 15000)
         ),
       ])
 
@@ -289,6 +296,13 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
         setIsLoading(false)
         return
       }
+
+      // Log errors so they appear in browser console for diagnosis
+      console.error('[useData] Query errors on first fetch:', getQueryErrors(results))
+
+      // If some core data DID load, stay silent on subsequent retries —
+      // the app is usable and showing an "Offline" modal would be disruptive.
+      const dataLoaded = freshData.proyectos.length > 0 || freshData.clientes.length > 0 || freshData.registros.length > 0
 
       // Retry 1: wait 1.5 s to handle cold-start timeouts on the DB connection pool
       await new Promise(resolve => setTimeout(resolve, 1500))
@@ -308,16 +322,22 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       const retryData2 = await filterProyectosByAssignment(applyResults(base, results))
       setData(retryData2)
 
+      const finalErrors = getQueryErrors(results)
+      console.error('[useData] Persistent query errors after retries:', finalErrors)
+
       if (!hasErrors(results)) {
         saveCache(retryData2)
-      } else {
+      } else if (!dataLoaded) {
+        // Only block the UI if we truly have no data at all
         Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
       }
+      // If data loaded but some queries still error, stay silent — data is visible in the UI
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
       if (msg === 'fetch_timeout') {
         Swal.fire('Tiempo de espera agotado', 'El servidor tardó demasiado. Verifique su conexión e intente de nuevo.', 'warning')
       } else {
+        console.error('[useData] Unexpected error in cargarDatos:', err)
         Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
       }
     } finally {
