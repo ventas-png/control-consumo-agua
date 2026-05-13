@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { SolicitudMudanzaUnidad, TipoSolicitudMudanza, EstadoSolicitudMudanza } from '../../../types'
@@ -25,34 +25,92 @@ const ESTADO_CFG: Record<EstadoSolicitudMudanza, { label: string; bg: string; co
 }
 
 function blankForm() {
-  return { tipo_mudanza: 'nueva_mudanza' as TipoSolicitudMudanza, fecha_solicitada: '', hora_solicitada: '', descripcion: '' }
+  return {
+    tipo_mudanza: 'nueva_mudanza' as TipoSolicitudMudanza,
+    fecha_solicitada: '',
+    hora_solicitada: '',
+    descripcion: '',
+    imagenes: [] as File[],
+    terminosAceptados: false,
+  }
 }
 
 export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId, clienteId }: Props) {
-  const [solicitudes, setSolicitudes] = useState<SolicitudMudanzaUnidad[]>([])
-  const [loading, setLoading]         = useState(true)
-  const [showForm, setShowForm]       = useState(false)
-  const [form, setForm]               = useState(blankForm())
-  const [saving, setSaving]           = useState(false)
+  const [solicitudes, setSolicitudes]       = useState<SolicitudMudanzaUnidad[]>([])
+  const [loading, setLoading]               = useState(true)
+  const [showForm, setShowForm]             = useState(false)
+  const [form, setForm]                     = useState(blankForm())
+  const [saving, setSaving]                 = useState(false)
+  const [terminosMudanza, setTerminosMudanza] = useState<string>('')
+  const fileInputRef                        = useRef<HTMLInputElement>(null)
 
   const cargar = useCallback(async () => {
     if (!unidadId) return
     setLoading(true)
-    const { data } = await supabase
-      .from('solicitud_mudanza_unidad')
-      .select('*')
-      .eq('unidad_id', unidadId)
-      .order('created_at', { ascending: false })
-    setSolicitudes((data as SolicitudMudanzaUnidad[]) ?? [])
+
+    // Fetch solicitudes and terms in parallel
+    const [{ data: solData }, { data: termData }] = await Promise.all([
+      supabase
+        .from('solicitud_mudanza_unidad')
+        .select('*')
+        .eq('unidad_id', unidadId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('config_condominio')
+        .select('valor')
+        .eq('project_id', proyectoId)
+        .eq('clave', 'terminos_mudanza')
+        .maybeSingle(),
+    ])
+
+    setSolicitudes((solData as SolicitudMudanzaUnidad[]) ?? [])
+    setTerminosMudanza(termData?.valor ?? '')
     setLoading(false)
-  }, [unidadId])
+  }, [unidadId, proyectoId])
 
   useEffect(() => { cargar() }, [cargar])
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    setForm(p => {
+      const combined = [...p.imagenes, ...files]
+      return { ...p, imagenes: combined.slice(0, 5) }
+    })
+    // Reset input so same file can be re-added after removal
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function removeImage(index: number) {
+    setForm(p => ({ ...p, imagenes: p.imagenes.filter((_, i) => i !== index) }))
+  }
+
   async function enviar() {
-    if (!form.fecha_solicitada) { Swal.fire('Error', 'La fecha propuesta es requerida.', 'error'); return }
+    if (!form.fecha_solicitada) {
+      Swal.fire('Error', 'La fecha propuesta es requerida.', 'error')
+      return
+    }
+    if (terminosMudanza && !form.terminosAceptados) {
+      Swal.fire('Error', 'Debes aceptar los términos de mudanza para continuar.', 'error')
+      return
+    }
+
     setSaving(true)
-    const { error } = await supabase.from('solicitud_mudanza_unidad').insert({
+
+    // Upload images
+    const uploadedUrls: string[] = []
+    for (const file of form.imagenes) {
+      const path = `${unidadId}/${Date.now()}_${file.name}`
+      const { error: upErr } = await supabase.storage.from('mudanza-docs').upload(path, file)
+      if (upErr) {
+        setSaving(false)
+        Swal.fire('Error', `No se pudo subir la imagen: ${upErr.message}`, 'error')
+        return
+      }
+      const { data: urlData } = supabase.storage.from('mudanza-docs').getPublicUrl(path)
+      uploadedUrls.push(urlData.publicUrl)
+    }
+
+    const payload: Record<string, unknown> = {
       company_id: companyId,
       project_id: proyectoId,
       unidad_id: unidadId,
@@ -61,11 +119,18 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
       fecha_solicitada: form.fecha_solicitada,
       hora_solicitada: form.hora_solicitada || null,
       descripcion: form.descripcion.trim() || null,
-    })
+    }
+    if (uploadedUrls.length > 0) {
+      payload.imagenes = uploadedUrls
+    }
+
+    const { error } = await supabase.from('solicitud_mudanza_unidad').insert(payload)
     setSaving(false)
     if (error) { Swal.fire('Error', error.message, 'error'); return }
     Swal.fire({ icon: 'success', title: '¡Solicitud enviada!', text: 'La administración revisará tu solicitud pronto.', timer: 2000, showConfirmButton: false })
-    setShowForm(false); setForm(blankForm()); cargar()
+    setShowForm(false)
+    setForm(blankForm())
+    cargar()
   }
 
   const fieldStyle: React.CSSProperties = {
@@ -138,7 +203,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
               </div>
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '16px' }}>
               <label style={labelStyle}>Descripción / lista de artículos (opcional)</label>
               <textarea
                 style={{ ...fieldStyle, minHeight: '80px', resize: 'vertical' }}
@@ -148,9 +213,101 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
               />
             </div>
 
+            {/* Image upload */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={labelStyle}>Fotos / documentos (opcional, máx. 5)</label>
+              <div
+                style={{
+                  border: '1.5px dashed #c7d2fe', borderRadius: '8px', padding: '10px 12px',
+                  background: '#f8f9ff', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
+                }}
+              >
+                {form.imagenes.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      padding: '6px 14px', background: '#eef2ff', border: '1.5px solid #c7d2fe',
+                      borderRadius: '7px', color: '#4f46e5', fontWeight: 600, fontSize: '12px', cursor: 'pointer',
+                    }}
+                  >
+                    + Agregar imagen
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={handleFileChange}
+                />
+                {form.imagenes.map((file, idx) => {
+                  const url = URL.createObjectURL(file)
+                  return (
+                    <div key={idx} style={{ position: 'relative', width: '56px', height: '56px', flexShrink: 0 }}>
+                      <img
+                        src={url}
+                        alt={file.name}
+                        style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1.5px solid #e2e8f0' }}
+                        onLoad={() => URL.revokeObjectURL(url)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(idx)}
+                        style={{
+                          position: 'absolute', top: '-6px', right: '-6px',
+                          width: '18px', height: '18px', borderRadius: '50%',
+                          background: '#ef4444', color: 'white', border: 'none',
+                          fontSize: '10px', cursor: 'pointer', display: 'flex',
+                          alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+                        }}
+                      >✕</button>
+                    </div>
+                  )
+                })}
+                {form.imagenes.length === 0 && (
+                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>Sin imágenes seleccionadas</span>
+                )}
+              </div>
+            </div>
+
+            {/* Terms */}
+            {terminosMudanza && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={labelStyle}>Términos y condiciones de mudanza</label>
+                <div style={{
+                  background: '#f1f5f9', borderRadius: '8px', padding: '12px',
+                  maxHeight: '130px', overflowY: 'auto', fontSize: '12.5px',
+                  color: '#334155', lineHeight: 1.6, marginBottom: '10px',
+                  border: '1px solid #e2e8f0', whiteSpace: 'pre-wrap',
+                }}>
+                  {terminosMudanza}
+                </div>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#0f172a', fontWeight: 500 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.terminosAceptados}
+                    onChange={e => setForm(p => ({ ...p, terminosAceptados: e.target.checked }))}
+                    style={{ marginTop: '2px', accentColor: '#4f46e5', width: '15px', height: '15px', flexShrink: 0 }}
+                  />
+                  He leído y acepto los términos de mudanza
+                </label>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button onClick={() => setShowForm(false)} style={{ padding: '9px 20px', background: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: '#475569' }}>Cancelar</button>
-              <button onClick={enviar} disabled={saving} style={{ padding: '9px 22px', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '8px', cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px', opacity: saving ? 0.7 : 1 }}>
+              <button
+                onClick={enviar}
+                disabled={saving || (!!terminosMudanza && !form.terminosAceptados)}
+                style={{
+                  padding: '9px 22px', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '8px',
+                  cursor: (saving || (!!terminosMudanza && !form.terminosAceptados)) ? 'not-allowed' : 'pointer',
+                  fontWeight: 600, fontSize: '13px',
+                  opacity: (saving || (!!terminosMudanza && !form.terminosAceptados)) ? 0.6 : 1,
+                }}
+              >
                 {saving ? 'Enviando…' : 'Enviar solicitud'}
               </button>
             </div>
