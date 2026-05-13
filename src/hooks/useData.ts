@@ -116,8 +116,10 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     let tarifasEnergiaQ = supabase.from('tarifas_energia').select('*').order('created_at', { ascending: false })
     let fuentesEnergiaQ = supabase.from('fuentes_energia').select('*').order('created_at', { ascending: false })
     let facturasEnergiaQ = supabase.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
-    let registrosQ = supabase.from('registros').select('*').order('fecha', { ascending: false }).limit(2000)
-    let clientesQ = supabase.from('clientes').select('*')
+    // registros uses project_id (not company_id) — filtered via RLS
+    // clientes has no company_id column — linked via company_clientes junction, filtered via RLS
+    const registrosQ = supabase.from('registros').select('*').order('fecha', { ascending: false }).limit(2000)
+    const clientesQ = supabase.from('clientes').select('*')
 
     if (cid) {
       tarifasQ         = tarifasQ.eq('company_id', cid)
@@ -129,8 +131,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       tarifasEnergiaQ  = tarifasEnergiaQ.eq('company_id', cid)
       fuentesEnergiaQ  = fuentesEnergiaQ.eq('company_id', cid)
       facturasEnergiaQ = facturasEnergiaQ.eq('company_id', cid)
-      registrosQ       = registrosQ.eq('company_id', cid)
-      clientesQ        = clientesQ.eq('company_id', cid)
     }
 
     return Promise.allSettled([
