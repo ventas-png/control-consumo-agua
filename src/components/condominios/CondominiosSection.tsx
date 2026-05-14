@@ -936,7 +936,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('fondo_reserva').select('*').eq('project_id', pid).eq('company_id', cid).order('fecha', { ascending: false }),
       supabase.from('config_condominio').select('*').eq('project_id', pid).eq('company_id', cid).maybeSingle(),
       supabase.from('solicitud_renta_unidad').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
-      supabase.from('solicitud_mudanza_unidad').select('*').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('solicitud_mudanza_unidad').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
     ])
 
     // Fase 57 — Rutas de ronda (separate to avoid giant Promise.all size limit)
@@ -1089,7 +1089,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setConfiguracion((configuracionRes.data ?? []) as ConfiguracionCondominio[])
     setSolicitudes(mapUnidad<SolicitudResidente>(solicitudesRes.data ?? []))
     setSolicitudesRenta((solicitudesRentaRes.data ?? []) as SolicitudRentaUnidad[])
-    setSolicitudesMudanza((solicitudesMudanzaRes.data ?? []) as SolicitudMudanzaUnidad[])
+    setSolicitudesMudanza(mapUnidad<SolicitudMudanzaUnidad>(solicitudesMudanzaRes.data ?? []))
     setJunta(mapUnidad<MiembroJunta>(juntaRes.data ?? []))
     setPrestamos(mapUnidad<PrestamoEquipo>(prestamosRes.data ?? []))
     setComunicados(mapUnidad<ComunicadoCondominio>(comunicadosRes.data ?? []))
@@ -1310,7 +1310,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
         {activeTab === 'cuotas' && <CuotasTab cuotas={cuotas} unidades={unidadesProyecto} proyectos={proyectosActivos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
-        {activeTab === 'visitantes' && <VisitantesTab visitantes={visitantes} unidades={unidadesProyecto} reservasSTR={reservasSTR} proyectoId={selectedProyectoId} companyId={cid} userId={uid} proyectoNombre={proyectoActual?.nombre} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
+        {activeTab === 'visitantes' && <VisitantesTab visitantes={visitantes} unidades={unidadesProyecto} reservasSTR={reservasSTR} solicitudesMudanza={solicitudesMudanza} proyectoId={selectedProyectoId} companyId={cid} userId={uid} proyectoNombre={proyectoActual?.nombre} canCreate={canCreate('condominios')} onRefresh={cargarDatos} />}
 
         {activeTab === 'amenidades' && <AmenidadesTab amenidades={amenidades} reservas={reservas} bloqueos={bloqueosAmenidades} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} userId={uid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
