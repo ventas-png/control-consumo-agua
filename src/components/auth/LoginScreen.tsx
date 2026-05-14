@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface Props {
   onLogin: (email: string, password: string) => Promise<string | null>
@@ -33,6 +33,19 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [shake, setShake] = useState(false)
+  const [loadingSeconds, setLoadingSeconds] = useState(0)
+
+  useEffect(() => {
+    if (!loading) { setLoadingSeconds(0); return }
+    const id = setInterval(() => setLoadingSeconds(s => s + 1), 1000)
+    return () => clearInterval(id)
+  }, [loading])
+
+  function getLoginStatusText(seconds: number): string {
+    if (seconds >= 15) return 'Iniciando sistema, espere...'
+    if (seconds >= 7) return 'Conectando con el servidor...'
+    return 'Autenticando...'
+  }
 
   async function handleLogin() {
     setError('')
@@ -377,7 +390,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
                     border: '2.5px solid rgba(255,255,255,0.4)', borderTopColor: 'white',
                     display: 'inline-block', animation: 'spin 0.7s linear infinite',
                   }} />
-                  Autenticando...
+                  {getLoginStatusText(loadingSeconds)}
                 </>
               ) : 'Iniciar Sesión'}
             </button>

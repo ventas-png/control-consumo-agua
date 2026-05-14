@@ -428,9 +428,8 @@ export function useAuth() {
     try {
       // signInWithPassword has no built-in timeout — wrap it so a stalled
       // network connection doesn't keep "Autenticando..." on screen forever.
-      // Supabase cold starts can take 15-20 s, so use 20 s and retry once:
-      // the first request wakes the server even if it times out.
-      const doSignIn = () => Promise.race([
+      // 20 s covers Supabase free-tier cold starts (~15-20 s).
+      const authResult = await Promise.race([
         supabase.auth.signInWithPassword({
           email: cleanEmail.toLowerCase(),
           password,
@@ -439,17 +438,6 @@ export function useAuth() {
           setTimeout(() => reject(new Error('auth_timeout')), 20000)
         ),
       ])
-      let authResult: Awaited<ReturnType<typeof doSignIn>>
-      try {
-        authResult = await doSignIn()
-      } catch (err) {
-        if (err instanceof Error && err.message === 'auth_timeout') {
-          // Cold-start timeout — retry once; server should be awake now
-          authResult = await doSignIn()
-        } else {
-          throw err
-        }
-      }
       const { data, error } = authResult
 
       if (error || !data?.session || !data?.user) {
@@ -481,7 +469,7 @@ export function useAuth() {
       logSecurityEvent('login_error', { email: cleanEmail, error: msg }).catch(console.error)
 
       if (msg === 'auth_timeout') {
-        return 'El servidor tardó en responder (posible inicio en frío). El sistema reintentó automáticamente — intente de nuevo.'
+        return 'El servidor tardó en responder. Puede estar iniciando — intente de nuevo en unos segundos.'
       }
       const isNetworkError = msg.toLowerCase().includes('fetch') ||
         msg.toLowerCase().includes('network') ||
