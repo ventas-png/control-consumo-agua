@@ -85,7 +85,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
       })
       setReservaHuespedes(grouped)
     })
-    supabase.from('visitantes').select('reserva_str_id').in('reserva_str_id', ids).then(({ data }) => {
+    supabase.from('visitantes').select('reserva_str_id').in('reserva_str_id', ids).is('hora_salida', null).then(({ data }) => {
       if (!data) return
       const counts: Record<string, number> = {}
       data.forEach((v: { reserva_str_id?: string | null }) => {
