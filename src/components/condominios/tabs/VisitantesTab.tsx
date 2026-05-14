@@ -453,7 +453,9 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
   function renderVisitanteCard(v: Visitante, isSTRMember = false) {
     const enPremisa = !v.hora_salida
     const esSTR = v.motivo?.startsWith('Renta corta')
-    const fechaSalidaSTR = esSTR ? (v.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
+    // Date restriction only applies to legacy single-person STR entries (no reserva_str_id).
+    // Group members with reserva_str_id can always exit individually.
+    const fechaSalidaSTR = (esSTR && !v.reserva_str_id) ? (v.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
     const salidaHabilitada = !fechaSalidaSTR || hoy >= fechaSalidaSTR
     const esAcompanante = !!v.visitante_principal_id
     const principal = esAcompanante ? visitantes.find(p => p.id === v.visitante_principal_id) : null
@@ -1167,7 +1169,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
                 {!visitanteDetalle.hora_salida && (() => {
                   const esSTR = visitanteDetalle.motivo?.startsWith('Renta corta')
-                  const fechaSalidaSTR = esSTR ? (visitanteDetalle.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
+                  const fechaSalidaSTR = (esSTR && !visitanteDetalle.reserva_str_id) ? (visitanteDetalle.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
                   const salidaHabilitada = !fechaSalidaSTR || hoy >= fechaSalidaSTR
                   return salidaHabilitada ? (
                     <button onClick={() => { setVisitanteDetalle(null); iniciarSalida(visitanteDetalle) }}
