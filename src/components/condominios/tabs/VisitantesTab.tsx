@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import type { Visitante, Unidad, ReservaSTR } from '../../../types'
+import type { Visitante, Unidad, ReservaSTR, HuespedSTR } from '../../../types'
 import { ImageUploader, MultiImageUploader } from '../ImageUploader'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
@@ -65,7 +65,8 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
   const [fotosExpiradas, setFotosExpiradas] = useState<{ foto: boolean; documento: boolean; vehiculo: boolean }>({ foto: false, documento: false, vehiculo: false })
   const [showStrModal, setShowStrModal] = useState(false)
   const [strSearch, setStrSearch] = useState('')
-  const [strIngresados, setStrIngresados] = useState<Set<string>>(new Set())
+  const [strHuespedes, setStrHuespedes] = useState<Record<string, HuespedSTR[]>>({})
+  const [strCtx, setStrCtx] = useState<{ reservaId: string; huespedId?: string } | null>(null)
   const [form, setForm] = useState({ unidad_id: '', nombre: '', identificacion: '', placa_vehiculo: '', motivo: '', notas: '' })
 
   // Minor & companions state
@@ -87,6 +88,26 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
 
   const inicioMes = hoy.slice(0, 7) + '-01'
 
+  // Fetch pre-registered guests when STR modal opens
+  useEffect(() => {
+    if (!showStrModal) return
+    const activas = reservasSTR.filter(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy)
+    if (activas.length === 0) return
+    supabase
+      .from('huespedes_str')
+      .select('*')
+      .in('reserva_str_id', activas.map(r => r.id))
+      .then(({ data }) => {
+        if (!data) return
+        const grouped: Record<string, HuespedSTR[]> = {}
+        data.forEach(h => {
+          if (!grouped[h.reserva_str_id]) grouped[h.reserva_str_id] = []
+          grouped[h.reserva_str_id].push(h as HuespedSTR)
+        })
+        setStrHuespedes(grouped)
+      })
+  }, [showStrModal, reservasSTR])
+
   // KPIs — exclude companions to avoid double-counting
   const principales = visitantes.filter(v => !v.visitante_principal_id)
   const visitasHoy = principales.filter(v => v.hora_entrada.startsWith(hoy)).length
@@ -94,7 +115,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
   const estaSemana = principales.filter(v => v.hora_entrada.slice(0, 10) >= inicioSemana).length
   const totalHistorico = principales.length
 
-  // Deduped frequent visitor suggestions — sorted by most recent first, matches name OR DPI
+  // Suggestions for main form — matches name OR DPI
   const sugerencias = (form.nombre.length >= 3 || form.identificacion.length >= 3)
     ? [...visitantes]
         .filter(v => !v.visitante_principal_id)
@@ -110,7 +131,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
         .slice(0, 5)
     : []
 
-  // Suggestions for the companion form, filtered by what's typed in name or DPI
+  // Suggestions for companion form
   const acompSugerencias = (acompForm.nombre.length >= 3 || acompForm.identificacion.length >= 3)
     ? [...visitantes]
         .filter(v => !v.visitante_principal_id)
@@ -140,6 +161,23 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     return matchBusqueda && matchActivo && matchFecha
   })
 
+  // Group STR visitors under their reservation
+  const strGruposMap = new Map<string, { reserva: ReservaSTR; miembros: Visitante[] }>()
+  const regulares: Visitante[] = []
+  for (const v of filtrados) {
+    if (v.reserva_str_id) {
+      const reserva = reservasSTR.find(r => r.id === v.reserva_str_id)
+      if (reserva) {
+        if (!strGruposMap.has(v.reserva_str_id)) strGruposMap.set(v.reserva_str_id, { reserva, miembros: [] })
+        strGruposMap.get(v.reserva_str_id)!.miembros.push(v)
+      } else {
+        regulares.push(v)
+      }
+    } else {
+      regulares.push(v)
+    }
+  }
+
   function resetForm() {
     setForm({ unidad_id: '', nombre: '', identificacion: '', placa_vehiculo: '', motivo: '', notas: '' })
     setFotoUrl(null)
@@ -151,28 +189,29 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     setAcompanantes([])
     setShowAcompForm(false)
     setAcompForm(defaultAcompForm())
+    setStrCtx(null)
     setShowForm(false)
   }
 
-  function precargarDesdeSTR(r: ReservaSTR) {
+  function abrirRegistroSTR(r: ReservaSTR, huesped?: HuespedSTR) {
     const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
     setForm({
-      nombre: r.huesped_nombre,
+      nombre: huesped ? huesped.nombre : r.huesped_nombre,
       unidad_id: r.unidad_id ?? '',
       placa_vehiculo: '',
       motivo: `Renta corta · ${PLATAFORMA_LABEL[r.plataforma] ?? r.plataforma}`,
       notas: `Entrada: ${r.fecha_entrada} · Salida: ${r.fecha_salida} (${noches} noche${noches !== 1 ? 's' : ''})`,
-      identificacion: '',
+      identificacion: huesped ? (huesped.identificacion ?? '') : '',
     })
-    setFotoUrl(r.foto_url ?? null)
-    setFotoDocumentoUrl(r.foto_documento_url ?? null)
+    setFotoUrl(huesped?.foto_url ?? r.foto_url ?? null)
+    setFotoDocumentoUrl(huesped?.foto_documento_url ?? r.foto_documento_url ?? null)
+    setFormEsMenor(huesped?.es_menor ?? false)
+    setFormFechaNacimiento(huesped?.fecha_nacimiento ?? '')
     setFotoVehiculoUrl(null)
     setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
-    setFormEsMenor(false)
-    setFormFechaNacimiento('')
     setAcompanantes([])
     setShowAcompForm(false)
-    setStrIngresados(prev => new Set([...prev, r.id]))
+    setStrCtx({ reservaId: r.id, huespedId: huesped?.id })
     setShowStrModal(false)
     setStrSearch('')
     setShowForm(true)
@@ -257,9 +296,17 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
       hora_entrada: horaEntrada,
       es_menor: formEsMenor,
       fecha_nacimiento: formEsMenor && formFechaNacimiento ? formFechaNacimiento : null,
+      reserva_str_id: strCtx?.reservaId ?? null,
     }).select('id').single()
 
     if (error) { setSaving(false); Swal.fire('Error', error.message, 'error'); return }
+
+    // Link pre-registered guest slot to this entry
+    if (strCtx?.huespedId && data?.id) {
+      await supabase.from('huespedes_str')
+        .update({ visitante_id: data.id })
+        .eq('id', strCtx.huespedId)
+    }
 
     if (acompanantes.length > 0 && data) {
       const acompRows = acompanantes.map(a => ({
@@ -278,6 +325,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
         es_menor: a.es_menor,
         fecha_nacimiento: a.es_menor && a.fecha_nacimiento ? a.fecha_nacimiento : null,
         visitante_principal_id: data.id,
+        reserva_str_id: strCtx?.reservaId ?? null,
       }))
       const { error: ae } = await supabase.from('visitantes').insert(acompRows)
       if (ae) {
@@ -322,7 +370,6 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     const { error } = await supabase.from('visitantes').update({ hora_salida: horaSalida }).eq('id', salidaPendiente.id)
     if (error) { setGuardandoSalida(false); Swal.fire('Error', error.message, 'error'); return }
 
-    // Also exit active companions if requested
     if (salidaConAcomp) {
       const acompsActivos = visitantes.filter(v => v.visitante_principal_id === salidaPendiente.id && !v.hora_salida)
       if (acompsActivos.length > 0) {
@@ -403,6 +450,103 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     }])
   }
 
+  function renderVisitanteCard(v: Visitante, isSTRMember = false) {
+    const enPremisa = !v.hora_salida
+    const esSTR = v.motivo?.startsWith('Renta corta')
+    const fechaSalidaSTR = esSTR ? (v.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
+    const salidaHabilitada = !fechaSalidaSTR || hoy >= fechaSalidaSTR
+    const esAcompanante = !!v.visitante_principal_id
+    const principal = esAcompanante ? visitantes.find(p => p.id === v.visitante_principal_id) : null
+    const acompsActivos = !esAcompanante ? visitantes.filter(a => a.visitante_principal_id === v.id && !a.hora_salida) : []
+
+    const borderColor = enPremisa
+      ? (isSTRMember ? '#c4b5fd' : esAcompanante ? '#bfdbfe' : '#bbf7d0')
+      : '#e2e8f0'
+    const borderLeft = isSTRMember
+      ? '4px solid #8b5cf6'
+      : esAcompanante ? '4px solid #93c5fd' : undefined
+
+    return (
+      <div key={v.id}
+        style={{
+          background: 'white',
+          border: `1.5px solid ${borderColor}`,
+          borderRadius: '12px',
+          padding: '12px 14px',
+          marginLeft: isSTRMember ? 0 : esAcompanante ? '20px' : 0,
+          borderLeft,
+        }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+          {v.foto_url
+            ? <img src={v.foto_url} alt={v.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `2px solid ${enPremisa ? (isSTRMember ? '#8b5cf6' : esAcompanante ? '#3b82f6' : '#10b981') : '#e2e8f0'}` }} />
+            : <div style={{
+                width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                background: v.es_menor
+                  ? (enPremisa ? '#fef9c3' : '#fef3c7')
+                  : isSTRMember
+                    ? (enPremisa ? 'linear-gradient(135deg,#8b5cf6,#7c3aed)' : '#ede9fe')
+                    : esAcompanante
+                      ? (enPremisa ? 'linear-gradient(135deg,#3b82f6,#2563eb)' : '#e0e7ff')
+                      : (enPremisa ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0'),
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: v.es_menor ? '#854d0e' : (enPremisa ? 'white' : '#94a3b8'),
+                fontWeight: 700, fontSize: '15px',
+              }}>
+              {v.es_menor ? '👶' : v.nombre.charAt(0).toUpperCase()}
+            </div>
+          }
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{v.nombre}</span>
+              {v.es_menor && (
+                <span style={{ padding: '2px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Menor</span>
+              )}
+              {esAcompanante && (
+                <span style={{ padding: '2px 7px', background: '#eff6ff', color: '#1d4ed8', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Acompañante</span>
+              )}
+            </div>
+            <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '3px' }}>
+              {v.unidad_nombre && <span>📍 {v.unidad_nombre}</span>}
+              {v.motivo && <span>· {v.motivo}</span>}
+              {!v.es_menor && v.identificacion && <span>· ID: {v.identificacion}</span>}
+              {v.es_menor && v.fecha_nacimiento && <span>· Nac. {v.fecha_nacimiento}</span>}
+              {v.placa_vehiculo && <span>· 🚗 {v.placa_vehiculo}</span>}
+              {esAcompanante && principal && (
+                <span style={{ color: '#3b82f6' }}>· De: {principal.nombre}</span>
+              )}
+              {!esAcompanante && acompsActivos.length > 0 && (
+                <span style={{ color: '#2563eb', fontWeight: 600 }}>· {acompsActivos.length} acomp. en premisas</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', flexWrap: 'wrap', gap: '6px' }}>
+          <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span>Entrada: {new Date(v.hora_entrada).toLocaleString('es', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</span>
+            {v.hora_salida && <span style={{ color: '#94a3b8' }}>· Salida: {new Date(v.hora_salida).toLocaleString('es', { hour: '2-digit', minute: '2-digit' })}</span>}
+            {enPremisa && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: isSTRMember ? '#ede9fe' : esAcompanante ? '#dbeafe' : '#dcfce7', color: isSTRMember ? '#6d28d9' : esAcompanante ? '#1d4ed8' : '#16a34a', fontWeight: 700 }}>En premisas</span>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            <button onClick={() => setVisitanteDetalle(v)}
+              style={{ padding: '6px 12px', background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+              Ver detalle
+            </button>
+            {enPremisa && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                <button onClick={() => salidaHabilitada && iniciarSalida(v)}
+                  title={!salidaHabilitada ? `Salida programada: ${fechaSalidaSTR}` : undefined}
+                  style={{ padding: '6px 12px', background: salidaHabilitada ? '#fef3c7' : '#f1f5f9', color: salidaHabilitada ? '#92400e' : '#94a3b8', border: `1px solid ${salidaHabilitada ? '#fde68a' : '#e2e8f0'}`, borderRadius: '8px', cursor: salidaHabilitada ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  Registrar salida
+                </button>
+                {!salidaHabilitada && <span style={{ fontSize: '10px', color: '#94a3b8' }}>Hasta {fechaSalidaSTR}</span>}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
       {/* Header */}
@@ -473,12 +617,12 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
         </label>
       </div>
 
-      {/* STR selection modal */}
+      {/* STR group entry modal */}
       {showStrModal && (
         <div onClick={e => { if (e.target === e.currentTarget) { setShowStrModal(false); setStrSearch('') } }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
           <div onClick={e => e.stopPropagation()}
-            style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '620px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '16px', overflow: 'hidden' }}>
+            style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '660px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '16px', overflow: 'hidden' }}>
             <div style={{ background: 'linear-gradient(135deg,#7c3aed,#6d28d9)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Renta Corta</div>
@@ -496,7 +640,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                 style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', background: '#f8fafc', marginBottom: '14px' }} />
               {(() => {
                 const reservasFiltradas = reservasSTR
-                  .filter(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy && !strIngresados.has(r.id))
+                  .filter(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy)
                   .filter(r => !strSearch || r.huesped_nombre.toLowerCase().includes(strSearch.toLowerCase()) || (r.unidad_nombre ?? '').toLowerCase().includes(strSearch.toLowerCase()))
                   .sort((a, b) => {
                     const aHoy = a.fecha_entrada <= hoy
@@ -515,35 +659,82 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                   )
                 }
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto' }}>
                     {reservasFiltradas.map(r => {
                       const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
                       const plat = PLATAFORMA_COLOR[r.plataforma] ?? PLATAFORMA_COLOR.otro
-                      const enCurso = r.estado === 'en_curso'
+                      const capacidad = r.num_adultos + r.num_ninos
+                      const ingresados = visitantes.filter(v => v.reserva_str_id === r.id).length
+                      const lleno = ingresados >= capacidad
                       const ingresoHabilitado = r.fecha_entrada <= hoy
+                      const huespedes = strHuespedes[r.id] ?? []
+                      const pendientes = huespedes.filter(h => !h.visitante_id)
+                      const cuposLibres = Math.max(0, capacidad - ingresados)
                       return (
-                        <div key={r.id} style={{ background: enCurso ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${enCurso ? '#86efac' : '#e2e8f0'}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                              <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{r.huesped_nombre}</span>
-                              <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: plat.bg, color: plat.color }}>
-                                {PLATAFORMA_LABEL[r.plataforma] ?? r.plataforma}
-                              </span>
-                              {enCurso && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#dcfce7', color: '#16a34a' }}>En curso</span>}
+                        <div key={r.id} style={{ background: lleno ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${lleno ? '#86efac' : '#e2e8f0'}`, borderRadius: '12px', padding: '14px 16px' }}>
+                          {/* Header */}
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px', gap: '10px' }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{r.huesped_nombre}</span>
+                                <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: plat.bg, color: plat.color }}>
+                                  {PLATAFORMA_LABEL[r.plataforma] ?? r.plataforma}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                {r.unidad_nombre && <span>🏠 {r.unidad_nombre}</span>}
+                                <span>📅 {r.fecha_entrada} → {r.fecha_salida} · {noches}n</span>
+                                <span>👥 {r.num_adultos}A{r.num_ninos > 0 ? `+${r.num_ninos}N` : ''}</span>
+                              </div>
                             </div>
-                            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                              {r.unidad_nombre && <span>🏠 {r.unidad_nombre}</span>}
-                              <span>📅 {r.fecha_entrada} → {r.fecha_salida} · {noches} noche{noches !== 1 ? 's' : ''}</span>
-                            </div>
+                            <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, flexShrink: 0, background: lleno ? '#dcfce7' : '#fef3c7', color: lleno ? '#16a34a' : '#92400e' }}>
+                              {ingresados}/{capacidad} ingresados
+                            </span>
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
-                            <button onClick={() => ingresoHabilitado && precargarDesdeSTR(r)}
-                              title={!ingresoHabilitado ? `Ingreso habilitado desde: ${r.fecha_entrada}` : undefined}
-                              style={{ padding: '7px 14px', background: ingresoHabilitado ? 'linear-gradient(135deg,#7c3aed,#6d28d9)' : '#f1f5f9', color: ingresoHabilitado ? 'white' : '#94a3b8', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: ingresoHabilitado ? 'pointer' : 'not-allowed', fontSize: '12px', whiteSpace: 'nowrap' }}>
-                              Registrar ingreso
+
+                          {/* Pre-registered pending guests */}
+                          {pendientes.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '8px' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '2px' }}>Pre-registrados pendientes de ingreso:</div>
+                              {pendientes.map(h => (
+                                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
+                                  <div style={{ flex: 1, fontSize: '12px' }}>
+                                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{h.es_menor ? '👶 ' : ''}{h.nombre}</span>
+                                    {h.identificacion && <span style={{ color: '#64748b' }}> · {h.identificacion}</span>}
+                                    {h.es_menor && <span style={{ marginLeft: 4, padding: '1px 6px', background: '#fef9c3', color: '#854d0e', borderRadius: '10px', fontSize: '10px', fontWeight: 600 }}>Menor</span>}
+                                  </div>
+                                  <button
+                                    onClick={() => ingresoHabilitado && !lleno && abrirRegistroSTR(r, h)}
+                                    disabled={!ingresoHabilitado || lleno}
+                                    style={{ padding: '5px 12px', background: ingresoHabilitado && !lleno ? 'linear-gradient(135deg,#7c3aed,#6d28d9)' : '#f1f5f9', color: ingresoHabilitado && !lleno ? 'white' : '#94a3b8', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: ingresoHabilitado && !lleno ? 'pointer' : 'not-allowed', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                                    Registrar ingreso
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Empty slots / new person */}
+                          {!lleno && (
+                            <button
+                              onClick={() => ingresoHabilitado && abrirRegistroSTR(r)}
+                              disabled={!ingresoHabilitado}
+                              style={{ width: '100%', padding: '8px', background: ingresoHabilitado ? 'white' : '#f8fafc', border: `1.5px dashed ${ingresoHabilitado ? '#cbd5e1' : '#e2e8f0'}`, borderRadius: '8px', cursor: ingresoHabilitado ? 'pointer' : 'not-allowed', color: ingresoHabilitado ? '#475569' : '#94a3b8', fontSize: '12px', fontWeight: 600, boxSizing: 'border-box' }}>
+                              + Nueva persona ({cuposLibres} cupo{cuposLibres !== 1 ? 's' : ''} disponible{cuposLibres !== 1 ? 's' : ''})
                             </button>
-                            {!ingresoHabilitado && <span style={{ fontSize: 10, color: '#94a3b8' }}>Desde {r.fecha_entrada}</span>}
-                          </div>
+                          )}
+
+                          {lleno && (
+                            <div style={{ textAlign: 'center', padding: '8px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', fontSize: '12px', color: '#15803d', fontWeight: 600 }}>
+                              ✓ Grupo completo — capacidad alcanzada
+                            </div>
+                          )}
+
+                          {!ingresoHabilitado && (
+                            <div style={{ fontSize: '10px', color: '#94a3b8', textAlign: 'center', marginTop: '6px' }}>
+                              Ingreso habilitado desde: {r.fecha_entrada}
+                            </div>
+                          )}
                         </div>
                       )
                     })}
@@ -555,7 +746,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
         </div>
       )}
 
-      {/* Form modal */}
+      {/* Registration form modal */}
       {showForm && (
         <div
           onClick={e => { if (e.target === e.currentTarget) resetForm() }}
@@ -563,7 +754,12 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
           <div onClick={e => e.stopPropagation()}
             style={{ background: 'white', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '640px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Registrar visitante</h3>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Registrar visitante</h3>
+                {strCtx && (
+                  <div style={{ fontSize: '11px', color: '#7c3aed', fontWeight: 600, marginTop: '2px' }}>🏠 Renta corta — ingreso al grupo</div>
+                )}
+              </div>
               <button onClick={resetForm}
                 style={{ width: 28, height: 28, borderRadius: '50%', background: '#f1f5f9', border: 'none', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', lineHeight: 1 }}>
                 ×
@@ -596,7 +792,6 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                 </select>
               </div>
               <div>
-                {/* Minor toggle + conditional fields */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <input type="checkbox" checked={formEsMenor} onChange={e => setFormEsMenor(e.target.checked)} />
@@ -696,7 +891,6 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                 )}
               </div>
 
-              {/* Companion list */}
               {acompanantes.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
                   {acompanantes.map(a => (
@@ -721,7 +915,6 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                 </div>
               )}
 
-              {/* Inline companion form */}
               {showAcompForm && (
                 <div style={{ padding: '14px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>Datos del acompañante</div>
@@ -812,7 +1005,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
         </div>
       )}
 
-      {/* Lista */}
+      {/* Visitor list */}
       {filtrados.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
           <div style={{ fontSize: '36px', marginBottom: '8px' }}>🚪</div>
@@ -821,92 +1014,43 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {filtrados.map(v => {
-            const enPremisa = !v.hora_salida
-            const esSTR = v.motivo?.startsWith('Renta corta')
-            const fechaSalidaSTR = esSTR ? (v.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
-            const salidaHabilitada = !fechaSalidaSTR || hoy >= fechaSalidaSTR
-            const esAcompanante = !!v.visitante_principal_id
-            const principal = esAcompanante ? visitantes.find(p => p.id === v.visitante_principal_id) : null
-            const acompsActivos = !esAcompanante ? visitantes.filter(a => a.visitante_principal_id === v.id && !a.hora_salida) : []
+          {/* Regular visitors */}
+          {regulares.map(v => renderVisitanteCard(v))}
 
+          {/* STR group blocks */}
+          {[...strGruposMap.values()].map(({ reserva, miembros }) => {
+            const totalIngresados = visitantes.filter(v => v.reserva_str_id === reserva.id).length
+            const enPremisasGrupo = miembros.filter(m => !m.hora_salida).length
+            const capacidad = reserva.num_adultos + reserva.num_ninos
             return (
-              <div key={v.id}
-                style={{
-                  background: 'white',
-                  border: `1.5px solid ${enPremisa ? (esAcompanante ? '#bfdbfe' : '#bbf7d0') : '#e2e8f0'}`,
-                  borderRadius: '12px',
-                  padding: '12px 14px',
-                  marginLeft: esAcompanante ? '20px' : 0,
-                  borderLeft: esAcompanante ? '4px solid #93c5fd' : undefined,
-                }}>
-                {/* Fila superior: avatar + nombre + badges + info */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  {v.foto_url
-                    ? <img src={v.foto_url} alt={v.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `2px solid ${enPremisa ? (esAcompanante ? '#3b82f6' : '#10b981') : '#e2e8f0'}` }} />
-                    : <div style={{
-                        width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-                        background: v.es_menor
-                          ? (enPremisa ? '#fef9c3' : '#fef3c7')
-                          : esAcompanante
-                            ? (enPremisa ? 'linear-gradient(135deg,#3b82f6,#2563eb)' : '#e0e7ff')
-                            : (enPremisa ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0'),
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: v.es_menor ? '#854d0e' : (enPremisa ? 'white' : '#94a3b8'),
-                        fontWeight: 700, fontSize: '15px',
-                      }}>
-                        {v.es_menor ? '👶' : v.nombre.charAt(0).toUpperCase()}
+              <div key={reserva.id}>
+                {/* Group header */}
+                <div style={{ background: 'linear-gradient(to right,#f5f3ff,#ede9fe)', border: '1.5px solid #c4b5fd', borderRadius: '12px', padding: '12px 16px', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: '#5b21b6' }}>
+                        🏠 {reserva.huesped_nombre}
+                        {reserva.unidad_nombre && <span style={{ fontWeight: 400, color: '#7c3aed', marginLeft: 6 }}>— {reserva.unidad_nombre}</span>}
                       </div>
-                  }
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{v.nombre}</span>
-                      {v.es_menor && (
-                        <span style={{ padding: '2px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Menor</span>
-                      )}
-                      {esAcompanante && (
-                        <span style={{ padding: '2px 7px', background: '#eff6ff', color: '#1d4ed8', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Acompañante</span>
-                      )}
+                      <div style={{ fontSize: '12px', color: '#7c3aed', marginTop: '2px' }}>
+                        Renta corta · {reserva.fecha_entrada} → {reserva.fecha_salida}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '3px' }}>
-                      {v.unidad_nombre && <span>📍 {v.unidad_nombre}</span>}
-                      {v.motivo && <span>· {v.motivo}</span>}
-                      {!v.es_menor && v.identificacion && <span>· ID: {v.identificacion}</span>}
-                      {v.es_menor && v.fecha_nacimiento && <span>· Nac. {v.fecha_nacimiento}</span>}
-                      {v.placa_vehiculo && <span>· 🚗 {v.placa_vehiculo}</span>}
-                      {esAcompanante && principal && (
-                        <span style={{ color: '#3b82f6' }}>· De: {principal.nombre}</span>
-                      )}
-                      {!esAcompanante && acompsActivos.length > 0 && (
-                        <span style={{ color: '#2563eb', fontWeight: 600 }}>· {acompsActivos.length} acomp. en premisas</span>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flexShrink: 0 }}>
+                      <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: totalIngresados >= capacidad ? '#dcfce7' : '#ede9fe', color: totalIngresados >= capacidad ? '#16a34a' : '#6d28d9' }}>
+                        {totalIngresados}/{capacidad} ingresados
+                      </span>
+                      {enPremisasGrupo > 0 && (
+                        <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#f5f3ff', color: '#7c3aed' }}>
+                          {enPremisasGrupo} en premisas
+                        </span>
                       )}
                     </div>
                   </div>
                 </div>
-
-                {/* Fila inferior: tiempo + estado + botones */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px', flexWrap: 'wrap', gap: '6px' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span>Entrada: {new Date(v.hora_entrada).toLocaleString('es', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</span>
-                    {v.hora_salida && <span style={{ color: '#94a3b8' }}>· Salida: {new Date(v.hora_salida).toLocaleString('es', { hour: '2-digit', minute: '2-digit' })}</span>}
-                    {enPremisa && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: esAcompanante ? '#dbeafe' : '#dcfce7', color: esAcompanante ? '#1d4ed8' : '#16a34a', fontWeight: 700 }}>En premisas</span>}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                    <button onClick={() => setVisitanteDetalle(v)}
-                      style={{ padding: '6px 12px', background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                      Ver detalle
-                    </button>
-                    {enPremisa && (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                        <button onClick={() => salidaHabilitada && iniciarSalida(v)}
-                          title={!salidaHabilitada ? `Salida programada: ${fechaSalidaSTR}` : undefined}
-                          style={{ padding: '6px 12px', background: salidaHabilitada ? '#fef3c7' : '#f1f5f9', color: salidaHabilitada ? '#92400e' : '#94a3b8', border: `1px solid ${salidaHabilitada ? '#fde68a' : '#e2e8f0'}`, borderRadius: '8px', cursor: salidaHabilitada ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                          Registrar salida
-                        </button>
-                        {!salidaHabilitada && <span style={{ fontSize: '10px', color: '#94a3b8' }}>Hasta {fechaSalidaSTR}</span>}
-                      </div>
-                    )}
-                  </div>
+                {/* Group members */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '16px' }}>
+                  {miembros.map(v => renderVisitanteCard(v, true))}
                 </div>
               </div>
             )
@@ -914,14 +1058,12 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
         </div>
       )}
 
-      {/* Modal detalle visita */}
+      {/* Detail modal */}
       {visitanteDetalle && (
         <div onClick={() => setVisitanteDetalle(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
           <div onClick={e => e.stopPropagation()}
             style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '500px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden', marginBottom: '16px' }}>
-
-            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '18px 20px', borderBottom: '1px solid #f1f5f9' }}>
               {visitanteDetalle.foto_url
                 ? <img src={visitanteDetalle.foto_url} alt={visitanteDetalle.nombre} style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', flexShrink: 0 }} />
@@ -938,6 +1080,9 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                   {visitanteDetalle.visitante_principal_id && (
                     <span style={{ padding: '2px 8px', background: '#eff6ff', color: '#1d4ed8', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Acompañante</span>
                   )}
+                  {visitanteDetalle.reserva_str_id && (
+                    <span style={{ padding: '2px 8px', background: '#f5f3ff', color: '#7c3aed', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>STR</span>
+                  )}
                 </div>
                 {visitanteDetalle.unidad_nombre && <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>📍 {visitanteDetalle.unidad_nombre}</div>}
               </div>
@@ -946,9 +1091,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                 ✕
               </button>
             </div>
-
             <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Info grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 {[
                   { label: 'Entrada', value: new Date(visitanteDetalle.hora_entrada).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) },
@@ -971,8 +1114,6 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                   </div>
                 ))}
               </div>
-
-              {/* Fotos */}
               {(visitanteDetalle.foto_url || visitanteDetalle.foto_documento_url || visitanteDetalle.foto_vehiculo_url) && (
                 <div>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Fotografías registradas</div>
@@ -990,8 +1131,6 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                   </div>
                 </div>
               )}
-
-              {/* Acciones */}
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
                 {!visitanteDetalle.hora_salida && (() => {
                   const esSTR = visitanteDetalle.motivo?.startsWith('Renta corta')
@@ -1014,13 +1153,12 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
         </div>
       )}
 
-      {/* Modal salida */}
+      {/* Exit modal */}
       {salidaPendiente && (() => {
         const acompsActivos = visitantes.filter(v => v.visitante_principal_id === salidaPendiente.id && !v.hora_salida)
         return (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
             <div style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
-              {/* Header */}
               <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #f1f5f9' }}>
                 <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>Registrar salida</div>
                 <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
@@ -1028,28 +1166,24 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                   {salidaPendiente.unidad_nombre ? ` · ${salidaPendiente.unidad_nombre}` : ''}
                   {salidaPendiente.es_menor && <span style={{ marginLeft: 6, padding: '1px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>}
                   {salidaPendiente.visitante_principal_id && <span style={{ marginLeft: 6, padding: '1px 7px', background: '#eff6ff', color: '#1d4ed8', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Acompañante</span>}
+                  {salidaPendiente.reserva_str_id && <span style={{ marginLeft: 6, padding: '1px 7px', background: '#f5f3ff', color: '#7c3aed', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>STR</span>}
                 </div>
               </div>
-
               <div style={{ padding: '20px 24px' }}>
-                {/* Opciones principales */}
                 <p style={{ margin: '0 0 14px', fontSize: '13.5px', color: '#374151', fontWeight: 600 }}>¿Cómo fue la salida?</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
-                  <button
-                    onClick={() => setModoSalida('sin_novedad')}
+                  <button onClick={() => setModoSalida('sin_novedad')}
                     style={{ padding: '14px 12px', borderRadius: '10px', border: `2px solid ${modoSalida === 'sin_novedad' ? '#16a34a' : '#e2e8f0'}`, background: modoSalida === 'sin_novedad' ? '#f0fdf4' : '#f8fafc', color: modoSalida === 'sin_novedad' ? '#15803d' : '#374151', fontWeight: 700, fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
                     ✅ Sin novedad
                     <div style={{ fontSize: '11px', fontWeight: 400, marginTop: '4px', color: modoSalida === 'sin_novedad' ? '#16a34a' : '#94a3b8' }}>Todo en orden</div>
                   </button>
-                  <button
-                    onClick={() => setModoSalida('con_novedad')}
+                  <button onClick={() => setModoSalida('con_novedad')}
                     style={{ padding: '14px 12px', borderRadius: '10px', border: `2px solid ${modoSalida === 'con_novedad' ? '#dc2626' : '#e2e8f0'}`, background: modoSalida === 'con_novedad' ? '#fff1f2' : '#f8fafc', color: modoSalida === 'con_novedad' ? '#dc2626' : '#374151', fontWeight: 700, fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
                     ⚠️ Con novedad
                     <div style={{ fontSize: '11px', fontWeight: 400, marginTop: '4px', color: modoSalida === 'con_novedad' ? '#ef4444' : '#94a3b8' }}>Registrar incidencia</div>
                   </button>
                 </div>
 
-                {/* Companions exit option */}
                 {acompsActivos.length > 0 && (
                   <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: '10px' }}>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#1d4ed8', fontWeight: 600 }}>
@@ -1064,14 +1198,11 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                   </div>
                 )}
 
-                {/* Formulario de novedad */}
                 {modoSalida === 'con_novedad' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: '10px', marginBottom: '16px' }}>
                     <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#c2410c' }}>Detalle de la novedad</div>
-
-                    {/* Resumen automático del visitante */}
                     <div style={{ background: 'white', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px' }}>
-                      <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Datos del registro (se incluyen automáticamente)</div>
+                      <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Datos del registro (incluidos automáticamente)</div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
                         <span style={{ fontSize: '12px', color: '#374151' }}>👤 <b>{salidaPendiente.nombre}</b></span>
                         {salidaPendiente.identificacion && <span style={{ fontSize: '12px', color: '#374151' }}>🪪 {salidaPendiente.identificacion}</span>}
@@ -1083,7 +1214,6 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                         </span>
                       </div>
                     </div>
-
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       <div>
                         <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Tipo</label>
@@ -1113,7 +1243,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                         style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
                     </div>
                     <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Comentarios / descripción de la novedad *</label>
+                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Comentarios / descripción *</label>
                       <textarea value={novedadForm.comentarios} onChange={e => setNovedadForm(f => ({ ...f, comentarios: e.target.value }))}
                         placeholder="Describe con detalle lo ocurrido durante la salida..."
                         rows={3}
@@ -1125,7 +1255,6 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                   </div>
                 )}
 
-                {/* Acciones */}
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                   <button onClick={cancelarSalida} disabled={guardandoSalida}
                     style={{ padding: '9px 18px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
