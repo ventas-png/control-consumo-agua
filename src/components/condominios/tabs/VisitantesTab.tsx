@@ -664,12 +664,19 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                       const noches = Math.max(0, Math.round((new Date(r.fecha_salida).getTime() - new Date(r.fecha_entrada).getTime()) / 86400000))
                       const plat = PLATAFORMA_COLOR[r.plataforma] ?? PLATAFORMA_COLOR.otro
                       const capacidad = r.num_adultos + r.num_ninos
-                      const ingresados = visitantes.filter(v => v.reserva_str_id === r.id).length
-                      const lleno = ingresados >= capacidad
+                      // Count only people currently in premises (exits and re-entries don't block capacity)
+                      const enPremisasAhora = visitantes.filter(v => v.reserva_str_id === r.id && !v.hora_salida).length
+                      const lleno = enPremisasAhora >= capacidad
                       const ingresoHabilitado = r.fecha_entrada <= hoy
-                      const huespedes = strHuespedes[r.id] ?? []
-                      const pendientes = huespedes.filter(h => !h.visitante_id)
-                      const cuposLibres = Math.max(0, capacidad - ingresados)
+                      const cuposLibres = Math.max(0, capacidad - enPremisasAhora)
+                      const grupoHuespedes = strHuespedes[r.id] ?? []
+                      // Classify pre-registered guests by current status
+                      const noIngresados = grupoHuespedes.filter(h => !h.visitante_id)
+                      const conVisitante = grupoHuespedes.filter(h => h.visitante_id).map(h => ({
+                        h, v: visitantes.find(vv => vv.id === h.visitante_id),
+                      }))
+                      const enPremisasGrupo = conVisitante.filter(({ v }) => v && !v.hora_salida)
+                      const salieronGrupo = conVisitante.filter(({ v }) => v && !!v.hora_salida)
                       return (
                         <div key={r.id} style={{ background: lleno ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${lleno ? '#86efac' : '#e2e8f0'}`, borderRadius: '12px', padding: '14px 16px' }}>
                           {/* Header */}
@@ -688,16 +695,48 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                               </div>
                             </div>
                             <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, flexShrink: 0, background: lleno ? '#dcfce7' : '#fef3c7', color: lleno ? '#16a34a' : '#92400e' }}>
-                              {ingresados}/{capacidad} ingresados
+                              {enPremisasAhora}/{capacidad} en premisas
                             </span>
                           </div>
 
-                          {/* Pre-registered pending guests */}
-                          {pendientes.length > 0 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '8px' }}>
-                              <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '2px' }}>Pre-registrados pendientes de ingreso:</div>
-                              {pendientes.map(h => (
-                                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
+                          {/* Currently inside */}
+                          {enPremisasGrupo.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '6px' }}>
+                              {enPremisasGrupo.map(({ h }) => (
+                                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a', flex: 1 }}>{h.es_menor ? '👶 ' : ''}{h.nombre}{h.identificacion ? <span style={{ color: '#64748b', fontWeight: 400 }}> · {h.identificacion}</span> : ''}</span>
+                                  <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 700 }}>✓ En premisas</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Exited — can re-enter */}
+                          {salieronGrupo.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '6px' }}>
+                              {salieronGrupo.map(({ h }) => (
+                                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px' }}>
+                                  <div style={{ flex: 1, fontSize: '12px' }}>
+                                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{h.es_menor ? '👶 ' : ''}{h.nombre}</span>
+                                    {h.identificacion && <span style={{ color: '#64748b' }}> · {h.identificacion}</span>}
+                                    <span style={{ marginLeft: 6, fontSize: '10px', color: '#92400e', fontWeight: 600 }}>🚪 Salió</span>
+                                  </div>
+                                  <button
+                                    onClick={() => !lleno && abrirRegistroSTR(r, h)}
+                                    disabled={lleno}
+                                    style={{ padding: '5px 12px', background: !lleno ? 'linear-gradient(135deg,#f59e0b,#d97706)' : '#f1f5f9', color: !lleno ? 'white' : '#94a3b8', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: !lleno ? 'pointer' : 'not-allowed', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                                    Reingresar
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Not yet entered */}
+                          {noIngresados.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '6px' }}>
+                              {noIngresados.map(h => (
+                                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
                                   <div style={{ flex: 1, fontSize: '12px' }}>
                                     <span style={{ fontWeight: 600, color: '#0f172a' }}>{h.es_menor ? '👶 ' : ''}{h.nombre}</span>
                                     {h.identificacion && <span style={{ color: '#64748b' }}> · {h.identificacion}</span>}
@@ -714,7 +753,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                             </div>
                           )}
 
-                          {/* Empty slots / new person */}
+                          {/* Empty slots / anonymous new person */}
                           {!lleno && (
                             <button
                               onClick={() => ingresoHabilitado && abrirRegistroSTR(r)}
@@ -726,7 +765,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
 
                           {lleno && (
                             <div style={{ textAlign: 'center', padding: '8px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', fontSize: '12px', color: '#15803d', fontWeight: 600 }}>
-                              ✓ Grupo completo — capacidad alcanzada
+                              ✓ Capacidad completa — {enPremisasAhora}/{capacidad} en premisas
                             </div>
                           )}
 
@@ -1019,8 +1058,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
 
           {/* STR group blocks */}
           {[...strGruposMap.values()].map(({ reserva, miembros }) => {
-            const totalIngresados = visitantes.filter(v => v.reserva_str_id === reserva.id).length
-            const enPremisasGrupo = miembros.filter(m => !m.hora_salida).length
+            const enPremisasAhora = miembros.filter(m => !m.hora_salida).length
             const capacidad = reserva.num_adultos + reserva.num_ninos
             return (
               <div key={reserva.id}>
@@ -1037,14 +1075,9 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flexShrink: 0 }}>
-                      <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: totalIngresados >= capacidad ? '#dcfce7' : '#ede9fe', color: totalIngresados >= capacidad ? '#16a34a' : '#6d28d9' }}>
-                        {totalIngresados}/{capacidad} ingresados
+                      <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: enPremisasAhora >= capacidad ? '#dcfce7' : '#ede9fe', color: enPremisasAhora >= capacidad ? '#16a34a' : '#6d28d9' }}>
+                        {enPremisasAhora}/{capacidad} en premisas
                       </span>
-                      {enPremisasGrupo > 0 && (
-                        <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#f5f3ff', color: '#7c3aed' }}>
-                          {enPremisasGrupo} en premisas
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
