@@ -118,10 +118,9 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     let facturasEnergiaQ = supabase.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
     // clientes has no company_id column — linked via company_clientes junction, filtered via RLS
     const clientesQ = supabase.from('clientes').select('*')
-    // registros uses project_id (not company_id). The RLS policy grants company_owner access
-    // to ALL registros regardless of company, so we pre-fetch the company's project IDs and
-    // filter explicitly — this ensures correct data isolation and avoids the global LIMIT 2000.
-    let registrosQ = supabase.from('registros').select('*').order('fecha', { ascending: false }).limit(2000)
+    // registros: RLS policy (registros_select) now scopes company_owner to only their
+    // company's registros via projects and company_clientes — no application-level filter needed.
+    const registrosQ = supabase.from('registros').select('*').order('fecha', { ascending: false })
 
     if (cid) {
       tarifasQ         = tarifasQ.eq('company_id', cid)
@@ -133,39 +132,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       tarifasEnergiaQ  = tarifasEnergiaQ.eq('company_id', cid)
       fuentesEnergiaQ  = fuentesEnergiaQ.eq('company_id', cid)
       facturasEnergiaQ = facturasEnergiaQ.eq('company_id', cid)
-
-      // Pre-fetch project IDs and client IDs so registros can be filtered to only this
-      // company's data. The RLS policy for 'company_owner' grants access to ALL registros
-      // regardless of company, so we need an explicit application-level filter.
-      // Many historical registros have project_id = NULL and are linked via cliente_id, so
-      // we include both: project-linked AND (null project, company-client-linked) registros.
-      const [{ data: proyIds }, { data: companyClientRows }] = await Promise.all([
-        supabase.from('projects').select('id').eq('company_id', cid),
-        supabase.from('company_clientes').select('cliente_id').eq('company_id', cid),
-      ])
-
-      const proyIdList = proyIds?.map((p: { id: string }) => p.id) ?? []
-      const clientIdList = companyClientRows?.map((c: { cliente_id: string }) => c.cliente_id) ?? []
-
-      if (proyIdList.length > 0 || clientIdList.length > 0) {
-        // Two simple targeted queries merged in JS — avoids complex PostgREST nested
-        // OR/AND syntax that can behave inconsistently across Supabase versions.
-        // Both queries start immediately and run concurrently with the main batch.
-        const q1 = proyIdList.length > 0
-          ? supabase.from('registros').select('*').order('fecha', { ascending: false })
-              .in('project_id', proyIdList)
-          : Promise.resolve({ data: [] as Registro[], error: null })
-        const q2 = clientIdList.length > 0
-          ? supabase.from('registros').select('*').order('fecha', { ascending: false })
-              .is('project_id', null).in('cliente_id', clientIdList)
-          : Promise.resolve({ data: [] as Registro[], error: null })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        registrosQ = Promise.all([q1, q2]).then(([r1, r2]) => ({
-          data: ([...(r1.data ?? []), ...(r2.data ?? [])] as Registro[])
-            .sort((a, b) => b.fecha.localeCompare(a.fecha)),
-          error: r1.error ?? r2.error ?? null,
-        })) as unknown as typeof registrosQ
-      }
     }
 
     return Promise.allSettled([
