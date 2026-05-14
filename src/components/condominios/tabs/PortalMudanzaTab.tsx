@@ -19,9 +19,13 @@ const TIPO_CFG: Record<TipoSolicitudMudanza, { label: string; icon: string; desc
 }
 
 const ESTADO_CFG: Record<EstadoSolicitudMudanza, { label: string; bg: string; color: string; icon: string }> = {
-  pendiente: { label: 'Pendiente', bg: '#fef3c7', color: '#d97706', icon: '⏳' },
-  aprobada:  { label: 'Aprobada',  bg: '#f0fdf4', color: '#16a34a', icon: '✅' },
-  rechazada: { label: 'Rechazada', bg: '#fef2f2', color: '#dc2626', icon: '❌' },
+  pendiente:  { label: 'Pendiente',  bg: '#fef3c7', color: '#d97706', icon: '⏳' },
+  aprobada:   { label: 'Aprobada',   bg: '#f0fdf4', color: '#16a34a', icon: '✅' },
+  rechazada:  { label: 'Rechazada',  bg: '#fef2f2', color: '#dc2626', icon: '❌' },
+  programada: { label: 'Programada', bg: '#e0f2fe', color: '#0ea5e9', icon: '📅' },
+  en_curso:   { label: 'En Curso',   bg: '#fef3c7', color: '#f59e0b', icon: '🚚' },
+  completada: { label: 'Completada', bg: '#d1fae5', color: '#10b981', icon: '🏁' },
+  cancelada:  { label: 'Cancelada',  bg: '#f1f5f9', color: '#64748b', icon: '🚫' },
 }
 
 function blankForm() {
@@ -350,7 +354,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
             {/* Resolution info */}
             {(s.comentario_admin || s.fecha_autorizada) && (
               <div style={{ marginTop: '10px', background: est.bg, borderRadius: '8px', padding: '10px 12px', fontSize: '12.5px', color: est.color }}>
-                {s.estado === 'aprobada' && s.fecha_autorizada && (
+                {s.estado !== 'pendiente' && s.estado !== 'rechazada' && s.fecha_autorizada && (
                   <div style={{ fontWeight: 600, marginBottom: '2px' }}>
                     ✅ Fecha autorizada: {s.fecha_autorizada}{s.hora_autorizada ? ` a las ${s.hora_autorizada}` : ''}
                     {s.aprobado_por && <span style={{ fontWeight: 400, opacity: 0.8 }}> — {s.aprobado_por}</span>}
