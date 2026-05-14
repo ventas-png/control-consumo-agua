@@ -109,6 +109,23 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
         .slice(0, 5)
     : []
 
+  // Suggestions for the companion form, filtered by what's typed in name or DPI
+  const acompSugerencias = (acompForm.nombre.length >= 3 || acompForm.identificacion.length >= 3)
+    ? [...visitantes]
+        .filter(v => !v.visitante_principal_id)
+        .sort((a, b) => b.hora_entrada.localeCompare(a.hora_entrada))
+        .filter(v =>
+          (acompForm.nombre.length >= 3 && v.nombre.toLowerCase().includes(acompForm.nombre.toLowerCase())) ||
+          (acompForm.identificacion.length >= 3 && (v.identificacion ?? '').includes(acompForm.identificacion))
+        )
+        .reduce<Visitante[]>((acc, v) => {
+          if (!acc.some(a => a.nombre === v.nombre && a.identificacion === v.identificacion)) acc.push(v)
+          return acc
+        }, [])
+        .filter(v => !acompanantes.some(a => a.nombre === v.nombre))
+        .slice(0, 5)
+    : []
+
   const filtrados = visitantes.filter(v => {
     const matchBusqueda = !busqueda
       || v.nombre.toLowerCase().includes(busqueda.toLowerCase())
@@ -186,6 +203,17 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     setFotoUrl(registroFoto?.foto_url ?? null)
     setFotoDocumentoUrl(registroDoc?.foto_documento_url ?? null)
     setFotoVehiculoUrl(registroVehiculo?.foto_vehiculo_url ?? null)
+  }
+
+  function autocompletarAcompanante(v: Visitante) {
+    setAcompForm(f => ({
+      ...f,
+      nombre: v.nombre,
+      identificacion: v.identificacion ?? '',
+      es_menor: v.es_menor ?? false,
+      fecha_nacimiento: v.fecha_nacimiento ?? '',
+      foto_url: v.foto_url ?? null,
+    }))
   }
 
   function agregarAcompanante() {
@@ -587,7 +615,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                     <input value={form.identificacion} onChange={e => setForm(f => ({ ...f, identificacion: e.target.value }))}
                       placeholder="Número de documento"
                       style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
-                    {sugerencias.length > 0 && form.nombre.length < 3 && (
+                    {sugerencias.length > 0 && (
                       <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                         <span style={{ fontSize: '11px', color: '#64748b' }}>Frecuente:</span>
                         {sugerencias.map((v, i) => (
@@ -699,6 +727,17 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                     <input value={acompForm.nombre} onChange={e => setAcompForm(f => ({ ...f, nombre: e.target.value }))}
                       placeholder="Nombre completo"
                       style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+                    {acompSugerencias.length > 0 && (
+                      <div style={{ marginTop: '5px', display: 'flex', flexWrap: 'wrap', gap: '5px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>Frecuente:</span>
+                        {acompSugerencias.map((v, i) => (
+                          <button key={i} type="button" onClick={() => autocompletarAcompanante(v)}
+                            style={{ padding: '3px 10px', background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                            {v.nombre}{v.identificacion ? ` · ${v.identificacion}` : ''}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151', cursor: 'pointer', fontWeight: 600 }}>
                     <input type="checkbox" checked={acompForm.es_menor} onChange={e => setAcompForm(f => ({ ...f, es_menor: e.target.checked, identificacion: '' }))} />
@@ -717,6 +756,17 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                       <input value={acompForm.identificacion} onChange={e => setAcompForm(f => ({ ...f, identificacion: e.target.value }))}
                         placeholder="Número de documento"
                         style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+                      {acompSugerencias.length > 0 && (
+                        <div style={{ marginTop: '5px', display: 'flex', flexWrap: 'wrap', gap: '5px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '11px', color: '#64748b' }}>Frecuente:</span>
+                          {acompSugerencias.map((v, i) => (
+                            <button key={i} type="button" onClick={() => autocompletarAcompanante(v)}
+                              style={{ padding: '3px 10px', background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                              {v.nombre}{v.identificacion ? ` · ${v.identificacion}` : ''}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                   <div>
