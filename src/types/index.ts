@@ -1595,6 +1595,8 @@ export interface ReservaSTR {
   monto_total?: number | null
   estado: EstadoSTR
   notas?: string | null
+  foto_url?: string | null
+  foto_documento_url?: string | null
   created_at: string
   unidad_nombre?: string
 }

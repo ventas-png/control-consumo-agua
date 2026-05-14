@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ReservaSTR, EstadoSTR, PlataformaSTR, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { ImageUploader } from '../ImageUploader'
 
 interface Props {
   reservasSTR: ReservaSTR[]
@@ -44,6 +45,8 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
   const [editId, setEditId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
+  const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -64,10 +67,15 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
       plataforma: r.plataforma, monto_noche: r.monto_noche ?? undefined,
       monto_total: r.monto_total ?? undefined, estado: r.estado, notas: r.notas ?? '',
     })
+    setFotoUrl(r.foto_url ?? null)
+    setFotoDocumentoUrl(r.foto_documento_url ?? null)
     setEditId(r.id); setShowForm(true)
   }
 
-  function cancelForm() { setShowForm(false); setEditId(null); setForm(blank()) }
+  function cancelForm() {
+    setShowForm(false); setEditId(null); setForm(blank())
+    setFotoUrl(null); setFotoDocumentoUrl(null)
+  }
 
   function recalcTotal(f: Partial<ReservaSTR>) {
     const noches = calcNoches(f.fecha_entrada ?? '', f.fecha_salida ?? '')
@@ -93,6 +101,8 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
       monto_total: form.monto_total ?? null,
       estado: form.estado ?? 'confirmada',
       notas: form.notas || null,
+      foto_url: fotoUrl,
+      foto_documento_url: fotoDocumentoUrl,
     }
     const { error } = editId
       ? await supabase.from('reservas_str').update(payload).eq('id', editId)
@@ -211,6 +221,21 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
               <label style={labelStyle}>Notas</label>
               <input style={inputStyle} value={form.notas ?? ''} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
             </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', marginBottom: '8px', paddingTop: '4px', borderTop: '1px solid #e2e8f0' }}>
+                Fotografías del huésped <span style={{ fontWeight: 400, color: '#94a3b8' }}>(opcional — se pueden completar al momento del ingreso)</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', maxWidth: '400px' }}>
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>Foto del huésped</div>
+                  <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="str_guests" label="Foto del huésped" capture />
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>Foto del documento / DPI</div>
+                  <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="str_guests" label="DPI / Documento" capture />
+                </div>
+              </div>
+            </div>
           </div>
           {form.fecha_entrada && form.fecha_salida && form.fecha_salida > form.fecha_entrada && (
             <div style={{ marginTop: '10px', fontSize: '12px', color: '#64748b' }}>
@@ -251,12 +276,23 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
             const noches = calcNoches(r.fecha_entrada, r.fecha_salida)
             return (
               <div key={r.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                  <div>
-                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>{PLATAFORMA_ICON[r.plataforma]} {r.huesped_nombre}</div>
-                    {r.unidad_nombre && <div style={{ fontSize: '11px', color: '#94a3b8' }}>🏠 {r.unidad_nombre}</div>}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    {r.foto_url
+                      ? <img src={r.foto_url} alt={r.huesped_nombre} style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid #e2e8f0' }} />
+                      : <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🏠</div>
+                    }
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>{PLATAFORMA_ICON[r.plataforma]} {r.huesped_nombre}</div>
+                      {r.unidad_nombre && <div style={{ fontSize: '11px', color: '#94a3b8' }}>🏠 {r.unidad_nombre}</div>}
+                    </div>
                   </div>
-                  <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                    <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
+                    {r.foto_documento_url && (
+                      <a href={r.foto_documento_url} target="_blank" rel="noreferrer" style={{ fontSize: '10px', color: '#0369a1', textDecoration: 'none', fontWeight: 600 }}>🪪 Ver doc.</a>
+                    )}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
                   <div>📅 {r.fecha_entrada} → {r.fecha_salida} <span style={{ fontWeight: 600, color: '#0f172a' }}>({noches}n)</span></div>

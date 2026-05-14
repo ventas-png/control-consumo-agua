@@ -24,10 +24,11 @@ interface AcompananteForm {
   fecha_nacimiento: string
   notas: string
   foto_url: string | null
+  foto_documento_url: string | null
 }
 
 const defaultAcompForm = (): Omit<AcompananteForm, 'tempId'> => ({
-  nombre: '', identificacion: '', es_menor: false, fecha_nacimiento: '', notas: '', foto_url: null,
+  nombre: '', identificacion: '', es_menor: false, fecha_nacimiento: '', notas: '', foto_url: null, foto_documento_url: null,
 })
 
 interface Props {
@@ -163,8 +164,8 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
       notas: `Entrada: ${r.fecha_entrada} · Salida: ${r.fecha_salida} (${noches} noche${noches !== 1 ? 's' : ''})`,
       identificacion: '',
     })
-    setFotoUrl(null)
-    setFotoDocumentoUrl(null)
+    setFotoUrl(r.foto_url ?? null)
+    setFotoDocumentoUrl(r.foto_documento_url ?? null)
     setFotoVehiculoUrl(null)
     setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
     setFormEsMenor(false)
@@ -213,6 +214,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
       es_menor: v.es_menor ?? false,
       fecha_nacimiento: v.fecha_nacimiento ?? '',
       foto_url: v.foto_url ?? null,
+      foto_documento_url: v.foto_documento_url ?? null,
     }))
   }
 
@@ -270,6 +272,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
         motivo: form.motivo.trim() || null,
         notas: a.notas.trim() || null,
         foto_url: a.foto_url,
+        foto_documento_url: a.es_menor ? null : (a.foto_documento_url ?? null),
         registrado_por: userId,
         hora_entrada: horaEntrada,
         es_menor: a.es_menor,
@@ -770,8 +773,19 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                     </div>
                   )}
                   <div>
-                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '3px' }}>Foto (opcional)</label>
-                    <ImageUploader value={acompForm.foto_url} onChange={v => setAcompForm(f => ({ ...f, foto_url: v }))} folder="visitantes" label="Foto" capture />
+                    <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Fotografías (opcional)</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: acompForm.es_menor ? '1fr' : '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <div style={{ fontSize: '10.5px', color: '#64748b', marginBottom: '3px' }}>Foto de la persona</div>
+                        <ImageUploader value={acompForm.foto_url} onChange={v => setAcompForm(f => ({ ...f, foto_url: v }))} folder="visitantes" label="Foto" capture />
+                      </div>
+                      {!acompForm.es_menor && (
+                        <div>
+                          <div style={{ fontSize: '10.5px', color: '#64748b', marginBottom: '3px' }}>Foto del documento / DPI</div>
+                          <ImageUploader value={acompForm.foto_documento_url} onChange={v => setAcompForm(f => ({ ...f, foto_documento_url: v }))} folder="visitantes" label="DPI" capture />
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="button" onClick={agregarAcompanante}
