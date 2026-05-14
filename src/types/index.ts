@@ -420,6 +420,19 @@ export interface CuotaCondominio {
   rubros_detalle?: RubroDetalle[] | null
 }
 
+export interface HuespedSTR {
+  id: string
+  reserva_str_id: string
+  nombre: string
+  identificacion?: string | null
+  es_menor: boolean
+  fecha_nacimiento?: string | null
+  foto_url?: string | null
+  foto_documento_url?: string | null
+  visitante_id?: string | null
+  created_at: string
+}
+
 export interface Visitante {
   id: string
   company_id: string
@@ -443,6 +456,7 @@ export interface Visitante {
   es_menor?: boolean
   fecha_nacimiento?: string | null
   visitante_principal_id?: string | null
+  reserva_str_id?: string | null
   // joins opcionales
   unidad_nombre?: string
 }
