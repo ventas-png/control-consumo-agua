@@ -148,17 +148,23 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       const clientIdList = companyClientRows?.map((c: { cliente_id: string }) => c.cliente_id) ?? []
 
       if (proyIdList.length > 0 || clientIdList.length > 0) {
-        const parts: string[] = []
-        if (proyIdList.length > 0) {
-          parts.push(`project_id.in.(${proyIdList.join(',')})`)
-        }
-        if (clientIdList.length > 0) {
-          // Historical registros with no project assigned — filter by company's clients
-          parts.push(`and(project_id.is.null,cliente_id.in.(${clientIdList.join(',')}))`)
-        }
-        registrosQ = supabase
-          .from('registros').select('*').order('fecha', { ascending: false })
-          .or(parts.join(','))
+        // Two simple targeted queries merged in JS — avoids complex PostgREST nested
+        // OR/AND syntax that can behave inconsistently across Supabase versions.
+        // Both queries start immediately and run concurrently with the main batch.
+        const q1 = proyIdList.length > 0
+          ? supabase.from('registros').select('*').order('fecha', { ascending: false })
+              .in('project_id', proyIdList)
+          : Promise.resolve({ data: [] as Registro[], error: null })
+        const q2 = clientIdList.length > 0
+          ? supabase.from('registros').select('*').order('fecha', { ascending: false })
+              .is('project_id', null).in('cliente_id', clientIdList)
+          : Promise.resolve({ data: [] as Registro[], error: null })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        registrosQ = Promise.all([q1, q2]).then(([r1, r2]) => ({
+          data: ([...(r1.data ?? []), ...(r2.data ?? [])] as Registro[])
+            .sort((a, b) => b.fecha.localeCompare(a.fecha)),
+          error: r1.error ?? r2.error ?? null,
+        })) as unknown as typeof registrosQ
       }
     }
 
