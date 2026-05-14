@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import type { Visitante, Unidad, ReservaSTR, HuespedSTR } from '../../../types'
+import type { Visitante, Unidad, ReservaSTR, HuespedSTR, SolicitudMudanzaUnidad, TipoSolicitudMudanza } from '../../../types'
 import { ImageUploader, MultiImageUploader } from '../ImageUploader'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
@@ -14,6 +14,13 @@ const PLATAFORMA_COLOR: Record<string, { bg: string; color: string }> = {
   vrbo:    { bg: '#f0fdf4', color: '#16a34a' },
   directo: { bg: '#f5f3ff', color: '#7c3aed' },
   otro:    { bg: '#f8fafc', color: '#475569' },
+}
+
+const TIPO_MUDANZA_LABEL: Record<TipoSolicitudMudanza, string> = {
+  nueva_mudanza:      'Nueva mudanza',
+  ingreso_articulos:  'Ingreso de artículos',
+  egreso_articulos:   'Egreso de artículos',
+  mudanza_salida:     'Salida de mudanza',
 }
 
 interface AcompananteForm {
@@ -35,6 +42,7 @@ interface Props {
   visitantes: Visitante[]
   unidades: Unidad[]
   reservasSTR: ReservaSTR[]
+  solicitudesMudanza: SolicitudMudanzaUnidad[]
   proyectoId: string
   companyId: string
   userId: string
@@ -47,7 +55,7 @@ type FiltroFecha = 'hoy' | 'semana' | 'mes' | 'todos'
 type TipoNovedad = 'incidente' | 'observacion' | 'alarma' | 'acceso' | 'otro'
 type PrioridadNovedad = 'normal' | 'alta' | 'critica'
 
-export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, companyId, userId, proyectoNombre = 'Condominio', canCreate, onRefresh }: Props) {
+export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMudanza, proyectoId, companyId, userId, proyectoNombre = 'Condominio', canCreate, onRefresh }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [busqueda, setBusqueda] = useState('')
@@ -67,6 +75,9 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
   const [strSearch, setStrSearch] = useState('')
   const [strHuespedes, setStrHuespedes] = useState<Record<string, HuespedSTR[]>>({})
   const [strCtx, setStrCtx] = useState<{ reservaId: string; huespedId?: string } | null>(null)
+  const [showMudanzaModal, setShowMudanzaModal] = useState(false)
+  const [mudanzaSearch, setMudanzaSearch] = useState('')
+  const [mudanzaCtx, setMudanzaCtx] = useState<{ solicitudId: string } | null>(null)
   const [form, setForm] = useState({ unidad_id: '', nombre: '', identificacion: '', placa_vehiculo: '', motivo: '', notas: '' })
 
   // Minor & companions state
@@ -161,8 +172,9 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     return matchBusqueda && matchActivo && matchFecha
   })
 
-  // Group STR visitors under their reservation
+  // Group STR visitors under their reservation, and mudanza visitors under their authorization
   const strGruposMap = new Map<string, { reserva: ReservaSTR; miembros: Visitante[] }>()
+  const mudanzaGruposMap = new Map<string, { solicitud: SolicitudMudanzaUnidad; miembros: Visitante[] }>()
   const regulares: Visitante[] = []
   for (const v of filtrados) {
     if (v.reserva_str_id) {
@@ -173,10 +185,23 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
       } else {
         regulares.push(v)
       }
+    } else if (v.solicitud_mudanza_id) {
+      const solicitud = solicitudesMudanza.find(s => s.id === v.solicitud_mudanza_id)
+      if (solicitud) {
+        if (!mudanzaGruposMap.has(v.solicitud_mudanza_id)) mudanzaGruposMap.set(v.solicitud_mudanza_id, { solicitud, miembros: [] })
+        mudanzaGruposMap.get(v.solicitud_mudanza_id)!.miembros.push(v)
+      } else {
+        regulares.push(v)
+      }
     } else {
       regulares.push(v)
     }
   }
+
+  // Eligible mudanzas for guard check-in: aprobada / programada / en_curso
+  const mudanzasElegibles = solicitudesMudanza.filter(s =>
+    s.estado === 'aprobada' || s.estado === 'programada' || s.estado === 'en_curso'
+  )
 
   function resetForm() {
     setForm({ unidad_id: '', nombre: '', identificacion: '', placa_vehiculo: '', motivo: '', notas: '' })
@@ -190,7 +215,40 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     setShowAcompForm(false)
     setAcompForm(defaultAcompForm())
     setStrCtx(null)
+    setMudanzaCtx(null)
     setShowForm(false)
+  }
+
+  function abrirRegistroMudanza(s: SolicitudMudanzaUnidad) {
+    const fechaEfectiva = s.fecha_autorizada ?? s.fecha_solicitada ?? ''
+    const horaEfectiva = s.hora_autorizada ?? s.hora_solicitada ?? ''
+    const notasPartes: string[] = []
+    notasPartes.push(`Mudanza autorizada · ${fechaEfectiva}${horaEfectiva ? ` ${horaEfectiva}` : ''}`)
+    if (s.empresa_mudanza) notasPartes.push(`Empresa: ${s.empresa_mudanza}`)
+    if (s.telefono) notasPartes.push(`Tel: ${s.telefono}`)
+    if (s.hora_fin) notasPartes.push(`Hora fin: ${s.hora_fin}`)
+    if (s.ascensor_reservado) notasPartes.push('Ascensor reservado')
+    setForm({
+      nombre: s.empresa_mudanza ? `Personal mudanza (${s.empresa_mudanza})` : 'Personal de mudanza',
+      unidad_id: s.unidad_id,
+      placa_vehiculo: '',
+      motivo: `Mudanza · ${TIPO_MUDANZA_LABEL[s.tipo_mudanza] ?? s.tipo_mudanza}`,
+      notas: notasPartes.join(' · '),
+      identificacion: '',
+    })
+    setFotoUrl(null)
+    setFotoDocumentoUrl(null)
+    setFotoVehiculoUrl(null)
+    setFotosExpiradas({ foto: false, documento: false, vehiculo: false })
+    setFormEsMenor(false)
+    setFormFechaNacimiento('')
+    setAcompanantes([])
+    setShowAcompForm(false)
+    setStrCtx(null)
+    setMudanzaCtx({ solicitudId: s.id })
+    setShowMudanzaModal(false)
+    setMudanzaSearch('')
+    setShowForm(true)
   }
 
   function abrirRegistroSTR(r: ReservaSTR, huesped?: HuespedSTR) {
@@ -212,6 +270,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
     setAcompanantes([])
     setShowAcompForm(false)
     setStrCtx({ reservaId: r.id, huespedId: huesped?.id })
+    setMudanzaCtx(null)
     setShowStrModal(false)
     setStrSearch('')
     setShowForm(true)
@@ -297,6 +356,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
       es_menor: formEsMenor,
       fecha_nacimiento: formEsMenor && formFechaNacimiento ? formFechaNacimiento : null,
       reserva_str_id: strCtx?.reservaId ?? null,
+      solicitud_mudanza_id: mudanzaCtx?.solicitudId ?? null,
     }).select('id').single()
 
     if (error) { setSaving(false); Swal.fire('Error', error.message, 'error'); return }
@@ -306,6 +366,16 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
       await supabase.from('huespedes_str')
         .update({ visitante_id: data.id })
         .eq('id', strCtx.huespedId)
+    }
+
+    // First ingress of an approved/scheduled mudanza moves it to "en_curso"
+    if (mudanzaCtx?.solicitudId) {
+      const sol = solicitudesMudanza.find(s => s.id === mudanzaCtx.solicitudId)
+      if (sol && (sol.estado === 'aprobada' || sol.estado === 'programada')) {
+        await supabase.from('solicitud_mudanza_unidad')
+          .update({ estado: 'en_curso' })
+          .eq('id', mudanzaCtx.solicitudId)
+      }
     }
 
     if (acompanantes.length > 0 && data) {
@@ -326,6 +396,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
         fecha_nacimiento: a.es_menor && a.fecha_nacimiento ? a.fecha_nacimiento : null,
         visitante_principal_id: data.id,
         reserva_str_id: strCtx?.reservaId ?? null,
+        solicitud_mudanza_id: mudanzaCtx?.solicitudId ?? null,
       }))
       const { error: ae } = await supabase.from('visitantes').insert(acompRows)
       if (ae) {
@@ -571,6 +642,12 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
               🏠 Renta corta
             </button>
           )}
+          {canCreate && mudanzasElegibles.length > 0 && (
+            <button onClick={() => setShowMudanzaModal(true)}
+              style={{ padding: '10px 16px', background: 'linear-gradient(135deg,#f97316,#ea580c)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              🚛 Mudanza
+            </button>
+          )}
           {canCreate && (
             <button onClick={() => setShowForm(true)}
               style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
@@ -787,6 +864,106 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
         </div>
       )}
 
+      {/* Mudanza authorization selection modal */}
+      {showMudanzaModal && (
+        <div onClick={e => { if (e.target === e.currentTarget) { setShowMudanzaModal(false); setMudanzaSearch('') } }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '660px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '16px', overflow: 'hidden' }}>
+            <div style={{ background: 'linear-gradient(135deg,#f97316,#ea580c)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Mudanza autorizada</div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'white' }}>🚛 Registrar ingreso de mudanza</h3>
+              </div>
+              <button onClick={() => { setShowMudanzaModal(false); setMudanzaSearch('') }}
+                style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer', fontSize: 18, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                ×
+              </button>
+            </div>
+            <div style={{ padding: '20px 24px' }}>
+              <input value={mudanzaSearch} onChange={e => setMudanzaSearch(e.target.value)}
+                placeholder="Buscar por unidad o empresa de mudanza..."
+                autoFocus
+                style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', background: '#f8fafc', marginBottom: '14px' }} />
+              {(() => {
+                const lista = mudanzasElegibles
+                  .filter(s => {
+                    if (!mudanzaSearch) return true
+                    const q = mudanzaSearch.toLowerCase()
+                    return (s.unidad_nombre ?? '').toLowerCase().includes(q)
+                      || (s.empresa_mudanza ?? '').toLowerCase().includes(q)
+                  })
+                  .sort((a, b) => {
+                    const fa = a.fecha_autorizada ?? a.fecha_solicitada ?? ''
+                    const fb = b.fecha_autorizada ?? b.fecha_solicitada ?? ''
+                    return fa.localeCompare(fb)
+                  })
+                if (lista.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94a3b8' }}>
+                      <div style={{ fontSize: '32px', marginBottom: '10px' }}>🚛</div>
+                      <p style={{ fontWeight: 600, color: '#64748b', margin: 0 }}>
+                        {mudanzaSearch ? 'No se encontraron mudanzas con ese criterio' : 'No hay mudanzas autorizadas pendientes'}
+                      </p>
+                    </div>
+                  )
+                }
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto' }}>
+                    {lista.map(s => {
+                      const fechaEfectiva = s.fecha_autorizada ?? s.fecha_solicitada ?? ''
+                      const horaEfectiva = s.hora_autorizada ?? s.hora_solicitada ?? ''
+                      const ingresoHabilitado = fechaEfectiva === hoy || s.estado === 'en_curso'
+                      const enCurso = s.estado === 'en_curso'
+                      const personasDentro = visitantes.filter(v => v.solicitud_mudanza_id === s.id && !v.hora_salida).length
+                      return (
+                        <div key={s.id} style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '12px', padding: '14px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px', gap: '10px' }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+                                  {TIPO_MUDANZA_LABEL[s.tipo_mudanza] ?? s.tipo_mudanza}
+                                </span>
+                                <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: enCurso ? '#dcfce7' : '#ffedd5', color: enCurso ? '#16a34a' : '#c2410c' }}>
+                                  {enCurso ? 'En curso' : (s.estado === 'programada' ? 'Programada' : 'Aprobada')}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                {s.unidad_nombre && <span>🏠 {s.unidad_nombre}</span>}
+                                <span>📅 {fechaEfectiva}{horaEfectiva ? ` ${horaEfectiva}` : ''}{s.hora_fin ? ` → ${s.hora_fin}` : ''}</span>
+                                {s.empresa_mudanza && <span>🚚 {s.empresa_mudanza}</span>}
+                              </div>
+                              {(s.telefono || s.ascensor_reservado) && (
+                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                  {s.telefono && <span>📞 {s.telefono}</span>}
+                                  {s.ascensor_reservado && <span>🛗 Ascensor reservado</span>}
+                                </div>
+                              )}
+                            </div>
+                            {personasDentro > 0 && (
+                              <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, flexShrink: 0, background: '#dcfce7', color: '#16a34a' }}>
+                                {personasDentro} en premisas
+                              </span>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => ingresoHabilitado && abrirRegistroMudanza(s)}
+                            disabled={!ingresoHabilitado}
+                            style={{ width: '100%', padding: '8px', background: ingresoHabilitado ? 'linear-gradient(135deg,#f97316,#ea580c)' : '#f1f5f9', color: ingresoHabilitado ? 'white' : '#94a3b8', border: 'none', borderRadius: '8px', cursor: ingresoHabilitado ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: '12px', boxSizing: 'border-box' }}>
+                            {ingresoHabilitado ? '+ Registrar ingreso de mudanza' : `Habilitado el ${fechaEfectiva}`}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Registration form modal */}
       {showForm && (
         <div
@@ -799,6 +976,9 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Registrar visitante</h3>
                 {strCtx && (
                   <div style={{ fontSize: '11px', color: '#7c3aed', fontWeight: 600, marginTop: '2px' }}>🏠 Renta corta — ingreso al grupo</div>
+                )}
+                {mudanzaCtx && (
+                  <div style={{ fontSize: '11px', color: '#ea580c', fontWeight: 600, marginTop: '2px' }}>🚛 Mudanza autorizada — ingreso al grupo</div>
                 )}
               </div>
               <button onClick={resetForm}
@@ -1090,6 +1270,37 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
               </div>
             )
           })}
+
+          {/* Mudanza group blocks */}
+          {[...mudanzaGruposMap.values()].map(({ solicitud, miembros }) => {
+            const enPremisasAhora = miembros.filter(m => !m.hora_salida).length
+            const fechaEfectiva = solicitud.fecha_autorizada ?? solicitud.fecha_solicitada ?? ''
+            const horaEfectiva = solicitud.hora_autorizada ?? solicitud.hora_solicitada ?? ''
+            return (
+              <div key={solicitud.id}>
+                <div style={{ background: 'linear-gradient(to right,#fff7ed,#ffedd5)', border: '1.5px solid #fdba74', borderRadius: '12px', padding: '12px 16px', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: '#9a3412' }}>
+                        🚛 {TIPO_MUDANZA_LABEL[solicitud.tipo_mudanza] ?? solicitud.tipo_mudanza}
+                        {solicitud.unidad_nombre && <span style={{ fontWeight: 400, color: '#c2410c', marginLeft: 6 }}>— {solicitud.unidad_nombre}</span>}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#c2410c', marginTop: '2px' }}>
+                        {fechaEfectiva}{horaEfectiva ? ` ${horaEfectiva}` : ''}{solicitud.hora_fin ? ` → ${solicitud.hora_fin}` : ''}
+                        {solicitud.empresa_mudanza ? ` · ${solicitud.empresa_mudanza}` : ''}
+                      </div>
+                    </div>
+                    <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#ffedd5', color: '#c2410c' }}>
+                      {enPremisasAhora} en premisas
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '16px' }}>
+                  {miembros.map(v => renderVisitanteCard(v, true))}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -1117,6 +1328,9 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                   )}
                   {visitanteDetalle.reserva_str_id && (
                     <span style={{ padding: '2px 8px', background: '#f5f3ff', color: '#7c3aed', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>STR</span>
+                  )}
+                  {visitanteDetalle.solicitud_mudanza_id && (
+                    <span style={{ padding: '2px 8px', background: '#fff7ed', color: '#ea580c', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Mudanza</span>
                   )}
                 </div>
                 {visitanteDetalle.unidad_nombre && <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>📍 {visitanteDetalle.unidad_nombre}</div>}
@@ -1202,6 +1416,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, proyectoId, c
                   {salidaPendiente.es_menor && <span style={{ marginLeft: 6, padding: '1px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>}
                   {salidaPendiente.visitante_principal_id && <span style={{ marginLeft: 6, padding: '1px 7px', background: '#eff6ff', color: '#1d4ed8', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Acompañante</span>}
                   {salidaPendiente.reserva_str_id && <span style={{ marginLeft: 6, padding: '1px 7px', background: '#f5f3ff', color: '#7c3aed', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>STR</span>}
+                  {salidaPendiente.solicitud_mudanza_id && <span style={{ marginLeft: 6, padding: '1px 7px', background: '#fff7ed', color: '#ea580c', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Mudanza</span>}
                 </div>
               </div>
               <div style={{ padding: '20px 24px' }}>

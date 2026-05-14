@@ -457,6 +457,7 @@ export interface Visitante {
   fecha_nacimiento?: string | null
   visitante_principal_id?: string | null
   reserva_str_id?: string | null
+  solicitud_mudanza_id?: string | null
   // joins opcionales
   unidad_nombre?: string
 }
