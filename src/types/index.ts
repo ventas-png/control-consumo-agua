@@ -894,7 +894,14 @@ export interface SolicitudRentaUnidad {
 // ── Autorización de Mudanza por Unidad ────────────────────────────────────
 
 export type TipoSolicitudMudanza = 'nueva_mudanza' | 'ingreso_articulos' | 'egreso_articulos' | 'mudanza_salida'
-export type EstadoSolicitudMudanza = 'pendiente' | 'aprobada' | 'rechazada'
+export type EstadoSolicitudMudanza =
+  | 'pendiente'
+  | 'aprobada'
+  | 'rechazada'
+  | 'programada'
+  | 'en_curso'
+  | 'completada'
+  | 'cancelada'
 
 export interface SolicitudMudanzaUnidad {
   id: string
@@ -913,6 +920,15 @@ export interface SolicitudMudanzaUnidad {
   hora_autorizada?: string | null
   aprobado_por?: string | null
   fecha_resolucion?: string | null
+  // Operational fields (fusionados desde la tabla mudanzas)
+  empresa_mudanza?: string | null
+  telefono?: string | null
+  hora_fin?: string | null
+  deposito_requerido?: boolean
+  deposito_pagado?: boolean
+  monto_deposito?: number | null
+  ascensor_reservado?: boolean
+  notas?: string | null
   created_at: string
   // joined
   unidad_nombre?: string
@@ -1431,8 +1447,6 @@ export interface PersonalCondominio {
 // ── Condominios Fase 5 ────────────────────────────────────────────────────────
 
 export type TipoContactoEmergencia = 'bomberos' | 'policia' | 'ambulancia' | 'hospital' | 'electricidad' | 'agua' | 'gas' | 'administracion' | 'general'
-export type TipoMudanza = 'ingreso' | 'salida'
-export type EstadoMudanza = 'programada' | 'en_curso' | 'completada' | 'cancelada'
 export type CategoriaDocumento = 'reglamento' | 'circular' | 'manual' | 'acta' | 'contrato' | 'formulario' | 'otro'
 export type VisibilidadDocumento = 'admin' | 'residentes' | 'todos'
 export type TipoResiduo = 'general' | 'reciclable' | 'organico' | 'electronico' | 'peligroso' | 'escombros'
@@ -1451,28 +1465,6 @@ export interface ContactoEmergencia {
   orden: number
   activo: boolean
   created_at: string
-}
-
-export interface Mudanza {
-  id: string
-  company_id: string
-  project_id: string
-  unidad_id?: string | null
-  tipo: TipoMudanza
-  fecha: string
-  hora_inicio?: string | null
-  hora_fin?: string | null
-  nombre_residente: string
-  telefono?: string | null
-  empresa_mudanza?: string | null
-  estado: EstadoMudanza
-  deposito_requerido: boolean
-  deposito_pagado: boolean
-  monto_deposito?: number | null
-  ascensor_reservado: boolean
-  notas?: string | null
-  created_at: string
-  unidad_nombre?: string
 }
 
 export interface DocumentoCondominio {
