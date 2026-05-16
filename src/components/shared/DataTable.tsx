@@ -77,6 +77,14 @@ export interface DataTableProps<T> {
 
   /** onClick por fila para hacerla interactiva. */
   onRowClick?: (row: T) => void
+
+  /**
+   * Fila de totales / agregaciones que se renderiza en `<tfoot>`. Recibe las
+   * filas que pasaron filtros y sort (NO paginadas) para que los totales
+   * reflejen el dataset visible del filtro, no sólo la página actual.
+   * Debe retornar `<tr>` con `<td>`s alineados con las columnas.
+   */
+  footerRow?: (filteredRows: T[]) => ReactNode
 }
 
 // ── Componente ────────────────────────────────────────────────────────────
@@ -95,6 +103,7 @@ export function DataTable<T>({
   toolbar,
   rowStyle,
   onRowClick,
+  footerRow,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('')
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(
@@ -327,6 +336,11 @@ export function DataTable<T>({
                   </tr>
                 ))}
               </tbody>
+              {footerRow && (
+                <tfoot>
+                  {footerRow(sorted)}
+                </tfoot>
+              )}
             </table>
           </div>
         )}

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { CuotaCondominio, Unidad } from '../../../types'
 import { exportarExcel, exportarPDFCartaCobro } from '../exportUtils'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -91,11 +92,95 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
   }
 
   type TotalesKey = 't0_30' | 't31_60' | 't61_90' | 't90plus'
-  const columnas: { key: TotalesKey; label: string; color: string }[] = [
+  const columnasBarra: { key: TotalesKey; label: string; color: string }[] = [
     { key: 't0_30',   label: '0–30 días',   color: '#d97706' },
     { key: 't31_60',  label: '31–60 días',  color: '#ea580c' },
     { key: 't61_90',  label: '61–90 días',  color: '#dc2626' },
     { key: 't90plus', label: '+90 días',    color: '#991b1b' },
+  ]
+
+  const columns: DataTableColumn<DeudorRow>[] = [
+    {
+      key: 'unidadNombre',
+      header: 'Unidad',
+      sortable: true,
+      render: row => <span style={{ fontWeight: 600, color: '#0f172a' }}>{row.unidadNombre}</span>,
+    },
+    {
+      key: 't0_30',
+      header: '0–30 días',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.t0_30,
+      render: row => (
+        <span style={{ color: row.t0_30 > 0 ? '#d97706' : '#9ca3af' }}>
+          {row.t0_30 > 0 ? `${moneda} ${row.t0_30.toFixed(2)}` : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 't31_60',
+      header: '31–60 días',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.t31_60,
+      render: row => (
+        <span style={{ color: row.t31_60 > 0 ? '#ea580c' : '#9ca3af' }}>
+          {row.t31_60 > 0 ? `${moneda} ${row.t31_60.toFixed(2)}` : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 't61_90',
+      header: '61–90 días',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.t61_90,
+      render: row => (
+        <span style={{ color: row.t61_90 > 0 ? '#dc2626' : '#9ca3af' }}>
+          {row.t61_90 > 0 ? `${moneda} ${row.t61_90.toFixed(2)}` : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 't90plus',
+      header: '+90 días',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.t90plus,
+      render: row => (
+        <span style={{ fontWeight: row.t90plus > 0 ? 700 : 400, color: row.t90plus > 0 ? '#991b1b' : '#9ca3af' }}>
+          {row.t90plus > 0 ? `${moneda} ${row.t90plus.toFixed(2)}` : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'total',
+      header: 'Total',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.total,
+      render: row => <span style={{ fontWeight: 800, color: '#ef4444' }}>{moneda} {row.total.toFixed(2)}</span>,
+    },
+    {
+      key: 'cuotasCount',
+      header: 'Cuotas',
+      sortable: true,
+      align: 'center',
+      accessor: row => row.cuotasCount,
+      render: row => <span style={{ color: '#64748b' }}>{row.cuotasCount}</span>,
+    },
+    {
+      key: 'acciones',
+      header: '',
+      align: 'right',
+      render: row => (
+        <button onClick={() => cartaCobro(row)}
+          style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid #2563eb', background: '#eff6ff', color: '#2563eb', cursor: 'pointer', fontWeight: 600 }}>
+          🖨️ Carta
+        </button>
+      ),
+    },
   ]
 
   return (
@@ -140,7 +225,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6, fontWeight: 600 }}>Distribución de deuda por antigüedad</div>
           <div style={{ display: 'flex', height: 16, borderRadius: 8, overflow: 'hidden', gap: 1 }}>
-            {columnas.map(col => {
+            {columnasBarra.map(col => {
               const val = totales[col.key] as number
               const pct = (val / totales.total) * 100
               return pct > 0 ? (
@@ -150,7 +235,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
             })}
           </div>
           <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-            {columnas.map(col => {
+            {columnasBarra.map(col => {
               const val = totales[col.key] as number
               const pct = totales.total > 0 ? (val / totales.total) * 100 : 0
               return (
@@ -163,72 +248,38 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
         </div>
       )}
 
-      {/* Tabla */}
-      {deudores.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: '#9ca3af', fontSize: 13 }}>
-          No hay unidades con saldo pendiente. ¡Excelente nivel de cobro!
-        </div>
-      ) : (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                <th style={{ padding: '9px 12px', textAlign: 'left', color: '#64748b', fontWeight: 600 }}>Unidad</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: '#d97706', fontWeight: 600 }}>0–30 días</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: '#ea580c', fontWeight: 600 }}>31–60 días</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: '#dc2626', fontWeight: 600 }}>61–90 días</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: '#991b1b', fontWeight: 600 }}>+90 días</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: '#374151', fontWeight: 700 }}>Total</th>
-                <th style={{ padding: '9px 12px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Cuotas</th>
-                <th style={{ padding: '9px 12px' }} />
-              </tr>
-            </thead>
-            <tbody>
-              {deudores.map((d, i) => (
-                <tr key={d.unidadId} style={{ borderTop: i > 0 ? '1px solid #f1f5f9' : undefined, background: d.t90plus > 0 ? '#fef2f200' : undefined }}>
-                  <td style={{ padding: '9px 12px', fontWeight: 600, color: '#0f172a' }}>{d.unidadNombre}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t0_30 > 0 ? '#d97706' : '#9ca3af' }}>
-                    {d.t0_30 > 0 ? `${moneda} ${d.t0_30.toFixed(2)}` : '—'}
-                  </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t31_60 > 0 ? '#ea580c' : '#9ca3af' }}>
-                    {d.t31_60 > 0 ? `${moneda} ${d.t31_60.toFixed(2)}` : '—'}
-                  </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t61_90 > 0 ? '#dc2626' : '#9ca3af' }}>
-                    {d.t61_90 > 0 ? `${moneda} ${d.t61_90.toFixed(2)}` : '—'}
-                  </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: d.t90plus > 0 ? 700 : 400, color: d.t90plus > 0 ? '#991b1b' : '#9ca3af' }}>
-                    {d.t90plus > 0 ? `${moneda} ${d.t90plus.toFixed(2)}` : '—'}
-                  </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>
-                    {moneda} {d.total.toFixed(2)}
-                  </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'center', color: '#64748b' }}>{d.cuotasCount}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right' }}>
-                    <button onClick={() => cartaCobro(d)}
-                      style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid #2563eb', background: '#eff6ff', color: '#2563eb', cursor: 'pointer', fontWeight: 600 }}>
-                      🖨️ Carta
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr style={{ borderTop: '2px solid #e5e7eb', background: '#f8fafc' }}>
-                <td style={{ padding: '9px 12px', fontWeight: 700 }}>TOTAL</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#d97706' }}>{moneda} {totales.t0_30.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#ea580c' }}>{moneda} {totales.t31_60.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>{moneda} {totales.t61_90.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#991b1b' }}>{moneda} {totales.t90plus.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>{moneda} {totales.total.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: '#64748b' }}>
-                  {deudores.reduce((s, d) => s + d.cuotasCount, 0)}
-                </td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
+      <DataTable
+        data={deudores}
+        columns={columns}
+        rowKey="unidadId"
+        searchableKeys={['unidadNombre']}
+        searchPlaceholder="Buscar unidad…"
+        defaultSort={{ key: 'total', direction: 'desc' }}
+        emptyState={{ icon: '✅', title: '¡Excelente! No hay unidades con saldo pendiente' }}
+        footerRow={rows => {
+          const tot = rows.reduce((acc, d) => ({
+            t0_30: acc.t0_30 + d.t0_30,
+            t31_60: acc.t31_60 + d.t31_60,
+            t61_90: acc.t61_90 + d.t61_90,
+            t90plus: acc.t90plus + d.t90plus,
+            total: acc.total + d.total,
+            cuotas: acc.cuotas + d.cuotasCount,
+          }), { t0_30: 0, t31_60: 0, t61_90: 0, t90plus: 0, total: 0, cuotas: 0 })
+          const tdStyle = { padding: '10px 14px', borderTop: '2px solid #e5e7eb', background: '#f8fafc', fontWeight: 700 }
+          return (
+            <tr>
+              <td style={{ ...tdStyle }}>TOTAL</td>
+              <td style={{ ...tdStyle, textAlign: 'right' as const, color: '#d97706' }}>{moneda} {tot.t0_30.toFixed(2)}</td>
+              <td style={{ ...tdStyle, textAlign: 'right' as const, color: '#ea580c' }}>{moneda} {tot.t31_60.toFixed(2)}</td>
+              <td style={{ ...tdStyle, textAlign: 'right' as const, color: '#dc2626' }}>{moneda} {tot.t61_90.toFixed(2)}</td>
+              <td style={{ ...tdStyle, textAlign: 'right' as const, color: '#991b1b' }}>{moneda} {tot.t90plus.toFixed(2)}</td>
+              <td style={{ ...tdStyle, textAlign: 'right' as const, fontWeight: 800, color: '#ef4444' }}>{moneda} {tot.total.toFixed(2)}</td>
+              <td style={{ ...tdStyle, textAlign: 'center' as const, color: '#64748b' }}>{tot.cuotas}</td>
+              <td style={tdStyle} />
+            </tr>
+          )
+        }}
+      />
     </div>
   )
 }
