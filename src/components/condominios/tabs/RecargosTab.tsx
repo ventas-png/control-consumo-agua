@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
 import { RecargoMora, EstadoRecargo, TipoRecargo, Unidad, CuotaCondominio, ReglaMoraConfig } from '../../../types'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   recargos: RecargoMora[]
@@ -90,7 +91,6 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
   async function aplicarMasivo() {
     const hoy = new Date().toISOString().slice(0, 10)
     const reglaActiva = reglas.find(r => r.activa)
-    // cuotas vencidas: moroso o pendiente con fecha_vencimiento superada
     const cuotasVenc = cuotas.filter(c =>
       c.estado === 'moroso' ||
       (c.estado === 'pendiente' && c.fecha_vencimiento && c.fecha_vencimiento < hoy)
@@ -152,6 +152,74 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
 
+  const columns: DataTableColumn<RecargoMora>[] = [
+    {
+      key: 'unidad',
+      header: 'Unidad',
+      sortable: true,
+      accessor: row => unidades.find(u => u.id === row.unidad_id)?.nombre ?? row.unidad_nombre ?? '',
+      render: row => {
+        const unidad = unidades.find(u => u.id === row.unidad_id)
+        return <span style={{ fontWeight: 600 }}>{unidad?.nombre ?? row.unidad_nombre ?? '—'}</span>
+      },
+    },
+    {
+      key: 'fecha_aplicacion',
+      header: 'Fecha',
+      sortable: true,
+      render: row => <span style={{ color: '#6b7280' }}>{row.fecha_aplicacion}</span>,
+    },
+    {
+      key: 'tipo',
+      header: 'Tipo',
+      sortable: true,
+      render: row => <span style={{ color: '#374151' }}>{row.tipo === 'porcentaje' ? `${row.valor}%` : 'Fijo'}</span>,
+    },
+    {
+      key: 'valor',
+      header: 'Valor',
+      sortable: true,
+      accessor: row => row.valor,
+      render: row => <span style={{ color: '#374151' }}>{row.tipo === 'porcentaje' ? `${row.valor}%` : `${moneda} ${row.valor}`}</span>,
+    },
+    {
+      key: 'monto_calculado',
+      header: 'Monto',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.monto_calculado,
+      render: row => <span style={{ fontWeight: 700, color: '#dc2626' }}>{moneda} {row.monto_calculado.toFixed(2)}</span>,
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      render: row => {
+        const ec = ESTADO_CFG[row.estado]
+        return <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
+      },
+    },
+    {
+      key: 'motivo',
+      header: 'Motivo',
+      render: row => <span style={{ color: '#9ca3af', fontSize: 12 }}>{row.motivo ?? '—'}</span>,
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: row => (
+        canEdit && row.estado === 'pendiente' ? (
+          <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => cambiarEstado(row, 'aplicado')}
+              style={{ padding: '4px 8px', background: '#dbeafe', color: '#1d4ed8', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Aplicar</button>
+            <button onClick={() => cambiarEstado(row, 'anulado')}
+              style={{ padding: '4px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>Anular</button>
+          </div>
+        ) : null
+      ),
+    },
+  ]
+
   return (
     <div style={{ padding: 16 }}>
       {/* KPIs */}
@@ -170,14 +238,9 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
         ))}
       </div>
 
-      {/* Filtros + botones */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+      {/* Filtros pill + botones */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <select value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}
-            style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 }}>
-            <option value="">Todas las unidades</option>
-            {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
-          </select>
           {(['', 'pendiente', 'aplicado', 'anulado'] as (EstadoRecargo | '')[]).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
               style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#4f46e5' : '#e2e8f0', background: filtroEstado === e ? '#eef2ff' : 'white', color: filtroEstado === e ? '#4f46e5' : '#64748b' }}>
@@ -252,51 +315,26 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
         </div>
       )}
 
-      {/* Tabla */}
-      {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0', fontSize: 13 }}>Sin recargos de mora registrados</div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                {['Unidad', 'Fecha', 'Tipo', 'Valor', 'Monto', 'Estado', 'Motivo', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#6b7280', fontWeight: 600, borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lista.map(r => {
-                const ec = ESTADO_CFG[r.estado]
-                const unidad = unidades.find(u => u.id === r.unidad_id)
-                return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? r.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', color: '#6b7280' }}>{r.fecha_aplicacion}</td>
-                    <td style={{ padding: '8px 12px', color: '#374151' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : 'Fijo'}</td>
-                    <td style={{ padding: '8px 12px', color: '#374151' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : `${moneda} ${r.valor}`}</td>
-                    <td style={{ padding: '8px 12px', fontWeight: 700, color: '#dc2626' }}>{moneda} {r.monto_calculado.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
-                    </td>
-                    <td style={{ padding: '8px 12px', color: '#9ca3af', fontSize: 12 }}>{r.motivo ?? '—'}</td>
-                    <td style={{ padding: '8px 12px' }}>
-                      {canEdit && r.estado === 'pendiente' && (
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button onClick={() => cambiarEstado(r, 'aplicado')}
-                            style={{ padding: '4px 8px', background: '#dbeafe', color: '#1d4ed8', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Aplicar</button>
-                          <button onClick={() => cambiarEstado(r, 'anulado')}
-                            style={{ padding: '4px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>Anular</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        data={lista}
+        columns={columns}
+        rowKey="id"
+        searchableKeys={[
+          row => unidades.find(u => u.id === row.unidad_id)?.nombre ?? row.unidad_nombre ?? '',
+          row => row.motivo ?? '',
+        ]}
+        searchPlaceholder="Buscar por unidad o motivo…"
+        filters={[
+          {
+            key: 'unidad',
+            value: filtroUnidad,
+            onChange: setFiltroUnidad,
+            options: [{ value: '', label: 'Todas las unidades' }, ...unidades.map(u => ({ value: u.id, label: u.nombre }))],
+          },
+        ]}
+        defaultSort={{ key: 'fecha_aplicacion', direction: 'desc' }}
+        emptyState={{ icon: '📋', title: 'Sin recargos de mora registrados' }}
+      />
     </div>
   )
 }

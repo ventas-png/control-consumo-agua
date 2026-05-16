@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import { CuotaCondominio, Unidad, ConciliacionCobrosLog } from '../../../types'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -100,6 +101,86 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
   const totalPendiente = cuotasPendientes.reduce((s, c) => s + c.monto, 0)
   const conciliacionesHoy = conciliaciones.filter(c => c.fecha_pago === new Date().toISOString().slice(0, 10))
   const montoConciliadoHoy = conciliacionesHoy.reduce((s, c) => s + c.monto_recibido, 0)
+
+  const historialColumns: DataTableColumn<ConciliacionCobrosLog>[] = [
+    {
+      key: 'fecha_pago',
+      header: 'Fecha',
+      sortable: true,
+      render: row => <span style={{ color: '#374151' }}>{row.fecha_pago}</span>,
+    },
+    {
+      key: 'unidad',
+      header: 'Unidad',
+      sortable: true,
+      accessor: row => unidades.find(u => u.id === row.unidad_id)?.nombre ?? '',
+      render: row => <span>{unidades.find(u => u.id === row.unidad_id)?.nombre ?? '—'}</span>,
+    },
+    {
+      key: 'concepto',
+      header: 'Concepto',
+      accessor: row => cuotas.find(q => q.id === row.cuota_id)?.concepto ?? '',
+      render: row => (
+        <span style={{ display: 'inline-block', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {cuotas.find(q => q.id === row.cuota_id)?.concepto ?? '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'monto_cuota',
+      header: 'Cuota',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.monto_cuota,
+      render: row => <span>{moneda} {row.monto_cuota.toFixed(2)}</span>,
+    },
+    {
+      key: 'monto_recibido',
+      header: 'Recibido',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.monto_recibido,
+      render: row => <span style={{ fontWeight: 600 }}>{moneda} {row.monto_recibido.toFixed(2)}</span>,
+    },
+    {
+      key: 'diferencia',
+      header: 'Diferencia',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.monto_recibido - row.monto_cuota,
+      render: row => {
+        const diff = row.monto_recibido - row.monto_cuota
+        return (
+          <span style={{ color: Math.abs(diff) < 0.01 ? '#16a34a' : diff > 0 ? '#d97706' : '#ef4444', fontWeight: 600 }}>
+            {Math.abs(diff) < 0.01 ? '✓' : diff > 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'metodo_pago',
+      header: 'Método',
+      sortable: true,
+    },
+    {
+      key: 'referencia_pago',
+      header: 'Ref.',
+      accessor: row => row.referencia_pago ?? '',
+      render: row => <span style={{ color: '#9ca3af', fontSize: 10 }}>{row.referencia_pago ?? '—'}</span>,
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      render: row => (
+        <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600,
+          background: row.estado === 'conciliado' ? '#dcfce7' : '#fef3c7',
+          color: row.estado === 'conciliado' ? '#16a34a' : '#d97706' }}>
+          {row.estado}
+        </span>
+      ),
+    },
+  ]
 
   return (
     <div style={{ padding: 16 }}>
@@ -236,51 +317,20 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
       )}
 
       {subTab === 'historial' && (
-        <div>
-          {conciliaciones.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#9ca3af', fontSize: 13 }}>Sin conciliaciones registradas.</div>
-          ) : (
-            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc' }}>
-                    {['Fecha', 'Unidad', 'Concepto', 'Cuota', 'Recibido', 'Diferencia', 'Método', 'Ref.', 'Estado'].map(h => (
-                      <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: '#64748b', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {conciliaciones.map((c, i) => {
-                    const cuota = cuotas.find(q => q.id === c.cuota_id)
-                    const unidad = unidades.find(u => u.id === c.unidad_id)
-                    const diff = c.monto_recibido - c.monto_cuota
-                    return (
-                      <tr key={c.id} style={{ borderTop: i > 0 ? '1px solid #f1f5f9' : undefined }}>
-                        <td style={{ padding: '8px 10px', color: '#374151' }}>{c.fecha_pago}</td>
-                        <td style={{ padding: '8px 10px' }}>{unidad?.nombre ?? '—'}</td>
-                        <td style={{ padding: '8px 10px', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cuota?.concepto ?? '—'}</td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right' }}>{moneda} {c.monto_cuota.toFixed(2)}</td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600 }}>{moneda} {c.monto_recibido.toFixed(2)}</td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', color: Math.abs(diff) < 0.01 ? '#16a34a' : diff > 0 ? '#d97706' : '#ef4444', fontWeight: 600 }}>
-                          {Math.abs(diff) < 0.01 ? '✓' : diff > 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)}
-                        </td>
-                        <td style={{ padding: '8px 10px' }}>{c.metodo_pago}</td>
-                        <td style={{ padding: '8px 10px', color: '#9ca3af', fontSize: 10 }}>{c.referencia_pago ?? '—'}</td>
-                        <td style={{ padding: '8px 10px' }}>
-                          <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600,
-                            background: c.estado === 'conciliado' ? '#dcfce7' : '#fef3c7',
-                            color: c.estado === 'conciliado' ? '#16a34a' : '#d97706' }}>
-                            {c.estado}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        <DataTable
+          data={conciliaciones}
+          columns={historialColumns}
+          rowKey="id"
+          searchableKeys={[
+            'metodo_pago',
+            row => row.referencia_pago ?? '',
+            row => unidades.find(u => u.id === row.unidad_id)?.nombre ?? '',
+            row => cuotas.find(q => q.id === row.cuota_id)?.concepto ?? '',
+          ]}
+          searchPlaceholder="Buscar por unidad, concepto, método o referencia…"
+          defaultSort={{ key: 'fecha_pago', direction: 'desc' }}
+          emptyState={{ icon: '✅', title: 'Sin conciliaciones registradas' }}
+        />
       )}
     </div>
   )

@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { SancionCondominio, Unidad, InfraccionCondominio } from '../../../types'
 import Swal from 'sweetalert2'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   sanciones: SancionCondominio[]
@@ -68,6 +69,85 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
   const totalPendiente = pendientes.reduce((s, x) => s + x.monto, 0)
 
   const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+
+  const columns: DataTableColumn<SancionCondominio>[] = [
+    {
+      key: 'unidad_nombre',
+      header: 'Unidad',
+      sortable: true,
+      accessor: row => row.unidad_nombre ?? '',
+      render: row => <span style={{ fontWeight: 600 }}>{row.unidad_nombre ?? '—'}</span>,
+    },
+    {
+      key: 'concepto',
+      header: 'Concepto',
+      sortable: true,
+      render: row => <span style={{ color: '#374151' }}>{row.concepto}</span>,
+    },
+    {
+      key: 'monto',
+      header: 'Monto',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.monto,
+      render: row => <span style={{ fontWeight: 700, color: '#ef4444' }}>{moneda} {row.monto.toFixed(2)}</span>,
+    },
+    {
+      key: 'fecha_emision',
+      header: 'Emisión',
+      sortable: true,
+      render: row => <span style={{ color: '#64748b', fontSize: '12px' }}>{row.fecha_emision}</span>,
+    },
+    {
+      key: 'fecha_vencimiento',
+      header: 'Vencimiento',
+      sortable: true,
+      accessor: row => row.fecha_vencimiento ?? '',
+      render: row => {
+        const vencida = row.estado === 'pendiente' && row.fecha_vencimiento && row.fecha_vencimiento < today
+        return (
+          <span style={{ fontSize: '12px', fontWeight: vencida ? 700 : 400, color: vencida ? '#ef4444' : '#64748b' }}>
+            {row.fecha_vencimiento ?? '—'}{vencida ? ' ⚠️' : ''}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      render: row => {
+        const est = ESTADO[row.estado]
+        return (
+          <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: est?.bg, color: est?.color }}>
+            {est?.label}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: row => (
+        canEdit && row.estado === 'pendiente' ? (
+          <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => cambiarEstado(row.id, 'pagado', '¿Marcar como pagada?')}
+              style={{ padding: '3px 8px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+              Pagado
+            </button>
+            <button onClick={() => cambiarEstado(row.id, 'apelado')}
+              style={{ padding: '3px 7px', background: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+              Apelar
+            </button>
+            <button onClick={() => cambiarEstado(row.id, 'anulado', '¿Anular sanción?')}
+              style={{ padding: '3px 7px', background: '#f1f5f9', color: '#94a3b8', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+              Anular
+            </button>
+          </div>
+        ) : null
+      ),
+    },
+  ]
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -151,7 +231,7 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
         </div>
       )}
 
-      {/* Filter */}
+      {/* Filter pill — UX custom mantenido fuera */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
         {(['todos', 'pendiente', 'pagado', 'apelado', 'anulado'] as const).map(f => (
           <button key={f} onClick={() => setFiltro(f)}
@@ -164,61 +244,15 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
         ))}
       </div>
 
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay sanciones.</div>
-      ) : (
-        <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                {['Unidad', 'Concepto', 'Monto', 'Emisión', 'Vencimiento', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((s, i) => {
-                const est = ESTADO[s.estado]
-                const vencida = s.estado === 'pendiente' && s.fecha_vencimiento && s.fecha_vencimiento < today
-                return (
-                  <tr key={s.id} style={{ background: i % 2 === 0 ? 'white' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{s.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#374151' }}>{s.concepto}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#ef4444' }}>{moneda} {s.monto.toFixed(2)}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b', fontSize: '12px' }}>{s.fecha_emision}</td>
-                    <td style={{ padding: '10px 12px', fontSize: '12px', fontWeight: vencida ? 700 : 400, color: vencida ? '#ef4444' : '#64748b' }}>
-                      {s.fecha_vencimiento ?? '—'}{vencida ? ' ⚠️' : ''}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: est?.bg, color: est?.color }}>
-                        {est?.label}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {canEdit && s.estado === 'pendiente' && (
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <button onClick={() => cambiarEstado(s.id, 'pagado', '¿Marcar como pagada?')}
-                            style={{ padding: '3px 8px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                            Pagado
-                          </button>
-                          <button onClick={() => cambiarEstado(s.id, 'apelado')}
-                            style={{ padding: '3px 7px', background: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                            Apelar
-                          </button>
-                          <button onClick={() => cambiarEstado(s.id, 'anulado', '¿Anular sanción?')}
-                            style={{ padding: '3px 7px', background: '#f1f5f9', color: '#94a3b8', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                            Anular
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        data={filtered}
+        columns={columns}
+        rowKey="id"
+        searchableKeys={[row => row.unidad_nombre ?? '', 'concepto']}
+        searchPlaceholder="Buscar por unidad o concepto…"
+        defaultSort={{ key: 'fecha_emision', direction: 'desc' }}
+        emptyState={{ icon: '⚖️', title: 'No hay sanciones' }}
+      />
     </div>
   )
 }
