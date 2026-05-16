@@ -3,6 +3,8 @@ import { supabase } from '../../lib/supabase'
 import { validateEmail, validatePhoneNumber, sanitizeInput } from '../../lib/validation'
 import type { UserSession, Registro } from '../../types'
 import { Chart } from '../../lib/chartjs'
+import { SecureImage } from '../shared/SecureImage'
+import { useSignedUrl } from '../../lib/storageUrls'
 import { CustomerPaymentsTab } from './CustomerPaymentsTab'
 import { CustomerComunicacion } from './CustomerComunicacion'
 
@@ -92,6 +94,35 @@ const ESTADO_COLORS: Record<string, { bg: string; color: string; label: string }
 function parseFecha(fecha: string | null | undefined): Date {
   if (!fecha) return new Date(NaN)
   return new Date(fecha.includes('T') ? fecha : fecha + 'T12:00:00')
+}
+
+// Lightbox que firma la URL bajo demanda con useSignedUrl. Se extrae como
+// sub-componente para que el hook pueda llamarse condicionalmente (solo
+// cuando hay un photoModal abierto).
+function PhotoLightbox({ modal, onClose }: { modal: { url: string; label: string }; onClose: () => void }) {
+  const signedUrl = useSignedUrl(modal.url, 'registro-fotos')
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 9999, cursor: 'pointer', flexDirection: 'column', gap: '14px', padding: '24px',
+      }}
+    >
+      <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12.5px', textAlign: 'center', maxWidth: '80vw' }}>
+        {modal.label}
+      </div>
+      {signedUrl && (
+        <img
+          src={signedUrl}
+          alt={modal.label}
+          style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', objectFit: 'contain' }}
+        />
+      )}
+      <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11.5px' }}>Toque o clic para cerrar</div>
+    </div>
+  )
 }
 
 type PortalTab = 'dashboard' | 'servicios' | 'pagos' | 'perfil' | 'comunicacion'
@@ -942,7 +973,8 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                 <div key={label} style={{ flex: 1 }}>
                                   <div style={{ fontSize: '9.5px', color: '#94a3b8', marginBottom: '3px', textAlign: 'center' }}>{label}</div>
                                   {lectura?.foto ? (
-                                    <img
+                                    <SecureImage
+                                      bucket="registro-fotos"
                                       src={lectura.foto}
                                       alt={label}
                                       onClick={() => setPhotoModal({ url: lectura.foto!, label: `${label} — #${contador.numero_serie} — ${parseFecha(lectura.fecha).toLocaleDateString('es-GT')}` })}
@@ -1530,24 +1562,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
       {/* ── Lightbox de fotos ── */}
       {photoModal && (
-        <div
-          onClick={() => setPhotoModal(null)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 9999, cursor: 'pointer', flexDirection: 'column', gap: '14px', padding: '24px',
-          }}
-        >
-          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12.5px', textAlign: 'center', maxWidth: '80vw' }}>
-            {photoModal.label}
-          </div>
-          <img
-            src={photoModal.url}
-            alt={photoModal.label}
-            style={{ maxWidth: '90vw', maxHeight: '80vh', borderRadius: '12px', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', objectFit: 'contain' }}
-          />
-          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11.5px' }}>Toque o clic para cerrar</div>
-        </div>
+        <PhotoLightbox modal={photoModal} onClose={() => setPhotoModal(null)} />
       )}
     </div>
   )

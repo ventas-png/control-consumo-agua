@@ -3,6 +3,57 @@ import Swal from 'sweetalert2'
 import { useConversations } from '../../hooks/useConversations'
 import { useBroadcasts } from '../../hooks/useBroadcasts'
 import { sanitizeInput } from '../../lib/validation'
+import { SecureImage } from '../shared/SecureImage'
+import { useSignedUrl } from '../../lib/storageUrls'
+
+function ChatAttachmentImage({ src, name, body }: { src: string; name?: string | null; body?: string | null }) {
+  const signed = useSignedUrl(src, 'conv-attachments')
+  if (!signed) return null
+  return (
+    <a href={signed} target="_blank" rel="noopener noreferrer">
+      <SecureImage
+        bucket="conv-attachments"
+        src={src}
+        alt={name ?? 'imagen'}
+        style={{ maxWidth: '220px', maxHeight: '200px', borderRadius: '8px', marginTop: body ? '6px' : 0, display: 'block' }}
+      />
+    </a>
+  )
+}
+
+function ChatAttachmentLink({ src, name, type, size, getIcon, fmt, body }: {
+  src: string
+  name?: string | null
+  type?: string | null
+  size?: number | null
+  getIcon: (mime?: string | null) => string
+  fmt: (bytes: number) => string
+  body?: string | null
+}) {
+  const signed = useSignedUrl(src, 'conv-attachments')
+  if (!signed) return null
+  return (
+    <a
+      href={signed}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: 'flex', alignItems: 'center', gap: '8px',
+        marginTop: body ? '6px' : 0,
+        background: 'rgba(0,0,0,0.08)', borderRadius: '8px',
+        padding: '8px 10px', color: 'inherit', textDecoration: 'none',
+      }}
+    >
+      <span style={{ fontSize: '20px' }}>{getIcon(type)}</span>
+      <div style={{ overflow: 'hidden' }}>
+        <div style={{ fontSize: '12px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {name}
+        </div>
+        {size && <div style={{ fontSize: '10px', opacity: 0.7 }}>{fmt(size)}</div>}
+      </div>
+    </a>
+  )
+}
 import type {
   UserSession,
   ConversationCategory,
@@ -656,36 +707,18 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                           </div>
                         )}
                         {msg.attachment_url && msg.attachment_type?.startsWith('image/') && (
-                          <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer">
-                            <img
-                              src={msg.attachment_url}
-                              alt={msg.attachment_name ?? 'imagen'}
-                              style={{ maxWidth: '220px', maxHeight: '200px', borderRadius: '8px', marginTop: msg.body ? '6px' : 0, display: 'block' }}
-                            />
-                          </a>
+                          <ChatAttachmentImage src={msg.attachment_url} name={msg.attachment_name} body={msg.body} />
                         )}
                         {msg.attachment_url && !msg.attachment_type?.startsWith('image/') && (
-                          <a
-                            href={msg.attachment_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: '8px',
-                              marginTop: msg.body ? '6px' : 0,
-                              background: 'rgba(0,0,0,0.08)', borderRadius: '8px',
-                              padding: '8px 10px', color: 'inherit', textDecoration: 'none',
-                            }}
-                          >
-                            <span style={{ fontSize: '20px' }}>{getFileIcon(msg.attachment_type)}</span>
-                            <div style={{ overflow: 'hidden' }}>
-                              <div style={{ fontSize: '12px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {msg.attachment_name}
-                              </div>
-                              {msg.attachment_size && (
-                                <div style={{ fontSize: '10px', opacity: 0.7 }}>{formatBytes(msg.attachment_size)}</div>
-                              )}
-                            </div>
-                          </a>
+                          <ChatAttachmentLink
+                            src={msg.attachment_url}
+                            name={msg.attachment_name}
+                            type={msg.attachment_type}
+                            size={msg.attachment_size}
+                            getIcon={getFileIcon}
+                            fmt={formatBytes}
+                            body={msg.body}
+                          />
                         )}
                         <div style={{ fontSize: '10px', opacity: 0.65, marginTop: '6px', textAlign: 'right' }}>
                           {new Date(msg.created_at).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' })}
