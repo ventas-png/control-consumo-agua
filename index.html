@@ -3,10 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      X-Frame-Options, X-XSS-Protection y Referrer-Policy se entregan como
+      headers HTTP desde vercel.json. Como <meta> son ignorados por los
+      navegadores (X-Frame-Options en meta produce un warning en la consola
+      "supplied in a <meta> element"), por eso no se duplican aquí.
+      X-Content-Type-Options sí se aplica como meta para defensa adicional
+      en entornos donde el header pudiera perderse (preview locales, etc.).
+    -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-Frame-Options" content="DENY">
-    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
-    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
     <title>Control de Consumo de Agua</title>
   </head>
   <body>

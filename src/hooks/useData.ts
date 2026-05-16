@@ -276,8 +276,9 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
         return
       }
 
-      // Auto-desactivar tarifas cuya fecha_revision ya pasó — fire-and-forget, no bloquea la carga
-      void Promise.resolve(supabase.rpc('deactivate_expired_tarifas')).catch(() => { /* silencioso */ })
+      // Auto-desactivación de tarifas vencidas se hace via pg_cron diario en BD
+      // (migración 20260516000004). Antes se invocaba en cada login del cliente, lo
+      // que generaba ruido en DevTools cuando el request se cancelaba.
 
       // Use cached data as base so partial query failures keep cached values for failed tables
       const base = loadCache() ?? INITIAL_DATA
