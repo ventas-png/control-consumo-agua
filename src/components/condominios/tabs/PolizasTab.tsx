@@ -4,6 +4,7 @@ import type { PolizaSeguro, TipoPoliza, EstadoPoliza } from '../../../types'
 import Swal from 'sweetalert2'
 import { FileUploader } from '../FileUploader'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   polizas: PolizaSeguro[]
@@ -136,9 +137,123 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
   const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px', display: 'block' }
 
+  const columns: DataTableColumn<PolizaSeguro>[] = [
+    {
+      key: 'numero_poliza',
+      header: 'Póliza',
+      sortable: true,
+      render: row => (
+        <div>
+          <div style={{ fontWeight: 700, color: '#0f172a' }}>{row.numero_poliza}</div>
+          <div style={{ fontSize: '12px', color: '#64748b' }}>{row.aseguradora}</div>
+          {row.agente_nombre && <div style={{ fontSize: '11px', color: '#94a3b8' }}>Agente: {row.agente_nombre}</div>}
+        </div>
+      ),
+    },
+    {
+      key: 'tipo',
+      header: 'Tipo',
+      sortable: true,
+      accessor: row => tipoInfo(row.tipo).label,
+      render: row => {
+        const ti = tipoInfo(row.tipo)
+        return (
+          <>
+            <span style={{ fontSize: '18px' }}>{ti.icon}</span>
+            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>{ti.label}</div>
+          </>
+        )
+      },
+    },
+    {
+      key: 'suma_asegurada',
+      header: 'Suma Asegurada',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.suma_asegurada ?? 0,
+      render: row => (
+        <span style={{ fontWeight: 600 }}>
+          {row.suma_asegurada != null ? `${moneda} ${row.suma_asegurada.toLocaleString()}` : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'prima_anual',
+      header: 'Prima Anual',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.prima_anual ?? 0,
+      render: row => (
+        <span style={{ fontWeight: 600 }}>
+          {row.prima_anual != null ? `${moneda} ${row.prima_anual.toFixed(2)}` : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'vigencia',
+      header: 'Vigencia',
+      sortable: true,
+      accessor: row => row.fecha_vencimiento,
+      render: row => {
+        const diasRestantes = row.fecha_vencimiento
+          ? Math.ceil((new Date(row.fecha_vencimiento).getTime() - Date.now()) / (24 * 3600 * 1000))
+          : null
+        return (
+          <div style={{ fontSize: '12px', color: '#64748b' }}>
+            <div>{row.fecha_inicio}</div>
+            <div>→ {row.fecha_vencimiento}</div>
+            {diasRestantes !== null && row.estado === 'vigente' && (
+              <div style={{ color: diasRestantes < 60 ? '#f59e0b' : '#10b981', fontWeight: 600, fontSize: '11px' }}>
+                {diasRestantes > 0 ? `${diasRestantes}d restantes` : 'Vencida'}
+              </div>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      render: row => {
+        const est = ESTADO_CONFIG[row.estado]
+        return canEdit ? (
+          <select value={row.estado} onChange={e => handleEstado(row.id, e.target.value as EstadoPoliza)}
+            onClick={e => e.stopPropagation()}
+            style={{ padding: '4px 8px', border: '1.5px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'white', cursor: 'pointer' }}>
+            {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+        ) : (
+          <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, background: est.bg, color: est.color }}>{est.label}</span>
+        )
+      },
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: row => (
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+          {row.estado !== 'cancelada' && (
+            <button
+              title="Notificar por WhatsApp"
+              onClick={() => {
+                const dias = row.fecha_vencimiento ? Math.ceil((new Date(row.fecha_vencimiento).getTime() - Date.now()) / 86400000) : null
+                const msg = `🛡️ Póliza ${row.numero_poliza}\nAseguradora: ${row.aseguradora}\nTipo: ${tipoInfo(row.tipo).label}\nVencimiento: ${row.fecha_vencimiento}${dias !== null ? ` (${dias} días)` : ''}\nEstado: ${ESTADO_CONFIG[row.estado].label}${row.prima_anual ? `\nPrima anual: ${moneda} ${row.prima_anual.toFixed(2)}` : ''}`
+                window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+              }}
+              style={{ padding: '4px 8px', background: '#dcfce7', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#16a34a' }}
+            >💬</button>
+          )}
+          {row.documento_url && <a href={row.documento_url} target="_blank" rel="noreferrer" style={{ padding: '4px 8px', background: '#f1f5f9', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: '#374151' }}>📄</a>}
+          {canEdit && <button onClick={() => startEdit(row)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+          {canEdit && <button onClick={() => handleDelete(row.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div style={{ padding: '20px 24px' }}>
-
       {porVencer.length > 0 && (
         <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>⚠️</span>
@@ -238,8 +353,8 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
         </div>
       )}
 
-      {/* Filtros */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+      {/* Filtros pills (estado) — UX custom mantenido fuera de DataTable */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
         {(['todos', 'vigente', 'vencida', 'cancelada'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
@@ -251,89 +366,15 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
         ))}
       </div>
 
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🛡️</div>
-          <p style={{ margin: 0, fontWeight: 600 }}>No hay pólizas registradas</p>
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                {['Póliza', 'Tipo', 'Suma Asegurada', 'Prima Anual', 'Vigencia', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: '12px' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(p => {
-                const ti = tipoInfo(p.tipo)
-                const est = ESTADO_CONFIG[p.estado]
-                const diasRestantes = p.fecha_vencimiento
-                  ? Math.ceil((new Date(p.fecha_vencimiento).getTime() - Date.now()) / (24 * 3600 * 1000))
-                  : null
-                return (
-                  <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{p.numero_poliza}</div>
-                      <div style={{ fontSize: '12px', color: '#64748b' }}>{p.aseguradora}</div>
-                      {p.agente_nombre && <div style={{ fontSize: '11px', color: '#94a3b8' }}>Agente: {p.agente_nombre}</div>}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ fontSize: '18px' }}>{ti.icon}</span>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>{ti.label}</div>
-                    </td>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>
-                      {p.suma_asegurada != null ? `${moneda} ${p.suma_asegurada.toLocaleString()}` : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>
-                      {p.prima_anual != null ? `${moneda} ${p.prima_anual.toFixed(2)}` : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontSize: '12px', color: '#64748b' }}>
-                      <div>{p.fecha_inicio}</div>
-                      <div>→ {p.fecha_vencimiento}</div>
-                      {diasRestantes !== null && p.estado === 'vigente' && (
-                        <div style={{ color: diasRestantes < 60 ? '#f59e0b' : '#10b981', fontWeight: 600, fontSize: '11px' }}>
-                          {diasRestantes > 0 ? `${diasRestantes}d restantes` : 'Vencida'}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {canEdit ? (
-                        <select value={p.estado} onChange={e => handleEstado(p.id, e.target.value as EstadoPoliza)}
-                          style={{ padding: '4px 8px', border: '1.5px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'white', cursor: 'pointer' }}>
-                          {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                        </select>
-                      ) : (
-                        <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, background: est.bg, color: est.color }}>{est.label}</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {p.estado !== 'cancelada' && (
-                          <button
-                            title="Notificar por WhatsApp"
-                            onClick={() => {
-                              const dias = p.fecha_vencimiento ? Math.ceil((new Date(p.fecha_vencimiento).getTime() - Date.now()) / 86400000) : null
-                              const msg = `🛡️ Póliza ${p.numero_poliza}\nAseguradora: ${p.aseguradora}\nTipo: ${tipoInfo(p.tipo).label}\nVencimiento: ${p.fecha_vencimiento}${dias !== null ? ` (${dias} días)` : ''}\nEstado: ${ESTADO_CONFIG[p.estado].label}${p.prima_anual ? `\nPrima anual: ${moneda} ${p.prima_anual.toFixed(2)}` : ''}`
-                              window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
-                            }}
-                            style={{ padding: '4px 8px', background: '#dcfce7', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#16a34a' }}
-                          >💬</button>
-                        )}
-                        {p.documento_url && <a href={p.documento_url} target="_blank" rel="noreferrer" style={{ padding: '4px 8px', background: '#f1f5f9', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: '#374151' }}>📄</a>}
-                        {canEdit && <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-                        {canEdit && <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        data={filtered}
+        columns={columns}
+        rowKey="id"
+        searchableKeys={['numero_poliza', 'aseguradora', row => row.agente_nombre ?? '']}
+        searchPlaceholder="Buscar por póliza, aseguradora o agente…"
+        defaultSort={{ key: 'fecha_vencimiento', direction: 'asc' }}
+        emptyState={{ icon: '🛡️', title: 'No hay pólizas registradas' }}
+      />
     </div>
   )
 }
