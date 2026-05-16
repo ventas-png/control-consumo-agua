@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { Registro, Contador, Proyecto, Unidad, TipoAgua } from '../../types'
 
 interface Props {
@@ -28,7 +29,7 @@ interface ProyectoStats {
   byTipo: Map<TipoAgua, number>
 }
 
-export function AdminResumenProyectos({ registros, contadores, proyectos, unidades, moneda, fechaDesde, fechaHasta }: Props) {
+function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades, moneda, fechaDesde, fechaHasta }: Props) {
   const hoy = new Date()
   const mesActual = registros.filter(r => {
     const f = r.fecha.slice(0, 10)
@@ -207,3 +208,5 @@ export function AdminResumenProyectos({ registros, contadores, proyectos, unidad
     </div>
   )
 }
+
+export const AdminResumenProyectos = memo(AdminResumenProyectosImpl)

@@ -347,6 +347,9 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
   }, [activeConversationId])
 
   // ── Realtime: nuevas conversaciones ──────────────────────────────────────
+  // Sin el filter, cada cambio en CUALQUIER conversación de CUALQUIER empresa
+  // disparaba loadConversations() en todos los clientes conectados — N
+  // recargas por minuto en horas pico. El filter scopea el canal al tenant.
   useEffect(() => {
     if (!companyId && !clienteId) return
 
@@ -358,15 +361,20 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
           event: '*',
           schema: 'public',
           table: 'conversations',
+          ...(companyId ? { filter: `company_id=eq.${companyId}` } : {}),
         },
         () => { loadConversations() }
       )
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [companyId, clienteId, loadConversations])
+  }, [companyId, clienteId, serviceType, loadConversations])
 
   // ── Realtime: cambios en asignaciones ────────────────────────────────────
+  // conversation_assignments no tiene company_id directo (linked vía
+  // conversation_id), pero su volumen es bajo así que recargar todo cuando
+  // hay cambio sigue siendo aceptable. Si crece, considerar agregar
+  // company_id desnormalizado para poder filtrar aquí también.
   useEffect(() => {
     if (!companyId) return
 

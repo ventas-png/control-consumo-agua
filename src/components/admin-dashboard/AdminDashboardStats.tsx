@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { Registro, Cliente } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
 
@@ -36,7 +37,7 @@ interface Props {
   isLoading?: boolean
 }
 
-export function AdminDashboardStats({ registros, moneda, clientes, fechaDesde, fechaHasta, isLoading = false }: Props) {
+function AdminDashboardStatsImpl({ registros, moneda, clientes, fechaDesde, fechaHasta, isLoading = false }: Props) {
   const mesActual = registros.filter(r => {
     const f = r.fecha.slice(0, 10)
     return (!fechaDesde || f >= fechaDesde) && (!fechaHasta || f <= fechaHasta)
@@ -164,3 +165,5 @@ export function AdminDashboardStats({ registros, moneda, clientes, fechaDesde, f
     </>
   )
 }
+
+export const AdminDashboardStats = memo(AdminDashboardStatsImpl)

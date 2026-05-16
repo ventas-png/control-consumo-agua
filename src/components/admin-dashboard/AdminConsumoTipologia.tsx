@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { Registro, Contador, Proyecto, TipoAgua } from '../../types'
 
 interface Props {
@@ -28,7 +29,7 @@ const TIPOLOGIA_META: Record<TipoAgua, { label: string; icon: string; from: stri
   residuales_tratadas: { label: 'Residuales Tratadas', icon: '🔄', from: '#f97316', to: '#ea580c' },
 }
 
-export function AdminConsumoTipologia({ registros, contadores, proyectos, moneda, selectedProjectId, unidades, fechaDesde, fechaHasta }: Props) {
+function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, selectedProjectId, unidades, fechaDesde, fechaHasta }: Props) {
   const contadorMap = new Map<string, { tipo_agua: TipoAgua; project_id: string }>()
   for (const c of contadores) {
     contadorMap.set(c.id, { tipo_agua: c.tipo_agua, project_id: c.project_id })
@@ -205,3 +206,5 @@ export function AdminConsumoTipologia({ registros, contadores, proyectos, moneda
     </div>
   )
 }
+
+export const AdminConsumoTipologia = memo(AdminConsumoTipologiaImpl)

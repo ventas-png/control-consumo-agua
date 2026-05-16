@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Cliente, Registro, Proyecto, Contador, FuenteAgua, RegistroCalidad, UserSession, Ruta, Tarifa, Unidad, AppSection } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { AdminDashboardStats } from './AdminDashboardStats'
@@ -129,40 +129,55 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
 
   useEffect(() => { void cargarConvStats() }, [cargarConvStats])
 
-  // Obtener IDs de clientes que pertenecen al proyecto seleccionado (a través de unidades)
-  const clienteIdsEnProyecto = selectedProjectId
-    ? new Set((data.unidades || [])
-        .filter(u => u.project_id === selectedProjectId && u.cliente_id)
-        .map(u => u.cliente_id))
-    : new Set(data.clientes.map(c => c.id))
+  // Memoizar todos los derivados: si las arrays subyacentes (data.*) o
+  // selectedProjectId no cambian, las referencias se mantienen estables y
+  // los hijos memoizados (AdminDashboardStats, AdminDashboardCharts, etc.)
+  // pueden saltar su re-render.
 
-  // Filtrar clientes por proyecto
-  const clientesEnProyecto = selectedProjectId
-    ? data.clientes.filter(c => clienteIdsEnProyecto.has(c.id))
-    : data.clientes
+  // IDs de clientes que pertenecen al proyecto seleccionado (vía unidades)
+  const clienteIdsEnProyecto = useMemo(() => (
+    selectedProjectId
+      ? new Set((data.unidades || [])
+          .filter(u => u.project_id === selectedProjectId && u.cliente_id)
+          .map(u => u.cliente_id))
+      : new Set(data.clientes.map(c => c.id))
+  ), [selectedProjectId, data.unidades, data.clientes])
 
-  // Filtrar registros por proyecto — usa project_id directo cuando está disponible,
-  // con fallback a la cadena cliente→unidad para registros históricos sin project_id
-  const registrosFiltrados = selectedProjectId
-    ? data.registros.filter(r =>
-        r.project_id
-          ? r.project_id === selectedProjectId
-          : clienteIdsEnProyecto.has(r.cliente_id)
-      )
-    : data.registros
+  const clientesEnProyecto = useMemo(() => (
+    selectedProjectId
+      ? data.clientes.filter(c => clienteIdsEnProyecto.has(c.id))
+      : data.clientes
+  ), [selectedProjectId, data.clientes, clienteIdsEnProyecto])
 
-  // Filtrar unidades y contadores por proyecto
-  const unidadesFiltradas = selectedProjectId
-    ? (data.unidades || []).filter(u => u.project_id === selectedProjectId)
-    : (data.unidades || [])
+  // Registros: usa project_id directo cuando está disponible, fallback a la
+  // cadena cliente→unidad para registros históricos sin project_id.
+  const registrosFiltrados = useMemo(() => (
+    selectedProjectId
+      ? data.registros.filter(r =>
+          r.project_id
+            ? r.project_id === selectedProjectId
+            : clienteIdsEnProyecto.has(r.cliente_id)
+        )
+      : data.registros
+  ), [selectedProjectId, data.registros, clienteIdsEnProyecto])
 
-  const contadoresFiltrados = selectedProjectId
-    ? data.contadores.filter(c => c.project_id === selectedProjectId)
-    : data.contadores
+  const unidadesFiltradas = useMemo(() => (
+    selectedProjectId
+      ? (data.unidades || []).filter(u => u.project_id === selectedProjectId)
+      : (data.unidades || [])
+  ), [selectedProjectId, data.unidades])
 
-  const tarifasFiltradas = selectedProjectId
-    ? (data.tarifas || []).filter(t => t.project_id === selectedProjectId)
-    : (data.tarifas || [])
+  const contadoresFiltrados = useMemo(() => (
+    selectedProjectId
+      ? data.contadores.filter(c => c.project_id === selectedProjectId)
+      : data.contadores
+  ), [selectedProjectId, data.contadores])
+
+  const tarifasFiltradas = useMemo(() => (
+    selectedProjectId
+      ? (data.tarifas || []).filter(t => t.project_id === selectedProjectId)
+      : (data.tarifas || [])
+  ), [selectedProjectId, data.tarifas])
 
   const handleReadingAdded = async () => {
     await onDataRefresh()
