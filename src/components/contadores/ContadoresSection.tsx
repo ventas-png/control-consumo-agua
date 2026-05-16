@@ -1,9 +1,11 @@
-import { useState, lazy, Suspense, type CSSProperties} from 'react'
+import { useState, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
 import type { Contador, Tarifa, TipoAgua, UserRole, UserSession, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
 import { EditModal } from '../shared/EditModal'
+import { DataTable, type DataTableColumn } from '../shared'
+import { formatDate, formatNumber } from '../../lib/format'
 import { getEditedTagInfo } from '../../lib/timeUtils'
 
 const ImportContadoresModal = lazy(() => import('./ImportContadoresModal').then(m => ({ default: m.ImportContadoresModal })))
@@ -351,6 +353,145 @@ export function ContadoresSection({
     const matchUnidad = filterUnidad === '' || c.unidad_id === filterUnidad
     return matchSearch && matchTipo && matchUnidad
   })
+
+  // Columnas de la tabla de contadores. Memoizar evita re-build cada render
+  // del padre y permite que React.memo en sub-componentes funcione.
+  const columns: DataTableColumn<Contador>[] = useMemo(() => {
+    const cols: DataTableColumn<Contador>[] = [
+      {
+        key: 'serie', header: 'N° Serie', sortable: true,
+        accessor: c => c.numero_serie,
+        render: c => <SerieCell contador={c} />,
+      },
+      {
+        key: 'tipo', header: 'Tipología', sortable: true,
+        accessor: c => c.tipo_agua,
+        render: c => {
+          const col = TIPO_COLORES[c.tipo_agua]
+          return (
+            <span style={{
+              padding: '3px 10px', borderRadius: 12,
+              background: col.bg, color: col.color,
+              fontSize: 12, fontWeight: 600,
+            }}>
+              {tipoLabel(c.tipo_agua)}
+            </span>
+          )
+        },
+      },
+      {
+        key: 'marcaModelo', header: 'Marca / Modelo',
+        accessor: c => `${c.marca ?? ''} ${c.modelo ?? ''}`.trim(),
+        render: c => {
+          if (!c.marca && !c.modelo) return <span style={{ color: '#cbd5e1' }}>—</span>
+          return (
+            <span style={{ color: '#475569' }}>
+              {c.marca && <span style={{ fontWeight: 500 }}>{c.marca}</span>}
+              {c.marca && c.modelo && ' / '}
+              {c.modelo && <span style={{ color: '#94a3b8' }}>{c.modelo}</span>}
+            </span>
+          )
+        },
+      },
+      {
+        key: 'caracteristicas', header: 'Características', hideOnMobile: true,
+        render: c => <CaracteristicasCell contador={c} />,
+      },
+      {
+        key: 'lecturaInicial', header: 'Lect. Inicial', sortable: true, align: 'right',
+        accessor: c => Number(c.lectura_inicial),
+        render: c => (
+          <span style={{ fontWeight: 600, color: '#0f172a' }}>
+            {formatNumber(Number(c.lectura_inicial), 4)}
+          </span>
+        ),
+      },
+      {
+        key: 'unidad', header: 'Unidad',
+        accessor: c => unidadNombre(c.unidad_id) ?? '',
+        render: c => {
+          const nombre = unidadNombre(c.unidad_id)
+          return nombre
+            ? (
+              <span style={{
+                padding: '3px 10px', borderRadius: 12,
+                background: '#f0fdf4', color: '#065f46',
+                fontSize: 12, fontWeight: 600,
+              }}>
+                🏠 {nombre}
+              </span>
+            )
+            : <span style={{ color: '#cbd5e1', fontSize: 13 }}>Sin unidad</span>
+        },
+      },
+      {
+        key: 'tarifa', header: 'Tarifa',
+        accessor: c => tarifaNombre(c.tarifa_id) ?? '',
+        render: c => {
+          const nombre = tarifaNombre(c.tarifa_id)
+          return nombre
+            ? (
+              <span style={{
+                padding: '3px 10px', borderRadius: 12,
+                background: '#eff6ff', color: '#1d4ed8',
+                fontSize: 12, fontWeight: 600,
+              }}>
+                {nombre}
+              </span>
+            )
+            : <span style={{ color: '#cbd5e1', fontSize: 13 }}>Sin tarifa</span>
+        },
+      },
+      {
+        key: 'estado', header: 'Estado', sortable: true, align: 'center',
+        accessor: c => c.activo ? 1 : 0,
+        render: c => {
+          const baseStyle: CSSProperties = {
+            padding: '4px 14px', borderRadius: 20, fontWeight: 600, fontSize: 12,
+            background: c.activo ? '#dcfce7' : '#fee2e2',
+            color: c.activo ? '#166534' : '#991b1b',
+          }
+          if (canEdit) {
+            return (
+              <button
+                onClick={() => handleToggleActivo(c)}
+                title="Clic para cambiar estado"
+                style={{ ...baseStyle, border: 'none', cursor: 'pointer' }}
+              >
+                {c.activo ? 'Activo' : 'Inactivo'}
+              </button>
+            )
+          }
+          return <span style={baseStyle}>{c.activo ? 'Activo' : 'Inactivo'}</span>
+        },
+      },
+    ]
+    if (canEdit) {
+      cols.push({
+        key: 'acciones', header: 'Acciones', align: 'center',
+        render: c => (
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+            <button
+              onClick={() => startEdit(c)}
+              style={{
+                padding: '5px 12px', background: '#eff6ff', color: '#1d4ed8',
+                border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+              }}
+            >Editar</button>
+            <button
+              onClick={() => handleEliminar(c)}
+              style={{
+                padding: '5px 12px', background: '#fef2f2', color: '#dc2626',
+                border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+              }}
+            >Eliminar</button>
+          </div>
+        ),
+      })
+    }
+    return cols
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit, unidades, tarifas])
 
   const inputStyle: CSSProperties = {
     padding: '10px 14px',
@@ -808,249 +949,29 @@ export function ContadoresSection({
       )}
 
       {/* Table */}
-      <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-        {filtered.length === 0 ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
-            <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔧</div>
-            <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '6px' }}>
-              {search || filterTipo ? 'Sin resultados' : 'No hay contadores registrados'}
-            </div>
-            <div style={{ fontSize: '14px' }}>
-              {search || filterTipo
-                ? 'Intenta con otro término o tipología'
-                : canEdit
-                ? 'Crea el primer contador con el botón "+ Nuevo Contador"'
-                : 'No hay contadores configurados aún'}
-            </div>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>N° Serie</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tipología</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Marca / Modelo</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Características</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Lect. Inicial</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Unidad</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Tarifa</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Estado</th>
-                  {canEdit && (
-                    <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((c, idx) => {
-                  const col = TIPO_COLORES[c.tipo_agua]
-                  return (
-                    <tr
-                      key={c.id}
-                      style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? 'white' : '#fafbfc' }}
-                    >
-                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#1e293b' }}>
-                        {c.numero_serie}
-                        {c.descripcion && (
-                          <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 400, marginTop: '2px' }}>
-                            {c.descripcion}
-                          </div>
-                        )}
-                        {c.fecha_instalacion && (
-                          <div style={{ fontSize: '11px', color: '#cbd5e1', marginTop: '1px' }}>
-                            Inst: {new Date(c.fecha_instalacion + 'T12:00:00').toLocaleDateString('es-GT')}
-                          </div>
-                        )}
-                        {(() => {
-                          const tag = getEditedTagInfo(c.updated_at, c.updated_by_name)
-                          if (!tag) return null
-                          return (
-                            <span
-                              title={tag.tooltip}
-                              style={{
-                                display: 'inline-block',
-                                marginTop: '4px',
-                                padding: '2px 8px',
-                                borderRadius: '10px',
-                                fontSize: '11px',
-                                fontWeight: 500,
-                                color: tag.color,
-                                background: tag.bg,
-                                cursor: 'default',
-                              }}
-                            >
-                              {tag.label}
-                            </span>
-                          )
-                        })()}
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{
-                          padding: '3px 10px',
-                          borderRadius: '12px',
-                          background: col.bg,
-                          color: col.color,
-                          fontSize: '12px',
-                          fontWeight: 600,
-                        }}>
-                          {tipoLabel(c.tipo_agua)}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', color: '#475569' }}>
-                        {c.marca && <span style={{ fontWeight: 500 }}>{c.marca}</span>}
-                        {c.marca && c.modelo && ' / '}
-                        {c.modelo && <span style={{ color: '#94a3b8' }}>{c.modelo}</span>}
-                        {!c.marca && !c.modelo && <span style={{ color: '#cbd5e1' }}>—</span>}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontSize: '12px', color: '#475569' }}>
-                        {c.medida && <div><span style={{ color: '#94a3b8' }}>Medida:</span> {c.medida}</div>}
-                        {c.tipo_contador && <div><span style={{ color: '#94a3b8' }}>Tipo:</span> {c.tipo_contador}</div>}
-                        {c.material && <div><span style={{ color: '#94a3b8' }}>Material:</span> {c.material}</div>}
-                        {c.valvula_cheque && <div><span style={{ color: '#94a3b8' }}>V. Cheque:</span> {c.valvula_cheque}</div>}
-                        {c.tipo_llave && <div><span style={{ color: '#94a3b8' }}>Llave:</span> {c.tipo_llave}</div>}
-                        {c.llave_antifraude && <div><span style={{ color: '#94a3b8' }}>Antifraude:</span> {c.llave_antifraude}</div>}
-                        {c.valvula_aire && <div><span style={{ color: '#94a3b8' }}>V. Aire:</span> {c.valvula_aire}</div>}
-                        {c.fecha_reemplazo_sugerida && (
-                          <div style={{ color: new Date(c.fecha_reemplazo_sugerida + 'T12:00:00') <= new Date() ? '#dc2626' : '#0369a1', fontWeight: 600 }}>
-                            Reemplazo: {new Date(c.fecha_reemplazo_sugerida + 'T12:00:00').toLocaleDateString('es-GT')}
-                          </div>
-                        )}
-                        {c.numero_derecho_servicio && (
-                          <div><span style={{ color: '#94a3b8' }}>Derecho:</span> {c.numero_derecho_servicio}</div>
-                        )}
-                        {c.cantidad_derecho_servicio_m3 != null && (
-                          <div><span style={{ color: '#94a3b8' }}>Caudal:</span> {Number(c.cantidad_derecho_servicio_m3).toFixed(2)} m³</div>
-                        )}
-                        {c.periodicidad_lectura_dias != null && (
-                          <div><span style={{ color: '#94a3b8' }}>Lectura c/</span> {c.periodicidad_lectura_dias} días</div>
-                        )}
-                        {c.contratista_instalador && (
-                          <div><span style={{ color: '#94a3b8' }}>Instalador:</span> {c.contratista_instalador}</div>
-                        )}
-                        {c.garantia_instalacion_vence && (
-                          <div style={{ color: new Date(c.garantia_instalacion_vence + 'T12:00:00') <= new Date() ? '#dc2626' : '#059669', fontWeight: 600 }}>
-                            Garantía: {new Date(c.garantia_instalacion_vence + 'T12:00:00').toLocaleDateString('es-GT')}
-                          </div>
-                        )}
-                        {!c.medida && !c.tipo_contador && !c.material && !c.valvula_cheque && !c.tipo_llave && !c.llave_antifraude && !c.valvula_aire && !c.fecha_reemplazo_sugerida && !c.numero_derecho_servicio && c.cantidad_derecho_servicio_m3 == null && c.periodicidad_lectura_dias == null && !c.contratista_instalador && !c.garantia_instalacion_vence && (
-                          <span style={{ color: '#cbd5e1' }}>—</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
-                        {Number(c.lectura_inicial).toFixed(4)}
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        {unidadNombre(c.unidad_id) ? (
-                          <span style={{
-                            padding: '3px 10px',
-                            borderRadius: '12px',
-                            background: '#f0fdf4',
-                            color: '#065f46',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                          }}>
-                            🏠 {unidadNombre(c.unidad_id)}
-                          </span>
-                        ) : (
-                          <span style={{ color: '#cbd5e1', fontSize: '13px' }}>Sin unidad</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        {tarifaNombre(c.tarifa_id) ? (
-                          <span style={{
-                            padding: '3px 10px',
-                            borderRadius: '12px',
-                            background: '#eff6ff',
-                            color: '#1d4ed8',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                          }}>
-                            {tarifaNombre(c.tarifa_id)}
-                          </span>
-                        ) : (
-                          <span style={{ color: '#cbd5e1', fontSize: '13px' }}>Sin tarifa</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        {canEdit ? (
-                          <button
-                            onClick={() => handleToggleActivo(c)}
-                            title="Clic para cambiar estado"
-                            style={{
-                              padding: '4px 14px',
-                              borderRadius: '20px',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                              fontSize: '12px',
-                              background: c.activo ? '#dcfce7' : '#fee2e2',
-                              color: c.activo ? '#166534' : '#991b1b',
-                            }}
-                          >
-                            {c.activo ? 'Activo' : 'Inactivo'}
-                          </button>
-                        ) : (
-                          <span style={{
-                            padding: '4px 14px',
-                            borderRadius: '20px',
-                            fontWeight: 600,
-                            fontSize: '12px',
-                            background: c.activo ? '#dcfce7' : '#fee2e2',
-                            color: c.activo ? '#166534' : '#991b1b',
-                          }}>
-                            {c.activo ? 'Activo' : 'Inactivo'}
-                          </span>
-                        )}
-                      </td>
-                      {canEdit && (
-                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                            <button
-                              onClick={() => startEdit(c)}
-                              style={{
-                                padding: '5px 12px',
-                                background: '#eff6ff',
-                                color: '#1d4ed8',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontWeight: 600,
-                                fontSize: '12px',
-                              }}
-                            >
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => handleEliminar(c)}
-                              style={{
-                                padding: '5px 12px',
-                                background: '#fef2f2',
-                                color: '#dc2626',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontWeight: 600,
-                                fontSize: '12px',
-                              }}
-                            >
-                              Eliminar
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <div style={{ padding: '12px 16px', borderTop: '1px solid #f1f5f9', color: '#94a3b8', fontSize: '12px' }}>
-          {filtered.length} contador{filtered.length !== 1 ? 'es' : ''}{' '}
-          {search || filterTipo || filterUnidad ? 'encontrados' : 'registrados'} ·{' '}
-          {contadores.filter(c => c.unidad_id).length} con unidad ·{' '}
-          {contadores.filter(c => c.tarifa_id).length} con tarifa asignada
-        </div>
+      <DataTable<Contador>
+        data={filtered}
+        columns={columns}
+        rowKey="id"
+        pageSize={50}
+        defaultSort={{ key: 'serie', direction: 'asc' }}
+        emptyState={{
+          icon: '🔧',
+          title: search || filterTipo ? 'Sin resultados' : 'No hay contadores registrados',
+          description: search || filterTipo
+            ? 'Intenta con otro término o tipología'
+            : canEdit
+              ? 'Crea el primer contador con el botón "+ Nuevo Contador"'
+              : 'No hay contadores configurados aún',
+        }}
+      />
+
+      {/* Stats compactos abajo de la tabla */}
+      <div style={{ padding: '8px 16px', color: '#94a3b8', fontSize: 12 }}>
+        {filtered.length} contador{filtered.length !== 1 ? 'es' : ''}{' '}
+        {search || filterTipo || filterUnidad ? 'encontrados' : 'registrados'} ·{' '}
+        {contadores.filter(c => c.unidad_id).length} con unidad ·{' '}
+        {contadores.filter(c => c.tarifa_id).length} con tarifa asignada
       </div>
     </div>
 
@@ -1068,4 +989,89 @@ export function ContadoresSection({
     )}
     </>
   )
+}
+
+// ── Sub-componentes de celdas para la tabla de contadores ────────────────
+// Extraídos para mantener el cuerpo de ContadoresSection más legible.
+
+function SerieCell({ contador: c }: { contador: Contador }) {
+  const tag = getEditedTagInfo(c.updated_at, c.updated_by_name)
+  return (
+    <div>
+      <div style={{ fontWeight: 600, color: '#1e293b' }}>{c.numero_serie}</div>
+      {c.descripcion && (
+        <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400, marginTop: 2 }}>
+          {c.descripcion}
+        </div>
+      )}
+      {c.fecha_instalacion && (
+        <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 1 }}>
+          Inst: {formatDate(c.fecha_instalacion)}
+        </div>
+      )}
+      {tag && (
+        <span
+          title={tag.tooltip}
+          style={{
+            display: 'inline-block', marginTop: 4, padding: '2px 8px',
+            borderRadius: 10, fontSize: 11, fontWeight: 500,
+            color: tag.color, background: tag.bg, cursor: 'default',
+          }}
+        >
+          {tag.label}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function CaracteristicasCell({ contador: c }: { contador: Contador }) {
+  const hasAny = c.medida || c.tipo_contador || c.material || c.valvula_cheque ||
+    c.tipo_llave || c.llave_antifraude || c.valvula_aire ||
+    c.fecha_reemplazo_sugerida || c.numero_derecho_servicio ||
+    c.cantidad_derecho_servicio_m3 != null || c.periodicidad_lectura_dias != null ||
+    c.contratista_instalador || c.garantia_instalacion_vence
+  if (!hasAny) return <span style={{ color: '#cbd5e1' }}>—</span>
+
+  const now = new Date()
+  const reemplazoVencido = c.fecha_reemplazo_sugerida
+    ? new Date(c.fecha_reemplazo_sugerida + 'T12:00:00') <= now
+    : false
+  const garantiaVencida = c.garantia_instalacion_vence
+    ? new Date(c.garantia_instalacion_vence + 'T12:00:00') <= now
+    : false
+
+  return (
+    <div style={{ fontSize: 12, color: '#475569' }}>
+      {c.medida && <Field label="Medida" value={c.medida} />}
+      {c.tipo_contador && <Field label="Tipo" value={c.tipo_contador} />}
+      {c.material && <Field label="Material" value={c.material} />}
+      {c.valvula_cheque && <Field label="V. Cheque" value={c.valvula_cheque} />}
+      {c.tipo_llave && <Field label="Llave" value={c.tipo_llave} />}
+      {c.llave_antifraude && <Field label="Antifraude" value={c.llave_antifraude} />}
+      {c.valvula_aire && <Field label="V. Aire" value={c.valvula_aire} />}
+      {c.fecha_reemplazo_sugerida && (
+        <div style={{ color: reemplazoVencido ? '#dc2626' : '#0369a1', fontWeight: 600 }}>
+          Reemplazo: {formatDate(c.fecha_reemplazo_sugerida)}
+        </div>
+      )}
+      {c.numero_derecho_servicio && <Field label="Derecho" value={c.numero_derecho_servicio} />}
+      {c.cantidad_derecho_servicio_m3 != null && (
+        <Field label="Caudal" value={`${Number(c.cantidad_derecho_servicio_m3).toFixed(2)} m³`} />
+      )}
+      {c.periodicidad_lectura_dias != null && (
+        <Field label="Lectura c/" value={`${c.periodicidad_lectura_dias} días`} />
+      )}
+      {c.contratista_instalador && <Field label="Instalador" value={c.contratista_instalador} />}
+      {c.garantia_instalacion_vence && (
+        <div style={{ color: garantiaVencida ? '#dc2626' : '#059669', fontWeight: 600 }}>
+          Garantía: {formatDate(c.garantia_instalacion_vence)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return <div><span style={{ color: '#94a3b8' }}>{label}:</span> {value}</div>
 }
