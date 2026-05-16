@@ -3,6 +3,7 @@ import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 import type { UserSession, Proyecto } from '../../types'
 import { MONEDAS } from '../../types'
+import { SecureImage } from '../shared/SecureImage'
 import { AsignacionModal } from './AsignacionModal'
 import { PermisosModuloModal } from './PermisosModuloModal'
 import { StripePayPalConfig } from './StripePayPalConfig'
@@ -114,17 +115,20 @@ export function EmpresaSection({ currentUser }: Props) {
 
   async function subirLogo(file: File) {
     if (!empresa) return
-    const path = `${empresa.id}/logo`
+    // Path único por upload para que cada cambio de logo produzca una signed
+    // URL fresca de inmediato (el useSignedUrl reacts a la nueva value en BD).
+    // Logos viejos quedan huérfanos en el bucket — cleanup mecánico pendiente.
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
+    const path = `${empresa.id}/logo-${Date.now()}.${ext}`
     const { error: uploadError } = await supabase.storage
       .from('company-logos')
-      .upload(path, file, { upsert: true, contentType: file.type })
+      .upload(path, file, { contentType: file.type })
     if (uploadError) {
       void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo subir el logo.' })
       return
     }
-    const { data } = supabase.storage.from('company-logos').getPublicUrl(path)
-    const url = `${data.publicUrl}?t=${Date.now()}`
-    await supabase.from('companies').update({ logo_url: url }).eq('id', empresa.id)
+    // Guardamos el path bare; SecureImage firma en cada render.
+    await supabase.from('companies').update({ logo_url: path }).eq('id', empresa.id)
     void cargar()
   }
 
@@ -329,17 +333,16 @@ export function EmpresaSection({ currentUser }: Props) {
   }
 
   async function subirLogoProyecto(proyectoId: string, file: File) {
-    const path = `${proyectoId}/logo`
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
+    const path = `${proyectoId}/logo-${Date.now()}.${ext}`
     const { error: uploadError } = await supabase.storage
       .from('project-logos')
-      .upload(path, file, { upsert: true, contentType: file.type })
+      .upload(path, file, { contentType: file.type })
     if (uploadError) {
       void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo subir el logo del proyecto.' })
       return
     }
-    const { data } = supabase.storage.from('project-logos').getPublicUrl(path)
-    const url = `${data.publicUrl}?t=${Date.now()}`
-    await supabase.from('projects').update({ logo_url: url }).eq('id', proyectoId)
+    await supabase.from('projects').update({ logo_url: path }).eq('id', proyectoId)
     void cargar()
   }
 
@@ -705,7 +708,7 @@ export function EmpresaSection({ currentUser }: Props) {
               }}
             >
               {empresa?.logo_url
-                ? <img src={empresa.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ? <SecureImage bucket="company-logos" src={empresa.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : <div style={{
                     background: 'linear-gradient(135deg,#0ea5e9,#0d9488)',
                     width: '100%', height: '100%',
@@ -838,7 +841,7 @@ export function EmpresaSection({ currentUser }: Props) {
                     }}
                   >
                     {p.logo_url
-                      ? <img src={p.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ? <SecureImage bucket="project-logos" src={p.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{
                           background: 'linear-gradient(135deg,#0ea5e9,#0d9488)',
                           width: '100%', height: '100%',
