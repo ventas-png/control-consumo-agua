@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
 import { LecturaMedidorGas, Unidad } from '../../../types'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   lecturas: LecturaMedidorGas[]
@@ -79,6 +80,87 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
 
+  const columns: DataTableColumn<LecturaMedidorGas>[] = [
+    {
+      key: 'unidad_area',
+      header: 'Unidad/Área',
+      sortable: true,
+      accessor: row => {
+        const unidad = unidades.find(u => u.id === row.unidad_id)
+        return unidad?.nombre ?? row.area ?? 'Área común'
+      },
+      render: row => {
+        const unidad = unidades.find(u => u.id === row.unidad_id)
+        return (
+          <span style={{ fontWeight: 600 }}>
+            {row.alerta_fuga && <span style={{ color: '#ef4444', marginRight: 4 }}>🚨</span>}
+            {unidad?.nombre ?? row.area ?? 'Área común'}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'periodo',
+      header: 'Período',
+      sortable: true,
+      accessor: row => row.periodo ?? '',
+      render: row => <span style={{ color: '#6b7280' }}>{row.periodo ?? '—'}</span>,
+    },
+    {
+      key: 'fecha',
+      header: 'Fecha',
+      sortable: true,
+      render: row => <span style={{ color: '#6b7280' }}>{row.fecha}</span>,
+    },
+    {
+      key: 'lectura_anterior',
+      header: 'Lect. anterior',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.lectura_anterior ?? 0,
+      render: row => <span style={{ color: '#9ca3af' }}>{row.lectura_anterior?.toFixed(3) ?? '—'}</span>,
+    },
+    {
+      key: 'lectura_actual',
+      header: 'Lect. actual',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.lectura_actual,
+      render: row => <span style={{ fontWeight: 600 }}>{row.lectura_actual.toFixed(3)}</span>,
+    },
+    {
+      key: 'consumo',
+      header: 'Consumo',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.consumo ?? 0,
+      render: row => (
+        <span style={{ color: '#6366f1', fontWeight: 600 }}>
+          {row.consumo != null ? `${row.consumo.toFixed(3)} m³` : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'costo_total',
+      header: 'Costo',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.costo_total ?? 0,
+      render: row => (
+        <span style={{ color: '#10b981', fontWeight: 600 }}>
+          {row.costo_total != null ? `${moneda} ${row.costo_total.toFixed(2)}` : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'obs',
+      header: '',
+      render: row => (
+        row.observaciones ? <span style={{ fontSize: 11, color: '#9ca3af' }} title={row.observaciones}>📝</span> : null
+      ),
+    },
+  ]
+
   return (
     <div style={{ padding: 16 }}>
       {/* KPIs */}
@@ -108,20 +190,8 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
         </div>
       )}
 
-      {/* Filtros + botón */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <select style={{ ...inp, width: 'auto' }} value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}>
-            <option value="">Todas las unidades</option>
-            {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
-            <option value="area">Áreas comunes</option>
-          </select>
-          <select style={{ ...inp, width: 'auto' }} value={filtroPeriodo} onChange={e => setFiltroPeriodo(e.target.value)}>
-            <option value="">Todos los períodos</option>
-            {periodos.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <span style={{ fontSize: 13, color: '#6b7280', alignSelf: 'center' }}>{lista.length} lecturas</span>
-        </div>
+      {/* Botón nueva lectura */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
             style={{ padding: '8px 16px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
@@ -204,48 +274,41 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
         </div>
       )}
 
-      {/* Tabla de lecturas */}
-      {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0', fontSize: 13 }}>Sin lecturas para los filtros seleccionados</div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                {['Unidad/Área', 'Período', 'Fecha', 'Lect. anterior', 'Lect. actual', 'Consumo', 'Costo', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#6b7280', fontWeight: 600, borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lista.map(l => {
-                const unidad = unidades.find(u => u.id === l.unidad_id)
-                return (
-                  <tr key={l.id} style={{ borderBottom: '1px solid #f3f4f6', background: l.alerta_fuga ? '#fef2f2' : '#fff' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>
-                      {l.alerta_fuga && <span style={{ color: '#ef4444', marginRight: 4 }}>🚨</span>}
-                      {unidad?.nombre ?? l.area ?? 'Área común'}
-                    </td>
-                    <td style={{ padding: '8px 12px', color: '#6b7280' }}>{l.periodo ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', color: '#6b7280' }}>{l.fecha}</td>
-                    <td style={{ padding: '8px 12px', color: '#9ca3af' }}>{l.lectura_anterior?.toFixed(3) ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>{l.lectura_actual.toFixed(3)}</td>
-                    <td style={{ padding: '8px 12px', color: '#6366f1', fontWeight: 600 }}>
-                      {l.consumo != null ? `${l.consumo.toFixed(3)} m³` : '—'}
-                    </td>
-                    <td style={{ padding: '8px 12px', color: '#10b981', fontWeight: 600 }}>
-                      {l.costo_total != null ? `${moneda} ${l.costo_total.toFixed(2)}` : '—'}
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      {l.observaciones && <span style={{ fontSize: 11, color: '#9ca3af' }} title={l.observaciones}>📝</span>}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        data={lista}
+        columns={columns}
+        rowKey="id"
+        searchableKeys={[
+          row => unidades.find(u => u.id === row.unidad_id)?.nombre ?? row.area ?? '',
+          row => row.observaciones ?? '',
+          row => row.leido_por ?? '',
+        ]}
+        searchPlaceholder="Buscar por unidad, área, observaciones…"
+        filters={[
+          {
+            key: 'unidad',
+            value: filtroUnidad,
+            onChange: setFiltroUnidad,
+            options: [
+              { value: '', label: 'Todas las unidades' },
+              ...unidades.map(u => ({ value: u.id, label: u.nombre })),
+              { value: 'area', label: 'Áreas comunes' },
+            ],
+          },
+          {
+            key: 'periodo',
+            value: filtroPeriodo,
+            onChange: setFiltroPeriodo,
+            options: [
+              { value: '', label: 'Todos los períodos' },
+              ...periodos.map(p => ({ value: p, label: p })),
+            ],
+          },
+        ]}
+        defaultSort={{ key: 'fecha', direction: 'desc' }}
+        rowStyle={row => row.alerta_fuga ? { background: '#fef2f2' } : {}}
+        emptyState={{ icon: '🔥', title: 'Sin lecturas para los filtros seleccionados' }}
+      />
     </div>
   )
 }

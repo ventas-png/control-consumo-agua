@@ -2,6 +2,7 @@ import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { MedidorUnidad, Unidad, Contador } from '../../../types'
 import Swal from 'sweetalert2'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   medidores: MedidorUnidad[]
@@ -85,6 +86,83 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
   const activosCount  = medidores.filter(m => m.activo).length
   const totalConsumo  = consumos.reduce((s, c) => s + c.consumo_total, 0)
 
+  const columns: DataTableColumn<MedidorUnidad>[] = [
+    {
+      key: 'unidad_nombre',
+      header: 'Unidad',
+      sortable: true,
+      accessor: row => row.unidad_nombre ?? '',
+      render: row => <span style={{ fontWeight: 600 }}>{row.unidad_nombre ?? '—'}</span>,
+    },
+    {
+      key: 'contador',
+      header: 'Contador',
+      sortable: true,
+      accessor: row => contadorMap[row.contador_id]?.numero_serie ?? row.contador_id,
+      render: row => {
+        const ctr = contadorMap[row.contador_id]
+        return <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>{ctr?.numero_serie ?? row.contador_id.slice(0,8)}</span>
+      },
+    },
+    {
+      key: 'tipo_agua',
+      header: 'Tipo Agua',
+      sortable: true,
+      accessor: row => contadorMap[row.contador_id]?.tipo_agua ?? '',
+      render: row => {
+        const ctr = contadorMap[row.contador_id]
+        return <span style={{ color: '#64748b', textTransform: 'capitalize' }}>{ctr?.tipo_agua ?? '—'}</span>
+      },
+    },
+    {
+      key: 'consumo',
+      header: `Consumo ${mesFiltro}`,
+      sortable: true,
+      align: 'right',
+      accessor: row => consumoMap[row.contador_id]?.consumo_total ?? 0,
+      render: row => {
+        const cons = consumoMap[row.contador_id]
+        return (
+          <span style={{ fontWeight: cons ? 700 : 400, color: cons ? '#8b5cf6' : '#94a3b8' }}>
+            {cons ? `${cons.consumo_total.toFixed(2)} m³` : '—'}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'ultima_lectura',
+      header: 'Última lectura',
+      sortable: true,
+      accessor: row => consumoMap[row.contador_id]?.ultima_lectura ?? '',
+      render: row => <span style={{ color: '#94a3b8', fontSize: '12px' }}>{consumoMap[row.contador_id]?.ultima_lectura ?? '—'}</span>,
+    },
+    {
+      key: 'activo',
+      header: 'Estado',
+      sortable: true,
+      accessor: row => row.activo ? 1 : 0,
+      render: row => (
+        <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px',
+          background: row.activo ? '#dcfce7' : '#f1f5f9',
+          color: row.activo ? '#16a34a' : '#94a3b8' }}>
+          {row.activo ? 'Activo' : 'Desvinculado'}
+        </span>
+      ),
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: row => (
+        canEdit && row.activo ? (
+          <button onClick={() => handleDesactivar(row.id)}
+            style={{ padding: '3px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+            Desvincular
+          </button>
+        ) : null
+      ),
+    },
+  ]
+
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -145,55 +223,22 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
         </div>
       )}
 
-      {/* Table */}
       {loadingCtrs ? (
         <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8' }}>Cargando contadores…</div>
-      ) : medidores.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay medidores vinculados a unidades.</div>
       ) : (
-        <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                {['Unidad','Contador','Tipo Agua',`Consumo ${mesFiltro}`,'Última lectura','Estado',''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {medidores.map((m, i) => {
-                const ctr = contadorMap[m.contador_id]
-                const cons = consumoMap[m.contador_id]
-                return (
-                  <tr key={m.id} style={{ background: i % 2 === 0 ? 'white' : '#fafafa', borderBottom: '1px solid #f1f5f9', opacity: m.activo ? 1 : 0.5 }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{m.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '12px' }}>{ctr?.numero_serie ?? m.contador_id.slice(0,8)}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b', textTransform: 'capitalize' }}>{ctr?.tipo_agua ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: cons ? 700 : 400, color: cons ? '#8b5cf6' : '#94a3b8' }}>
-                      {cons ? `${cons.consumo_total.toFixed(2)} m³` : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '12px' }}>{cons?.ultima_lectura ?? '—'}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px',
-                        background: m.activo ? '#dcfce7' : '#f1f5f9',
-                        color: m.activo ? '#16a34a' : '#94a3b8' }}>
-                        {m.activo ? 'Activo' : 'Desvinculado'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {canEdit && m.activo && (
-                        <button onClick={() => handleDesactivar(m.id)}
-                          style={{ padding: '3px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                          Desvincular
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          data={medidores}
+          columns={columns}
+          rowKey="id"
+          searchableKeys={[
+            row => row.unidad_nombre ?? '',
+            row => contadorMap[row.contador_id]?.numero_serie ?? '',
+          ]}
+          searchPlaceholder="Buscar por unidad o contador…"
+          defaultSort={{ key: 'unidad_nombre', direction: 'asc' }}
+          rowStyle={row => row.activo ? {} : { opacity: 0.5 }}
+          emptyState={{ icon: '💧', title: 'No hay medidores vinculados a unidades' }}
+        />
       )}
     </div>
   )
