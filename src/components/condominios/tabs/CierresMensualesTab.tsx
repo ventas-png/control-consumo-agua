@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import type { CierreMensual, CuotaCondominio, GastoCondominio } from '../../../types'
 import Swal from 'sweetalert2'
 import { exportarPDFTabla } from '../exportUtils'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   cierres: CierreMensual[]
@@ -39,7 +40,6 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
 
-  const sorted = [...cierres].sort((a, b) => b.periodo.localeCompare(a.periodo))
   const periodosCerrados = new Set(cierres.map(c => c.periodo))
   const preview = previewing ? calcCierre(periodoNuevo, cuotas, gastos) : null
 
@@ -111,6 +111,97 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
 
   const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: 'white', boxSizing: 'border-box' }
 
+  const columns: DataTableColumn<CierreMensual>[] = [
+    {
+      key: 'periodo',
+      header: 'Período',
+      sortable: true,
+      render: row => <span style={{ fontWeight: 700 }}>{row.periodo}</span>,
+    },
+    {
+      key: 'total_cuotas_emitidas',
+      header: 'Cuotas emitidas',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.total_cuotas_emitidas,
+      render: row => <span style={{ color: '#64748b' }}>{moneda} {row.total_cuotas_emitidas.toFixed(2)}</span>,
+    },
+    {
+      key: 'total_cuotas_cobradas',
+      header: 'Cuotas cobradas',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.total_cuotas_cobradas,
+      render: row => <span style={{ color: '#10b981', fontWeight: 600 }}>{moneda} {row.total_cuotas_cobradas.toFixed(2)}</span>,
+    },
+    {
+      key: 'total_gastos',
+      header: 'Gastos',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.total_gastos,
+      render: row => <span style={{ color: '#ef4444' }}>{moneda} {row.total_gastos.toFixed(2)}</span>,
+    },
+    {
+      key: 'saldo_periodo',
+      header: 'Saldo',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.saldo_periodo,
+      render: row => (
+        <span style={{ fontWeight: 700, color: row.saldo_periodo >= 0 ? '#10b981' : '#ef4444' }}>
+          {row.saldo_periodo >= 0 ? '+' : ''}{moneda} {row.saldo_periodo.toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      key: 'unidades_morosas',
+      header: 'Morosas',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.unidades_morosas,
+      render: row => (
+        <span style={{ color: row.unidades_morosas > 0 ? '#ef4444' : '#94a3b8', fontWeight: row.unidades_morosas > 0 ? 700 : 400 }}>
+          {row.unidades_morosas}
+        </span>
+      ),
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      render: row => (
+        <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
+          background: row.estado === 'cerrado' ? '#dcfce7' : '#fef3c7',
+          color: row.estado === 'cerrado' ? '#16a34a' : '#92400e' }}>
+          {row.estado === 'cerrado' ? '✓ Cerrado' : 'Borrador'}
+        </span>
+      ),
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: row => (
+        <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
+          <button onClick={() => exportarPDF(row)}
+            style={{ padding: '3px 7px', background: '#eff6ff', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#2563eb', fontWeight: 600 }} title="Exportar PDF">
+            📄
+          </button>
+          {canEdit && (
+            <>
+              <button onClick={() => toggleEstado(row)}
+                style={{ padding: '3px 8px', background: row.estado === 'cerrado' ? '#fef3c7' : '#dcfce7', color: row.estado === 'cerrado' ? '#92400e' : '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                {row.estado === 'cerrado' ? '↩ Reabrir' : '✓ Cerrar'}
+              </button>
+              <button onClick={() => handleDelete(row.id)}
+                style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+            </>
+          )}
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
@@ -136,7 +227,6 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
             </div>
           </div>
 
-          {/* Preview */}
           {periodoNuevo && (
             <div>
               <button onClick={() => setPreviewing(v => !v)} style={{ padding: '6px 12px', background: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', marginRight: '8px' }}>
@@ -170,61 +260,15 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
         </div>
       )}
 
-      {/* Table */}
-      {sorted.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay cierres mensuales registrados.</div>
-      ) : (
-        <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                {['Período','Cuotas emitidas','Cuotas cobradas','Gastos','Saldo','Morosas','Estado',''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Período' || h === 'Estado' || h === '' ? 'left' : 'right', fontSize: '11px', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((c, i) => (
-                <tr key={c.id} style={{ background: i % 2 === 0 ? 'white' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '10px 12px', fontWeight: 700 }}>{c.periodo}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: '#64748b' }}>{moneda} {c.total_cuotas_emitidas.toFixed(2)}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>{moneda} {c.total_cuotas_cobradas.toFixed(2)}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: '#ef4444' }}>{moneda} {c.total_gastos.toFixed(2)}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: c.saldo_periodo >= 0 ? '#10b981' : '#ef4444' }}>
-                    {c.saldo_periodo >= 0 ? '+' : ''}{moneda} {c.saldo_periodo.toFixed(2)}
-                  </td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: c.unidades_morosas > 0 ? '#ef4444' : '#94a3b8', fontWeight: c.unidades_morosas > 0 ? 700 : 400 }}>{c.unidades_morosas}</td>
-                  <td style={{ padding: '10px 12px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
-                      background: c.estado === 'cerrado' ? '#dcfce7' : '#fef3c7',
-                      color: c.estado === 'cerrado' ? '#16a34a' : '#92400e' }}>
-                      {c.estado === 'cerrado' ? '✓ Cerrado' : 'Borrador'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px 12px' }}>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button onClick={() => exportarPDF(c)}
-                        style={{ padding: '3px 7px', background: '#eff6ff', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#2563eb', fontWeight: 600 }} title="Exportar PDF">
-                        📄
-                      </button>
-                      {canEdit && (
-                        <>
-                          <button onClick={() => toggleEstado(c)}
-                            style={{ padding: '3px 8px', background: c.estado === 'cerrado' ? '#fef3c7' : '#dcfce7', color: c.estado === 'cerrado' ? '#92400e' : '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                            {c.estado === 'cerrado' ? '↩ Reabrir' : '✓ Cerrar'}
-                          </button>
-                          <button onClick={() => handleDelete(c.id)}
-                            style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        data={cierres}
+        columns={columns}
+        rowKey="id"
+        searchableKeys={['periodo', row => row.cerrado_por ?? '', row => row.notas ?? '']}
+        searchPlaceholder="Buscar por período, responsable o notas…"
+        defaultSort={{ key: 'periodo', direction: 'desc' }}
+        emptyState={{ icon: '📅', title: 'No hay cierres mensuales registrados' }}
+      />
     </div>
   )
 }

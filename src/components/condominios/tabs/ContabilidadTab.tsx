@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import type { GastoCondominio, CategoriaGasto, EstadoGasto } from '../../../types'
 import Swal from 'sweetalert2'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   gastos: GastoCondominio[]
@@ -58,7 +59,6 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
   const totalAnio  = pagados.filter(g => g.fecha.startsWith(thisYear)).reduce((s, g) => s + g.monto, 0)
   const totalMes   = pagados.filter(g => g.fecha.startsWith(thisMonth)).reduce((s, g) => s + g.monto, 0)
 
-  // Por categoría (pagados año actual)
   const porCat: Partial<Record<CategoriaGasto, number>> = {}
   for (const g of pagados.filter(g => g.fecha.startsWith(thisYear))) {
     porCat[g.categoria] = (porCat[g.categoria] ?? 0) + g.monto
@@ -134,6 +134,65 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
 
   const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px', display: 'block' }
+
+  const columns: DataTableColumn<GastoCondominio>[] = [
+    {
+      key: 'fecha',
+      header: 'Fecha',
+      sortable: true,
+      render: row => <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{row.fecha}</span>,
+    },
+    {
+      key: 'concepto',
+      header: 'Concepto',
+      sortable: true,
+      render: row => (
+        <div style={{ fontWeight: 600, color: '#0f172a' }}>
+          {row.concepto}
+          {row.proveedor_nombre && <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 400 }}>{row.proveedor_nombre}</div>}
+        </div>
+      ),
+    },
+    {
+      key: 'categoria',
+      header: 'Categoría',
+      sortable: true,
+      accessor: row => CAT_CONFIG[row.categoria].label,
+      render: row => {
+        const cat = CAT_CONFIG[row.categoria]
+        return <span style={{ fontSize: '11px', fontWeight: 600, color: cat.color }}>{cat.icon} {cat.label}</span>
+      },
+    },
+    {
+      key: 'monto',
+      header: 'Monto',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.monto,
+      render: row => <span style={{ fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>{moneda} {row.monto.toFixed(2)}</span>,
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      render: row => {
+        const est = ESTADO_CONFIG[row.estado]
+        return <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
+      },
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: row => (
+        canEdit ? (
+          <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => startEdit(row)} style={{ padding: '3px 7px', background: '#f1f5f9', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+            <button onClick={() => handleDelete(row.id)} style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+          </div>
+        ) : null
+      ),
+    },
+  ]
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -226,7 +285,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
             </div>
           )}
 
-          {/* Filtros */}
+          {/* Filtros pill por categoría (UX custom con contadores) */}
           <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
             {(['todos', ...Object.keys(CAT_CONFIG)] as const).map(c => (
               <button key={c} onClick={() => setFiltroCat(c as CategoriaGasto | 'todos')}
@@ -238,70 +297,30 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
               </button>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-            {(['todos', 'pendiente', 'pagado', 'anulado'] as const).map(e => (
-              <button key={e} onClick={() => setFiltroEstado(e)}
-                style={{ padding: '4px 10px', borderRadius: '16px', border: '1.5px solid', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-                  borderColor: filtroEstado === e ? '#0ea5e9' : '#e2e8f0',
-                  background: filtroEstado === e ? '#e0f2fe' : 'white',
-                  color: filtroEstado === e ? '#0ea5e9' : '#64748b' }}>
-                {e === 'todos' ? 'Todos' : ESTADO_CONFIG[e as EstadoGasto].label}
-              </button>
-            ))}
-          </div>
 
-          {/* Tabla de gastos */}
-          {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-              <div style={{ fontSize: '36px', marginBottom: '10px' }}>🧾</div>
-              <p style={{ margin: 0, fontWeight: 600 }}>No hay gastos registrados</p>
-            </div>
-          ) : (
-            <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc' }}>
-                    {['Fecha', 'Concepto', 'Categoría', 'Monto', 'Estado', ''].map(h => (
-                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((g, i) => {
-                    const cat = CAT_CONFIG[g.categoria]
-                    const est = ESTADO_CONFIG[g.estado]
-                    return (
-                      <tr key={g.id} style={{ background: i % 2 === 0 ? 'white' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '10px 12px', color: '#64748b', whiteSpace: 'nowrap' }}>{g.fecha}</td>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>
-                          {g.concepto}
-                          {g.proveedor_nombre && <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 400 }}>{g.proveedor_nombre}</div>}
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: cat.color }}>{cat.icon} {cat.label}</span>
-                        </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>{moneda} {g.monto.toFixed(2)}</td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          {canEdit && (
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              <button onClick={() => startEdit(g)} style={{ padding: '3px 7px', background: '#f1f5f9', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                              <button onClick={() => handleDelete(g.id)} style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DataTable
+            data={filtered}
+            columns={columns}
+            rowKey="id"
+            searchableKeys={['concepto', row => row.proveedor_nombre ?? '', row => row.comprobante_num ?? '']}
+            searchPlaceholder="Buscar por concepto, proveedor o comprobante…"
+            filters={[
+              {
+                key: 'estado',
+                value: filtroEstado,
+                onChange: v => setFiltroEstado(v as EstadoGasto | 'todos'),
+                options: [
+                  { value: 'todos', label: 'Todos los estados' },
+                  ...Object.entries(ESTADO_CONFIG).map(([k, v]) => ({ value: k, label: v.label })),
+                ],
+              },
+            ]}
+            defaultSort={{ key: 'fecha', direction: 'desc' }}
+            emptyState={{ icon: '🧾', title: 'No hay gastos registrados' }}
+          />
         </div>
 
-        {/* Panel de categorías */}
+        {/* Panel de categorías (sticky) */}
         <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', position: 'sticky', top: '20px' }}>
           <h3 style={{ margin: '0 0 14px', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>📊 Gastos por categoría ({thisYear})</h3>
           {catEntries.length === 0 ? (
