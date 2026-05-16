@@ -1,17 +1,22 @@
+import DOMPurify from 'dompurify'
+
+// Strip all HTML tags + attributes from `input`. Defends against XSS payloads
+// stored at rest that later leak into HTML rendering contexts (chat history,
+// emails, server-rendered exports). The previous regex-based blacklist missed
+// Unicode-escaped variants (<, &#x3C;) and SVG attributes; DOMPurify
+// parses the input as HTML and discards anything not in the allowlist (empty).
 export function sanitizeInput(input: string): string {
-  return input
-    .replace(/[<>]/g, '')
-    .replace(/javascript\s*:/gi, '')
-    .replace(/data\s*:/gi, '')
-    .replace(/vbscript\s*:/gi, '')
-    .replace(/on\w+\s*=/gi, '')
-    .replace(/&#\d+;?/g, '')
-    .replace(/&#x[a-fA-F0-9]+;?/g, '')
-    .replace(/expression\s*\(/gi, '')
-    .replace(/url\s*\(/gi, '')
-    .trim()
+  if (!input) return ''
+  return DOMPurify.sanitize(input, {
+    ALLOWED_TAGS: [],
+    ALLOWED_ATTR: [],
+    KEEP_CONTENT: true,
+  }).trim()
 }
 
+// HTML-encodes a string so it can be inserted into an HTML context as text
+// without being interpreted as markup. Suitable for places that build HTML
+// strings by concatenation (rare in this codebase — JSX auto-escapes).
 export function sanitizeHTML(html: string): string {
   const temp = document.createElement('div')
   temp.textContent = html
