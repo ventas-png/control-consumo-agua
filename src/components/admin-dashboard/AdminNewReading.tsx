@@ -65,8 +65,9 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
     setLoading(true)
 
     try {
-      // Subir foto si existe
-      let fotoUrl = null
+      // Subir foto si existe — guardamos el path bare; el display site
+      // (CustomerPortal, etc.) firma vía useSignedUrl en cada render.
+      let fotoPath: string | null = null
       if (preview) {
         const timestamp = Date.now()
         const path = `registros/${selectedClienteId}_${timestamp}`
@@ -75,8 +76,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
           .upload(path, preview.image, { contentType: preview.image.type })
 
         if (!uploadError) {
-          const { data } = supabase.storage.from('registro-fotos').getPublicUrl(path)
-          fotoUrl = data.publicUrl
+          fotoPath = path
         }
       }
 
@@ -94,7 +94,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
         tipo_cobro: calculation.tipo_cobro,
         estado: 'pendiente',
         notas,
-        foto: fotoUrl,
+        foto: fotoPath,
       })
 
       if (error) throw error

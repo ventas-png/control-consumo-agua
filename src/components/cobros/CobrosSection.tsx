@@ -3,9 +3,32 @@ import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 import type { Registro, Cliente, UserRole, UserSession, Pago, ConvenioPago, FormaPago } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
+import { useSignedUrl } from '../../lib/storageUrls'
 import { PagoModal } from './PagoModal'
 import { ConvenioModal } from './ConvenioModal'
 import { PagosHistorial } from './PagosHistorial'
+
+// Pequeño wrapper para firmar el link al comprobante (bucket pagos-comprobantes
+// es privado tras S6 follow-up). Tipo y label se pasan como props.
+function ComprobanteLink({ src, tipo }: { src: string; tipo?: string | null }) {
+  const signed = useSignedUrl(src, 'pagos-comprobantes')
+  if (!signed) return null
+  return (
+    <a
+      href={signed}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        fontSize: '13px',
+        color: '#0ea5e9',
+        textDecoration: 'none',
+        fontWeight: 600,
+      }}
+    >
+      📎 Ver comprobante{tipo ? ` (${tipo})` : ''}
+    </a>
+  )
+}
 
 interface Props {
   registros: Registro[]
@@ -501,19 +524,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
 
                           {pago.comprobante_url && (
                             <div style={{ marginTop: '12px' }}>
-                              <a
-                                href={pago.comprobante_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  fontSize: '13px',
-                                  color: '#0ea5e9',
-                                  textDecoration: 'none',
-                                  fontWeight: 600,
-                                }}
-                              >
-                                📎 Ver comprobante ({pago.comprobante_tipo})
-                              </a>
+                              <ComprobanteLink src={pago.comprobante_url} tipo={pago.comprobante_tipo} />
                             </div>
                           )}
                         </div>

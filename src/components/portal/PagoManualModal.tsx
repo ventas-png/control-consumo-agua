@@ -61,8 +61,9 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
     setLoading(true)
 
     try {
-      // Subir comprobante si existe
-      let comprobanteUrl = null
+      // Subir comprobante si existe — guardamos el path bare; el display
+      // site (CobrosSection) firma vía useSignedUrl en cada render.
+      let comprobantePath: string | null = null
       if (adjunto) {
         const path = `comprobantes/${currentUser.user_id}/${Date.now()}`
         const { error: uploadError } = await supabase.storage
@@ -70,8 +71,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
           .upload(path, adjunto, { contentType: adjunto.type })
 
         if (!uploadError) {
-          const { data } = supabase.storage.from('pagos-comprobantes').getPublicUrl(path)
-          comprobanteUrl = data.publicUrl
+          comprobantePath = path
         }
       }
 
@@ -84,7 +84,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
         metodo: formaPago,
         numero_documento: numeroComprobante.trim(),
         referencia: referencia.trim() || null,
-        comprobante_url: comprobanteUrl,
+        comprobante_url: comprobantePath,
         comprobante_tipo: adjunto ? (adjunto.type.startsWith('image') ? 'imagen' : 'pdf') : null,
         tipo_aplicacion: 'pago_total',
         verification_status: 'pendiente',

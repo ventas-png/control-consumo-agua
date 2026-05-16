@@ -196,8 +196,9 @@ export function useConversations({ companyId, clienteId, userId, isCliente = fal
           .from('conv-attachments')
           .upload(path, file, { contentType: file.type })
         if (uploadError) throw uploadError
-        const { data } = supabase.storage.from('conv-attachments').getPublicUrl(path)
-        attachmentUrl = data.publicUrl
+        // Guardamos el path bare; ComunicacionSection / CustomerComunicacion
+        // firman vía useSignedUrl en cada render.
+        attachmentUrl = path
         attachmentName = file.name
         attachmentType = file.type
         attachmentSize = file.size
