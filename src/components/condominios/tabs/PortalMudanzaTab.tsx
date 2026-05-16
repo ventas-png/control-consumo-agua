@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
+import { validateFileMagic, buildUploadPath } from '../../../lib/fileValidation'
 import type { SolicitudMudanzaUnidad, TipoSolicitudMudanza, EstadoSolicitudMudanza } from '../../../types'
 
 interface Props {
@@ -102,8 +103,17 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
     // Upload images
     const uploadedUrls: string[] = []
     for (const file of form.imagenes) {
-      const path = `${unidadId}/${Date.now()}_${file.name}`
-      const { error: upErr } = await supabase.storage.from('mudanza-docs').upload(path, file)
+      // Magic-byte check defends against renamed payloads (.html → .jpg).
+      const magicCheck = await validateFileMagic(file, 'image')
+      if (!magicCheck.ok) {
+        setSaving(false)
+        Swal.fire('Error', magicCheck.reason, 'error')
+        return
+      }
+      const path = buildUploadPath(unidadId, file.name)
+      const { error: upErr } = await supabase.storage.from('mudanza-docs').upload(path, file, {
+        contentType: magicCheck.detected,
+      })
       if (upErr) {
         setSaving(false)
         Swal.fire('Error', `No se pudo subir la imagen: ${upErr.message}`, 'error')
