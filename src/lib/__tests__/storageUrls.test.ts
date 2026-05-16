@@ -41,4 +41,9 @@ describe('extractBucketPath', () => {
     expect(extractBucketPath(null, bucket)).toBeNull()
     expect(extractBucketPath(undefined, bucket)).toBeNull()
   })
+
+  it('null para data: URI (base64) — caller debe pasarlo sin firmar', () => {
+    const dataUri = 'data:image/jpeg;base64,/9j/4AAQSkZJRg=='
+    expect(extractBucketPath(dataUri, bucket)).toBeNull()
+  })
 })

@@ -16,6 +16,10 @@ const PUBLIC_URL_RE = /\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+?)(?:
  */
 export function extractBucketPath(value: string | null | undefined, bucket: string): string | null {
   if (!value) return null
+  // Data URIs (base64-embedded images) are not bucket objects — caller should
+  // pass them through unchanged. Some legacy `registros.foto` rows store the
+  // image inline as `data:image/jpeg;base64,...` instead of an uploaded path.
+  if (value.startsWith('data:')) return null
   const match = value.match(PUBLIC_URL_RE)
   if (match) {
     const [, urlBucket, path] = match
