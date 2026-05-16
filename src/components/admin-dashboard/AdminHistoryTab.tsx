@@ -176,7 +176,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
           border: '1px solid #dcfce7',
         }}>
           <div style={{ fontSize: '12px', color: '#4d7c0f', marginBottom: '4px' }}>Recaudo Total</div>
-          <div style={{ fontSize: '24px', fontWeight: '700', color: '#65a30d' }}>Q {stats.recaudoTotal.toFixed(2)}</div>
+          <div style={{ fontSize: '24px', fontWeight: '700', color: '#65a30d' }}>{moneda} {stats.recaudoTotal.toFixed(2)}</div>
         </div>
       </div>
 

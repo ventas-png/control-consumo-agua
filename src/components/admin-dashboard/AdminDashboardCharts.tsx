@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { Chart, registerables } from 'chart.js'
+import { Chart } from '../../lib/chartjs'
 import type { Registro, Cliente } from '../../types'
-
-Chart.register(...registerables)
 
 interface Props {
   registros: Registro[]

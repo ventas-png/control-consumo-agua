@@ -1,11 +1,12 @@
-import { useState, useMemo, type CSSProperties} from 'react'
+import { useState, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
 import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, UserSession, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
-import { ImportUnidadesModal } from './ImportUnidadesModal'
 import { EditModal } from '../shared/EditModal'
 import { getEditedTagInfo } from '../../lib/timeUtils'
+
+const ImportUnidadesModal = lazy(() => import('./ImportUnidadesModal').then(m => ({ default: m.ImportUnidadesModal })))
 
 interface Props {
   unidades: Unidad[]
@@ -1247,6 +1248,7 @@ export function UnidadesSection({
       </div>
 
       {showImportModal && (
+        <Suspense fallback={null}>
         <ImportUnidadesModal
           currentUser={currentUser}
           onClose={() => setShowImportModal(false)}
@@ -1255,6 +1257,7 @@ export function UnidadesSection({
             setShowImportModal(false)
           }}
         />
+        </Suspense>
       )}
     </div>
   )

@@ -2,11 +2,9 @@ import { useState, useEffect, useCallback, useRef, useMemo, type CSSProperties} 
 import { supabase } from '../../lib/supabase'
 import { validateEmail, validatePhoneNumber, sanitizeInput } from '../../lib/validation'
 import type { UserSession, Registro } from '../../types'
-import { Chart, registerables } from 'chart.js'
+import { Chart } from '../../lib/chartjs'
 import { CustomerPaymentsTab } from './CustomerPaymentsTab'
 import { CustomerComunicacion } from './CustomerComunicacion'
-
-Chart.register(...registerables)
 
 interface Props {
   currentUser: UserSession
@@ -210,38 +208,37 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
       const REGISTROS_SELECT = 'id, cliente_id, cliente_nombre, contador_id, fecha, lectura_anterior, lectura_actual, consumo, tarifa_aplicada, tarifa_exceso_aplicada, canon_aplicado, monto_calculado, tipo_cobro, estado, monto_pagado, fecha_pago, mes, fecha_lectura_anterior, dias_servicio, notas, foto'
 
-      let mergedLecturas: LecturaInfo[] = (rData as LecturaInfo[]) ?? []
-      const mergeIn = (rows: unknown[] | null) => {
-        if (!rows?.length) return
-        const seen = new Set(mergedLecturas.map(l => l.id))
-        const extra = (rows as LecturaInfo[]).filter(l => !seen.has(l.id))
-        if (extra.length > 0) mergedLecturas = [...mergedLecturas, ...extra]
-      }
-
+      // Run both fallbacks in parallel (instead of sequentially) — saves ~400-1500ms on cold start.
       // Fallback 1: by contador_id — catches registros where cliente_id is wrong/null
-      if (cData.length > 0) {
-        const { data: byContador } = await supabase
-          .from('registros').select(REGISTROS_SELECT)
-          .in('contador_id', cData.map(c => c.id))
-          .order('fecha', { ascending: false })
-        mergeIn(byContador)
-      }
-
       // Fallback 2: by project_id — catches registros where contador_id is also null
-      // Only safe because RLS (after migration 20260420000023) restricts clients to their own data
+      //   (safe because RLS, migration 20260420000023, restricts clients to their own data)
+      const contadorIds = cData.map(c => c.id)
       const unidadProjectIds = [...new Set(unidadesList.map(u => u.project_id).filter(Boolean))]
-      if (unidadProjectIds.length > 0 && clienteId) {
-        const { data: byProject } = await supabase
-          .from('registros').select(REGISTROS_SELECT)
-          .in('project_id', unidadProjectIds)
-          .order('fecha', { ascending: false })
-        // Extra safety: only keep rows for this client or for our counters
-        const knownCounterIds = new Set(cData.map(c => c.id))
-        const safe = (byProject as LecturaInfo[] | null)?.filter(l =>
-          l.cliente_id === clienteId || (l.contador_id != null && knownCounterIds.has(l.contador_id))
-        ) ?? []
-        mergeIn(safe)
+      const [byContadorRes, byProjectRes] = await Promise.all([
+        contadorIds.length > 0
+          ? supabase.from('registros').select(REGISTROS_SELECT)
+              .in('contador_id', contadorIds)
+              .order('fecha', { ascending: false })
+          : Promise.resolve({ data: null }),
+        unidadProjectIds.length > 0 && clienteId
+          ? supabase.from('registros').select(REGISTROS_SELECT)
+              .in('project_id', unidadProjectIds)
+              .order('fecha', { ascending: false })
+          : Promise.resolve({ data: null }),
+      ])
+
+      const merged = new Map<string, LecturaInfo>()
+      for (const row of (rData as LecturaInfo[] | null) ?? []) merged.set(row.id, row)
+      for (const row of (byContadorRes.data as LecturaInfo[] | null) ?? []) {
+        if (!merged.has(row.id)) merged.set(row.id, row)
       }
+      const knownCounterIds = new Set(contadorIds)
+      for (const row of (byProjectRes.data as LecturaInfo[] | null) ?? []) {
+        if (merged.has(row.id)) continue
+        const safe = row.cliente_id === clienteId || (row.contador_id != null && knownCounterIds.has(row.contador_id))
+        if (safe) merged.set(row.id, row)
+      }
+      const mergedLecturas = Array.from(merged.values())
 
       setLecturas(mergedLecturas)
       setRegistros(mergedLecturas as Registro[])

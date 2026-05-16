@@ -1,13 +1,14 @@
-import { useState, useEffect, type CSSProperties} from 'react'
+import { useState, useEffect, lazy, Suspense, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
 import type { Cliente, UserRole, UserSession, ClienteLookupResult, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber, formatPhoneForWa } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
-import { ImportClientesModal } from './ImportClientesModal'
 import { EditModal } from '../shared/EditModal'
 import { getEditedTagInfo } from '../../lib/timeUtils'
 import { ClienteRentasModal } from './ClienteRentasModal'
+
+const ImportClientesModal = lazy(() => import('./ImportClientesModal').then(m => ({ default: m.ImportClientesModal })))
 
 interface Props {
   clientes: Cliente[]
@@ -1149,6 +1150,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
       </div>
 
       {showImportModal && (
+        <Suspense fallback={null}>
         <ImportClientesModal
           existingClientes={clientes}
           userId={userId}
@@ -1159,6 +1161,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
             setShowImportModal(false)
           }}
         />
+        </Suspense>
       )}
 
       {rentasClienteId && companyId && (

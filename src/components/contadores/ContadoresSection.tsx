@@ -1,11 +1,12 @@
-import { useState, type CSSProperties} from 'react'
+import { useState, lazy, Suspense, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
 import type { Contador, Tarifa, TipoAgua, UserRole, UserSession, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
-import { ImportContadoresModal } from './ImportContadoresModal'
 import { EditModal } from '../shared/EditModal'
 import { getEditedTagInfo } from '../../lib/timeUtils'
+
+const ImportContadoresModal = lazy(() => import('./ImportContadoresModal').then(m => ({ default: m.ImportContadoresModal })))
 
 interface Props {
   contadores: Contador[]
@@ -1054,6 +1055,7 @@ export function ContadoresSection({
     </div>
 
     {showImport && (
+      <Suspense fallback={null}>
       <ImportContadoresModal
         currentUser={currentUser}
         onClose={() => setShowImport(false)}
@@ -1062,6 +1064,7 @@ export function ContadoresSection({
           setShowImport(false)
         }}
       />
+      </Suspense>
     )}
     </>
   )

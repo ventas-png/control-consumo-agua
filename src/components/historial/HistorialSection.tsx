@@ -3,7 +3,6 @@ import Swal from 'sweetalert2'
 import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
-import { exportarPDFGlobal } from '../../lib/pdf'
 import { APP_CONFIG } from '../../lib/config'
 
 interface Props {
@@ -234,7 +233,10 @@ export function HistorialSection({
             </button>
           </div>
           <button
-            onClick={() => exportarPDFGlobal(filtrados)}
+            onClick={async () => {
+              const { exportarPDFGlobal } = await import('../../lib/pdf')
+              exportarPDFGlobal(filtrados)
+            }}
             style={{ padding: '10px 20px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}
           >
             📄 PDF
