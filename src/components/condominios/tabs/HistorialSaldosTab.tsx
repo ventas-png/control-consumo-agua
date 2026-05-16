@@ -1,8 +1,9 @@
-import { useState, type CSSProperties} from 'react'
+import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
 import { toast } from '../../../lib/toast'
 import { HistorialSaldoUnidad, Unidad, CuotaCondominio } from '../../../types'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   historial: HistorialSaldoUnidad[]
@@ -17,12 +18,12 @@ interface Props {
 
 export default function HistorialSaldosTab({ historial, cuotas, unidades, proyectoId, companyId, moneda, canCreate, onRefresh }: Props) {
   const [filtroUnidad, setFiltroUnidad] = useState('')
+  const [filtroPeriodo, setFiltroPeriodo] = useState('')
   const [saving, setSaving] = useState(false)
 
   const periodos = [...new Set(historial.map(h => h.periodo))].sort().reverse()
-  const [filtroPeriodo, setFiltroPeriodo] = useState('')
 
-  const lista = historial.filter(h =>
+  const dataFiltrada = historial.filter(h =>
     (!filtroUnidad || h.unidad_id === filtroUnidad) &&
     (!filtroPeriodo || h.periodo === filtroPeriodo)
   )
@@ -71,7 +72,64 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
     onRefresh()
   }
 
-  const inp: CSSProperties = { padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 }
+  const unidadNombre = (id: string) => unidades.find(u => u.id === id)?.nombre ?? ''
+
+  const columns: DataTableColumn<HistorialSaldoUnidad>[] = [
+    {
+      key: 'unidad',
+      header: 'Unidad',
+      sortable: true,
+      accessor: row => unidadNombre(row.unidad_id) || row.unidad_nombre || '',
+      render: row => <span style={{ fontWeight: 600 }}>{unidadNombre(row.unidad_id) || row.unidad_nombre || '—'}</span>,
+    },
+    {
+      key: 'periodo',
+      header: 'Período',
+      sortable: true,
+      render: row => <span style={{ color: '#6b7280' }}>{row.periodo}</span>,
+    },
+    {
+      key: 'saldo_anterior',
+      header: 'Saldo anterior',
+      sortable: true,
+      align: 'right',
+      render: row => <span style={{ color: '#374151' }}>{moneda} {row.saldo_anterior.toFixed(2)}</span>,
+    },
+    {
+      key: 'cargos_periodo',
+      header: 'Cargos',
+      sortable: true,
+      align: 'right',
+      render: row => <span style={{ color: '#dc2626' }}>+ {moneda} {row.cargos_periodo.toFixed(2)}</span>,
+    },
+    {
+      key: 'pagos_periodo',
+      header: 'Pagos',
+      sortable: true,
+      align: 'right',
+      render: row => <span style={{ color: '#16a34a' }}>− {moneda} {row.pagos_periodo.toFixed(2)}</span>,
+    },
+    {
+      key: 'saldo_final',
+      header: 'Saldo final',
+      sortable: true,
+      align: 'right',
+      render: row => (
+        <span style={{ fontWeight: 700, color: row.saldo_final > 0 ? '#ef4444' : '#16a34a' }}>
+          {moneda} {row.saldo_final.toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      key: 'num_cuotas_vencidas',
+      header: 'Cuotas vencidas',
+      sortable: true,
+      align: 'center',
+      render: row => row.num_cuotas_vencidas > 0
+        ? <span style={{ padding: '2px 7px', borderRadius: 20, background: '#fee2e2', color: '#ef4444', fontSize: 11, fontWeight: 700 }}>{row.num_cuotas_vencidas}</span>
+        : <span style={{ color: '#9ca3af', fontSize: 12 }}>—</span>,
+    },
+  ]
 
   return (
     <div style={{ padding: 16 }}>
@@ -91,70 +149,34 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
         </div>
       </div>
 
-      {/* Filtros + botón */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <select value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)} style={inp}>
-            <option value="">Todas las unidades</option>
-            {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
-          </select>
-          <select value={filtroPeriodo} onChange={e => setFiltroPeriodo(e.target.value)} style={inp}>
-            <option value="">Todos los períodos</option>
-            {periodos.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <span style={{ fontSize: 12, color: '#6b7280', alignSelf: 'center' }}>{lista.length} registros</span>
-        </div>
-        {canCreate && (
+      <DataTable
+        data={dataFiltrada}
+        columns={columns}
+        rowKey="id"
+        filters={[
+          {
+            key: 'unidad',
+            value: filtroUnidad,
+            onChange: setFiltroUnidad,
+            options: [{ value: '', label: 'Todas las unidades' }, ...unidades.map(u => ({ value: u.id, label: u.nombre }))],
+          },
+          {
+            key: 'periodo',
+            value: filtroPeriodo,
+            onChange: setFiltroPeriodo,
+            options: [{ value: '', label: 'Todos los períodos' }, ...periodos.map(p => ({ value: p, label: p }))],
+          },
+        ]}
+        defaultSort={{ key: 'periodo', direction: 'desc' }}
+        rowStyle={row => row.saldo_final > 0 ? { background: '#fef9f9' } : {}}
+        emptyState={{ icon: '📊', title: 'Sin snapshots de saldo', description: 'Usa "Generar snapshot" para el período actual' }}
+        toolbar={canCreate ? (
           <button onClick={generarSnapshot} disabled={saving}
             style={{ padding: '8px 16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             {saving ? '⏳ Generando…' : '📸 Generar snapshot'}
           </button>
-        )}
-      </div>
-
-      {/* Tabla */}
-      {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0', fontSize: 13 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
-          Sin snapshots de saldo — usa "Generar snapshot" para el período actual
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#f9fafb' }}>
-                {['Unidad', 'Período', 'Saldo anterior', 'Cargos', 'Pagos', 'Saldo final', 'Cuotas vencidas'].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#6b7280', fontWeight: 600, borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lista.sort((a, b) => b.periodo.localeCompare(a.periodo) || (unidades.find(u => u.id === a.unidad_id)?.nombre ?? '').localeCompare(unidades.find(u => u.id === b.unidad_id)?.nombre ?? '')).map(h => {
-                const unidad = unidades.find(u => u.id === h.unidad_id)
-                const deudor = h.saldo_final > 0
-                return (
-                  <tr key={h.id} style={{ borderBottom: '1px solid #f3f4f6', background: deudor ? '#fef9f9' : '#fff' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? h.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', color: '#6b7280' }}>{h.periodo}</td>
-                    <td style={{ padding: '8px 12px', color: '#374151' }}>{moneda} {h.saldo_anterior.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px', color: '#dc2626' }}>+ {moneda} {h.cargos_periodo.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px', color: '#16a34a' }}>− {moneda} {h.pagos_periodo.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px', fontWeight: 700, color: deudor ? '#ef4444' : '#16a34a' }}>
-                      {moneda} {h.saldo_final.toFixed(2)}
-                    </td>
-                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                      {h.num_cuotas_vencidas > 0
-                        ? <span style={{ padding: '2px 7px', borderRadius: 20, background: '#fee2e2', color: '#ef4444', fontSize: 11, fontWeight: 700 }}>{h.num_cuotas_vencidas}</span>
-                        : <span style={{ color: '#9ca3af', fontSize: 12 }}>—</span>
-                      }
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+        ) : undefined}
+      />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { CuotaCondominio, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -21,12 +22,8 @@ const ESTADO_STYLE: Record<string, { color: string; bg: string }> = {
 
 export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }: Props) {
   const [selectedUnidad, setSelectedUnidad] = useState<string>('all')
-  const [searchPeriodo, setSearchPeriodo] = useState('')
 
-  const filtered = cuotas
-    .filter(c => selectedUnidad === 'all' || c.unidad_id === selectedUnidad)
-    .filter(c => !searchPeriodo || c.periodo.includes(searchPeriodo))
-    .sort((a, b) => b.periodo.localeCompare(a.periodo))
+  const filtered = cuotas.filter(c => selectedUnidad === 'all' || c.unidad_id === selectedUnidad)
 
   const totals = {
     total:    filtered.reduce((s, c) => s + c.monto, 0),
@@ -50,24 +47,75 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
     onRefresh()
   }
 
+  const columns: DataTableColumn<CuotaCondominio>[] = [
+    {
+      key: 'periodo',
+      header: 'Período',
+      sortable: true,
+      render: row => <span style={{ fontWeight: 600 }}>{row.periodo}</span>,
+    },
+    {
+      key: 'unidad_nombre',
+      header: 'Unidad',
+      sortable: true,
+      render: row => <span style={{ color: '#64748b' }}>{row.unidad_nombre ?? '—'}</span>,
+    },
+    {
+      key: 'concepto',
+      header: 'Concepto',
+      sortable: true,
+      render: row => <span style={{ color: '#64748b' }}>{row.concepto}</span>,
+    },
+    {
+      key: 'fecha_vencimiento',
+      header: 'Vencimiento',
+      sortable: true,
+      render: row => <span style={{ color: '#94a3b8', fontSize: '12px' }}>{row.fecha_vencimiento ?? '—'}</span>,
+    },
+    {
+      key: 'monto',
+      header: 'Monto',
+      sortable: true,
+      align: 'right',
+      render: row => <span style={{ fontWeight: 700 }}>{moneda} {row.monto.toFixed(2)}</span>,
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      render: row => {
+        const es = ESTADO_STYLE[row.estado] ?? ESTADO_STYLE.pendiente
+        return <span style={{ background: es.bg, color: es.color, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>{row.estado}</span>
+      },
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: row => canEdit && row.estado !== 'pagado' ? (
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button onClick={() => marcarPagada(row.id)}
+            style={{ padding: '3px 8px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+            ✓ Pagada
+          </button>
+          {row.estado === 'pendiente' && (
+            <button onClick={() => marcarMorosa(row.id)}
+              style={{ padding: '3px 7px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+              Morosa
+            </button>
+          )}
+        </div>
+      ) : null,
+    },
+  ]
+
   return (
     <div style={{ padding: '20px 24px' }}>
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Estado de Cuenta</h2>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <select value={selectedUnidad} onChange={e => setSelectedUnidad(e.target.value)}
-            style={{ padding: '6px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#0f172a', background: 'white', cursor: 'pointer' }}>
-            <option value="all">Todas las unidades</option>
-            {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
-          </select>
-          <input value={searchPeriodo} onChange={e => setSearchPeriodo(e.target.value)}
-            placeholder="Filtrar período…" style={{ padding: '6px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', width: '130px' }} />
-          <button onClick={() => window.print()}
-            style={{ padding: '6px 12px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-            🖨️ Imprimir
-          </button>
-        </div>
+        <button onClick={() => window.print()}
+          style={{ padding: '6px 12px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+          🖨️ Imprimir
+        </button>
       </div>
 
       {/* KPIs */}
@@ -85,7 +133,7 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
         ))}
       </div>
 
-      {/* Unidad detail card when a specific unit is selected */}
+      {/* Unidad detail card cuando una unidad específica está seleccionada */}
       {selectedUnidad !== 'all' && (() => {
         const u = unidades.find(x => x.id === selectedUnidad)
         const cuotasU = filtered
@@ -105,55 +153,23 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
         ) : null
       })()}
 
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay cuotas para mostrar.</div>
-      ) : (
-        <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                {['Período', 'Unidad', 'Concepto', 'Vencimiento', 'Monto', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Monto' ? 'right' : 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c, i) => {
-                const es = ESTADO_STYLE[c.estado] ?? ESTADO_STYLE.pendiente
-                return (
-                  <tr key={c.id} style={{ background: i % 2 === 0 ? 'white' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{c.periodo}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>{c.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>{c.concepto}</td>
-                    <td style={{ padding: '10px 12px', color: '#94a3b8', fontSize: '12px' }}>{c.fecha_vencimiento ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>{moneda} {c.monto.toFixed(2)}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ background: es.bg, color: es.color, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>{c.estado}</span>
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {canEdit && c.estado !== 'pagado' && (
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <button onClick={() => marcarPagada(c.id)}
-                            style={{ padding: '3px 8px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                            ✓ Pagada
-                          </button>
-                          {c.estado === 'pendiente' && (
-                            <button onClick={() => marcarMorosa(c.id)}
-                              style={{ padding: '3px 7px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                              Morosa
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        data={filtered}
+        columns={columns}
+        rowKey="id"
+        searchableKeys={['periodo', 'concepto', row => row.unidad_nombre ?? '']}
+        searchPlaceholder="Filtrar período, concepto o unidad…"
+        filters={[
+          {
+            key: 'unidad',
+            value: selectedUnidad,
+            onChange: setSelectedUnidad,
+            options: [{ value: 'all', label: 'Todas las unidades' }, ...unidades.map(u => ({ value: u.id, label: u.nombre }))],
+          },
+        ]}
+        defaultSort={{ key: 'periodo', direction: 'desc' }}
+        emptyState={{ icon: '💰', title: 'No hay cuotas para mostrar' }}
+      />
       <style>{`@media print { button { display: none !important; } }`}</style>
     </div>
   )
