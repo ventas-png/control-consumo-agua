@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
+import { toast } from '../../../lib/toast'
 import type { Asamblea, PuntoAsamblea, VotoAsamblea, Unidad, TipoAsamblea, EstadoAsamblea, TipoPunto, TipoVoto } from '../../../types'
 
 interface Props {
@@ -53,8 +54,8 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   }
 
   async function handleGuardar() {
-    if (!form.titulo.trim()) { Swal.fire('Error', 'Ingrese el título.', 'error'); return }
-    if (!form.fecha || !form.hora_inicio) { Swal.fire('Error', 'Ingrese fecha y hora de inicio.', 'error'); return }
+    if (!form.titulo.trim()) { toast.error('Ingrese el título.'); return }
+    if (!form.fecha || !form.hora_inicio) { toast.error('Ingrese fecha y hora de inicio.'); return }
     setSaving(true)
     const { error } = await supabase.from('asambleas').insert({
       company_id: companyId, project_id: proyectoId,
@@ -65,8 +66,8 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
       estado: 'programada', convocado_por: userId,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: 'Asamblea convocada', timer: 1400, showConfirmButton: false })
+    if (error) { toast.error(error.message); return }
+    toast.success('Asamblea convocada')
     resetForm(); onRefresh()
   }
 
@@ -100,7 +101,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
       asamblea_id: selectedId, orden: maxOrden,
       titulo: puntoForm.titulo.trim(), descripcion: puntoForm.descripcion.trim() || null, tipo: puntoForm.tipo,
     })
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { toast.error(error.message); return }
     setPuntoForm({ titulo: '', descripcion: '', tipo: 'informativo' })
     setShowPuntoForm(false)
     cargarPuntos(selectedId)

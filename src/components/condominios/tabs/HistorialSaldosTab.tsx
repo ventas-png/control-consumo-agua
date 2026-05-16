@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { toast } from '../../../lib/toast'
 import { HistorialSaldoUnidad, Unidad, CuotaCondominio } from '../../../types'
 
 interface Props {
@@ -65,8 +66,8 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
 
     const { error } = await supabase.from('historial_saldos_unidad').upsert(rows, { onConflict: 'project_id,unidad_id,periodo' })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: `Snapshot ${periodo} generado`, text: `${rows.length} unidades procesadas`, timer: 2000, showConfirmButton: false })
+    if (error) { toast.error(error.message); return }
+    toast.success(`Snapshot ${periodo} generado`, { description: `${rows.length} unidades procesadas` })
     onRefresh()
   }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import Swal from 'sweetalert2'
+import { Toaster } from 'sonner'
 import type { AppSection, Ruta, UserSession } from './types'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
@@ -330,6 +331,12 @@ export default function App() {
   // Authenticated app
   return (
     <>
+      {/* Toaster montado a nivel app: lib/toast emite mensajes non-blocking
+          en la esquina superior derecha. Reemplaza paulatinamente Swal.fire
+          para success/warning/info no críticos. Confirmaciones destructivas
+          siguen usando Swal. */}
+      <Toaster richColors position="top-right" closeButton />
+
       <style>{`
         @media (max-width: 767px) {
           .app-sidebar {

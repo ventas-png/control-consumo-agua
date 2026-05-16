@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
+import { toast } from '../../../lib/toast'
 import type { InfraccionCondominio, Unidad, TipoInfraccion, EstadoInfraccion } from '../../../types'
 
 interface Props {
@@ -55,8 +56,8 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
   }
 
   async function handleGuardar() {
-    if (!form.descripcion.trim()) { Swal.fire('Error', 'Ingrese la descripción de la infracción.', 'error'); return }
-    if (!form.unidad_id) { Swal.fire('Error', 'Seleccione la unidad infractora.', 'error'); return }
+    if (!form.descripcion.trim()) { toast.error('Ingrese la descripción de la infracción.'); return }
+    if (!form.unidad_id) { toast.error('Seleccione la unidad infractora.'); return }
     setSaving(true)
     const { error } = await supabase.from('infracciones_condominio').insert({
       company_id: companyId, project_id: proyectoId, unidad_id: form.unidad_id,
@@ -67,8 +68,8 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
       fecha_limite_descargo: form.fecha_limite_descargo || null,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: 'Infracción registrada', timer: 1400, showConfirmButton: false })
+    if (error) { toast.error(error.message); return }
+    toast.success('Infracción registrada')
     resetForm(); onRefresh()
   }
 

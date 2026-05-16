@@ -1,6 +1,7 @@
 import { useState, type ReactNode} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { toast } from '../../../lib/toast'
 import { CierreAnual, EstadoCierreAnual, CuotaCondominio, GastoCondominio } from '../../../types'
 
 interface Props {
@@ -60,8 +61,8 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
       monto_mora_total: parseFloat(monto_mora_total.toFixed(2)),
     }, { onConflict: 'project_id,anio' })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: `Cierre ${anio} generado`, timer: 1800, showConfirmButton: false })
+    if (error) { toast.error(error.message); return }
+    toast.success(`Cierre ${anio} generado`)
     onRefresh()
   }
 
