@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { validateFileMagic, buildUploadPath } from '../../lib/fileValidation'
+import { useSignedUrl } from '../../lib/storageUrls'
 
 const ACCEPT = 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp'
 const MAX_BYTES = 20 * 1024 * 1024
@@ -29,7 +30,13 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
 
-  const fileName = value ? decodeURIComponent(value.split('/').pop() ?? 'archivo') : null
+  // The DB value may be a legacy publicUrl (full https://...) or a bare path
+  // after the S6 migration. useSignedUrl handles both transparently.
+  const signedUrl = useSignedUrl(value, 'condominios-media')
+  // Display name: extract from the stored value (last path segment, query-stripped).
+  const fileName = value
+    ? decodeURIComponent(value.split('?')[0].split('/').pop() ?? 'archivo')
+    : null
 
   async function uploadFile(file: File) {
     setError(null)
@@ -94,10 +101,12 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
             <div style={{ fontSize: '12px', fontWeight: 600, color: '#166534', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</div>
             <div style={{ fontSize: '11px', color: '#4ade80' }}>Subido</div>
           </div>
-          <a href={value} target="_blank" rel="noreferrer"
-            style={{ padding: '4px 10px', background: '#16a34a', color: '#fff', borderRadius: '6px', fontSize: '11px', fontWeight: 600, textDecoration: 'none' }}>
-            Ver
-          </a>
+          {signedUrl && (
+            <a href={signedUrl} target="_blank" rel="noreferrer"
+              style={{ padding: '4px 10px', background: '#16a34a', color: '#fff', borderRadius: '6px', fontSize: '11px', fontWeight: 600, textDecoration: 'none' }}>
+              Ver
+            </a>
+          )}
           <button onClick={removeFile}
             style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', color: '#dc2626', cursor: 'pointer', fontSize: '13px' }}>
             ✕

@@ -3,6 +3,7 @@ import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { AnuncioComunidad, TipoAnuncio } from '../../../types'
 import { ImageUploader } from '../ImageUploader'
+import { SecureImage } from '../../shared/SecureImage'
 
 interface Props {
   anuncios: AnuncioComunidad[]
@@ -187,7 +188,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
                     <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '6px' }}>{a.titulo}</div>
                     <div style={{ fontSize: '13.5px', color: '#374151', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{a.contenido}</div>
                     {a.foto_url && (
-                      <img src={a.foto_url} alt="anuncio" style={{ marginTop: 10, maxWidth: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid #e2e8f0', cursor: 'zoom-in' }}
+                      <SecureImage src={a.foto_url} alt="anuncio" style={{ marginTop: 10, maxWidth: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid #e2e8f0', cursor: 'zoom-in' }}
                         onClick={() => window.open(a.foto_url!, '_blank')} />
                     )}
                     <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '8px' }}>

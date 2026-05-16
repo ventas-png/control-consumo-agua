@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import type { ReservaSTR, EstadoSTR, PlataformaSTR, Unidad, HuespedSTR } from '../../../types'
 import Swal from 'sweetalert2'
 import { ImageUploader } from '../ImageUploader'
+import { SecureImage } from '../../shared/SecureImage'
 
 interface HuespedSTRForm {
   id?: string
@@ -509,7 +510,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                     {r.foto_url
-                      ? <img src={r.foto_url} alt={r.huesped_nombre} style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid #e2e8f0' }} />
+                      ? <SecureImage src={r.foto_url} alt={r.huesped_nombre} style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid #e2e8f0' }} />
                       : <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🏠</div>
                     }
                     <div style={{ minWidth: 0 }}>

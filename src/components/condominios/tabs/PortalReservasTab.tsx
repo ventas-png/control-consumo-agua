@@ -1,8 +1,40 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
+import { useSignedUrl } from '../../../lib/storageUrls'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MetodoPagoTarifa } from '../../../types'
 import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSemana, addMinutosToTime } from './AmenidadesTab'
+
+// Card de amenidad con background-image signed-URL. Extraído como
+// sub-componente porque useSignedUrl es un hook y no puede llamarse dentro
+// del .map() en el render del padre.
+function AmenidadHeroButton({ amenidad, onClick, children }: { amenidad: Amenidad; onClick: () => void; children: ReactNode }) {
+  const signedFotoUrl = useSignedUrl(amenidad.foto_url, 'condominios-media')
+  const fondo = signedFotoUrl
+    ? `linear-gradient(180deg, rgba(15,23,42,0.05) 0%, rgba(15,23,42,0.85) 100%), center/cover no-repeat url(${signedFotoUrl})`
+    : 'linear-gradient(135deg,#0ea5e9 0%,#0d9488 100%)'
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        position: 'relative',
+        height: 180,
+        background: fondo,
+        border: 'none', borderRadius: 16,
+        cursor: 'pointer',
+        color: 'white',
+        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+        padding: 14, textAlign: 'left',
+        boxShadow: '0 4px 14px -6px rgba(15,23,42,0.25)',
+        transition: 'transform 0.18s ease, box-shadow 0.18s ease',
+        overflow: 'hidden',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 18px 36px -14px rgba(15,23,42,0.35)' }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px -6px rgba(15,23,42,0.25)' }}>
+      {children}
+    </button>
+  )
+}
 
 interface Props {
   amenidades: Amenidad[]
@@ -186,28 +218,9 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
 
       {/* Amenidades disponibles - estilo hero card */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14, marginBottom: 22 }}>
-        {amenidadesActivas.map(a => {
-          const fondo = a.foto_url
-            ? `linear-gradient(180deg, rgba(15,23,42,0.05) 0%, rgba(15,23,42,0.85) 100%), center/cover no-repeat url(${a.foto_url})`
-            : 'linear-gradient(135deg,#0ea5e9 0%,#0d9488 100%)'
-          return (
-            <button key={a.id}
-              onClick={() => { setForm(f => ({ ...f, amenidad_id: a.id })); setShowForm(true) }}
-              style={{
-                position: 'relative',
-                height: 180,
-                background: fondo,
-                border: 'none', borderRadius: 16,
-                cursor: 'pointer',
-                color: 'white',
-                display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-                padding: 14, textAlign: 'left',
-                boxShadow: '0 4px 14px -6px rgba(15,23,42,0.25)',
-                transition: 'transform 0.18s ease, box-shadow 0.18s ease',
-                overflow: 'hidden',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 18px 36px -14px rgba(15,23,42,0.35)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px -6px rgba(15,23,42,0.25)' }}>
+        {amenidadesActivas.map(a => (
+          <AmenidadHeroButton key={a.id} amenidad={a}
+            onClick={() => { setForm(f => ({ ...f, amenidad_id: a.id })); setShowForm(true) }}>
               {/* Icono fallback si no hay foto */}
               {!a.foto_url && (
                 <div style={{ position: 'absolute', top: 16, right: 16, fontSize: 36, opacity: 0.55 }}>🏖</div>
@@ -242,9 +255,8 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
                   </div>
                 )}
               </div>
-            </button>
-          )
-        })}
+          </AmenidadHeroButton>
+        ))}
         {amenidadesActivas.length === 0 && (
           <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,#f8fafc)', border: '1.5px dashed #cbd5e1', textAlign: 'center' }}>
             <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#dbeafe,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>🏖</div>
