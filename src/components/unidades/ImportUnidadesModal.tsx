@@ -1,9 +1,9 @@
 import { useState, useRef, type CSSProperties, type ChangeEvent, type DragEvent} from 'react'
-import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
+import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
 
 const TIPOS_UNIDAD_VALIDOS: TipoUnidad[] = [
   'apartamento', 'casa', 'bodega', 'local_comercial', 'oficina', 'parqueadero', 'otro',
@@ -161,39 +161,33 @@ export function ImportUnidadesModal({ currentUser, onClose, onImportado }: Props
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function descargarPlantilla() {
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.aoa_to_sheet([
-      [
-        'nombre', 'tipo', 'descripcion', 'piso', 'area_m2',
-        'propietario_nombre', 'propietario_telefono', 'propietario_email',
-        'direccion', 'datos_registrales', 'tipo_regimen', 'fecha_construccion',
-        'estado_ocupacional', 'contrato_suministro', 'fecha_firma_contrato',
-        'numero_contrato_suministro', 'fecha_vencimiento_contrato',
+    void writeXlsx('plantilla_unidades', [{
+      name: 'Unidades',
+      rows: [
+        [
+          'nombre', 'tipo', 'descripcion', 'piso', 'area_m2',
+          'propietario_nombre', 'propietario_telefono', 'propietario_email',
+          'direccion', 'datos_registrales', 'tipo_regimen', 'fecha_construccion',
+          'estado_ocupacional', 'contrato_suministro', 'fecha_firma_contrato',
+          'numero_contrato_suministro', 'fecha_vencimiento_contrato',
+        ],
+        [
+          'Apto 101', 'apartamento', 'Primer piso, vista al jardín', 1, 85.5,
+          'Juan Pérez', '88887777', 'juan@email.com',
+          'Bloque A, Torre 1', 'Finca 12345', 'propiedad_horizontal', '2020-06-15',
+          'habitado', 'si', '2023-01-01',
+          'CONT-001', '2025-12-31',
+        ],
+        [
+          'Casa 5', 'casa', '', 0, 120,
+          'María López', '', '',
+          'Calle Principal #5', '', 'urbanizacion', '',
+          'desocupada', 'no', '',
+          '', '',
+        ],
       ],
-      [
-        'Apto 101', 'apartamento', 'Primer piso, vista al jardín', 1, 85.5,
-        'Juan Pérez', '88887777', 'juan@email.com',
-        'Bloque A, Torre 1', 'Finca 12345', 'propiedad_horizontal', '2020-06-15',
-        'habitado', 'si', '2023-01-01',
-        'CONT-001', '2025-12-31',
-      ],
-      [
-        'Casa 5', 'casa', '', 0, 120,
-        'María López', '', '',
-        'Calle Principal #5', '', 'urbanizacion', '',
-        'desocupada', 'no', '',
-        '', '',
-      ],
-    ])
-    ws['!cols'] = [
-      { wch: 14 }, { wch: 16 }, { wch: 26 }, { wch: 6 }, { wch: 10 },
-      { wch: 20 }, { wch: 18 }, { wch: 22 },
-      { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 16 },
-      { wch: 22 }, { wch: 20 }, { wch: 18 },
-      { wch: 26 }, { wch: 24 },
-    ]
-    XLSX.utils.book_append_sheet(wb, ws, 'Unidades')
-    XLSX.writeFile(wb, 'plantilla_unidades.xlsx')
+      colWidths: [14, 16, 26, 6, 10, 20, 18, 22, 22, 18, 22, 16, 22, 20, 18, 26, 24],
+    }]).catch(err => Swal.fire('Error', err.message ?? 'No se pudo generar la plantilla', 'error'))
   }
 
   function processFile(file: File) {
@@ -202,11 +196,9 @@ export function ImportUnidadesModal({ currentUser, onClose, onImportado }: Props
       return
     }
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const wb = XLSX.read(e.target!.result as ArrayBuffer, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+        const raw = await parseXlsxToObjects<Record<string, string | number | boolean>>(e.target!.result as ArrayBuffer)
         if (raw.length === 0) {
           Swal.fire('Archivo vacío', 'El archivo no contiene filas de datos.', 'warning')
           return
