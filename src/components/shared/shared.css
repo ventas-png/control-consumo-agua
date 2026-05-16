@@ -1,0 +1,56 @@
+/* Single source of truth para keyframes compartidos.
+ *
+ * Background: la app tenía shimmer/skeleton keyframes duplicados en
+ * AdminDashboardStats, AdminDashboardCharts, AmenidadesTab, CondominiosClientPortal
+ * y otros (4+ implementaciones distintas). Importar este CSS una sola vez
+ * (desde main.tsx o desde el primer consumer) deja los keyframes
+ * disponibles globalmente.
+ */
+
+@keyframes shared-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+/* Pulse para indicadores "live" como el dot de Conectado/Activo. */
+@keyframes shared-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* Spin para botones de loading y placeholders de Suspense. */
+@keyframes shared-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Fade-in suave usado por modales, lightboxes y skeletons al desaparecer. */
+@keyframes shared-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Clase utilitaria para skeleton — fondo gradiente con shimmer.
+ * Usa color por defecto que funciona sobre fondo blanco; para fondos
+ * oscuros (KPI cards), el componente <Skeleton> override el background. */
+.shared-skeleton {
+  background: linear-gradient(90deg,
+    rgba(148, 163, 184, 0.15) 25%,
+    rgba(148, 163, 184, 0.30) 50%,
+    rgba(148, 163, 184, 0.15) 75%
+  );
+  background-size: 800px 100%;
+  animation: shared-shimmer 1.4s infinite linear;
+  border-radius: 6px;
+}
+
+/* Variante para usar sobre fondos oscuros (KPI cards de colores). */
+.shared-skeleton--on-dark {
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, 0.18) 25%,
+    rgba(255, 255, 255, 0.38) 50%,
+    rgba(255, 255, 255, 0.18) 75%
+  );
+  background-size: 800px 100%;
+  animation: shared-shimmer 1.4s infinite linear;
+  border-radius: 6px;
+}
