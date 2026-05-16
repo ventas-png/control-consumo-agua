@@ -3,6 +3,7 @@ import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { CuotaCondominio, ConceptoCuota, EstadoCuota, Unidad, Proyecto, RubroDetalle } from '../../../types'
 import { exportarExcel, exportarPDFRecibo } from '../exportUtils'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface CSVRow {
   rawUnidad: string
@@ -67,8 +68,6 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     ? cuotas
     : cuotas.filter(c => c.estado === filtroEstado)
 
-  const cuotasPagables = cuotasFiltradas.filter(c => c.estado !== 'pagado')
-
   const totales = {
     pendiente: cuotas.filter(c => c.estado === 'pendiente').reduce((s, c) => s + c.monto, 0),
     moroso:    cuotas.filter(c => c.estado === 'moroso').reduce((s, c) => s + c.monto, 0),
@@ -78,7 +77,6 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   function parsearCSV(text: string): CSVRow[] {
     const lineas = text.trim().split('\n').filter(l => l.trim())
     if (lineas.length < 2) return []
-    // skip header row
     return lineas.slice(1).map(linea => {
       const cols = linea.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
       const [rawUnidad = '', rawConcepto = '', rawMonto = '', rawPeriodo = '', rawVencimiento = '', rawNotas = ''] = cols
@@ -171,26 +169,10 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     setShowForm(false)
   }
 
-  function toggleSeleccion(id: string) {
-    setSeleccionadas(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      return next
-    })
-  }
-
-  function toggleTodas() {
-    if (seleccionadas.size === cuotasPagables.length) {
-      setSeleccionadas(new Set())
-    } else {
-      setSeleccionadas(new Set(cuotasPagables.map(c => c.id)))
-    }
-  }
-
   function toggleRubros(id: string) {
     setExpandidasRubros(prev => {
       const s = new Set(prev)
-      s.has(id) ? s.delete(id) : s.add(id)
+      if (s.has(id)) s.delete(id); else s.add(id)
       return s
     })
   }
@@ -398,6 +380,103 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   }
 
   const montoSeleccionado = cuotas.filter(c => seleccionadas.has(c.id)).reduce((s, c) => s + c.monto, 0)
+  const hoy = new Date().toISOString().slice(0, 10)
+
+  const columns: DataTableColumn<CuotaCondominio>[] = [
+    {
+      key: 'unidad_nombre',
+      header: 'Unidad',
+      sortable: true,
+      accessor: row => row.unidad_nombre ?? '',
+      render: row => (
+        row.unidad_nombre
+          ? <span style={{ color: '#374151' }}>{row.unidad_nombre}</span>
+          : <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>General</span>
+      ),
+    },
+    {
+      key: 'concepto',
+      header: 'Concepto',
+      sortable: true,
+      accessor: row => CONCEPTOS.find(x => x.value === row.concepto)?.label || row.concepto,
+      render: row => <span style={{ color: '#374151' }}>{CONCEPTOS.find(x => x.value === row.concepto)?.label || row.concepto}</span>,
+    },
+    {
+      key: 'periodo',
+      header: 'Período',
+      sortable: true,
+      render: row => <span style={{ color: '#374151' }}>{row.periodo}</span>,
+    },
+    {
+      key: 'monto',
+      header: 'Monto',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.monto,
+      render: row => (
+        <div>
+          <div style={{ fontWeight: 700, color: '#0f172a' }}>{moneda} {row.monto.toFixed(2)}</div>
+          {row.estado === 'pagado' && row.metodo_pago && (
+            <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '1px' }}>
+              {row.metodo_pago}{row.fecha_pago ? ` · ${row.fecha_pago}` : ''}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'fecha_vencimiento',
+      header: 'Vencimiento',
+      sortable: true,
+      accessor: row => row.fecha_vencimiento ?? '',
+      render: row => (
+        <span style={{ color: row.fecha_vencimiento && row.fecha_vencimiento < hoy && row.estado !== 'pagado' ? '#dc2626' : '#374151' }}>
+          {row.fecha_vencimiento || '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      render: row => (
+        canEdit ? (
+          <select value={row.estado} onChange={e => cambiarEstado(row, e.target.value as EstadoCuota)}
+            onClick={e => e.stopPropagation()}
+            style={{ padding: '4px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, border: 'none', cursor: 'pointer', background: ESTADO_COLORS[row.estado].bg, color: ESTADO_COLORS[row.estado].color }}>
+            <option value="pendiente">Pendiente</option>
+            <option value="pagado">Pagado</option>
+            <option value="moroso">Moroso</option>
+          </select>
+        ) : (
+          <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ESTADO_COLORS[row.estado].bg, color: ESTADO_COLORS[row.estado].color }}>
+            {row.estado}
+          </span>
+        )
+      ),
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: row => (
+        <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
+          {(row.estado === 'pendiente' || row.estado === 'moroso') && (
+            <button onClick={() => whatsappRecordatorio(row)} title="Recordatorio por WhatsApp"
+              style={{ background: '#f0fdf4', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
+              💬
+            </button>
+          )}
+          {row.estado === 'pagado' && canCreate && (
+            <button onClick={() => crearRecibo(row)} title="Crear recibo digital"
+              style={{ background: '#eff6ff', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
+              🧾
+            </button>
+          )}
+          <button onClick={() => eliminar(row.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '16px', padding: '2px 6px', borderRadius: '6px' }}>🗑</button>
+        </div>
+      ),
+    },
+  ]
 
   return (
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
@@ -444,7 +523,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
         </div>
       </div>
 
-      {/* Resumen */}
+      {/* Resumen + filtro estado (pills tipo KPI clickeables) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
         {([['pendiente', '#2563eb', '#eff6ff'], ['moroso', '#dc2626', '#fef2f2'], ['pagado', '#16a34a', '#f0fdf4']] as const).map(([estado, color, bg]) => (
           <button key={estado} onClick={() => { setFiltroEstado(filtroEstado === estado ? 'todos' : estado); setSeleccionadas(new Set()) }}
@@ -568,134 +647,51 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
         </div>
       )}
 
-      {/* Lista */}
-      {cuotasFiltradas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>💳</div>
-          <p style={{ fontWeight: 600, color: '#64748b' }}>No hay cuotas {filtroEstado !== 'todos' ? `con estado "${filtroEstado}"` : 'registradas'}</p>
-        </div>
-      ) : (
-        <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                {canEdit && (
-                  <th style={{ padding: '10px 14px', width: 36 }}>
-                    <input type="checkbox"
-                      checked={cuotasPagables.length > 0 && seleccionadas.size === cuotasPagables.length}
-                      onChange={toggleTodas}
-                      title="Seleccionar todas las pagables"
-                    />
-                  </th>
-                )}
-                {['Unidad', 'Concepto', 'Período', 'Monto', 'Vencimiento', 'Estado', 'Rubros', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>{h}</th>
+      <DataTable
+        data={cuotasFiltradas}
+        columns={columns}
+        rowKey="id"
+        searchableKeys={[
+          row => row.unidad_nombre ?? 'General',
+          'concepto',
+          'periodo',
+          row => row.notas ?? '',
+        ]}
+        searchPlaceholder="Buscar por unidad, concepto, período o notas…"
+        defaultSort={{ key: 'periodo', direction: 'desc' }}
+        selectable={canEdit ? {
+          selectedIds: seleccionadas,
+          onSelectionChange: setSeleccionadas,
+          isRowSelectable: row => row.estado !== 'pagado',
+        } : undefined}
+        expandable={{
+          expandedKeys: expandidasRubros,
+          onToggle: toggleRubros,
+          isRowExpandable: row => {
+            const rd = row.rubros_detalle as RubroDetalle[] | null | undefined
+            return !!(rd && rd.length > 0)
+          },
+          renderExpanded: row => {
+            const rd = (row.rubros_detalle ?? []) as RubroDetalle[]
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 12px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #e0e7ff' }}>
+                {rd.map((it, ri) => (
+                  <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#374151' }}>
+                    <span>
+                      {it.nombre}
+                      <span style={{ marginLeft: 6, color: '#9ca3af', fontSize: 11 }}>
+                        ({it.metodo === 'fijo' ? 'fijo' : it.metodo === 'por_m2' ? `${moneda} ${it.valor}/m²` : `alíc. ${it.valor.toLocaleString('es')}`})
+                      </span>
+                    </span>
+                    <span style={{ fontWeight: 600 }}>{moneda} {it.monto_calculado.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
+                  </div>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {cuotasFiltradas.flatMap(c => {
-                const esPagable = c.estado !== 'pagado'
-                const seleccionada = seleccionadas.has(c.id)
-                const rubrosDetalle = c.rubros_detalle as RubroDetalle[] | null | undefined
-                const tieneRubros = rubrosDetalle && rubrosDetalle.length > 0
-                const expandido = expandidasRubros.has(c.id)
-                const hoy = new Date().toISOString().slice(0, 10)
-                const colCount = canEdit ? 9 : 8
-
-                const mainRow = (
-                  <tr key={c.id} style={{ borderBottom: expandido ? 'none' : '1px solid #f1f5f9', background: seleccionada ? '#f0fdf4' : undefined }}>
-                    {canEdit && (
-                      <td style={{ padding: '10px 14px' }}>
-                        {esPagable && (
-                          <input type="checkbox" checked={seleccionada} onChange={() => toggleSeleccion(c.id)} />
-                        )}
-                      </td>
-                    )}
-                    <td style={{ padding: '10px 14px', color: '#374151' }}>{c.unidad_nombre || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>General</span>}</td>
-                    <td style={{ padding: '10px 14px', color: '#374151' }}>{CONCEPTOS.find(x => x.value === c.concepto)?.label || c.concepto}</td>
-                    <td style={{ padding: '10px 14px', color: '#374151' }}>{c.periodo}</td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{moneda} {c.monto.toFixed(2)}</div>
-                      {c.estado === 'pagado' && c.metodo_pago && (
-                        <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '1px' }}>
-                          {c.metodo_pago}{c.fecha_pago ? ` · ${c.fecha_pago}` : ''}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 14px', color: c.fecha_vencimiento && c.fecha_vencimiento < hoy && c.estado !== 'pagado' ? '#dc2626' : '#374151' }}>
-                      {c.fecha_vencimiento || '—'}
-                    </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      {canEdit ? (
-                        <select value={c.estado} onChange={e => cambiarEstado(c, e.target.value as EstadoCuota)}
-                          style={{ padding: '4px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, border: 'none', cursor: 'pointer', background: ESTADO_COLORS[c.estado].bg, color: ESTADO_COLORS[c.estado].color }}>
-                          <option value="pendiente">Pendiente</option>
-                          <option value="pagado">Pagado</option>
-                          <option value="moroso">Moroso</option>
-                        </select>
-                      ) : (
-                        <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ESTADO_COLORS[c.estado].bg, color: ESTADO_COLORS[c.estado].color }}>
-                          {c.estado}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      {tieneRubros ? (
-                        <button onClick={() => toggleRubros(c.id)}
-                          style={{ fontSize: '11px', padding: '3px 8px', border: '1px solid #c7d2fe', borderRadius: '6px', cursor: 'pointer', background: expandido ? '#eff6ff' : '#f8fafc', color: '#4f46e5', fontWeight: 600 }}>
-                          {expandido ? '▲' : '▼'} {rubrosDetalle!.length}
-                        </button>
-                      ) : <span style={{ color: '#d1d5db', fontSize: 11 }}>—</span>}
-                    </td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {(c.estado === 'pendiente' || c.estado === 'moroso') && (
-                          <button onClick={() => whatsappRecordatorio(c)} title="Recordatorio por WhatsApp"
-                            style={{ background: '#f0fdf4', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
-                            💬
-                          </button>
-                        )}
-                        {c.estado === 'pagado' && canCreate && (
-                          <button onClick={() => crearRecibo(c)} title="Crear recibo digital"
-                            style={{ background: '#eff6ff', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
-                            🧾
-                          </button>
-                        )}
-                        <button onClick={() => eliminar(c.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '16px', padding: '2px 6px', borderRadius: '6px' }}>🗑</button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-
-                if (!expandido || !tieneRubros) return [mainRow]
-
-                const detalleRow = (
-                  <tr key={`${c.id}-rubros`} style={{ borderBottom: '1px solid #f1f5f9', background: '#f8faff' }}>
-                    <td colSpan={colCount} style={{ padding: '0 14px 10px 48px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 12px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #e0e7ff' }}>
-                        {rubrosDetalle!.map((rd, ri) => (
-                          <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#374151' }}>
-                            <span>
-                              {rd.nombre}
-                              <span style={{ marginLeft: 6, color: '#9ca3af', fontSize: 11 }}>
-                                ({rd.metodo === 'fijo' ? 'fijo' : rd.metodo === 'por_m2' ? `${moneda} ${rd.valor}/m²` : `alíc. ${rd.valor.toLocaleString('es')}`})
-                              </span>
-                            </span>
-                            <span style={{ fontWeight: 600 }}>{moneda} {rd.monto_calculado.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                )
-
-                return [mainRow, detalleRow]
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </div>
+            )
+          },
+        }}
+        emptyState={{ icon: '💳', title: `No hay cuotas${filtroEstado !== 'todos' ? ` con estado "${filtroEstado}"` : ' registradas'}` }}
+      />
     </div>
   )
 }

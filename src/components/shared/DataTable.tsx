@@ -1,4 +1,4 @@
-import { useState, useMemo, type ReactNode, type CSSProperties } from 'react'
+import { useState, useMemo, useRef, useEffect, type ReactNode, type CSSProperties } from 'react'
 import { EmptyState } from './EmptyState'
 import { Skeleton } from './Skeleton'
 
@@ -85,6 +85,30 @@ export interface DataTableProps<T> {
    * Debe retornar `<tr>` con `<td>`s alineados con las columnas.
    */
   footerRow?: (filteredRows: T[]) => ReactNode
+
+  /**
+   * Selección masiva con checkboxes. Estado controlado por el padre.
+   * El checkbox del header opera sobre las filas seleccionables de la página
+   * actual (tras filter/sort/paginate). Filas con `isRowSelectable === false`
+   * muestran checkbox deshabilitado.
+   */
+  selectable?: {
+    selectedIds: Set<string>
+    onSelectionChange: (ids: Set<string>) => void
+    isRowSelectable?: (row: T) => boolean
+  }
+
+  /**
+   * Filas expandibles. Cuando `expandedKeys` contiene el row key, debajo de
+   * la fila principal se renderiza una fila adicional con `renderExpanded`
+   * ocupando todas las columnas. Estado controlado por el padre.
+   */
+  expandable?: {
+    expandedKeys: Set<string>
+    onToggle: (key: string) => void
+    renderExpanded: (row: T) => ReactNode
+    isRowExpandable?: (row: T) => boolean
+  }
 }
 
 // ── Componente ────────────────────────────────────────────────────────────
@@ -104,6 +128,8 @@ export function DataTable<T>({
   rowStyle,
   onRowClick,
   footerRow,
+  selectable,
+  expandable,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('')
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(
@@ -187,6 +213,51 @@ export function DataTable<T>({
     const v = (row as Record<string, unknown>)[rowKey as string]
     return v != null ? String(v) : `row-${idx}`
   }
+
+  // ── Selección masiva ────────────────────────────────────────────────────
+  const selectAllRef = useRef<HTMLInputElement>(null)
+  const pageSelectableIds = useMemo(() => {
+    if (!selectable) return [] as string[]
+    return paginated
+      .filter(r => selectable.isRowSelectable ? selectable.isRowSelectable(r) : true)
+      .map((r, i) => getRowKey(r, i))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginated, selectable])
+
+  const selectedOnPageCount = useMemo(() => {
+    if (!selectable) return 0
+    let count = 0
+    for (const id of pageSelectableIds) if (selectable.selectedIds.has(id)) count++
+    return count
+  }, [pageSelectableIds, selectable])
+
+  const allPageSelected = pageSelectableIds.length > 0 && selectedOnPageCount === pageSelectableIds.length
+  const somePageSelected = selectedOnPageCount > 0 && !allPageSelected
+
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = somePageSelected
+  }, [somePageSelected])
+
+  function toggleSelectAllOnPage() {
+    if (!selectable) return
+    const next = new Set(selectable.selectedIds)
+    if (allPageSelected) {
+      for (const id of pageSelectableIds) next.delete(id)
+    } else {
+      for (const id of pageSelectableIds) next.add(id)
+    }
+    selectable.onSelectionChange(next)
+  }
+
+  function toggleRowSelection(id: string) {
+    if (!selectable) return
+    const next = new Set(selectable.selectedIds)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    selectable.onSelectionChange(next)
+  }
+
+  const extraColsCount = (selectable ? 1 : 0) + (expandable ? 1 : 0)
+  const totalColCount = columns.length + extraColsCount
 
   // ── Render: estados especiales ──────────────────────────────────────────
   if (isLoading) {
@@ -277,6 +348,36 @@ export function DataTable<T>({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
+                  {selectable && (
+                    <th
+                      scope="col"
+                      style={{
+                        padding: '12px 14px',
+                        borderBottom: '2px solid #e2e8f0',
+                        width: 36,
+                      }}
+                    >
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        checked={allPageSelected}
+                        onChange={toggleSelectAllOnPage}
+                        disabled={pageSelectableIds.length === 0}
+                        aria-label="Seleccionar todas las filas de esta página"
+                      />
+                    </th>
+                  )}
+                  {expandable && (
+                    <th
+                      scope="col"
+                      aria-label="Expandir"
+                      style={{
+                        padding: '12px 6px',
+                        borderBottom: '2px solid #e2e8f0',
+                        width: 32,
+                      }}
+                    />
+                  )}
                   {columns.map(col => {
                     const isSorted = sortConfig?.key === col.key
                     const arrow = !isSorted ? '' : sortConfig.direction === 'asc' ? ' ↑' : ' ↓'
@@ -308,33 +409,93 @@ export function DataTable<T>({
                 </tr>
               </thead>
               <tbody>
-                {paginated.map((row, idx) => (
-                  <tr
-                    key={getRowKey(row, idx)}
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
-                    style={{
-                      borderBottom: '1px solid #f1f5f9',
-                      cursor: onRowClick ? 'pointer' : 'default',
-                      transition: 'background 0.12s',
-                      ...(rowStyle ? rowStyle(row) : {}),
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '' }}
-                  >
-                    {columns.map(col => (
-                      <td
-                        key={col.key}
-                        style={{
-                          padding: '10px 14px',
-                          textAlign: col.align ?? 'left',
-                          color: '#0f172a',
-                        }}
-                      >
-                        {col.render ? col.render(row) : String(getAccessorValue(col, row) ?? '')}
+                {paginated.flatMap((row, idx) => {
+                  const key = getRowKey(row, idx)
+                  const isSelected = selectable?.selectedIds.has(key) ?? false
+                  const canSelect = selectable
+                    ? (selectable.isRowSelectable ? selectable.isRowSelectable(row) : true)
+                    : false
+                  const isExpanded = expandable?.expandedKeys.has(key) ?? false
+                  const canExpand = expandable
+                    ? (expandable.isRowExpandable ? expandable.isRowExpandable(row) : true)
+                    : false
+
+                  const mainRow = (
+                    <tr
+                      key={key}
+                      onClick={onRowClick ? () => onRowClick(row) : undefined}
+                      style={{
+                        borderBottom: isExpanded && canExpand ? 'none' : '1px solid #f1f5f9',
+                        cursor: onRowClick ? 'pointer' : 'default',
+                        transition: 'background 0.12s',
+                        ...(isSelected ? { background: '#f0fdf4' } : {}),
+                        ...(rowStyle ? rowStyle(row) : {}),
+                      }}
+                      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f8fafc' }}
+                      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = '' }}
+                    >
+                      {selectable && (
+                        <td style={{ padding: '10px 14px' }} onClick={e => e.stopPropagation()}>
+                          {canSelect && (
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleRowSelection(key)}
+                              aria-label="Seleccionar fila"
+                            />
+                          )}
+                        </td>
+                      )}
+                      {expandable && (
+                        <td style={{ padding: '10px 6px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                          {canExpand && (
+                            <button
+                              onClick={() => expandable.onToggle(key)}
+                              aria-expanded={isExpanded}
+                              aria-label={isExpanded ? 'Colapsar fila' : 'Expandir fila'}
+                              style={{
+                                background: isExpanded ? '#eff6ff' : 'transparent',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                padding: '2px 6px',
+                                fontSize: 11,
+                                color: '#4f46e5',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {isExpanded ? '▲' : '▼'}
+                            </button>
+                          )}
+                        </td>
+                      )}
+                      {columns.map(col => (
+                        <td
+                          key={col.key}
+                          style={{
+                            padding: '10px 14px',
+                            textAlign: col.align ?? 'left',
+                            color: '#0f172a',
+                          }}
+                        >
+                          {col.render ? col.render(row) : String(getAccessorValue(col, row) ?? '')}
+                        </td>
+                      ))}
+                    </tr>
+                  )
+
+                  if (!isExpanded || !canExpand || !expandable) return [mainRow]
+
+                  const expandedRow = (
+                    <tr key={`${key}__expanded`} style={{ borderBottom: '1px solid #f1f5f9', background: '#f8faff' }}>
+                      <td colSpan={totalColCount} style={{ padding: '0 14px 12px' }}>
+                        {expandable.renderExpanded(row)}
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                    </tr>
+                  )
+
+                  return [mainRow, expandedRow]
+                })}
               </tbody>
               {footerRow && (
                 <tfoot>
