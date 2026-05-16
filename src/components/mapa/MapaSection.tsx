@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import type { Cliente, Registro } from '../../types'
 interface Props {
   clientes: Cliente[]
