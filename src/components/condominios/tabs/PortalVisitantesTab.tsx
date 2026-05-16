@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
+import { toast } from '../../../lib/toast'
 import type { Visitante } from '../../../types'
 
 interface Props {
@@ -25,7 +25,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
   const recientes = visitantes.filter(v => v.hora_entrada.slice(0, 10) === hoy)
 
   async function preAutorizar() {
-    if (!form.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre del visitante.', 'error'); return }
+    if (!form.nombre.trim()) { toast.error('Ingrese el nombre del visitante.'); return }
     setSaving(true)
     const { error } = await supabase.from('visitantes').insert({
       company_id: companyId, project_id: proyectoId, unidad_id: unidadId,
@@ -37,8 +37,8 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
       hora_entrada: new Date().toISOString(),
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
-    Swal.fire({ icon: 'success', title: '¡Visitante pre-autorizado!', text: 'La administración fue notificada.', timer: 1800, showConfirmButton: false })
+    if (error) { toast.error(error.message); return }
+    toast.success('¡Visitante pre-autorizado!', { description: 'La administración fue notificada.' })
     setForm(blankForm()); setShowForm(false); onRefresh()
   }
 

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
+import { toast } from '../../../lib/toast'
 import { CampanaCobro, CanalCampana, EstadoCampana, CuotaCondominio, Unidad } from '../../../types'
 
 interface Props {
@@ -52,7 +53,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
 
   async function crear() {
     if (!form.nombre.trim() || !form.mensaje.trim()) {
-      Swal.fire('Error', 'Nombre y mensaje son obligatorios', 'warning'); return
+      toast.warning('Nombre y mensaje son obligatorios'); return
     }
     setSaving(true)
     const { error } = await supabase.from('campanas_cobro').insert({
@@ -64,7 +65,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
       total_destinatarios: filteredPreview.length,
     })
     setSaving(false)
-    if (error) { Swal.fire('Error', error.message, 'error'); return }
+    if (error) { toast.error(error.message); return }
     setMostrarForm(false); setForm(BLANK); onRefresh()
   }
 
@@ -80,7 +81,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
       estado: 'enviada', enviadas: c.total_destinatarios,
       enviada_por: autorNombre, fecha_envio: new Date().toISOString(),
     }).eq('id', c.id)
-    Swal.fire({ icon: 'success', title: 'Campaña enviada', timer: 1500, showConfirmButton: false })
+    toast.success('Campaña enviada')
     onRefresh()
   }
 

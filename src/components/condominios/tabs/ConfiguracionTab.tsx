@@ -1,7 +1,7 @@
 import { useState, useEffect, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ConfiguracionCondominio } from '../../../types'
-import Swal from 'sweetalert2'
+import { toast } from '../../../lib/toast'
 
 interface Props {
   configuracion: ConfiguracionCondominio[]
@@ -65,13 +65,13 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
       const { error } = await supabase.from('configuracion_condominio')
         .update({ valor: values[clave] || null, updated_at: new Date().toISOString() })
         .eq('id', existing.id)
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(null); return }
+      if (error) { toast.error(error.message); setSaving(null); return }
     } else {
       const { error } = await supabase.from('configuracion_condominio').insert({
         company_id: companyId, project_id: proyectoId,
         clave, valor: values[clave] || null, tipo,
       })
-      if (error) { Swal.fire('Error', error.message, 'error'); setSaving(null); return }
+      if (error) { toast.error(error.message); setSaving(null); return }
     }
     setSaving(null)
     setDirty(prev => { const n = new Set(prev); n.delete(clave); return n })
@@ -100,7 +100,7 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
     setSaving(null)
     setDirty(new Set())
     onRefresh()
-    Swal.fire({ icon: 'success', title: 'Configuración guardada', timer: 1500, showConfirmButton: false })
+    toast.success('Configuración guardada')
   }
 
   const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', color: '#1e293b', background: canEdit ? 'white' : '#f8fafc', boxSizing: 'border-box' }
