@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
 import type { Registro, Cliente } from '../../types'
+import { DataTable, type DataTableColumn } from '../shared'
+import { formatDate, formatCurrency, formatNumber } from '../../lib/format'
 
 interface Props {
   registros: Registro[]
@@ -7,102 +9,124 @@ interface Props {
   moneda: string
 }
 
-type SortField = 'fecha' | 'cliente' | 'consumo' | 'monto' | 'estado'
-type SortOrder = 'asc' | 'desc'
+type FiltroEstado = 'todos' | 'pagado' | 'pendiente' | 'mora'
+
+const ESTADO_STYLES: Record<string, { bg: string; color: string; label: string }> = {
+  pagado:    { bg: '#dcfce7', color: '#166534', label: '✓ Pagado' },
+  pendiente: { bg: '#fef3c7', color: '#b45309', label: '⏳ Pendiente' },
+  mora:      { bg: '#fee2e2', color: '#991b1b', label: '⚠ Mora' },
+}
+
+interface RowVm {
+  registro: Registro
+  cliente?: Cliente
+}
 
 export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterEstado, setFilterEstado] = useState<'todos' | 'pagado' | 'pendiente' | 'mora'>('todos')
-  const [sortField, setSortField] = useState<SortField>('fecha')
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+  const [filterEstado, setFilterEstado] = useState<FiltroEstado>('todos')
 
-  const registrosFiltrados = useMemo(() => {
-    let filtered = registros
+  // Index clientes por id para evitar el O(N×M) original que buscaba por
+  // cliente_id en cada render de fila + cada sort + cada filter.
+  const clientesById = useMemo(
+    () => new Map(clientes.map(c => [c.id, c])),
+    [clientes]
+  )
 
-    // Filtrar por búsqueda
-    if (searchTerm) {
-      filtered = filtered.filter(r => {
-        const cliente = clientes.find(c => c.id === r.cliente_id)
+  const filtrados: RowVm[] = useMemo(() => {
+    const needle = searchTerm.toLowerCase().trim()
+    return registros
+      .filter(r => filterEstado === 'todos' || r.estado === filterEstado)
+      .filter(r => {
+        if (!needle) return true
+        const cliente = clientesById.get(r.cliente_id ?? '')
         return (
-          cliente?.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          cliente?.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          r.id.includes(searchTerm)
+          (cliente?.nombre?.toLowerCase().includes(needle) ?? false) ||
+          (cliente?.codigo?.toLowerCase().includes(needle) ?? false) ||
+          r.id.includes(needle)
         )
       })
-    }
+      .map(registro => ({ registro, cliente: clientesById.get(registro.cliente_id ?? '') }))
+  }, [registros, filterEstado, searchTerm, clientesById])
 
-    // Filtrar por estado
-    if (filterEstado !== 'todos') {
-      filtered = filtered.filter(r => r.estado === filterEstado)
-    }
+  const stats = useMemo(() => ({
+    total: filtrados.length,
+    consumoTotal: filtrados.reduce((acc, r) => acc + r.registro.consumo, 0),
+    recaudoTotal: filtrados.reduce((acc, r) => acc + (r.registro.monto_calculado ?? 0), 0),
+  }), [filtrados])
 
-    // Ordenar
-    filtered.sort((a, b) => {
-      let aVal: string | number = ''
-      let bVal: string | number = ''
-
-      switch (sortField) {
-        case 'fecha':
-          aVal = a.fecha
-          bVal = b.fecha
-          break
-        case 'cliente':
-          aVal = clientes.find(c => c.id === a.cliente_id)?.nombre || ''
-          bVal = clientes.find(c => c.id === b.cliente_id)?.nombre || ''
-          break
-        case 'consumo':
-          aVal = a.consumo
-          bVal = b.consumo
-          break
-        case 'monto':
-          aVal = a.monto_calculado || 0
-          bVal = b.monto_calculado || 0
-          break
-        case 'estado':
-          aVal = a.estado
-          bVal = b.estado
-          break
-      }
-
-      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1
-      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1
-      return 0
-    })
-
-    return filtered
-  }, [registros, clientes, searchTerm, filterEstado, sortField, sortOrder])
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortField(field)
-      setSortOrder('desc')
-    }
-  }
-
-  const getEstadoStyle = (estado: string) => {
-    switch (estado) {
-      case 'pagado':
-        return { bg: '#dcfce7', color: '#166534', label: '✓ Pagado' }
-      case 'pendiente':
-        return { bg: '#fef3c7', color: '#b45309', label: '⏳ Pendiente' }
-      case 'mora':
-        return { bg: '#fee2e2', color: '#991b1b', label: '⚠ Mora' }
-      default:
-        return { bg: '#f1f5f9', color: '#475569', label: 'Desconocido' }
-    }
-  }
-
-  const stats = {
-    total: registrosFiltrados.length,
-    consumoTotal: registrosFiltrados.reduce((acc, r) => acc + r.consumo, 0),
-    recaudoTotal: registrosFiltrados.reduce((acc, r) => acc + (r.monto_calculado ?? 0), 0),
-  }
+  const columns: DataTableColumn<RowVm>[] = useMemo(() => [
+    {
+      key: 'fecha',
+      header: 'Fecha',
+      sortable: true,
+      accessor: r => r.registro.fecha,
+      render: r => formatDate(r.registro.fecha),
+    },
+    {
+      key: 'cliente',
+      header: 'Cliente',
+      sortable: true,
+      accessor: r => r.cliente?.nombre ?? '',
+      render: r => (
+        <div>
+          <div style={{ fontWeight: 600, color: '#0f172a' }}>{r.cliente?.nombre ?? '—'}</div>
+          <div style={{ fontSize: '12px', color: '#94a3b8' }}>{r.cliente?.codigo ?? ''}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'consumo',
+      header: 'Consumo',
+      sortable: true,
+      align: 'right',
+      accessor: r => r.registro.consumo,
+      render: r => (
+        <span style={{ color: '#0ea5e9', fontWeight: 600 }}>
+          {formatNumber(r.registro.consumo)} m³
+        </span>
+      ),
+    },
+    {
+      key: 'monto',
+      header: 'Monto',
+      sortable: true,
+      align: 'right',
+      accessor: r => r.registro.monto_calculado ?? 0,
+      render: r => (
+        <span style={{ color: '#10b981', fontWeight: 600 }}>
+          {formatCurrency(r.registro.monto_calculado, moneda)}
+        </span>
+      ),
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      align: 'center',
+      accessor: r => r.registro.estado,
+      render: r => {
+        const style = ESTADO_STYLES[r.registro.estado] ?? { bg: '#f1f5f9', color: '#475569', label: r.registro.estado }
+        return (
+          <span style={{
+            display: 'inline-block',
+            padding: '6px 12px',
+            background: style.bg,
+            color: style.color,
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: 600,
+          }}>
+            {style.label}
+          </span>
+        )
+      },
+    },
+  ], [moneda])
 
   return (
     <div>
-      {/* Filtros */}
+      {/* Filtros — controlados por el padre para poder calcular los stats */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 200px',
@@ -122,10 +146,10 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
             fontFamily: 'inherit',
           }}
         />
-
         <select
           value={filterEstado}
-          onChange={(e) => setFilterEstado(e.target.value as 'todos' | 'pagado' | 'pendiente' | 'mora')}
+          onChange={(e) => setFilterEstado(e.target.value as FiltroEstado)}
+          aria-label="Filtrar por estado"
           style={{
             padding: '12px 16px',
             borderRadius: '8px',
@@ -142,194 +166,70 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
         </select>
       </div>
 
-      {/* Resumen */}
+      {/* Stats — derivados del set filtrado */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
         gap: '12px',
         marginBottom: '24px',
       }}>
-        <div style={{
-          padding: '16px',
-          background: '#f0f9ff',
-          borderRadius: '12px',
-          border: '1px solid #bae6fd',
-        }}>
-          <div style={{ fontSize: '12px', color: '#0369a1', marginBottom: '4px' }}>Total Registros</div>
-          <div style={{ fontSize: '24px', fontWeight: '700', color: '#0284c7' }}>{stats.total}</div>
-        </div>
-
-        <div style={{
-          padding: '16px',
-          background: '#f0fdf4',
-          borderRadius: '12px',
-          border: '1px solid #bbf7d0',
-        }}>
-          <div style={{ fontSize: '12px', color: '#166534', marginBottom: '4px' }}>Consumo Total</div>
-          <div style={{ fontSize: '24px', fontWeight: '700', color: '#15803d' }}>{stats.consumoTotal.toFixed(2)} m³</div>
-        </div>
-
-        <div style={{
-          padding: '16px',
-          background: '#f7fee7',
-          borderRadius: '12px',
-          border: '1px solid #dcfce7',
-        }}>
-          <div style={{ fontSize: '12px', color: '#4d7c0f', marginBottom: '4px' }}>Recaudo Total</div>
-          <div style={{ fontSize: '24px', fontWeight: '700', color: '#65a30d' }}>{moneda} {stats.recaudoTotal.toFixed(2)}</div>
-        </div>
+        <StatCard
+          label="Total Registros"
+          value={String(stats.total)}
+          bg="#f0f9ff" border="#bae6fd" labelColor="#0369a1" valueColor="#0284c7"
+        />
+        <StatCard
+          label="Consumo Total"
+          value={`${formatNumber(stats.consumoTotal)} m³`}
+          bg="#f0fdf4" border="#bbf7d0" labelColor="#166534" valueColor="#15803d"
+        />
+        <StatCard
+          label="Recaudo Total"
+          value={formatCurrency(stats.recaudoTotal, moneda)}
+          bg="#f7fee7" border="#dcfce7" labelColor="#4d7c0f" valueColor="#65a30d"
+        />
       </div>
 
-      {/* Tabla de registros */}
-      <div style={{
-        background: 'white',
-        borderRadius: '12px',
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
-        overflow: 'hidden',
-      }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: '14px',
-          }}>
-            <thead style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-              <tr>
-                <th scope="col"
-                  onClick={() => handleSort('fecha')}
-                  style={{
-                    padding: '16px',
-                    textAlign: 'left',
-                    fontWeight: '700',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    userSelect: 'none',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Fecha {sortField === 'fecha' && (sortOrder === 'asc' ? '↑' : '↓')}
-                </th>
-                <th scope="col"
-                  onClick={() => handleSort('cliente')}
-                  style={{
-                    padding: '16px',
-                    textAlign: 'left',
-                    fontWeight: '700',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    userSelect: 'none',
-                  }}
-                >
-                  Cliente {sortField === 'cliente' && (sortOrder === 'asc' ? '↑' : '↓')}
-                </th>
-                <th scope="col"
-                  onClick={() => handleSort('consumo')}
-                  style={{
-                    padding: '16px',
-                    textAlign: 'right',
-                    fontWeight: '700',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    userSelect: 'none',
-                  }}
-                >
-                  Consumo {sortField === 'consumo' && (sortOrder === 'asc' ? '↑' : '↓')}
-                </th>
-                <th scope="col"
-                  onClick={() => handleSort('monto')}
-                  style={{
-                    padding: '16px',
-                    textAlign: 'right',
-                    fontWeight: '700',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    userSelect: 'none',
-                  }}
-                >
-                  Monto {sortField === 'monto' && (sortOrder === 'asc' ? '↑' : '↓')}
-                </th>
-                <th scope="col"
-                  onClick={() => handleSort('estado')}
-                  style={{
-                    padding: '16px',
-                    textAlign: 'center',
-                    fontWeight: '700',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    userSelect: 'none',
-                  }}
-                >
-                  Estado {sortField === 'estado' && (sortOrder === 'asc' ? '↑' : '↓')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {registrosFiltrados.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{
-                    padding: '32px',
-                    textAlign: 'center',
-                    color: '#94a3b8',
-                  }}>
-                    No se encontraron registros
-                  </td>
-                </tr>
-              ) : (
-                registrosFiltrados.map((registro) => {
-                  const cliente = clientes.find(c => c.id === registro.cliente_id)
-                  const estadoStyle = getEstadoStyle(registro.estado)
+      <DataTable<RowVm>
+        data={filtrados}
+        columns={columns}
+        rowKey={r => r.registro.id}
+        defaultSort={{ key: 'fecha', direction: 'desc' }}
+        pageSize={50}
+        emptyState={{
+          icon: '📋',
+          title: 'No se encontraron registros',
+          description: searchTerm || filterEstado !== 'todos'
+            ? 'Prueba con otros filtros o limpia la búsqueda.'
+            : 'Aún no hay lecturas registradas.',
+        }}
+      />
+    </div>
+  )
+}
 
-                  return (
-                    <tr
-                      key={registro.id}
-                      style={{
-                        borderBottom: '1px solid #e2e8f0',
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLTableRowElement).style.background = '#f8fafc'
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'
-                      }}
-                    >
-                      <td style={{ padding: '16px', color: '#0f172a', fontWeight: '500', whiteSpace: 'nowrap' }}>
-                        {new Date(registro.fecha).toLocaleDateString('es-GT')}
-                      </td>
-                      <td style={{ padding: '16px', color: '#475569' }}>
-                        <div style={{ fontWeight: '600', color: '#0f172a', marginBottom: '2px' }}>
-                          {cliente?.nombre}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                          {cliente?.codigo}
-                        </div>
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'right', color: '#0ea5e9', fontWeight: '600' }}>
-                        {registro.consumo.toFixed(2)} m³
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'right', color: '#10b981', fontWeight: '600' }}>
-                        {moneda} {(registro.monto_calculado ?? 0).toFixed(2)}
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'center' }}>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '6px 12px',
-                          background: estadoStyle.bg,
-                          color: estadoStyle.color,
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                        }}>
-                          {estadoStyle.label}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+// Sub-componente local — los KPI cards de AdminHistoryTab tienen su propio
+// look (fondo pastel claro con borde), distinto a los <KpiCard> gradient.
+// Se queda local hasta que decidamos si unificarlos.
+function StatCard({
+  label, value, bg, border, labelColor, valueColor,
+}: {
+  label: string
+  value: string
+  bg: string
+  border: string
+  labelColor: string
+  valueColor: string
+}) {
+  return (
+    <div style={{
+      padding: '16px',
+      background: bg,
+      borderRadius: '12px',
+      border: `1px solid ${border}`,
+    }}>
+      <div style={{ fontSize: '12px', color: labelColor, marginBottom: '4px' }}>{label}</div>
+      <div style={{ fontSize: '24px', fontWeight: 700, color: valueColor }}>{value}</div>
     </div>
   )
 }
