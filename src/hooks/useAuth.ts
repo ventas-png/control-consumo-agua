@@ -197,37 +197,35 @@ async function buildSessionFromSupabase(
   let servicio_agua: boolean | undefined
   let servicio_condominios: boolean | undefined
   try {
-    const batch2: Promise<void> = companyId
-      ? supabase
+    const batch2: Promise<void> = (async () => {
+      if (companyId) {
+        const { data } = await supabase
           .from('companies')
           .select('servicio_agua, servicio_condominios')
           .eq('id', companyId)
           .single()
-          .then(({ data }) => {
-            if (data) {
-              const flags = data as { servicio_agua: boolean; servicio_condominios: boolean }
-              servicio_agua = flags.servicio_agua
-              servicio_condominios = flags.servicio_condominios
-            }
-          })
-      : clienteId
-      ? (async () => {
-          type UnidadRow = { projects: { companies: { servicio_agua: boolean; servicio_condominios: boolean } | null } | null }
-          const { data: unidadesFlags } = await supabase
-            .from('unidades')
-            .select('projects(companies(servicio_agua, servicio_condominios))')
-            .eq('cliente_id', clienteId)
-            .eq('activo', true)
-          if (unidadesFlags) {
-            for (const u of (unidadesFlags as unknown as UnidadRow[])) {
-              const flags = u.projects?.companies
-              if (!flags) continue
-              if (flags.servicio_condominios) servicio_condominios = true
-              if (flags.servicio_agua) servicio_agua = true
-            }
+        if (data) {
+          const flags = data as { servicio_agua: boolean; servicio_condominios: boolean }
+          servicio_agua = flags.servicio_agua
+          servicio_condominios = flags.servicio_condominios
+        }
+      } else if (clienteId) {
+        type UnidadRow = { projects: { companies: { servicio_agua: boolean; servicio_condominios: boolean } | null } | null }
+        const { data: unidadesFlags } = await supabase
+          .from('unidades')
+          .select('projects(companies(servicio_agua, servicio_condominios))')
+          .eq('cliente_id', clienteId)
+          .eq('activo', true)
+        if (unidadesFlags) {
+          for (const u of (unidadesFlags as unknown as UnidadRow[])) {
+            const flags = u.projects?.companies
+            if (!flags) continue
+            if (flags.servicio_condominios) servicio_condominios = true
+            if (flags.servicio_agua) servicio_agua = true
           }
-        })()
-      : Promise.resolve()
+        }
+      }
+    })()
 
     await Promise.race([batch2, new Promise<void>(resolve => setTimeout(resolve, 4000))])
   } catch {
