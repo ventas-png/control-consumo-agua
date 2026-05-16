@@ -101,6 +101,10 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
   condominiosRoleRef.current = condominiosRole
   companyIdRef.current = companyId
 
+  // Guard against silent-retry-storm when the network is fully down:
+  // only one background retry per outer-trigger cycle.
+  const silentRetryDoneRef = useRef(false)
+
   const fetchAllData = async () => {
     const cid = companyIdRef.current
     // Defense-in-depth: add company_id filters where columns exist.
@@ -281,13 +285,23 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       // que generaba ruido en DevTools cuando el request se cancelaba.
 
       // Use cached data as base so partial query failures keep cached values for failed tables
-      const base = loadCache() ?? INITIAL_DATA
+      const cached = loadCache()
+      const base = cached ?? INITIAL_DATA
 
-      // Each fetchAllData() call is capped at 15 s — Supabase cold starts can stall indefinitely
+      // If we have usable cache, paint it immediately so mobile users see data while the
+      // network round-trip is in flight — avoids long skeletons on slow 4G.
+      const cacheUsable = cached && (cached.clientes.length > 0 || cached.registros.length > 0 || cached.proyectos.length > 0)
+      if (cacheUsable) {
+        setData(cached)
+        setIsLoading(false)
+      }
+
+      // Each fetchAllData() call is capped at 25 s — mobile 4G + Supabase cold starts
+      // can take 18-20 s legitimately. Below that we get false-positive timeouts.
       const fetchWithTimeout = () => Promise.race([
         fetchAllData(),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('fetch_timeout')), 15000)
+          setTimeout(() => reject(new Error('fetch_timeout')), 25000)
         ),
       ])
 
@@ -300,6 +314,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
 
       if (!hasErrors(results)) {
         saveCache(freshData)
+        silentRetryDoneRef.current = false
         return
       }
 
@@ -318,6 +333,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
 
       if (!hasErrors(results)) {
         saveCache(retryData)
+        silentRetryDoneRef.current = false
         return
       }
 
@@ -332,6 +348,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
 
       if (!hasErrors(results)) {
         saveCache(retryData2)
+        silentRetryDoneRef.current = false
       } else if (!dataLoaded) {
         // Only block the UI if we truly have no data at all
         Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
@@ -339,7 +356,19 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       // If data loaded but some queries still error, stay silent — data is visible in the UI
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
-      if (msg === 'fetch_timeout') {
+      const cached = loadCache()
+      const cacheUsable = cached && (cached.clientes.length > 0 || cached.registros.length > 0 || cached.proyectos.length > 0)
+
+      if (cacheUsable) {
+        // Stay silent — user already sees cached data. Log for diagnosis only.
+        console.warn('[useData] Fetch failed, showing cached data:', msg || err)
+        setData(cached)
+        // One silent background retry — avoids retry-storm if the network is fully down
+        if (!silentRetryDoneRef.current) {
+          silentRetryDoneRef.current = true
+          setTimeout(() => { cargarDatos() }, 5000)
+        }
+      } else if (msg === 'fetch_timeout') {
         Swal.fire('Tiempo de espera agotado', 'El servidor tardó demasiado. Verifique su conexión e intente de nuevo.', 'warning')
       } else {
         console.error('[useData] Unexpected error in cargarDatos:', err)
