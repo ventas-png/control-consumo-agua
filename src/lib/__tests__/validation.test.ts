@@ -10,30 +10,35 @@ import {
 } from '../validation'
 
 describe('sanitizeInput', () => {
-  it('elimina etiquetas HTML', () => {
-    expect(sanitizeInput('<script>alert(1)</script>')).not.toContain('<')
-    expect(sanitizeInput('<script>alert(1)</script>')).not.toContain('>')
+  it('elimina etiquetas <script> incluyendo su contenido', () => {
+    expect(sanitizeInput('<script>alert(1)</script>')).toBe('')
   })
 
-  it('elimina javascript: protocol', () => {
-    expect(sanitizeInput('javascript:alert(1)')).not.toContain('javascript:')
+  it('elimina etiquetas pero preserva su texto plano', () => {
+    expect(sanitizeInput('<b>bold</b>')).toBe('bold')
+    expect(sanitizeInput('<a href="javascript:foo">click</a>')).toBe('click')
   })
 
-  it('elimina data: protocol', () => {
-    expect(sanitizeInput('data:text/html,<h1>x</h1>')).not.toContain('data:')
+  it('elimina vectores XSS comunes (img onerror, svg onload, iframe)', () => {
+    expect(sanitizeInput('<img src=x onerror=alert(1)>')).toBe('')
+    expect(sanitizeInput('<svg onload=alert(1)>')).toBe('')
+    expect(sanitizeInput('<iframe src="evil"></iframe>')).toBe('')
   })
 
-  it('elimina event handlers inline', () => {
-    expect(sanitizeInput('onclick=alert(1)')).not.toContain('onclick=')
+  it('preserva texto que parece código pero no es HTML', () => {
+    // El sanitize anterior (blacklist) eliminaba estas substrings hasta en texto
+    // plano, lo cual era overkill. DOMPurify solo desactiva HTML real; el texto
+    // plano se entrega tal cual porque en JSX/PDF/CSV no se interpreta.
+    expect(sanitizeInput('javascript:alert(1)')).toBe('javascript:alert(1)')
+    expect(sanitizeInput('onclick=foo')).toBe('onclick=foo')
   })
 
-  it('elimina entidades HTML numéricas', () => {
-    // &#60; → '' y &#62; → '' (regex /&#\d+;?/ elimina ambas)
-    expect(sanitizeInput('&#60;script&#62;')).toBe('script')
-  })
-
-  it('preserva texto normal', () => {
+  it('preserva texto normal y limpia whitespace en bordes', () => {
     expect(sanitizeInput('  Hola mundo  ')).toBe('Hola mundo')
+  })
+
+  it('cuerpos vacíos o nullish devuelven cadena vacía', () => {
+    expect(sanitizeInput('')).toBe('')
   })
 })
 
