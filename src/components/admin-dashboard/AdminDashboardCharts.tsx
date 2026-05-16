@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useMemo, memo } from 'react'
 import { Chart } from '../../lib/chartjs'
 import type { Registro, Cliente } from '../../types'
 
@@ -7,50 +7,70 @@ interface Props {
   clientes: Cliente[]
 }
 
-export function AdminDashboardCharts({ registros }: Props) {
+const MESES_NOMBRES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+function AdminDashboardChartsImpl({ registros }: Props) {
   const chartRef = useRef<HTMLCanvasElement>(null)
   const chartRef2 = useRef<HTMLCanvasElement>(null)
   const chartInstance = useRef<Chart | null>(null)
   const chartInstance2 = useRef<Chart | null>(null)
 
-  // Gráfico 1: Consumo por mes (últimos 6 meses)
-  useEffect(() => {
-    if (!chartRef.current) return
-
-    const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+  // Pre-compute todos los datos derivados en una sola pasada sobre registros.
+  // Antes: 6× filter por mes + 12× reduce + 3× filter por estado = 21 pasadas
+  // sobre el array; con 10k+ registros era el principal cuello de botella
+  // del dashboard. Ahora una sola pasada (O(n)) construye ambos charts.
+  const chartsData = useMemo(() => {
+    const monthKeys: string[] = []
     const labels: string[] = []
-    const dataConsumo: number[] = []
-    const dataRecaudo: number[] = []
-
     for (let i = 5; i >= 0; i--) {
       const d = new Date()
       d.setMonth(d.getMonth() - i)
-      const mes_idx = d.getMonth()
-      const anio = d.getFullYear()
-      labels.push(`${mesesNombres[mes_idx]} ${anio}`)
-
-      const mesRegistros = registros.filter(r => {
-        const fr = new Date(r.fecha)
-        return fr.getMonth() === mes_idx && fr.getFullYear() === anio
-      })
-
-      const consumo = mesRegistros.reduce((acc, r) => acc + r.consumo, 0)
-      const recaudo = mesRegistros.reduce((acc, r) => acc + (r.monto_calculado ?? 0), 0)
-
-      dataConsumo.push(consumo)
-      dataRecaudo.push(recaudo)
+      const key = `${d.getFullYear()}-${d.getMonth()}`
+      monthKeys.push(key)
+      labels.push(`${MESES_NOMBRES[d.getMonth()]} ${d.getFullYear()}`)
     }
+    const buckets: Record<string, { consumo: number; recaudo: number }> = {}
+    monthKeys.forEach(k => { buckets[k] = { consumo: 0, recaudo: 0 } })
+
+    let pagado = 0
+    let pendiente = 0
+    let mora = 0
+
+    for (const r of registros) {
+      if (r.estado === 'pagado') pagado++
+      else if (r.estado === 'pendiente') pendiente++
+      else if (r.estado === 'mora') mora++
+      const d = new Date(r.fecha)
+      const key = `${d.getFullYear()}-${d.getMonth()}`
+      const b = buckets[key]
+      if (b) {
+        b.consumo += r.consumo
+        b.recaudo += r.monto_calculado ?? 0
+      }
+    }
+
+    return {
+      labels,
+      dataConsumo: monthKeys.map(k => buckets[k].consumo),
+      dataRecaudo: monthKeys.map(k => buckets[k].recaudo),
+      estados: [pagado, pendiente, mora],
+    }
+  }, [registros])
+
+  // Gráfico 1: Consumo por mes (últimos 6 meses)
+  useEffect(() => {
+    if (!chartRef.current) return
 
     if (chartInstance.current) chartInstance.current.destroy()
 
     chartInstance.current = new Chart(chartRef.current, {
       type: 'line',
       data: {
-        labels,
+        labels: chartsData.labels,
         datasets: [
           {
             label: 'Consumo (m³)',
-            data: dataConsumo,
+            data: chartsData.dataConsumo,
             borderColor: '#0ea5e9',
             backgroundColor: 'rgba(14, 165, 233, 0.1)',
             borderWidth: 3,
@@ -60,7 +80,7 @@ export function AdminDashboardCharts({ registros }: Props) {
           },
           {
             label: 'Recaudo (Q)',
-            data: dataRecaudo,
+            data: chartsData.dataRecaudo,
             borderColor: '#10b981',
             backgroundColor: 'rgba(16, 185, 129, 0.1)',
             borderWidth: 3,
@@ -96,17 +116,11 @@ export function AdminDashboardCharts({ registros }: Props) {
     })
 
     return () => { chartInstance.current?.destroy() }
-  }, [registros])
+  }, [chartsData])
 
   // Gráfico 2: Distribución por estado
   useEffect(() => {
     if (!chartRef2.current) return
-
-    const estados = {
-      pagado: registros.filter(r => r.estado === 'pagado').length,
-      pendiente: registros.filter(r => r.estado === 'pendiente').length,
-      mora: registros.filter(r => r.estado === 'mora').length,
-    }
 
     if (chartInstance2.current) chartInstance2.current.destroy()
 
@@ -115,7 +129,7 @@ export function AdminDashboardCharts({ registros }: Props) {
       data: {
         labels: ['Pagado', 'Pendiente', 'En Mora'],
         datasets: [{
-          data: [estados.pagado, estados.pendiente, estados.mora],
+          data: chartsData.estados,
           backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
           borderColor: ['#059669', '#d97706', '#dc2626'],
           borderWidth: 2,
@@ -131,7 +145,7 @@ export function AdminDashboardCharts({ registros }: Props) {
     })
 
     return () => { chartInstance2.current?.destroy() }
-  }, [registros])
+  }, [chartsData])
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '20px' }}>
@@ -167,3 +181,8 @@ export function AdminDashboardCharts({ registros }: Props) {
     </div>
   )
 }
+
+// React.memo evita re-render cuando el padre (AdminClientDashboard) cambia
+// pero las props (registros) siguen siendo la misma referencia — clave para
+// que la memoización en padre tenga efecto.
+export const AdminDashboardCharts = memo(AdminDashboardChartsImpl)

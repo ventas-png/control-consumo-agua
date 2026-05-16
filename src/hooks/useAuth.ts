@@ -333,7 +333,15 @@ export function useAuth() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Periodic token refresh (every 30 minutes)
+  // Periodic token refresh (every 30 minutes).
+  //
+  // Antes hacíamos buildSessionFromSupabase() en cada refresh — eran 3
+  // queries adicionales (app_users, user_module_permissions, companies)
+  // que solo necesitábamos en login o cuando rol/empresa cambiaban. Ahora
+  // solo actualizamos el expires_at local; role/permissions persisten
+  // estables hasta el próximo login. Si el admin cambia el rol del
+  // usuario mid-session, el usuario lo verá tras logout/login (igual que
+  // antes — el refresh de 30 min no era una garantía de "latest perms").
   useEffect(() => {
     if (!currentUser) return
 
@@ -345,14 +353,16 @@ export function useAuth() {
           return
         }
 
-        // Update session with new expiry
-        const fresh = await buildSessionFromSupabase(
-          data.session.user.id,
-          data.session.user.email ?? '',
-          data.session.expires_at
-        )
-        storeSession(fresh)
-        setCurrentUser(fresh)
+        const newExpiresAt = data.session.expires_at
+          ? new Date(data.session.expires_at * 1000).toISOString()
+          : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString()
+
+        setCurrentUser(prev => {
+          if (!prev) return prev
+          const fresh = { ...prev, expires_at: newExpiresAt }
+          storeSession(fresh)
+          return fresh
+        })
       } catch (err) {
         console.error('Token refresh error:', err)
       }
