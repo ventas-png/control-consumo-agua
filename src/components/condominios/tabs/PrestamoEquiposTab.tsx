@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PrestamoEquipo, EstadoPrestamo, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   prestamos: PrestamoEquipo[]
@@ -93,6 +94,94 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
 
   const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
 
+  const columns: DataTableColumn<PrestamoEquipo>[] = [
+    {
+      key: 'equipo_nombre',
+      header: 'Equipo',
+      sortable: true,
+      render: row => (
+        <div style={{ fontWeight: 600 }}>
+          {row.equipo_nombre}
+          {row.observaciones && <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 400 }}>{row.observaciones}</div>}
+        </div>
+      ),
+    },
+    {
+      key: 'unidad_nombre',
+      header: 'Unidad',
+      sortable: true,
+      accessor: row => row.unidad_nombre ?? '',
+      render: row => <span style={{ color: '#64748b' }}>{row.unidad_nombre ?? '—'}</span>,
+    },
+    {
+      key: 'cantidad',
+      header: 'Qty',
+      sortable: true,
+      align: 'center',
+      accessor: row => row.cantidad,
+    },
+    {
+      key: 'fecha_prestamo',
+      header: 'F. Préstamo',
+      sortable: true,
+      render: row => <span style={{ color: '#64748b' }}>{row.fecha_prestamo}{row.hora_prestamo ? ` ${row.hora_prestamo}` : ''}</span>,
+    },
+    {
+      key: 'fecha_devolucion',
+      header: 'F. Devolución',
+      sortable: true,
+      accessor: row => row.fecha_devolucion ?? '',
+      render: row => <span style={{ color: '#64748b' }}>{row.fecha_devolucion ?? '—'}</span>,
+    },
+    {
+      key: 'deposito',
+      header: 'Depósito',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.deposito ?? 0,
+      render: row => (
+        row.deposito ? (
+          <span style={{ fontSize: '12px', color: row.deposito_pagado ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+            {row.deposito_pagado ? '✓' : '!'} {row.deposito.toFixed(2)}
+          </span>
+        ) : <span style={{ color: '#cbd5e1' }}>—</span>
+      ),
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      render: row => {
+        const es = ESTADO_STYLE[row.estado]
+        return <span style={{ background: es.bg, color: es.color, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>{es.label}</span>
+      },
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: row => (
+        canEdit ? (
+          <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
+            {row.estado === 'prestado' && (
+              <>
+                <button onClick={() => marcarDevuelto(row)}
+                  style={{ padding: '3px 8px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                  ✓ Devuelto
+                </button>
+                <button onClick={() => marcarEstado(row.id, 'dañado')}
+                  style={{ padding: '3px 7px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+                  Dañado
+                </button>
+              </>
+            )}
+            <button onClick={() => handleDelete(row.id)}
+              style={{ padding: '3px 7px', background: '#f1f5f9', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#94a3b8' }}>🗑️</button>
+          </div>
+        ) : null
+      ),
+    },
+  ]
+
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -180,8 +269,8 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
         </div>
       )}
 
-      {/* Filter */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
+      {/* Filter pill — UX custom mantenido fuera */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
         {(['all','prestado','devuelto','dañado','perdido'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e as EstadoPrestamo | 'all')}
             style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
@@ -193,69 +282,15 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
         ))}
       </div>
 
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay préstamos registrados.</div>
-      ) : (
-        <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                {['Equipo','Unidad','Qty','F. Préstamo','F. Devolución','Depósito','Estado',''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((p, i) => {
-                const es = ESTADO_STYLE[p.estado]
-                return (
-                  <tr key={p.id} style={{ background: i % 2 === 0 ? 'white' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>
-                      {p.equipo_nombre}
-                      {p.observaciones && <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 400 }}>{p.observaciones}</div>}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>{p.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>{p.cantidad}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>{p.fecha_prestamo}{p.hora_prestamo ? ` ${p.hora_prestamo}` : ''}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>{p.fecha_devolucion ?? <span style={{ color: '#cbd5e1' }}>—</span>}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {p.deposito ? (
-                        <span style={{ fontSize: '12px', color: p.deposito_pagado ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
-                          {p.deposito_pagado ? '✓' : '!'} {p.deposito.toFixed(2)}
-                        </span>
-                      ) : <span style={{ color: '#cbd5e1' }}>—</span>}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ background: es.bg, color: es.color, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>{es.label}</span>
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {canEdit && (
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          {p.estado === 'prestado' && (
-                            <>
-                              <button onClick={() => marcarDevuelto(p)}
-                                style={{ padding: '3px 8px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                                ✓ Devuelto
-                              </button>
-                              <button onClick={() => marcarEstado(p.id, 'dañado')}
-                                style={{ padding: '3px 7px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
-                                Dañado
-                              </button>
-                            </>
-                          )}
-                          <button onClick={() => handleDelete(p.id)}
-                            style={{ padding: '3px 7px', background: '#f1f5f9', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#94a3b8' }}>🗑️</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        data={filtered}
+        columns={columns}
+        rowKey="id"
+        searchableKeys={['equipo_nombre', row => row.unidad_nombre ?? '', row => row.entregado_por ?? '']}
+        searchPlaceholder="Buscar por equipo, unidad o encargado…"
+        defaultSort={{ key: 'fecha_prestamo', direction: 'desc' }}
+        emptyState={{ icon: '📦', title: 'No hay préstamos registrados' }}
+      />
     </div>
   )
 }

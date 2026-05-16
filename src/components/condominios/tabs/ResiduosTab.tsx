@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { RegistroResiduo, TipoResiduo, EstadoResiduo } from '../../../types'
 import Swal from 'sweetalert2'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   residuos: RegistroResiduo[]
@@ -106,6 +107,84 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
   const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px', display: 'block' }
 
+  const columns: DataTableColumn<RegistroResiduo>[] = [
+    {
+      key: 'fecha',
+      header: 'Fecha',
+      sortable: true,
+      render: row => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{row.fecha}</div>
+          {row.incidencia && <span style={{ fontSize: '10px', fontWeight: 700, color: '#ef4444' }}>⚠ Incidencia</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'tipo_residuo',
+      header: 'Tipo',
+      sortable: true,
+      accessor: row => tipoInfo(row.tipo_residuo).label,
+      render: row => {
+        const ti = tipoInfo(row.tipo_residuo)
+        return (
+          <>
+            <span style={{ fontSize: '16px' }}>{ti.icon}</span>
+            <div style={{ fontSize: '11px', color: ti.color, fontWeight: 600 }}>{ti.label}</div>
+          </>
+        )
+      },
+    },
+    {
+      key: 'cantidad_kg',
+      header: 'Cantidad',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.cantidad_kg ?? 0,
+      render: row => <span style={{ fontWeight: 600 }}>{row.cantidad_kg != null ? `${row.cantidad_kg} kg` : '—'}</span>,
+    },
+    {
+      key: 'punto_acopio',
+      header: 'Punto Acopio',
+      sortable: true,
+      accessor: row => row.punto_acopio ?? '',
+      render: row => <span style={{ color: '#64748b' }}>{row.punto_acopio ?? '—'}</span>,
+    },
+    {
+      key: 'empresa_recolectora',
+      header: 'Empresa',
+      sortable: true,
+      accessor: row => row.empresa_recolectora ?? '',
+      render: row => <span style={{ color: '#64748b' }}>{row.empresa_recolectora ?? '—'}</span>,
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      render: row => {
+        const est = ESTADO_CONFIG[row.estado]
+        return canEdit ? (
+          <select value={row.estado} onChange={e => handleEstado(row.id, e.target.value as EstadoResiduo)}
+            onClick={e => e.stopPropagation()}
+            style={{ padding: '4px 8px', border: '1.5px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'white', cursor: 'pointer' }}>
+            {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+        ) : (
+          <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, background: est.bg, color: est.color }}>{est.label}</span>
+        )
+      },
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: row => (
+        <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
+          {canEdit && <button onClick={() => startEdit(row)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+          {canEdit && <button onClick={() => handleDelete(row.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div style={{ padding: '20px 24px' }}>
 
@@ -204,8 +283,8 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
         </div>
       )}
 
-      {/* Filtros */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+      {/* Filtros pill por tipo (UX custom con contadores) */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
         {TIPOS.map(t => (
           <button key={t.value} onClick={() => setFiltroTipo(filtroTipo === t.value ? 'todos' : t.value)}
             style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
@@ -215,69 +294,33 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
             {t.icon} {t.label} ({residuos.filter(r => r.tipo_residuo === t.value).length})
           </button>
         ))}
-        <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 4px' }} />
-        <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoResiduo | 'todos')}
-          style={{ padding: '5px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '12px', background: '#f8fafc' }}>
-          <option value="todos">Todos los estados</option>
-          {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
       </div>
 
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>♻️</div>
-          <p style={{ margin: 0, fontWeight: 600 }}>No hay registros de residuos</p>
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                {['Fecha', 'Tipo', 'Cantidad', 'Punto Acopio', 'Empresa', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: '12px' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(r => {
-                const ti = tipoInfo(r.tipo_residuo)
-                const est = ESTADO_CONFIG[r.estado]
-                return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9', background: r.incidencia ? '#fff7ed' : 'white' }}>
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ fontWeight: 600 }}>{r.fecha}</div>
-                      {r.incidencia && <span style={{ fontSize: '10px', fontWeight: 700, color: '#ef4444' }}>⚠ Incidencia</span>}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ fontSize: '16px' }}>{ti.icon}</span>
-                      <div style={{ fontSize: '11px', color: ti.color, fontWeight: 600 }}>{ti.label}</div>
-                    </td>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>{r.cantidad_kg != null ? `${r.cantidad_kg} kg` : '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>{r.punto_acopio ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>{r.empresa_recolectora ?? '—'}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {canEdit ? (
-                        <select value={r.estado} onChange={e => handleEstado(r.id, e.target.value as EstadoResiduo)}
-                          style={{ padding: '4px 8px', border: '1.5px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'white', cursor: 'pointer' }}>
-                          {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                        </select>
-                      ) : (
-                        <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, background: est.bg, color: est.color }}>{est.label}</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        {canEdit && <button onClick={() => startEdit(r)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-                        {canEdit && <button onClick={() => handleDelete(r.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        data={filtered}
+        columns={columns}
+        rowKey="id"
+        searchableKeys={[
+          row => row.punto_acopio ?? '',
+          row => row.empresa_recolectora ?? '',
+          row => row.notas ?? '',
+        ]}
+        searchPlaceholder="Buscar por punto, empresa o notas…"
+        filters={[
+          {
+            key: 'estado',
+            value: filtroEstado,
+            onChange: v => setFiltroEstado(v as EstadoResiduo | 'todos'),
+            options: [
+              { value: 'todos', label: 'Todos los estados' },
+              ...Object.entries(ESTADO_CONFIG).map(([k, v]) => ({ value: k, label: v.label })),
+            ],
+          },
+        ]}
+        defaultSort={{ key: 'fecha', direction: 'desc' }}
+        rowStyle={row => row.incidencia ? { background: '#fff7ed' } : {}}
+        emptyState={{ icon: '♻️', title: 'No hay registros de residuos' }}
+      />
     </div>
   )
 }
