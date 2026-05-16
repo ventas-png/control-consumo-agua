@@ -2,6 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { CorrespondenciaCondominio, Unidad } from '../../../types'
 import Swal from 'sweetalert2'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   correspondencia: CorrespondenciaCondominio[]
@@ -71,6 +72,66 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
   const detail = selected ? correspondencia.find(c => c.id === selected) : null
 
   const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+
+  const columns: DataTableColumn<CorrespondenciaCondominio>[] = [
+    {
+      key: 'tipo',
+      header: 'Tipo',
+      sortable: true,
+      render: row => (
+        <>
+          <span style={{ fontSize: '13px' }}>{row.tipo === 'entrada' ? '📥' : '📤'}</span>
+          {row.prioridad === 'urgente' && <span style={{ fontSize: '10px', marginLeft: '4px', color: '#ef4444', fontWeight: 700 }}>URG</span>}
+        </>
+      ),
+    },
+    {
+      key: 'asunto',
+      header: 'Asunto',
+      sortable: true,
+      render: row => <span style={{ fontWeight: 600, color: '#0f172a' }}>{row.asunto}</span>,
+    },
+    {
+      key: 'categoria',
+      header: 'Categoría',
+      sortable: true,
+      accessor: row => CAT_LABELS[row.categoria] ?? row.categoria,
+      render: row => <span style={{ color: '#64748b', fontSize: '12px' }}>{CAT_LABELS[row.categoria]}</span>,
+    },
+    {
+      key: 'fecha',
+      header: 'Fecha',
+      sortable: true,
+      render: row => <span style={{ color: '#64748b', fontSize: '12px' }}>{row.fecha}</span>,
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      render: row => {
+        const es = ESTADO_STYLE[row.estado]
+        return <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es?.bg, color: es?.color }}>{row.estado}</span>
+      },
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: row => (
+        canEdit && row.estado === 'pendiente' ? (
+          <div style={{ display: 'flex', gap: '4px' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => cambiarEstado(row.id, 'atendido')}
+              style={{ padding: '2px 7px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+              Atender
+            </button>
+            <button onClick={() => cambiarEstado(row.id, 'archivado')}
+              style={{ padding: '2px 7px', background: '#f1f5f9', color: '#94a3b8', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
+              Archivar
+            </button>
+          </div>
+        ) : null
+      ),
+    },
+  ]
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -165,84 +226,49 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
         </div>
       )}
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {(['todos', 'entrada', 'salida'] as const).map(f => (
-            <button key={f} onClick={() => setFiltroTipo(f)}
-              style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-                borderColor: filtroTipo === f ? '#0ea5e9' : '#e2e8f0', background: filtroTipo === f ? '#e0f2fe' : 'white', color: filtroTipo === f ? '#0369a1' : '#64748b', fontWeight: filtroTipo === f ? 700 : 500 }}>
-              {f === 'todos' ? 'Todos' : f === 'entrada' ? '📥 Entrada' : '📤 Salida'}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {(['todos', 'pendiente', 'atendido', 'archivado'] as const).map(f => (
-            <button key={f} onClick={() => setFiltroEstado(f)}
-              style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-                borderColor: filtroEstado === f ? '#8b5cf6' : '#e2e8f0', background: filtroEstado === f ? '#ede9fe' : 'white', color: filtroEstado === f ? '#7c3aed' : '#64748b', fontWeight: filtroEstado === f ? 700 : 500 }}>
-              {f === 'todos' ? 'Todos estados' : f}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Split view */}
+      {/* Split view: tabla + detail panel */}
       <div style={{ display: 'grid', gridTemplateColumns: detail ? '1fr 340px' : '1fr', gap: '16px' }}>
-        {/* List */}
-        <div>
-          {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay correspondencia.</div>
-          ) : (
-            <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ background: '#f8fafc' }}>
-                    {['Tipo', 'Asunto', 'Categoría', 'Fecha', 'Estado', ''].map(h => (
-                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((c, i) => {
-                    const es = ESTADO_STYLE[c.estado]
-                    return (
-                      <tr key={c.id} onClick={() => setSelected(selected === c.id ? null : c.id)}
-                        style={{ background: selected === c.id ? '#f0f9ff' : i % 2 === 0 ? 'white' : '#fafafa', borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}>
-                        <td style={{ padding: '9px 12px' }}>
-                          <span style={{ fontSize: '13px' }}>{c.tipo === 'entrada' ? '📥' : '📤'}</span>
-                          {c.prioridad === 'urgente' && <span style={{ fontSize: '10px', marginLeft: '4px', color: '#ef4444', fontWeight: 700 }}>URG</span>}
-                        </td>
-                        <td style={{ padding: '9px 12px', fontWeight: 600, color: '#0f172a' }}>{c.asunto}</td>
-                        <td style={{ padding: '9px 12px', color: '#64748b', fontSize: '12px' }}>{CAT_LABELS[c.categoria]}</td>
-                        <td style={{ padding: '9px 12px', color: '#64748b', fontSize: '12px' }}>{c.fecha}</td>
-                        <td style={{ padding: '9px 12px' }}>
-                          <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es?.bg, color: es?.color }}>{c.estado}</span>
-                        </td>
-                        <td style={{ padding: '9px 12px' }}>
-                          {canEdit && c.estado === 'pendiente' && (
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              <button onClick={e => { e.stopPropagation(); cambiarEstado(c.id, 'atendido') }}
-                                style={{ padding: '2px 7px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
-                                Atender
-                              </button>
-                              <button onClick={e => { e.stopPropagation(); cambiarEstado(c.id, 'archivado') }}
-                                style={{ padding: '2px 7px', background: '#f1f5f9', color: '#94a3b8', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
-                                Archivar
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        <DataTable
+          data={filtered}
+          columns={columns}
+          rowKey="id"
+          searchableKeys={[
+            'asunto',
+            row => row.remitente ?? '',
+            row => row.destinatario ?? '',
+            row => row.numero_guia ?? '',
+          ]}
+          searchPlaceholder="Buscar por asunto, remitente, destinatario…"
+          filters={[
+            {
+              key: 'tipo',
+              value: filtroTipo,
+              onChange: v => setFiltroTipo(v as 'todos' | 'entrada' | 'salida'),
+              options: [
+                { value: 'todos', label: 'Todos los tipos' },
+                { value: 'entrada', label: '📥 Entrada' },
+                { value: 'salida', label: '📤 Salida' },
+              ],
+            },
+            {
+              key: 'estado',
+              value: filtroEstado,
+              onChange: v => setFiltroEstado(v as 'todos' | 'pendiente' | 'atendido' | 'archivado'),
+              options: [
+                { value: 'todos', label: 'Todos los estados' },
+                { value: 'pendiente', label: 'Pendiente' },
+                { value: 'atendido', label: 'Atendido' },
+                { value: 'archivado', label: 'Archivado' },
+              ],
+            },
+          ]}
+          defaultSort={{ key: 'fecha', direction: 'desc' }}
+          rowStyle={row => row.id === selected ? { background: '#f0f9ff' } : {}}
+          onRowClick={row => setSelected(selected === row.id ? null : row.id)}
+          emptyState={{ icon: '✉️', title: 'No hay correspondencia' }}
+        />
 
-        {/* Detail */}
+        {/* Detail panel */}
         {detail && (
           <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', alignSelf: 'flex-start' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
