@@ -1,4 +1,5 @@
 import { useState, type KeyboardEvent} from 'react'
+import { SecureImage } from '../shared/SecureImage'
 
 interface Props {
   urls: string[]
@@ -27,7 +28,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         {visible.map((url, i) => (
           <div key={url} onClick={() => setLightbox(i)} style={{ position: 'relative', cursor: 'zoom-in', flexShrink: 0 }}>
-            <img
+            <SecureImage
               src={url}
               alt={`foto ${i + 1}`}
               style={{ width: 64, height: 48, objectFit: 'cover', borderRadius: 7, border: '1.5px solid #e2e8f0', display: 'block' }}
@@ -66,7 +67,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
           )}
 
           {/* Image */}
-          <img
+          <SecureImage
             src={urls[lightbox]}
             alt={`foto ${lightbox + 1}`}
             onClick={e => e.stopPropagation()}

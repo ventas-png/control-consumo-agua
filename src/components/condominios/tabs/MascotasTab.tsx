@@ -3,6 +3,7 @@ import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Mascota, Unidad, EspecieMascota } from '../../../types'
 import { ImageUploader } from '../ImageUploader'
+import { SecureImage } from '../../shared/SecureImage'
 
 interface Props {
   mascotas: Mascota[]
@@ -210,7 +211,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
               <div key={m.id} style={{ background: 'white', border: `1.5px solid ${vacunaVencida ? '#fde68a' : '#e2e8f0'}`, borderRadius: '14px', padding: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                   {m.foto_url
-                    ? <img src={m.foto_url} alt={m.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', flexShrink: 0 }} />
+                    ? <SecureImage src={m.foto_url} alt={m.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', flexShrink: 0 }} />
                     : <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
                         {ESPECIE_ICON[m.especie]}
                       </div>

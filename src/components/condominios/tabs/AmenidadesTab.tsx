@@ -4,6 +4,7 @@ import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
 import { ImageUploader } from '../ImageUploader'
+import { SecureImage } from '../../shared/SecureImage'
 import { formatPhoneForWa } from '../../../lib/validation'
 
 interface Props {
@@ -1657,7 +1658,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           render: (
             <>
               {r.checkin_foto_url && (
-                <img src={r.checkin_foto_url} alt="check-in" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, marginTop: 8 }} />
+                <SecureImage src={r.checkin_foto_url} alt="check-in" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, marginTop: 8 }} />
               )}
               {!r.checkin_at && canEdit && r.estado === 'confirmada' && (
                 <div style={{ marginTop: 10 }}>
@@ -1688,7 +1689,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           render: r.checkin_at ? (
             <>
               {r.checkout_foto_url && (
-                <img src={r.checkout_foto_url} alt="check-out" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, marginTop: 8 }} />
+                <SecureImage src={r.checkout_foto_url} alt="check-out" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, marginTop: 8 }} />
               )}
               {r.observaciones_uso && (
                 <div style={{ fontSize: 12.5, color: '#475569', background: '#f8fafc', borderRadius: 8, padding: 8, marginTop: 8 }}>

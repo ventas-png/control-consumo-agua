@@ -1,6 +1,7 @@
 import { useRef, useState, type DragEvent} from 'react'
 import { supabase } from '../../lib/supabase'
 import { validateFileMagic, buildUploadPath } from '../../lib/fileValidation'
+import { SecureImage } from '../shared/SecureImage'
 
 const MAX_DIMENSION = 1280
 const QUALITY = 0.82
@@ -95,7 +96,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
       <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>{label}</label>
       {value ? (
         <div style={{ position: 'relative', width: '100%', paddingBottom: '75%' }}>
-          <img src={value} alt="preview"
+          <SecureImage src={value} alt="preview"
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10, border: '2px solid #e2e8f0', display: 'block' }}
             onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           <button
@@ -197,7 +198,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 8 }}>
         {values.map(url => (
           <div key={url} style={{ position: 'relative', paddingBottom: '75%' }}>
-            <img src={url} alt=""
+            <SecureImage src={url} alt=""
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: '1.5px solid #e2e8f0', display: 'block' }}
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <button

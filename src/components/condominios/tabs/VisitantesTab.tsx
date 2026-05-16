@@ -3,6 +3,7 @@ import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { Visitante, Unidad, ReservaSTR, HuespedSTR, SolicitudMudanzaUnidad, TipoSolicitudMudanza } from '../../../types'
 import { ImageUploader, MultiImageUploader } from '../ImageUploader'
+import { SecureImage } from '../../shared/SecureImage'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 const PLATAFORMA_LABEL: Record<string, string> = {
@@ -551,7 +552,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
         }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
           {v.foto_url
-            ? <img src={v.foto_url} alt={v.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `2px solid ${enPremisa ? (isSTRMember ? '#8b5cf6' : esAcompanante ? '#3b82f6' : '#10b981') : '#e2e8f0'}` }} />
+            ? <SecureImage src={v.foto_url} alt={v.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `2px solid ${enPremisa ? (isSTRMember ? '#8b5cf6' : esAcompanante ? '#3b82f6' : '#10b981') : '#e2e8f0'}` }} />
             : <div style={{
                 width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
                 background: v.es_menor
@@ -1312,7 +1313,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
             style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '500px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '18px 20px', borderBottom: '1px solid #f1f5f9' }}>
               {visitanteDetalle.foto_url
-                ? <img src={visitanteDetalle.foto_url} alt={visitanteDetalle.nombre} style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', flexShrink: 0 }} />
+                ? <SecureImage src={visitanteDetalle.foto_url} alt={visitanteDetalle.nombre} style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0', flexShrink: 0 }} />
                 : <div style={{ width: 52, height: 52, borderRadius: '50%', background: !visitanteDetalle.hora_salida ? 'linear-gradient(135deg,#10b981,#059669)' : '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: !visitanteDetalle.hora_salida ? 'white' : '#94a3b8', fontWeight: 800, fontSize: '20px', flexShrink: 0 }}>
                     {visitanteDetalle.es_menor ? '👶' : visitanteDetalle.nombre.charAt(0).toUpperCase()}
                   </div>
