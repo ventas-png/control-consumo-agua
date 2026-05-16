@@ -1,10 +1,11 @@
-import { useState, useEffect, lazy, Suspense, type CSSProperties} from 'react'
+import { useState, useEffect, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
 import type { Cliente, UserRole, UserSession, ClienteLookupResult, Unidad } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML, validateEmail, validatePhoneNumber, formatPhoneForWa } from '../../lib/validation'
 import { logSecurityEvent } from '../../lib/security'
 import { EditModal } from '../shared/EditModal'
+import { DataTable, type DataTableColumn } from '../shared'
 import { getEditedTagInfo } from '../../lib/timeUtils'
 import { ClienteRentasModal } from './ClienteRentasModal'
 
@@ -392,6 +393,124 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
     c.codigo.toLowerCase().includes(search.toLowerCase()) ||
     (c.cui_dui ?? '').toLowerCase().includes(search.toLowerCase())
   )
+
+  // Columnas de la tabla de clientes. Memoizamos para que React.memo en
+  // DataTable y los sub-componentes funcione efectivamente.
+  const columns: DataTableColumn<Cliente>[] = useMemo(() => {
+    const cols: DataTableColumn<Cliente>[] = [
+      {
+        key: 'cliente',
+        header: 'Cliente',
+        sortable: true,
+        accessor: c => c.nombre,
+        render: c => <ClienteCell cliente={c} />,
+      },
+      {
+        key: 'codigo',
+        header: 'Código',
+        sortable: true,
+        accessor: c => c.codigo,
+        render: c => (
+          <span style={{ color: '#475569', fontFamily: 'monospace' }}>
+            {sanitizeHTML(c.codigo)}
+          </span>
+        ),
+      },
+      {
+        key: 'identificacion',
+        header: 'Identificación',
+        hideOnMobile: true,
+        accessor: c => c.cui_dui ?? '',
+        render: c => <IdentificacionCell cliente={c} />,
+      },
+      {
+        key: 'contacto',
+        header: 'Contacto',
+        render: c => <ContactoCell cliente={c} />,
+      },
+      {
+        key: 'facturacion',
+        header: 'Facturación',
+        hideOnMobile: true,
+        accessor: c => c.numero_facturacion ?? '',
+        render: c => c.numero_facturacion
+          ? <span style={{ fontSize: 13, fontFamily: 'monospace' }}>{sanitizeHTML(c.numero_facturacion)}</span>
+          : <span style={{ color: '#cbd5e1' }}>—</span>,
+      },
+      {
+        key: 'cuenta',
+        header: 'Cuenta',
+        align: 'center',
+        render: c => (
+          <CuentaCell
+            cliente={c}
+            hasAccount={!!accountMap[c.id]}
+            activoEntry={activoMap[c.id]}
+            canEdit={canEdit}
+            onToggleActivo={handleToggleActivo}
+          />
+        ),
+      },
+      {
+        key: 'rentas',
+        header: 'Rentas',
+        align: 'center',
+        render: c => {
+          const count = unidades.filter(u => u.cliente_id === c.id && u.activo).length
+          return (
+            <button
+              onClick={() => setRentasClienteId(c.id)}
+              title={count > 0 ? `${count} unidad${count !== 1 ? 'es' : ''} asignada${count !== 1 ? 's' : ''}` : 'Sin unidades asignadas'}
+              style={{
+                padding: '4px 12px',
+                background: count > 0 ? '#f0fdf4' : '#f8fafc',
+                color: count > 0 ? '#16a34a' : '#94a3b8',
+                border: `1px solid ${count > 0 ? '#bbf7d0' : '#e2e8f0'}`,
+                borderRadius: 20,
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: 12,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              🏠 {count > 0 ? `${count} unidad${count !== 1 ? 'es' : ''}` : 'Sin unidades'}
+            </button>
+          )
+        },
+      },
+    ]
+    if (canEdit) {
+      cols.push({
+        key: 'acciones',
+        header: 'Acciones',
+        align: 'center',
+        render: c => (
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+            <button
+              onClick={() => startEdit(c)}
+              style={{
+                padding: '5px 12px', background: '#eff6ff', color: '#1d4ed8',
+                border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+              }}
+            >
+              Editar
+            </button>
+            <button
+              onClick={() => handleEliminar(c)}
+              style={{
+                padding: '5px 12px', background: '#fef2f2', color: '#dc2626',
+                border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+              }}
+            >
+              Eliminar
+            </button>
+          </div>
+        ),
+      })
+    }
+    return cols
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit, accountMap, activoMap, unidades])
 
   const inputStyle: CSSProperties = {
     padding: '10px 14px',
@@ -924,230 +1043,22 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
       )}
 
       {/* Table */}
-      <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-        {filtered.length === 0 ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
-            <div style={{ fontSize: '40px', marginBottom: '12px' }}>👤</div>
-            <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '6px' }}>
-              {search ? 'Sin resultados' : 'No hay clientes registrados'}
-            </div>
-            <div style={{ fontSize: '14px' }}>
-              {search ? 'Intenta con otro término' : canEdit ? 'Crea el primer cliente con el botón "+ Nuevo Cliente"' : 'No hay clientes aún'}
-            </div>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Cliente</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Código</th>
-                  <th scope="col" className="table-col-secondary" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Identificación</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Contacto</th>
-                  <th scope="col" className="table-col-secondary" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Facturación</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Cuenta</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Rentas</th>
-                  {canEdit && (
-                    <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#475569' }}>Acciones</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((c, idx) => (
-                  <tr
-                    key={c.id}
-                    style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? 'white' : '#fafbfc' }}
-                  >
-                    <td style={{ padding: '12px 16px', fontWeight: 600, color: '#1e293b' }}>
-                      {sanitizeHTML(c.nombre)}
-                      {c.direccion && (
-                        <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 400, marginTop: '2px' }}>
-                          {sanitizeHTML(c.direccion)}
-                        </div>
-                      )}
-                      {c.fecha_nacimiento && (
-                        <div style={{ fontSize: '11px', color: '#cbd5e1', marginTop: '1px' }}>
-                          Nac: {c.fecha_nacimiento}
-                        </div>
-                      )}
-                      {(() => {
-                        const tag = getEditedTagInfo(c.updated_at, c.updated_by_name)
-                        if (!tag) return null
-                        return (
-                          <span
-                            title={tag.tooltip}
-                            style={{
-                              display: 'inline-block',
-                              marginTop: '4px',
-                              padding: '2px 8px',
-                              borderRadius: '10px',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              color: tag.color,
-                              background: tag.bg,
-                              cursor: 'default',
-                            }}
-                          >
-                            {tag.label}
-                          </span>
-                        )
-                      })()}
-                    </td>
-                    <td style={{ padding: '12px 16px', color: '#475569', fontFamily: 'monospace' }}>
-                      {sanitizeHTML(c.codigo)}
-                    </td>
-                    <td className="table-col-secondary" style={{ padding: '12px 16px', color: '#475569' }}>
-                      {c.cui_dui ? (
-                        <div style={{ fontSize: '13px', fontFamily: 'monospace' }}>{sanitizeHTML(c.cui_dui)}</div>
-                      ) : null}
-                      {c.nacionalidad ? (
-                        <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{sanitizeHTML(c.nacionalidad)}</div>
-                      ) : null}
-                      {!c.cui_dui && !c.nacionalidad && <span style={{ color: '#cbd5e1' }}>—</span>}
-                    </td>
-                    <td style={{ padding: '12px 16px', color: '#475569' }}>
-                      {c.email && <div style={{ fontSize: '13px' }}>✉️ {sanitizeHTML(c.email)}</div>}
-                      {c.telefono && (
-                        <div style={{ fontSize: '12px', marginTop: '2px' }}>
-                          <a href={`tel:${c.telefono}`} style={{ color: '#0369a1', textDecoration: 'none' }} title="Llamar">
-                            📞 {sanitizeHTML(c.telefono)}
-                          </a>
-                        </div>
-                      )}
-                      {c.telefono_alterno && (
-                        <div style={{ fontSize: '12px', marginTop: '2px' }}>
-                          <a href={`tel:${c.telefono_alterno}`} style={{ color: '#64748b', textDecoration: 'none' }} title="Llamar alterno">
-                            📱 {sanitizeHTML(c.telefono_alterno)}
-                          </a>
-                        </div>
-                      )}
-                      {c.whatsapp && (
-                        <div style={{ fontSize: '12px', marginTop: '2px' }}>
-                          <a
-                            href={`https://wa.me/${formatPhoneForWa(c.whatsapp)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ color: '#16a34a', textDecoration: 'none' }}
-                            title="Abrir WhatsApp"
-                          >
-                            💬 {sanitizeHTML(c.whatsapp)}
-                          </a>
-                        </div>
-                      )}
-                      {!c.email && !c.telefono && !c.telefono_alterno && !c.whatsapp && <span style={{ color: '#cbd5e1' }}>—</span>}
-                    </td>
-                    <td className="table-col-secondary" style={{ padding: '12px 16px', color: '#475569' }}>
-                      {c.numero_facturacion ? (
-                        <div style={{ fontSize: '13px', fontFamily: 'monospace' }}>{sanitizeHTML(c.numero_facturacion)}</div>
-                      ) : <span style={{ color: '#cbd5e1' }}>—</span>}
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                        <span style={{
-                          padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                          background: c.puede_crear_cuenta ? '#dcfce7' : '#f1f5f9',
-                          color: c.puede_crear_cuenta ? '#166534' : '#94a3b8',
-                        }}>
-                          {c.puede_crear_cuenta ? 'Habilitado' : 'Deshabilitado'}
-                        </span>
-                        {accountMap[c.id] ? (
-                          <>
-                            <span style={{ padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: '#dbeafe', color: '#1d4ed8' }}>
-                              Cuenta activa
-                            </span>
-                            {canEdit && activoMap[c.id] && (
-                              <button
-                                onClick={() => handleToggleActivo(c.id)}
-                                title={activoMap[c.id].activo ? 'Clic para ocultar datos al cliente' : 'Clic para mostrar datos al cliente'}
-                                style={{
-                                  padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                                  border: 'none', cursor: 'pointer',
-                                  background: activoMap[c.id].activo ? '#f0fdf4' : '#fff7ed',
-                                  color: activoMap[c.id].activo ? '#15803d' : '#c2410c',
-                                }}
-                              >
-                                {activoMap[c.id].activo ? '● Datos visibles' : '○ Datos ocultos'}
-                              </button>
-                            )}
-                          </>
-                        ) : (
-                          <span style={{ padding: '2px 10px', borderRadius: '20px', fontSize: '11px', color: '#94a3b8', background: '#f8fafc' }}>
-                            Sin cuenta
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      {(() => {
-                        const clienteUnidades = unidades.filter(u => u.cliente_id === c.id && u.activo)
-                        const count = clienteUnidades.length
-                        return (
-                          <button
-                            onClick={() => setRentasClienteId(c.id)}
-                            title={count > 0 ? `${count} unidad${count !== 1 ? 'es' : ''} asignada${count !== 1 ? 's' : ''}` : 'Sin unidades asignadas'}
-                            style={{
-                              padding: '4px 12px',
-                              background: count > 0 ? '#f0fdf4' : '#f8fafc',
-                              color: count > 0 ? '#16a34a' : '#94a3b8',
-                              border: `1px solid ${count > 0 ? '#bbf7d0' : '#e2e8f0'}`,
-                              borderRadius: '20px',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                              fontSize: '12px',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            🏠 {count > 0 ? `${count} unidad${count !== 1 ? 'es' : ''}` : 'Sin unidades'}
-                          </button>
-                        )
-                      })()}
-                    </td>
-                    {canEdit && (
-                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                          <button
-                            onClick={() => startEdit(c)}
-                            style={{
-                              padding: '5px 12px',
-                              background: '#eff6ff',
-                              color: '#1d4ed8',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                              fontSize: '12px',
-                            }}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleEliminar(c)}
-                            style={{
-                              padding: '5px 12px',
-                              background: '#fef2f2',
-                              color: '#dc2626',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                              fontSize: '12px',
-                            }}
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <div style={{ padding: '12px 16px', borderTop: '1px solid #f1f5f9', color: '#94a3b8', fontSize: '12px' }}>
-          {filtered.length} cliente{filtered.length !== 1 ? 's' : ''} {search ? 'encontrados' : 'registrados'}
-        </div>
-      </div>
+      <DataTable<Cliente>
+        data={filtered}
+        columns={columns}
+        rowKey="id"
+        pageSize={50}
+        defaultSort={{ key: 'cliente', direction: 'asc' }}
+        emptyState={{
+          icon: '👤',
+          title: search ? 'Sin resultados' : 'No hay clientes registrados',
+          description: search
+            ? 'Intenta con otro término'
+            : canEdit
+              ? 'Crea el primer cliente con el botón "+ Nuevo Cliente"'
+              : 'No hay clientes aún',
+        }}
+      />
 
       {showImportModal && (
         <Suspense fallback={null}>
@@ -1172,6 +1083,136 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
           canEdit={canEdit}
           onClose={() => setRentasClienteId(null)}
         />
+      )}
+    </div>
+  )
+}
+
+// ── Sub-componentes de celdas para la tabla de clientes ──────────────────
+// Extraídos del render principal para mantener el cuerpo de ClientesSection
+// más legible y para que React pueda potencialmente memoizarlos en el futuro.
+
+function ClienteCell({ cliente: c }: { cliente: Cliente }) {
+  const tag = getEditedTagInfo(c.updated_at, c.updated_by_name)
+  return (
+    <div>
+      <div style={{ fontWeight: 600, color: '#1e293b' }}>{sanitizeHTML(c.nombre)}</div>
+      {c.direccion && (
+        <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400, marginTop: 2 }}>
+          {sanitizeHTML(c.direccion)}
+        </div>
+      )}
+      {c.fecha_nacimiento && (
+        <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 1 }}>
+          Nac: {c.fecha_nacimiento}
+        </div>
+      )}
+      {tag && (
+        <span
+          title={tag.tooltip}
+          style={{
+            display: 'inline-block', marginTop: 4, padding: '2px 8px',
+            borderRadius: 10, fontSize: 11, fontWeight: 500,
+            color: tag.color, background: tag.bg, cursor: 'default',
+          }}
+        >
+          {tag.label}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function IdentificacionCell({ cliente: c }: { cliente: Cliente }) {
+  if (!c.cui_dui && !c.nacionalidad) return <span style={{ color: '#cbd5e1' }}>—</span>
+  return (
+    <>
+      {c.cui_dui && <div style={{ fontSize: 13, fontFamily: 'monospace' }}>{sanitizeHTML(c.cui_dui)}</div>}
+      {c.nacionalidad && (
+        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{sanitizeHTML(c.nacionalidad)}</div>
+      )}
+    </>
+  )
+}
+
+function ContactoCell({ cliente: c }: { cliente: Cliente }) {
+  if (!c.email && !c.telefono && !c.telefono_alterno && !c.whatsapp) {
+    return <span style={{ color: '#cbd5e1' }}>—</span>
+  }
+  return (
+    <>
+      {c.email && <div style={{ fontSize: 13 }}>✉️ {sanitizeHTML(c.email)}</div>}
+      {c.telefono && (
+        <div style={{ fontSize: 12, marginTop: 2 }}>
+          <a href={`tel:${c.telefono}`} style={{ color: '#0369a1', textDecoration: 'none' }} title="Llamar">
+            📞 {sanitizeHTML(c.telefono)}
+          </a>
+        </div>
+      )}
+      {c.telefono_alterno && (
+        <div style={{ fontSize: 12, marginTop: 2 }}>
+          <a href={`tel:${c.telefono_alterno}`} style={{ color: '#64748b', textDecoration: 'none' }} title="Llamar alterno">
+            📱 {sanitizeHTML(c.telefono_alterno)}
+          </a>
+        </div>
+      )}
+      {c.whatsapp && (
+        <div style={{ fontSize: 12, marginTop: 2 }}>
+          <a
+            href={`https://wa.me/${formatPhoneForWa(c.whatsapp)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#16a34a', textDecoration: 'none' }}
+            title="Abrir WhatsApp"
+          >
+            💬 {sanitizeHTML(c.whatsapp)}
+          </a>
+        </div>
+      )}
+    </>
+  )
+}
+
+function CuentaCell({
+  cliente: c, hasAccount, activoEntry, canEdit, onToggleActivo,
+}: {
+  cliente: Cliente
+  hasAccount: boolean
+  activoEntry: { ccId: string; activo: boolean } | undefined
+  canEdit: boolean
+  onToggleActivo: (id: string) => void
+}) {
+  const pill: CSSProperties = {
+    padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <span style={{
+        ...pill,
+        background: c.puede_crear_cuenta ? '#dcfce7' : '#f1f5f9',
+        color: c.puede_crear_cuenta ? '#166534' : '#94a3b8',
+      }}>
+        {c.puede_crear_cuenta ? 'Habilitado' : 'Deshabilitado'}
+      </span>
+      {hasAccount ? (
+        <>
+          <span style={{ ...pill, background: '#dbeafe', color: '#1d4ed8' }}>Cuenta activa</span>
+          {canEdit && activoEntry && (
+            <button
+              onClick={() => onToggleActivo(c.id)}
+              title={activoEntry.activo ? 'Clic para ocultar datos al cliente' : 'Clic para mostrar datos al cliente'}
+              style={{
+                ...pill, border: 'none', cursor: 'pointer',
+                background: activoEntry.activo ? '#f0fdf4' : '#fff7ed',
+                color: activoEntry.activo ? '#15803d' : '#c2410c',
+              }}
+            >
+              {activoEntry.activo ? '● Datos visibles' : '○ Datos ocultos'}
+            </button>
+          )}
+        </>
+      ) : (
+        <span style={{ ...pill, color: '#94a3b8', background: '#f8fafc', fontWeight: 400 }}>Sin cuenta</span>
       )}
     </div>
   )
