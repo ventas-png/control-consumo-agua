@@ -101,7 +101,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
     setSaving(true)
 
     // Upload images
-    const uploadedUrls: string[] = []
+    const uploadedPaths: string[] = []
     for (const file of form.imagenes) {
       // Magic-byte check defends against renamed payloads (.html → .jpg).
       const magicCheck = await validateFileMagic(file, 'image')
@@ -119,8 +119,8 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
         Swal.fire('Error', `No se pudo subir la imagen: ${upErr.message}`, 'error')
         return
       }
-      const { data: urlData } = supabase.storage.from('mudanza-docs').getPublicUrl(path)
-      uploadedUrls.push(urlData.publicUrl)
+      // S6 phase 2: store the bare path; display sites sign via useSignedUrl.
+      uploadedPaths.push(path)
     }
 
     const payload: Record<string, unknown> = {
@@ -133,8 +133,8 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
       hora_solicitada: form.hora_solicitada || null,
       descripcion: form.descripcion.trim() || null,
     }
-    if (uploadedUrls.length > 0) {
-      payload.imagenes = uploadedUrls
+    if (uploadedPaths.length > 0) {
+      payload.imagenes = uploadedPaths
     }
 
     const { error } = await supabase.from('solicitud_mudanza_unidad').insert(payload)

@@ -71,17 +71,21 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
       return
     }
 
-    const { data: urlData } = supabase.storage.from('condominios-media').getPublicUrl(data.path)
+    // S6 phase 2: store the bare path (not the public URL). SecureImage /
+    // useSignedUrl reads back via createSignedUrl on render. Legacy rows
+    // with full URLs continue to work because extractBucketPath normalizes
+    // either form.
     setProgress(100)
     setUploading(false)
-    onChange(urlData.publicUrl)
+    onChange(data.path)
     setTimeout(() => setProgress(0), 600)
   }
 
   async function removeFile() {
     if (!value) return
-    const match = value.match(/condominios-media\/(.+)$/)
-    if (match) await supabase.storage.from('condominios-media').remove([match[1]])
+    // value may be a bare path (new) or a legacy publicUrl (old) — handle both.
+    const path = value.startsWith('http') ? value.match(/condominios-media\/(.+)$/)?.[1] : value
+    if (path) await supabase.storage.from('condominios-media').remove([path])
     onChange(null)
   }
 
