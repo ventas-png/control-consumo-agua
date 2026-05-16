@@ -1,9 +1,9 @@
 import { useState, useRef, type CSSProperties, type ChangeEvent, type DragEvent } from 'react'
-import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import type { TipoContactoEmergencia } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
+import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
 
 const TIPOS_VALIDOS: TipoContactoEmergencia[] = [
   'bomberos', 'policia', 'ambulancia', 'hospital',
@@ -83,22 +83,20 @@ export function ImportEmergenciasModal({ proyectoId, companyId, onClose, onImpor
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function descargarPlantilla() {
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.aoa_to_sheet([
-      ['nombre', 'tipo', 'telefono', 'telefono_alternativo', 'descripcion', 'disponible_24h', 'orden'],
-      ['Policía Nacional Civil', 'policia', '110', '', '', 'sí', 1],
-      ['Bomberos Voluntarios', 'bomberos', '122', '123', 'Estación central', 'sí', 2],
-      ['Cruz Roja / Ambulancia', 'ambulancia', '125', '', '', 'sí', 3],
-      ['Hospital General', 'hospital', '2329-0000', '2329-0001', 'Urgencias 24h', 'sí', 4],
-      ['EEGSA Electricidad', 'electricidad', '1516', '', 'Reporte de averías', 'sí', 5],
-      ['EMPAGUA Agua', 'agua', '1543', '', '', 'no', 6],
-      ['Administración', 'administracion', '+502 5555-0000', '', 'Encargado: Juan Pérez', 'no', 7],
-    ])
-    ws['!cols'] = [
-      { wch: 28 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 28 }, { wch: 14 }, { wch: 8 },
-    ]
-    XLSX.utils.book_append_sheet(wb, ws, 'Emergencias')
-    XLSX.writeFile(wb, 'plantilla_emergencias.xlsx')
+    void writeXlsx('plantilla_emergencias', [{
+      name: 'Emergencias',
+      rows: [
+        ['nombre', 'tipo', 'telefono', 'telefono_alternativo', 'descripcion', 'disponible_24h', 'orden'],
+        ['Policía Nacional Civil', 'policia', '110', '', '', 'sí', 1],
+        ['Bomberos Voluntarios', 'bomberos', '122', '123', 'Estación central', 'sí', 2],
+        ['Cruz Roja / Ambulancia', 'ambulancia', '125', '', '', 'sí', 3],
+        ['Hospital General', 'hospital', '2329-0000', '2329-0001', 'Urgencias 24h', 'sí', 4],
+        ['EEGSA Electricidad', 'electricidad', '1516', '', 'Reporte de averías', 'sí', 5],
+        ['EMPAGUA Agua', 'agua', '1543', '', '', 'no', 6],
+        ['Administración', 'administracion', '+502 5555-0000', '', 'Encargado: Juan Pérez', 'no', 7],
+      ],
+      colWidths: [28, 14, 16, 18, 28, 14, 8],
+    }]).catch(err => Swal.fire('Error', err.message ?? 'No se pudo generar la plantilla', 'error'))
   }
 
   function processFile(file: File) {
@@ -107,11 +105,9 @@ export function ImportEmergenciasModal({ proyectoId, companyId, onClose, onImpor
       return
     }
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const wb = XLSX.read(e.target!.result as ArrayBuffer, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+        const raw = await parseXlsxToObjects<Record<string, string | number | boolean>>(e.target!.result as ArrayBuffer)
         if (raw.length === 0) {
           Swal.fire('Archivo vacío', 'El archivo no contiene filas de datos.', 'warning')
           return

@@ -15,7 +15,7 @@ export default defineConfig({
           'vendor-charts': ['chart.js'],
           'vendor-maps': ['leaflet'],
           'vendor-pdf': ['jspdf', 'jspdf-autotable'],
-          'vendor-xlsx': ['xlsx'],
+          'vendor-xlsx': ['exceljs'],
           'vendor-ui': ['sweetalert2'],
         },
       },

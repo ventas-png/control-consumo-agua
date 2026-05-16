@@ -1,8 +1,8 @@
 import { useState, useRef, type CSSProperties, type ChangeEvent, type DragEvent } from 'react'
-import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
+import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
 
 function normalizeTime(raw: unknown): string | null {
   if (raw === null || raw === undefined || raw === '') return null
@@ -136,33 +136,29 @@ export function ImportAmenidadesModal({ proyectoId, companyId, onClose, onImport
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function descargarPlantilla() {
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.aoa_to_sheet([
-      [
-        'nombre', 'descripcion', 'capacidad_max', 'horario_inicio', 'horario_fin',
-        'requiere_deposito', 'monto_deposito', 'requiere_tarifa', 'tarifa_uso',
-        'tarifa_uso_finde', 'requiere_aprobacion', 'reglamento',
+    void writeXlsx('plantilla_amenidades', [{
+      name: 'Amenidades',
+      rows: [
+        [
+          'nombre', 'descripcion', 'capacidad_max', 'horario_inicio', 'horario_fin',
+          'requiere_deposito', 'monto_deposito', 'requiere_tarifa', 'tarifa_uso',
+          'tarifa_uso_finde', 'requiere_aprobacion', 'reglamento',
+        ],
+        [
+          'Piscina', 'Área de natación principal', 30, '06:00', '22:00',
+          'sí', 100, 'no', '', '', 'no', '',
+        ],
+        [
+          'Salón Social', 'Salón para eventos y reuniones', 80, '08:00', '23:00',
+          'sí', 200, 'sí', 50, 75, 'sí', 'El residente es responsable de dejar el salón limpio.',
+        ],
+        [
+          'Gimnasio', '', 20, '05:00', '23:00',
+          'no', '', 'no', '', '', 'no', '',
+        ],
       ],
-      [
-        'Piscina', 'Área de natación principal', 30, '06:00', '22:00',
-        'sí', 100, 'no', '', '', 'no', '',
-      ],
-      [
-        'Salón Social', 'Salón para eventos y reuniones', 80, '08:00', '23:00',
-        'sí', 200, 'sí', 50, 75, 'sí', 'El residente es responsable de dejar el salón limpio.',
-      ],
-      [
-        'Gimnasio', '', 20, '05:00', '23:00',
-        'no', '', 'no', '', '', 'no', '',
-      ],
-    ])
-    ws['!cols'] = [
-      { wch: 18 }, { wch: 30 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
-      { wch: 18 }, { wch: 15 }, { wch: 16 }, { wch: 12 },
-      { wch: 16 }, { wch: 20 }, { wch: 40 },
-    ]
-    XLSX.utils.book_append_sheet(wb, ws, 'Amenidades')
-    XLSX.writeFile(wb, 'plantilla_amenidades.xlsx')
+      colWidths: [18, 30, 14, 14, 12, 18, 15, 16, 12, 16, 20, 40],
+    }]).catch(err => Swal.fire('Error', err.message ?? 'No se pudo generar la plantilla', 'error'))
   }
 
   function processFile(file: File) {
@@ -171,11 +167,9 @@ export function ImportAmenidadesModal({ proyectoId, companyId, onClose, onImport
       return
     }
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const wb = XLSX.read(e.target!.result as ArrayBuffer, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+        const raw = await parseXlsxToObjects<Record<string, string | number | boolean>>(e.target!.result as ArrayBuffer)
         if (raw.length === 0) {
           Swal.fire('Archivo vacío', 'El archivo no contiene filas de datos.', 'warning')
           return

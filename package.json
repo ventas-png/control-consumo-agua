@@ -15,13 +15,13 @@
     "@emailjs/browser": "^3.12.1",
     "@supabase/supabase-js": "^2.39.0",
     "chart.js": "^4.4.0",
+    "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "leaflet": "^1.9.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "sweetalert2": "^11.10.0",
-    "xlsx": "^0.18.5"
+    "sweetalert2": "^11.10.0"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.8",

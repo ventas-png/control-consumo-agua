@@ -1,8 +1,8 @@
 import { useState, useRef, type CSSProperties, type ChangeEvent, type DragEvent} from 'react'
-import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import type { Contador, TipoAgua, UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
+import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
 import { sanitizeInput } from '../../lib/validation'
 
 function normalizeDate(raw: unknown): string | null {
@@ -114,32 +114,27 @@ export function ImportContadoresModal({ currentUser, onClose, onImportado }: Pro
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function descargarPlantilla() {
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.aoa_to_sheet([
-      [
-        'numero_serie', 'tipo_agua', 'lectura_inicial', 'descripcion', 'marca', 'modelo',
-        'fecha_instalacion', 'medida', 'material', 'tipo_contador', 'valvula_cheque',
-        'tipo_llave', 'periodicidad_lectura_dias', 'contratista_instalador', 'garantia_instalacion_vence',
+    void writeXlsx('plantilla_contadores', [{
+      name: 'Contadores',
+      rows: [
+        [
+          'numero_serie', 'tipo_agua', 'lectura_inicial', 'descripcion', 'marca', 'modelo',
+          'fecha_instalacion', 'medida', 'material', 'tipo_contador', 'valvula_cheque',
+          'tipo_llave', 'periodicidad_lectura_dias', 'contratista_instalador', 'garantia_instalacion_vence',
+        ],
+        [
+          'MED-001', 'potable', 0, 'Medidor zona A', 'Sensus', '620',
+          '2024-01-15', '1/2"', 'Latón', 'Analógico volumétrico', 'Sí',
+          'Bola', 30, 'Instalaciones Pérez S.A.', '2027-01-15',
+        ],
+        [
+          'MED-002', 'riego', 0, 'Medidor riego sur', '', '',
+          '', '3/4"', '', '', '',
+          '', '', '', '',
+        ],
       ],
-      [
-        'MED-001', 'potable', 0, 'Medidor zona A', 'Sensus', '620',
-        '2024-01-15', '1/2"', 'Latón', 'Analógico volumétrico', 'Sí',
-        'Bola', 30, 'Instalaciones Pérez S.A.', '2027-01-15',
-      ],
-      [
-        'MED-002', 'riego', 0, 'Medidor riego sur', '', '',
-        '', '3/4"', '', '', '',
-        '', '', '', '',
-      ],
-    ])
-    // Column widths
-    ws['!cols'] = [
-      { wch: 14 }, { wch: 20 }, { wch: 16 }, { wch: 22 }, { wch: 12 }, { wch: 10 },
-      { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 24 }, { wch: 14 },
-      { wch: 12 }, { wch: 24 }, { wch: 26 }, { wch: 26 },
-    ]
-    XLSX.utils.book_append_sheet(wb, ws, 'Contadores')
-    XLSX.writeFile(wb, 'plantilla_contadores.xlsx')
+      colWidths: [14, 20, 16, 22, 12, 10, 16, 10, 12, 24, 14, 12, 24, 26, 26],
+    }]).catch(err => Swal.fire('Error', err.message ?? 'No se pudo generar la plantilla', 'error'))
   }
 
   function processFile(file: File) {
@@ -148,11 +143,9 @@ export function ImportContadoresModal({ currentUser, onClose, onImportado }: Pro
       return
     }
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const wb = XLSX.read(e.target!.result as ArrayBuffer, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+        const raw = await parseXlsxToObjects<Record<string, string | number | boolean>>(e.target!.result as ArrayBuffer)
         if (raw.length === 0) {
           Swal.fire('Archivo vacío', 'El archivo no contiene filas de datos.', 'warning')
           return

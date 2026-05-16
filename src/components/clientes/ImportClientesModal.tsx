@@ -1,9 +1,9 @@
 import { useState, useRef, type CSSProperties, type ChangeEvent, type DragEvent} from 'react'
-import * as XLSX from 'xlsx'
 import Swal from 'sweetalert2'
 import type { Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, validateEmail, validatePhoneNumber } from '../../lib/validation'
+import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
 
 function normalizeDate(raw: unknown): string | null {
   if (raw === null || raw === undefined || raw === '') return null
@@ -178,58 +178,52 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function descargarPlantilla() {
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.aoa_to_sheet([
-      [
-        'nombre', 'codigo', 'email', 'telefono', 'whatsapp', 'direccion',
-        'nacionalidad', 'cui_dui', 'fecha_nacimiento', 'numero_facturacion', 'telefono_alterno',
+    void writeXlsx('plantilla_clientes', [{
+      name: 'Clientes',
+      rows: [
+        [
+          'nombre', 'codigo', 'email', 'telefono', 'whatsapp', 'direccion',
+          'nacionalidad', 'cui_dui', 'fecha_nacimiento', 'numero_facturacion', 'telefono_alterno',
+        ],
+        [
+          'María López', 'CLI-001', 'maria@email.com', '22223333', '22223333', 'Av. Principal 123',
+          'Guatemalteca', '1234567890101', '1985-06-15', 'FAC-001', '',
+        ],
+        [
+          'Juan Pérez', 'CLI-002', 'juan@email.com', '44445555', '', 'Calle 5 Norte',
+          '', '', '', '', '',
+        ],
       ],
-      [
-        'María López', 'CLI-001', 'maria@email.com', '22223333', '22223333', 'Av. Principal 123',
-        'Guatemalteca', '1234567890101', '1985-06-15', 'FAC-001', '',
-      ],
-      [
-        'Juan Pérez', 'CLI-002', 'juan@email.com', '44445555', '', 'Calle 5 Norte',
-        '', '', '', '', '',
-      ],
-    ])
-    ws['!cols'] = [
-      { wch: 22 }, { wch: 12 }, { wch: 26 }, { wch: 12 }, { wch: 12 }, { wch: 26 },
-      { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 },
-    ]
-    XLSX.utils.book_append_sheet(wb, ws, 'Clientes')
-    XLSX.writeFile(wb, 'plantilla_clientes.xlsx')
+      colWidths: [22, 12, 26, 12, 12, 26, 16, 18, 18, 18, 18],
+    }]).catch(err => Swal.fire('Error', err.message ?? 'No se pudo generar la plantilla', 'error'))
   }
 
   function descargarErrores() {
     if (analyzed.conErrores.length === 0) return
-    const wb = XLSX.utils.book_new()
-    const headers = [
+    const headers: (string | number | null | undefined)[] = [
       'nombre', 'codigo', 'email', 'telefono', 'whatsapp', 'direccion',
       'nacionalidad', 'cui_dui', 'fecha_nacimiento', 'numero_facturacion', 'telefono_alterno',
       'motivo_error',
     ]
     const dataRows = analyzed.conErrores.map(r => [
-      r.rawData['nombre'] ?? '',
-      r.rawData['codigo'] ?? '',
-      r.rawData['email'] ?? '',
-      r.rawData['telefono'] ?? '',
-      r.rawData['whatsapp'] ?? '',
-      r.rawData['direccion'] ?? '',
-      r.rawData['nacionalidad'] ?? '',
-      r.rawData['cui_dui'] ?? '',
-      r.rawData['fecha_nacimiento'] ?? '',
-      r.rawData['numero_facturacion'] ?? '',
-      r.rawData['telefono_alterno'] ?? '',
+      String(r.rawData['nombre'] ?? ''),
+      String(r.rawData['codigo'] ?? ''),
+      String(r.rawData['email'] ?? ''),
+      String(r.rawData['telefono'] ?? ''),
+      String(r.rawData['whatsapp'] ?? ''),
+      String(r.rawData['direccion'] ?? ''),
+      String(r.rawData['nacionalidad'] ?? ''),
+      String(r.rawData['cui_dui'] ?? ''),
+      String(r.rawData['fecha_nacimiento'] ?? ''),
+      String(r.rawData['numero_facturacion'] ?? ''),
+      String(r.rawData['telefono_alterno'] ?? ''),
       r.errors.join('; '),
     ])
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-    ws['!cols'] = [
-      { wch: 22 }, { wch: 12 }, { wch: 26 }, { wch: 12 }, { wch: 12 }, { wch: 26 },
-      { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 50 },
-    ]
-    XLSX.utils.book_append_sheet(wb, ws, 'Errores')
-    XLSX.writeFile(wb, 'clientes_con_errores.xlsx')
+    void writeXlsx('clientes_con_errores', [{
+      name: 'Errores',
+      rows: [headers, ...dataRows],
+      colWidths: [22, 12, 26, 12, 12, 26, 16, 18, 18, 18, 18, 50],
+    }]).catch(err => Swal.fire('Error', err.message ?? 'No se pudo exportar', 'error'))
   }
 
   async function processFile(file: File) {
@@ -240,9 +234,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
     const reader = new FileReader()
     reader.onload = async (e) => {
       try {
-        const wb = XLSX.read(e.target!.result as ArrayBuffer, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+        const raw = await parseXlsxToObjects<Record<string, string | number | boolean>>(e.target!.result as ArrayBuffer)
         if (raw.length === 0) {
           Swal.fire('Archivo vacío', 'El archivo no contiene filas de datos.', 'warning')
           return

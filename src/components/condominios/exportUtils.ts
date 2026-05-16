@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import * as XLSX from 'xlsx'
+import { writeXlsx } from '../../lib/xlsx'
 
 // ── Excel ─────────────────────────────────────────────────────────────────────
 
@@ -11,20 +11,19 @@ export interface ExcelSheet {
 }
 
 export function exportarExcel(filename: string, sheets: ExcelSheet[]): void {
-  const wb = XLSX.utils.book_new()
-  for (const sheet of sheets) {
-    const data: (string | number | null | undefined)[][] = [sheet.headers, ...sheet.rows]
-    const ws = XLSX.utils.aoa_to_sheet(data)
-    ws['!cols'] = sheet.headers.map((h, i) => ({
-      wch: Math.max(
-        h.length + 2,
-        ...sheet.rows.map(r => String(r[i] ?? '').length),
-        8
-      ),
-    }))
-    XLSX.utils.book_append_sheet(wb, ws, sheet.name.slice(0, 31))
-  }
-  XLSX.writeFile(wb, `${filename}.xlsx`)
+  const xlsxSheets = sheets.map(sheet => ({
+    name: sheet.name,
+    rows: [sheet.headers, ...sheet.rows],
+    colWidths: sheet.headers.map((h, i) => Math.max(
+      h.length + 2,
+      ...sheet.rows.map(r => String(r[i] ?? '').length),
+      8,
+    )),
+  }))
+  // Fire-and-forget — caller pattern is onClick handler that doesn't await.
+  void writeXlsx(filename, xlsxSheets).catch(err => {
+    console.error('Excel export failed:', err)
+  })
 }
 
 // ── PDF helpers ───────────────────────────────────────────────────────────────
