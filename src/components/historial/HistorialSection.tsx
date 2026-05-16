@@ -1,9 +1,11 @@
-import { useState, useMemo, type CSSProperties} from 'react'
+import { useState, useMemo, type CSSProperties } from 'react'
 import Swal from 'sweetalert2'
 import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
+import { DataTable, type DataTableColumn } from '../shared'
+import { formatDate, formatCurrency, formatNumber } from '../../lib/format'
 
 interface Props {
   registros: Registro[]
@@ -16,6 +18,19 @@ interface Props {
   onEstadoUpdated: (id: string, estado: Registro['estado']) => void
   canEdit?: boolean
   canChangeStatus?: boolean
+}
+
+const ESTADO_PILL: Record<string, { bg: string; color: string; icon: string }> = {
+  pendiente: { bg: '#fef3c7', color: '#92400e', icon: '⏳' },
+  pagado:    { bg: '#d1fae5', color: '#065f46', icon: '✓' },
+  mora:      { bg: '#fee2e2', color: '#991b1b', icon: '⚠️' },
+}
+
+const TIPO_AGUA_LABELS: Record<string, string> = {
+  potable: 'Agua Potable', rehuso: 'Agua de Rehúso', piscina: 'Piscina',
+  desalinada: 'Desalinada', riego: 'Riego', jacuzzi: 'Jacuzzi',
+  consumo_humano: 'Consumo Humano', desmineralizada: 'Desmineralizada',
+  residuales_tratadas: 'Residuales Tratadas',
 }
 
 export function HistorialSection({
@@ -46,71 +61,57 @@ export function HistorialSection({
 
   const canEdit = canEditProp && canChangeStatusProp && userRole !== 'viewer'
 
-  // Filtrado avanzado
+  // Index contadores por id para evitar buscar el unidad_id / tipo_agua en
+  // cada iteración del filter.
+  const contadoresById = useMemo(
+    () => new Map(contadores.map(c => [c.id, c])),
+    [contadores]
+  )
+
   const filtrados = useMemo(() => {
+    const needle = filtroTexto.toLowerCase().trim()
     return registros
       .filter(r => {
-        // Texto
-        const matchTxt = (r.cliente_nombre ?? '').toLowerCase().includes(filtroTexto.toLowerCase())
-
-        // Estado
-        const matchEst = filtroEstado ? r.estado === filtroEstado : true
-
-        // Fecha
+        const matchTxt = !needle || (r.cliente_nombre ?? '').toLowerCase().includes(needle)
+        const matchEst = !filtroEstado || r.estado === filtroEstado
         const fecha = new Date(r.fecha)
-        const matchFechaInicio = filtroFechaInicio ? fecha >= new Date(filtroFechaInicio) : true
-        const matchFechaFin = filtroFechaFin ? fecha <= new Date(filtroFechaFin + 'T23:59:59') : true
-
-        // Proyecto (si el registro tiene project_id)
-        const matchProyecto = filtroProyecto ? (r as any).project_id === filtroProyecto : true
-
-        // Unidad — registros link via contador_id → contador.unidad_id
-        const matchUnidad = filtroUnidad
-          ? contadores.some(c => c.unidad_id === filtroUnidad && c.id === r.contador_id)
-          : true
-
-        // Tipo de agua — registros link via contador_id → contador.tipo_agua
-        const matchTipoAgua = filtroTipoAgua
-          ? contadores.some(c => c.tipo_agua === filtroTipoAgua && c.id === r.contador_id)
-          : true
-
+        const matchFechaInicio = !filtroFechaInicio || fecha >= new Date(filtroFechaInicio)
+        const matchFechaFin = !filtroFechaFin || fecha <= new Date(filtroFechaFin + 'T23:59:59')
+        const matchProyecto = !filtroProyecto || (r as Registro & { project_id?: string }).project_id === filtroProyecto
+        const contador = r.contador_id ? contadoresById.get(r.contador_id) : undefined
+        const matchUnidad = !filtroUnidad || contador?.unidad_id === filtroUnidad
+        const matchTipoAgua = !filtroTipoAgua || contador?.tipo_agua === filtroTipoAgua
         return matchTxt && matchEst && matchFechaInicio && matchFechaFin && matchProyecto && matchUnidad && matchTipoAgua
       })
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-  }, [registros, filtroTexto, filtroEstado, filtroFechaInicio, filtroFechaFin, filtroProyecto, filtroUnidad, filtroTipoAgua, contadores])
+  }, [registros, filtroTexto, filtroEstado, filtroFechaInicio, filtroFechaFin, filtroProyecto, filtroUnidad, filtroTipoAgua, contadoresById])
 
-  // Paginación
-  const totalPages = Math.ceil(filtrados.length / itemsPerPage)
-  const paginados = filtrados.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-
-  // Estadísticas
-  const stats = useMemo(() => {
-    const total = filtrados.reduce((sum, r) => sum + (getTotal(r) || 0), 0)
-    const pagado = filtrados
-      .filter(r => r.estado === 'pagado')
-      .reduce((sum, r) => sum + (getTotal(r) || 0), 0)
-    const pendiente = filtrados
-      .filter(r => r.estado === 'pendiente')
-      .reduce((sum, r) => sum + (getTotal(r) || 0), 0)
-    const mora = filtrados.filter(r => r.estado === 'mora').reduce((sum, r) => sum + (getTotal(r) || 0), 0)
-
-    const totalConsumo = filtrados.reduce((sum, r) => sum + (r.consumo || 0), 0)
-
-    return {
-      totalRegistros: filtrados.length,
-      totalMonto: total,
-      totalConsumo,
-      pagado,
-      pendiente,
-      mora,
-      countPendiente: filtrados.filter(r => r.estado === 'pendiente').length,
-      countMora: filtrados.filter(r => r.estado === 'mora').length,
-    }
-  }, [filtrados])
+  const totalPages = Math.max(1, Math.ceil(filtrados.length / itemsPerPage))
+  const paginados = useMemo(
+    () => filtrados.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+    [filtrados, currentPage]
+  )
 
   function getTotal(r: Registro): number {
     return r.monto_calculado ?? calcularTotalPagar(r.consumo, r.tarifa_aplicada, r.canon_aplicado ?? 20).total
   }
+
+  const stats = useMemo(() => {
+    let totalMonto = 0, totalConsumo = 0, pagado = 0, pendiente = 0, mora = 0
+    let countPendiente = 0, countMora = 0
+    for (const r of filtrados) {
+      const t = getTotal(r)
+      totalMonto += t
+      totalConsumo += r.consumo || 0
+      if (r.estado === 'pagado') pagado += t
+      else if (r.estado === 'pendiente') { pendiente += t; countPendiente++ }
+      else if (r.estado === 'mora') { mora += t; countMora++ }
+    }
+    return {
+      totalRegistros: filtrados.length,
+      totalMonto, totalConsumo, pagado, pendiente, mora, countPendiente, countMora,
+    }
+  }, [filtrados])
 
   function enviarWhatsApp(registro: Registro) {
     const cliente = clientes.find(c => c.id === registro.cliente_id)
@@ -127,9 +128,9 @@ export function HistorialSection({
     }
     const total = getTotal(registro)
     const periodoStr = registro.fecha_lectura_anterior
-      ? `\n📆 Período: ${new Date(registro.fecha_lectura_anterior).toLocaleDateString()} al ${new Date(registro.fecha).toLocaleDateString()} (${registro.dias_servicio ?? '—'} días)`
+      ? `\n📆 Período: ${formatDate(registro.fecha_lectura_anterior)} al ${formatDate(registro.fecha)} (${registro.dias_servicio ?? '—'} días)`
       : ''
-    const msg = `Hola ${registro.cliente_nombre}, su recibo de agua potable:\n📅 Fecha: ${new Date(registro.fecha).toLocaleDateString()}${periodoStr}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${registro.consumo.toFixed(2)} m³\n💰 Total a Pagar: ${moneda}${total.toFixed(2)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
+    const msg = `Hola ${registro.cliente_nombre}, su recibo de agua potable:\n📅 Fecha: ${formatDate(registro.fecha)}${periodoStr}\n💧 Lectura Actual: ${registro.lectura_actual}\n📊 Consumo: ${formatNumber(registro.consumo)} m³\n💰 Total a Pagar: ${formatCurrency(total, moneda)}\nℹ️ Estado: ${registro.estado.toUpperCase()}\n\nGracias por su pago puntual.`
     window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
@@ -140,7 +141,6 @@ export function HistorialSection({
       .from('registros')
       .update({ estado: editModal.estado, updated_at: new Date().toISOString() })
       .eq('id', editModal.registroId)
-
     if (!error) {
       onEstadoUpdated(editModal.registroId, editModal.estado)
       setEditModal(null)
@@ -151,477 +151,274 @@ export function HistorialSection({
     setSavingEstado(false)
   }
 
-  const pillStyle = (estado: string): CSSProperties => {
-    const colors: Record<string, { bg: string; color: string }> = {
-      pendiente: { bg: '#fef3c7', color: '#92400e' },
-      pagado: { bg: '#d1fae5', color: '#065f46' },
-      mora: { bg: '#fee2e2', color: '#991b1b' },
-    }
-    return { padding: '6px 14px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, ...colors[estado] }
+  function resetFiltros() {
+    setFiltroTexto(''); setFiltroEstado(''); setFiltroProyecto('')
+    setFiltroUnidad(''); setFiltroTipoAgua('')
+    setFiltroFechaInicio(''); setFiltroFechaFin('')
+    setCurrentPage(1)
   }
 
-  const statCard = (label: string, value: string | number, color: string, icon: string) => (
-    <div
-      style={{
-        flex: 1,
-        minWidth: '200px',
-        padding: '16px',
-        background: `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)`,
-        borderLeft: `4px solid ${color}`,
-        borderRadius: '12px',
-        border: `1px solid ${color}40`,
-      }}
-    >
-      <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, marginBottom: '8px' }}>
-        {icon} {label}
-      </div>
-      <div style={{ fontSize: '24px', fontWeight: 700, color }}>
-        {typeof value === 'number' ? `${moneda}${value.toFixed(2)}` : value}
-      </div>
-    </div>
-  )
+  // ── Tabla via DataTable ─────────────────────────────────────────────────
+  const columns: DataTableColumn<Registro>[] = useMemo(() => [
+    {
+      key: 'fecha', header: 'Fecha', sortable: true,
+      accessor: r => r.fecha,
+      render: r => `📅 ${formatDate(r.fecha)}`,
+    },
+    {
+      key: 'cliente', header: 'Cliente', sortable: true,
+      accessor: r => r.cliente_nombre ?? '',
+      render: r => r.cliente_nombre ?? '—',
+    },
+    {
+      key: 'lectAnt', header: 'Lect. Ant.', align: 'right',
+      accessor: r => r.lectura_anterior,
+      render: r => <span style={{ color: '#64748b' }}>{r.lectura_anterior}</span>,
+    },
+    {
+      key: 'lectAct', header: 'Lect. Act.', align: 'right',
+      accessor: r => r.lectura_actual,
+      render: r => <span style={{ color: '#0ea5e9', fontWeight: 600 }}>{r.lectura_actual}</span>,
+    },
+    {
+      key: 'consumo', header: 'Consumo (m³)', sortable: true, align: 'right',
+      accessor: r => r.consumo,
+      render: r => <span style={{ fontWeight: 600 }}>💧 {formatNumber(r.consumo)}</span>,
+    },
+    {
+      key: 'total', header: `Total (${moneda})`, sortable: true, align: 'right',
+      accessor: r => getTotal(r),
+      render: r => <span style={{ fontWeight: 700, color: '#0ea5e9' }}>{formatCurrency(getTotal(r), moneda)}</span>,
+    },
+    {
+      key: 'estado', header: 'Estado', sortable: true,
+      accessor: r => r.estado,
+      render: r => {
+        const p = ESTADO_PILL[r.estado] ?? { bg: '#f1f5f9', color: '#475569', icon: '' }
+        return (
+          <span style={pillStyle(p)}>
+            {p.icon} {r.estado}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'acciones', header: 'Acciones',
+      render: r => (
+        <div style={{ display: 'flex', gap: 5 }}>
+          {canEdit && (
+            <button
+              onClick={() => setEditModal({ registroId: r.id, estado: r.estado })}
+              aria-label="Editar estado"
+              style={btnEditStyle}
+            >✏️ Editar</button>
+          )}
+          <button
+            onClick={() => enviarWhatsApp(r)}
+            aria-label="Enviar por WhatsApp"
+            style={btnWaStyle}
+          >💬 WhatsApp</button>
+        </div>
+      ),
+    },
+  ], [moneda, canEdit])
 
   return (
-    <div style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+    <div style={{ background: 'white', borderRadius: 24, padding: 32, boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '12px', borderBottom: '2px solid #e2e8f0' }}>
-        <span style={{ fontSize: '20px', fontWeight: 700 }}>📊 Historial de Lecturas</span>
-        <div style={{ display: 'flex', gap: '10px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 12, borderBottom: '2px solid #e2e8f0' }}>
+        <span style={{ fontSize: 20, fontWeight: 700 }}>📊 Historial de Lecturas</span>
+        <div style={{ display: 'flex', gap: 10 }}>
           <button
-            onClick={() => setShowFilters(!showFilters)}
+            onClick={() => setShowFilters(s => !s)}
             style={{
               padding: '10px 16px',
               background: showFilters ? '#0ea5e9' : '#f1f5f9',
               color: showFilters ? 'white' : '#475569',
-              border: 'none',
-              borderRadius: '10px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontSize: '14px',
+              border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14,
             }}
-          >
-            ⚙️ Filtros
-          </button>
-          <div style={{ display: 'flex', gap: '5px', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '4px' }}>
-            <button
-              onClick={() => setViewMode('table')}
-              style={{
-                padding: '8px 12px',
-                background: viewMode === 'table' ? '#0ea5e9' : 'transparent',
-                color: viewMode === 'table' ? 'white' : '#64748b',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '12px',
-              }}
-            >
-              📋
-            </button>
-            <button
-              onClick={() => setViewMode('cards')}
-              style={{
-                padding: '8px 12px',
-                background: viewMode === 'cards' ? '#0ea5e9' : 'transparent',
-                color: viewMode === 'cards' ? 'white' : '#64748b',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '12px',
-              }}
-            >
-              🎴
-            </button>
+          >⚙️ Filtros</button>
+          <div style={{ display: 'flex', gap: 5, border: '1px solid #e2e8f0', borderRadius: 8, padding: 4 }}>
+            <button onClick={() => setViewMode('table')} style={viewBtnStyle(viewMode === 'table')}>📋</button>
+            <button onClick={() => setViewMode('cards')} style={viewBtnStyle(viewMode === 'cards')}>🎴</button>
           </div>
           <button
             onClick={async () => {
               const { exportarPDFGlobal } = await import('../../lib/pdf')
               exportarPDFGlobal(filtrados)
             }}
-            style={{ padding: '10px 20px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}
-          >
-            📄 PDF
-          </button>
+            style={{ padding: '10px 20px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
+          >📄 PDF</button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {statCard('Total Registros', String(stats.totalRegistros), '#0ea5e9', '📝')}
-        {statCard('Total Consumo', `${stats.totalConsumo.toFixed(2)} m³`, '#0d9488', '💧')}
-        {statCard('Total Monto', stats.totalMonto, '#8b5cf6', '💰')}
-        {statCard('Pagado', stats.pagado, '#10b981', '✓')}
-        {statCard('Pendiente', stats.pendiente, '#f59e0b', `⏳ (${stats.countPendiente})`)}
-        {statCard('En Mora', stats.mora, '#ef4444', `⚠️ (${stats.countMora})`)}
+      {/* Stats — derivados del filtered set */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <StatCard label="Total Registros" value={String(stats.totalRegistros)} color="#0ea5e9" icon="📝" moneda={moneda} />
+        <StatCard label="Total Consumo" value={`${formatNumber(stats.totalConsumo)} m³`} color="#0d9488" icon="💧" moneda={moneda} />
+        <StatCard label="Total Monto" value={stats.totalMonto} color="#8b5cf6" icon="💰" moneda={moneda} />
+        <StatCard label="Pagado" value={stats.pagado} color="#10b981" icon="✓" moneda={moneda} />
+        <StatCard label="Pendiente" value={stats.pendiente} color="#f59e0b" icon={`⏳ (${stats.countPendiente})`} moneda={moneda} />
+        <StatCard label="En Mora" value={stats.mora} color="#ef4444" icon={`⚠️ (${stats.countMora})`} moneda={moneda} />
       </div>
 
       {/* Filters Panel */}
       {showFilters && (
-        <div style={{ background: '#f8fafc', padding: '16px', marginBottom: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+        <div style={{ background: '#f8fafc', padding: 16, marginBottom: 20, borderRadius: 12, border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
           <input
             type="text"
             placeholder="🔍 Buscar cliente..."
             value={filtroTexto}
             onChange={e => { setFiltroTexto(e.target.value); setCurrentPage(1) }}
-            style={{ padding: '10px 12px', border: '1px solid #cbd5e0', borderRadius: '8px', fontSize: '14px' }}
+            style={filterFieldStyle}
           />
-          <select
-            value={filtroEstado}
-            onChange={e => { setFiltroEstado(e.target.value); setCurrentPage(1) }}
-            style={{ padding: '10px 12px', border: '1px solid #cbd5e0', borderRadius: '8px', fontSize: '14px' }}
-          >
+          <select value={filtroEstado} onChange={e => { setFiltroEstado(e.target.value); setCurrentPage(1) }} style={filterFieldStyle}>
             <option value="">Todos los Estados</option>
             <option value="pendiente">⏳ Pendiente</option>
             <option value="pagado">✓ Pagado</option>
             <option value="mora">⚠️ Mora</option>
           </select>
           {proyectos.length > 1 && (
-            <select
-              value={filtroProyecto}
-              onChange={e => { setFiltroProyecto(e.target.value); setCurrentPage(1) }}
-              style={{ padding: '10px 12px', border: '1px solid #cbd5e0', borderRadius: '8px', fontSize: '14px' }}
-            >
+            <select value={filtroProyecto} onChange={e => { setFiltroProyecto(e.target.value); setCurrentPage(1) }} style={filterFieldStyle}>
               <option value="">Todos los Proyectos</option>
-              {proyectos.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
+              {proyectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           )}
           {unidades.length > 0 && (
-            <select
-              value={filtroUnidad}
-              onChange={e => { setFiltroUnidad(e.target.value); setCurrentPage(1) }}
-              style={{ padding: '10px 12px', border: '1px solid #cbd5e0', borderRadius: '8px', fontSize: '14px' }}
-            >
+            <select value={filtroUnidad} onChange={e => { setFiltroUnidad(e.target.value); setCurrentPage(1) }} style={filterFieldStyle}>
               <option value="">Todas las Unidades</option>
-              {unidades.map(u => (
-                <option key={u.id} value={u.id}>
-                  {u.nombre}
-                </option>
-              ))}
+              {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
             </select>
           )}
           {(() => {
-            const tiposDisponibles = [...new Set(contadores.map(c => c.tipo_agua).filter(Boolean))]
-            if (tiposDisponibles.length < 2) return null
-            const TIPO_LABELS: Record<string, string> = {
-              potable: 'Agua Potable', rehuso: 'Agua de Rehúso', piscina: 'Piscina',
-              desalinada: 'Desalinada', riego: 'Riego', jacuzzi: 'Jacuzzi',
-              consumo_humano: 'Consumo Humano', desmineralizada: 'Desmineralizada',
-              residuales_tratadas: 'Residuales Tratadas',
-            }
+            const tipos = [...new Set(contadores.map(c => c.tipo_agua).filter(Boolean))]
+            if (tipos.length < 2) return null
             return (
-              <select
-                value={filtroTipoAgua}
-                onChange={e => { setFiltroTipoAgua(e.target.value); setCurrentPage(1) }}
-                style={{ padding: '10px 12px', border: '1px solid #cbd5e0', borderRadius: '8px', fontSize: '14px' }}
-              >
+              <select value={filtroTipoAgua} onChange={e => { setFiltroTipoAgua(e.target.value); setCurrentPage(1) }} style={filterFieldStyle}>
                 <option value="">Todos los Tipos de Agua</option>
-                {tiposDisponibles.map(tipo => (
-                  <option key={tipo} value={tipo}>{TIPO_LABELS[tipo] ?? tipo}</option>
-                ))}
+                {tipos.map(tipo => <option key={tipo} value={tipo}>{TIPO_AGUA_LABELS[tipo] ?? tipo}</option>)}
               </select>
             )
           })()}
           <div>
-            <input
-              type="date"
-              value={filtroFechaInicio}
-              onChange={e => { setFiltroFechaInicio(e.target.value); setCurrentPage(1) }}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e0', borderRadius: '8px', fontSize: '14px' }}
-            />
-            <small style={{ color: '#64748b', marginTop: '4px', display: 'block' }}>Desde</small>
+            <input type="date" value={filtroFechaInicio} onChange={e => { setFiltroFechaInicio(e.target.value); setCurrentPage(1) }} style={{ ...filterFieldStyle, width: '100%' }} />
+            <small style={{ color: '#64748b', marginTop: 4, display: 'block' }}>Desde</small>
           </div>
           <div>
-            <input
-              type="date"
-              value={filtroFechaFin}
-              onChange={e => { setFiltroFechaFin(e.target.value); setCurrentPage(1) }}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e0', borderRadius: '8px', fontSize: '14px' }}
-            />
-            <small style={{ color: '#64748b', marginTop: '4px', display: 'block' }}>Hasta</small>
+            <input type="date" value={filtroFechaFin} onChange={e => { setFiltroFechaFin(e.target.value); setCurrentPage(1) }} style={{ ...filterFieldStyle, width: '100%' }} />
+            <small style={{ color: '#64748b', marginTop: 4, display: 'block' }}>Hasta</small>
           </div>
-          <button
-            onClick={() => {
-              setFiltroTexto('')
-              setFiltroEstado('')
-              setFiltroProyecto('')
-              setFiltroUnidad('')
-              setFiltroTipoAgua('')
-              setFiltroFechaInicio('')
-              setFiltroFechaFin('')
-              setCurrentPage(1)
-            }}
-            style={{ padding: '10px 12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}
-          >
+          <button onClick={resetFiltros} style={{ padding: '10px 12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
             🔄 Limpiar Filtros
           </button>
         </div>
       )}
 
-      {/* View Mode: Table */}
+      {/* View Mode: Table (vía DataTable, sin paginación interna) */}
       {viewMode === 'table' && (
-        <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-            <thead style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white' }}>
-              <tr>
-                {['Fecha', 'Cliente', 'Lect. Ant.', 'Lect. Act.', 'Consumo (m³)', `Total (${moneda})`, 'Estado', 'Acciones'].map(h => (
-                  <th scope="col" key={h} style={{ padding: '14px 12px', textAlign: 'left', fontWeight: 600 }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {paginados.map(r => {
-                const total = getTotal(r)
-                return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #e2e8f0', transition: 'background 0.2s' }} onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')} onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
-                    <td style={{ padding: '14px 12px', fontWeight: 500 }}>
-                      📅 {new Date(r.fecha).toLocaleDateString()}
-                    </td>
-                    <td style={{ padding: '14px 12px' }}>{r.cliente_nombre}</td>
-                    <td style={{ padding: '14px 12px', color: '#64748b' }}>{r.lectura_anterior}</td>
-                    <td style={{ padding: '14px 12px', color: '#0ea5e9', fontWeight: 600 }}>{r.lectura_actual}</td>
-                    <td style={{ padding: '14px 12px', fontWeight: 600 }}>💧 {r.consumo.toFixed(2)}</td>
-                    <td style={{ padding: '14px 12px', fontWeight: 700, color: '#0ea5e9' }}>
-                      {moneda}
-                      {total.toFixed(2)}
-                    </td>
-                    <td style={{ padding: '14px 12px' }}>
-                      <span style={pillStyle(r.estado)}>
-                        {r.estado === 'pagado' && '✓'}
-                        {r.estado === 'pendiente' && '⏳'}
-                        {r.estado === 'mora' && '⚠️'} {r.estado}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 12px' }}>
-                      <div style={{ display: 'flex', gap: '5px' }}>
-                        {canEdit && (
-                          <button
-                            onClick={() => setEditModal({ registroId: r.id, estado: r.estado })}
-                            aria-label="Editar estado"
-                            style={{
-                              padding: '8px 12px',
-                              minHeight: '36px',
-                              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                            }}
-                          >
-                            ✏️ Editar
-                          </button>
-                        )}
-                        <button
-                          onClick={() => enviarWhatsApp(r)}
-                          aria-label="Enviar por WhatsApp"
-                          style={{
-                            padding: '8px 12px',
-                            minHeight: '36px',
-                            background: '#25D366',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                          }}
-                        >
-                          💬 WhatsApp
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-              {paginados.length === 0 && (
-                <tr>
-                  <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-                    <div style={{ fontSize: '48px', marginBottom: '10px' }}>📭</div>
-                    <div>Sin registros</div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div style={{ marginBottom: 20 }}>
+          <DataTable<Registro>
+            data={paginados}
+            columns={columns}
+            rowKey="id"
+            pageSize={0}  // paginación la hacemos en el padre para que cards también use la misma
+            emptyState={{ icon: '📭', title: 'Sin registros' }}
+          />
         </div>
       )}
 
-      {/* View Mode: Cards */}
+      {/* View Mode: Cards (custom — no es un patrón estándar de DataTable) */}
       {viewMode === 'cards' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16, marginBottom: 20 }}>
           {paginados.map(r => {
             const total = getTotal(r)
+            const p = ESTADO_PILL[r.estado] ?? { bg: '#f1f5f9', color: '#475569', icon: '' }
             return (
               <div
                 key={r.id}
                 style={{
-                  background: 'white',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  padding: '16px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                  transition: 'all 0.2s',
-                  cursor: 'pointer',
+                  background: 'white', border: '1px solid #e2e8f0', borderRadius: 12,
+                  padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  transition: 'all 0.2s', cursor: 'pointer',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)')}
-                onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)')}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)' }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)' }}
               >
-                <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b' }}>{r.cliente_nombre}</div>
-                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>📅 {new Date(r.fecha).toLocaleDateString()}</div>
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>{r.cliente_nombre}</div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>📅 {formatDate(r.fecha)}</div>
                 </div>
-                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                  <div>
-                    <span style={{ color: '#64748b' }}>Anterior</span>
-                    <div style={{ fontWeight: 600, color: '#0ea5e9' }}>{r.lectura_anterior}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b' }}>Actual</span>
-                    <div style={{ fontWeight: 600, color: '#0ea5e9' }}>{r.lectura_actual}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b' }}>Consumo</span>
-                    <div style={{ fontWeight: 600, color: '#8b5cf6' }}>💧 {r.consumo.toFixed(2)} m³</div>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b' }}>Total</span>
-                    <div style={{ fontWeight: 700, color: '#0ea5e9' }}>
-                      {moneda}
-                      {total.toFixed(2)}
-                    </div>
-                  </div>
+                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
+                  <div><span style={{ color: '#64748b' }}>Anterior</span><div style={{ fontWeight: 600, color: '#0ea5e9' }}>{r.lectura_anterior}</div></div>
+                  <div><span style={{ color: '#64748b' }}>Actual</span><div style={{ fontWeight: 600, color: '#0ea5e9' }}>{r.lectura_actual}</div></div>
+                  <div><span style={{ color: '#64748b' }}>Consumo</span><div style={{ fontWeight: 600, color: '#8b5cf6' }}>💧 {formatNumber(r.consumo)} m³</div></div>
+                  <div><span style={{ color: '#64748b' }}>Total</span><div style={{ fontWeight: 700, color: '#0ea5e9' }}>{formatCurrency(total, moneda)}</div></div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={pillStyle(r.estado)}>
-                    {r.estado === 'pagado' && '✓'}
-                    {r.estado === 'pendiente' && '⏳'}
-                    {r.estado === 'mora' && '⚠️'} {r.estado}
-                  </span>
-                  <div style={{ display: 'flex', gap: '6px' }}>
+                  <span style={pillStyle(p)}>{p.icon} {r.estado}</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
                     {canEdit && (
-                      <button
-                        onClick={() => setEditModal({ registroId: r.id, estado: r.estado })}
-                        style={{ padding: '6px 10px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-                      >
-                        ✏️
-                      </button>
+                      <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado })} style={{ padding: '6px 10px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>✏️</button>
                     )}
-                    <button
-                      onClick={() => enviarWhatsApp(r)}
-                      style={{ padding: '6px 10px', background: '#25D366', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-                    >
-                      💬
-                    </button>
+                    <button onClick={() => enviarWhatsApp(r)} style={{ padding: '6px 10px', background: '#25D366', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>💬</button>
                   </div>
                 </div>
               </div>
             )
           })}
           {paginados.length === 0 && (
-            <div style={{ gridColumn: '1 / -1', padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+            <div style={{ gridColumn: '1 / -1', padding: 40, textAlign: 'center', color: '#94a3b8' }}>
               📭 Sin registros
             </div>
           )}
         </div>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (() => {
-        const btnStyle = (active: boolean, disabled = false): CSSProperties => ({
-          minWidth: '40px', height: '40px', padding: '0 10px',
-          background: active ? '#0ea5e9' : disabled ? '#f1f5f9' : '#f8fafc',
-          color: active ? 'white' : disabled ? '#cbd5e0' : '#475569',
-          border: '1px solid', borderColor: active ? '#0ea5e9' : '#e2e8f0',
-          borderRadius: '8px', fontSize: '13px', fontWeight: active ? 700 : 400,
-          cursor: disabled ? 'not-allowed' : 'pointer', transition: 'all 0.12s',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        })
-        // Build visible page tokens: numbers + '…' separators
-        const pages: (number | '…')[] = []
-        const delta = 2 // pages around current
-        const add = (n: number) => { if (!pages.includes(n)) pages.push(n) }
-        add(1)
-        for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) add(i)
-        if (totalPages > 1) add(totalPages)
-        const withEllipsis: (number | '…')[] = []
-        pages.forEach((p, idx) => {
-          if (idx > 0) {
-            const prev = pages[idx - 1] as number
-            if ((p as number) - prev > 1) withEllipsis.push('…')
-          }
-          withEllipsis.push(p)
-        })
-        return (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', marginBottom: '20px', flexWrap: 'wrap' }}>
-            <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} style={btnStyle(false, currentPage === 1)}>«</button>
-            <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1} style={btnStyle(false, currentPage === 1)}>‹</button>
-            {withEllipsis.map((p, idx) =>
-              p === '…'
-                ? <span key={`e${idx}`} style={{ padding: '0 4px', color: '#94a3b8', fontSize: '13px', userSelect: 'none' }}>…</span>
-                : <button key={p} onClick={() => setCurrentPage(p as number)} style={btnStyle(currentPage === p)}>{p}</button>
-            )}
-            <button onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} style={btnStyle(false, currentPage === totalPages)}>›</button>
-            <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} style={btnStyle(false, currentPage === totalPages)}>»</button>
-            <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: '6px' }}>Pág. {currentPage} de {totalPages}</span>
-          </div>
-        )
-      })()}
+      {/* Pagination compartida entre table y cards */}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onChange={setCurrentPage}
+        />
+      )}
 
       {/* Edit Status Modal */}
       {editModal && (
         <div
           style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+            background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             backdropFilter: 'blur(4px)',
           }}
           onClick={e => e.target === e.currentTarget && setEditModal(null)}
         >
-          <div style={{ background: 'white', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '480px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div style={{ background: 'white', padding: 32, borderRadius: 16, width: '90%', maxWidth: 480 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h3 style={{ margin: 0 }}>📝 Modificar Estado de Pago</h3>
-              <button onClick={() => setEditModal(null)} aria-label="Cerrar modal" style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>
-                ×
-              </button>
+              <button onClick={() => setEditModal(null)} aria-label="Cerrar modal" style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer' }}>×</button>
             </div>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px' }}>Nuevo Estado</label>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>Nuevo Estado</label>
               <select
                 value={editModal.estado}
-                onChange={e => setEditModal(prev => (prev ? { ...prev, estado: e.target.value as Registro['estado'] } : null))}
-                style={{ width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px' }}
+                onChange={e => setEditModal(prev => prev ? { ...prev, estado: e.target.value as Registro['estado'] } : null)}
+                style={{ width: '100%', padding: 12, border: '2px solid #e2e8f0', borderRadius: 10, fontSize: 15 }}
               >
                 <option value="pendiente">⏳ Pendiente</option>
                 <option value="pagado">✓ Pagado</option>
                 <option value="mora">⚠️ Mora</option>
               </select>
             </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: 12 }}>
               <button
                 onClick={updateEstado}
                 disabled={savingEstado}
                 style={{
-                  flex: 1,
-                  padding: '12px',
+                  flex: 1, padding: 12,
                   background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '10px',
-                  fontWeight: 600,
+                  color: 'white', border: 'none', borderRadius: 10, fontWeight: 600,
                   cursor: savingEstado ? 'not-allowed' : 'pointer',
                   opacity: savingEstado ? 0.6 : 1,
                 }}
@@ -630,16 +427,7 @@ export function HistorialSection({
               </button>
               <button
                 onClick={() => setEditModal(null)}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  border: 'none',
-                  borderRadius: '10px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
+                style={{ flex: 1, padding: 12, background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer' }}
               >
                 ✕ Cancelar
               </button>
@@ -649,4 +437,99 @@ export function HistorialSection({
       )}
     </div>
   )
+}
+
+// ── Sub-componentes locales ───────────────────────────────────────────────
+
+function StatCard({ label, value, color, icon, moneda }: {
+  label: string; value: string | number; color: string; icon: string; moneda: string
+}) {
+  return (
+    <div style={{
+      flex: 1, minWidth: 200, padding: 16,
+      background: `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)`,
+      borderLeft: `4px solid ${color}`,
+      borderRadius: 12, border: `1px solid ${color}40`,
+    }}>
+      <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>
+        {icon} {label}
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 700, color }}>
+        {typeof value === 'number' ? formatCurrency(value, moneda) : value}
+      </div>
+    </div>
+  )
+}
+
+function Pagination({ currentPage, totalPages, onChange }: {
+  currentPage: number; totalPages: number; onChange: (page: number) => void
+}) {
+  const btnStyle = (active: boolean, disabled = false): CSSProperties => ({
+    minWidth: 40, height: 40, padding: '0 10px',
+    background: active ? '#0ea5e9' : disabled ? '#f1f5f9' : '#f8fafc',
+    color: active ? 'white' : disabled ? '#cbd5e0' : '#475569',
+    border: '1px solid', borderColor: active ? '#0ea5e9' : '#e2e8f0',
+    borderRadius: 8, fontSize: 13, fontWeight: active ? 700 : 400,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  })
+  const pages: (number | '…')[] = []
+  const delta = 2
+  const add = (n: number) => { if (!pages.includes(n)) pages.push(n) }
+  add(1)
+  for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) add(i)
+  if (totalPages > 1) add(totalPages)
+  const withEllipsis: (number | '…')[] = []
+  pages.forEach((p, idx) => {
+    if (idx > 0) {
+      const prev = pages[idx - 1] as number
+      if ((p as number) - prev > 1) withEllipsis.push('…')
+    }
+    withEllipsis.push(p)
+  })
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, marginBottom: 20, flexWrap: 'wrap' }}>
+      <button onClick={() => onChange(1)} disabled={currentPage === 1} style={btnStyle(false, currentPage === 1)}>«</button>
+      <button onClick={() => onChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1} style={btnStyle(false, currentPage === 1)}>‹</button>
+      {withEllipsis.map((p, idx) =>
+        p === '…'
+          ? <span key={`e${idx}`} style={{ padding: '0 4px', color: '#94a3b8', fontSize: 13 }}>…</span>
+          : <button key={p} onClick={() => onChange(p as number)} style={btnStyle(currentPage === p)}>{p}</button>
+      )}
+      <button onClick={() => onChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} style={btnStyle(false, currentPage === totalPages)}>›</button>
+      <button onClick={() => onChange(totalPages)} disabled={currentPage === totalPages} style={btnStyle(false, currentPage === totalPages)}>»</button>
+      <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 6 }}>Pág. {currentPage} de {totalPages}</span>
+    </div>
+  )
+}
+
+// ── Styles compartidos ────────────────────────────────────────────────────
+
+function pillStyle(p: { bg: string; color: string }): CSSProperties {
+  return { padding: '6px 14px', borderRadius: 12, fontSize: 12, fontWeight: 600, ...p }
+}
+
+function viewBtnStyle(active: boolean): CSSProperties {
+  return {
+    padding: '8px 12px', background: active ? '#0ea5e9' : 'transparent',
+    color: active ? 'white' : '#64748b',
+    border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+  }
+}
+
+const filterFieldStyle: CSSProperties = {
+  padding: '10px 12px', border: '1px solid #cbd5e0', borderRadius: 8, fontSize: 14,
+}
+
+const btnEditStyle: CSSProperties = {
+  padding: '8px 12px', minHeight: 36,
+  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+  color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
+  fontSize: 12, fontWeight: 600,
+}
+
+const btnWaStyle: CSSProperties = {
+  padding: '8px 12px', minHeight: 36, background: '#25D366',
+  color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
+  fontSize: 12, fontWeight: 600,
 }
