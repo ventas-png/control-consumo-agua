@@ -1,7 +1,34 @@
 import { useState, useEffect, useCallback, type CSSProperties } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
+import { SecureImage } from '../../shared/SecureImage'
+import { useSignedUrl } from '../../../lib/storageUrls'
 import type { SolicitudMudanzaUnidad, TipoSolicitudMudanza, EstadoSolicitudMudanza, Unidad } from '../../../types'
+
+// Pequeño wrapper para link de descarga con signed URL del bucket mudanza-docs.
+function SignedMudanzaImageLink({ url, idx }: { url: string; idx: number }) {
+  const signed = useSignedUrl(url, 'mudanza-docs')
+  return (
+    <a
+      href={signed ?? '#'}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Ver imagen completa"
+      style={{ display: 'block', flexShrink: 0 }}
+    >
+      <SecureImage
+        bucket="mudanza-docs"
+        src={url}
+        alt={`Imagen ${idx + 1}`}
+        style={{
+          width: 84, height: 84, objectFit: 'cover',
+          borderRadius: 6, border: '1.5px solid #e2e8f0',
+          cursor: 'zoom-in',
+        }}
+      />
+    </a>
+  )
+}
 
 interface Props {
   solicitudes: SolicitudMudanzaUnidad[]
@@ -375,26 +402,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {s.imagenes.map((url, idx) => (
-                        <a
-                          key={idx}
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Ver imagen completa"
-                          style={{ display: 'block', flexShrink: 0 }}
-                        >
-                          <img
-                            src={url}
-                            alt={`Imagen ${idx + 1}`}
-                            style={{
-                              width: '72px', height: '72px', objectFit: 'cover',
-                              borderRadius: '8px', border: '1.5px solid #e2e8f0',
-                              cursor: 'pointer', transition: 'opacity 0.15s',
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
-                            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-                          />
-                        </a>
+                        <SignedMudanzaImageLink key={idx} url={url} idx={idx} />
                       ))}
                     </div>
                   </div>
