@@ -188,9 +188,11 @@ export default function App() {
 
   const fetchUnreadComunicacion = useCallback(async () => {
     if (!currentUser?.company_id) return
+    // `planned` uses the cheap pg_class estimate; falls back to an approximate count
+    // without scanning the whole table. Avoids COUNT(*) every 60s.
     const { count } = await supabase
       .from('conversations')
-      .select('id', { count: 'exact', head: true })
+      .select('id', { count: 'planned', head: true })
       .eq('company_id', currentUser.company_id)
       .eq('status', 'abierta')
     setUnreadComunicacion(count ?? 0)
@@ -198,7 +200,8 @@ export default function App() {
 
   useEffect(() => {
     fetchUnreadComunicacion()
-    const interval = setInterval(fetchUnreadComunicacion, 60_000)
+    // Refresh every 5 min instead of 1 min (realtime channel in useConversations covers active changes).
+    const interval = setInterval(fetchUnreadComunicacion, 300_000)
     return () => clearInterval(interval)
   }, [fetchUnreadComunicacion])
 

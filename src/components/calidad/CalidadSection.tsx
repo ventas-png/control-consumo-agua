@@ -3,7 +3,6 @@ import Swal from 'sweetalert2'
 import type { FuenteAgua, RegistroCalidad, TipoAgua } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput, sanitizeHTML } from '../../lib/validation'
-import { generarPDFAnalisis, exportarPDFCalidad } from '../../lib/pdf'
 import { TIPOLOGIAS_CALIDAD, calcularCumplimiento } from './constants'
 import type { Empresa } from '../../types'
 
@@ -480,7 +479,10 @@ export function CalidadSection({
             </div>
           </div>
           <div style={{ marginBottom: '16px' }}>
-            <button onClick={() => exportarPDFCalidad(historialFiltrado, empresa)} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={async () => {
+              const { exportarPDFCalidad } = await import('../../lib/pdf')
+              exportarPDFCalidad(historialFiltrado, empresa)
+            }} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               📄 Exportar PDF
             </button>
           </div>
@@ -507,7 +509,10 @@ export function CalidadSection({
                       <td style={{ padding: '10px' }}>
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
                           <button onClick={() => verDetalle(r)} style={{ background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>🔍 Detalle</button>
-                          <button onClick={() => generarPDFAnalisis(r, empresa)} style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
+                          <button onClick={async () => {
+                            const { generarPDFAnalisis } = await import('../../lib/pdf')
+                            generarPDFAnalisis(r, empresa)
+                          }} style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
                           {r.reporte_base64 && <button onClick={() => verReporte(r)} style={{ background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📎 Reporte</button>}
                         </div>
                       </td>

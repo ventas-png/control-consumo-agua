@@ -1,9 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { Registro } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
-import { Chart, registerables } from 'chart.js'
-
-Chart.register(...registerables)
+import { Chart } from '../../lib/chartjs'
 
 const SHIMMER_CSS = `
 @keyframes shimmer {
