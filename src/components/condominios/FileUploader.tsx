@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { validateFileMagic, buildUploadPath } from '../../lib/fileValidation'
 
 const ACCEPT = 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp'
 const MAX_BYTES = 20 * 1024 * 1024
@@ -34,16 +35,26 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
     setError(null)
     if (file.size > MAX_BYTES) { setError(`El archivo excede el límite de 20 MB.`); return }
 
+    // Verify the file's actual content matches a supported document/image type.
+    // Defends against renamed payloads (e.g. evil.html → evil.pdf) that the
+    // HTML `accept` attribute would let through.
+    setProgress(5)
+    const magicCheck = await validateFileMagic(file, 'document')
+    if (!magicCheck.ok) { setError(magicCheck.reason); return }
+
     setUploading(true)
     setProgress(10)
 
-    const ext = file.name.split('.').pop() ?? 'bin'
-    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const path = buildUploadPath(folder, file.name)
 
     setProgress(30)
     const { data, error: upErr } = await supabase.storage
       .from('condominios-media')
-      .upload(path, file, { contentType: file.type, upsert: false })
+      .upload(path, file, {
+        // Use the magic-detected type — ignores any client-spoofed file.type
+        contentType: magicCheck.detected,
+        upsert: false,
+      })
     setProgress(80)
 
     if (upErr || !data) {

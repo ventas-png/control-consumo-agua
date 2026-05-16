@@ -1,5 +1,6 @@
 import { useRef, useState, type DragEvent} from 'react'
 import { supabase } from '../../lib/supabase'
+import { validateFileMagic, buildUploadPath } from '../../lib/fileValidation'
 
 const MAX_DIMENSION = 1280
 const QUALITY = 0.82
@@ -48,13 +49,16 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
 
   async function handleFile(file: File) {
     setError(null)
-    if (!file.type.startsWith('image/')) { setError('Solo se aceptan imágenes'); return }
     if (file.size > maxSizeMB * 1024 * 1024) { setError(`Máximo ${maxSizeMB} MB`); return }
+    // Magic-byte validation defends against payloads renamed to .png/.jpg.
+    const magicCheck = await validateFileMagic(file, 'image')
+    if (!magicCheck.ok) { setError(magicCheck.reason); return }
     setUploading(true)
     try {
       const blob = await compressImage(file)
-      const ext = 'jpg'
-      const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      // We always re-encode to JPEG via canvas (compressImage), so forcing
+      // .jpg + image/jpeg is safe regardless of input format.
+      const path = buildUploadPath(folder, file.name, 'jpg')
       const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, blob, { contentType: 'image/jpeg', upsert: false })
       if (upErr) { setError(upErr.message); return }
       const { data } = supabase.storage.from('condominios-media').getPublicUrl(path)
@@ -151,15 +155,16 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
     const toUpload = Array.from(files).slice(0, maxFiles - values.length)
     if (toUpload.length === 0) { setError(`Máximo ${maxFiles} fotos`); return }
     for (const file of toUpload) {
-      if (!file.type.startsWith('image/')) { setError('Solo se aceptan imágenes'); return }
       if (file.size > maxSizeMB * 1024 * 1024) { setError(`Máximo ${maxSizeMB} MB por archivo`); return }
+      const magicCheck = await validateFileMagic(file, 'image')
+      if (!magicCheck.ok) { setError(magicCheck.reason); return }
     }
     setUploading(true)
     try {
       const newUrls: string[] = []
       for (const file of toUpload) {
         const blob = await compressImage(file)
-        const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
+        const path = buildUploadPath(folder, file.name, 'jpg')
         const { error: upErr } = await supabase.storage.from('condominios-media').upload(path, blob, { contentType: 'image/jpeg' })
         if (upErr) { setError(upErr.message); break }
         const { data } = supabase.storage.from('condominios-media').getPublicUrl(path)
