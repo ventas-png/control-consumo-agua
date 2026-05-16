@@ -118,9 +118,11 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     let facturasEnergiaQ = supabase.from('facturas_energia').select('*').order('periodo_fin', { ascending: false })
     // clientes has no company_id column — linked via company_clientes junction, filtered via RLS
     const clientesQ = supabase.from('clientes').select('*')
-    // registros: RLS policy (registros_select) now scopes company_owner to only their
-    // company's registros via projects and company_clientes — no application-level filter needed.
-    const registrosQ = supabase.from('registros').select('*').order('fecha', { ascending: false })
+    // registros: RLS policy (registros_select) scopes company_owner to their company's
+    // registros via projects + company_clientes. Limit to most-recent 5000 to avoid
+    // PostgREST timeouts on companies with large history; dashboard filters by date
+    // range so older readings are never needed for KPIs.
+    const registrosQ = supabase.from('registros').select('*').order('fecha', { ascending: false }).limit(5000)
 
     if (cid) {
       tarifasQ         = tarifasQ.eq('company_id', cid)
