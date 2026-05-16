@@ -1,9 +1,11 @@
-import { useState, useMemo, lazy, Suspense, type CSSProperties} from 'react'
+import { useState, useEffect, useMemo, lazy, Suspense, type CSSProperties} from 'react'
 import Swal from 'sweetalert2'
 import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserRole, UserSession, Contador, Proyecto, MaxUnidadesPorTipo, Cliente } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { sanitizeInput } from '../../lib/validation'
 import { EditModal } from '../shared/EditModal'
+import { EmptyState } from '../shared'
+import { formatDate, formatNumber } from '../../lib/format'
 import { getEditedTagInfo } from '../../lib/timeUtils'
 
 const ImportUnidadesModal = lazy(() => import('./ImportUnidadesModal').then(m => ({ default: m.ImportUnidadesModal })))
@@ -137,6 +139,8 @@ export function UnidadesSection({
   const [filterTipo, setFilterTipo] = useState<TipoUnidad | ''>('')
   const [filterProyecto, setFilterProyecto] = useState<string>('')
   const [showImportModal, setShowImportModal] = useState(false)
+  const [currentPage, setCurrentPage] = useState(0)
+  const PAGE_SIZE = 24  // cards grandes, 24 ≈ 4 filas × 6 columnas en pantalla XL
 
   // Compute effective max per type based on the selected project filter.
   // When a specific project is selected use its limits; when showing all projects
@@ -456,7 +460,7 @@ export function UnidadesSection({
   const contadoresDeUnidad = (id: string) =>
     contadores.filter(c => c.unidad_id === id).length
 
-  const filtered = unidades.filter(u => {
+  const filtered = useMemo(() => unidades.filter(u => {
     const matchSearch =
       u.nombre.toLowerCase().includes(search.toLowerCase()) ||
       (u.propietario_nombre ?? '').toLowerCase().includes(search.toLowerCase()) ||
@@ -464,7 +468,18 @@ export function UnidadesSection({
     const matchTipo = filterTipo === '' || u.tipo === filterTipo
     const matchProyecto = filterProyecto === '' || u.project_id === filterProyecto
     return matchSearch && matchTipo && matchProyecto
-  })
+  }), [unidades, search, filterTipo, filterProyecto])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paginated = useMemo(
+    () => filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE),
+    [filtered, currentPage]
+  )
+
+  // Reset paginación cuando los filtros cambian o se reduce el dataset.
+  useEffect(() => {
+    if (currentPage > 0 && currentPage >= totalPages) setCurrentPage(0)
+  }, [currentPage, totalPages])
 
   // Summary by tipo
   const baseUnidades = filterProyecto === '' ? unidades : unidades.filter(u => u.project_id === filterProyecto)
@@ -995,253 +1010,63 @@ export function UnidadesSection({
         </EditModal>
       )}
 
-      {/* Cards / Table */}
+      {/* Cards grid */}
       {filtered.length === 0 ? (
-        <div style={{ background: 'white', borderRadius: '16px', padding: '60px', textAlign: 'center', color: '#94a3b8', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏗️</div>
-          <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '6px' }}>
-            {search || filterTipo ? 'Sin resultados' : 'No hay unidades registradas'}
-          </div>
-          <div style={{ fontSize: '14px' }}>
-            {search || filterTipo
+        <div style={{ background: 'white', borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+          <EmptyState
+            icon="🏗️"
+            title={search || filterTipo ? 'Sin resultados' : 'No hay unidades registradas'}
+            description={search || filterTipo
               ? 'Intenta con otro término o tipo'
               : canEdit
-              ? 'Crea la primera unidad con el botón "+ Nueva Unidad"'
-              : 'No hay unidades configuradas aún'}
-          </div>
+                ? 'Crea la primera unidad con el botón "+ Nueva Unidad"'
+                : 'No hay unidades configuradas aún'}
+          />
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-          {filtered.map(u => {
-            const tipo = tipoInfo(u.tipo)
-            const col = TIPO_COLORES[u.tipo]
-            const nContadores = contadoresDeUnidad(u.id)
-            return (
-              <div
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+            {paginated.map(u => (
+              <UnidadCard
                 key={u.id}
-                style={{
-                  background: 'white',
-                  borderRadius: '14px',
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-                  overflow: 'hidden',
-                  border: u.activo ? '1px solid #e2e8f0' : '1px solid #fca5a5',
-                  opacity: u.activo ? 1 : 0.75,
-                }}
+                unidad={u}
+                tipo={tipoInfo(u.tipo)}
+                tipoColor={TIPO_COLORES[u.tipo]}
+                nContadores={contadoresDeUnidad(u.id)}
+                proyectoNombre={proyectos.length > 1 ? proyectos.find(p => p.id === u.project_id)?.nombre : undefined}
+                clienteAsignado={u.cliente_id ? clientes.find(c => c.id === u.cliente_id) : undefined}
+                canEdit={canEdit}
+                onEdit={() => startEdit(u)}
+                onToggleActivo={() => handleToggleActivo(u)}
+                onEliminar={() => handleEliminar(u)}
+              />
+            ))}
+          </div>
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16, fontSize: 13 }}>
+              <button
+                onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                disabled={currentPage === 0}
+                style={pageBtnStyle(currentPage === 0)}
               >
-                {/* Card top stripe */}
-                <div style={{ height: '4px', background: col.color }} />
-
-                <div style={{ padding: '18px' }}>
-                  {/* Title row */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '24px' }}>{tipo.icon}</span>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>{u.nombre}</div>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '2px 9px',
-                          borderRadius: '10px',
-                          background: col.bg,
-                          color: col.color,
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          marginTop: '2px',
-                        }}>
-                          {tipo.label}
-                        </span>
-                        {proyectos.length > 1 && u.project_id && (() => {
-                          const p = proyectos.find(pr => pr.id === u.project_id)
-                          return p ? (
-                            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>🏗️ {p.nombre}</div>
-                          ) : null
-                        })()}
-                      </div>
-                    </div>
-                    <span style={{
-                      padding: '3px 10px',
-                      borderRadius: '12px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      background: u.activo ? '#dcfce7' : '#fee2e2',
-                      color: u.activo ? '#166534' : '#991b1b',
-                      flexShrink: 0,
-                    }}>
-                      {u.activo ? 'Activa' : 'Inactiva'}
-                    </span>
-                  </div>
-
-                  {/* Details */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px', fontSize: '13px', color: '#475569' }}>
-                    {(u.piso != null || u.area_m2 != null) && (
-                      <div style={{ display: 'flex', gap: '16px' }}>
-                        {u.piso != null && (
-                          <span>🏢 Piso {u.piso}</span>
-                        )}
-                        {u.area_m2 != null && (
-                          <span>📐 {Number(u.area_m2).toFixed(2)} m²</span>
-                        )}
-                      </div>
-                    )}
-                    {u.propietario_nombre && (
-                      <div>👤 {u.propietario_nombre}</div>
-                    )}
-                    {u.propietario_telefono && (
-                      <div>📞 {u.propietario_telefono}</div>
-                    )}
-                    {u.propietario_email && (
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        ✉️ {u.propietario_email}
-                      </div>
-                    )}
-                    {u.descripcion && (
-                      <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>{u.descripcion}</div>
-                    )}
-                    {u.direccion && (
-                      <div>📍 {u.direccion}</div>
-                    )}
-                    {u.estado_ocupacional && (
-                      <div>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '2px 9px',
-                          borderRadius: '10px',
-                          background: '#f0f9ff',
-                          color: '#0369a1',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                        }}>
-                          {ESTADOS_OCUPACIONALES.find(e => e.value === u.estado_ocupacional)?.label ?? u.estado_ocupacional}
-                        </span>
-                      </div>
-                    )}
-                    {u.contrato_suministro && (
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{
-                          padding: '2px 9px',
-                          borderRadius: '10px',
-                          background: u.contrato_suministro === 'si' ? '#dcfce7' : u.contrato_suministro === 'no' ? '#fee2e2' : '#f1f5f9',
-                          color: u.contrato_suministro === 'si' ? '#166534' : u.contrato_suministro === 'no' ? '#991b1b' : '#475569',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                        }}>
-                          📄 Contrato: {CONTRATOS_SUMINISTRO.find(c => c.value === u.contrato_suministro)?.label ?? u.contrato_suministro}
-                        </span>
-                        {u.numero_contrato_suministro && (
-                          <span style={{ fontSize: '11px', color: '#64748b' }}>#{u.numero_contrato_suministro}</span>
-                        )}
-                        {u.fecha_vencimiento_contrato && (
-                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>Vence: {u.fecha_vencimiento_contrato}</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Cliente asignado */}
-                  {u.cliente_id && (() => {
-                    const cli = clientes.find(c => c.id === u.cliente_id)
-                    return cli ? (
-                      <div style={{ marginBottom: '8px', fontSize: '13px', color: '#0369a1', fontWeight: 600 }}>
-                        👤 {cli.nombre} <span style={{ fontWeight: 400, color: '#64748b' }}>({cli.codigo})</span>
-                      </div>
-                    ) : null
-                  })()}
-
-                  {/* Contadores badge */}
-                  <div style={{ marginBottom: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{
-                      padding: '4px 12px',
-                      borderRadius: '20px',
-                      background: nContadores > 0 ? '#eff6ff' : '#f8fafc',
-                      color: nContadores > 0 ? '#1d4ed8' : '#94a3b8',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      border: `1px solid ${nContadores > 0 ? '#bfdbfe' : '#e2e8f0'}`,
-                    }}>
-                      🔧 {nContadores} contador{nContadores !== 1 ? 'es' : ''} asignado{nContadores !== 1 ? 's' : ''}
-                    </span>
-                    {(() => {
-                      const tag = getEditedTagInfo(u.updated_at, u.updated_by_name)
-                      if (!tag) return null
-                      return (
-                        <span
-                          title={tag.tooltip}
-                          style={{
-                            padding: '3px 8px',
-                            borderRadius: '10px',
-                            fontSize: '11px',
-                            fontWeight: 500,
-                            color: tag.color,
-                            background: tag.bg,
-                            cursor: 'default',
-                          }}
-                        >
-                          {tag.label}
-                        </span>
-                      )
-                    })()}
-                  </div>
-
-                  {/* Actions */}
-                  {canEdit && (
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => startEdit(u)}
-                        style={{
-                          flex: 1,
-                          padding: '7px 0',
-                          background: '#eff6ff',
-                          color: '#1d4ed8',
-                          border: 'none',
-                          borderRadius: '7px',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          fontSize: '12px',
-                        }}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleToggleActivo(u)}
-                        style={{
-                          flex: 1,
-                          padding: '7px 0',
-                          background: u.activo ? '#fef9c3' : '#f0fdf4',
-                          color: u.activo ? '#854d0e' : '#166534',
-                          border: 'none',
-                          borderRadius: '7px',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          fontSize: '12px',
-                        }}
-                      >
-                        {u.activo ? 'Desactivar' : 'Activar'}
-                      </button>
-                      <button
-                        onClick={() => handleEliminar(u)}
-                        style={{
-                          padding: '7px 12px',
-                          background: '#fef2f2',
-                          color: '#dc2626',
-                          border: 'none',
-                          borderRadius: '7px',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          fontSize: '12px',
-                        }}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                ← Anterior
+              </button>
+              <span style={{ color: '#475569', fontWeight: 600 }}>
+                Página {currentPage + 1} de {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={currentPage >= totalPages - 1}
+                style={pageBtnStyle(currentPage >= totalPages - 1)}
+              >
+                Siguiente →
+              </button>
+            </div>
+          )}
+        </>
       )}
 
-      <div style={{ marginTop: '16px', color: '#94a3b8', fontSize: '12px' }}>
+      <div style={{ marginTop: 16, color: '#94a3b8', fontSize: 12 }}>
         {filtered.length} unidad{filtered.length !== 1 ? 'es' : ''}{' '}
         {search || filterTipo ? 'encontradas' : 'registradas'} ·{' '}
         {unidades.filter(u => u.activo).length} activa{unidades.filter(u => u.activo).length !== 1 ? 's' : ''}
@@ -1261,4 +1086,201 @@ export function UnidadesSection({
       )}
     </div>
   )
+}
+
+// ── Sub-componente UnidadCard ────────────────────────────────────────────
+// Extraído del render principal para reducir el cuerpo de UnidadesSection
+// y dejar la card como una unidad de UI testeable / memoizable a futuro.
+
+function UnidadCard({
+  unidad: u,
+  tipo,
+  tipoColor: col,
+  nContadores,
+  proyectoNombre,
+  clienteAsignado,
+  canEdit,
+  onEdit,
+  onToggleActivo,
+  onEliminar,
+}: {
+  unidad: Unidad
+  tipo: { icon: string; label: string }
+  tipoColor: { bg: string; color: string }
+  nContadores: number
+  proyectoNombre?: string
+  clienteAsignado?: Cliente
+  canEdit: boolean
+  onEdit: () => void
+  onToggleActivo: () => void
+  onEliminar: () => void
+}) {
+  const tag = getEditedTagInfo(u.updated_at, u.updated_by_name)
+  return (
+    <div
+      style={{
+        background: 'white',
+        borderRadius: 14,
+        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        overflow: 'hidden',
+        border: u.activo ? '1px solid #e2e8f0' : '1px solid #fca5a5',
+        opacity: u.activo ? 1 : 0.75,
+      }}
+    >
+      {/* Top stripe color por tipo */}
+      <div style={{ height: 4, background: col.color }} />
+
+      <div style={{ padding: 18 }}>
+        {/* Title row */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 24 }}>{tipo.icon}</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{u.nombre}</div>
+              <span style={{
+                display: 'inline-block', padding: '2px 9px',
+                borderRadius: 10, background: col.bg, color: col.color,
+                fontSize: 11, fontWeight: 600, marginTop: 2,
+              }}>
+                {tipo.label}
+              </span>
+              {proyectoNombre && (
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 3 }}>🏗️ {proyectoNombre}</div>
+              )}
+            </div>
+          </div>
+          <span style={{
+            padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600,
+            background: u.activo ? '#dcfce7' : '#fee2e2',
+            color: u.activo ? '#166534' : '#991b1b', flexShrink: 0,
+          }}>
+            {u.activo ? 'Activa' : 'Inactiva'}
+          </span>
+        </div>
+
+        {/* Details */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, fontSize: 13, color: '#475569' }}>
+          {(u.piso != null || u.area_m2 != null) && (
+            <div style={{ display: 'flex', gap: 16 }}>
+              {u.piso != null && <span>🏢 Piso {u.piso}</span>}
+              {u.area_m2 != null && <span>📐 {formatNumber(Number(u.area_m2))} m²</span>}
+            </div>
+          )}
+          {u.propietario_nombre && <div>👤 {u.propietario_nombre}</div>}
+          {u.propietario_telefono && <div>📞 {u.propietario_telefono}</div>}
+          {u.propietario_email && (
+            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              ✉️ {u.propietario_email}
+            </div>
+          )}
+          {u.descripcion && <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>{u.descripcion}</div>}
+          {u.direccion && <div>📍 {u.direccion}</div>}
+          {u.estado_ocupacional && (
+            <div>
+              <span style={{
+                display: 'inline-block', padding: '2px 9px', borderRadius: 10,
+                background: '#f0f9ff', color: '#0369a1', fontSize: 11, fontWeight: 600,
+              }}>
+                {ESTADOS_OCUPACIONALES.find(e => e.value === u.estado_ocupacional)?.label ?? u.estado_ocupacional}
+              </span>
+            </div>
+          )}
+          {u.contrato_suministro && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{
+                padding: '2px 9px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+                background: u.contrato_suministro === 'si' ? '#dcfce7' : u.contrato_suministro === 'no' ? '#fee2e2' : '#f1f5f9',
+                color:      u.contrato_suministro === 'si' ? '#166534' : u.contrato_suministro === 'no' ? '#991b1b' : '#475569',
+              }}>
+                📄 Contrato: {CONTRATOS_SUMINISTRO.find(c => c.value === u.contrato_suministro)?.label ?? u.contrato_suministro}
+              </span>
+              {u.numero_contrato_suministro && (
+                <span style={{ fontSize: 11, color: '#64748b' }}>#{u.numero_contrato_suministro}</span>
+              )}
+              {u.fecha_vencimiento_contrato && (
+                <span style={{ fontSize: 11, color: '#94a3b8' }}>Vence: {formatDate(u.fecha_vencimiento_contrato)}</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Cliente asignado */}
+        {clienteAsignado && (
+          <div style={{ marginBottom: 8, fontSize: 13, color: '#0369a1', fontWeight: 600 }}>
+            👤 {clienteAsignado.nombre} <span style={{ fontWeight: 400, color: '#64748b' }}>({clienteAsignado.codigo})</span>
+          </div>
+        )}
+
+        {/* Contadores badge + edited tag */}
+        <div style={{ marginBottom: 14, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{
+            padding: '4px 12px', borderRadius: 20,
+            background: nContadores > 0 ? '#eff6ff' : '#f8fafc',
+            color: nContadores > 0 ? '#1d4ed8' : '#94a3b8',
+            fontSize: 12, fontWeight: 600,
+            border: `1px solid ${nContadores > 0 ? '#bfdbfe' : '#e2e8f0'}`,
+          }}>
+            🔧 {nContadores} contador{nContadores !== 1 ? 'es' : ''} asignado{nContadores !== 1 ? 's' : ''}
+          </span>
+          {tag && (
+            <span
+              title={tag.tooltip}
+              style={{
+                padding: '3px 8px', borderRadius: 10, fontSize: 11, fontWeight: 500,
+                color: tag.color, background: tag.bg, cursor: 'default',
+              }}
+            >
+              {tag.label}
+            </span>
+          )}
+        </div>
+
+        {/* Actions */}
+        {canEdit && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={onEdit}
+              style={{
+                flex: 1, padding: '7px 0', background: '#eff6ff', color: '#1d4ed8',
+                border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+              }}
+            >
+              Editar
+            </button>
+            <button
+              onClick={onToggleActivo}
+              style={{
+                flex: 1, padding: '7px 0',
+                background: u.activo ? '#fef9c3' : '#f0fdf4',
+                color: u.activo ? '#854d0e' : '#166534',
+                border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+              }}
+            >
+              {u.activo ? 'Desactivar' : 'Activar'}
+            </button>
+            <button
+              onClick={onEliminar}
+              style={{
+                padding: '7px 12px', background: '#fef2f2', color: '#dc2626',
+                border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12,
+              }}
+            >
+              Eliminar
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function pageBtnStyle(disabled: boolean): CSSProperties {
+  return {
+    padding: '6px 14px', borderRadius: 8,
+    border: '1px solid #e2e8f0',
+    background: disabled ? '#f1f5f9' : 'white',
+    color: disabled ? '#cbd5e1' : '#475569',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    fontWeight: 600, fontSize: 12,
+  }
 }
