@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { CuotaCondominio, RecargoMora, ConvenioCuotaCond, Unidad } from '../../../types'
 import { exportarPDFEstadoCuenta } from '../exportUtils'
+import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -14,12 +15,14 @@ interface Props {
 type TipoMovimiento = 'cuota' | 'recargo' | 'pago' | 'convenio'
 
 interface Movimiento {
+  idx: number
   fecha: string
   tipo: TipoMovimiento
   descripcion: string
   cargo: number
   abono: number
   estado: string
+  saldoAcum: number
 }
 
 const ESTADO_CFG: Record<string, { color: string; bg: string }> = {
@@ -42,7 +45,7 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
   }, [cuotas])
 
   const movimientos: Movimiento[] = useMemo(() => {
-    const list: Movimiento[] = []
+    const list: Omit<Movimiento, 'saldoAcum' | 'idx'>[] = []
 
     cuotas
       .filter(c => c.unidad_id === unidadId && c.periodo?.startsWith(String(anio)))
@@ -83,7 +86,16 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
         })
       })
 
-    return list.sort((a, b) => a.fecha.localeCompare(b.fecha))
+    // Ordenar cronológicamente y calcular saldo acumulado fijo.
+    // El saldoAcum queda "congelado" como el saldo al cierre de ese movimiento;
+    // si el usuario reordena por otra columna en la UI, sigue siendo válido
+    // semánticamente (es el saldo cronológico de ese momento).
+    const sorted = list.sort((a, b) => a.fecha.localeCompare(b.fecha))
+    let acum = 0
+    return sorted.map((m, idx) => {
+      acum += m.cargo - m.abono
+      return { ...m, idx, saldoAcum: acum }
+    })
   }, [cuotas, recargosMora, conveniosCuota, unidadId, anio])
 
   const totalCargos = movimientos.reduce((s, m) => s + m.cargo, 0)
@@ -147,6 +159,72 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
     if (win) { win.document.write(html); win.document.close(); win.print() }
   }
 
+  const columns: DataTableColumn<Movimiento>[] = [
+    {
+      key: 'fecha',
+      header: 'Fecha',
+      sortable: true,
+      render: row => <span style={{ color: '#64748b' }}>{row.fecha}</span>,
+    },
+    {
+      key: 'descripcion',
+      header: 'Descripción',
+      sortable: true,
+      render: row => <span style={{ color: '#0f172a' }}>{row.descripcion}</span>,
+    },
+    {
+      key: 'cargo',
+      header: 'Cargo',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.cargo,
+      render: row => (
+        <span style={{ color: row.cargo > 0 ? '#ef4444' : '#9ca3af' }}>
+          {row.cargo > 0 ? `${moneda} ${row.cargo.toFixed(2)}` : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'abono',
+      header: 'Abono',
+      sortable: true,
+      align: 'right',
+      accessor: row => row.abono,
+      render: row => (
+        <span style={{ color: row.abono > 0 ? '#16a34a' : '#9ca3af' }}>
+          {row.abono > 0 ? `${moneda} ${row.abono.toFixed(2)}` : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'saldoAcum',
+      // Sin sortable: representa el saldo al cierre de ese movimiento en orden
+      // cronológico; ordenarlo independientemente perdería el significado.
+      header: 'Saldo acum.',
+      align: 'right',
+      accessor: row => row.saldoAcum,
+      render: row => (
+        <span style={{ fontWeight: 600, color: row.saldoAcum > 0 ? '#ef4444' : '#16a34a' }}>
+          {row.saldoAcum > 0 ? `${moneda} ${row.saldoAcum.toFixed(2)}` : '✓'}
+        </span>
+      ),
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      align: 'right',
+      render: row => {
+        const sCfg = ESTADO_CFG[row.estado] ?? { color: '#374151', bg: '#f1f5f9' }
+        return (
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: sCfg.bg, color: sCfg.color, fontSize: 10, fontWeight: 600 }}>
+            {row.estado}
+          </span>
+        )
+      },
+    },
+  ]
+
   return (
     <div style={{ padding: 16 }}>
       {/* Controls */}
@@ -188,56 +266,35 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
         ))}
       </div>
 
-      {/* Table */}
-      {movimientos.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: '#9ca3af', fontSize: 13 }}>
-          Sin movimientos para {unidad?.nombre} en {anio}.
-        </div>
-      ) : (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                {['Fecha', 'Descripción', 'Cargo', 'Abono', 'Saldo acum.', 'Estado'].map(h => (
-                  <th key={h} style={{ padding: '9px 12px', textAlign: h === 'Fecha' || h === 'Descripción' ? 'left' : 'right', color: '#64748b', fontWeight: 600, fontSize: 11 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {movimientos.reduce<{ rows: JSX.Element[]; saldoAcum: number }>((acc, m, i) => {
-                acc.saldoAcum += m.cargo - m.abono
-                const sCfg = ESTADO_CFG[m.estado] ?? { color: '#374151', bg: '#f1f5f9' }
-                acc.rows.push(
-                  <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f1f5f9' : undefined }}>
-                    <td style={{ padding: '9px 12px', color: '#64748b' }}>{m.fecha}</td>
-                    <td style={{ padding: '9px 12px', color: '#0f172a' }}>{m.descripcion}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', color: m.cargo > 0 ? '#ef4444' : '#9ca3af' }}>{m.cargo > 0 ? `${moneda} ${m.cargo.toFixed(2)}` : '—'}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', color: m.abono > 0 ? '#16a34a' : '#9ca3af' }}>{m.abono > 0 ? `${moneda} ${m.abono.toFixed(2)}` : '—'}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600, color: acc.saldoAcum > 0 ? '#ef4444' : '#16a34a' }}>
-                      {acc.saldoAcum > 0 ? `${moneda} ${acc.saldoAcum.toFixed(2)}` : '✓'}
-                    </td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: 20, background: sCfg.bg, color: sCfg.color, fontSize: 10, fontWeight: 600 }}>{m.estado}</span>
-                    </td>
-                  </tr>
-                )
-                return acc
-              }, { rows: [], saldoAcum: 0 }).rows}
-            </tbody>
-            <tfoot>
-              <tr style={{ borderTop: '2px solid #e5e7eb', background: '#f8fafc' }}>
-                <td colSpan={2} style={{ padding: '9px 12px', fontWeight: 700 }}>TOTAL</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#ef4444' }}>{moneda} {totalCargos.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{moneda} {totalAbonos.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: saldo <= 0 ? '#16a34a' : '#ef4444' }}>
-                  {saldo <= 0 ? '✓ Al día' : `${moneda} ${saldo.toFixed(2)}`}
-                </td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
+      <DataTable
+        data={movimientos}
+        columns={columns}
+        rowKey="idx"
+        searchableKeys={['descripcion', 'estado']}
+        searchPlaceholder="Buscar movimientos…"
+        defaultSort={{ key: 'fecha', direction: 'asc' }}
+        emptyState={{
+          icon: '📋',
+          title: `Sin movimientos para ${unidad?.nombre} en ${anio}`,
+        }}
+        footerRow={rows => {
+          const cargos = rows.reduce((s, m) => s + m.cargo, 0)
+          const abonos = rows.reduce((s, m) => s + m.abono, 0)
+          const saldoFiltrado = cargos - abonos
+          const tdStyle = { padding: '10px 14px', borderTop: '2px solid #e5e7eb', background: '#f8fafc', fontWeight: 700 }
+          return (
+            <tr>
+              <td colSpan={2} style={tdStyle}>TOTAL</td>
+              <td style={{ ...tdStyle, textAlign: 'right' as const, color: '#ef4444' }}>{moneda} {cargos.toFixed(2)}</td>
+              <td style={{ ...tdStyle, textAlign: 'right' as const, color: '#16a34a' }}>{moneda} {abonos.toFixed(2)}</td>
+              <td style={{ ...tdStyle, textAlign: 'right' as const, fontWeight: 800, color: saldoFiltrado <= 0 ? '#16a34a' : '#ef4444' }}>
+                {saldoFiltrado <= 0 ? '✓ Al día' : `${moneda} ${saldoFiltrado.toFixed(2)}`}
+              </td>
+              <td style={tdStyle} />
+            </tr>
+          )
+        }}
+      />
     </div>
   )
 }
