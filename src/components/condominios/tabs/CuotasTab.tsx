@@ -663,6 +663,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
           selectedIds: seleccionadas,
           onSelectionChange: setSeleccionadas,
           isRowSelectable: row => row.estado !== 'pagado',
+          getRowLabel: row => `Seleccionar cuota ${row.concepto} ${row.unidad_nombre ?? 'General'} ${row.periodo}`,
         } : undefined}
         expandable={{
           expandedKeys: expandidasRubros,

@@ -57,8 +57,14 @@ export interface DataTableProps<T> {
   /** Dropdowns adicionales para filtrar. */
   filters?: DataTableFilter[]
 
-  /** Filas por página. 0 = sin paginación. Default: 50. */
+  /** Filas por página iniciales. 0 = sin paginación. Default: 50. */
   pageSize?: number
+
+  /**
+   * Si se pasa, muestra un selector de tamaño de página junto a la paginación.
+   * Si no, el pageSize queda fijo en el valor inicial.
+   */
+  pageSizeOptions?: number[]
 
   /** Orden inicial. */
   defaultSort?: { key: string; direction: 'asc' | 'desc' }
@@ -96,6 +102,12 @@ export interface DataTableProps<T> {
     selectedIds: Set<string>
     onSelectionChange: (ids: Set<string>) => void
     isRowSelectable?: (row: T) => boolean
+    /**
+     * Texto descriptivo de la fila para lectores de pantalla. Default:
+     * "Seleccionar fila". Recomendado: retornar algo que identifique la
+     * fila concreta (ej. "Seleccionar cuota Apto 101 — marzo 2026").
+     */
+    getRowLabel?: (row: T) => string
   }
 
   /**
@@ -120,7 +132,8 @@ export function DataTable<T>({
   searchableKeys,
   searchPlaceholder = 'Buscar…',
   filters,
-  pageSize = 50,
+  pageSize: pageSizeProp = 50,
+  pageSizeOptions,
   defaultSort,
   emptyState,
   isLoading = false,
@@ -136,6 +149,7 @@ export function DataTable<T>({
     defaultSort ?? null
   )
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(pageSizeProp)
 
   // Helper para obtener el valor de una columna desde una fila.
   const getAccessorValue = (col: DataTableColumn<T>, row: T): string | number | boolean | null | undefined => {
@@ -170,10 +184,12 @@ export function DataTable<T>({
     copy.sort((a, b) => {
       const av = getAccessorValue(col, a)
       const bv = getAccessorValue(col, b)
-      // null/undefined al final siempre
-      if (av == null && bv == null) return 0
-      if (av == null) return 1
-      if (bv == null) return -1
+      // null, undefined y string vacío se tratan como "sin valor" → al final
+      const aEmpty = av == null || av === ''
+      const bEmpty = bv == null || bv === ''
+      if (aEmpty && bEmpty) return 0
+      if (aEmpty) return 1
+      if (bEmpty) return -1
       let cmp = 0
       if (typeof av === 'number' && typeof bv === 'number') cmp = av - bv
       else cmp = String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' })
@@ -192,10 +208,10 @@ export function DataTable<T>({
 
   const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1
 
-  // Reset page si quedó fuera de rango (ej. al cambiar filtro).
-  if (page > 0 && page >= totalPages) {
-    setPage(0)
-  }
+  // Reset page si quedó fuera de rango (ej. al cambiar filtro/pageSize).
+  useEffect(() => {
+    if (page > 0 && page >= totalPages) setPage(0)
+  }, [page, totalPages])
 
   // ── Handlers ────────────────────────────────────────────────────────────
   const handleHeaderClick = (col: DataTableColumn<T>) => {
@@ -424,6 +440,14 @@ export function DataTable<T>({
                     <tr
                       key={key}
                       onClick={onRowClick ? () => onRowClick(row) : undefined}
+                      onKeyDown={onRowClick ? e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          onRowClick(row)
+                        }
+                      } : undefined}
+                      tabIndex={onRowClick ? 0 : undefined}
+                      role={onRowClick ? 'button' : undefined}
                       style={{
                         borderBottom: isExpanded && canExpand ? 'none' : '1px solid #f1f5f9',
                         cursor: onRowClick ? 'pointer' : 'default',
@@ -441,7 +465,7 @@ export function DataTable<T>({
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleRowSelection(key)}
-                              aria-label="Seleccionar fila"
+                              aria-label={selectable.getRowLabel?.(row) ?? 'Seleccionar fila'}
                             />
                           )}
                         </td>
@@ -521,9 +545,33 @@ export function DataTable<T>({
               gap: '8px',
             }}
           >
-            <div>
-              {sorted.length} {sorted.length === 1 ? 'resultado' : 'resultados'}
-              {data.length !== sorted.length && ` (de ${data.length})`}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <span>
+                {sorted.length} {sorted.length === 1 ? 'resultado' : 'resultados'}
+                {data.length !== sorted.length && ` (de ${data.length})`}
+              </span>
+              {pageSizeOptions && pageSizeOptions.length > 0 && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  Filas:
+                  <select
+                    value={pageSize}
+                    onChange={e => { setPageSize(Number(e.target.value)); setPage(0) }}
+                    aria-label="Filas por página"
+                    style={{
+                      padding: '2px 6px',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '12px',
+                      background: 'white',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {pageSizeOptions.map(n => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
             {pageSize > 0 && totalPages > 1 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
