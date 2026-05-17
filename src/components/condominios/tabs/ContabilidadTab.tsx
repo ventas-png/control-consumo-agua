@@ -315,6 +315,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
                 ],
               },
             ]}
+            pageSizeOptions={[25, 50, 100, 200]}
             defaultSort={{ key: 'fecha', direction: 'desc' }}
             emptyState={{ icon: '🧾', title: 'No hay gastos registrados' }}
           />

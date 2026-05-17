@@ -265,6 +265,7 @@ export default function EstacionamientoVisitaTab({
           rowKey="id"
           searchableKeys={['placa', 'espacio', row => row.visitante_nombre ?? '']}
           searchPlaceholder="Buscar por placa, espacio o visitante…"
+          pageSizeOptions={[25, 50, 100, 200]}
           defaultSort={{ key: 'hora_salida', direction: 'desc' }}
           emptyState={{ icon: '🅿️', title: 'Sin registros de salidas para esta fecha' }}
         />

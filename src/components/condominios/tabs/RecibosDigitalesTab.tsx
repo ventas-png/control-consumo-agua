@@ -314,6 +314,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
             ],
           },
         ]}
+        pageSizeOptions={[25, 50, 100, 200]}
         defaultSort={{ key: 'fecha_emision', direction: 'desc' }}
         rowStyle={row => row.estado === 'anulado' ? { opacity: 0.5 } : {}}
         emptyState={{ icon: '🧾', title: 'Sin recibos digitales', description: 'Genera el primero con el botón superior' }}

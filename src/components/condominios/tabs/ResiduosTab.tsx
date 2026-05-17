@@ -317,6 +317,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
             ],
           },
         ]}
+        pageSizeOptions={[25, 50, 100, 200]}
         defaultSort={{ key: 'fecha', direction: 'desc' }}
         rowStyle={row => row.incidencia ? { background: '#fff7ed' } : {}}
         emptyState={{ icon: '♻️', title: 'No hay registros de residuos' }}

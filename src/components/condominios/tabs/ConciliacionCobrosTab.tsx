@@ -328,6 +328,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
             row => cuotas.find(q => q.id === row.cuota_id)?.concepto ?? '',
           ]}
           searchPlaceholder="Buscar por unidad, concepto, método o referencia…"
+          pageSizeOptions={[25, 50, 100, 200]}
           defaultSort={{ key: 'fecha_pago', direction: 'desc' }}
           emptyState={{ icon: '✅', title: 'Sin conciliaciones registradas' }}
         />

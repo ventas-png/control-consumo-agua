@@ -325,6 +325,7 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
             options: [{ value: '', label: 'Todas las áreas' }, ...areas.map(a => ({ value: a, label: a }))],
           },
         ]}
+        pageSizeOptions={[25, 50, 100, 200]}
         defaultSort={{ key: 'fecha_lectura', direction: 'desc' }}
         emptyState={{ icon: '📊', title: 'Sin registros de consumo' }}
       />

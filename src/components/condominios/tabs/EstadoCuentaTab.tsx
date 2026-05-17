@@ -167,6 +167,7 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
             options: [{ value: 'all', label: 'Todas las unidades' }, ...unidades.map(u => ({ value: u.id, label: u.nombre }))],
           },
         ]}
+        pageSizeOptions={[25, 50, 100, 200]}
         defaultSort={{ key: 'periodo', direction: 'desc' }}
         emptyState={{ icon: '💰', title: 'No hay cuotas para mostrar' }}
       />

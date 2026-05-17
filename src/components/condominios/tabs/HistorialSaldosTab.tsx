@@ -167,6 +167,7 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
             options: [{ value: '', label: 'Todos los períodos' }, ...periodos.map(p => ({ value: p, label: p }))],
           },
         ]}
+        pageSizeOptions={[25, 50, 100, 200]}
         defaultSort={{ key: 'periodo', direction: 'desc' }}
         rowStyle={row => row.saldo_final > 0 ? { background: '#fef9f9' } : {}}
         emptyState={{ icon: '📊', title: 'Sin snapshots de saldo', description: 'Usa "Generar snapshot" para el período actual' }}

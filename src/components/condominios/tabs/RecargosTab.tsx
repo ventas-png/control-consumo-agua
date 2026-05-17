@@ -332,6 +332,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
             options: [{ value: '', label: 'Todas las unidades' }, ...unidades.map(u => ({ value: u.id, label: u.nombre }))],
           },
         ]}
+        pageSizeOptions={[25, 50, 100, 200]}
         defaultSort={{ key: 'fecha_aplicacion', direction: 'desc' }}
         emptyState={{ icon: '📋', title: 'Sin recargos de mora registrados' }}
       />

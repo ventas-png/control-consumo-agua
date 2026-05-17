@@ -127,6 +127,7 @@ export default function BitacoraAccionesTab({ bitacora }: Props) {
             options: [{ value: '', label: 'Todos los módulos' }, ...modulos.map(m => ({ value: m, label: m }))],
           },
         ]}
+        pageSizeOptions={[25, 50, 100, 200]}
         defaultSort={{ key: 'created_at', direction: 'desc' }}
         emptyState={{ icon: '📋', title: 'Sin registros de auditoría' }}
       />

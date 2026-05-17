@@ -262,6 +262,7 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
               ],
             },
           ]}
+          pageSizeOptions={[25, 50, 100, 200]}
           defaultSort={{ key: 'fecha', direction: 'desc' }}
           rowStyle={row => row.id === selected ? { background: '#f0f9ff' } : {}}
           onRowClick={row => setSelected(selected === row.id ? null : row.id)}

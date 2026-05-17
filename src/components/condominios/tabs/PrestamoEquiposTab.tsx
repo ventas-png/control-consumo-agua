@@ -288,6 +288,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
         rowKey="id"
         searchableKeys={['equipo_nombre', row => row.unidad_nombre ?? '', row => row.entregado_por ?? '']}
         searchPlaceholder="Buscar por equipo, unidad o encargado…"
+        pageSizeOptions={[25, 50, 100, 200]}
         defaultSort={{ key: 'fecha_prestamo', direction: 'desc' }}
         emptyState={{ icon: '📦', title: 'No hay préstamos registrados' }}
       />

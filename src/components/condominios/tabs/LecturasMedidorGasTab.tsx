@@ -305,6 +305,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
             ],
           },
         ]}
+        pageSizeOptions={[25, 50, 100, 200]}
         defaultSort={{ key: 'fecha', direction: 'desc' }}
         rowStyle={row => row.alerta_fuga ? { background: '#fef2f2' } : {}}
         emptyState={{ icon: '🔥', title: 'Sin lecturas para los filtros seleccionados' }}

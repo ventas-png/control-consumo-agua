@@ -658,6 +658,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
           row => row.notas ?? '',
         ]}
         searchPlaceholder="Buscar por unidad, concepto, período o notas…"
+        pageSizeOptions={[25, 50, 100, 200]}
         defaultSort={{ key: 'periodo', direction: 'desc' }}
         selectable={canEdit ? {
           selectedIds: seleccionadas,
