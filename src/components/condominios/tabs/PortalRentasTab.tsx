@@ -1,11 +1,28 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
+import { ImageUploader } from '../ImageUploader'
 import type {
   ContratoArrendamiento, ReservaSTR,
   EstadoContrato, EstadoSTR, PlataformaSTR,
-  SolicitudRentaUnidad, TipoRenta,
+  SolicitudRentaUnidad, TipoRenta, HuespedSTR,
 } from '../../../types'
+
+interface HuespedSTRForm {
+  id?: string
+  nombre: string
+  identificacion: string
+  es_menor: boolean
+  fecha_nacimiento: string
+  foto_url: string | null
+  foto_documento_url: string | null
+  visitante_id?: string | null
+}
+
+const defaultHuesped = (): Omit<HuespedSTRForm, 'id' | 'visitante_id'> => ({
+  nombre: '', identificacion: '', es_menor: false, fecha_nacimiento: '',
+  foto_url: null, foto_documento_url: null,
+})
 
 interface Props {
   unidadId: string
@@ -196,6 +213,12 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
   const [editSTR, setEditSTR]     = useState<ReservaSTR | null>(null)
   const [formSTR, setFormSTR]     = useState<Partial<ReservaSTR>>(blankReserva())
   const [savingSTR, setSavingSTR] = useState(false)
+  const [fotoUrl, setFotoUrl]                 = useState<string | null>(null)
+  const [fotoDocumentoUrl, setFotoDocumentoUrl] = useState<string | null>(null)
+  const [huespedes, setHuespedes]             = useState<HuespedSTRForm[]>([])
+  const [reservaHuespedes, setReservaHuespedes] = useState<Record<string, HuespedSTR[]>>({})
+  const [showHuespedForm, setShowHuespedForm] = useState(false)
+  const [huespedForm, setHuespedForm]         = useState<Omit<HuespedSTRForm, 'id' | 'visitante_id'>>(defaultHuesped())
 
   const cargar = useCallback(async () => {
     if (!unidadId || solicitudRenta?.estado !== 'aprobada') return
@@ -205,7 +228,24 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       supabase.from('reservas_str').select('*').eq('unidad_id', unidadId).order('fecha_entrada', { ascending: false }),
     ])
     setContratos((cd as ContratoArrendamiento[]) ?? [])
-    setReservas((rd as ReservaSTR[]) ?? [])
+    const reservasData = (rd as ReservaSTR[]) ?? []
+    setReservas(reservasData)
+
+    // Fetch group members for all reservations to show pre-registration progress.
+    if (reservasData.length > 0) {
+      const { data: hd } = await supabase
+        .from('huespedes_str')
+        .select('*')
+        .in('reserva_str_id', reservasData.map(r => r.id))
+      const grouped: Record<string, HuespedSTR[]> = {}
+      ;(hd ?? []).forEach(h => {
+        if (!grouped[h.reserva_str_id]) grouped[h.reserva_str_id] = []
+        grouped[h.reserva_str_id].push(h as HuespedSTR)
+      })
+      setReservaHuespedes(grouped)
+    } else {
+      setReservaHuespedes({})
+    }
     setLoading(false)
   }, [unidadId, solicitudRenta?.estado])
 
@@ -265,13 +305,95 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
 
   // ── STR helpers ─────────────────────────────────────────────────────────────
 
-  function openNewSTR() { setEditSTR(null); setFormSTR(blankReserva()); setShowSTR(true) }
-  function openEditSTR(r: ReservaSTR) { setEditSTR(r); setFormSTR({ ...r }); setShowSTR(true) }
+  function resetSTRForm() {
+    setShowSTR(false); setEditSTR(null); setFormSTR(blankReserva())
+    setFotoUrl(null); setFotoDocumentoUrl(null)
+    setHuespedes([]); setShowHuespedForm(false); setHuespedForm(defaultHuesped())
+  }
+
+  function openNewSTR() {
+    setEditSTR(null); setFormSTR(blankReserva())
+    setFotoUrl(null); setFotoDocumentoUrl(null)
+    setHuespedes([]); setShowHuespedForm(false); setHuespedForm(defaultHuesped())
+    setShowSTR(true)
+  }
+
+  function openEditSTR(r: ReservaSTR) {
+    setEditSTR(r); setFormSTR({ ...r })
+    setFotoUrl(r.foto_url ?? null)
+    setFotoDocumentoUrl(r.foto_documento_url ?? null)
+    setHuespedes((reservaHuespedes[r.id] ?? []).map(h => ({
+      id: h.id,
+      nombre: h.nombre,
+      identificacion: h.identificacion ?? '',
+      es_menor: h.es_menor,
+      fecha_nacimiento: h.fecha_nacimiento ?? '',
+      foto_url: h.foto_url ?? null,
+      foto_documento_url: h.foto_documento_url ?? null,
+      visitante_id: h.visitante_id,
+    })))
+    setShowHuespedForm(false); setHuespedForm(defaultHuesped())
+    setShowSTR(true)
+  }
 
   function calcNights(entrada: string, salida: string) {
     if (!entrada || !salida) return 0
     const d = (new Date(salida).getTime() - new Date(entrada).getTime()) / 86400000
     return d > 0 ? d : 0
+  }
+
+  const maxAdicionalesSTR = (Number(formSTR.num_adultos) || 1) + (Number(formSTR.num_ninos) || 0) - 1
+
+  function agregarHuesped() {
+    if (!huespedForm.nombre.trim()) { Swal.fire('Error', 'Ingrese el nombre de la persona.', 'error'); return }
+    if (huespedes.length >= maxAdicionalesSTR) {
+      Swal.fire('Capacidad', 'Ya se alcanzó el máximo de personas adicionales para esta reserva.', 'warning')
+      return
+    }
+    setHuespedes(prev => [...prev, { ...huespedForm, nombre: huespedForm.nombre.trim() }])
+    setHuespedForm(defaultHuesped()); setShowHuespedForm(false)
+  }
+
+  function quitarHuesped(index: number) {
+    if (huespedes[index]?.visitante_id) {
+      Swal.fire('No permitido', 'Esta persona ya registró su ingreso y no puede eliminarse.', 'info')
+      return
+    }
+    setHuespedes(prev => prev.filter((_, i) => i !== index))
+  }
+
+  async function saveGuests(reservaId: string) {
+    const existing = reservaHuespedes[reservaId] ?? []
+    const formIds = new Set(huespedes.filter(h => h.id).map(h => h.id!))
+
+    const toDelete = existing.filter(h => !h.visitante_id && !formIds.has(h.id)).map(h => h.id)
+    if (toDelete.length > 0) {
+      await supabase.from('huespedes_str').delete().in('id', toDelete)
+    }
+
+    for (const h of huespedes.filter(g => g.id && !g.visitante_id)) {
+      await supabase.from('huespedes_str').update({
+        nombre: h.nombre.trim(),
+        identificacion: h.identificacion.trim() || null,
+        es_menor: h.es_menor,
+        fecha_nacimiento: h.es_menor && h.fecha_nacimiento ? h.fecha_nacimiento : null,
+        foto_url: h.foto_url,
+        foto_documento_url: h.foto_documento_url,
+      }).eq('id', h.id!)
+    }
+
+    const toInsert = huespedes.filter(h => !h.id && h.nombre.trim())
+    if (toInsert.length > 0) {
+      await supabase.from('huespedes_str').insert(toInsert.map(h => ({
+        reserva_str_id: reservaId,
+        nombre: h.nombre.trim(),
+        identificacion: h.identificacion.trim() || null,
+        es_menor: h.es_menor,
+        fecha_nacimiento: h.es_menor && h.fecha_nacimiento ? h.fecha_nacimiento : null,
+        foto_url: h.foto_url,
+        foto_documento_url: h.foto_documento_url,
+      })))
+    }
   }
 
   async function saveSTR() {
@@ -294,15 +416,20 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       monto_total: total || null,
       estado: formSTR.estado ?? 'confirmada',
       notas: formSTR.notas || null,
+      foto_url: fotoUrl,
+      foto_documento_url: fotoDocumentoUrl,
     }
+    let reservaId: string | null = editSTR?.id ?? null
     if (editSTR) {
       const { error } = await supabase.from('reservas_str').update(payload).eq('id', editSTR.id)
       if (error) { Swal.fire('Error', error.message, 'error'); setSavingSTR(false); return }
     } else {
-      const { error } = await supabase.from('reservas_str').insert(payload)
+      const { data, error } = await supabase.from('reservas_str').insert(payload).select('id').single()
       if (error) { Swal.fire('Error', error.message, 'error'); setSavingSTR(false); return }
+      reservaId = data.id
     }
-    setSavingSTR(false); setShowSTR(false); cargar()
+    if (reservaId) await saveGuests(reservaId)
+    setSavingSTR(false); resetSTRForm(); cargar()
     Swal.fire({ icon: 'success', title: editSTR ? 'Reserva actualizada' : 'Reserva creada', timer: 1400, showConfirmButton: false })
   }
 
@@ -534,16 +661,26 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
           ) : reservas.map(r => {
             const cfg    = ESTADO_STR[r.estado]
             const nights = calcNights(r.fecha_entrada, r.fecha_salida)
+            const preregistrados = (reservaHuespedes[r.id] ?? []).length
+            const capacidad = r.num_adultos + r.num_ninos
             return (
               <div key={r.id} style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>👤 {r.huesped_nombre}</div>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>
+                      👤 {r.huesped_nombre}
+                      {preregistrados > 0 && (
+                        <span style={{ marginLeft: 8, padding: '2px 8px', background: '#eff6ff', color: '#2563eb', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                          +{preregistrados} pre-reg
+                        </span>
+                      )}
+                    </div>
                     <div style={{ fontSize: '12.5px', color: '#475569' }}>
                       📅 {r.fecha_entrada} → {r.fecha_salida}{nights > 0 && ` (${nights} noche${nights !== 1 ? 's' : ''})`}
                     </div>
                     <div style={{ fontSize: '12.5px', color: '#475569', marginTop: '2px' }}>
                       👥 {r.num_adultos} adulto{r.num_adultos !== 1 ? 's' : ''}{r.num_ninos > 0 ? `, ${r.num_ninos} niño${r.num_ninos !== 1 ? 's' : ''}` : ''}{'  ·  '}🌐 {PLATAFORMAS[r.plataforma]}{r.monto_total ? `  ·  💰 ${r.monto_total.toLocaleString()}` : ''}
+                      {preregistrados > 0 && ` · ${1 + preregistrados}/${capacidad} personas pre-registradas`}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -562,7 +699,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
               <div style={{ background: 'white', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>{editSTR ? 'Editar reserva STR' : 'Nueva reserva STR'}</h3>
-                  <button onClick={() => setShowSTR(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#94a3b8' }}>✕</button>
+                  <button onClick={resetSTRForm} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#94a3b8' }}>✕</button>
                 </div>
                 <div style={rowStyle}>
                   <div style={{ gridColumn: '1/-1' }}>
@@ -623,9 +760,124 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                     <label style={labelStyle}>Notas</label>
                     <textarea style={{ ...fieldStyle, minHeight: '72px', resize: 'vertical' }} value={formSTR.notas ?? ''} onChange={e => setFormSTR(p => ({ ...p, notas: e.target.value }))} placeholder="Observaciones opcionales…" />
                   </div>
+
+                  {/* Fotos del huésped principal */}
+                  <div style={{ gridColumn: '1/-1', paddingTop: '4px', borderTop: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', marginBottom: '8px' }}>
+                      Fotografías del huésped principal <span style={{ fontWeight: 400, color: '#94a3b8' }}>(opcional — se pueden completar al ingreso)</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', maxWidth: '400px' }}>
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>Foto del huésped</div>
+                        <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="str_guests" label="Foto del huésped" capture />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>Foto del documento / DPI</div>
+                        <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="str_guests" label="DPI / Documento" capture />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Personas del grupo */}
+                  <div style={{ gridColumn: '1/-1', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>
+                        Personas del grupo
+                        <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: 6 }}>
+                          (principal + {huespedes.length}/{maxAdicionalesSTR} adicionales pre-registradas)
+                        </span>
+                      </div>
+                      {!showHuespedForm && huespedes.length < maxAdicionalesSTR && (
+                        <button type="button" onClick={() => setShowHuespedForm(true)}
+                          style={{ padding: '4px 12px', background: '#f8fafc', color: '#374151', border: '1.5px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                          + Agregar persona
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Principal */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', marginBottom: '6px' }}>
+                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#0ea5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'white', fontWeight: 700, flexShrink: 0 }}>1</div>
+                      <div style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{formSTR.huesped_nombre || 'Huésped principal'}</div>
+                      <span style={{ fontSize: '10px', color: '#0369a1', fontWeight: 600, padding: '2px 8px', background: '#e0f2fe', borderRadius: '10px' }}>Principal</span>
+                    </div>
+
+                    {/* Adicionales */}
+                    {huespedes.map((h, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: h.visitante_id ? '#f0fdf4' : '#f8fafc', border: `1px solid ${h.visitante_id ? '#86efac' : '#e2e8f0'}`, borderRadius: '8px', marginBottom: '6px' }}>
+                        <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#475569', fontWeight: 700, flexShrink: 0 }}>{i + 2}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
+                            {h.es_menor ? '👶 ' : ''}{h.nombre}
+                            {h.visitante_id && <span style={{ marginLeft: 6, fontSize: '10px', color: '#16a34a', fontWeight: 600 }}>✓ Ingresado</span>}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>
+                            {h.es_menor
+                              ? `Menor${h.fecha_nacimiento ? ` · Nac. ${h.fecha_nacimiento}` : ''}`
+                              : h.identificacion ? `DPI: ${h.identificacion}` : 'Sin documento'}
+                          </div>
+                        </div>
+                        {!h.visitante_id && (
+                          <button type="button" onClick={() => quitarHuesped(i)}
+                            style={{ width: 22, height: 22, borderRadius: '50%', background: '#fee2e2', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Sub-form */}
+                    {showHuespedForm && (
+                      <div style={{ padding: '14px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>Nueva persona del grupo</div>
+                        <div>
+                          <label style={labelStyle}>Nombre *</label>
+                          <input style={fieldStyle} value={huespedForm.nombre} onChange={e => setHuespedForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre completo" />
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#374151', cursor: 'pointer', fontWeight: 600 }}>
+                          <input type="checkbox" checked={huespedForm.es_menor} onChange={e => setHuespedForm(f => ({ ...f, es_menor: e.target.checked, identificacion: '' }))} />
+                          Es menor de edad
+                          {huespedForm.es_menor && <span style={{ padding: '2px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '10px' }}>Menor</span>}
+                        </label>
+                        {huespedForm.es_menor ? (
+                          <div>
+                            <label style={labelStyle}>Fecha de nacimiento (opcional)</label>
+                            <input type="date" style={fieldStyle} value={huespedForm.fecha_nacimiento} onChange={e => setHuespedForm(f => ({ ...f, fecha_nacimiento: e.target.value }))} />
+                          </div>
+                        ) : (
+                          <div>
+                            <label style={labelStyle}>DPI / Identificación</label>
+                            <input style={fieldStyle} value={huespedForm.identificacion} onChange={e => setHuespedForm(f => ({ ...f, identificacion: e.target.value }))} placeholder="Número de documento" />
+                          </div>
+                        )}
+                        <div style={{ display: 'grid', gridTemplateColumns: huespedForm.es_menor ? '1fr' : '1fr 1fr', gap: '10px' }}>
+                          <div>
+                            <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '3px' }}>Foto de la persona</div>
+                            <ImageUploader value={huespedForm.foto_url} onChange={v => setHuespedForm(f => ({ ...f, foto_url: v }))} folder="str_guests" label="Foto" capture />
+                          </div>
+                          {!huespedForm.es_menor && (
+                            <div>
+                              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '3px' }}>Foto del documento</div>
+                              <ImageUploader value={huespedForm.foto_documento_url} onChange={v => setHuespedForm(f => ({ ...f, foto_documento_url: v }))} folder="str_guests" label="Documento" capture />
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button type="button" onClick={agregarHuesped}
+                            style={{ padding: '7px 16px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
+                            + Agregar
+                          </button>
+                          <button type="button" onClick={() => { setShowHuespedForm(false); setHuespedForm(defaultHuesped()) }}
+                            style={{ padding: '7px 14px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  <button onClick={() => setShowSTR(false)} style={{ padding: '9px 20px', background: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: '#475569' }}>Cancelar</button>
+                  <button onClick={resetSTRForm} style={{ padding: '9px 20px', background: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: '#475569' }}>Cancelar</button>
                   <button onClick={saveSTR} disabled={savingSTR} style={{ padding: '9px 22px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', cursor: savingSTR ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px', opacity: savingSTR ? 0.7 : 1 }}>
                     {savingSTR ? 'Guardando…' : editSTR ? 'Actualizar' : 'Crear reserva'}
                   </button>
