@@ -208,11 +208,22 @@ DROP POLICY IF EXISTS "user_roles_insert" ON public.user_roles;
 CREATE POLICY "user_roles_insert" ON public.user_roles FOR INSERT
   WITH CHECK (
     is_super_admin()
-    OR EXISTS (
-      SELECT 1 FROM public.app_users u
-      WHERE u.id = user_roles.user_id
-        AND u.company_id = get_my_company_id()
-        AND current_user_role() IN ('company_owner', 'admin')
+    OR (
+      -- target user must belong to caller's company
+      EXISTS (
+        SELECT 1 FROM public.app_users u
+        WHERE u.id = user_roles.user_id
+          AND u.company_id = get_my_company_id()
+          AND current_user_role() IN ('company_owner', 'admin')
+      )
+      -- role must be a system role or belong to caller's company (prevents cross-company grants)
+      AND EXISTS (
+        SELECT 1 FROM public.roles r
+        WHERE r.id = user_roles.role_id
+          AND (r.is_system = true OR r.company_id = get_my_company_id())
+      )
+      -- assigned_by must be the caller themselves (prevents audit log spoofing)
+      AND (user_roles.assigned_by IS NULL OR user_roles.assigned_by = auth.uid())
     )
   );
 

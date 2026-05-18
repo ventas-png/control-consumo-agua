@@ -15,6 +15,7 @@ AS $$
   )
   SELECT
     CASE
+      WHEN auth.uid() IS NULL THEN false
       WHEN (SELECT role FROM me) IN ('super_admin', 'superadmin', 'company_owner', 'admin') THEN true
       WHEN EXISTS (
         SELECT 1 FROM public.user_roles ur
@@ -35,7 +36,8 @@ AS $$
     END
 $$;
 
-GRANT EXECUTE ON FUNCTION public.user_has_permission(text) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.user_has_permission(text) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.user_has_permission(text) FROM anon;
 
 -- Returns the set of effective permission keys for a given user.
 -- Used by the session loader. SECURITY DEFINER bypasses RLS so the join works,

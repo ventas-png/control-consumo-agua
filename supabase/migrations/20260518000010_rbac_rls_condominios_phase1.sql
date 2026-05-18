@@ -387,17 +387,20 @@ CREATE POLICY "votos_asamblea_delete" ON public.votos_asamblea
   );
 
 -- huespedes_str: company derived via reservas_str
-DROP POLICY IF EXISTS "huespedes_str_select" ON public.huespedes_str;
-DROP POLICY IF EXISTS "huespedes_str_insert" ON public.huespedes_str;
-DROP POLICY IF EXISTS "huespedes_str_update" ON public.huespedes_str;
-DROP POLICY IF EXISTS "huespedes_str_delete" ON public.huespedes_str;
+-- Also drop the legacy permissive "company_access" FOR ALL policy (20260514000002)
+-- which was not regex-matched by the helper (no _select|insert|update|delete suffix).
+DROP POLICY IF EXISTS "company_access"         ON public.huespedes_str;
+DROP POLICY IF EXISTS "huespedes_str_select"   ON public.huespedes_str;
+DROP POLICY IF EXISTS "huespedes_str_insert"   ON public.huespedes_str;
+DROP POLICY IF EXISTS "huespedes_str_update"   ON public.huespedes_str;
+DROP POLICY IF EXISTS "huespedes_str_delete"   ON public.huespedes_str;
 
 CREATE POLICY "huespedes_str_select" ON public.huespedes_str
   FOR SELECT TO authenticated
   USING (
     public.is_super_admin() OR EXISTS (
       SELECT 1 FROM public.reservas_str r
-      WHERE r.id = huespedes_str.reserva_id
+      WHERE r.id = huespedes_str.reserva_str_id
         AND r.company_id = public.get_my_company_id()
         AND public.user_has_permission('condominios.tab.str')
     )
@@ -408,7 +411,7 @@ CREATE POLICY "huespedes_str_insert" ON public.huespedes_str
   WITH CHECK (
     public.is_super_admin() OR EXISTS (
       SELECT 1 FROM public.reservas_str r
-      WHERE r.id = huespedes_str.reserva_id
+      WHERE r.id = huespedes_str.reserva_str_id
         AND r.company_id = public.get_my_company_id()
         AND public.user_has_permission('condominios.tab.str')
     )
@@ -419,7 +422,7 @@ CREATE POLICY "huespedes_str_update" ON public.huespedes_str
   USING (
     public.is_super_admin() OR EXISTS (
       SELECT 1 FROM public.reservas_str r
-      WHERE r.id = huespedes_str.reserva_id
+      WHERE r.id = huespedes_str.reserva_str_id
         AND r.company_id = public.get_my_company_id()
         AND public.user_has_permission('condominios.tab.str')
     )
@@ -427,7 +430,7 @@ CREATE POLICY "huespedes_str_update" ON public.huespedes_str
   WITH CHECK (
     public.is_super_admin() OR EXISTS (
       SELECT 1 FROM public.reservas_str r
-      WHERE r.id = huespedes_str.reserva_id
+      WHERE r.id = huespedes_str.reserva_str_id
         AND r.company_id = public.get_my_company_id()
         AND public.user_has_permission('condominios.tab.str')
     )
@@ -438,7 +441,7 @@ CREATE POLICY "huespedes_str_delete" ON public.huespedes_str
   USING (
     public.is_super_admin() OR EXISTS (
       SELECT 1 FROM public.reservas_str r
-      WHERE r.id = huespedes_str.reserva_id
+      WHERE r.id = huespedes_str.reserva_str_id
         AND r.company_id = public.get_my_company_id()
         AND public.current_user_role() IN ('company_owner','admin')
     )
