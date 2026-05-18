@@ -205,3 +205,53 @@ export function canViewCondominiosTab(tabId: string, role: CondominiosRole | und
   if (allowed === null) return true
   return allowed.has(tabId)
 }
+
+// ─── Multi-role support ───────────────────────────────────────────────────────
+
+export interface SectionGroup {
+  key: string
+  label: string
+  tabs: string[]
+}
+
+export const CONDOMINIOS_SECTION_GROUPS: SectionGroup[] = [
+  {
+    key: 'panel',
+    label: 'Panel / Dashboard',
+    tabs: [...new Set([...PANEL_ESTRATEGICO, ...PANEL_OPERATIVO, ...PANEL_MINIMO])],
+  },
+  { key: 'finanzas',      label: 'Finanzas',      tabs: TODAS_FINANZAS },
+  { key: 'residentes',    label: 'Residentes',     tabs: TODAS_RESIDENTES },
+  { key: 'operaciones',   label: 'Operaciones',    tabs: TODAS_OPERACIONES },
+  { key: 'instalaciones', label: 'Instalaciones',  tabs: TODAS_INSTALACIONES },
+  { key: 'seguridad',     label: 'Seguridad',      tabs: TODAS_SEGURIDAD },
+  { key: 'comunidad',     label: 'Comunidad',      tabs: TODA_COMUNIDAD },
+]
+
+/**
+ * Returns the union of tab sets for an array of roles.
+ * Returns null if the user has full access (administrador_general or exempt).
+ * Returns an empty Set if roles is empty.
+ */
+export function getEffectiveTabAccess(roles: CondominiosRole[]): Set<string> | null {
+  if (roles.length === 0) return new Set()
+  if (roles.includes('administrador_general')) return null
+  const union = new Set<string>()
+  for (const role of roles) {
+    const access = CONDOMINIOS_TAB_ACCESS[role]
+    if (access === null) return null
+    for (const tab of access) union.add(tab)
+  }
+  return union
+}
+
+/**
+ * Multi-role version of canViewCondominiosTab.
+ * Pass null for roles to indicate an exempt user (sees everything).
+ */
+export function canViewCondominiosTabMulti(tabId: string, roles: CondominiosRole[] | null): boolean {
+  if (roles === null) return true
+  const access = getEffectiveTabAccess(roles)
+  if (access === null) return true
+  return access.has(tabId)
+}

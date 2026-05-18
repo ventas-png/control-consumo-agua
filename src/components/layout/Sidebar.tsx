@@ -324,7 +324,13 @@ function isServiceEnabled(tabId: string, session: UserSession): boolean {
   if (CONDOMINIOS_MODULE_KEYS.has(tabId)) {
     if (session.servicio_condominios === false) return false
     if (isExempt) return true
-    return session.condominios_role != null
+    // RBAC: user has any condominios permission, OR legacy column fallback
+    if (session.permissions) {
+      for (const key of session.permissions) {
+        if (key.startsWith('condominios.')) return true
+      }
+    }
+    return (session.condominios_roles?.length ?? 0) > 0 || session.condominios_role != null
   }
   return true
 }

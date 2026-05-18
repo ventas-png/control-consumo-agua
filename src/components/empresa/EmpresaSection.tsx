@@ -8,8 +8,11 @@ import { AsignacionModal } from './AsignacionModal'
 import { PermisosModuloModal } from './PermisosModuloModal'
 import { StripePayPalConfig } from './StripePayPalConfig'
 import { GoogleEmailConfig } from './GoogleEmailConfig'
+import { RolPermisosModal } from './RolPermisosModal'
+import { CustomRoleEditor } from './CustomRoleEditor'
+import { AuditLogModal } from './AuditLogModal'
+import { SYSTEM_ROLE_IDS, type AguaSystemRoleKey, type CondominiosSystemRoleKey } from '../../lib/systemRoleIds'
 import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
-import { AGUA_ROLE_PERMISSIONS, WATER_MODULE_KEYS } from '../../lib/moduleConfig'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: '#22c55e' },
@@ -34,6 +37,7 @@ interface Usuario {
   activo: boolean
   agua_role?: string | null
   condominios_role?: string | null
+  condominios_roles?: string[] | null
 }
 
 interface EmpresaInfo {
@@ -57,6 +61,10 @@ export function EmpresaSection({ currentUser }: Props) {
   const [loading, setLoading] = useState(true)
   const [usuarioAsignar, setUsuarioAsignar] = useState<Usuario | null>(null)
   const [usuarioPermisos, setUsuarioPermisos] = useState<Usuario | null>(null)
+  const [rolCondModal, setRolCondModal] = useState<Usuario | null>(null)
+  const [customRoleEditor, setCustomRoleEditor] = useState<{ roleId: string | null } | null>(null)
+  const [rolesRefreshKey, setRolesRefreshKey] = useState(0)
+  const [showAuditLog, setShowAuditLog] = useState(false)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -65,7 +73,7 @@ export function EmpresaSection({ currentUser }: Props) {
     const [empresaRes, proyectosRes, usuariosRes] = await Promise.all([
       supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects, logo_url').eq('id', currentUser.company_id).single(),
       supabase.from('projects').select('id, nombre, logo_url, descripcion, direccion, latitud, longitud, moneda, moneda_condominios, estado, max_unidades_apartamento, max_unidades_casa, max_unidades_bodega, max_unidades_local_comercial, max_unidades_oficina, max_unidades_parqueadero, max_unidades_otro').eq('company_id', currentUser.company_id).order('nombre'),
-      supabase.from('app_users').select('id, full_name, role, activo, agua_role, condominios_role')
+      supabase.from('app_users').select('id, full_name, role, activo, agua_role, condominios_role, condominios_roles')
         .eq('company_id', currentUser.company_id)
         .neq('id', currentUser.user_id)
         .order('full_name'),
@@ -497,20 +505,23 @@ export function EmpresaSection({ currentUser }: Props) {
       const created = await res.json() as { user_id?: string }
       if (!created.user_id) return
 
-      // Set agua_role + override agua module permissions independently
-      if (formValues.aguaRol) {
-        await supabase.from('app_users').update({ agua_role: formValues.aguaRol }).eq('id', created.user_id)
-        const perms = AGUA_ROLE_PERMISSIONS[formValues.aguaRol as keyof typeof AGUA_ROLE_PERMISSIONS]
-        if (perms) {
-          await supabase.from('user_module_permissions').upsert(
-            Array.from(WATER_MODULE_KEYS).map(key => ({ user_id: created.user_id!, module_key: key, ...perms })),
-            { onConflict: 'user_id,module_key' }
-          )
-        }
+      // Assign RBAC roles. Sync triggers keep agua_role, condominios_role(s) and
+      // user_module_permissions in sync as a denormalized cache.
+      const newAssignments: { user_id: string; role_id: string }[] = []
+      if (formValues.aguaRol && formValues.aguaRol in SYSTEM_ROLE_IDS.agua) {
+        newAssignments.push({
+          user_id: created.user_id,
+          role_id: SYSTEM_ROLE_IDS.agua[formValues.aguaRol as AguaSystemRoleKey],
+        })
       }
-
-      if (formValues.condRol) {
-        await supabase.from('app_users').update({ condominios_role: formValues.condRol }).eq('id', created.user_id)
+      if (formValues.condRol && formValues.condRol in SYSTEM_ROLE_IDS.condominios) {
+        newAssignments.push({
+          user_id: created.user_id,
+          role_id: SYSTEM_ROLE_IDS.condominios[formValues.condRol as CondominiosSystemRoleKey],
+        })
+      }
+      if (newAssignments.length > 0) {
+        await supabase.from('user_roles').insert(newAssignments)
       }
 
       void Swal.fire({ icon: 'success', title: 'Usuario creado', timer: 1500, showConfirmButton: false })
@@ -520,141 +531,9 @@ export function EmpresaSection({ currentUser }: Props) {
     }
   }
 
-  async function cambiarRolAgua(usuario: Usuario) {
-    const allRoles = [
-      { id: '', label: 'Sin acceso a Control de Agua', description: 'Los módulos de agua no serán visibles', color: '#64748b' },
-      { id: 'admin',     label: 'Administrador',    description: 'Acceso completo a todos los módulos de agua', color: '#0ea5e9' },
-      { id: 'operator',  label: 'Operador',         description: 'Lecturas, rutas, calidad y operaciones', color: '#10b981' },
-      { id: 'collector', label: 'Gestor de Cobros', description: 'Cobros, historial y comunicaciones', color: '#f59e0b' },
-      { id: 'viewer',    label: 'Visualizador',     description: 'Solo lectura, sin modificaciones', color: '#8b5cf6' },
-    ]
-    const rolesHtml = allRoles.map(r => {
-      const isActive = usuario.agua_role === r.id || (!usuario.agua_role && r.id === '')
-      return `
-        <button data-rol="${r.id}" type="button" style="
-          display:flex;align-items:flex-start;gap:10px;width:100%;padding:10px 12px;
-          margin-bottom:6px;border-radius:8px;text-align:left;cursor:pointer;
-          border:1px solid ${isActive ? r.color + '88' : r.color + '33'};
-          background:${isActive ? r.color + '22' : 'rgba(0,0,0,0)'};
-        ">
-          <span style="width:10px;height:10px;border-radius:50%;background:${r.color};flex-shrink:0;margin-top:3px"></span>
-          <div style="min-width:0">
-            <div style="font-weight:600;font-size:13px;color:#1e293b;line-height:1.3">${r.label}</div>
-            <div style="font-size:11px;color:#64748b;margin-top:2px;line-height:1.4">${r.description}</div>
-          </div>
-        </button>`
-    }).join('')
-
-    await Swal.fire({
-      title: 'Rol Control de Agua',
-      width: 440,
-      html: `
-        <p style="color:#64748b;font-size:13px;margin-bottom:14px">
-          Usuario: <strong style="color:#1e293b">${usuario.full_name}</strong>
-        </p>
-        <div style="max-height:320px;overflow-y:auto;padding:2px 4px">${rolesHtml}</div>
-      `,
-      showConfirmButton: false,
-      showCancelButton: true,
-      cancelButtonText: 'Cancelar',
-      didOpen: () => {
-        document.querySelectorAll('[data-rol]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const rolId = (btn as HTMLElement).dataset.rol ?? ''
-            Swal.close()
-            void aplicarRolAgua(usuario, rolId || null)
-          })
-        })
-      },
-    })
-  }
-
-  async function aplicarRolAgua(usuario: Usuario, nuevoRol: string | null) {
-    const { error } = await supabase.from('app_users')
-      .update({ agua_role: nuevoRol })
-      .eq('id', usuario.id)
-    if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el rol.' })
-      return
-    }
-    // Update agua module permissions based on new role
-    if (nuevoRol) {
-      const perms = AGUA_ROLE_PERMISSIONS[nuevoRol as keyof typeof AGUA_ROLE_PERMISSIONS]
-      if (perms) {
-        await supabase.from('user_module_permissions').upsert(
-          Array.from(WATER_MODULE_KEYS).map(key => ({ user_id: usuario.id, module_key: key, ...perms })),
-          { onConflict: 'user_id,module_key' }
-        )
-      }
-    } else {
-      // Remove agua module permissions
-      await supabase.from('user_module_permissions')
-        .delete()
-        .eq('user_id', usuario.id)
-        .in('module_key', Array.from(WATER_MODULE_KEYS))
-    }
-    void cargar()
-  }
-
-  async function cambiarRolCondominios(usuario: Usuario) {
-    const allRoles = [
-      { id: '', label: 'Sin rol de condominios', description: 'Acceso estándar según permisos de módulo', color: '#64748b' },
-      ...CONDOMINIOS_ROLES,
-    ]
-    const rolesHtml = allRoles.map(r => {
-      const isActive = usuario.condominios_role === r.id || (!usuario.condominios_role && r.id === '')
-      return `
-        <button data-rol="${r.id}" type="button" style="
-          display:flex;align-items:flex-start;gap:10px;width:100%;padding:10px 12px;
-          margin-bottom:6px;border-radius:8px;text-align:left;cursor:pointer;
-          border:1px solid ${isActive ? r.color + '88' : r.color + '33'};
-          background:${isActive ? r.color + '22' : 'rgba(0,0,0,0)'};
-          transition:background 0.15s;
-        ">
-          <span style="width:10px;height:10px;border-radius:50%;background:${r.color};flex-shrink:0;margin-top:3px"></span>
-          <div style="min-width:0">
-            <div style="font-weight:600;font-size:13px;color:#1e293b;line-height:1.3">${r.label}</div>
-            <div style="font-size:11px;color:#64748b;margin-top:2px;line-height:1.4">${r.description}</div>
-          </div>
-        </button>`
-    }).join('')
-
-    await Swal.fire({
-      title: 'Rol Condominios',
-      width: 480,
-      html: `
-        <p style="color:#64748b;font-size:13px;margin-bottom:14px">
-          Usuario: <strong style="color:#1e293b">${usuario.full_name}</strong>
-        </p>
-        <div style="max-height:340px;overflow-y:auto;padding:2px 4px">
-          ${rolesHtml}
-        </div>
-      `,
-      showConfirmButton: false,
-      showCancelButton: true,
-      cancelButtonText: 'Cancelar',
-      didOpen: () => {
-        document.querySelectorAll('[data-rol]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const rolId = (btn as HTMLElement).dataset.rol ?? ''
-            Swal.close()
-            void aplicarRolCondominios(usuario, rolId || null)
-          })
-        })
-      },
-    })
-  }
-
-  async function aplicarRolCondominios(usuario: Usuario, nuevoRol: string | null) {
-    const { error } = await supabase.from('app_users')
-      .update({ condominios_role: nuevoRol })
-      .eq('id', usuario.id)
-    if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el rol.' })
-    } else {
-      void cargar()
-    }
-  }
+  // Note: aguaRole assignment is now handled by the unified RolPermisosModal
+  // (which assigns RBAC roles; a sync trigger keeps app_users.agua_role and
+  // user_module_permissions up to date).
 
   async function toggleActivoUsuario(usuario: Usuario) {
     await supabase.from('app_users').update({ activo: !usuario.activo }).eq('id', usuario.id)
@@ -969,20 +848,35 @@ export function EmpresaSection({ currentUser }: Props) {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <h2 style={{ color: '#e2e8f0', fontSize: '16px', fontWeight: 600, margin: 0 }}>Usuarios de la Empresa</h2>
-          <button
-            onClick={() => void crearAdmin()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '9px 16px', borderRadius: '8px', border: 'none',
-              background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
-              color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
-            }}
-          >
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-            </svg>
-            Nuevo Usuario
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => setShowAuditLog(true)}
+              title="Auditoría de roles y permisos"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '9px 14px', borderRadius: '8px',
+                border: '1px solid rgba(148,163,184,0.3)',
+                background: 'rgba(148,163,184,0.08)', color: '#cbd5e1',
+                cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+              }}
+            >
+              📜 Auditoría
+            </button>
+            <button
+              onClick={() => void crearAdmin()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '9px 16px', borderRadius: '8px', border: 'none',
+                background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+                color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+              }}
+            >
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+              Nuevo Usuario
+            </button>
+          </div>
         </div>
 
         {usuarios.length === 0 ? (
@@ -1072,8 +966,8 @@ export function EmpresaSection({ currentUser }: Props) {
                   </button>
                   {currentUser.servicio_agua !== false && (
                     <button
-                      onClick={() => void cambiarRolAgua(u)}
-                      title="Rol en Control de Agua"
+                      onClick={() => setRolCondModal(u)}
+                      title="Roles y permisos (agua + condominios)"
                       style={{
                         display: 'flex', alignItems: 'center', gap: '5px',
                         padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(14,165,233,0.3)',
@@ -1086,7 +980,7 @@ export function EmpresaSection({ currentUser }: Props) {
                   )}
                   {currentUser.servicio_condominios !== false && (
                     <button
-                      onClick={() => void cambiarRolCondominios(u)}
+                      onClick={() => setRolCondModal(u)}
                       title="Rol en módulo condominios"
                       style={{
                         display: 'flex', alignItems: 'center', gap: '5px',
@@ -1166,6 +1060,34 @@ export function EmpresaSection({ currentUser }: Props) {
           onClose={() => setUsuarioPermisos(null)}
           onSaved={() => void cargar()}
         />
+      )}
+
+      {/* Modal de roles y permisos (RBAC) */}
+      {rolCondModal && currentUser.company_id && (
+        <RolPermisosModal
+          usuarioId={rolCondModal.id}
+          usuarioNombre={rolCondModal.full_name}
+          companyId={currentUser.company_id}
+          rolesRefreshKey={rolesRefreshKey}
+          onClose={() => setRolCondModal(null)}
+          onSaved={() => void cargar()}
+          onOpenCustomEditor={(roleId) => setCustomRoleEditor({ roleId })}
+        />
+      )}
+
+      {/* Editor de rol personalizado */}
+      {customRoleEditor && currentUser.company_id && (
+        <CustomRoleEditor
+          companyId={currentUser.company_id}
+          roleId={customRoleEditor.roleId}
+          onClose={() => setCustomRoleEditor(null)}
+          onSaved={() => setRolesRefreshKey(k => k + 1)}
+        />
+      )}
+
+      {/* Modal de auditoría */}
+      {showAuditLog && (
+        <AuditLogModal onClose={() => setShowAuditLog(false)} />
       )}
     </div>
   )
