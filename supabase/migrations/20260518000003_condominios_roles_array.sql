@@ -8,14 +8,18 @@ UPDATE public.app_users
   WHERE condominios_role IS NOT NULL
     AND (condominios_roles IS NULL OR condominios_roles = '{}');
 
--- Validate all array elements are valid role values
-ALTER TABLE public.app_users
-  ADD CONSTRAINT condominios_roles_valid CHECK (
-    condominios_roles <@ ARRAY[
-      'administrador_general', 'junta_directiva', 'finanzas',
-      'operaciones', 'seguridad', 'comunidad', 'recepcion', 'visualizador'
-    ]::text[]
-  );
+-- Validate all array elements are valid role values (idempotent)
+DO $$
+BEGIN
+  ALTER TABLE public.app_users
+    ADD CONSTRAINT condominios_roles_valid CHECK (
+      condominios_roles <@ ARRAY[
+        'administrador_general', 'junta_directiva', 'finanzas',
+        'operaciones', 'seguridad', 'comunidad', 'recepcion', 'visualizador'
+      ]::text[]
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Index for queries filtering by role membership
 CREATE INDEX IF NOT EXISTS idx_app_users_condominios_roles

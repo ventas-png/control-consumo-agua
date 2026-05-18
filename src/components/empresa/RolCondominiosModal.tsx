@@ -45,8 +45,11 @@ export function RolCondominiosModal({ usuarioNombre, rolesActuales, onClose, onS
 
   async function handleSave() {
     setSaving(true)
-    await onSave(selectedArray)
-    setSaving(false)
+    try {
+      await onSave(selectedArray)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
