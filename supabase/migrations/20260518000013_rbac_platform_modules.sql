@@ -61,13 +61,16 @@ DECLARE
   rid_viewer    uuid := '00000000-0000-0000-0000-000000000203';
   rid_collector uuid := '00000000-0000-0000-0000-000000000204';
 BEGIN
-  -- Admin platform: covers all platform modules + all 10 water modules + condominios tab access
+  -- Admin platform: covers all platform.* + all agua.* permissions.
+  -- Does NOT include condominios.tab.* — those must be granted separately
+  -- via a condominios system role (e.g. administrador_general) or a custom
+  -- role. This matches the legacy admin defaults (no condominios access by
+  -- default for the platform admin tier).
   INSERT INTO public.role_permissions (role_id, permission_key, effect)
   SELECT rid_admin, p.key, 'allow'
   FROM public.permissions p
   WHERE p.key LIKE 'platform.%'
   ON CONFLICT DO NOTHING;
-  -- Admin also gets all water permissions
   INSERT INTO public.role_permissions (role_id, permission_key, effect)
   SELECT rid_admin, p.key, 'allow'
   FROM public.permissions p

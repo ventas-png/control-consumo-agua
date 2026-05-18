@@ -142,13 +142,34 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { error: permError } = await adminClient.rpc('populate_default_module_permissions', {
-      p_user_id: newUser.user.id,
-      p_role: role,
-    })
-    if (permError) {
-      console.error('Warning: could not populate default module permissions:', permError.message)
+    // Assign the matching platform system role in user_roles (RBAC).
+    // Mirrors the mapping in migration 20260518000013_rbac_platform_modules.sql.
+    const PLATFORM_ROLE_ID: Record<string, string> = {
+      admin:     '00000000-0000-0000-0000-000000000201',
+      operator:  '00000000-0000-0000-0000-000000000202',
+      operador:  '00000000-0000-0000-0000-000000000202',
+      viewer:    '00000000-0000-0000-0000-000000000203',
+      visor:     '00000000-0000-0000-0000-000000000203',
+      collector: '00000000-0000-0000-0000-000000000204',
     }
+    const platformRoleId = PLATFORM_ROLE_ID[role]
+    if (platformRoleId) {
+      const { error: roleError } = await adminClient.from('user_roles').insert({
+        user_id:     newUser.user.id,
+        role_id:     platformRoleId,
+        assigned_by: caller.id,
+      })
+      if (roleError) {
+        // Roll back to avoid leaving an orphan user with no permissions
+        await adminClient.from('app_users').delete().eq('id', newUser.user.id)
+        await adminClient.auth.admin.deleteUser(newUser.user.id)
+        return new Response(JSON.stringify({ error: 'Failed to assign platform role: ' + roleError.message }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
+    // Note: super_admin / company_owner / cliente do not get a platform role —
+    // they bypass RBAC checks via EXEMPT_ROLES in moduleConfig.ts.
 
     return new Response(JSON.stringify({ user_id: newUser.user.id }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
