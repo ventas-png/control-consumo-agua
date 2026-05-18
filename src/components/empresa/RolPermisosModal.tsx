@@ -26,6 +26,10 @@ export function RolPermisosModal({
 }: Props) {
   const [roles, setRoles] = useState<RoleRow[]>([])
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(new Set())
+  // role_id -> expiration ISO date (yyyy-mm-dd) or null for permanent
+  const [expirations, setExpirations] = useState<Map<string, string | null>>(new Map())
+  // Snapshot of initial state, used to detect changes for UPDATE
+  const [initialExpirations, setInitialExpirations] = useState<Map<string, string | null>>(new Map())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -64,9 +68,16 @@ export function RolPermisosModal({
       try {
         await loadRoles()
         const { data: userRolesData } = await supabase
-          .from('user_roles').select('role_id').eq('user_id', usuarioId)
+          .from('user_roles').select('role_id, expires_at').eq('user_id', usuarioId)
         if (cancelled) return
-        setSelectedRoleIds(new Set(((userRolesData ?? []) as Array<{ role_id: string }>).map(ur => ur.role_id)))
+        const rows = (userRolesData ?? []) as Array<{ role_id: string; expires_at: string | null }>
+        setSelectedRoleIds(new Set(rows.map(ur => ur.role_id)))
+        const expMap = new Map<string, string | null>()
+        for (const r of rows) {
+          expMap.set(r.role_id, r.expires_at ? r.expires_at.slice(0, 10) : null)
+        }
+        setExpirations(expMap)
+        setInitialExpirations(new Map(expMap))
       } catch (e: unknown) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'No se pudieron cargar los roles.')
       } finally {
@@ -86,8 +97,24 @@ export function RolPermisosModal({
   function toggleRole(roleId: string) {
     setSelectedRoleIds(prev => {
       const next = new Set(prev)
-      if (next.has(roleId)) next.delete(roleId)
-      else next.add(roleId)
+      if (next.has(roleId)) {
+        next.delete(roleId)
+        // Drop the expiration if we removed the role
+        setExpirations(em => {
+          const m = new Map(em); m.delete(roleId); return m
+        })
+      } else {
+        next.add(roleId)
+      }
+      return next
+    })
+  }
+
+  function setExpiration(roleId: string, value: string | null) {
+    setExpirations(prev => {
+      const next = new Map(prev)
+      if (value) next.set(roleId, value)
+      else next.set(roleId, null)
       return next
     })
   }
@@ -135,6 +162,13 @@ export function RolPermisosModal({
 
       const toAdd = [...selectedRoleIds].filter(id => !existingIds.has(id))
       const toRemove = [...existingIds].filter(id => !selectedRoleIds.has(id))
+      // Rows that exist in both before and after, but whose expiration changed
+      const toUpdateExpiration = [...selectedRoleIds].filter(id => {
+        if (!existingIds.has(id)) return false
+        const before = initialExpirations.get(id) ?? null
+        const after = expirations.get(id) ?? null
+        return before !== after
+      })
 
       if (toRemove.length > 0) {
         const { error: delErr } = await supabase.from('user_roles')
@@ -142,9 +176,21 @@ export function RolPermisosModal({
         if (delErr) throw delErr
       }
       if (toAdd.length > 0) {
-        const rows = toAdd.map(role_id => ({ user_id: usuarioId, role_id }))
+        const rows = toAdd.map(role_id => ({
+          user_id: usuarioId,
+          role_id,
+          expires_at: expirations.get(role_id) ? expirations.get(role_id) : null,
+        }))
         const { error: insErr } = await supabase.from('user_roles').insert(rows)
         if (insErr) throw insErr
+      }
+      // UPDATE expires_at on roles that were already assigned
+      for (const roleId of toUpdateExpiration) {
+        const exp = expirations.get(roleId) ?? null
+        const { error: updErr } = await supabase.from('user_roles')
+          .update({ expires_at: exp })
+          .eq('user_id', usuarioId).eq('role_id', roleId)
+        if (updErr) throw updErr
       }
 
       onSaved()
@@ -160,7 +206,7 @@ export function RolPermisosModal({
     if (!confirm('¿Eliminar este rol personalizado? Los usuarios que lo tengan asignado perderán esos permisos.')) return
     const { error: delErr } = await supabase.from('roles').delete().eq('id', roleId)
     if (delErr) { setError(delErr.message); return }
-    void load()
+    void loadRoles()
   }
 
   return (
@@ -210,7 +256,9 @@ export function RolPermisosModal({
                     key={r.id}
                     role={r}
                     checked={selectedRoleIds.has(r.id)}
+                    expiresAt={expirations.get(r.id) ?? null}
                     onToggle={() => toggleRole(r.id)}
+                    onExpirationChange={(v) => setExpiration(r.id, v)}
                   />
                 ))}
 
@@ -249,7 +297,9 @@ export function RolPermisosModal({
                       key={r.id}
                       role={r}
                       checked={selectedRoleIds.has(r.id)}
+                      expiresAt={expirations.get(r.id) ?? null}
                       onToggle={() => toggleRole(r.id)}
+                      onExpirationChange={(v) => setExpiration(r.id, v)}
                       onEdit={() => onOpenCustomEditor(r.id)}
                       onDelete={() => void handleDeleteCustomRole(r.id)}
                     />
@@ -343,56 +393,104 @@ function PreviewRow({ label, level, count, total }: { label: string; level: 'com
 }
 
 function RoleCard({
-  role, checked, onToggle, onEdit, onDelete,
+  role, checked, expiresAt, onToggle, onExpirationChange, onEdit, onDelete,
 }: {
-  role: RoleRow; checked: boolean; onToggle: () => void; onEdit?: () => void; onDelete?: () => void
+  role: RoleRow; checked: boolean; expiresAt?: string | null;
+  onToggle: () => void; onExpirationChange?: (v: string | null) => void;
+  onEdit?: () => void; onDelete?: () => void
 }) {
+  const expiresSoon = expiresAt ? new Date(expiresAt) < new Date(Date.now() + 7 * 86400000) : false
+  const expired = expiresAt ? new Date(expiresAt) < new Date() : false
   return (
     <div style={{
-      display: 'flex', alignItems: 'flex-start', gap: '8px', width: '100%',
-      padding: '9px 11px', marginBottom: '6px', borderRadius: '8px',
+      display: 'flex', flexDirection: 'column',
+      width: '100%', marginBottom: '6px', borderRadius: '8px',
       border: `1px solid ${checked ? role.color + '55' : '#e2e8f0'}`,
       background: checked ? role.color + '12' : 'transparent',
       transition: 'border-color 0.15s, background 0.15s',
     }}>
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0, marginTop: '1px' }}
-      >
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: '16px', height: '16px', borderRadius: '4px',
-          border: `2px solid ${checked ? role.color : '#cbd5e1'}`,
-          background: checked ? role.color : 'transparent',
-        }}>
-          {checked && <span style={{ color: '#fff', fontSize: '11px', lineHeight: 1 }}>✓</span>}
-        </span>
-      </button>
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flex: 1, textAlign: 'left' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: role.color, flexShrink: 0 }} />
-          <span style={{ fontWeight: 600, fontSize: '13px', color: '#1e293b' }}>{role.name}</span>
-          {!role.is_system && (
-            <span style={{
-              fontSize: '9px', fontWeight: 700, color: '#7c3aed',
-              background: 'rgba(124,58,237,0.1)', padding: '1px 5px', borderRadius: '4px',
-              letterSpacing: '0.04em', textTransform: 'uppercase',
-            }}>Custom</span>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '9px 11px' }}>
+        <button
+          type="button"
+          onClick={onToggle}
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0, marginTop: '1px' }}
+        >
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: '16px', height: '16px', borderRadius: '4px',
+            border: `2px solid ${checked ? role.color : '#cbd5e1'}`,
+            background: checked ? role.color : 'transparent',
+          }}>
+            {checked && <span style={{ color: '#fff', fontSize: '11px', lineHeight: 1 }}>✓</span>}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={onToggle}
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flex: 1, textAlign: 'left' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: role.color, flexShrink: 0 }} />
+            <span style={{ fontWeight: 600, fontSize: '13px', color: '#1e293b' }}>{role.name}</span>
+            {!role.is_system && (
+              <span style={{
+                fontSize: '9px', fontWeight: 700, color: '#7c3aed',
+                background: 'rgba(124,58,237,0.1)', padding: '1px 5px', borderRadius: '4px',
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+              }}>Custom</span>
+            )}
+            {expiresAt && (
+              <span style={{
+                fontSize: '9px', fontWeight: 700,
+                color: expired ? '#ef4444' : expiresSoon ? '#f59e0b' : '#0ea5e9',
+                background: expired ? 'rgba(239,68,68,0.1)' : expiresSoon ? 'rgba(245,158,11,0.1)' : 'rgba(14,165,233,0.1)',
+                padding: '1px 5px', borderRadius: '4px',
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+              }}>{expired ? 'Expirado' : 'Temporal'}</span>
+            )}
+          </div>
+          {role.description && (
+            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', lineHeight: '1.4' }}>{role.description}</div>
           )}
-        </div>
-        {role.description && (
-          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', lineHeight: '1.4' }}>{role.description}</div>
+        </button>
+        {!role.is_system && (
+          <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+            <button onClick={onEdit} title="Editar" style={iconBtnStyle('#3b82f6')}>✎</button>
+            <button onClick={onDelete} title="Eliminar" style={iconBtnStyle('#ef4444')}>🗑</button>
+          </div>
         )}
-      </button>
-      {!role.is_system && (
-        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-          <button onClick={onEdit} title="Editar" style={iconBtnStyle('#3b82f6')}>✎</button>
-          <button onClick={onDelete} title="Eliminar" style={iconBtnStyle('#ef4444')}>🗑</button>
+      </div>
+      {checked && onExpirationChange && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '0 11px 9px', borderTop: `1px dashed ${role.color}22`, paddingTop: '8px', marginTop: '0',
+        }}>
+          <label style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Expira:</label>
+          <input
+            type="date"
+            value={expiresAt ?? ''}
+            onChange={(e) => onExpirationChange(e.target.value || null)}
+            min={new Date().toISOString().slice(0, 10)}
+            style={{
+              fontSize: '11px', padding: '3px 6px',
+              border: '1px solid #cbd5e1', borderRadius: '4px',
+              color: '#334155', background: '#fff',
+            }}
+          />
+          {expiresAt && (
+            <button
+              onClick={() => onExpirationChange(null)}
+              title="Quitar expiración (permanente)"
+              style={{
+                fontSize: '10px', padding: '3px 7px', borderRadius: '4px',
+                border: '1px solid #cbd5e1', background: '#fff', color: '#64748b',
+                cursor: 'pointer', fontWeight: 600,
+              }}
+            >Permanente</button>
+          )}
+          {!expiresAt && (
+            <span style={{ fontSize: '11px', color: '#94a3b8' }}>(sin expiración)</span>
+          )}
         </div>
       )}
     </div>
