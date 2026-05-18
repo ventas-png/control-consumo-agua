@@ -21,5 +21,11 @@ ALTER TABLE public.app_users DROP COLUMN IF EXISTS condominios_role;
 ALTER TABLE public.app_users DROP COLUMN IF EXISTS condominios_roles;
 ALTER TABLE public.app_users DROP COLUMN IF EXISTS agua_role;
 
--- 3. Drop the user_module_permissions table (replaced by user_roles + role_permissions)
+-- 3. Drop functions that read from user_module_permissions before dropping the table.
+-- DROP TABLE ... CASCADE drops policies and indexes but NOT functions that reference it —
+-- those would silently fail at runtime. Versions exist from migrations 20260407, 20260408,
+-- 20260504 (each CREATE OR REPLACE overwrites the previous one).
+DROP FUNCTION IF EXISTS public.populate_default_module_permissions(uuid, text);
+
+-- 4. Drop the user_module_permissions table (replaced by user_roles + role_permissions)
 DROP TABLE IF EXISTS public.user_module_permissions CASCADE;

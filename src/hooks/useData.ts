@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import Swal from 'sweetalert2'
 import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../types'
 import { supabase } from '../lib/supabase'
+import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
 
 async function ensureSupabaseSession(): Promise<boolean> {
   const { data: { session } } = await supabase.auth.getSession()
@@ -86,6 +87,14 @@ const INITIAL_DATA: AppData = {
 }
 
 const PROJECT_EXEMPT_ROLES = new Set(['super_admin', 'company_owner', 'admin'])
+
+// Condominios system roles that restrict project visibility (everything except
+// administrador_general). Derived from systemRoleIds to avoid UUID drift.
+const RESTRICTED_COND_ROLE_IDS = new Set(
+  Object.entries(SYSTEM_ROLE_IDS.condominios)
+    .filter(([k]) => k !== 'administrador_general')
+    .map(([, v]) => v)
+)
 
 export function useData(companyId?: string, userId?: string, userRole?: string, assignedRoleIds?: string[]) {
   const [data, setData] = useState<AppData>(() => loadCache() ?? INITIAL_DATA)
@@ -219,19 +228,6 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     const uid = userIdRef.current
     const role = userRoleRef.current
     const roleIds = assignedRoleIdsRef.current ?? []
-    // System role UUIDs for condominios (see src/lib/systemRoleIds.ts).
-    // Anyone with a *restricted* condominios role (002-008, i.e. anything
-    // other than Administrador General) gets project-filtered even if their
-    // platform role would normally exempt them.
-    const RESTRICTED_COND_ROLE_IDS = new Set([
-      '00000000-0000-0000-0000-000000000002',
-      '00000000-0000-0000-0000-000000000003',
-      '00000000-0000-0000-0000-000000000004',
-      '00000000-0000-0000-0000-000000000005',
-      '00000000-0000-0000-0000-000000000006',
-      '00000000-0000-0000-0000-000000000007',
-      '00000000-0000-0000-0000-000000000008',
-    ])
     const hasRestrictedCondRole = roleIds.some(rid => RESTRICTED_COND_ROLE_IDS.has(rid))
     if (!uid || !role || (PROJECT_EXEMPT_ROLES.has(role) && !hasRestrictedCondRole)) return appData
     const { data: assignments } = await supabase
