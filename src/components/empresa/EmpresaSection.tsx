@@ -10,6 +10,7 @@ import { StripePayPalConfig } from './StripePayPalConfig'
 import { GoogleEmailConfig } from './GoogleEmailConfig'
 import { RolPermisosModal } from './RolPermisosModal'
 import { CustomRoleEditor } from './CustomRoleEditor'
+import { AuditLogModal } from './AuditLogModal'
 import { SYSTEM_ROLE_IDS, type AguaSystemRoleKey, type CondominiosSystemRoleKey } from '../../lib/systemRoleIds'
 import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
 
@@ -63,6 +64,7 @@ export function EmpresaSection({ currentUser }: Props) {
   const [rolCondModal, setRolCondModal] = useState<Usuario | null>(null)
   const [customRoleEditor, setCustomRoleEditor] = useState<{ roleId: string | null } | null>(null)
   const [rolesRefreshKey, setRolesRefreshKey] = useState(0)
+  const [showAuditLog, setShowAuditLog] = useState(false)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -846,20 +848,35 @@ export function EmpresaSection({ currentUser }: Props) {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <h2 style={{ color: '#e2e8f0', fontSize: '16px', fontWeight: 600, margin: 0 }}>Usuarios de la Empresa</h2>
-          <button
-            onClick={() => void crearAdmin()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '9px 16px', borderRadius: '8px', border: 'none',
-              background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
-              color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
-            }}
-          >
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-            </svg>
-            Nuevo Usuario
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => setShowAuditLog(true)}
+              title="Auditoría de roles y permisos"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '9px 14px', borderRadius: '8px',
+                border: '1px solid rgba(148,163,184,0.3)',
+                background: 'rgba(148,163,184,0.08)', color: '#cbd5e1',
+                cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+              }}
+            >
+              📜 Auditoría
+            </button>
+            <button
+              onClick={() => void crearAdmin()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '9px 16px', borderRadius: '8px', border: 'none',
+                background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+                color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+              }}
+            >
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+              Nuevo Usuario
+            </button>
+          </div>
         </div>
 
         {usuarios.length === 0 ? (
@@ -1066,6 +1083,11 @@ export function EmpresaSection({ currentUser }: Props) {
           onClose={() => setCustomRoleEditor(null)}
           onSaved={() => setRolesRefreshKey(k => k + 1)}
         />
+      )}
+
+      {/* Modal de auditoría */}
+      {showAuditLog && (
+        <AuditLogModal onClose={() => setShowAuditLog(false)} />
       )}
     </div>
   )
