@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { RoleDef } from '../../types'
 import { CONDOMINIOS_SECTION_GROUPS } from '../../lib/condominiosRoles'
+import { AGUA_MODULE_GROUPS } from '../../lib/aguaPermissions'
 import { condominiosTabPermission } from '../../lib/permissions'
 
 interface Props {
@@ -17,6 +18,7 @@ interface Props {
 
 interface RoleRow extends RoleDef {
   permission_keys: string[]
+  service?: string | null
 }
 
 export function RolPermisosModal({
@@ -31,7 +33,7 @@ export function RolPermisosModal({
   const loadRoles = useCallback(async () => {
     const [{ data: rolesData, error: rolesErr }, { data: rolePermsData }] = await Promise.all([
       supabase.from('roles')
-        .select('id, company_id, name, description, is_system, color')
+        .select('id, company_id, name, description, is_system, color, service')
         .or(`is_system.eq.true,company_id.eq.${companyId}`)
         .order('is_system', { ascending: false })
         .order('name'),
@@ -99,7 +101,7 @@ export function RolPermisosModal({
     return set
   }, [roles, selectedRoleIds])
 
-  const sectionStatus = useMemo(() =>
+  const condominiosStatus = useMemo(() =>
     CONDOMINIOS_SECTION_GROUPS.map(group => {
       const total = group.tabs.length
       const count = group.tabs.filter(t => effectivePermissions.has(condominiosTabPermission(t))).length
@@ -109,8 +111,20 @@ export function RolPermisosModal({
     [effectivePermissions]
   )
 
-  const systemRoles = roles.filter(r => r.is_system)
-  const customRoles = roles.filter(r => !r.is_system)
+  const aguaStatus = useMemo(() =>
+    AGUA_MODULE_GROUPS.map(group => {
+      const total = group.tabs.length
+      // For agua, "tabs" are already full permission keys, not tab IDs
+      const count = group.tabs.filter(k => effectivePermissions.has(k)).length
+      const level = count === 0 ? 'ninguno' as const : count === total ? 'completo' as const : 'parcial' as const
+      return { key: group.key, label: group.label, level, count, total }
+    }),
+    [effectivePermissions]
+  )
+
+  const condominiosSystemRoles = roles.filter(r => r.is_system && (r.service === 'condominios' || r.service == null))
+  const aguaSystemRoles         = roles.filter(r => r.is_system && r.service === 'agua')
+  const customRoles             = roles.filter(r => !r.is_system)
 
   async function handleSave() {
     setSaving(true)
@@ -190,8 +204,8 @@ export function RolPermisosModal({
               <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', marginTop: '40px' }}>Cargando…</div>
             ) : (
               <>
-                <SectionHeader>Roles del sistema</SectionHeader>
-                {systemRoles.map(r => (
+                <SectionHeader>Condominios — roles del sistema</SectionHeader>
+                {condominiosSystemRoles.map(r => (
                   <RoleCard
                     key={r.id}
                     role={r}
@@ -199,6 +213,20 @@ export function RolPermisosModal({
                     onToggle={() => toggleRole(r.id)}
                   />
                 ))}
+
+                {aguaSystemRoles.length > 0 && (
+                  <div style={{ marginTop: '14px' }}>
+                    <SectionHeader>Agua — roles del sistema</SectionHeader>
+                    {aguaSystemRoles.map(r => (
+                      <RoleCard
+                        key={r.id}
+                        role={r}
+                        checked={selectedRoleIds.has(r.id)}
+                        onToggle={() => toggleRole(r.id)}
+                      />
+                    ))}
+                  </div>
+                )}
 
                 <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <SectionHeader>Roles personalizados</SectionHeader>
@@ -236,22 +264,25 @@ export function RolPermisosModal({
             <SectionHeader>Permisos efectivos</SectionHeader>
             {selectedRoleIds.size === 0 ? (
               <div style={{ fontSize: '13px', color: '#94a3b8', textAlign: 'center', marginTop: '32px', lineHeight: '1.6' }}>
-                Sin roles asignados.<br />El usuario no tendrá<br />acceso al módulo.
+                Sin roles asignados.<br />El usuario no tendrá<br />acceso a ningún módulo.
               </div>
             ) : (
               <>
                 {selectedRoleIds.size > 1 && (
                   <Banner color="#0ea5e9">{selectedRoleIds.size} roles activos — permisos combinados</Banner>
                 )}
-                {sectionStatus.map(s => (
-                  <div key={s.key} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '7px 0', borderBottom: '1px solid #f1f5f9',
-                  }}>
-                    <span style={{ fontSize: '13px', color: '#334155', fontWeight: 500 }}>{s.label}</span>
-                    <AccessBadge level={s.level} count={s.count} total={s.total} />
-                  </div>
+
+                <SubsectionHeader>Condominios</SubsectionHeader>
+                {condominiosStatus.map(s => (
+                  <PreviewRow key={s.key} label={s.label} level={s.level} count={s.count} total={s.total} />
                 ))}
+
+                <div style={{ marginTop: '16px' }}>
+                  <SubsectionHeader>Agua</SubsectionHeader>
+                  {aguaStatus.map(s => (
+                    <PreviewRow key={s.key} label={s.label} level={s.level} count={s.count} total={s.total} />
+                  ))}
+                </div>
               </>
             )}
           </div>
@@ -286,6 +317,28 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
       fontSize: '11px', fontWeight: 700, color: '#94a3b8',
       letterSpacing: '0.06em', marginBottom: '8px', textTransform: 'uppercase',
     }}>{children}</div>
+  )
+}
+
+function SubsectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontSize: '11px', fontWeight: 700, color: '#475569',
+      letterSpacing: '0.04em', marginBottom: '4px', textTransform: 'uppercase',
+      paddingBottom: '4px', borderBottom: '1px solid #e2e8f0',
+    }}>{children}</div>
+  )
+}
+
+function PreviewRow({ label, level, count, total }: { label: string; level: 'completo'|'parcial'|'ninguno'; count: number; total: number }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '7px 0', borderBottom: '1px solid #f1f5f9',
+    }}>
+      <span style={{ fontSize: '13px', color: '#334155', fontWeight: 500 }}>{label}</span>
+      <AccessBadge level={level} count={count} total={total} />
+    </div>
   )
 }
 
