@@ -5,8 +5,9 @@
 --
 -- Strategy: a dynamic helper function (kept for future tables) detects the
 -- table's existing CRUD policy names (anything ending in _select|_insert|
--- _update|_delete that doesn't contain "cliente") and replaces them with
--- new RBAC-aware policies gated by user_has_permission(perm_key).
+-- _update|_delete or the truncated _sel|_ins|_upd|_del variants used in older
+-- migrations, that doesn't contain "cliente") and replaces them with new
+-- RBAC-aware policies gated by user_has_permission(perm_key).
 
 -- ─── Helper: install standard 4-policy RBAC set on a company-scoped table ───
 CREATE OR REPLACE FUNCTION public.rbac_install_company_policies(
@@ -25,10 +26,12 @@ DECLARE
 BEGIN
   -- Detect which operations had policies BEFORE we drop them. This preserves
   -- existing immutability patterns (e.g., audit-style tables with no UPDATE).
+  -- Matches both canonical (_select|insert|update|delete) and truncated
+  -- (_sel|ins|upd|del) suffixes used by older migrations.
   SELECT array_agg(DISTINCT cmd) INTO existing_ops
   FROM pg_policies
   WHERE schemaname = 'public' AND tablename = tbl
-    AND policyname ~ '_(select|insert|update|delete)$'
+    AND policyname ~ '_(select|insert|update|delete|sel|ins|upd|del)$'
     AND policyname NOT ILIKE '%cliente%';
 
   IF existing_ops IS NOT NULL THEN
@@ -42,11 +45,12 @@ BEGIN
     had_select := true; had_insert := true; had_update := true; had_delete := true;
   END IF;
 
-  -- Drop existing CRUD policies (skip cliente-specific ones)
+  -- Drop existing CRUD policies (skip cliente-specific ones). Same regex as
+  -- the detection above so we drop every legacy policy that "covered" CRUD.
   FOR pol IN
     SELECT policyname FROM pg_policies
     WHERE schemaname = 'public' AND tablename = tbl
-      AND policyname ~ '_(select|insert|update|delete)$'
+      AND policyname ~ '_(select|insert|update|delete|sel|ins|upd|del)$'
       AND policyname NOT ILIKE '%cliente%'
   LOOP
     EXECUTE format('DROP POLICY %I ON public.%I', pol.policyname, tbl);
@@ -446,3 +450,9 @@ CREATE POLICY "huespedes_str_delete" ON public.huespedes_str
         AND public.current_user_role() IN ('company_owner','admin')
     )
   );
+
+-- ─── Drop the migration-only helper ─────────────────────────────────────────
+-- The function has no runtime callers — it exists purely to factor the bulk
+-- policy installation loop above. Dropping it eliminates the lingering
+-- SECURITY INVOKER + DDL-executing surface area.
+DROP FUNCTION IF EXISTS public.rbac_install_company_policies(text, text);
