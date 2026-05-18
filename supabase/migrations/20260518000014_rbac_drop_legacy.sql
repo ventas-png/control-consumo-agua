@@ -26,6 +26,11 @@ ALTER TABLE public.app_users DROP COLUMN IF EXISTS agua_role;
 -- those would silently fail at runtime. Versions exist from migrations 20260407, 20260408,
 -- 20260504 (each CREATE OR REPLACE overwrites the previous one).
 DROP FUNCTION IF EXISTS public.populate_default_module_permissions(uuid, text);
+-- check_module_permission was the SECURITY DEFINER helper used by old RLS
+-- policies before RBAC. App code already migrated to usePermissions
+-- (session.permissions); drop the function to prevent future callers from
+-- hitting the missing-table foot-gun.
+DROP FUNCTION IF EXISTS public.check_module_permission(text, text);
 
 -- 4. Drop the user_module_permissions table (replaced by user_roles + role_permissions)
 DROP TABLE IF EXISTS public.user_module_permissions CASCADE;
