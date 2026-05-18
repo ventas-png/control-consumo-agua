@@ -159,7 +159,7 @@ export default function App() {
     addTarifaEnergia, updateTarifaEnergia, deleteTarifaEnergia,
     addFuenteEnergia, updateFuenteEnergia, deleteFuenteEnergia,
     addFacturaEnergia, updateFacturaEnergia, deleteFacturaEnergia,
-  } = useData(currentUser?.company_id, currentUser?.user_id, currentUser?.role, currentUser?.condominios_role)
+  } = useData(currentUser?.company_id, currentUser?.user_id, currentUser?.role, currentUser?.assigned_role_ids)
 
   const { canViewModule, canCreate, canEdit, canChangeStatus } = usePermissions(currentUser)
 

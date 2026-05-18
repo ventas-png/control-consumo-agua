@@ -127,16 +127,6 @@ export type CondominiosRole =
   | 'recepcion'
   | 'visualizador'
 
-export interface ModulePermission {
-  module_key: string
-  can_view: boolean
-  can_create: boolean
-  can_edit: boolean
-  can_change_status: boolean
-}
-
-export type ModulePermissionsMap = Record<string, ModulePermission>
-
 export interface UserSession {
   user_id: string;
   email: string;
@@ -146,12 +136,8 @@ export interface UserSession {
   cliente_id?: string;
   login_time: string;
   expires_at: string;
-  module_permissions?: ModulePermissionsMap;
   servicio_agua?: boolean;
   servicio_condominios?: boolean;
-  agua_role?: AguaRole;
-  condominios_role?: CondominiosRole;
-  condominios_roles?: CondominiosRole[];
   // RBAC: effective permission keys for this user (e.g. 'condominios.tab.cuotas')
   permissions?: Set<string>;
   // RBAC: assigned role IDs (system + custom)

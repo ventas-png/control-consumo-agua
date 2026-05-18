@@ -5,7 +5,6 @@ import type { UserSession, Proyecto } from '../../types'
 import { MONEDAS } from '../../types'
 import { SecureImage } from '../shared/SecureImage'
 import { AsignacionModal } from './AsignacionModal'
-import { PermisosModuloModal } from './PermisosModuloModal'
 import { StripePayPalConfig } from './StripePayPalConfig'
 import { GoogleEmailConfig } from './GoogleEmailConfig'
 import { RolPermisosModal } from './RolPermisosModal'
@@ -35,9 +34,8 @@ interface Usuario {
   full_name: string
   role: string
   activo: boolean
-  agua_role?: string | null
-  condominios_role?: string | null
-  condominios_roles?: string[] | null
+  // Display chips derived at fetch time from user_roles + roles join
+  assigned_roles?: Array<{ id: string; name: string; color: string; service: string | null }>
 }
 
 interface EmpresaInfo {
@@ -60,7 +58,6 @@ export function EmpresaSection({ currentUser }: Props) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [loading, setLoading] = useState(true)
   const [usuarioAsignar, setUsuarioAsignar] = useState<Usuario | null>(null)
-  const [usuarioPermisos, setUsuarioPermisos] = useState<Usuario | null>(null)
   const [rolCondModal, setRolCondModal] = useState<Usuario | null>(null)
   const [customRoleEditor, setCustomRoleEditor] = useState<{ roleId: string | null } | null>(null)
   const [rolesRefreshKey, setRolesRefreshKey] = useState(0)
@@ -73,7 +70,7 @@ export function EmpresaSection({ currentUser }: Props) {
     const [empresaRes, proyectosRes, usuariosRes] = await Promise.all([
       supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects, logo_url').eq('id', currentUser.company_id).single(),
       supabase.from('projects').select('id, nombre, logo_url, descripcion, direccion, latitud, longitud, moneda, moneda_condominios, estado, max_unidades_apartamento, max_unidades_casa, max_unidades_bodega, max_unidades_local_comercial, max_unidades_oficina, max_unidades_parqueadero, max_unidades_otro').eq('company_id', currentUser.company_id).order('nombre'),
-      supabase.from('app_users').select('id, full_name, role, activo, agua_role, condominios_role, condominios_roles')
+      supabase.from('app_users').select('id, full_name, role, activo')
         .eq('company_id', currentUser.company_id)
         .neq('id', currentUser.user_id)
         .order('full_name'),
@@ -81,7 +78,30 @@ export function EmpresaSection({ currentUser }: Props) {
 
     if (empresaRes.data) setEmpresa(empresaRes.data as EmpresaInfo)
     if (proyectosRes.data) setProyectos(proyectosRes.data as Proyecto[])
-    if (usuariosRes.data) setUsuarios(usuariosRes.data as Usuario[])
+
+    if (usuariosRes.data) {
+      const baseUsers = usuariosRes.data as Usuario[]
+      // Fetch assigned roles for chips display
+      const userIds = baseUsers.map(u => u.id)
+      if (userIds.length > 0) {
+        const { data: userRolesData } = await supabase
+          .from('user_roles')
+          .select('user_id, role:roles(id, name, color, service)')
+          .in('user_id', userIds)
+        type Row = { user_id: string; role: { id: string; name: string; color: string; service: string | null } | null }
+        const byUser = new Map<string, NonNullable<Row['role']>[]>()
+        for (const r of ((userRolesData ?? []) as unknown as Row[])) {
+          if (!r.role) continue
+          const arr = byUser.get(r.user_id) ?? []
+          arr.push(r.role)
+          byUser.set(r.user_id, arr)
+        }
+        for (const u of baseUsers) {
+          u.assigned_roles = byUser.get(u.id) ?? []
+        }
+      }
+      setUsuarios(baseUsers)
+    }
     setLoading(false)
   }, [currentUser.company_id, currentUser.user_id])
 
@@ -505,8 +525,8 @@ export function EmpresaSection({ currentUser }: Props) {
       const created = await res.json() as { user_id?: string }
       if (!created.user_id) return
 
-      // Assign RBAC roles. Sync triggers keep agua_role, condominios_role(s) and
-      // user_module_permissions in sync as a denormalized cache.
+      // Assign RBAC roles via user_roles. With the legacy columns dropped,
+      // user_roles is the sole source of truth for permissions.
       const newAssignments: { user_id: string; role_id: string }[] = []
       if (formValues.aguaRol && formValues.aguaRol in SYSTEM_ROLE_IDS.agua) {
         newAssignments.push({
@@ -531,9 +551,8 @@ export function EmpresaSection({ currentUser }: Props) {
     }
   }
 
-  // Note: aguaRole assignment is now handled by the unified RolPermisosModal
-  // (which assigns RBAC roles; a sync trigger keeps app_users.agua_role and
-  // user_module_permissions up to date).
+  // Note: agua and condominios role assignment is handled by the unified
+  // RolPermisosModal, which writes directly to user_roles.
 
   async function toggleActivoUsuario(usuario: Usuario) {
     await supabase.from('app_users').update({ activo: !usuario.activo }).eq('id', usuario.id)
@@ -911,24 +930,18 @@ export function EmpresaSection({ currentUser }: Props) {
                       {u.full_name}
                     </div>
                     <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '3px' }}>
-                      {u.agua_role && currentUser.servicio_agua !== false && (() => {
-                        const aguaColors: Record<string, string> = { admin: '#0ea5e9', operator: '#10b981', collector: '#f59e0b', viewer: '#8b5cf6' }
-                        const aguaLabels: Record<string, string> = { admin: 'Admin Agua', operator: 'Operador', collector: 'Cobros', viewer: 'Visualizador' }
-                        const c = aguaColors[u.agua_role] ?? '#64748b'
+                      {(u.assigned_roles ?? []).map(r => {
+                        const icon = r.service === 'agua' ? '💧' : r.service === 'condominios' ? '🏢' : '⚙️'
                         return (
-                          <span style={{ padding: '1px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: c + '22', color: c }}>
-                            💧 {aguaLabels[u.agua_role] ?? u.agua_role}
+                          <span key={r.id} style={{
+                            padding: '1px 8px', borderRadius: '20px',
+                            fontSize: '11px', fontWeight: 600,
+                            background: r.color + '22', color: r.color,
+                          }}>
+                            {icon} {r.name}
                           </span>
                         )
-                      })()}
-                      {u.condominios_role && currentUser.servicio_condominios !== false && (() => {
-                        const rDef = CONDOMINIOS_ROLES.find(r => r.id === u.condominios_role)
-                        return rDef ? (
-                          <span style={{ padding: '1px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: rDef.color + '22', color: rDef.color }}>
-                            🏢 {rDef.label}
-                          </span>
-                        ) : null
-                      })()}
+                      })}
                     </div>
                   </div>
                 </div>
@@ -948,21 +961,6 @@ export function EmpresaSection({ currentUser }: Props) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                     </svg>
                     Acceso
-                  </button>
-                  <button
-                    onClick={() => setUsuarioPermisos(u)}
-                    title="Configurar permisos de módulos"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '5px',
-                      padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(168,85,247,0.3)',
-                      background: 'rgba(168,85,247,0.08)', color: '#c084fc',
-                      cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Permisos
                   </button>
                   {currentUser.servicio_agua !== false && (
                     <button
@@ -1047,17 +1045,6 @@ export function EmpresaSection({ currentUser }: Props) {
           proyectos={proyectos}
 
           onClose={() => setUsuarioAsignar(null)}
-          onSaved={() => void cargar()}
-        />
-      )}
-
-      {/* Modal de permisos de módulos */}
-      {usuarioPermisos && (
-        <PermisosModuloModal
-          usuario={usuarioPermisos}
-          servicioAgua={currentUser.servicio_agua !== false}
-          servicioCondominios={currentUser.servicio_condominios !== false}
-          onClose={() => setUsuarioPermisos(null)}
           onSaved={() => void cargar()}
         />
       )}

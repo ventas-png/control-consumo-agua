@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import Swal from 'sweetalert2'
 import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../types'
 import { supabase } from '../lib/supabase'
+import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
 
 async function ensureSupabaseSession(): Promise<boolean> {
   const { data: { session } } = await supabase.auth.getSession()
@@ -87,18 +88,26 @@ const INITIAL_DATA: AppData = {
 
 const PROJECT_EXEMPT_ROLES = new Set(['super_admin', 'company_owner', 'admin'])
 
-export function useData(companyId?: string, userId?: string, userRole?: string, condominiosRole?: string) {
+// Condominios system roles that restrict project visibility (everything except
+// administrador_general). Derived from systemRoleIds to avoid UUID drift.
+const RESTRICTED_COND_ROLE_IDS = new Set(
+  Object.entries(SYSTEM_ROLE_IDS.condominios)
+    .filter(([k]) => k !== 'administrador_general')
+    .map(([, v]) => v)
+)
+
+export function useData(companyId?: string, userId?: string, userRole?: string, assignedRoleIds?: string[]) {
   const [data, setData] = useState<AppData>(() => loadCache() ?? INITIAL_DATA)
   const [isLoading, setIsLoading] = useState(false)
 
   // Refs so the stable cargarDatos closure always reads the latest values
   const userIdRef = useRef(userId)
   const userRoleRef = useRef(userRole)
-  const condominiosRoleRef = useRef(condominiosRole)
+  const assignedRoleIdsRef = useRef(assignedRoleIds)
   const companyIdRef = useRef(companyId)
   userIdRef.current = userId
   userRoleRef.current = userRole
-  condominiosRoleRef.current = condominiosRole
+  assignedRoleIdsRef.current = assignedRoleIds
   companyIdRef.current = companyId
 
   const fetchAllData = async () => {
@@ -218,9 +227,8 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
   const filterProyectosByAssignment = async (appData: AppData): Promise<AppData> => {
     const uid = userIdRef.current
     const role = userRoleRef.current
-    const condRole = condominiosRoleRef.current
-    // Exempt only if agua role is exempt AND user has no restricted condominios role
-    const hasRestrictedCondRole = condRole && condRole !== 'administrador_general'
+    const roleIds = assignedRoleIdsRef.current ?? []
+    const hasRestrictedCondRole = roleIds.some(rid => RESTRICTED_COND_ROLE_IDS.has(rid))
     if (!uid || !role || (PROJECT_EXEMPT_ROLES.has(role) && !hasRestrictedCondRole)) return appData
     const { data: assignments } = await supabase
       .from('user_project_assignments')
