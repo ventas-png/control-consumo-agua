@@ -319,18 +319,20 @@ function isServiceEnabled(tabId: string, session: UserSession): boolean {
   if (WATER_MODULE_KEYS.has(tabId)) {
     if (session.servicio_agua === false) return false
     if (isExempt) return true
-    return session.agua_role != null
+    if (!session.permissions) return false
+    for (const key of session.permissions) {
+      if (key.startsWith('agua.')) return true
+    }
+    return false
   }
   if (CONDOMINIOS_MODULE_KEYS.has(tabId)) {
     if (session.servicio_condominios === false) return false
     if (isExempt) return true
-    // RBAC: user has any condominios permission, OR legacy column fallback
-    if (session.permissions) {
-      for (const key of session.permissions) {
-        if (key.startsWith('condominios.')) return true
-      }
+    if (!session.permissions) return false
+    for (const key of session.permissions) {
+      if (key.startsWith('condominios.')) return true
     }
-    return (session.condominios_roles?.length ?? 0) > 0 || session.condominios_role != null
+    return false
   }
   return true
 }

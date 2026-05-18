@@ -1,26 +1,33 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { UserSession, UserRole, ModulePermissionsMap, CondominiosRole, AguaRole } from '../types'
+import type { UserSession, UserRole } from '../types'
 import { supabase } from '../lib/supabase'
 import { APP_CONFIG } from '../lib/config'
 import { sanitizeInput, validateEmail } from '../lib/validation'
 import { logSecurityEvent } from '../lib/security'
-import { EXEMPT_ROLES, ROLE_DEFAULT_TEMPLATES } from '../lib/moduleConfig'
 
 function getStoredSession(): UserSession | null {
   try {
     const data = sessionStorage.getItem('userSession')
     if (!data) return null
-    const session = JSON.parse(data) as UserSession
-    if (new Date() < new Date(session.expires_at)) return session
-    return null
+    const parsed = JSON.parse(data) as UserSession & { permissions?: string[] | Set<string> }
+    if (new Date() >= new Date(parsed.expires_at)) return null
+    // permissions serializes as array; hydrate back to Set
+    if (Array.isArray(parsed.permissions)) {
+      parsed.permissions = new Set(parsed.permissions) as Set<string>
+    }
+    return parsed as UserSession
   } catch {
     return null
   }
 }
 
 function storeSession(session: UserSession): void {
-  sessionStorage.setItem('userSession', JSON.stringify(session))
+  const serializable = {
+    ...session,
+    permissions: session.permissions ? [...session.permissions] : undefined,
+  }
+  sessionStorage.setItem('userSession', JSON.stringify(serializable))
   // Security: no longer store session in localStorage to prevent theft via XSS
 }
 
@@ -117,17 +124,12 @@ async function buildSessionFromSupabase(
     setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
   )
 
-  // Batch 1: profile + module permissions + RBAC permissions + assigned roles, in parallel
+  // Batch 1: profile + RBAC permissions + assigned roles, in parallel
   const profileQuery = supabase
     .from('app_users')
-    .select('full_name, role, company_id, cliente_id, activo, condominios_role, condominios_roles, agua_role')
+    .select('full_name, role, company_id, cliente_id, activo')
     .eq('id', userId)
     .single()
-
-  const permsQuery = supabase
-    .from('user_module_permissions')
-    .select('module_key, can_view, can_create, can_edit, can_change_status')
-    .eq('user_id', userId)
 
   const rbacPermsQuery = supabase.rpc('get_user_permissions', { target_user_id: userId })
 
@@ -136,12 +138,12 @@ async function buildSessionFromSupabase(
     .select('role_id')
     .eq('user_id', userId)
 
-  const [profileResult, permsResult, rbacPermsResult, userRolesResult] = await Promise.race([
-    Promise.all([profileQuery, permsQuery, rbacPermsQuery, userRolesQuery]),
+  const [profileResult, rbacPermsResult, userRolesResult] = await Promise.race([
+    Promise.all([profileQuery, rbacPermsQuery, userRolesQuery]),
     timeout,
   ])
 
-  type ProfileRow = { full_name?: string; role?: string; company_id?: string; cliente_id?: string; activo?: boolean; condominios_role?: string; condominios_roles?: string[]; agua_role?: string } | null
+  type ProfileRow = { full_name?: string; role?: string; company_id?: string; cliente_id?: string; activo?: boolean } | null
   const prof = profileResult.data as ProfileRow
 
   if (prof?.activo === false) {
@@ -150,15 +152,6 @@ async function buildSessionFromSupabase(
   const dbRole: string = prof?.role ?? ''
   const companyId: string | undefined = prof?.company_id ?? undefined
   const clienteId: string | undefined = prof?.cliente_id ?? undefined
-  const condominiosRole: CondominiosRole | undefined = (prof?.condominios_role ?? undefined) as CondominiosRole | undefined
-  const rawCondRoles = prof?.condominios_roles ?? []
-  const condominiosRoles: CondominiosRole[] | undefined =
-    rawCondRoles.length > 0
-      ? rawCondRoles as CondominiosRole[]
-      : condominiosRole
-        ? [condominiosRole]
-        : undefined
-  const aguaRole: AguaRole | undefined = (prof?.agua_role ?? undefined) as AguaRole | undefined
   let uiRole: UserRole = 'viewer'
   if (dbRole === 'super_admin' || dbRole === 'superadmin') uiRole = 'super_admin'
   else if (dbRole === 'company_owner') uiRole = 'company_owner'
@@ -169,42 +162,6 @@ async function buildSessionFromSupabase(
   else if (dbRole === 'collector') uiRole = 'collector'
 
   const displayName = prof?.full_name ?? email
-
-  // Apply module permissions from batch 1 result
-  let modulePermissions: ModulePermissionsMap | undefined
-  if (!EXEMPT_ROLES.includes(uiRole)) {
-    try {
-      const perms = permsResult.data
-      if (perms && perms.length > 0) {
-        modulePermissions = {}
-        for (const p of perms) {
-          modulePermissions[p.module_key] = {
-            module_key: p.module_key,
-            can_view: p.can_view,
-            can_create: p.can_create,
-            can_edit: p.can_edit,
-            can_change_status: p.can_change_status,
-          }
-        }
-      } else {
-        const defaults = ROLE_DEFAULT_TEMPLATES[uiRole]
-        if (defaults && defaults.length > 0) {
-          modulePermissions = {}
-          for (const p of defaults) {
-            modulePermissions[p.module_key] = p
-          }
-        }
-      }
-    } catch {
-      const defaults = ROLE_DEFAULT_TEMPLATES[uiRole]
-      if (defaults && defaults.length > 0) {
-        modulePermissions = {}
-        for (const p of defaults) {
-          modulePermissions[p.module_key] = p
-        }
-      }
-    }
-  }
 
   // Batch 2: company flags (needs companyId from batch 1) — wrapped in 4s timeout
   // to prevent login from hanging if Supabase is slow or the nested join stalls
@@ -257,12 +214,8 @@ async function buildSessionFromSupabase(
     expires_at: expiresAt
       ? new Date(expiresAt * 1000).toISOString()
       : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString(),
-    module_permissions: modulePermissions,
     servicio_agua,
     servicio_condominios,
-    agua_role: aguaRole,
-    condominios_role: condominiosRole,
-    condominios_roles: condominiosRoles,
     permissions: buildPermissionsSet(rbacPermsResult),
     assigned_role_ids: buildAssignedRoleIds(userRolesResult),
   }
@@ -308,7 +261,9 @@ export function useAuth() {
               session.user.email ?? '',
               session.expires_at
             )
-            const permissionsChanged = JSON.stringify(fresh.module_permissions) !== JSON.stringify(stored.module_permissions)
+            const freshPerms = fresh.permissions ? [...fresh.permissions].sort() : []
+            const storedPerms = stored.permissions ? [...stored.permissions].sort() : []
+            const permissionsChanged = JSON.stringify(freshPerms) !== JSON.stringify(storedPerms)
             if (
               fresh.role !== stored.role ||
               fresh.name !== stored.name ||
@@ -371,7 +326,7 @@ export function useAuth() {
   // Periodic token refresh (every 30 minutes).
   //
   // Antes hacíamos buildSessionFromSupabase() en cada refresh — eran 3
-  // queries adicionales (app_users, user_module_permissions, companies)
+  // queries adicionales (app_users, user_roles, get_user_permissions RPC, companies)
   // que solo necesitábamos en login o cuando rol/empresa cambiaban. Ahora
   // solo actualizamos el expires_at local; role/permissions persisten
   // estables hasta el próximo login. Si el admin cambia el rol del
