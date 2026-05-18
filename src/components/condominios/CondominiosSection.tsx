@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import { canViewCondominiosTabMulti } from '../../lib/condominiosRoles'
+import { canViewCondominiosTabByPermission } from '../../lib/permissions'
 import type {
   UserSession, Proyecto, Unidad,
   OrdenCompra, AsambleaDigital, Proforma,
@@ -532,25 +532,15 @@ interface Props {
 }
 
 export function CondominiosSection({ proyectos, unidades, currentUser, canCreate, canEdit, initialTab }: Props) {
-  const isExemptRole = (['super_admin', 'company_owner'] as string[]).includes(currentUser.role)
-
-  const visibleSections = useMemo(() => {
-    // null = exempt user sees everything; array = filtered by assigned roles
-    const roles = isExemptRole
-      ? null
-      : (currentUser.condominios_roles?.length
-          ? currentUser.condominios_roles
-          : currentUser.condominios_role
-            ? [currentUser.condominios_role]
-            : []
-        )
-    return SECTIONS
+  const visibleSections = useMemo(() =>
+    SECTIONS
       .map(sec => ({
         ...sec,
-        tabs: sec.tabs.filter(tid => canViewCondominiosTabMulti(tid, roles)),
+        tabs: sec.tabs.filter(tid => canViewCondominiosTabByPermission(currentUser, tid)),
       }))
-      .filter(sec => sec.tabs.length > 0)
-  }, [isExemptRole, currentUser.condominios_roles, currentUser.condominios_role])
+      .filter(sec => sec.tabs.length > 0),
+    [currentUser]
+  )
 
   const [activeTab, setActiveTab] = useState<CondominioTab>(initialTab ?? 'panel')
   const [activeSection, setActiveSection] = useState<SectionKey>('panel')

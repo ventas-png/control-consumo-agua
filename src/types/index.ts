@@ -152,6 +152,32 @@ export interface UserSession {
   agua_role?: AguaRole;
   condominios_role?: CondominiosRole;
   condominios_roles?: CondominiosRole[];
+  // RBAC: effective permission keys for this user (e.g. 'condominios.tab.cuotas')
+  permissions?: Set<string>;
+  // RBAC: assigned role IDs (system + custom)
+  assigned_role_ids?: string[];
+}
+
+// ─── RBAC types ──────────────────────────────────────────────────────────────
+
+export interface PermissionDef {
+  key: string;
+  category: string;
+  label: string;
+  description?: string;
+}
+
+export interface RoleDef {
+  id: string;
+  company_id: string | null;
+  name: string;
+  description: string | null;
+  is_system: boolean;
+  color: string;
+}
+
+export interface RoleWithPermissions extends RoleDef {
+  permission_keys: string[];
 }
 
 export interface Ruta {

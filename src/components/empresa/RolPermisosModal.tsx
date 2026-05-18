@@ -1,0 +1,378 @@
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { supabase } from '../../lib/supabase'
+import type { RoleDef } from '../../types'
+import { CONDOMINIOS_SECTION_GROUPS } from '../../lib/condominiosRoles'
+import { condominiosTabPermission } from '../../lib/permissions'
+
+interface Props {
+  usuarioId: string
+  usuarioNombre: string
+  companyId: string
+  /** Bump this counter to force a re-fetch of the roles list (preserves current selection) */
+  rolesRefreshKey?: number
+  onClose: () => void
+  onSaved: () => void
+  onOpenCustomEditor: (roleId: string | null) => void
+}
+
+interface RoleRow extends RoleDef {
+  permission_keys: string[]
+}
+
+export function RolPermisosModal({
+  usuarioId, usuarioNombre, companyId, rolesRefreshKey = 0, onClose, onSaved, onOpenCustomEditor,
+}: Props) {
+  const [roles, setRoles] = useState<RoleRow[]>([])
+  const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadRoles = useCallback(async () => {
+    const [{ data: rolesData, error: rolesErr }, { data: rolePermsData }] = await Promise.all([
+      supabase.from('roles')
+        .select('id, company_id, name, description, is_system, color')
+        .or(`is_system.eq.true,company_id.eq.${companyId}`)
+        .order('is_system', { ascending: false })
+        .order('name'),
+      supabase.from('role_permissions').select('role_id, permission_key, effect'),
+    ])
+    if (rolesErr) throw rolesErr
+
+    const permMap = new Map<string, string[]>()
+    for (const rp of (rolePermsData ?? []) as Array<{ role_id: string; permission_key: string; effect: string }>) {
+      if (rp.effect !== 'allow') continue
+      const arr = permMap.get(rp.role_id) ?? []
+      arr.push(rp.permission_key)
+      permMap.set(rp.role_id, arr)
+    }
+    const enriched: RoleRow[] = ((rolesData ?? []) as RoleDef[]).map(r => ({
+      ...r,
+      permission_keys: permMap.get(r.id) ?? [],
+    }))
+    setRoles(enriched)
+  }, [companyId])
+
+  // Initial: fetch roles + user's current assignments. Re-runs only on user/company change.
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    void (async () => {
+      try {
+        await loadRoles()
+        const { data: userRolesData } = await supabase
+          .from('user_roles').select('role_id').eq('user_id', usuarioId)
+        if (cancelled) return
+        setSelectedRoleIds(new Set(((userRolesData ?? []) as Array<{ role_id: string }>).map(ur => ur.role_id)))
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'No se pudieron cargar los roles.')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [loadRoles, usuarioId])
+
+  // Refresh only the roles list (custom roles created/edited in another modal)
+  // Preserves the current selection.
+  useEffect(() => {
+    if (rolesRefreshKey === 0) return
+    void loadRoles().catch(e => setError(e instanceof Error ? e.message : 'Error al refrescar roles.'))
+  }, [rolesRefreshKey, loadRoles])
+
+  function toggleRole(roleId: string) {
+    setSelectedRoleIds(prev => {
+      const next = new Set(prev)
+      if (next.has(roleId)) next.delete(roleId)
+      else next.add(roleId)
+      return next
+    })
+  }
+
+  // Effective permissions = union of selected roles' permission keys
+  const effectivePermissions = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of roles) {
+      if (selectedRoleIds.has(r.id)) for (const k of r.permission_keys) set.add(k)
+    }
+    return set
+  }, [roles, selectedRoleIds])
+
+  const sectionStatus = useMemo(() =>
+    CONDOMINIOS_SECTION_GROUPS.map(group => {
+      const total = group.tabs.length
+      const count = group.tabs.filter(t => effectivePermissions.has(condominiosTabPermission(t))).length
+      const level = count === 0 ? 'ninguno' as const : count === total ? 'completo' as const : 'parcial' as const
+      return { key: group.key, label: group.label, level, count, total }
+    }),
+    [effectivePermissions]
+  )
+
+  const systemRoles = roles.filter(r => r.is_system)
+  const customRoles = roles.filter(r => !r.is_system)
+
+  async function handleSave() {
+    setSaving(true)
+    setError(null)
+    try {
+      const { data: existing } = await supabase.from('user_roles').select('role_id').eq('user_id', usuarioId)
+      const existingIds = new Set(((existing ?? []) as Array<{ role_id: string }>).map(r => r.role_id))
+
+      const toAdd = [...selectedRoleIds].filter(id => !existingIds.has(id))
+      const toRemove = [...existingIds].filter(id => !selectedRoleIds.has(id))
+
+      if (toRemove.length > 0) {
+        const { error: delErr } = await supabase.from('user_roles')
+          .delete().eq('user_id', usuarioId).in('role_id', toRemove)
+        if (delErr) throw delErr
+      }
+      if (toAdd.length > 0) {
+        const rows = toAdd.map(role_id => ({ user_id: usuarioId, role_id }))
+        const { error: insErr } = await supabase.from('user_roles').insert(rows)
+        if (insErr) throw insErr
+      }
+
+      onSaved()
+      onClose()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteCustomRole(roleId: string) {
+    if (!confirm('¿Eliminar este rol personalizado? Los usuarios que lo tengan asignado perderán esos permisos.')) return
+    const { error: delErr } = await supabase.from('roles').delete().eq('id', roleId)
+    if (delErr) { setError(delErr.message); return }
+    void load()
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9000,
+        background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '16px',
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{
+        background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '780px',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
+        display: 'flex', flexDirection: 'column', maxHeight: '90vh',
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '20px 24px 16px', borderBottom: '1px solid #e2e8f0',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '16px', color: '#1e293b' }}>Roles y permisos</div>
+            <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>{usuarioNombre}</div>
+          </div>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: '20px', color: '#94a3b8', padding: '4px 8px', borderRadius: '6px', lineHeight: 1,
+          }}>×</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          {/* Left: roles */}
+          <div style={{
+            flex: '0 0 58%', borderRight: '1px solid #e2e8f0',
+            overflowY: 'auto', padding: '16px',
+          }}>
+            {loading ? (
+              <div style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', marginTop: '40px' }}>Cargando…</div>
+            ) : (
+              <>
+                <SectionHeader>Roles del sistema</SectionHeader>
+                {systemRoles.map(r => (
+                  <RoleCard
+                    key={r.id}
+                    role={r}
+                    checked={selectedRoleIds.has(r.id)}
+                    onToggle={() => toggleRole(r.id)}
+                  />
+                ))}
+
+                <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <SectionHeader>Roles personalizados</SectionHeader>
+                  <button
+                    onClick={() => onOpenCustomEditor(null)}
+                    style={{
+                      fontSize: '11px', fontWeight: 600, color: '#3b82f6',
+                      background: 'transparent', border: '1px solid #93c5fd', borderRadius: '6px',
+                      padding: '3px 10px', cursor: 'pointer',
+                    }}
+                  >+ Crear</button>
+                </div>
+                {customRoles.length === 0 ? (
+                  <div style={{ fontSize: '12px', color: '#94a3b8', textAlign: 'center', padding: '14px 0' }}>
+                    Sin roles personalizados.<br />Crea uno desde "Crear".
+                  </div>
+                ) : (
+                  customRoles.map(r => (
+                    <RoleCard
+                      key={r.id}
+                      role={r}
+                      checked={selectedRoleIds.has(r.id)}
+                      onToggle={() => toggleRole(r.id)}
+                      onEdit={() => onOpenCustomEditor(r.id)}
+                      onDelete={() => void handleDeleteCustomRole(r.id)}
+                    />
+                  ))
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Right: preview */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+            <SectionHeader>Permisos efectivos</SectionHeader>
+            {selectedRoleIds.size === 0 ? (
+              <div style={{ fontSize: '13px', color: '#94a3b8', textAlign: 'center', marginTop: '32px', lineHeight: '1.6' }}>
+                Sin roles asignados.<br />El usuario no tendrá<br />acceso al módulo.
+              </div>
+            ) : (
+              <>
+                {selectedRoleIds.size > 1 && (
+                  <Banner color="#0ea5e9">{selectedRoleIds.size} roles activos — permisos combinados</Banner>
+                )}
+                {sectionStatus.map(s => (
+                  <div key={s.key} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '7px 0', borderBottom: '1px solid #f1f5f9',
+                  }}>
+                    <span style={{ fontSize: '13px', color: '#334155', fontWeight: 500 }}>{s.label}</span>
+                    <AccessBadge level={s.level} count={s.count} total={s.total} />
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '14px 24px', borderTop: '1px solid #e2e8f0',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+        }}>
+          <div style={{ fontSize: '12px', color: error ? '#ef4444' : '#94a3b8' }}>{error ?? ''}</div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={onClose} style={{
+              padding: '8px 18px', borderRadius: '8px', border: '1px solid #e2e8f0',
+              background: '#fff', color: '#475569', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+            }}>Cancelar</button>
+            <button onClick={() => void handleSave()} disabled={saving || loading} style={{
+              padding: '8px 20px', borderRadius: '8px', border: 'none',
+              background: saving ? '#93c5fd' : '#3b82f6', color: '#fff',
+              fontWeight: 600, fontSize: '13px', cursor: saving ? 'default' : 'pointer',
+            }}>{saving ? 'Guardando…' : 'Guardar roles'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontSize: '11px', fontWeight: 700, color: '#94a3b8',
+      letterSpacing: '0.06em', marginBottom: '8px', textTransform: 'uppercase',
+    }}>{children}</div>
+  )
+}
+
+function RoleCard({
+  role, checked, onToggle, onEdit, onDelete,
+}: {
+  role: RoleRow; checked: boolean; onToggle: () => void; onEdit?: () => void; onDelete?: () => void
+}) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: '8px', width: '100%',
+      padding: '9px 11px', marginBottom: '6px', borderRadius: '8px',
+      border: `1px solid ${checked ? role.color + '55' : '#e2e8f0'}`,
+      background: checked ? role.color + '12' : 'transparent',
+      transition: 'border-color 0.15s, background 0.15s',
+    }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0, marginTop: '1px' }}
+      >
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: '16px', height: '16px', borderRadius: '4px',
+          border: `2px solid ${checked ? role.color : '#cbd5e1'}`,
+          background: checked ? role.color : 'transparent',
+        }}>
+          {checked && <span style={{ color: '#fff', fontSize: '11px', lineHeight: 1 }}>✓</span>}
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flex: 1, textAlign: 'left' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: role.color, flexShrink: 0 }} />
+          <span style={{ fontWeight: 600, fontSize: '13px', color: '#1e293b' }}>{role.name}</span>
+          {!role.is_system && (
+            <span style={{
+              fontSize: '9px', fontWeight: 700, color: '#7c3aed',
+              background: 'rgba(124,58,237,0.1)', padding: '1px 5px', borderRadius: '4px',
+              letterSpacing: '0.04em', textTransform: 'uppercase',
+            }}>Custom</span>
+          )}
+        </div>
+        {role.description && (
+          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', lineHeight: '1.4' }}>{role.description}</div>
+        )}
+      </button>
+      {!role.is_system && (
+        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+          <button onClick={onEdit} title="Editar" style={iconBtnStyle('#3b82f6')}>✎</button>
+          <button onClick={onDelete} title="Eliminar" style={iconBtnStyle('#ef4444')}>🗑</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function iconBtnStyle(color: string): React.CSSProperties {
+  return {
+    background: 'transparent', border: 'none', cursor: 'pointer',
+    color, fontSize: '13px', padding: '2px 5px', borderRadius: '4px',
+  }
+}
+
+function Banner({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontSize: '11px', color, background: color + '14',
+      border: `1px solid ${color}33`, borderRadius: '6px',
+      padding: '6px 10px', marginBottom: '10px', lineHeight: '1.4',
+    }}>{children}</div>
+  )
+}
+
+function AccessBadge({ level, count, total }: { level: 'completo' | 'parcial' | 'ninguno'; count: number; total: number }) {
+  const cfg = level === 'completo'
+    ? { color: '#22c55e', label: 'Completo' }
+    : level === 'parcial'
+      ? { color: '#f59e0b', label: `Parcial ${count}/${total}` }
+      : { color: '#94a3b8', label: 'Sin acceso' }
+  return (
+    <span style={{
+      fontSize: '11px', fontWeight: 600, color: cfg.color,
+      background: cfg.color + '1a', padding: '2px 8px', borderRadius: '999px',
+    }}>{cfg.label}</span>
+  )
+}

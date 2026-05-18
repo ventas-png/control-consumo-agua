@@ -117,7 +117,7 @@ async function buildSessionFromSupabase(
     setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
   )
 
-  // Batch 1: profile + permissions in parallel
+  // Batch 1: profile + module permissions + RBAC permissions + assigned roles, in parallel
   const profileQuery = supabase
     .from('app_users')
     .select('full_name, role, company_id, cliente_id, activo, condominios_role, condominios_roles, agua_role')
@@ -129,8 +129,15 @@ async function buildSessionFromSupabase(
     .select('module_key, can_view, can_create, can_edit, can_change_status')
     .eq('user_id', userId)
 
-  const [profileResult, permsResult] = await Promise.race([
-    Promise.all([profileQuery, permsQuery]),
+  const rbacPermsQuery = supabase.rpc('get_user_permissions', { target_user_id: userId })
+
+  const userRolesQuery = supabase
+    .from('user_roles')
+    .select('role_id')
+    .eq('user_id', userId)
+
+  const [profileResult, permsResult, rbacPermsResult, userRolesResult] = await Promise.race([
+    Promise.all([profileQuery, permsQuery, rbacPermsQuery, userRolesQuery]),
     timeout,
   ])
 
@@ -256,7 +263,27 @@ async function buildSessionFromSupabase(
     agua_role: aguaRole,
     condominios_role: condominiosRole,
     condominios_roles: condominiosRoles,
+    permissions: buildPermissionsSet(rbacPermsResult),
+    assigned_role_ids: buildAssignedRoleIds(userRolesResult),
   }
+}
+
+function buildPermissionsSet(result: { data: unknown; error: unknown }): Set<string> | undefined {
+  if (result.error || !result.data) return undefined
+  // get_user_permissions RPC returns SETOF text -> array of { get_user_permissions: string } or string[]
+  const rows = result.data as Array<{ get_user_permissions?: string } | string>
+  const keys: string[] = []
+  for (const row of rows) {
+    if (typeof row === 'string') keys.push(row)
+    else if (row && typeof row.get_user_permissions === 'string') keys.push(row.get_user_permissions)
+  }
+  return new Set(keys)
+}
+
+function buildAssignedRoleIds(result: { data: unknown; error: unknown }): string[] | undefined {
+  if (result.error || !result.data) return undefined
+  const rows = result.data as Array<{ role_id: string }>
+  return rows.map(r => r.role_id)
 }
 
 export function useAuth() {

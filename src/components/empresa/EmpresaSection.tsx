@@ -8,8 +8,8 @@ import { AsignacionModal } from './AsignacionModal'
 import { PermisosModuloModal } from './PermisosModuloModal'
 import { StripePayPalConfig } from './StripePayPalConfig'
 import { GoogleEmailConfig } from './GoogleEmailConfig'
-import { RolCondominiosModal } from './RolCondominiosModal'
-import type { CondominiosRole } from '../../types'
+import { RolPermisosModal } from './RolPermisosModal'
+import { CustomRoleEditor } from './CustomRoleEditor'
 import { AGUA_ROLE_PERMISSIONS, WATER_MODULE_KEYS } from '../../lib/moduleConfig'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
@@ -60,6 +60,8 @@ export function EmpresaSection({ currentUser }: Props) {
   const [usuarioAsignar, setUsuarioAsignar] = useState<Usuario | null>(null)
   const [usuarioPermisos, setUsuarioPermisos] = useState<Usuario | null>(null)
   const [rolCondModal, setRolCondModal] = useState<Usuario | null>(null)
+  const [customRoleEditor, setCustomRoleEditor] = useState<{ roleId: string | null } | null>(null)
+  const [rolesRefreshKey, setRolesRefreshKey] = useState(0)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -602,20 +604,6 @@ export function EmpresaSection({ currentUser }: Props) {
     void cargar()
   }
 
-  async function aplicarRolesCondominios(usuario: Usuario, roles: CondominiosRole[]) {
-    const { error } = await supabase.from('app_users')
-      .update({
-        condominios_roles: roles,
-        condominios_role: roles.length > 0 ? roles[0] : null,
-      })
-      .eq('id', usuario.id)
-    if (error) {
-      void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el rol.' })
-    } else {
-      setRolCondModal(null)
-      void cargar()
-    }
-  }
 
   async function toggleActivoUsuario(usuario: Usuario) {
     await supabase.from('app_users').update({ activo: !usuario.activo }).eq('id', usuario.id)
@@ -1129,20 +1117,26 @@ export function EmpresaSection({ currentUser }: Props) {
         />
       )}
 
-      {/* Modal de roles de condominios */}
-      {rolCondModal && (
-        <RolCondominiosModal
+      {/* Modal de roles y permisos (RBAC) */}
+      {rolCondModal && currentUser.company_id && (
+        <RolPermisosModal
+          usuarioId={rolCondModal.id}
           usuarioNombre={rolCondModal.full_name}
-          rolesActuales={
-            (rolCondModal.condominios_roles?.length
-              ? rolCondModal.condominios_roles
-              : rolCondModal.condominios_role
-                ? [rolCondModal.condominios_role]
-                : []
-            ) as CondominiosRole[]
-          }
+          companyId={currentUser.company_id}
+          rolesRefreshKey={rolesRefreshKey}
           onClose={() => setRolCondModal(null)}
-          onSave={roles => aplicarRolesCondominios(rolCondModal, roles)}
+          onSaved={() => void cargar()}
+          onOpenCustomEditor={(roleId) => setCustomRoleEditor({ roleId })}
+        />
+      )}
+
+      {/* Editor de rol personalizado */}
+      {customRoleEditor && currentUser.company_id && (
+        <CustomRoleEditor
+          companyId={currentUser.company_id}
+          roleId={customRoleEditor.roleId}
+          onClose={() => setCustomRoleEditor(null)}
+          onSaved={() => setRolesRefreshKey(k => k + 1)}
         />
       )}
     </div>
