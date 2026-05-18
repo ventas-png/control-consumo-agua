@@ -151,6 +151,7 @@ export interface UserSession {
   servicio_condominios?: boolean;
   agua_role?: AguaRole;
   condominios_role?: CondominiosRole;
+  condominios_roles?: CondominiosRole[];
 }
 
 export interface Ruta {

@@ -137,7 +137,9 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
 
   // isAdmin: puede VER el panel de configuración
   const isAdmin = serviceType === 'condominios'
-    ? ['super_admin', 'company_owner'].includes(currentUser.role) || currentUser.condominios_role === 'administrador_general'
+    ? ['super_admin', 'company_owner'].includes(currentUser.role)
+        || currentUser.condominios_role === 'administrador_general'
+        || (currentUser.condominios_roles?.includes('administrador_general') ?? false)
     : ['super_admin', 'company_owner', 'admin'].includes(currentUser.role)
   // canEditRules: puede GUARDAR cambios en conversation_access_rules (coincide con RLS)
   const canEditRules = ['super_admin', 'company_owner'].includes(currentUser.role)

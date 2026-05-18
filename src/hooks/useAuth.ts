@@ -120,7 +120,7 @@ async function buildSessionFromSupabase(
   // Batch 1: profile + permissions in parallel
   const profileQuery = supabase
     .from('app_users')
-    .select('full_name, role, company_id, cliente_id, activo, condominios_role, agua_role')
+    .select('full_name, role, company_id, cliente_id, activo, condominios_role, condominios_roles, agua_role')
     .eq('id', userId)
     .single()
 
@@ -134,7 +134,7 @@ async function buildSessionFromSupabase(
     timeout,
   ])
 
-  type ProfileRow = { full_name?: string; role?: string; company_id?: string; cliente_id?: string; activo?: boolean; condominios_role?: string; agua_role?: string } | null
+  type ProfileRow = { full_name?: string; role?: string; company_id?: string; cliente_id?: string; activo?: boolean; condominios_role?: string; condominios_roles?: string[]; agua_role?: string } | null
   const prof = profileResult.data as ProfileRow
 
   if (prof?.activo === false) {
@@ -144,6 +144,13 @@ async function buildSessionFromSupabase(
   const companyId: string | undefined = prof?.company_id ?? undefined
   const clienteId: string | undefined = prof?.cliente_id ?? undefined
   const condominiosRole: CondominiosRole | undefined = (prof?.condominios_role ?? undefined) as CondominiosRole | undefined
+  const rawCondRoles = prof?.condominios_roles ?? []
+  const condominiosRoles: CondominiosRole[] | undefined =
+    rawCondRoles.length > 0
+      ? rawCondRoles as CondominiosRole[]
+      : condominiosRole
+        ? [condominiosRole]
+        : undefined
   const aguaRole: AguaRole | undefined = (prof?.agua_role ?? undefined) as AguaRole | undefined
   let uiRole: UserRole = 'viewer'
   if (dbRole === 'super_admin' || dbRole === 'superadmin') uiRole = 'super_admin'
@@ -248,6 +255,7 @@ async function buildSessionFromSupabase(
     servicio_condominios,
     agua_role: aguaRole,
     condominios_role: condominiosRole,
+    condominios_roles: condominiosRoles,
   }
 }
 

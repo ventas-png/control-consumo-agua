@@ -8,7 +8,8 @@ import { AsignacionModal } from './AsignacionModal'
 import { PermisosModuloModal } from './PermisosModuloModal'
 import { StripePayPalConfig } from './StripePayPalConfig'
 import { GoogleEmailConfig } from './GoogleEmailConfig'
-import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
+import { RolCondominiosModal } from './RolCondominiosModal'
+import type { CondominiosRole } from '../../types'
 import { AGUA_ROLE_PERMISSIONS, WATER_MODULE_KEYS } from '../../lib/moduleConfig'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
@@ -34,6 +35,7 @@ interface Usuario {
   activo: boolean
   agua_role?: string | null
   condominios_role?: string | null
+  condominios_roles?: string[] | null
 }
 
 interface EmpresaInfo {
@@ -57,6 +59,7 @@ export function EmpresaSection({ currentUser }: Props) {
   const [loading, setLoading] = useState(true)
   const [usuarioAsignar, setUsuarioAsignar] = useState<Usuario | null>(null)
   const [usuarioPermisos, setUsuarioPermisos] = useState<Usuario | null>(null)
+  const [rolCondModal, setRolCondModal] = useState<Usuario | null>(null)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -65,7 +68,7 @@ export function EmpresaSection({ currentUser }: Props) {
     const [empresaRes, proyectosRes, usuariosRes] = await Promise.all([
       supabase.from('companies').select('id, nombre, nit, email, telefono, max_projects, logo_url').eq('id', currentUser.company_id).single(),
       supabase.from('projects').select('id, nombre, logo_url, descripcion, direccion, latitud, longitud, moneda, moneda_condominios, estado, max_unidades_apartamento, max_unidades_casa, max_unidades_bodega, max_unidades_local_comercial, max_unidades_oficina, max_unidades_parqueadero, max_unidades_otro').eq('company_id', currentUser.company_id).order('nombre'),
-      supabase.from('app_users').select('id, full_name, role, activo, agua_role, condominios_role')
+      supabase.from('app_users').select('id, full_name, role, activo, agua_role, condominios_role, condominios_roles')
         .eq('company_id', currentUser.company_id)
         .neq('id', currentUser.user_id)
         .order('full_name'),
@@ -510,7 +513,10 @@ export function EmpresaSection({ currentUser }: Props) {
       }
 
       if (formValues.condRol) {
-        await supabase.from('app_users').update({ condominios_role: formValues.condRol }).eq('id', created.user_id)
+        await supabase.from('app_users').update({
+          condominios_role: formValues.condRol,
+          condominios_roles: [formValues.condRol],
+        }).eq('id', created.user_id)
       }
 
       void Swal.fire({ icon: 'success', title: 'Usuario creado', timer: 1500, showConfirmButton: false })
@@ -596,62 +602,17 @@ export function EmpresaSection({ currentUser }: Props) {
     void cargar()
   }
 
-  async function cambiarRolCondominios(usuario: Usuario) {
-    const allRoles = [
-      { id: '', label: 'Sin rol de condominios', description: 'Acceso estándar según permisos de módulo', color: '#64748b' },
-      ...CONDOMINIOS_ROLES,
-    ]
-    const rolesHtml = allRoles.map(r => {
-      const isActive = usuario.condominios_role === r.id || (!usuario.condominios_role && r.id === '')
-      return `
-        <button data-rol="${r.id}" type="button" style="
-          display:flex;align-items:flex-start;gap:10px;width:100%;padding:10px 12px;
-          margin-bottom:6px;border-radius:8px;text-align:left;cursor:pointer;
-          border:1px solid ${isActive ? r.color + '88' : r.color + '33'};
-          background:${isActive ? r.color + '22' : 'rgba(0,0,0,0)'};
-          transition:background 0.15s;
-        ">
-          <span style="width:10px;height:10px;border-radius:50%;background:${r.color};flex-shrink:0;margin-top:3px"></span>
-          <div style="min-width:0">
-            <div style="font-weight:600;font-size:13px;color:#1e293b;line-height:1.3">${r.label}</div>
-            <div style="font-size:11px;color:#64748b;margin-top:2px;line-height:1.4">${r.description}</div>
-          </div>
-        </button>`
-    }).join('')
-
-    await Swal.fire({
-      title: 'Rol Condominios',
-      width: 480,
-      html: `
-        <p style="color:#64748b;font-size:13px;margin-bottom:14px">
-          Usuario: <strong style="color:#1e293b">${usuario.full_name}</strong>
-        </p>
-        <div style="max-height:340px;overflow-y:auto;padding:2px 4px">
-          ${rolesHtml}
-        </div>
-      `,
-      showConfirmButton: false,
-      showCancelButton: true,
-      cancelButtonText: 'Cancelar',
-      didOpen: () => {
-        document.querySelectorAll('[data-rol]').forEach(btn => {
-          btn.addEventListener('click', () => {
-            const rolId = (btn as HTMLElement).dataset.rol ?? ''
-            Swal.close()
-            void aplicarRolCondominios(usuario, rolId || null)
-          })
-        })
-      },
-    })
-  }
-
-  async function aplicarRolCondominios(usuario: Usuario, nuevoRol: string | null) {
+  async function aplicarRolesCondominios(usuario: Usuario, roles: CondominiosRole[]) {
     const { error } = await supabase.from('app_users')
-      .update({ condominios_role: nuevoRol })
+      .update({
+        condominios_roles: roles,
+        condominios_role: roles.length > 0 ? roles[0] : null,
+      })
       .eq('id', usuario.id)
     if (error) {
       void Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar el rol.' })
     } else {
+      setRolCondModal(null)
       void cargar()
     }
   }
@@ -1086,7 +1047,7 @@ export function EmpresaSection({ currentUser }: Props) {
                   )}
                   {currentUser.servicio_condominios !== false && (
                     <button
-                      onClick={() => void cambiarRolCondominios(u)}
+                      onClick={() => setRolCondModal(u)}
                       title="Rol en módulo condominios"
                       style={{
                         display: 'flex', alignItems: 'center', gap: '5px',
@@ -1165,6 +1126,23 @@ export function EmpresaSection({ currentUser }: Props) {
           servicioCondominios={currentUser.servicio_condominios !== false}
           onClose={() => setUsuarioPermisos(null)}
           onSaved={() => void cargar()}
+        />
+      )}
+
+      {/* Modal de roles de condominios */}
+      {rolCondModal && (
+        <RolCondominiosModal
+          usuarioNombre={rolCondModal.full_name}
+          rolesActuales={
+            (rolCondModal.condominios_roles?.length
+              ? rolCondModal.condominios_roles
+              : rolCondModal.condominios_role
+                ? [rolCondModal.condominios_role]
+                : []
+            ) as CondominiosRole[]
+          }
+          onClose={() => setRolCondModal(null)}
+          onSave={roles => aplicarRolesCondominios(rolCondModal, roles)}
         />
       )}
     </div>
