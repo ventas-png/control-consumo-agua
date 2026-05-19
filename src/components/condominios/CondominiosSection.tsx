@@ -794,7 +794,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
       supabase.from('amenidades').select('*').eq('project_id', pid).eq('company_id', cid).order('nombre'),
       supabase.from('reservas_amenidades').select('*, amenidades(nombre), unidades(nombre)').eq('company_id', cid).order('fecha', { ascending: false }).limit(200),
       supabase.from('tickets_mantenimiento').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }).limit(300),
-      supabase.from('anuncios_comunidad').select('*, app_users(nombre_completo)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
+      supabase.from('anuncios_comunidad').select('*, app_users(full_name)').eq('project_id', pid).eq('company_id', cid).order('created_at', { ascending: false }),
       supabase.from('parqueos_condominio').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('numero'),
       supabase.from('mascotas').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('nombre'),
       supabase.from('paquetes_recibidos').select('*, unidades(nombre)').eq('project_id', pid).eq('company_id', cid).order('hora_recepcion', { ascending: false }).limit(200),
@@ -1029,7 +1029,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
     setTickets(mapUnidad<TicketMantenimiento>(ticketsRes.data ?? []))
     setAnuncios((anunciosRes.data ?? []).map((r: Record<string, unknown>) => ({
       ...r,
-      publicado_por_nombre: (r.app_users as { nombre_completo: string } | null)?.nombre_completo,
+      publicado_por_nombre: (r.app_users as { full_name: string } | null)?.full_name,
     } as AnuncioComunidad)))
     setParqueos(mapUnidad<ParqueoCondominio>(parqueosRes.data ?? []))
     setMascotas(mapUnidad<Mascota>(mascotasRes.data ?? []))
