@@ -898,6 +898,25 @@ export function EmpresaSection({ currentUser }: Props) {
           </div>
         </div>
 
+        {(currentUser.role === 'company_owner' || currentUser.role === 'admin') && (
+          <div style={{
+            background: 'rgba(139,92,246,0.06)',
+            border: '1px solid rgba(139,92,246,0.18)',
+            borderRadius: '10px', padding: '10px 14px', marginBottom: '12px',
+            display: 'flex', alignItems: 'flex-start', gap: '10px',
+            color: '#cbd5e1', fontSize: '12px', lineHeight: 1.5,
+          }}>
+            <span style={{ color: '#a78bfa', fontSize: '14px', lineHeight: 1, marginTop: '1px' }}>💡</span>
+            <div>
+              <strong style={{ color: '#e2e8f0' }}>Personalización fina de permisos:</strong>{' '}
+              Asigna un rol del sistema desde el botón <em>Roles y permisos</em> en cada usuario.
+              Si necesitas un perfil distinto, crea un <em>rol personalizado</em> desde el mismo modal y
+              ajusta exactamente qué tabs/acciones permite. Los cambios se auditan en{' '}
+              <span style={{ color: '#a78bfa' }}>📜 Auditoría</span>.
+            </div>
+          </div>
+        )}
+
         {usuarios.length === 0 ? (
           <div style={{
             background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)',
