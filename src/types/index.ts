@@ -127,6 +127,13 @@ export type CondominiosRole =
   | 'recepcion'
   | 'visualizador'
 
+export interface AssignedRoleInfo {
+  id: string;
+  name: string;
+  service: 'condominios' | 'agua' | 'general' | null;
+  color: string | null;
+}
+
 export interface UserSession {
   user_id: string;
   email: string;
@@ -142,6 +149,10 @@ export interface UserSession {
   permissions?: Set<string>;
   // RBAC: assigned role IDs (system + custom)
   assigned_role_ids?: string[];
+  // RBAC: assigned role objects with display metadata (name, service, color)
+  // Used to render the user's effective role label in the UI when a project-
+  // scoped role (condominios/agua) is more meaningful than the platform role.
+  assigned_roles?: AssignedRoleInfo[];
 }
 
 // ─── RBAC types ──────────────────────────────────────────────────────────────

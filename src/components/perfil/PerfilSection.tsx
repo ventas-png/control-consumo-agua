@@ -1,6 +1,7 @@
 import { useState, useEffect, type ReactNode, type FormEvent} from 'react'
 import type { UserSession } from '../../types'
 import { supabase } from '../../lib/supabase'
+import { getDisplayRoleLabel, getDisplayRoleColor } from '../../lib/permissions'
 
 interface Props {
   currentUser: UserSession
@@ -9,22 +10,6 @@ interface Props {
 
 function getInitials(name: string): string {
   return name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
-}
-
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: 'Super Administrador',
-  admin: 'Administrador',
-  operator: 'Operador',
-  viewer: 'Visualizador',
-  collector: 'Gestor de Cobros',
-}
-
-const ROLE_COLORS: Record<string, string> = {
-  super_admin: '#7c3aed',
-  admin: '#0ea5e9',
-  operator: '#0d9488',
-  viewer: '#64748b',
-  collector: '#f59e0b',
 }
 
 type FeedbackState = { type: 'success' | 'error'; msg: string } | null
@@ -229,6 +214,8 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     </button>
   )
 
+  const roleColor = getDisplayRoleColor(currentUser)
+
   return (
     <div style={{ maxWidth: '640px' }}>
       {/* Header card — Avatar + info */}
@@ -255,12 +242,12 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
           <div style={{ color: '#94a3b8', fontSize: '13px', marginTop: '3px' }}>{currentUser.email}</div>
           <span style={{
             display: 'inline-block', marginTop: '8px',
-            background: ROLE_COLORS[currentUser.role] + '22',
-            color: ROLE_COLORS[currentUser.role],
-            border: `1px solid ${ROLE_COLORS[currentUser.role]}44`,
+            background: roleColor + '22',
+            color: roleColor,
+            border: `1px solid ${roleColor}44`,
             borderRadius: '20px', padding: '2px 10px', fontSize: '11px', fontWeight: 700,
           }}>
-            {ROLE_LABELS[currentUser.role] ?? currentUser.role}
+            {getDisplayRoleLabel(currentUser)}
           </span>
         </div>
       </div>

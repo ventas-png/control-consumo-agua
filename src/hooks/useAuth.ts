@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
-import type { UserSession, UserRole } from '../types'
+import type { UserSession, UserRole, AssignedRoleInfo } from '../types'
 import { supabase } from '../lib/supabase'
 import { APP_CONFIG } from '../lib/config'
 import { sanitizeInput, validateEmail } from '../lib/validation'
@@ -135,7 +135,7 @@ async function buildSessionFromSupabase(
 
   const userRolesQuery = supabase
     .from('user_roles')
-    .select('role_id')
+    .select('role_id, role:roles(id, name, service, color)')
     .eq('user_id', userId)
 
   const [profileResult, rbacPermsResult, userRolesResult] = await Promise.race([
@@ -218,6 +218,7 @@ async function buildSessionFromSupabase(
     servicio_condominios,
     permissions: buildPermissionsSet(rbacPermsResult),
     assigned_role_ids: buildAssignedRoleIds(userRolesResult),
+    assigned_roles: buildAssignedRoles(userRolesResult),
   }
 }
 
@@ -237,6 +238,26 @@ function buildAssignedRoleIds(result: { data: unknown; error: unknown }): string
   if (result.error || !result.data) return undefined
   const rows = result.data as Array<{ role_id: string }>
   return rows.map(r => r.role_id)
+}
+
+function buildAssignedRoles(result: { data: unknown; error: unknown }): AssignedRoleInfo[] | undefined {
+  if (result.error || !result.data) return undefined
+  type Row = {
+    role_id: string
+    role: { id: string; name: string; service: string | null; color: string | null } | null
+  }
+  const rows = result.data as Row[]
+  const allowed = new Set(['condominios', 'agua', 'general'])
+  return rows
+    .filter((r): r is Row & { role: NonNullable<Row['role']> } => r.role !== null)
+    .map(r => ({
+      id: r.role.id,
+      name: r.role.name,
+      service: r.role.service && allowed.has(r.role.service)
+        ? (r.role.service as AssignedRoleInfo['service'])
+        : null,
+      color: r.role.color,
+    }))
 }
 
 export function useAuth() {
