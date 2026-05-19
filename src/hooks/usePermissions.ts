@@ -13,6 +13,14 @@ export interface PermissionsAPI {
   canChangeStatus: (moduleKey: string) => boolean
 }
 
+// Sidebar keys for condominios shortcuts → corresponding condominios tab ids.
+// Visibility falls back to checking `condominios.tab.<tabId>` for these.
+const CONDOMINIOS_SIDEBAR_TAB_MAP: Record<string, string> = {
+  condominios_visitantes: 'visitantes',
+  condominios_cuotas: 'cuotas',
+  condominios_mantenimiento: 'mantenimiento',
+}
+
 /**
  * Hook que expone helpers para verificar permisos de módulo del usuario actual.
  *
@@ -21,7 +29,13 @@ export interface PermissionsAPI {
  *
  * Permission key convention:
  *   - water modules (WATER_MODULE_KEYS) → 'agua.<module>.<action>'
- *   - platform modules (clientes/unidades/configuracion/comunicacion/condominios)
+ *   - condominios sidebar shortcuts (condominios_dashboard, condominios_visitantes,
+ *     condominios_cuotas, condominios_mantenimiento) → resolved against the
+ *     fine-grained 'condominios.tab.<tab_id>' keys granted by condominios roles
+ *   - condominios parent ('condominios') → visible if user has any
+ *     'condominios.tab.*' permission (avoids requiring the broader
+ *     platform.condominios.view to be granted explicitly)
+ *   - other platform modules (clientes/unidades/configuracion/comunicacion)
  *     → 'platform.<module>.<action>'
  */
 export function usePermissions(session: UserSession | null): PermissionsAPI {
@@ -40,9 +54,29 @@ export function usePermissions(session: UserSession | null): PermissionsAPI {
       return perms?.has(permissionKey(moduleKey, action)) ?? false
     }
 
+    function hasAnyCondominiosTab(): boolean {
+      if (!perms) return false
+      for (const key of perms) {
+        if (key.startsWith('condominios.tab.')) return true
+      }
+      return false
+    }
+
     function canViewModule(moduleKey: string): boolean {
       if ((NON_CONFIGURABLE_MODULES as readonly string[]).includes(moduleKey)) return true
       if (isExempt) return true
+
+      // Condominios shortcuts in the sidebar map to fine-grained tab permissions.
+      const condTab = CONDOMINIOS_SIDEBAR_TAB_MAP[moduleKey]
+      if (condTab) return perms?.has(`condominios.tab.${condTab}`) ?? false
+
+      // Panel / Módulo Completo are visible whenever the user has any
+      // condominios tab granted — they're entry points, not specific tabs.
+      if (moduleKey === 'condominios_dashboard') return hasAnyCondominiosTab()
+      if (moduleKey === 'condominios') {
+        return has('condominios', 'view') || hasAnyCondominiosTab()
+      }
+
       return has(moduleKey, 'view')
     }
 
