@@ -146,11 +146,14 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
 
   const fetchAllData = async () => {
     const cid = companyIdRef.current
-    // Per-query timeout (10 s). A single slow query no longer kills the entire
+    // Per-query timeout (15 s). A single slow query no longer kills the entire
     // batch — each query races independently. Faster queries return immediately
     // while slow ones eventually fail in isolation and we keep their cached
-    // value (see applyResults' partial-update behavior).
-    const PER_QUERY_TIMEOUT_MS = 10_000
+    // value (see applyResults' partial-update behavior). 15 s is enough for the
+    // heaviest query (registros with limit 5000 ≈ 1 MB JSON) on a 200 kbps mobile
+    // connection — under that, the company should be warned to use the lighter
+    // dashboard which queries by date range.
+    const PER_QUERY_TIMEOUT_MS = 15_000
     const signal = () => AbortSignal.timeout(PER_QUERY_TIMEOUT_MS)
 
     // Defense-in-depth: add company_id filters where columns exist.
@@ -299,14 +302,31 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
   const getQueryErrors = (results: Awaited<ReturnType<typeof fetchAllData>>) => {
     const [clRes, regRes, , , , , , contadoresRes, unidadesRes] = results
     const errs: string[] = []
-    if (clRes.status === 'fulfilled' && clRes.value.error)
-      errs.push(`clientes: ${clRes.value.error.message}`)
-    if (regRes.status === 'fulfilled' && regRes.value.error)
-      errs.push(`registros: ${regRes.value.error.message}`)
-    if (contadoresRes.status === 'fulfilled' && contadoresRes.value.error)
-      errs.push(`contadores: ${contadoresRes.value.error.message}`)
-    if (unidadesRes.status === 'fulfilled' && unidadesRes.value.error)
-      errs.push(`unidades: ${unidadesRes.value.error.message}`)
+    // Collect both fulfilled-with-error AND rejected (AbortError, network failure, etc.).
+    // Previously only the fulfilled branch was checked, so per-query timeouts
+    // (AbortSignal.timeout()) silently produced empty arrays in the UI — the
+    // user saw 0 records and no error message, because the retry path was
+    // also gated on this same `hasErrors` check.
+    const errorFrom = (label: string, res: PromiseSettledResult<{ error: { message: string } | null } | unknown>): string | null => {
+      if (res.status === 'rejected') {
+        const reason = res.reason
+        const msg = reason instanceof Error ? `${reason.name}: ${reason.message}` : String(reason)
+        return `${label}: ${msg}`
+      }
+      const value = res.value as { error?: { message: string } | null } | null
+      if (value && value.error) return `${label}: ${value.error.message}`
+      return null
+    }
+    const checks: Array<[string, typeof clRes]> = [
+      ['clientes', clRes],
+      ['registros', regRes],
+      ['contadores', contadoresRes],
+      ['unidades', unidadesRes],
+    ]
+    for (const [label, res] of checks) {
+      const err = errorFrom(label, res)
+      if (err) errs.push(err)
+    }
     return errs
   }
 
