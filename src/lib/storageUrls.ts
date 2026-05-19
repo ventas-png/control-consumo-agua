@@ -89,6 +89,10 @@ export function useSignedUrl(
 /**
  * Hook variant that takes an array and returns an array of signed URLs
  * (parallel to the input, same length). `null` for empty slots.
+ *
+ * Uses Supabase Storage's plural `createSignedUrls` endpoint — one HTTP
+ * roundtrip signs the whole batch, replacing the older per-path loop that
+ * did N roundtrips for N images.
  */
 export function useSignedUrls(
   values: (string | null | undefined)[] | null | undefined,
@@ -109,17 +113,39 @@ export function useSignedUrls(
     if (list.length === 0) { setUrls([]); return }
 
     async function signAll() {
-      const result = await Promise.all(list.map(async (v) => {
-        if (!v) return null
+      // Pre-resolve each input: null/empty → null, external URL → pass through,
+      // bucket path → collect for batch signing.
+      const result: (string | null)[] = new Array(list.length).fill(null)
+      const toSign: { idx: number; path: string }[] = []
+      list.forEach((v, idx) => {
+        if (!v) return
         const path = extractBucketPath(v, bucket)
-        if (!path) return v
-        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, ttl)
-        if (error || !data?.signedUrl) {
-          const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path)
-          return pub?.publicUrl ?? null
+        if (!path) { result[idx] = v; return }
+        toSign.push({ idx, path })
+      })
+
+      if (toSign.length > 0) {
+        const { data, error } = await supabase.storage.from(bucket)
+          .createSignedUrls(toSign.map(e => e.path), ttl)
+        if (!error && data) {
+          data.forEach((sig: { signedUrl?: string; error?: string | null; path?: string | null }, i: number) => {
+            const entry = toSign[i]
+            if (sig.signedUrl && !sig.error) {
+              result[entry.idx] = sig.signedUrl
+            } else {
+              const { data: pub } = supabase.storage.from(bucket).getPublicUrl(entry.path)
+              result[entry.idx] = pub?.publicUrl ?? null
+            }
+          })
+        } else {
+          // Batch failed — fall back to public URL for each path
+          toSign.forEach(entry => {
+            const { data: pub } = supabase.storage.from(bucket).getPublicUrl(entry.path)
+            result[entry.idx] = pub?.publicUrl ?? null
+          })
         }
-        return data.signedUrl
-      }))
+      }
+
       if (cancelled) return
       setUrls(result)
       const refreshIn = Math.max(ttl * 1000 - REFRESH_LEAD_MS, 30_000)
