@@ -18,6 +18,7 @@ import { Topbar } from './components/layout/Topbar'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RoleGuard } from './components/shared/AccessDenied'
 import { usePermissions } from './hooks/usePermissions'
+import { SinProyectoAsignado } from './components/condominios/SinProyectoAsignado'
 
 const ClientesSection = lazy(() => import('./components/clientes/ClientesSection').then(m => ({ default: m.ClientesSection })))
 const LecturasSection = lazy(() => import('./components/lecturas/LecturasSection').then(m => ({ default: m.LecturasSection })))
@@ -327,6 +328,14 @@ export default function App() {
   const proximaRuta = rutasPendientes.sort((a: Ruta, b: Ruta) =>
     (a.fecha_programada ?? '').localeCompare(b.fecha_programada ?? '')
   )[0]
+
+  // Restricted users (viewer/operator/...) only see their assigned projects (RLS-enforced).
+  // When a condominios section is open but they have no authorized active project, show a
+  // "no project assigned" notice instead of an empty selector.
+  const condominiosSinProyecto =
+    !dataLoading &&
+    activeSection.startsWith('condominios') &&
+    proyectos.filter(p => p.estado === 'activo').length === 0
 
   // Authenticated app
   return (
@@ -696,7 +705,8 @@ export default function App() {
               />
             </ErrorBoundary>
           )}
-          {activeSection === 'condominios_dashboard' && (
+          {condominiosSinProyecto && <SinProyectoAsignado />}
+          {activeSection === 'condominios_dashboard' && !condominiosSinProyecto && (
             <CondominiosDashboard
               currentUser={currentUser}
               proyectos={proyectos}
@@ -704,22 +714,22 @@ export default function App() {
               onNavigateSection={setActiveSection}
             />
           )}
-          {activeSection === 'condominios_visitantes' && (
+          {activeSection === 'condominios_visitantes' && !condominiosSinProyecto && (
             <ErrorBoundary sectionName="condominios">
               <CondominiosSection proyectos={proyectos} unidades={unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} initialTab="visitantes" />
             </ErrorBoundary>
           )}
-          {activeSection === 'condominios_cuotas' && (
+          {activeSection === 'condominios_cuotas' && !condominiosSinProyecto && (
             <ErrorBoundary sectionName="condominios">
               <CondominiosSection proyectos={proyectos} unidades={unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} initialTab="cuotas" />
             </ErrorBoundary>
           )}
-          {activeSection === 'condominios_mantenimiento' && (
+          {activeSection === 'condominios_mantenimiento' && !condominiosSinProyecto && (
             <ErrorBoundary sectionName="condominios">
               <CondominiosSection proyectos={proyectos} unidades={unidades} currentUser={currentUser} canCreate={canCreate} canEdit={canEdit} initialTab="mantenimiento" />
             </ErrorBoundary>
           )}
-          {activeSection === 'condominios' && (
+          {activeSection === 'condominios' && !condominiosSinProyecto && (
             <ErrorBoundary sectionName="condominios">
               <CondominiosSection
                 proyectos={proyectos}

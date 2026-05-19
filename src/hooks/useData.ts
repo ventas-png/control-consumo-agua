@@ -285,8 +285,10 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       .from('user_project_assignments')
       .select('project_id')
       .eq('user_id', uid)
-    if (!assignments) return appData
-    const allowed = new Set(assignments.map((a: { project_id: string }) => a.project_id))
+    // Fail closed: a null (error) or empty result restricts to no projects
+    // rather than falling back to the full list. RLS on `projects` is the
+    // authoritative guard; this keeps the client consistent with it.
+    const allowed = new Set((assignments ?? []).map((a: { project_id: string }) => a.project_id))
     const filtered = appData.proyectos.filter(p => allowed.has(p.id))
     if (filtered.length === appData.proyectos.length) return appData
     const first = filtered[0]
