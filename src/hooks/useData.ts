@@ -175,7 +175,14 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     // registros via projects + company_clientes. Limit to most-recent 5000 to avoid
     // PostgREST timeouts on companies with large history; dashboard filters by date
     // range so older readings are never needed for KPIs.
-    const registrosQ = supabase.from('registros').select('*').order('fecha', { ascending: false }).limit(5000)
+    //
+    // IMPORTANT: never select `foto` here. It is base64 (up to 15 MB per row) and
+    // TOAST-stored — including it inflates the payload to tens of MB and trips the
+    // PostgREST statement_timeout on companies with photographed readings. The
+    // dashboard/lecturas/historial/cobros views never read `foto`; only
+    // CustomerPortal needs it and it fetches its own slice scoped by cliente_id.
+    const REGISTROS_LIST_COLS = 'id,cliente_id,cliente_nombre,contador_id,project_id,fecha,lectura_anterior,lectura_actual,consumo,tarifa_aplicada,tarifa_exceso_aplicada,canon_aplicado,monto_calculado,tipo_cobro,estado,monto_pagado,fecha_pago,mes,fecha_lectura_anterior,dias_servicio,notas,gps,created_at'
+    const registrosQ = supabase.from('registros').select(REGISTROS_LIST_COLS).order('fecha', { ascending: false }).limit(5000)
 
     if (cid) {
       tarifasQ         = tarifasQ.eq('company_id', cid)
