@@ -472,7 +472,10 @@ export default function App() {
               )}
             </ErrorBoundary>
           )}
-          {activeSection === 'lecturas' && (
+          {['lecturas','tabla','dashboard','mapa','rutas','calidad','tarifas','unidades','contadores'].includes(activeSection) && !canViewModule(activeSection) && (
+            <ErrorBoundary sectionName="agua"><AccessDenied /></ErrorBoundary>
+          )}
+          {activeSection === 'lecturas' && canViewModule('lecturas') && (
             <ErrorBoundary sectionName="lecturas">
               <LecturasSection
                 clientes={clientes}
@@ -492,7 +495,7 @@ export default function App() {
               />
             </ErrorBoundary>
           )}
-          {activeSection === 'tabla' && (
+          {activeSection === 'tabla' && canViewModule('tabla') && (
             <ErrorBoundary sectionName="historial">
               <HistorialSection
                 registros={registros}
@@ -530,7 +533,7 @@ export default function App() {
               </RoleGuard>
             </ErrorBoundary>
           )}
-          {activeSection === 'dashboard' && (
+          {activeSection === 'dashboard' && canViewModule('dashboard') && (
             <ErrorBoundary sectionName="dashboard">
               <DashboardSection registros={registros} moneda={moneda} isLoading={dataLoading} />
             </ErrorBoundary>
@@ -559,12 +562,12 @@ export default function App() {
               </RoleGuard>
             </ErrorBoundary>
           )}
-          {activeSection === 'mapa' && (
+          {activeSection === 'mapa' && canViewModule('mapa') && (
             <ErrorBoundary sectionName="mapa">
               <MapaSection clientes={clientes} registros={registros} />
             </ErrorBoundary>
           )}
-          {activeSection === 'rutas' && (
+          {activeSection === 'rutas' && canViewModule('rutas') && (
             <ErrorBoundary sectionName="rutas">
               <RutasSection
                 clientes={clientes}
@@ -583,7 +586,7 @@ export default function App() {
               />
             </ErrorBoundary>
           )}
-          {activeSection === 'calidad' && (
+          {activeSection === 'calidad' && canViewModule('calidad') && (
             <ErrorBoundary sectionName="calidad">
               <CalidadSection
                 fuentesAgua={fuentesAgua}
@@ -616,7 +619,7 @@ export default function App() {
               </RoleGuard>
             </ErrorBoundary>
           )}
-          {activeSection === 'tarifas' && (
+          {activeSection === 'tarifas' && canViewModule('tarifas') && (
             <ErrorBoundary sectionName="tarifas">
               <TarifasSection
                 tarifas={tarifas}
@@ -632,7 +635,7 @@ export default function App() {
               />
             </ErrorBoundary>
           )}
-          {activeSection === 'unidades' && (
+          {activeSection === 'unidades' && canViewModule('unidades') && (
             <ErrorBoundary sectionName="unidades">
               <UnidadesSection
                 unidades={unidades}
@@ -651,7 +654,7 @@ export default function App() {
               />
             </ErrorBoundary>
           )}
-          {activeSection === 'contadores' && (
+          {activeSection === 'contadores' && canViewModule('contadores') && (
             <ErrorBoundary sectionName="contadores">
               <ContadoresSection
                 contadores={contadores}
