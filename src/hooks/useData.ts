@@ -12,10 +12,20 @@ async function ensureSupabaseSession(): Promise<boolean> {
   return !!refreshed
 }
 
-const CACHE_KEY = 'aquacontrol_data_v2'
-const CACHE_MAX_AGE = 10 * 60 * 1000 // 10 minutes
+// Cache key prefix — per-user keys avoid cross-user leakage on shared devices
+// (e.g. employee A logs out, employee B logs in: each user has their own
+// cache, no flash of A's data while B's fetch is in flight).
+const CACHE_KEY_PREFIX = 'aquacontrol_data_v3_'
+// 24 h — under the SWR pattern we ALWAYS refetch in cargarDatos(), the cache
+// only powers first-paint while the network request is in flight. Extended
+// from 10 min (sessionStorage) so a user returning the next day still gets an
+// instant render instead of an empty skeleton while fetch is pending.
+const CACHE_MAX_AGE = 24 * 60 * 60 * 1000
 
-// Strip PII fields from clientes before caching to localStorage
+// Strip PII fields from clientes before persisting. localStorage is plain-text
+// and accessible to any script on the origin — never persist emails, phones,
+// addresses, DPI numbers, etc. Sensitive fields are re-hydrated when the
+// fresh fetch completes.
 function sanitizeForCache(payload: AppData): AppData {
   return {
     ...payload,
@@ -33,19 +43,43 @@ function sanitizeForCache(payload: AppData): AppData {
   }
 }
 
-function loadCache(): AppData | null {
+function cacheKey(userId?: string): string | null {
+  if (!userId) return null
+  return `${CACHE_KEY_PREFIX}${userId}`
+}
+
+function loadCache(userId?: string): AppData | null {
+  const key = cacheKey(userId)
+  if (!key) return null
   try {
-    const raw = sessionStorage.getItem(CACHE_KEY)
+    const raw = localStorage.getItem(key)
     if (!raw) return null
     const { ts, payload }: { ts: number; payload: AppData } = JSON.parse(raw)
-    if (Date.now() - ts > CACHE_MAX_AGE) { sessionStorage.removeItem(CACHE_KEY); return null }
+    if (Date.now() - ts > CACHE_MAX_AGE) { localStorage.removeItem(key); return null }
     return payload
   } catch { return null }
 }
 
-function saveCache(payload: AppData): void {
-  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), payload: sanitizeForCache(payload) })) }
-  catch { /* storage full — ignore */ }
+function saveCache(userId: string | undefined, payload: AppData): void {
+  const key = cacheKey(userId)
+  if (!key) return
+  const serialized = JSON.stringify({ ts: Date.now(), payload: sanitizeForCache(payload) })
+  try {
+    localStorage.setItem(key, serialized)
+  } catch (err) {
+    // QuotaExceededError — drop OTHER users' caches and retry. localStorage
+    // is ~5 MB per origin; a single user's payload should fit, but stale
+    // entries from prior sessions on shared devices can fill it up.
+    const isQuotaError = err instanceof DOMException &&
+      (err.name === 'QuotaExceededError' || err.code === 22 || err.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+    if (!isQuotaError) return
+    try {
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith(CACHE_KEY_PREFIX) && k !== key) localStorage.removeItem(k)
+      })
+      localStorage.setItem(key, serialized)
+    } catch { /* still full — give up silently */ }
+  }
 }
 
 interface AppData {
@@ -97,7 +131,7 @@ const RESTRICTED_COND_ROLE_IDS = new Set(
 )
 
 export function useData(companyId?: string, userId?: string, userRole?: string, assignedRoleIds?: string[]) {
-  const [data, setData] = useState<AppData>(() => loadCache() ?? INITIAL_DATA)
+  const [data, setData] = useState<AppData>(() => loadCache(userId) ?? INITIAL_DATA)
   const [isLoading, setIsLoading] = useState(false)
 
   // Refs so the stable cargarDatos closure always reads the latest values
@@ -296,7 +330,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       // que generaba ruido en DevTools cuando el request se cancelaba.
 
       // Use cached data as base so partial query failures keep cached values for failed tables
-      const base = loadCache() ?? INITIAL_DATA
+      const base = loadCache(userIdRef.current) ?? INITIAL_DATA
 
       // First attempt. Each query inside fetchAllData() has its own 10 s
       // AbortSignal timeout, so individual slow queries fail in isolation
@@ -309,7 +343,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       setIsLoading(false)
 
       if (!hasErrors(results)) {
-        saveCache(freshData)
+        saveCache(userIdRef.current, freshData)
         return
       }
 
@@ -329,7 +363,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
 
       const finalErrors = getQueryErrors(results)
       if (!hasErrors(results)) {
-        saveCache(retryData)
+        saveCache(userIdRef.current, retryData)
       } else {
         console.error('[useData] Persistent query errors after retry:', finalErrors)
         if (!dataLoaded && retryData.proyectos.length === 0 && retryData.clientes.length === 0) {
