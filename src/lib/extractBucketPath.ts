@@ -22,6 +22,7 @@ export function extractBucketPath(value: string | null | undefined, bucket: stri
     if (urlBucket !== bucket) return null
     return decodeURIComponent(path)
   }
-  if (/^https?:\/\//.test(value)) return null
+  // External URLs and data URLs are not bucket paths — caller passes them through as-is.
+  if (/^https?:\/\//.test(value) || /^data:/.test(value)) return null
   return value.replace(/^\/+/, '')
 }
