@@ -92,6 +92,13 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       const projectIds = [...new Set(unidadesList.map(u => u.project_id).filter(Boolean))]
       const today      = new Date().toISOString().slice(0, 10)
 
+      // Bounds for queries without natural date filter — prevent unbounded growth
+      // as unit history accumulates. The portal shows recent activity, the
+      // admin side (Condominios) keeps full visibility via its own loader.
+      const SESENTA_DIAS_ATRAS = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()
+      const NOVENTA_DIAS_ATRAS = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+      const HACE_DOS_ANOS = new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
       // Batch 2: all condominios data in parallel
       const [
         { data: projData },
@@ -107,13 +114,26 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       ] = await Promise.all([
         supabase.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
         supabase.from('amenidades').select('*').in('project_id', projectIds).eq('activo', true),
-        supabase.from('cuotas_condominio').select('*').in('unidad_id', unidadIds).order('fecha_vencimiento', { ascending: false }),
+        // cuotas: últimos 2 años + cap 500. Cubre pendientes vigentes y pagadas
+        // recientes; deuda muy antigua igual está incluida hasta el cap.
+        supabase.from('cuotas_condominio').select('*').in('unidad_id', unidadIds)
+          .gte('fecha_vencimiento', HACE_DOS_ANOS)
+          .order('fecha_vencimiento', { ascending: false })
+          .limit(500),
         supabase.from('reservas_amenidades').select('*').in('unidad_id', unidadIds).gte('fecha', today).order('fecha'),
         supabase.from('amenidades_bloqueos').select('*').in('project_id', projectIds),
-        supabase.from('tickets_mantenimiento').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }),
+        // tickets: últimos 90 días + cap 200. Tickets viejos cerrados rara vez se consultan.
+        supabase.from('tickets_mantenimiento').select('*').in('unidad_id', unidadIds)
+          .gte('created_at', NOVENTA_DIAS_ATRAS)
+          .order('created_at', { ascending: false })
+          .limit(200),
         supabase.from('anuncios_comunidad').select('*').in('project_id', projectIds).eq('activo', true).order('created_at', { ascending: false }),
         supabase.from('visitantes').select('*').in('unidad_id', unidadIds).order('hora_entrada', { ascending: false }).limit(200),
-        supabase.from('mensajes_portal').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }),
+        // mensajes: últimos 60 días + cap 100. Conversación reciente con admin.
+        supabase.from('mensajes_portal').select('*').in('unidad_id', unidadIds)
+          .gte('created_at', SESENTA_DIAS_ATRAS)
+          .order('created_at', { ascending: false })
+          .limit(100),
         supabase.from('solicitud_renta_unidad').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }).limit(50),
       ])
 
