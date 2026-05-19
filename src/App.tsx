@@ -16,7 +16,7 @@ import { CondominiosClientPortal } from './components/portal/CondominiosClientPo
 import { Sidebar } from './components/layout/Sidebar'
 import { Topbar } from './components/layout/Topbar'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { RoleGuard } from './components/shared/AccessDenied'
+import { RoleGuard, AccessDenied } from './components/shared/AccessDenied'
 import { usePermissions } from './hooks/usePermissions'
 import { SinProyectoAsignado } from './components/condominios/SinProyectoAsignado'
 
@@ -216,9 +216,15 @@ export default function App() {
         setActiveSection('superadmin_empresas')
       } else if (currentUser.role === 'collector') {
         setActiveSection('cobros')
+      } else if (!canViewModule('clientes')) {
+        // Roles without clientes access (e.g. viewer "Visualizador Plataforma")
+        // must not land on the default Clientes section — send them to their
+        // always-available profile so they can navigate via the sidebar.
+        setActiveSection('perfil')
       }
       // 'cliente' role is handled by its own portal render path — no section needed
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.user_id, currentUser?.role])
 
   // Load data after login (skip for cliente — portal loads its own data)
@@ -446,20 +452,24 @@ export default function App() {
           <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}><div style={{ width: 36, height: 36, border: '3px solid #e2e8f0', borderTop: '3px solid #0ea5e9', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>}>
           {activeSection === 'clientes' && (
             <ErrorBoundary sectionName="clientes">
-              <ClientesSection
-                clientes={clientes}
-                unidades={unidades}
-                userRole={currentUser.role}
-                userId={currentUser.user_id}
-                currentUser={currentUser}
-                companyId={currentUser.company_id}
-                onClienteAdded={addCliente}
-                onClienteUpdated={updateCliente}
-                onClienteDeleted={deleteCliente}
-                canCreate={canCreate('clientes')}
-                canEdit={canEdit('clientes')}
-                canChangeStatus={canChangeStatus('clientes')}
-              />
+              {canViewModule('clientes') ? (
+                <ClientesSection
+                  clientes={clientes}
+                  unidades={unidades}
+                  userRole={currentUser.role}
+                  userId={currentUser.user_id}
+                  currentUser={currentUser}
+                  companyId={currentUser.company_id}
+                  onClienteAdded={addCliente}
+                  onClienteUpdated={updateCliente}
+                  onClienteDeleted={deleteCliente}
+                  canCreate={canCreate('clientes')}
+                  canEdit={canEdit('clientes')}
+                  canChangeStatus={canChangeStatus('clientes')}
+                />
+              ) : (
+                <AccessDenied />
+              )}
             </ErrorBoundary>
           )}
           {activeSection === 'lecturas' && (
