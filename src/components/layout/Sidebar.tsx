@@ -1,6 +1,7 @@
 import { useState, useEffect, type ReactNode} from 'react'
 import type { AppSection, UserRole, UserSession } from '../../types'
 import { WATER_MODULE_KEYS, CONDOMINIOS_MODULE_KEYS } from '../../lib/moduleConfig'
+import { getDisplayRoleLabel } from '../../lib/permissions'
 
 interface Tab {
   id: AppSection
@@ -299,16 +300,6 @@ function getInitials(name: string): string {
     .map(n => n[0])
     .join('')
     .toUpperCase()
-}
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  super_admin: 'Super Admin',
-  company_owner: 'Admin Empresa',
-  admin: 'Administrador',
-  operator: 'Operador',
-  viewer: 'Visualizador',
-  cliente: 'Cliente',
-  collector: 'Gestor de Cobros',
 }
 
 const NON_CONFIGURABLE = ['perfil', 'admin_dashboard', 'empresa_proyectos', 'superadmin_empresas']
@@ -664,7 +655,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
               {currentUser.name}
             </div>
             <div style={{ color: '#4b5563', fontSize: '11px', marginTop: '1px' }}>
-              {ROLE_LABELS[currentUser.role]}
+              {getDisplayRoleLabel(currentUser)}
             </div>
           </div>
           <svg width="13" height="13" fill="none" stroke="#374151" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
