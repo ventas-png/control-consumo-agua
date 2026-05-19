@@ -9,7 +9,22 @@ on:
       - 'supabase/config.toml'
 
 jobs:
+  check-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required secrets are set
+        run: |
+          missing=""
+          [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] && missing="$missing SUPABASE_ACCESS_TOKEN"
+          [ -z "${{ secrets.SUPABASE_PROJECT_ID }}" ]   && missing="$missing SUPABASE_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing GitHub secrets:$missing"
+            echo "Add them at: Settings → Secrets and variables → Actions → New repository secret"
+            exit 1
+          fi
+
   deploy:
+    needs: check-secrets
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
