@@ -60,8 +60,7 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
 
 CREATE INDEX IF NOT EXISTS idx_user_roles_role ON public.user_roles(role_id);
 CREATE INDEX IF NOT EXISTS idx_user_roles_user ON public.user_roles(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_roles_active ON public.user_roles(user_id)
-  WHERE expires_at IS NULL OR expires_at > now();
+CREATE INDEX IF NOT EXISTS idx_user_roles_expiry ON public.user_roles(expires_at) WHERE expires_at IS NOT NULL;
 
 -- Permission audit log
 CREATE TABLE IF NOT EXISTS public.permission_audit_log (
