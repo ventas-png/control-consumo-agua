@@ -112,6 +112,13 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
 
   const fetchAllData = async () => {
     const cid = companyIdRef.current
+    // Per-query timeout (10 s). A single slow query no longer kills the entire
+    // batch — each query races independently. Faster queries return immediately
+    // while slow ones eventually fail in isolation and we keep their cached
+    // value (see applyResults' partial-update behavior).
+    const PER_QUERY_TIMEOUT_MS = 10_000
+    const signal = () => AbortSignal.timeout(PER_QUERY_TIMEOUT_MS)
+
     // Defense-in-depth: add company_id filters where columns exist.
     // RLS is the primary enforcement, these are secondary safeguards.
     // NOTE: Supabase query builder is immutable — .eq() returns a new builder,
@@ -146,20 +153,20 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     }
 
     return Promise.allSettled([
-      clientesQ,
-      registrosQ,
-      supabase.from('empresa').select('*').limit(1),
-      fuentesQ,
-      rcalQ,
-      supabase.from('rutas').select('*').order('created_at', { ascending: false }),
-      tarifasQ,
-      contadoresQ,
-      unidadesQ,
-      supabase.from('projects').select('*').order('nombre', { ascending: true }),
-      proveedoresEnergiaQ,
-      tarifasEnergiaQ,
-      fuentesEnergiaQ,
-      facturasEnergiaQ,
+      clientesQ.abortSignal(signal()),
+      registrosQ.abortSignal(signal()),
+      supabase.from('empresa').select('*').limit(1).abortSignal(signal()),
+      fuentesQ.abortSignal(signal()),
+      rcalQ.abortSignal(signal()),
+      supabase.from('rutas').select('*').order('created_at', { ascending: false }).abortSignal(signal()),
+      tarifasQ.abortSignal(signal()),
+      contadoresQ.abortSignal(signal()),
+      unidadesQ.abortSignal(signal()),
+      supabase.from('projects').select('*').order('nombre', { ascending: true }).abortSignal(signal()),
+      proveedoresEnergiaQ.abortSignal(signal()),
+      tarifasEnergiaQ.abortSignal(signal()),
+      fuentesEnergiaQ.abortSignal(signal()),
+      facturasEnergiaQ.abortSignal(signal()),
     ])
   }
 
@@ -291,15 +298,10 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       // Use cached data as base so partial query failures keep cached values for failed tables
       const base = loadCache() ?? INITIAL_DATA
 
-      // Each fetchAllData() call is capped at 15 s — Supabase cold starts can stall indefinitely
-      const fetchWithTimeout = () => Promise.race([
-        fetchAllData(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('fetch_timeout')), 15000)
-        ),
-      ])
-
-      let results = await fetchWithTimeout()
+      // First attempt. Each query inside fetchAllData() has its own 10 s
+      // AbortSignal timeout, so individual slow queries fail in isolation
+      // and don't block the rest of the batch.
+      let results = await fetchAllData()
       const freshData = await filterProyectosByAssignment(applyResults(base, results))
       setData(freshData)
       // Hide skeleton as soon as the first fetch completes — data is visible even if
@@ -311,48 +313,34 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
         return
       }
 
-      // Log errors so they appear in browser console for diagnosis
       console.error('[useData] Query errors on first fetch:', getQueryErrors(results))
 
       // If some core data DID load, stay silent on subsequent retries —
       // the app is usable and showing an "Offline" modal would be disruptive.
       const dataLoaded = freshData.proyectos.length > 0 || freshData.clientes.length > 0 || freshData.registros.length > 0
 
-      // Retry 1: wait 1.5 s to handle cold-start timeouts on the DB connection pool
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      results = await fetchWithTimeout()
+      // Single retry after a brief backoff (per-query timeouts make the
+      // older double-retry redundant; what failed once will likely fail again
+      // unless the DB connection pool was cold-starting).
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      results = await fetchAllData()
       const retryData = await filterProyectosByAssignment(applyResults(freshData, results))
       setData(retryData)
 
+      const finalErrors = getQueryErrors(results)
       if (!hasErrors(results)) {
         saveCache(retryData)
-        return
-      }
-
-      // Retry 2: wait an additional 3 s for slow Supabase cold starts
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      results = await fetchWithTimeout()
-      const retryData2 = await filterProyectosByAssignment(applyResults(retryData, results))
-      setData(retryData2)
-
-      const finalErrors = getQueryErrors(results)
-      console.error('[useData] Persistent query errors after retries:', finalErrors)
-
-      if (!hasErrors(results)) {
-        saveCache(retryData2)
-      } else if (!dataLoaded) {
-        // Only block the UI if we truly have no data at all
-        Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
-      }
-      // If data loaded but some queries still error, stay silent — data is visible in the UI
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : ''
-      if (msg === 'fetch_timeout') {
-        Swal.fire('Tiempo de espera agotado', 'El servidor tardó demasiado. Verifique su conexión e intente de nuevo.', 'warning')
       } else {
-        console.error('[useData] Unexpected error in cargarDatos:', err)
-        Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
+        console.error('[useData] Persistent query errors after retry:', finalErrors)
+        if (!dataLoaded && retryData.proyectos.length === 0 && retryData.clientes.length === 0) {
+          // Only block the UI if we truly have no data at all
+          Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
+        }
+        // If data loaded but some queries still error, stay silent — data is visible in the UI
       }
+    } catch (err) {
+      console.error('[useData] Unexpected error in cargarDatos:', err)
+      Swal.fire('Modo Offline', 'No se pudo conectar a la base de datos.', 'warning')
     } finally {
       setIsLoading(false)
     }
