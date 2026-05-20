@@ -87,7 +87,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
   const nivelColor: Record<Alerta['nivel'], { bg: string; border: string; color: string; dot: string }> = {
     error:   { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', dot: '#dc2626' },
     warning: { bg: '#fffbeb', border: '#fde68a', color: '#92400e', dot: '#f59e0b' },
-    info:    { bg: '#eff6ff', border: '#bfdbfe', color: '#1e40af', dot: '#3b82f6' },
+    info:    { bg: '#EEF2EC', border: '#C2D2CA', color: '#0E2A24', dot: '#2F5D4F' },
   }
 
   // ── Mini gráfica de recaudación — últimos 6 meses ─────────────────────────────
@@ -124,20 +124,20 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
   const saldoMes = recaudadoMes - gastadoMes
 
   const kpis = [
-    { label: 'Cuotas pendientes', value: cuotasPendientes.length, sub: `${moneda} ${montoPendiente.toFixed(2)}`, color: '#0ea5e9', bg: 'rgba(14,165,233,0.1)', icon: '💳' },
+    { label: 'Cuotas pendientes', value: cuotasPendientes.length, sub: `${moneda} ${montoPendiente.toFixed(2)}`, color: '#1B3B36', bg: 'rgba(27, 59, 54,0.1)', icon: '💳' },
     { label: 'Cuotas en mora',    value: cuotasMorosas.length,   sub: 'unidades morosas',                   color: '#ef4444', bg: 'rgba(239,68,68,0.1)',    icon: '⚠️' },
     { label: 'Tickets abiertos',  value: ticketsAbiertos.length, sub: `${ticketsUrgentes.length} urgentes`, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',    icon: '🔧' },
     { label: 'Visitas hoy',       value: visitantesHoy.length,   sub: 'registradas',                        color: '#10b981', bg: 'rgba(16,185,129,0.1)',    icon: '🚪' },
-    { label: 'Amenidades',        value: amenidadesActivas.length, sub: 'disponibles',                      color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)',    icon: '🏊' },
+    { label: 'Amenidades',        value: amenidadesActivas.length, sub: 'disponibles',                      color: '#B96A3F', bg: 'rgba(185, 106, 63,0.1)',    icon: '🏊' },
   ]
 
   return (
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
       <div style={{ marginBottom: '20px' }}>
-        <h2 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>
+        <h2 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: 700, color: '#15291F' }}>
           Panel General{proyectoNombre ? ` — ${proyectoNombre}` : ''}
         </h2>
-        <p style={{ margin: 0, color: '#64748b', fontSize: '13.5px' }}>
+        <p style={{ margin: 0, color: '#7E9389', fontSize: '13.5px' }}>
           {new Date().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
@@ -164,23 +164,23 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
       {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px', marginBottom: '24px' }}>
         {kpis.map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div key={k.label} style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '14px', padding: '18px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
             <div style={{ width: 34, height: 34, borderRadius: '10px', background: k.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', marginBottom: '10px' }}>
               {k.icon}
             </div>
             <div style={{ fontSize: '26px', fontWeight: 800, color: k.color, lineHeight: 1 }}>{k.value}</div>
-            <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#374151', margin: '4px 0 2px' }}>{k.label}</div>
-            <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>{k.sub}</div>
+            <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', margin: '4px 0 2px' }}>{k.label}</div>
+            <div style={{ fontSize: '11.5px', color: '#7E9389' }}>{k.sub}</div>
           </div>
         ))}
       </div>
 
       {/* Gráfica de recaudación */}
-      <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+      <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: 8 }}>
-          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>📊 Recaudación — últimos 6 meses</h3>
-          <div style={{ display: 'flex', gap: 14, fontSize: '11px', color: '#64748b' }}>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#bfdbfe', marginRight: 4 }} />Emitido</span>
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#15291F' }}>📊 Recaudación — últimos 6 meses</h3>
+          <div style={{ display: 'flex', gap: 14, fontSize: '11px', color: '#7E9389' }}>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#C2D2CA', marginRight: 4 }} />Emitido</span>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#34d399', marginRight: 4 }} />Cobrado</span>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#fca5a5', marginRight: 4 }} />Gastos</span>
           </div>
@@ -195,13 +195,13 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
               return (
                 <g key={d.mes}>
                   {/* Emitido */}
-                  <rect x={x} y={chartH - hE} width={barW} height={hE} rx={3} fill="#bfdbfe" />
+                  <rect x={x} y={chartH - hE} width={barW} height={hE} rx={3} fill="#C2D2CA" />
                   {/* Cobrado */}
                   <rect x={x + barW + gap} y={chartH - hC} width={barW} height={hC} rx={3} fill="#34d399" />
                   {/* Gastos */}
                   <rect x={x + (barW + gap) * 2} y={chartH - hG} width={barW} height={hG} rx={3} fill="#fca5a5" />
                   {/* Mes label */}
-                  <text x={x + groupW / 2} y={chartH + 16} textAnchor="middle" fontSize={11} fill="#94a3b8">{d.mes}</text>
+                  <text x={x + groupW / 2} y={chartH + 16} textAnchor="middle" fontSize={11} fill="#7E9389">{d.mes}</text>
                 </g>
               )
             })}
@@ -215,9 +215,9 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
             { label: 'Gastado este mes',  val: gastadoMes,   color: '#dc2626' },
             { label: 'Saldo neto',        val: saldoMes,     color: saldoMes >= 0 ? '#16a34a' : '#dc2626' },
           ].map(k => (
-            <div key={k.label} style={{ flex: 1, minWidth: 120, background: '#f8fafc', borderRadius: 10, padding: '10px 14px' }}>
+            <div key={k.label} style={{ flex: 1, minWidth: 120, background: '#FAF7EF', borderRadius: 10, padding: '10px 14px' }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: k.color }}>{saldoMes !== 0 && k.label === 'Saldo neto' && saldoMes > 0 ? '+' : ''}{moneda} {k.val.toFixed(2)}</div>
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{k.label}</div>
+              <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>{k.label}</div>
             </div>
           ))}
         </div>
@@ -226,26 +226,26 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
         {/* Tickets abiertos */}
         {ticketsAbiertos.length > 0 && (
-          <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px' }}>
-            <h3 style={{ margin: '0 0 14px', fontSize: '13.5px', fontWeight: 700, color: '#0f172a' }}>🔧 Tickets abiertos</h3>
+          <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '14px', padding: '18px' }}>
+            <h3 style={{ margin: '0 0 14px', fontSize: '13.5px', fontWeight: 700, color: '#15291F' }}>🔧 Tickets abiertos</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
               {ticketsAbiertos.slice(0, 5).map(t => (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: '#f8fafc', borderRadius: '9px' }}>
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: '#FAF7EF', borderRadius: '9px' }}>
                   <span style={{ padding: '2px 7px', borderRadius: '20px', fontSize: '10px', fontWeight: 700,
                     background: t.prioridad === 'urgente' ? '#fef2f2' : t.prioridad === 'alta' ? '#fff7ed' : '#f0fdf4',
                     color: t.prioridad === 'urgente' ? '#dc2626' : t.prioridad === 'alta' ? '#ea580c' : '#16a34a' }}>
                     {t.prioridad}
                   </span>
-                  <span style={{ flex: 1, fontSize: '12.5px', color: '#374151', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.titulo}</span>
+                  <span style={{ flex: 1, fontSize: '12.5px', color: '#3E5A4C', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.titulo}</span>
                   <span style={{ padding: '2px 7px', borderRadius: '20px', fontSize: '10px',
-                    background: t.estado === 'en_proceso' ? '#eff6ff' : '#f8fafc',
-                    color: t.estado === 'en_proceso' ? '#2563eb' : '#64748b' }}>
+                    background: t.estado === 'en_proceso' ? '#EEF2EC' : '#FAF7EF',
+                    color: t.estado === 'en_proceso' ? '#1B3B36' : '#7E9389' }}>
                     {t.estado.replace('_', ' ')}
                   </span>
                 </div>
               ))}
               {ticketsAbiertos.length > 5 && (
-                <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', paddingTop: 4 }}>+{ticketsAbiertos.length - 5} más</div>
+                <div style={{ fontSize: 11, color: '#7E9389', textAlign: 'center', paddingTop: 4 }}>+{ticketsAbiertos.length - 5} más</div>
               )}
             </div>
           </div>
@@ -253,26 +253,26 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
 
         {/* Visitas de hoy */}
         {visitantesHoy.length > 0 && (
-          <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px' }}>
-            <h3 style={{ margin: '0 0 14px', fontSize: '13.5px', fontWeight: 700, color: '#0f172a' }}>🚪 Visitas de hoy</h3>
+          <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '14px', padding: '18px' }}>
+            <h3 style={{ margin: '0 0 14px', fontSize: '13.5px', fontWeight: 700, color: '#15291F' }}>🚪 Visitas de hoy</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
               {visitantesHoy.slice(0, 5).map(v => (
-                <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: '#f8fafc', borderRadius: '9px' }}>
-                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
+                <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: '#FAF7EF', borderRadius: '9px' }}>
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,#1B3B36,#577B69)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
                     {v.nombre.charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.nombre}</div>
-                    {v.unidad_nombre && <div style={{ fontSize: '11px', color: '#94a3b8' }}>{v.unidad_nombre}</div>}
+                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.nombre}</div>
+                    {v.unidad_nombre && <div style={{ fontSize: '11px', color: '#7E9389' }}>{v.unidad_nombre}</div>}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: '11px', color: '#64748b' }}>{new Date(v.hora_entrada).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</div>
+                    <div style={{ fontSize: '11px', color: '#7E9389' }}>{new Date(v.hora_entrada).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</div>
                     {!v.hora_salida && <div style={{ fontSize: '10px', color: '#16a34a', fontWeight: 600 }}>Activo</div>}
                   </div>
                 </div>
               ))}
               {visitantesHoy.length > 5 && (
-                <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', paddingTop: 4 }}>+{visitantesHoy.length - 5} más</div>
+                <div style={{ fontSize: 11, color: '#7E9389', textAlign: 'center', paddingTop: 4 }}>+{visitantesHoy.length - 5} más</div>
               )}
             </div>
           </div>
@@ -280,14 +280,14 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
 
         {/* Reservas de hoy */}
         {reservasHoy.length > 0 && (
-          <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '18px' }}>
-            <h3 style={{ margin: '0 0 14px', fontSize: '13.5px', fontWeight: 700, color: '#0f172a' }}>🏊 Reservas de hoy</h3>
+          <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '14px', padding: '18px' }}>
+            <h3 style={{ margin: '0 0 14px', fontSize: '13.5px', fontWeight: 700, color: '#15291F' }}>🏊 Reservas de hoy</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
               {reservasHoy.map(r => (
-                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: '#f8fafc', borderRadius: '9px' }}>
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: '#FAF7EF', borderRadius: '9px' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#374151' }}>{r.unidad_nombre ?? '—'}</div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{r.hora_inicio} – {r.hora_fin}</div>
+                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C' }}>{r.unidad_nombre ?? '—'}</div>
+                    <div style={{ fontSize: '11px', color: '#7E9389' }}>{r.hora_inicio} – {r.hora_fin}</div>
                   </div>
                   <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: '10px', fontWeight: 700,
                     background: r.estado === 'confirmada' ? '#f0fdf4' : '#fffbeb',
@@ -302,9 +302,9 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
       </div>
 
       {cuotas.length === 0 && tickets.length === 0 && visitantes.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: '#7E9389' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏢</div>
-          <p style={{ fontSize: '16px', fontWeight: 600, color: '#64748b' }}>El módulo Condominios está listo</p>
+          <p style={{ fontSize: '16px', fontWeight: 600, color: '#7E9389' }}>El módulo Condominios está listo</p>
           <p style={{ fontSize: '13px' }}>Comienza registrando cuotas, visitantes o tickets de mantenimiento</p>
         </div>
       )}

@@ -353,7 +353,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* ── Main tabs: Conversaciones / Difusión ── */}
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #e2e8f0', paddingBottom: '0' }}>
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #E1DDD0', paddingBottom: '0' }}>
         {(['conversaciones', ...(showDifusion ? ['difusion'] : [])] as ('conversaciones' | 'difusion')[]).map(tab => {
           const active = mainTab === tab
           return (
@@ -363,8 +363,8 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
               style={{
                 padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer',
                 fontSize: '14px', fontWeight: active ? 700 : 500,
-                color: active ? '#0ea5e9' : '#6b7280',
-                borderBottom: active ? '2px solid #0ea5e9' : '2px solid transparent',
+                color: active ? '#1B3B36' : '#7E9389',
+                borderBottom: active ? '2px solid #1B3B36' : '2px solid transparent',
                 marginBottom: '-2px', transition: 'all 0.13s ease',
                 display: 'flex', alignItems: 'center', gap: '8px',
               }}
@@ -406,8 +406,8 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#111827' }}>Centro de Comunicación</h2>
-          <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#6b7280' }}>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#15291F' }}>Centro de Comunicación</h2>
+          <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#7E9389' }}>
             Gestión de conversaciones con clientes
           </p>
         </div>
@@ -415,7 +415,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
           {canCreate && convTab === 'clientes' && (
             <button
               onClick={() => setShowNuevaModal(true)}
-              style={{ padding: '8px 14px', border: 'none', borderRadius: '8px', background: '#0ea5e9', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{ padding: '8px 14px', border: 'none', borderRadius: '8px', background: '#1B3B36', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               + Nueva conversación
             </button>
@@ -423,7 +423,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
           {canCreate && convTab === 'equipo' && (
             <button
               onClick={() => setShowNuevaInternaModal(true)}
-              style={{ padding: '8px 14px', border: 'none', borderRadius: '8px', background: '#7c3aed', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{ padding: '8px 14px', border: 'none', borderRadius: '8px', background: '#9C5733', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               + Nueva discusión
             </button>
@@ -433,10 +433,10 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
               onClick={() => setView(view === 'config' ? 'list' : 'config')}
               style={{
                 padding: '8px 14px',
-                border: '1px solid #d1d5db',
+                border: '1px solid #C7C2B0',
                 borderRadius: '8px',
-                background: view === 'config' ? '#f0f9ff' : 'white',
-                color: '#374151',
+                background: view === 'config' ? '#EEF2EC' : 'white',
+                color: '#3E5A4C',
                 fontSize: '13px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -453,28 +453,28 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       {/* ── Stats rápidas ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px' }}>
         {[
-          { label: 'Abiertas', value: stats.abiertas, color: '#3b82f6' },
+          { label: 'Abiertas', value: stats.abiertas, color: '#2F5D4F' },
           { label: 'En Progreso', value: stats.en_progreso, color: '#f59e0b' },
-          { label: 'Esperando', value: stats.esperando, color: '#8b5cf6' },
+          { label: 'Esperando', value: stats.esperando, color: '#B96A3F' },
           { label: 'Resueltas', value: stats.resueltas, color: '#10b981' },
         ].map(s => (
           <div key={s.label} style={{
             background: 'white',
-            border: '1px solid #e5e7eb',
+            border: '1px solid #E1DDD0',
             borderRadius: '10px',
             padding: '12px 14px',
             borderTop: `3px solid ${s.color}`,
           }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: '11.5px', color: '#6b7280', marginTop: '2px' }}>{s.label}</div>
+            <div style={{ fontSize: '11.5px', color: '#7E9389', marginTop: '2px' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* ── Vista Configuración ── */}
       {view === 'config' && isAdmin && (
-        <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 700, color: '#111827' }}>
+        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '12px', padding: '20px' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 700, color: '#15291F' }}>
             Reglas de Acceso por Rol
           </h3>
           <AccessRulesPanel
@@ -499,24 +499,24 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
           {/* Lista */}
           <div style={{
             background: 'white',
-            border: '1px solid #e5e7eb',
+            border: '1px solid #E1DDD0',
             borderRadius: '12px',
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
           }}>
             {/* Tabs: Clientes / Equipo */}
-            <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid #EAE6D8' }}>
               {([['clientes', `👥 ${clientesTabLabel}`, clientConvs.length], ['equipo', '🏢 Equipo', teamConvs.length]] as const).map(([tab, label, count]) => (
                 <button key={tab} onClick={() => { setConvTab(tab); setView('list') }}
                   style={{
-                    flex: 1, padding: '10px 8px', border: 'none', borderBottom: `2px solid ${convTab === tab ? (tab === 'equipo' ? '#7c3aed' : '#0ea5e9') : 'transparent'}`,
+                    flex: 1, padding: '10px 8px', border: 'none', borderBottom: `2px solid ${convTab === tab ? (tab === 'equipo' ? '#9C5733' : '#1B3B36') : 'transparent'}`,
                     background: 'white', cursor: 'pointer', fontSize: '12.5px', fontWeight: convTab === tab ? 700 : 400,
-                    color: convTab === tab ? (tab === 'equipo' ? '#7c3aed' : '#0ea5e9') : '#6b7280',
+                    color: convTab === tab ? (tab === 'equipo' ? '#9C5733' : '#1B3B36') : '#7E9389',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
                   }}>
                   {label}
-                  <span style={{ background: convTab === tab ? (tab === 'equipo' ? '#ede9fe' : '#e0f2fe') : '#f3f4f6', color: convTab === tab ? (tab === 'equipo' ? '#7c3aed' : '#0369a1') : '#9ca3af', borderRadius: '999px', padding: '1px 6px', fontSize: '11px', fontWeight: 600 }}>
+                  <span style={{ background: convTab === tab ? (tab === 'equipo' ? '#F4EBE3' : '#D9E2DC') : '#EAE6D8', color: convTab === tab ? (tab === 'equipo' ? '#9C5733' : '#102622') : '#7E9389', borderRadius: '999px', padding: '1px 6px', fontSize: '11px', fontWeight: 600 }}>
                     {count}
                   </span>
                 </button>
@@ -524,7 +524,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
             </div>
 
             {/* Filtros */}
-            <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #f1f5f9' }}>
+            <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #EAE6D8' }}>
               <input
                 type="text"
                 placeholder="Buscar conversación..."
@@ -533,7 +533,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                 style={{
                   width: '100%',
                   padding: '7px 10px',
-                  border: '1px solid #e5e7eb',
+                  border: '1px solid #E1DDD0',
                   borderRadius: '8px',
                   fontSize: '12.5px',
                   outline: 'none',
@@ -545,7 +545,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                 <select
                   value={filterStatus}
                   onChange={e => setFilterStatus(e.target.value as ConversationStatus | 'todas')}
-                  style={{ flex: 1, padding: '5px 8px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '11.5px', outline: 'none' }}
+                  style={{ flex: 1, padding: '5px 8px', border: '1px solid #E1DDD0', borderRadius: '6px', fontSize: '11.5px', outline: 'none' }}
                 >
                   <option value="todas">Todos los estados</option>
                   {Object.entries(STATUS_LABELS).map(([k, v]) => (
@@ -555,7 +555,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                 <select
                   value={filterCategory}
                   onChange={e => setFilterCategory(e.target.value as ConversationCategory | 'todas')}
-                  style={{ flex: 1, padding: '5px 8px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '11.5px', outline: 'none' }}
+                  style={{ flex: 1, padding: '5px 8px', border: '1px solid #E1DDD0', borderRadius: '6px', fontSize: '11.5px', outline: 'none' }}
                 >
                   <option value="todas">Todas las categorías</option>
                   {(serviceType === 'condominios' ? CONDOMINIOS_CATEGORIES : AGUA_CATEGORIES).map(k => (
@@ -568,7 +568,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
             {/* Lista de conversaciones */}
             <div style={{ flex: 1, overflowY: 'auto', maxHeight: '600px' }}>
               {loading ? (
-                <div style={{ padding: '32px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+                <div style={{ padding: '32px', textAlign: 'center', color: '#7E9389', fontSize: '13px' }}>
                   Cargando…
                 </div>
               ) : (
@@ -587,7 +587,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
           {view === 'detail' && activeConversation && (
             <div style={{
               background: 'white',
-              border: '1px solid #e5e7eb',
+              border: '1px solid #E1DDD0',
               borderRadius: '12px',
               display: 'flex',
               flexDirection: 'column',
@@ -597,7 +597,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
               {/* Header conversación */}
               <div style={{
                 padding: '14px 16px',
-                borderBottom: '1px solid #f1f5f9',
+                borderBottom: '1px solid #EAE6D8',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
@@ -608,11 +608,11 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <button
                       onClick={() => setView('list')}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '18px', padding: '0', lineHeight: 1 }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', fontSize: '18px', padding: '0', lineHeight: 1 }}
                     >
                       ←
                     </button>
-                    <span style={{ fontWeight: 700, fontSize: '14px', color: '#111827' }}>{activeConversation.subject}</span>
+                    <span style={{ fontWeight: 700, fontSize: '14px', color: '#15291F' }}>{activeConversation.subject}</span>
                     <span style={{
                       fontSize: '11px', padding: '2px 8px', borderRadius: '999px',
                       background: STATUS_COLORS[activeConversation.status] + '18',
@@ -628,9 +628,9 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                       {PRIORITY_LABELS[activeConversation.priority]}
                     </span>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', marginLeft: '26px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '4px', marginLeft: '26px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     {activeConversation.is_internal ? (
-                      <span style={{ background: '#ede9fe', color: '#7c3aed', borderRadius: '999px', padding: '1px 8px', fontSize: '11px', fontWeight: 600 }}>
+                      <span style={{ background: '#F4EBE3', color: '#9C5733', borderRadius: '999px', padding: '1px 8px', fontSize: '11px', fontWeight: 600 }}>
                         🏢 Discusión interna de equipo
                       </span>
                     ) : (
@@ -647,7 +647,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                       onChange={e => handleChangeStatus(e.target.value as ConversationStatus)}
                       style={{
                         padding: '6px 10px',
-                        border: '1px solid #d1d5db',
+                        border: '1px solid #C7C2B0',
                         borderRadius: '8px',
                         fontSize: '12px',
                         cursor: 'pointer',
@@ -661,19 +661,19 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                     {/* Asignación principal */}
                     {activeConversation.assigned_name ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '11.5px', color: '#6b7280' }}>
+                        <span style={{ fontSize: '11.5px', color: '#7E9389' }}>
                           👤 {activeConversation.assigned_name}
                         </span>
                         <button
                           onClick={handleUnassign}
-                          style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '11px', color: '#6b7280', cursor: 'pointer', padding: '2px 8px' }}
+                          style={{ background: 'none', border: '1px solid #C7C2B0', borderRadius: '6px', fontSize: '11px', color: '#7E9389', cursor: 'pointer', padding: '2px 8px' }}
                         >
                           Desasignar
                         </button>
                         {activeConversation.assigned_to !== currentUser.user_id && (
                           <button
                             onClick={handleAssignToMe}
-                            style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '11px', color: '#1d4ed8', cursor: 'pointer', padding: '2px 8px', fontWeight: 600 }}
+                            style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '6px', fontSize: '11px', color: '#102622', cursor: 'pointer', padding: '2px 8px', fontWeight: 600 }}
                           >
                             Asignarme
                           </button>
@@ -682,7 +682,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                     ) : (
                       <button
                         onClick={handleAssignToMe}
-                        style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '11.5px', color: '#1d4ed8', cursor: 'pointer', padding: '4px 10px', fontWeight: 600 }}
+                        style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '6px', fontSize: '11.5px', color: '#102622', cursor: 'pointer', padding: '4px 10px', fontWeight: 600 }}
                       >
                         + Asignarme
                       </button>
@@ -705,14 +705,14 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                               key={a.id}
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                background: '#ede9fe', color: '#6d28d9',
+                                background: '#F4EBE3', color: '#7E461F',
                                 fontSize: '11px', padding: '2px 6px', borderRadius: '999px', fontWeight: 500,
                               }}
                             >
                               {a.user_name}
                               <button
                                 onClick={() => handleRemoveAssignment(a.id)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7c3aed', padding: '0', lineHeight: 1, fontSize: '12px' }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9C5733', padding: '0', lineHeight: 1, fontSize: '12px' }}
                               >
                                 ×
                               </button>
@@ -728,7 +728,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
               {/* Mensajes */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px' }}>
                 {messages.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: '13px', marginTop: '40px' }}>
+                  <div style={{ textAlign: 'center', color: '#7E9389', fontSize: '13px', marginTop: '40px' }}>
                     No hay mensajes aún
                   </div>
                 ) : (
@@ -747,9 +747,9 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                           background: isNote
                             ? '#fffbeb'
                             : isAgent
-                            ? '#0ea5e9'
-                            : '#f1f5f9',
-                          color: isNote ? '#78350f' : isAgent ? 'white' : '#111827',
+                            ? '#1B3B36'
+                            : '#EAE6D8',
+                          color: isNote ? '#78350f' : isAgent ? 'white' : '#15291F',
                           border: isNote ? '1px solid #fde68a' : 'none',
                           boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                         }}>
@@ -785,10 +785,10 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
 
               {/* Compositor de mensaje */}
               {canCreate && activeConversation.status !== 'cerrada' && (
-                <div style={{ borderTop: '1px solid #f1f5f9', padding: '12px 14px' }}>
+                <div style={{ borderTop: '1px solid #EAE6D8', padding: '12px 14px' }}>
                   {/* Toggle nota interna — solo para conversaciones con clientes */}
                   {!activeConversation.is_internal && (
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#6b7280', cursor: 'pointer', marginBottom: '8px', userSelect: 'none' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#7E9389', cursor: 'pointer', marginBottom: '8px', userSelect: 'none' }}>
                       <input type="checkbox" checked={isInternalNote} onChange={e => setIsInternalNote(e.target.checked)}
                         style={{ width: '13px', height: '13px', accentColor: '#f59e0b' }} />
                       Nota interna (solo visible para el equipo)
@@ -799,7 +799,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: '8px',
                       padding: '7px 10px', marginBottom: '7px',
-                      background: '#f0f9ff', border: '1px solid #bae6fd',
+                      background: '#EEF2EC', border: '1px solid #C2D2CA',
                       borderRadius: '8px',
                     }}>
                       {pendingFile.type.startsWith('image/') ? (
@@ -812,14 +812,14 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                         <span style={{ fontSize: '22px', flexShrink: 0 }}>{getFileIcon(pendingFile.type)}</span>
                       )}
                       <div style={{ flex: 1, overflow: 'hidden' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 500, color: '#0369a1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 500, color: '#102622', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {pendingFile.name}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#6b7280' }}>{formatBytes(pendingFile.size)}</div>
+                        <div style={{ fontSize: '11px', color: '#7E9389' }}>{formatBytes(pendingFile.size)}</div>
                       </div>
                       <button
                         onClick={() => setPendingFile(null)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '16px', lineHeight: 1, padding: '2px', flexShrink: 0 }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', fontSize: '16px', lineHeight: 1, padding: '2px', flexShrink: 0 }}
                       >
                         ×
                       </button>
@@ -834,7 +834,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                       style={{
                         flex: 1,
                         padding: '10px 12px',
-                        border: `1px solid ${isInternalNote ? '#fde68a' : '#e5e7eb'}`,
+                        border: `1px solid ${isInternalNote ? '#fde68a' : '#E1DDD0'}`,
                         borderRadius: '10px',
                         fontSize: '13px',
                         resize: 'none',
@@ -847,7 +847,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                       }}
                     />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label title="Adjuntar archivo" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', border: '1px solid #e5e7eb', borderRadius: '10px', background: 'white', fontSize: '18px' }}>
+                      <label title="Adjuntar archivo" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', border: '1px solid #E1DDD0', borderRadius: '10px', background: 'white', fontSize: '18px' }}>
                         📎
                         <input
                           type="file"
@@ -870,7 +870,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                         disabled={sending || (!messageText.trim() && !pendingFile)}
                         style={{
                           padding: '10px 16px',
-                          background: (sending || (!messageText.trim() && !pendingFile)) ? '#9ca3af' : '#0ea5e9',
+                          background: (sending || (!messageText.trim() && !pendingFile)) ? '#7E9389' : '#1B3B36',
                           color: 'white',
                           border: 'none',
                           borderRadius: '10px',
@@ -885,7 +885,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                       </button>
                     </div>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '5px' }}>
+                  <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '5px' }}>
                     Ctrl+Enter para enviar · Max 10 MB por adjunto
                   </div>
                 </div>
@@ -893,15 +893,15 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
 
               {activeConversation.status === 'cerrada' && (
                 <div style={{
-                  borderTop: '1px solid #f1f5f9', padding: '12px 14px',
-                  background: '#f9fafb', textAlign: 'center',
-                  fontSize: '12.5px', color: '#6b7280',
+                  borderTop: '1px solid #EAE6D8', padding: '12px 14px',
+                  background: '#FAF7EF', textAlign: 'center',
+                  fontSize: '12.5px', color: '#7E9389',
                 }}>
                   Esta conversación está cerrada.
                   {canEdit && (
                     <button
                       onClick={() => handleChangeStatus('abierta')}
-                      style={{ marginLeft: '10px', color: '#0ea5e9', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600 }}
+                      style={{ marginLeft: '10px', color: '#1B3B36', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600 }}
                     >
                       Reabrir
                     </button>

@@ -20,12 +20,12 @@ type Tab = 'arrendamiento' | 'str'
 const ESTADO_CONTRATO_CONFIG: Record<EstadoContrato, { label: string; bg: string; color: string }> = {
   activo:    { label: 'Activo',    bg: '#f0fdf4', color: '#16a34a' },
   vencido:   { label: 'Vencido',   bg: '#fef2f2', color: '#dc2626' },
-  terminado: { label: 'Terminado', bg: '#f8fafc', color: '#64748b' },
+  terminado: { label: 'Terminado', bg: '#FAF7EF', color: '#7E9389' },
 }
 
 const ESTADO_STR_CONFIG: Record<EstadoSTR, { label: string; color: string; bg: string }> = {
-  confirmada: { label: 'Confirmada', color: '#0ea5e9', bg: '#e0f2fe' },
-  en_curso:   { label: 'En curso',   color: '#8b5cf6', bg: '#ede9fe' },
+  confirmada: { label: 'Confirmada', color: '#1B3B36', bg: '#D9E2DC' },
+  en_curso:   { label: 'En curso',   color: '#B96A3F', bg: '#F4EBE3' },
   completada: { label: 'Completada', color: '#10b981', bg: '#d1fae5' },
   cancelada:  { label: 'Cancelada',  color: '#ef4444', bg: '#fee2e2' },
 }
@@ -193,7 +193,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#64748b',
+      cancelButtonColor: '#7E9389',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
     })
@@ -308,7 +308,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#64748b',
+      cancelButtonColor: '#7E9389',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
     })
@@ -324,7 +324,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
   // ── Styles ──────────────────────────────────────────────────────────────────
 
   const inputStyle = {
-    padding: '9px 12px', border: '2px solid #e2e8f0', borderRadius: '8px',
+    padding: '9px 12px', border: '2px solid #E1DDD0', borderRadius: '8px',
     fontSize: '14px', width: '100%', boxSizing: 'border-box' as const, outline: 'none',
   }
   const labelStyle = {
@@ -332,12 +332,12 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
     marginBottom: '4px', display: 'block',
   }
   const btnPrimary = {
-    padding: '9px 20px', background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+    padding: '9px 20px', background: 'linear-gradient(135deg, #1B3B36, #577B69)',
     color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600 as const,
     fontSize: '14px', cursor: 'pointer',
   }
   const btnSecondary = {
-    padding: '9px 20px', background: '#f1f5f9', color: '#475569',
+    padding: '9px 20px', background: '#EAE6D8', color: '#3E5A4C',
     border: 'none', borderRadius: '8px', fontWeight: 600 as const,
     fontSize: '14px', cursor: 'pointer',
   }
@@ -353,7 +353,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
     >
       {/* Client units summary */}
       {clienteUnidades.length === 0 ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+        <div style={{ padding: '40px', textAlign: 'center', color: '#7E9389' }}>
           <div style={{ fontSize: '36px', marginBottom: '12px' }}>🏠</div>
           <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '6px' }}>
             Este cliente no tiene unidades asignadas
@@ -371,7 +371,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                 key={u.id}
                 style={{
                   padding: '4px 12px', borderRadius: '20px', fontSize: '12px',
-                  fontWeight: 600, background: '#e0f2fe', color: '#0369a1',
+                  fontWeight: 600, background: '#D9E2DC', color: '#102622',
                 }}
               >
                 🏠 {u.nombre}
@@ -380,7 +380,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
           </div>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', borderBottom: '2px solid #E1DDD0', marginBottom: '20px' }}>
             {(['arrendamiento', 'str'] as Tab[]).map(tab => (
               <button
                 key={tab}
@@ -388,8 +388,8 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                 style={{
                   padding: '10px 20px', border: 'none', cursor: 'pointer',
                   fontWeight: 600, fontSize: '14px', background: 'transparent',
-                  borderBottom: activeTab === tab ? '3px solid #0ea5e9' : '3px solid transparent',
-                  color: activeTab === tab ? '#0ea5e9' : '#64748b',
+                  borderBottom: activeTab === tab ? '3px solid #1B3B36' : '3px solid transparent',
+                  color: activeTab === tab ? '#1B3B36' : '#7E9389',
                   marginBottom: '-2px',
                 }}
               >
@@ -399,7 +399,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
           </div>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389' }}>
               Cargando información...
             </div>
           ) : (
@@ -417,10 +417,10 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
 
                   {showContratoForm && (
                     <div style={{
-                      background: '#f8fafc', border: '1px solid #e2e8f0',
+                      background: '#FAF7EF', border: '1px solid #E1DDD0',
                       borderRadius: '12px', padding: '20px', marginBottom: '20px',
                     }}>
-                      <div style={{ fontWeight: 700, fontSize: '15px', color: '#1e293b', marginBottom: '16px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '16px' }}>
                         {editingContratoId ? 'Editar Contrato' : 'Nuevo Contrato de Arrendamiento'}
                       </div>
 
@@ -555,7 +555,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                   )}
 
                   {contratos.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389' }}>
                       <div style={{ fontSize: '32px', marginBottom: '8px' }}>📄</div>
                       <div style={{ fontWeight: 600 }}>Sin contratos de arrendamiento</div>
                       {canEdit && <div style={{ fontSize: '13px', marginTop: '4px' }}>Agrega el primer contrato con el botón de arriba</div>}
@@ -568,7 +568,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                           <div
                             key={c.id}
                             style={{
-                              background: 'white', border: '1px solid #e2e8f0',
+                              background: 'white', border: '1px solid #E1DDD0',
                               borderRadius: '10px', padding: '14px 16px',
                               display: 'flex', justifyContent: 'space-between',
                               alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap',
@@ -576,7 +576,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                           >
                             <div style={{ flex: 1, minWidth: '200px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                <span style={{ fontWeight: 700, fontSize: '15px', color: '#1e293b' }}>
+                                <span style={{ fontWeight: 700, fontSize: '15px', color: '#15291F' }}>
                                   {c.arrendatario_nombre}
                                 </span>
                                 <span style={{
@@ -586,19 +586,19 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                                   {cfg.label}
                                 </span>
                               </div>
-                              <div style={{ fontSize: '13px', color: '#64748b' }}>
+                              <div style={{ fontSize: '13px', color: '#7E9389' }}>
                                 🏠 {unidadNombre(c.unidad_id)}
                                 {c.arrendatario_telefono && <span style={{ marginLeft: '12px' }}>📞 {c.arrendatario_telefono}</span>}
                                 {c.arrendatario_email && <span style={{ marginLeft: '12px' }}>✉️ {c.arrendatario_email}</span>}
                               </div>
-                              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
-                                Renta: <b style={{ color: '#0d9488' }}>{c.monto_renta.toLocaleString()}</b>
+                              <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '4px' }}>
+                                Renta: <b style={{ color: '#577B69' }}>{c.monto_renta.toLocaleString()}</b>
                                 {' · '}Día {c.dia_pago}
                                 {' · '}{c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' (sin vencimiento)'}
                                 {c.arrendatario_identificacion && <> · ID: {c.arrendatario_identificacion}</>}
                               </div>
                               {c.notas && (
-                                <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px', fontStyle: 'italic' }}>
+                                <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px', fontStyle: 'italic' }}>
                                   {c.notas}
                                 </div>
                               )}
@@ -607,7 +607,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                               <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                                 <button
                                   onClick={() => startEditContrato(c)}
-                                  style={{ padding: '5px 12px', background: '#eff6ff', color: '#1d4ed8', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                                  style={{ padding: '5px 12px', background: '#EEF2EC', color: '#102622', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
                                 >
                                   Editar
                                 </button>
@@ -640,10 +640,10 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
 
                   {showSTRForm && (
                     <div style={{
-                      background: '#f8fafc', border: '1px solid #e2e8f0',
+                      background: '#FAF7EF', border: '1px solid #E1DDD0',
                       borderRadius: '12px', padding: '20px', marginBottom: '20px',
                     }}>
-                      <div style={{ fontWeight: 700, fontSize: '15px', color: '#1e293b', marginBottom: '16px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '16px' }}>
                         {editingSTRId ? 'Editar Reserva' : 'Nueva Reserva STR'}
                       </div>
 
@@ -765,7 +765,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                           <label style={labelStyle}>
                             Monto Total
                             {strForm.fecha_entrada && strForm.fecha_salida && (
-                              <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: '6px' }}>
+                              <span style={{ fontWeight: 400, color: '#7E9389', marginLeft: '6px' }}>
                                 ({calcNoches(strForm.fecha_entrada, strForm.fecha_salida)} noches)
                               </span>
                             )}
@@ -812,7 +812,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                   )}
 
                   {reservas.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389' }}>
                       <div style={{ fontSize: '32px', marginBottom: '8px' }}>🏨</div>
                       <div style={{ fontWeight: 600 }}>Sin reservas STR registradas</div>
                       {canEdit && <div style={{ fontSize: '13px', marginTop: '4px' }}>Agrega la primera reserva con el botón de arriba</div>}
@@ -826,7 +826,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                           <div
                             key={r.id}
                             style={{
-                              background: 'white', border: '1px solid #e2e8f0',
+                              background: 'white', border: '1px solid #E1DDD0',
                               borderRadius: '10px', padding: '14px 16px',
                               display: 'flex', justifyContent: 'space-between',
                               alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap',
@@ -834,7 +834,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                           >
                             <div style={{ flex: 1, minWidth: '200px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                <span style={{ fontWeight: 700, fontSize: '15px', color: '#1e293b' }}>
+                                <span style={{ fontWeight: 700, fontSize: '15px', color: '#15291F' }}>
                                   {r.huesped_nombre}
                                 </span>
                                 <span style={{
@@ -843,25 +843,25 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                                 }}>
                                   {cfg.label}
                                 </span>
-                                <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                <span style={{ fontSize: '12px', color: '#7E9389' }}>
                                   {PLATAFORMA_LABEL[r.plataforma]}
                                 </span>
                               </div>
-                              <div style={{ fontSize: '13px', color: '#64748b' }}>
+                              <div style={{ fontSize: '13px', color: '#7E9389' }}>
                                 {r.unidad_id && <span>🏠 {unidadNombre(r.unidad_id)}{' · '}</span>}
                                 📅 {r.fecha_entrada} → {r.fecha_salida} ({noches} noche{noches !== 1 ? 's' : ''})
                                 {' · '}👥 {r.num_adultos} adulto{r.num_adultos !== 1 ? 's' : ''}
                                 {r.num_ninos > 0 && `, ${r.num_ninos} niño${r.num_ninos !== 1 ? 's' : ''}`}
                               </div>
-                              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+                              <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '4px' }}>
                                 {r.huesped_telefono && <span>📞 {r.huesped_telefono}{' · '}</span>}
                                 {r.huesped_email && <span>✉️ {r.huesped_email}{' · '}</span>}
                                 {r.monto_total != null && (
-                                  <span>Total: <b style={{ color: '#0d9488' }}>{r.monto_total.toLocaleString()}</b></span>
+                                  <span>Total: <b style={{ color: '#577B69' }}>{r.monto_total.toLocaleString()}</b></span>
                                 )}
                               </div>
                               {r.notas && (
-                                <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px', fontStyle: 'italic' }}>
+                                <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px', fontStyle: 'italic' }}>
                                   {r.notas}
                                 </div>
                               )}
@@ -870,7 +870,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                               <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                                 <button
                                   onClick={() => startEditSTR(r)}
-                                  style={{ padding: '5px 12px', background: '#eff6ff', color: '#1d4ed8', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                                  style={{ padding: '5px 12px', background: '#EEF2EC', color: '#102622', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
                                 >
                                   Editar
                                 </button>

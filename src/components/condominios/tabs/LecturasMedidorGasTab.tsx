@@ -76,28 +76,28 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
-        <div style={{ background: '#eef2ff', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#6366f1' }}>{totalConsumo.toFixed(2)}</div>
-          <div style={{ fontSize: 11, color: '#6366f1' }}>m³ consumo total</div>
+        <div style={{ background: '#F4EBE3', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#B96A3F' }}>{totalConsumo.toFixed(2)}</div>
+          <div style={{ fontSize: 11, color: '#B96A3F' }}>m³ consumo total</div>
         </div>
         <div style={{ background: '#d1fae5', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: '#10b981' }}>{moneda} {totalCosto.toLocaleString()}</div>
           <div style={{ fontSize: 11, color: '#10b981' }}>Costo total</div>
         </div>
-        <div style={{ background: alertasFuga > 0 ? '#fef2f2' : '#f3f4f6', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: alertasFuga > 0 ? '#ef4444' : '#6b7280' }}>{alertasFuga}</div>
-          <div style={{ fontSize: 11, color: alertasFuga > 0 ? '#ef4444' : '#6b7280' }}>Alertas de fuga</div>
+        <div style={{ background: alertasFuga > 0 ? '#fef2f2' : '#EAE6D8', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: alertasFuga > 0 ? '#ef4444' : '#7E9389' }}>{alertasFuga}</div>
+          <div style={{ fontSize: 11, color: alertasFuga > 0 ? '#ef4444' : '#7E9389' }}>Alertas de fuga</div>
         </div>
-        <div style={{ background: '#f9fafb', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#374151' }}>{lecturas.length}</div>
-          <div style={{ fontSize: 11, color: '#6b7280' }}>Lecturas registradas</div>
+        <div style={{ background: '#FAF7EF', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#3E5A4C' }}>{lecturas.length}</div>
+          <div style={{ fontSize: 11, color: '#7E9389' }}>Lecturas registradas</div>
         </div>
       </div>
 
@@ -120,7 +120,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
             <option value="">Todos los períodos</option>
             {periodos.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
-          <span style={{ fontSize: 13, color: '#6b7280', alignSelf: 'center' }}>{lista.length} lecturas</span>
+          <span style={{ fontSize: 13, color: '#7E9389', alignSelf: 'center' }}>{lista.length} lecturas</span>
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
@@ -132,7 +132,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nueva lectura de gas</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -166,7 +166,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
             </div>
             <div>
               <label style={lbl}>Consumo (m³)</label>
-              <div style={{ ...inp, background: '#f3f4f6', color: consumoCalculado != null ? '#374151' : '#9ca3af' }}>
+              <div style={{ ...inp, background: '#EAE6D8', color: consumoCalculado != null ? '#3E5A4C' : '#7E9389' }}>
                 {consumoCalculado != null ? `${consumoCalculado.toFixed(3)} m³` : 'Auto-calculado'}
               </div>
             </div>
@@ -188,7 +188,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 20 }}>
               <input type="checkbox" id="fuga_check" checked={form.alerta_fuga} onChange={e => setForm(p => ({ ...p, alerta_fuga: e.target.checked }))} />
-              <label htmlFor="fuga_check" style={{ fontSize: 13, cursor: 'pointer', color: form.alerta_fuga ? '#ef4444' : '#374151' }}>
+              <label htmlFor="fuga_check" style={{ fontSize: 13, cursor: 'pointer', color: form.alerta_fuga ? '#ef4444' : '#3E5A4C' }}>
                 🚨 Alerta de fuga
               </label>
             </div>
@@ -206,14 +206,14 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
 
       {/* Tabla de lecturas */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0', fontSize: 13 }}>Sin lecturas para los filtros seleccionados</div>
+        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>Sin lecturas para los filtros seleccionados</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#f9fafb' }}>
+              <tr style={{ background: '#FAF7EF' }}>
                 {['Unidad/Área', 'Período', 'Fecha', 'Lect. anterior', 'Lect. actual', 'Consumo', 'Costo', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#6b7280', fontWeight: 600, borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#7E9389', fontWeight: 600, borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -221,23 +221,23 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
               {lista.map(l => {
                 const unidad = unidades.find(u => u.id === l.unidad_id)
                 return (
-                  <tr key={l.id} style={{ borderBottom: '1px solid #f3f4f6', background: l.alerta_fuga ? '#fef2f2' : '#fff' }}>
+                  <tr key={l.id} style={{ borderBottom: '1px solid #EAE6D8', background: l.alerta_fuga ? '#fef2f2' : '#fff' }}>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>
                       {l.alerta_fuga && <span style={{ color: '#ef4444', marginRight: 4 }}>🚨</span>}
                       {unidad?.nombre ?? l.area ?? 'Área común'}
                     </td>
-                    <td style={{ padding: '8px 12px', color: '#6b7280' }}>{l.periodo ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', color: '#6b7280' }}>{l.fecha}</td>
-                    <td style={{ padding: '8px 12px', color: '#9ca3af' }}>{l.lectura_anterior?.toFixed(3) ?? '—'}</td>
+                    <td style={{ padding: '8px 12px', color: '#7E9389' }}>{l.periodo ?? '—'}</td>
+                    <td style={{ padding: '8px 12px', color: '#7E9389' }}>{l.fecha}</td>
+                    <td style={{ padding: '8px 12px', color: '#7E9389' }}>{l.lectura_anterior?.toFixed(3) ?? '—'}</td>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>{l.lectura_actual.toFixed(3)}</td>
-                    <td style={{ padding: '8px 12px', color: '#6366f1', fontWeight: 600 }}>
+                    <td style={{ padding: '8px 12px', color: '#B96A3F', fontWeight: 600 }}>
                       {l.consumo != null ? `${l.consumo.toFixed(3)} m³` : '—'}
                     </td>
                     <td style={{ padding: '8px 12px', color: '#10b981', fontWeight: 600 }}>
                       {l.costo_total != null ? `${moneda} ${l.costo_total.toFixed(2)}` : '—'}
                     </td>
                     <td style={{ padding: '8px 12px' }}>
-                      {l.observaciones && <span style={{ fontSize: 11, color: '#9ca3af' }} title={l.observaciones}>📝</span>}
+                      {l.observaciones && <span style={{ fontSize: 11, color: '#7E9389' }} title={l.observaciones}>📝</span>}
                     </td>
                   </tr>
                 )

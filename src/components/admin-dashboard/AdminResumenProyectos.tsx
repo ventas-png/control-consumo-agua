@@ -12,13 +12,13 @@ interface Props {
 }
 
 const TIPOLOGIA_META: Partial<Record<TipoAgua, { label: string; icon: string; color: string }>> = {
-  potable:             { label: 'Potable',             icon: '💧', color: '#0ea5e9' },
-  rehuso:              { label: 'Rehúso',              icon: '♻️', color: '#06b6d4' },
-  piscina:             { label: 'Piscina',             icon: '🏊', color: '#38bdf8' },
-  desalinada:          { label: 'Desalinada',          icon: '🌊', color: '#6366f1' },
+  potable:             { label: 'Potable',             icon: '💧', color: '#1B3B36' },
+  rehuso:              { label: 'Rehúso',              icon: '♻️', color: '#577B69' },
+  piscina:             { label: 'Piscina',             icon: '🏊', color: '#577B69' },
+  desalinada:          { label: 'Desalinada',          icon: '🌊', color: '#B96A3F' },
   riego:               { label: 'Riego',               icon: '🌿', color: '#10b981' },
-  jacuzzi:             { label: 'Jacuzzi',             icon: '🛁', color: '#8b5cf6' },
-  consumo_humano:      { label: 'Consumo Humano',      icon: '🚰', color: '#14b8a6' },
+  jacuzzi:             { label: 'Jacuzzi',             icon: '🛁', color: '#B96A3F' },
+  consumo_humano:      { label: 'Consumo Humano',      icon: '🚰', color: '#577B69' },
   desmineralizada:     { label: 'Desmineralizada',     icon: '🧪', color: '#a855f7' },
   residuales_tratadas: { label: 'Residuales Tratadas', icon: '🔄', color: '#f97316' },
 }
@@ -101,19 +101,19 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
     padding: '10px 12px',
     textAlign: center ? ('center' as const) : ('left' as const),
     fontWeight: 700,
-    color: color ?? '#475569',
-    borderBottom: '2px solid #e2e8f0',
+    color: color ?? '#3E5A4C',
+    borderBottom: '2px solid #E1DDD0',
     whiteSpace: 'nowrap' as const,
     fontSize: '12px',
-    background: '#f8fafc',
+    background: '#FAF7EF',
   })
 
   const tdVal = (val: number | undefined, color?: string) => ({
     padding: '10px 12px',
     textAlign: 'center' as const,
-    borderBottom: '1px solid #f1f5f9',
+    borderBottom: '1px solid #EAE6D8',
     fontWeight: val && val > 0 ? 600 : 400,
-    color: val && val > 0 ? (color ?? '#0f172a') : '#cbd5e1',
+    color: val && val > 0 ? (color ?? '#15291F') : '#C7C2B0',
     fontSize: '12px',
   })
 
@@ -122,7 +122,7 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
       <h3 style={{
         fontSize: '13px',
         fontWeight: 700,
-        color: '#94a3b8',
+        color: '#7E9389',
         marginBottom: '12px',
         textTransform: 'uppercase',
         letterSpacing: '0.08em',
@@ -135,7 +135,7 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
           <thead>
             <tr>
               <th style={th(undefined, false)}>Proyecto</th>
-              <th style={th('#0ea5e9')}>💧 Total m³</th>
+              <th style={th('#1B3B36')}>💧 Total m³</th>
               {activeTipos.map(tipo => {
                 const meta = TIPOLOGIA_META[tipo]
                 return (
@@ -153,14 +153,14 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
               return (
                 <tr
                   key={p.id}
-                  style={{ background: i % 2 === 0 ? 'white' : '#f8fafc' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#eff6ff'}
-                  onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'white' : '#f8fafc'}
+                  style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#EEF2EC'}
+                  onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'white' : '#FAF7EF'}
                 >
-                  <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid #EAE6D8', whiteSpace: 'nowrap' }}>
                     {p.nombre}
                   </td>
-                  <td style={tdVal(ps.totalM3, '#0ea5e9')}>
+                  <td style={tdVal(ps.totalM3, '#1B3B36')}>
                     {ps.totalM3 > 0 ? ps.totalM3.toFixed(1) : '—'}
                   </td>
                   {activeTipos.map(tipo => {
@@ -182,18 +182,18 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
             })}
 
             {/* Totals row */}
-            <tr style={{ background: '#f1f5f9', borderTop: '2px solid #e2e8f0' }}>
-              <td style={{ padding: '10px 12px', fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>
+            <tr style={{ background: '#EAE6D8', borderTop: '2px solid #E1DDD0' }}>
+              <td style={{ padding: '10px 12px', fontWeight: 700, color: '#15291F', fontSize: '13px' }}>
                 Total
               </td>
-              <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: '#0ea5e9', fontSize: '13px' }}>
+              <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: '#1B3B36', fontSize: '13px' }}>
                 {totals.totalM3.toFixed(1)}
               </td>
               {activeTipos.map(tipo => {
                 const m3 = totals.byTipo.get(tipo)
                 const meta = TIPOLOGIA_META[tipo]
                 return (
-                  <td key={tipo} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: meta?.color ?? '#0f172a', fontSize: '12px' }}>
+                  <td key={tipo} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: meta?.color ?? '#15291F', fontSize: '12px' }}>
                     {m3 && m3 > 0 ? m3.toFixed(1) : '—'}
                   </td>
                 )

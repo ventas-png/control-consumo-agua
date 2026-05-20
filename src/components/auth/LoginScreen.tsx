@@ -98,18 +98,18 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
         }
         .login-input:focus {
           outline: none;
-          border-color: #0ea5e9 !important;
-          box-shadow: 0 0 0 3px rgba(14,165,233,0.15);
+          border-color: #1B3B36 !important;
+          box-shadow: 0 0 0 3px rgba(27, 59, 54,0.15);
         }
-        .login-input::placeholder { color: #94a3b8; }
+        .login-input::placeholder { color: #7E9389; }
         .login-btn-main:hover:not(:disabled) {
           filter: brightness(1.08);
           transform: translateY(-1px);
-          box-shadow: 0 8px 24px rgba(14,165,233,0.45);
+          box-shadow: 0 8px 24px rgba(27, 59, 54,0.45);
         }
         .login-btn-main:active:not(:disabled) { transform: translateY(0); }
         .login-btn-google:hover:not(:disabled) {
-          background: #f8fafc !important;
+          background: #FAF7EF !important;
           box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
         }
         .feat-card:hover {
@@ -129,7 +129,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
 
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'linear-gradient(135deg, #0369a1 0%, #0891b2 45%, #0d9488 100%)',
+        background: 'linear-gradient(135deg, #102622 0%, #102622 45%, #577B69 100%)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 2000, overflow: 'hidden',
       }}>
@@ -250,10 +250,10 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
             justifyContent: 'center',
             minWidth: '300px',
           }}>
-            <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', margin: '0 0 4px', letterSpacing: '-0.6px' }}>
+            <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#15291F', margin: '0 0 4px', letterSpacing: '-0.6px' }}>
               Bienvenido
             </h2>
-            <p style={{ color: '#64748b', fontSize: '14.5px', margin: '0 0 32px' }}>
+            <p style={{ color: '#7E9389', fontSize: '14.5px', margin: '0 0 32px' }}>
               Inicia sesión para acceder al sistema
             </p>
 
@@ -264,8 +264,8 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               disabled={googleLoading || loading}
               style={{
                 width: '100%', padding: '13px', fontSize: '15px', fontWeight: 600,
-                background: 'white', color: '#374151',
-                border: '1.5px solid #e2e8f0', borderRadius: '14px',
+                background: 'white', color: '#3E5A4C',
+                border: '1.5px solid #E1DDD0', borderRadius: '14px',
                 cursor: 'pointer', display: 'flex', alignItems: 'center',
                 justifyContent: 'center', gap: '10px',
                 transition: 'all 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
@@ -275,7 +275,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               {googleLoading ? (
                 <span style={{
                   width: 20, height: 20, borderRadius: '50%',
-                  border: '2.5px solid #e2e8f0', borderTopColor: '#4285f4',
+                  border: '2.5px solid #E1DDD0', borderTopColor: '#4285f4',
                   display: 'inline-block', animation: 'spin 0.7s linear infinite',
                 }} />
               ) : (
@@ -291,9 +291,9 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
 
             {/* Divider */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
-              <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-              <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500 }}>o con tu correo</span>
-              <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+              <div style={{ flex: 1, height: '1px', background: '#E1DDD0' }} />
+              <span style={{ fontSize: '13px', color: '#7E9389', fontWeight: 500 }}>o con tu correo</span>
+              <div style={{ flex: 1, height: '1px', background: '#E1DDD0' }} />
             </div>
 
             {/* Email input */}
@@ -311,10 +311,10 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
                 onKeyDown={e => e.key === 'Enter' && handleLogin()}
                 style={{
                   padding: '13px 14px 13px 44px',
-                  border: '1.5px solid #e2e8f0', borderRadius: '12px',
+                  border: '1.5px solid #E1DDD0', borderRadius: '12px',
                   width: '100%', fontSize: '15px', boxSizing: 'border-box',
-                  background: '#f8fafc', transition: 'border-color 0.2s, box-shadow 0.2s',
-                  color: '#0f172a',
+                  background: '#FAF7EF', transition: 'border-color 0.2s, box-shadow 0.2s',
+                  color: '#15291F',
                 }}
               />
             </div>
@@ -334,10 +334,10 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
                 onKeyDown={e => e.key === 'Enter' && handleLogin()}
                 style={{
                   padding: '13px 44px 13px 44px',
-                  border: '1.5px solid #e2e8f0', borderRadius: '12px',
+                  border: '1.5px solid #E1DDD0', borderRadius: '12px',
                   width: '100%', fontSize: '15px', boxSizing: 'border-box',
-                  background: '#f8fafc', transition: 'border-color 0.2s, box-shadow 0.2s',
-                  color: '#0f172a',
+                  background: '#FAF7EF', transition: 'border-color 0.2s, box-shadow 0.2s',
+                  color: '#15291F',
                 }}
               />
               <button
@@ -374,13 +374,13 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               disabled={loading || googleLoading}
               style={{
                 width: '100%', padding: '14px', fontSize: '16px', fontWeight: 700,
-                background: 'linear-gradient(135deg, #0ea5e9 0%, #0891b2 50%, #0d9488 100%)',
+                background: 'linear-gradient(135deg, #1B3B36 0%, #102622 50%, #577B69 100%)',
                 color: 'white', border: 'none', borderRadius: '14px',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.8 : 1,
                 transition: 'all 0.2s',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                boxShadow: '0 4px 16px rgba(14,165,233,0.35)',
+                boxShadow: '0 4px 16px rgba(27, 59, 54,0.35)',
               }}
             >
               {loading ? (
@@ -400,7 +400,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               <button
                 onClick={onForgotPassword}
                 style={{
-                  background: 'none', border: 'none', color: '#0ea5e9',
+                  background: 'none', border: 'none', color: '#1B3B36',
                   cursor: 'pointer', fontSize: '14px', fontWeight: 500,
                   textDecoration: 'underline', textUnderlineOffset: '3px',
                 }}
@@ -413,28 +413,28 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
             <div style={{
               marginTop: '16px',
               padding: '14px 18px',
-              background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)',
-              border: '1px solid #bae6fd',
+              background: 'linear-gradient(135deg, #EEF2EC, #D9E2DC)',
+              border: '1px solid #C2D2CA',
               borderRadius: '14px',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               gap: '10px', flexWrap: 'wrap',
             }}>
               <div>
-                <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#0369a1' }}>
+                <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#102622' }}>
                   ¿Eres cliente?
                 </p>
-                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#0284c7' }}>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#102622' }}>
                   Consulta tu consumo en el portal
                 </p>
               </div>
               <button
                 onClick={onRegister}
                 style={{
-                  background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                  background: 'linear-gradient(135deg, #1B3B36, #577B69)',
                   color: 'white', border: 'none', borderRadius: '10px',
                   padding: '8px 18px', fontSize: '13px', fontWeight: 700,
                   cursor: 'pointer', whiteSpace: 'nowrap',
-                  boxShadow: '0 3px 10px rgba(14,165,233,0.35)',
+                  boxShadow: '0 3px 10px rgba(27, 59, 54,0.35)',
                   transition: 'all 0.2s',
                 }}
               >

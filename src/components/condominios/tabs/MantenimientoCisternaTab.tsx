@@ -14,17 +14,17 @@ interface Props {
 }
 
 const TIPOS: { value: TipoMantenimientoCisterna; label: string; icon: string; color: string }[] = [
-  { value: 'lectura',    label: 'Lectura',    icon: '📊', color: '#06b6d4' },
+  { value: 'lectura',    label: 'Lectura',    icon: '📊', color: '#577B69' },
   { value: 'limpieza',   label: 'Limpieza',   icon: '🧹', color: '#10b981' },
-  { value: 'cloracion',  label: 'Cloración',  icon: '🧪', color: '#8b5cf6' },
-  { value: 'inspeccion', label: 'Inspección', icon: '🔍', color: '#6366f1' },
+  { value: 'cloracion',  label: 'Cloración',  icon: '🧪', color: '#B96A3F' },
+  { value: 'inspeccion', label: 'Inspección', icon: '🔍', color: '#B96A3F' },
   { value: 'reparacion', label: 'Reparación', icon: '🔧', color: '#f59e0b' },
 ]
 
 const ESTADOS: { value: EstadoCisterna; label: string; color: string; bg: string; icon: string }[] = [
   { value: 'normal',        label: 'Normal',        color: '#10b981', bg: '#d1fae5', icon: '✅' },
   { value: 'bajo_nivel',    label: 'Bajo nivel',    color: '#f59e0b', bg: '#fef3c7', icon: '⚠️' },
-  { value: 'mantenimiento', label: 'Mantenimiento', color: '#6366f1', bg: '#eef2ff', icon: '🔧' },
+  { value: 'mantenimiento', label: 'Mantenimiento', color: '#B96A3F', bg: '#F4EBE3', icon: '🔧' },
   { value: 'fuera_servicio',label: 'Fuera servicio',color: '#ef4444', bg: '#fef2f2', icon: '🚫' },
 ]
 
@@ -34,7 +34,7 @@ const PH_MIN = 6.5
 const PH_MAX = 8.5
 
 function nivelColor(pct: number | null | undefined): string {
-  if (pct == null) return '#6b7280'
+  if (pct == null) return '#7E9389'
   if (pct >= 60) return '#10b981'
   if (pct >= 30) return '#f59e0b'
   return '#ef4444'
@@ -97,8 +97,8 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
@@ -109,7 +109,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
             const r = ultimo[c]
             const est = ESTADOS.find(e => e.value === r?.estado)
             return (
-              <div key={c} style={{ background: est?.bg ?? '#f9fafb', border: `1px solid ${est?.color ?? '#e5e7eb'}`, borderRadius: 12, padding: '12px 16px' }}>
+              <div key={c} style={{ background: est?.bg ?? '#FAF7EF', border: `1px solid ${est?.color ?? '#E1DDD0'}`, borderRadius: 12, padding: '12px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <span style={{ fontWeight: 700, fontSize: 14 }}>🏗️ {c}</span>
                   <span style={{ fontSize: 11, fontWeight: 600, color: est?.color }}>{est?.icon} {est?.label}</span>
@@ -119,10 +119,10 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
                     {r.nivel_agua_pct != null && (
                       <div style={{ marginBottom: 6 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                          <span style={{ fontSize: 11, color: '#6b7280' }}>Nivel</span>
+                          <span style={{ fontSize: 11, color: '#7E9389' }}>Nivel</span>
                           <span style={{ fontSize: 12, fontWeight: 700, color: nivelColor(r.nivel_agua_pct) }}>{r.nivel_agua_pct}%</span>
                         </div>
-                        <div style={{ height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ height: 6, background: '#E1DDD0', borderRadius: 3, overflow: 'hidden' }}>
                           <div style={{ height: '100%', width: `${Math.min(r.nivel_agua_pct, 100)}%`, background: nivelColor(r.nivel_agua_pct) }} />
                         </div>
                       </div>
@@ -130,11 +130,11 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
                     <div style={{ display: 'flex', gap: 12, fontSize: 11 }}>
                       {r.cloro_residual != null && <span style={{ color: r.cloro_residual >= CLORO_MIN && r.cloro_residual <= CLORO_MAX ? '#10b981' : '#ef4444' }}>Cl: {r.cloro_residual}</span>}
                       {r.ph != null && <span style={{ color: r.ph >= PH_MIN && r.ph <= PH_MAX ? '#10b981' : '#ef4444' }}>pH: {r.ph}</span>}
-                      <span style={{ color: '#9ca3af' }}>{r.fecha}</span>
+                      <span style={{ color: '#7E9389' }}>{r.fecha}</span>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: '#9ca3af' }}>Sin registros</div>
+                  <div style={{ fontSize: 12, color: '#7E9389' }}>Sin registros</div>
                 )}
               </div>
             )
@@ -143,12 +143,12 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
       )}
 
       {proximas.length > 0 && (
-        <div style={{ background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 10, padding: '10px 16px', marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: '#6366f1', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase' }}>🔍 Próximas revisiones</div>
+        <div style={{ background: '#F4EBE3', border: '1px solid #E6CDBB', borderRadius: 10, padding: '10px 16px', marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: '#B96A3F', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase' }}>🔍 Próximas revisiones</div>
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             {proximas.map(r => (
-              <span key={r.id} style={{ fontSize: 12, color: '#374151' }}>
-                {r.cisterna} · <strong style={{ color: '#6366f1' }}>{r.proxima_revision}</strong>
+              <span key={r.id} style={{ fontSize: 12, color: '#3E5A4C' }}>
+                {r.cisterna} · <strong style={{ color: '#B96A3F' }}>{r.proxima_revision}</strong>
               </span>
             ))}
           </div>
@@ -162,11 +162,11 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
             <option value="">Todas las cisternas</option>
             {cisternas.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          <span style={{ fontSize: 13, color: '#6b7280', alignSelf: 'center' }}>{lista.length} registros</span>
+          <span style={{ fontSize: 13, color: '#7E9389', alignSelf: 'center' }}>{lista.length} registros</span>
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#06b6d4', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: '#577B69', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nuevo registro'}
           </button>
         )}
@@ -174,7 +174,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nuevo registro de cisterna</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -193,14 +193,14 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
             </div>
             <div>
               <label style={lbl}>Nivel agua (%)</label>
-              <input type="number" step="0.1" min="0" max="100" style={{ ...inp, borderColor: form.nivel_agua_pct ? (parseFloat(form.nivel_agua_pct) < 30 ? '#ef4444' : '#d1d5db') : '#d1d5db' }} value={form.nivel_agua_pct} onChange={e => setForm(p => ({ ...p, nivel_agua_pct: e.target.value }))} />
+              <input type="number" step="0.1" min="0" max="100" style={{ ...inp, borderColor: form.nivel_agua_pct ? (parseFloat(form.nivel_agua_pct) < 30 ? '#ef4444' : '#C7C2B0') : '#C7C2B0' }} value={form.nivel_agua_pct} onChange={e => setForm(p => ({ ...p, nivel_agua_pct: e.target.value }))} />
             </div>
             <div>
-              <label style={lbl}>Cloro residual <span style={{ color: '#9ca3af' }}>({CLORO_MIN}–{CLORO_MAX})</span></label>
+              <label style={lbl}>Cloro residual <span style={{ color: '#7E9389' }}>({CLORO_MIN}–{CLORO_MAX})</span></label>
               <input type="number" step="0.01" style={inp} value={form.cloro_residual} onChange={e => setForm(p => ({ ...p, cloro_residual: e.target.value }))} />
             </div>
             <div>
-              <label style={lbl}>pH <span style={{ color: '#9ca3af' }}>({PH_MIN}–{PH_MAX})</span></label>
+              <label style={lbl}>pH <span style={{ color: '#7E9389' }}>({PH_MIN}–{PH_MAX})</span></label>
               <input type="number" step="0.01" style={inp} value={form.ph} onChange={e => setForm(p => ({ ...p, ph: e.target.value }))} />
             </div>
             <div>
@@ -239,21 +239,21 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
 
       {/* Historial */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0', fontSize: 13 }}>Sin registros</div>
+        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>Sin registros</div>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
           {lista.map(r => {
             const tipo = TIPOS.find(t => t.value === r.tipo)
             const est = ESTADOS.find(e => e.value === r.estado)
             return (
-              <div key={r.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={r.id} style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>🏗️ {r.cisterna}</span>
                     <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: tipo?.color + '20', color: tipo?.color }}>{tipo?.icon} {tipo?.label}</span>
                     <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.icon} {est?.label}</span>
                   </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>
+                  <div style={{ fontSize: 12, color: '#7E9389', marginTop: 3 }}>
                     {r.fecha}
                     {r.empresa_servicio && <span> · {r.empresa_servicio}</span>}
                     {r.observaciones && <span> · {r.observaciones}</span>}
@@ -262,19 +262,19 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
                 <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
                   {r.nivel_agua_pct != null && (
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 10, color: '#9ca3af' }}>Nivel</div>
+                      <div style={{ fontSize: 10, color: '#7E9389' }}>Nivel</div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: nivelColor(r.nivel_agua_pct) }}>{r.nivel_agua_pct}%</div>
                     </div>
                   )}
                   {r.cloro_residual != null && (
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 10, color: '#9ca3af' }}>Cl</div>
+                      <div style={{ fontSize: 10, color: '#7E9389' }}>Cl</div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: r.cloro_residual >= CLORO_MIN && r.cloro_residual <= CLORO_MAX ? '#10b981' : '#ef4444' }}>{r.cloro_residual}</div>
                     </div>
                   )}
                   {r.ph != null && (
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 10, color: '#9ca3af' }}>pH</div>
+                      <div style={{ fontSize: 10, color: '#7E9389' }}>pH</div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: r.ph >= PH_MIN && r.ph <= PH_MAX ? '#10b981' : '#ef4444' }}>{r.ph}</div>
                     </div>
                   )}

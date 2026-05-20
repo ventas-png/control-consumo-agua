@@ -68,7 +68,7 @@ export function PasswordResetPage({ onBack }: Props) {
 
   if (sessionReady === null) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #14b8a6 100%)' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 50%, #577B69 100%)' }}>
         <div style={cardStyle}><p style={{ textAlign: 'center' }}>Validando enlace...</p></div>
       </div>
     )
@@ -76,12 +76,12 @@ export function PasswordResetPage({ onBack }: Props) {
 
   if (!sessionReady) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #14b8a6 100%)' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 50%, #577B69 100%)' }}>
         <div style={cardStyle}>
           <div style={{ background: '#fef2f2', color: '#dc2626', padding: '15px', borderRadius: '8px', marginBottom: '16px' }}>
             Enlace inválido o expirado. Solicita un nuevo restablecimiento.
           </div>
-          <button onClick={onBack} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={onBack} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
             Volver al Inicio
           </button>
         </div>
@@ -90,7 +90,7 @@ export function PasswordResetPage({ onBack }: Props) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #14b8a6 100%)' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 50%, #577B69 100%)' }}>
       <div style={cardStyle}>
         <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '24px' }}>Restablecer Contraseña</h2>
 
@@ -104,7 +104,7 @@ export function PasswordResetPage({ onBack }: Props) {
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                style={{ width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '12px', border: '2px solid #E1DDD0', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
               />
               {newPassError && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>{newPassError}</p>}
             </div>
@@ -116,7 +116,7 @@ export function PasswordResetPage({ onBack }: Props) {
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 placeholder="Repite tu nueva contraseña"
-                style={{ width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '12px', border: '2px solid #E1DDD0', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
               />
               {confirmError && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>{confirmError}</p>}
             </div>
@@ -124,13 +124,13 @@ export function PasswordResetPage({ onBack }: Props) {
               <button
                 onClick={handleUpdate}
                 disabled={loading}
-                style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
               >
                 {loading ? 'Actualizando...' : 'Actualizar Contraseña'}
               </button>
               <button
                 onClick={onBack}
-                style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '12px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
               >
                 Volver
               </button>
@@ -141,12 +141,12 @@ export function PasswordResetPage({ onBack }: Props) {
             <div style={{ padding: '20px', background: '#d1fae5', borderRadius: '8px', marginBottom: '20px', color: '#059669', fontWeight: 600 }}>
               ✅ ¡Contraseña actualizada exitosamente!
             </div>
-            <p style={{ color: '#64748b', marginBottom: '20px' }}>
+            <p style={{ color: '#7E9389', marginBottom: '20px' }}>
               Tu contraseña ha sido actualizada. Ahora puedes iniciar sesión.
             </p>
             <button
               onClick={onBack}
-              style={{ padding: '12px 32px', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+              style={{ padding: '12px 32px', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
             >
               Iniciar Sesión
             </button>

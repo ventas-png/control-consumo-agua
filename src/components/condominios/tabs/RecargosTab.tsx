@@ -18,8 +18,8 @@ interface Props {
 
 const ESTADO_CFG: Record<EstadoRecargo, { label: string; bg: string; color: string }> = {
   pendiente: { label: 'Pendiente', bg: '#fef3c7', color: '#92400e' },
-  aplicado:  { label: 'Aplicado',  bg: '#dbeafe', color: '#1d4ed8' },
-  anulado:   { label: 'Anulado',   bg: '#f3f4f6', color: '#9ca3af' },
+  aplicado:  { label: 'Aplicado',  bg: '#D9E2DC', color: '#102622' },
+  anulado:   { label: 'Anulado',   bg: '#EAE6D8', color: '#7E9389' },
 }
 
 export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
@@ -108,7 +108,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
       motivo = `Recargo automático — ${reglaActiva.nombre}`
       const conf = await Swal.fire({
         title: 'Aplicar mora automática',
-        html: `<p style="font-size:13px;color:#374151">Usando regla: <b>${reglaActiva.nombre}</b><br>
+        html: `<p style="font-size:13px;color:#3E5A4C">Usando regla: <b>${reglaActiva.nombre}</b><br>
                Tipo: <b>${tipoRecargo === 'porcentaje' ? pct + '%' : moneda + ' ' + pct + ' fijo'}</b><br>
                ${unidadesMorosas.length} unidades afectadas</p>`,
         icon: 'question', showCancelButton: true,
@@ -118,9 +118,9 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     } else {
       const { value } = await Swal.fire({
         title: 'Recargo masivo por mora',
-        html: `<p style="font-size:13px;color:#374151;margin-bottom:8px">${unidadesMorosas.length} unidades con cuotas vencidas · Porcentaje de recargo:</p>
+        html: `<p style="font-size:13px;color:#3E5A4C;margin-bottom:8px">${unidadesMorosas.length} unidades con cuotas vencidas · Porcentaje de recargo:</p>
                <input id="pct-input" class="swal2-input" type="number" min="0.1" max="100" step="0.1" value="5" style="font-size:14px">
-               <p style="font-size:11px;color:#94a3b8;margin-top:4px">Configura reglas automáticas en la pestaña "Reglas mora"</p>`,
+               <p style="font-size:11px;color:#7E9389;margin-top:4px">Configura reglas automáticas en la pestaña "Reglas mora"</p>`,
         showCancelButton: true, confirmButtonText: 'Aplicar', cancelButtonText: 'Cancelar',
         preConfirm: () => parseFloat((document.getElementById('pct-input') as HTMLInputElement)?.value ?? '0'),
       })
@@ -149,17 +149,17 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Recargos aplicados', val: recargos.filter(r => r.estado === 'aplicado').length, sub: `${moneda} ${totalAplicado.toLocaleString()}`, bg: '#eff6ff', color: '#2563eb' },
+          { label: 'Recargos aplicados', val: recargos.filter(r => r.estado === 'aplicado').length, sub: `${moneda} ${totalAplicado.toLocaleString()}`, bg: '#EEF2EC', color: '#1B3B36' },
           { label: 'Pendientes de aplicar', val: recargos.filter(r => r.estado === 'pendiente').length, sub: `${moneda} ${totalPendiente.toLocaleString()}`, bg: '#fef3c7', color: '#d97706' },
-          { label: 'Anulados', val: recargos.filter(r => r.estado === 'anulado').length, sub: '', bg: '#f3f4f6', color: '#6b7280' },
+          { label: 'Anulados', val: recargos.filter(r => r.estado === 'anulado').length, sub: '', bg: '#EAE6D8', color: '#7E9389' },
           { label: 'Unidades con mora', val: new Set(cuotas.filter(c => c.estado === 'moroso').map(c => c.unidad_id)).size, sub: '', bg: '#fef2f2', color: '#ef4444' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
@@ -174,13 +174,13 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}
-            style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 }}>
+            style={{ padding: '6px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
             <option value="">Todas las unidades</option>
             {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
           </select>
           {(['', 'pendiente', 'aplicado', 'anulado'] as (EstadoRecargo | '')[]).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
-              style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#4f46e5' : '#e2e8f0', background: filtroEstado === e ? '#eef2ff' : 'white', color: filtroEstado === e ? '#4f46e5' : '#64748b' }}>
+              style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#9C5733' : '#E1DDD0', background: filtroEstado === e ? '#F4EBE3' : 'white', color: filtroEstado === e ? '#9C5733' : '#7E9389' }}>
               {e === '' ? 'Todos' : ESTADO_CFG[e].label}
             </button>
           ))}
@@ -194,7 +194,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
           )}
           {canCreate && (
             <button onClick={() => setMostrarForm(!mostrarForm)}
-              style={{ padding: '8px 14px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+              style={{ padding: '8px 14px', background: '#9C5733', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
               {mostrarForm ? '✕ Cancelar' : '+ Recargo individual'}
             </button>
           )}
@@ -203,7 +203,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nuevo recargo de mora</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -246,7 +246,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
             </div>
           )}
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: '#9C5733', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear recargo'}
           </button>
         </div>
@@ -254,14 +254,14 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
 
       {/* Tabla */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0', fontSize: 13 }}>Sin recargos de mora registrados</div>
+        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>Sin recargos de mora registrados</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#f9fafb' }}>
+              <tr style={{ background: '#FAF7EF' }}>
                 {['Unidad', 'Fecha', 'Tipo', 'Valor', 'Monto', 'Estado', 'Motivo', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#6b7280', fontWeight: 600, borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#7E9389', fontWeight: 600, borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -270,21 +270,21 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
                 const ec = ESTADO_CFG[r.estado]
                 const unidad = unidades.find(u => u.id === r.unidad_id)
                 return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <tr key={r.id} style={{ borderBottom: '1px solid #EAE6D8' }}>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? r.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', color: '#6b7280' }}>{r.fecha_aplicacion}</td>
-                    <td style={{ padding: '8px 12px', color: '#374151' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : 'Fijo'}</td>
-                    <td style={{ padding: '8px 12px', color: '#374151' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : `${moneda} ${r.valor}`}</td>
+                    <td style={{ padding: '8px 12px', color: '#7E9389' }}>{r.fecha_aplicacion}</td>
+                    <td style={{ padding: '8px 12px', color: '#3E5A4C' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : 'Fijo'}</td>
+                    <td style={{ padding: '8px 12px', color: '#3E5A4C' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : `${moneda} ${r.valor}`}</td>
                     <td style={{ padding: '8px 12px', fontWeight: 700, color: '#dc2626' }}>{moneda} {r.monto_calculado.toFixed(2)}</td>
                     <td style={{ padding: '8px 12px' }}>
                       <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                     </td>
-                    <td style={{ padding: '8px 12px', color: '#9ca3af', fontSize: 12 }}>{r.motivo ?? '—'}</td>
+                    <td style={{ padding: '8px 12px', color: '#7E9389', fontSize: 12 }}>{r.motivo ?? '—'}</td>
                     <td style={{ padding: '8px 12px' }}>
                       {canEdit && r.estado === 'pendiente' && (
                         <div style={{ display: 'flex', gap: 4 }}>
                           <button onClick={() => cambiarEstado(r, 'aplicado')}
-                            style={{ padding: '4px 8px', background: '#dbeafe', color: '#1d4ed8', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Aplicar</button>
+                            style={{ padding: '4px 8px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Aplicar</button>
                           <button onClick={() => cambiarEstado(r, 'anulado')}
                             style={{ padding: '4px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>Anular</button>
                         </div>

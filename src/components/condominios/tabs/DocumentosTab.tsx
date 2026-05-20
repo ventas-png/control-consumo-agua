@@ -25,7 +25,7 @@ const CATEGORIAS: { value: CategoriaDocumento; label: string; icon: string }[] =
 
 const VISIBILIDAD: { value: VisibilidadDocumento; label: string; color: string }[] = [
   { value: 'admin',      label: 'Solo Admin',   color: '#ef4444' },
-  { value: 'residentes', label: 'Residentes',   color: '#0ea5e9' },
+  { value: 'residentes', label: 'Residentes',   color: '#1B3B36' },
   { value: 'todos',      label: 'Público',      color: '#10b981' },
 ]
 
@@ -96,8 +96,8 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
   const catInfo = (c: CategoriaDocumento) => CATEGORIAS.find(x => x.value === c) ?? CATEGORIAS[CATEGORIAS.length - 1]
   const visInfo = (v: VisibilidadDocumento) => VISIBILIDAD.find(x => x.value === v) ?? VISIBILIDAD[0]
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   // Group by category for display
   const grouped = filtered.reduce<Record<string, DocumentoCondominio[]>>((acc, d) => {
@@ -110,16 +110,16 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
     <div style={{ padding: '20px 24px' }}>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Biblioteca de Documentos</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Biblioteca de Documentos</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Agregar Documento
           </button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Documento' : 'Nuevo Documento'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
@@ -143,7 +143,7 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
               <input style={inputStyle} value={form.version ?? ''} onChange={e => setForm(f => ({ ...f, version: e.target.value }))} placeholder="v1.0" />
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#374151', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#3E5A4C', cursor: 'pointer' }}>
                 <input type="checkbox" checked={form.vigente ?? true} onChange={e => setForm(f => ({ ...f, vigente: e.target.checked }))} />
                 Documento vigente
               </label>
@@ -158,8 +158,8 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
           </div>
@@ -169,25 +169,25 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar documentos…"
-          style={{ padding: '6px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: '#f8fafc', minWidth: '180px' }} />
+          style={{ padding: '6px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: '#FAF7EF', minWidth: '180px' }} />
         <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value as CategoriaDocumento | 'todos')}
-          style={{ padding: '6px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '12px', background: '#f8fafc' }}>
+          style={{ padding: '6px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
           <option value="todos">Todas las categorías</option>
           {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
         </select>
         {(['todos', true, false] as const).map(v => (
           <button key={String(v)} onClick={() => setFiltroVigente(v)}
             style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: filtroVigente === v ? '#0ea5e9' : '#e2e8f0',
-              background: filtroVigente === v ? '#e0f2fe' : 'white',
-              color: filtroVigente === v ? '#0ea5e9' : '#64748b' }}>
+              borderColor: filtroVigente === v ? '#1B3B36' : '#E1DDD0',
+              background: filtroVigente === v ? '#D9E2DC' : 'white',
+              color: filtroVigente === v ? '#1B3B36' : '#7E9389' }}>
             {v === 'todos' ? 'Todos' : v ? 'Vigentes' : 'Histórico'}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>📁</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay documentos en la biblioteca</p>
         </div>
@@ -203,8 +203,8 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
             <div key={cat.value}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                 <span style={{ fontSize: '18px' }}>{cat.icon}</span>
-                <span style={{ fontWeight: 700, fontSize: '14px', color: '#374151' }}>{cat.label}</span>
-                <span style={{ fontSize: '12px', color: '#94a3b8' }}>({grouped[cat.value].length})</span>
+                <span style={{ fontWeight: 700, fontSize: '14px', color: '#3E5A4C' }}>{cat.label}</span>
+                <span style={{ fontSize: '12px', color: '#7E9389' }}>({grouped[cat.value].length})</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
                 {grouped[cat.value].map(d => <DocumentCard key={d.id} doc={d} catInfo={catInfo} visInfo={visInfo} canEdit={canEdit} onEdit={startEdit} onDelete={handleDelete} onToggle={toggleVigente} />)}
@@ -228,22 +228,22 @@ function DocumentCard({ doc, catInfo, visInfo, canEdit, onEdit, onDelete, onTogg
 }) {
   const vi = visInfo(doc.visibilidad)
   return (
-    <div style={{ background: 'white', border: `1.5px solid ${doc.vigente ? '#e2e8f0' : '#f1f5f9'}`, borderRadius: '10px', padding: '14px', opacity: doc.vigente ? 1 : 0.6, display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+    <div style={{ background: 'white', border: `1.5px solid ${doc.vigente ? '#E1DDD0' : '#EAE6D8'}`, borderRadius: '10px', padding: '14px', opacity: doc.vigente ? 1 : 0.6, display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
       <span style={{ fontSize: '28px', flexShrink: 0 }}>{catInfo(doc.categoria).icon}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px', marginBottom: '2px' }}>{doc.titulo}</div>
-        {doc.version && <div style={{ fontSize: '11px', color: '#94a3b8' }}>v{doc.version}</div>}
-        {doc.descripcion && <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>{doc.descripcion}</div>}
+        <div style={{ fontWeight: 700, color: '#15291F', fontSize: '13px', marginBottom: '2px' }}>{doc.titulo}</div>
+        {doc.version && <div style={{ fontSize: '11px', color: '#7E9389' }}>v{doc.version}</div>}
+        {doc.descripcion && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '3px' }}>{doc.descripcion}</div>}
         <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: `${vi.color}15`, color: vi.color }}>{vi.label}</span>
-          {!doc.vigente && <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: '#f1f5f9', color: '#94a3b8' }}>Histórico</span>}
+          {!doc.vigente && <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '4px', background: '#EAE6D8', color: '#7E9389' }}>Histórico</span>}
         </div>
         <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
           <a href={doc.url} target="_blank" rel="noreferrer"
-            style={{ padding: '4px 10px', background: '#e0f2fe', color: '#0369a1', borderRadius: '6px', fontSize: '12px', fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
+            style={{ padding: '4px 10px', background: '#D9E2DC', color: '#102622', borderRadius: '6px', fontSize: '12px', fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
             📄 Abrir
           </a>
-          {canEdit && <button onClick={() => onEdit(doc)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+          {canEdit && <button onClick={() => onEdit(doc)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
           {canEdit && <button onClick={() => onToggle(doc)} style={{ padding: '4px 8px', background: doc.vigente ? '#fef3c7' : '#d1fae5', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }} title={doc.vigente ? 'Archivar' : 'Reactivar'}>{doc.vigente ? '📦' : '♻️'}</button>}
           {canEdit && <button onClick={() => onDelete(doc.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
         </div>

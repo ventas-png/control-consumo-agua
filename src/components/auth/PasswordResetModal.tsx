@@ -59,7 +59,7 @@ export function PasswordResetModal({ onClose }: Props) {
 
         {!sent ? (
           <>
-            <p style={{ color: '#64748b', marginBottom: '16px' }}>
+            <p style={{ color: '#7E9389', marginBottom: '16px' }}>
               Ingresa tu correo electrónico para recibir instrucciones de recuperación.
             </p>
             <div style={{ marginBottom: '16px' }}>
@@ -72,7 +72,7 @@ export function PasswordResetModal({ onClose }: Props) {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="tu@correo.com"
-                style={{ width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '12px', border: '2px solid #E1DDD0', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
               />
               {emailError && (
                 <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>{emailError}</p>
@@ -82,13 +82,13 @@ export function PasswordResetModal({ onClose }: Props) {
               <button
                 onClick={handleRequest}
                 disabled={loading}
-                style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
               >
                 {loading ? 'Enviando...' : 'Enviar Enlace'}
               </button>
               <button
                 onClick={onClose}
-                style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '12px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
               >
                 Cancelar
               </button>
@@ -99,12 +99,12 @@ export function PasswordResetModal({ onClose }: Props) {
             <div style={{ padding: '20px', background: '#d1fae5', borderRadius: '8px', marginBottom: '16px', color: '#059669', fontWeight: 600 }}>
               ✅ ¡Correo enviado! Revisa tu bandeja de entrada.
             </div>
-            <p style={{ color: '#64748b', marginBottom: '20px' }}>
+            <p style={{ color: '#7E9389', marginBottom: '20px' }}>
               Hemos enviado instrucciones de recuperación a tu correo.
             </p>
             <button
               onClick={onClose}
-              style={{ padding: '12px 32px', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+              style={{ padding: '12px 32px', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
             >
               Entendido
             </button>

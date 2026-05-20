@@ -155,18 +155,18 @@ function NuevoComunicadoModal({
 
   const labelStyle: CSSProperties = {
     display: 'block', fontWeight: 600, fontSize: '13px',
-    color: '#374151', marginBottom: '4px',
+    color: '#3E5A4C', marginBottom: '4px',
   }
   const inputStyle: CSSProperties = {
-    width: '100%', padding: '9px 12px', border: '1px solid #d1d5db',
+    width: '100%', padding: '9px 12px', border: '1px solid #C7C2B0',
     borderRadius: '8px', fontSize: '13.5px', boxSizing: 'border-box',
-    outline: 'none', color: '#111827',
+    outline: 'none', color: '#15291F',
   }
   const chipStyle = (active: boolean): CSSProperties => ({
     padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px',
     fontWeight: 600, cursor: 'pointer', border: 'none',
-    background: active ? '#0ea5e9' : '#f1f5f9',
-    color: active ? '#fff' : '#475569',
+    background: active ? '#1B3B36' : '#EAE6D8',
+    color: active ? '#fff' : '#3E5A4C',
     transition: 'all 0.13s ease',
   })
 
@@ -191,14 +191,14 @@ function NuevoComunicadoModal({
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px 14px', borderBottom: '1px solid #e2e8f0', flexShrink: 0,
+          padding: '16px 20px 14px', borderBottom: '1px solid #E1DDD0', flexShrink: 0,
         }}>
-          <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#1e293b' }}>
+          <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#15291F' }}>
             Nuevo comunicado
           </h2>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: '#64748b', padding: '4px 8px', borderRadius: '6px' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: '#7E9389', padding: '4px 8px', borderRadius: '6px' }}
           >×</button>
         </div>
 
@@ -251,9 +251,9 @@ function NuevoComunicadoModal({
             {/* Selector dinámico */}
             {form.target_type === 'proyecto' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
-                {proyectos.length === 0 && <p style={{ color: '#9ca3af', fontSize: '13px' }}>No hay proyectos.</p>}
+                {proyectos.length === 0 && <p style={{ color: '#7E9389', fontSize: '13px' }}>No hay proyectos.</p>}
                 {proyectos.map(p => (
-                  <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13.5px', color: '#374151' }}>
+                  <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13.5px', color: '#3E5A4C' }}>
                     <input
                       type="checkbox"
                       checked={form.selected_proyecto_ids.includes(p.id)}
@@ -267,16 +267,16 @@ function NuevoComunicadoModal({
 
             {form.target_type === 'unidades' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
-                {unidades.length === 0 && <p style={{ color: '#9ca3af', fontSize: '13px' }}>No hay unidades.</p>}
+                {unidades.length === 0 && <p style={{ color: '#7E9389', fontSize: '13px' }}>No hay unidades.</p>}
                 {unidades.filter(u => u.cliente_id).map(u => (
-                  <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13.5px', color: '#374151' }}>
+                  <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13.5px', color: '#3E5A4C' }}>
                     <input
                       type="checkbox"
                       checked={form.selected_unidad_ids.includes(u.id)}
                       onChange={() => setForm(f => ({ ...f, selected_unidad_ids: toggleId(f.selected_unidad_ids, u.id) }))}
                     />
                     {u.nombre}
-                    {u.propietario_nombre && <span style={{ color: '#9ca3af', fontSize: '12px' }}> — {u.propietario_nombre}</span>}
+                    {u.propietario_nombre && <span style={{ color: '#7E9389', fontSize: '12px' }}> — {u.propietario_nombre}</span>}
                   </label>
                 ))}
               </div>
@@ -292,16 +292,16 @@ function NuevoComunicadoModal({
                   style={{ ...inputStyle, marginBottom: '8px' }}
                 />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
-                  {filteredClientes.length === 0 && <p style={{ color: '#9ca3af', fontSize: '13px' }}>Sin resultados.</p>}
+                  {filteredClientes.length === 0 && <p style={{ color: '#7E9389', fontSize: '13px' }}>Sin resultados.</p>}
                   {filteredClientes.map(c => (
-                    <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13.5px', color: '#374151' }}>
+                    <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13.5px', color: '#3E5A4C' }}>
                       <input
                         type="checkbox"
                         checked={form.selected_cliente_ids.includes(c.id)}
                         onChange={() => setForm(f => ({ ...f, selected_cliente_ids: toggleId(f.selected_cliente_ids, c.id) }))}
                       />
                       <span>{c.nombre}</span>
-                      <span style={{ color: '#9ca3af', fontSize: '12px' }}>#{c.codigo}</span>
+                      <span style={{ color: '#7E9389', fontSize: '12px' }}>#{c.codigo}</span>
                     </label>
                   ))}
                 </div>
@@ -315,19 +315,19 @@ function NuevoComunicadoModal({
               type="checkbox"
               checked={form.send_email}
               onChange={e => setForm(f => ({ ...f, send_email: e.target.checked }))}
-              style={{ width: '16px', height: '16px', accentColor: '#0ea5e9' }}
+              style={{ width: '16px', height: '16px', accentColor: '#1B3B36' }}
             />
-            <span style={{ fontSize: '13.5px', color: '#374151' }}>
+            <span style={{ fontSize: '13.5px', color: '#3E5A4C' }}>
               Enviar también por <strong>email</strong> a los clientes que tengan correo registrado
             </span>
           </label>
 
           {/* Preview */}
           <div style={{
-            background: estimated > 0 ? '#f0f9ff' : '#f8fafc',
-            border: `1px solid ${estimated > 0 ? '#bae6fd' : '#e2e8f0'}`,
+            background: estimated > 0 ? '#EEF2EC' : '#FAF7EF',
+            border: `1px solid ${estimated > 0 ? '#C2D2CA' : '#E1DDD0'}`,
             borderRadius: '10px', padding: '12px 16px',
-            fontSize: '13.5px', color: estimated > 0 ? '#0369a1' : '#64748b',
+            fontSize: '13.5px', color: estimated > 0 ? '#102622' : '#7E9389',
             fontWeight: 500,
           }}>
             {estimated === 0
@@ -338,14 +338,14 @@ function NuevoComunicadoModal({
 
         {/* Footer */}
         <div style={{
-          padding: '14px 20px', borderTop: '1px solid #e2e8f0',
+          padding: '14px 20px', borderTop: '1px solid #E1DDD0',
           display: 'flex', justifyContent: 'flex-end', gap: '10px', flexShrink: 0,
         }}>
           <button
             onClick={onClose}
             style={{
-              padding: '9px 20px', border: '1px solid #e2e8f0', borderRadius: '9px',
-              background: 'white', color: '#374151', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px',
+              padding: '9px 20px', border: '1px solid #E1DDD0', borderRadius: '9px',
+              background: 'white', color: '#3E5A4C', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px',
             }}
           >
             Cancelar
@@ -355,7 +355,7 @@ function NuevoComunicadoModal({
             disabled={sending}
             style={{
               padding: '9px 22px', border: 'none', borderRadius: '9px',
-              background: sending ? '#7dd3fc' : '#0ea5e9', color: 'white',
+              background: sending ? '#9CC6B6' : '#1B3B36', color: 'white',
               fontWeight: 700, cursor: sending ? 'not-allowed' : 'pointer', fontSize: '13.5px',
               display: 'flex', alignItems: 'center', gap: '8px',
             }}
@@ -395,7 +395,7 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
 
   return (
     <div style={{
-      background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px',
+      background: 'white', border: '1px solid #E1DDD0', borderRadius: '12px',
       overflow: 'hidden', transition: 'box-shadow 0.15s ease',
     }}>
       <button
@@ -409,9 +409,9 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
         {/* Megaphone icon */}
         <div style={{
           width: '36px', height: '36px', borderRadius: '9px',
-          background: 'linear-gradient(135deg, #e0f2fe, #dbeafe)',
+          background: 'linear-gradient(135deg, #D9E2DC, #D9E2DC)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0, color: '#0ea5e9',
+          flexShrink: 0, color: '#1B3B36',
         }}>
           <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
@@ -421,22 +421,22 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 700, fontSize: '14px', color: '#111827' }}>{broadcast.title}</span>
+            <span style={{ fontWeight: 700, fontSize: '14px', color: '#15291F' }}>{broadcast.title}</span>
             <span style={{
               padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-              background: '#f1f5f9', color: '#64748b',
+              background: '#EAE6D8', color: '#7E9389',
             }}>{targetLabel}</span>
           </div>
-          <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '3px' }}>
+          <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '3px' }}>
             {formatDate(broadcast.created_at)} · {broadcast.sent_by_name}
           </div>
 
           {/* Stats bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', color: '#6b7280' }}>
-              <strong style={{ color: '#111827' }}>{broadcast.recipient_count}</strong> destinatarios
+            <span style={{ fontSize: '12px', color: '#7E9389' }}>
+              <strong style={{ color: '#15291F' }}>{broadcast.recipient_count}</strong> destinatarios
             </span>
-            <span style={{ fontSize: '12px', color: '#6b7280' }}>
+            <span style={{ fontSize: '12px', color: '#7E9389' }}>
               <strong style={{ color: '#059669' }}>{broadcast.read_count ?? 0}</strong> leídos ({pct}%)
             </span>
             {broadcast.send_email && (
@@ -449,7 +449,7 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
         </div>
 
         <svg
-          width="16" height="16" fill="none" stroke="#94a3b8" viewBox="0 0 24 24"
+          width="16" height="16" fill="none" stroke="#7E9389" viewBox="0 0 24 24"
           style={{ flexShrink: 0, transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -459,9 +459,9 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
       {expanded && (
         <div style={{
           padding: '0 18px 16px 66px',
-          borderTop: '1px solid #f1f5f9', paddingTop: '12px',
+          borderTop: '1px solid #EAE6D8', paddingTop: '12px',
         }}>
-          <p style={{ margin: 0, fontSize: '13.5px', color: '#374151', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+          <p style={{ margin: 0, fontSize: '13.5px', color: '#3E5A4C', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
             {broadcast.body}
           </p>
         </div>
@@ -483,8 +483,8 @@ export default function DifusionTab({ currentUser, clientes, proyectos, unidades
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#111827' }}>Difusión</h2>
-          <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#6b7280' }}>
+          <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#15291F' }}>Difusión</h2>
+          <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#7E9389' }}>
             Comunicados masivos enviados a grupos de clientes
           </p>
         </div>
@@ -493,7 +493,7 @@ export default function DifusionTab({ currentUser, clientes, proyectos, unidades
             onClick={() => setShowModal(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '9px 18px', background: '#0ea5e9', color: 'white',
+              padding: '9px 18px', background: '#1B3B36', color: 'white',
               border: 'none', borderRadius: '10px', fontWeight: 700,
               fontSize: '13.5px', cursor: 'pointer',
             }}
@@ -508,7 +508,7 @@ export default function DifusionTab({ currentUser, clientes, proyectos, unidades
 
       {/* List */}
       {loading && (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af', fontSize: '14px' }}>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '14px' }}>
           Cargando comunicados...
         </div>
       )}
@@ -516,14 +516,14 @@ export default function DifusionTab({ currentUser, clientes, proyectos, unidades
       {!loading && broadcasts.length === 0 && (
         <div style={{
           textAlign: 'center', padding: '56px 24px',
-          background: 'white', border: '1px dashed #e2e8f0', borderRadius: '16px',
+          background: 'white', border: '1px dashed #E1DDD0', borderRadius: '16px',
         }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>📣</div>
-          <p style={{ margin: 0, color: '#64748b', fontWeight: 600, fontSize: '14px' }}>
+          <p style={{ margin: 0, color: '#7E9389', fontWeight: 600, fontSize: '14px' }}>
             No hay comunicados enviados todavía
           </p>
           {canCreate && (
-            <p style={{ margin: '6px 0 0', color: '#9ca3af', fontSize: '13px' }}>
+            <p style={{ margin: '6px 0 0', color: '#7E9389', fontSize: '13px' }}>
               Crea el primero con el botón de arriba
             </p>
           )}

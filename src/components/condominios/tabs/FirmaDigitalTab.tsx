@@ -17,7 +17,7 @@ const ESTADO_CONFIG: Record<EstadoFirma, { label: string; color: string; bg: str
   pendiente: { label: 'Pendiente', color: '#f59e0b', bg: '#fef3c7', icon: '⏳' },
   firmado:   { label: 'Firmado',   color: '#10b981', bg: '#d1fae5', icon: '✅' },
   rechazado: { label: 'Rechazado', color: '#ef4444', bg: '#fee2e2', icon: '❌' },
-  expirado:  { label: 'Expirado',  color: '#94a3b8', bg: '#f1f5f9', icon: '⌛' },
+  expirado:  { label: 'Expirado',  color: '#7E9389', bg: '#EAE6D8', icon: '⌛' },
 }
 
 const TIPO_LABELS: Record<TipoDocumentoFirma, string> = {
@@ -91,8 +91,8 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -100,28 +100,28 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Total solicitudes', value: String(firmas.length), icon: '📝', color: '#0ea5e9' },
+          { label: 'Total solicitudes', value: String(firmas.length), icon: '📝', color: '#1B3B36' },
           { label: 'Pendientes',        value: String(pendientes),    icon: '⏳', color: '#f59e0b' },
           { label: 'Firmados',          value: String(firmados),      icon: '✅', color: '#10b981' },
           { label: 'Expirados pronto',  value: String(expirados),     icon: '⌛', color: '#ef4444' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Firma Digital de Documentos</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Firma Digital de Documentos</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Solicitud</button>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Solicitud</button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Solicitud' : 'Nueva Solicitud de Firma'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
@@ -165,8 +165,8 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear Solicitud'}
             </button>
           </div>
@@ -178,16 +178,16 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
         {(['todos', 'pendiente', 'firmado', 'rechazado', 'expirado'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: filtroEstado === e ? '#0ea5e9' : '#e2e8f0',
-              background: filtroEstado === e ? '#e0f2fe' : 'white',
-              color: filtroEstado === e ? '#0ea5e9' : '#64748b' }}>
+              borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0',
+              background: filtroEstado === e ? '#D9E2DC' : 'white',
+              color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
             {e === 'todos' ? `Todas (${firmas.length})` : `${ESTADO_CONFIG[e as EstadoFirma]?.icon} ${ESTADO_CONFIG[e as EstadoFirma]?.label} (${firmas.filter(f => f.estado === e).length})`}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>✍️</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay solicitudes de firma</p>
         </div>
@@ -197,19 +197,19 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
             const est = ESTADO_CONFIG[f.estado]
             const venceProto = f.estado === 'pendiente' && f.fecha_vencimiento && f.fecha_vencimiento <= today
             return (
-              <div key={f.id} style={{ background: 'white', border: `1.5px solid ${venceProto ? '#fcd34d' : '#e2e8f0'}`, borderRadius: '10px', padding: '16px' }}>
+              <div key={f.id} style={{ background: 'white', border: `1.5px solid ${venceProto ? '#fcd34d' : '#E1DDD0'}`, borderRadius: '10px', padding: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                   <div style={{ flex: 1, marginRight: '8px' }}>
-                    <div style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', lineHeight: 1.3 }}>{f.documento_titulo}</div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{TIPO_LABELS[f.documento_tipo]}</div>
+                    <div style={{ fontWeight: 800, fontSize: '14px', color: '#15291F', lineHeight: 1.3 }}>{f.documento_titulo}</div>
+                    <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>{TIPO_LABELS[f.documento_tipo]}</div>
                   </div>
                   <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color, whiteSpace: 'nowrap' }}>{est.icon} {est.label}</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: '#7E9389', marginBottom: '10px' }}>
                   {f.unidad_nombre && <div>🏠 {f.unidad_nombre}</div>}
                   {f.firmante_nombre && <div>👤 {f.firmante_nombre}</div>}
                   {f.firmante_email && <div>✉️ {f.firmante_email}</div>}
-                  {f.fecha_vencimiento && <div style={{ color: venceProto ? '#ef4444' : '#64748b', fontWeight: venceProto ? 700 : 400 }}>📅 Vence: {f.fecha_vencimiento}{venceProto ? ' ⚠️' : ''}</div>}
+                  {f.fecha_vencimiento && <div style={{ color: venceProto ? '#ef4444' : '#7E9389', fontWeight: venceProto ? 700 : 400 }}>📅 Vence: {f.fecha_vencimiento}{venceProto ? ' ⚠️' : ''}</div>}
                   {f.fecha_firma && <div style={{ color: '#10b981', fontWeight: 600 }}>✅ Firmado: {new Date(f.fecha_firma).toLocaleDateString()}</div>}
                 </div>
                 {canEdit && (
@@ -217,7 +217,7 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
                     {f.estado === 'pendiente' && (
                       <button onClick={() => marcarFirmado(f.id)} style={{ flex: 1, padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>✅ Marcar firmado</button>
                     )}
-                    <button onClick={() => startEdit(f)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                    <button onClick={() => startEdit(f)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
                     <button onClick={() => handleDelete(f.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                   </div>
                 )}

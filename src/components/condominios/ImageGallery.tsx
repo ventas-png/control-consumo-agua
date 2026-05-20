@@ -31,7 +31,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
             <SecureImage
               src={url}
               alt={`foto ${i + 1}`}
-              style={{ width: 64, height: 48, objectFit: 'cover', borderRadius: 7, border: '1.5px solid #e2e8f0', display: 'block' }}
+              style={{ width: 64, height: 48, objectFit: 'cover', borderRadius: 7, border: '1.5px solid #E1DDD0', display: 'block' }}
             />
             {i === maxVisible - 1 && extra > 0 && (
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

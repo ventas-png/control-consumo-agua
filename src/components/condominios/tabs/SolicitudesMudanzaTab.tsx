@@ -22,7 +22,7 @@ function SignedMudanzaImageLink({ url, idx }: { url: string; idx: number }) {
         alt={`Imagen ${idx + 1}`}
         style={{
           width: 84, height: 84, objectFit: 'cover',
-          borderRadius: 6, border: '1.5px solid #e2e8f0',
+          borderRadius: 6, border: '1.5px solid #E1DDD0',
           cursor: 'zoom-in',
         }}
       />
@@ -52,10 +52,10 @@ const ESTADO_CFG: Record<EstadoSolicitudMudanza, { label: string; color: string;
   pendiente:  { label: 'Pendiente',  color: '#d97706', bg: '#fef3c7', icon: '⏳' },
   aprobada:   { label: 'Aprobada',   color: '#16a34a', bg: '#dcfce7', icon: '✅' },
   rechazada:  { label: 'Rechazada',  color: '#dc2626', bg: '#fef2f2', icon: '❌' },
-  programada: { label: 'Programada', color: '#0ea5e9', bg: '#e0f2fe', icon: '📅' },
+  programada: { label: 'Programada', color: '#1B3B36', bg: '#D9E2DC', icon: '📅' },
   en_curso:   { label: 'En Curso',   color: '#f59e0b', bg: '#fef3c7', icon: '🚚' },
   completada: { label: 'Completada', color: '#10b981', bg: '#d1fae5', icon: '🏁' },
-  cancelada:  { label: 'Cancelada',  color: '#64748b', bg: '#f1f5f9', icon: '🚫' },
+  cancelada:  { label: 'Cancelada',  color: '#7E9389', bg: '#EAE6D8', icon: '🚫' },
 }
 
 // Estados que indican una mudanza ya aprobada (en flujo operativo).
@@ -215,32 +215,32 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
   const chipStyle = (active: boolean, color: string): CSSProperties => ({
     padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
     cursor: 'pointer', border: 'none',
-    background: active ? color : '#f1f5f9',
-    color: active ? 'white' : '#64748b',
+    background: active ? color : '#EAE6D8',
+    color: active ? 'white' : '#7E9389',
   })
 
   const fieldStyle: CSSProperties = {
     padding: '7px 10px', fontSize: '13px', borderRadius: '8px',
-    border: '1.5px solid #e2e8f0', background: 'white',
+    border: '1.5px solid #E1DDD0', background: 'white',
   }
 
   return (
     <div>
       {/* Header */}
       <div style={{ marginBottom: '20px' }}>
-        <h3 style={{ margin: '0 0 4px', fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '17px', fontWeight: 700, color: '#15291F' }}>
           🚛 Autorizaciones y Control de Mudanzas
         </h3>
-        <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+        <p style={{ margin: 0, fontSize: '13px', color: '#7E9389' }}>
           Gestiona el flujo completo: solicitud del residente → aprobación → ejecución con depósito y ascensor.
         </p>
       </div>
 
       {/* Alertas operativas */}
       {mudanzasHoy.length > 0 && (
-        <div style={{ background: '#ede9fe', border: '1px solid #8b5cf6', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: '#F4EBE3', border: '1px solid #B96A3F', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>🚚</span>
-          <span style={{ fontSize: '13px', color: '#5b21b6', fontWeight: 600 }}>
+          <span style={{ fontSize: '13px', color: '#5E3417', fontWeight: 600 }}>
             {mudanzasHoy.length} mudanza{mudanzasHoy.length > 1 ? 's' : ''} programada{mudanzasHoy.length > 1 ? 's' : ''} para hoy
           </span>
         </div>
@@ -255,30 +255,30 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
       )}
 
       {/* Terms configuration section */}
-      <div style={{ marginBottom: '20px', border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+      <div style={{ marginBottom: '20px', border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden' }}>
         <button
           onClick={() => setTerminosOpen(o => !o)}
           style={{
-            width: '100%', padding: '12px 16px', background: '#f8fafc',
+            width: '100%', padding: '12px 16px', background: '#FAF7EF',
             border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
             justifyContent: 'space-between', gap: '12px',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '15px' }}>📋</span>
-            <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#0f172a' }}>Términos de mudanza</span>
+            <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#15291F' }}>Términos de mudanza</span>
             {terminosMudanza && !terminosOpen && (
-              <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 400, maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '11.5px', color: '#7E9389', fontWeight: 400, maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 — {terminosMudanza.slice(0, 80)}{terminosMudanza.length > 80 ? '…' : ''}
               </span>
             )}
           </div>
-          <span style={{ color: '#94a3b8', fontSize: '14px' }}>{terminosOpen ? '▲' : '▼'}</span>
+          <span style={{ color: '#7E9389', fontSize: '14px' }}>{terminosOpen ? '▲' : '▼'}</span>
         </button>
 
         {terminosOpen && (
-          <div style={{ padding: '16px', borderTop: '1px solid #e2e8f0' }}>
-            <p style={{ margin: '0 0 10px', fontSize: '12.5px', color: '#64748b' }}>
+          <div style={{ padding: '16px', borderTop: '1px solid #E1DDD0' }}>
+            <p style={{ margin: '0 0 10px', fontSize: '12.5px', color: '#7E9389' }}>
               Este texto se mostrará al cliente cuando solicite una mudanza. Si está configurado, el cliente deberá aceptarlo para poder enviar la solicitud.
             </p>
             <textarea
@@ -287,9 +287,9 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
               placeholder="Escribe aquí los términos y condiciones para autorización de mudanzas…"
               style={{
                 width: '100%', minHeight: '120px', padding: '10px 12px',
-                fontSize: '13px', borderRadius: '8px', border: '1.5px solid #e2e8f0',
+                fontSize: '13px', borderRadius: '8px', border: '1.5px solid #E1DDD0',
                 resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit',
-                lineHeight: 1.6, color: '#334155',
+                lineHeight: 1.6, color: '#3E5A4C',
               }}
             />
             <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
@@ -297,7 +297,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
                 onClick={guardarTerminos}
                 disabled={savingTerminos}
                 style={{
-                  padding: '8px 20px', background: '#4f46e5', color: 'white',
+                  padding: '8px 20px', background: '#9C5733', color: 'white',
                   border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13px',
                   cursor: savingTerminos ? 'not-allowed' : 'pointer',
                   opacity: savingTerminos ? 0.7 : 1,
@@ -326,18 +326,18 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <button style={chipStyle(filtroEstado === 'all', '#64748b')} onClick={() => setFiltroEstado('all')}>Todas</button>
+        <button style={chipStyle(filtroEstado === 'all', '#7E9389')} onClick={() => setFiltroEstado('all')}>Todas</button>
         <button style={chipStyle(filtroEstado === 'pendiente', '#f59e0b')} onClick={() => setFiltroEstado('pendiente')}>⏳ Pendientes</button>
         <button style={chipStyle(filtroEstado === 'aprobada', '#16a34a')} onClick={() => setFiltroEstado('aprobada')}>✅ Aprobadas</button>
-        <button style={chipStyle(filtroEstado === 'operativas', '#0ea5e9')} onClick={() => setFiltroEstado('operativas')}>🚚 En ejecución</button>
+        <button style={chipStyle(filtroEstado === 'operativas', '#1B3B36')} onClick={() => setFiltroEstado('operativas')}>🚚 En ejecución</button>
         <button style={chipStyle(filtroEstado === 'completada', '#10b981')} onClick={() => setFiltroEstado('completada')}>🏁 Completadas</button>
         <button style={chipStyle(filtroEstado === 'rechazada', '#dc2626')} onClick={() => setFiltroEstado('rechazada')}>❌ Rechazadas</button>
-        <button style={chipStyle(filtroEstado === 'cancelada', '#64748b')} onClick={() => setFiltroEstado('cancelada')}>🚫 Canceladas</button>
+        <button style={chipStyle(filtroEstado === 'cancelada', '#7E9389')} onClick={() => setFiltroEstado('cancelada')}>🚫 Canceladas</button>
       </div>
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
           <div style={{ fontSize: '36px', marginBottom: '10px' }}>🚛</div>
           <div style={{ fontSize: '14px' }}>No hay solicitudes{filtroEstado !== 'all' ? ` en este estado` : ''}</div>
         </div>
@@ -350,7 +350,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
 
         return (
           <div key={s.id} style={{
-            border: `1.5px solid ${expanded ? '#c7d2fe' : '#e2e8f0'}`,
+            border: `1.5px solid ${expanded ? '#E6CDBB' : '#E1DDD0'}`,
             borderRadius: '12px', marginBottom: '10px',
             background: expanded ? '#fafafe' : 'white', transition: 'all 0.15s',
           }}>
@@ -360,36 +360,36 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
               onClick={() => onExpand(s.id)}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: '#15291F' }}>
                   {tipo.icon} {unidadNombre(s)}
                 </div>
-                <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '2px' }}>
+                <div style={{ fontSize: '12.5px', color: '#7E9389', marginTop: '2px' }}>
                   {tipo.label} · {fecha}
                   {s.fecha_solicitada && <span>{'  ·  '}Propuesto: {s.fecha_solicitada}{s.hora_solicitada ? ` ${s.hora_solicitada}` : ''}</span>}
                 </div>
                 {esOperativa && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
-                    {s.ascensor_reservado && <span style={{ fontSize: '10px', fontWeight: 600, background: '#e0f2fe', color: '#0369a1', padding: '1px 6px', borderRadius: '4px' }}>🛗 Ascensor</span>}
+                    {s.ascensor_reservado && <span style={{ fontSize: '10px', fontWeight: 600, background: '#D9E2DC', color: '#102622', padding: '1px 6px', borderRadius: '4px' }}>🛗 Ascensor</span>}
                     {s.deposito_requerido && (
                       <span style={{ fontSize: '10px', fontWeight: 600, background: s.deposito_pagado ? '#d1fae5' : '#fef3c7', color: s.deposito_pagado ? '#059669' : '#92400e', padding: '1px 6px', borderRadius: '4px' }}>
                         💰 {s.deposito_pagado ? 'Depósito pagado' : 'Depósito pendiente'}{s.monto_deposito ? ` (${moneda} ${s.monto_deposito})` : ''}
                       </span>
                     )}
-                    {s.empresa_mudanza && <span style={{ fontSize: '10px', fontWeight: 600, background: '#f1f5f9', color: '#475569', padding: '1px 6px', borderRadius: '4px' }}>🏢 {s.empresa_mudanza}</span>}
+                    {s.empresa_mudanza && <span style={{ fontSize: '10px', fontWeight: 600, background: '#EAE6D8', color: '#3E5A4C', padding: '1px 6px', borderRadius: '4px' }}>🏢 {s.empresa_mudanza}</span>}
                   </div>
                 )}
               </div>
               <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 600, background: est.bg, color: est.color, whiteSpace: 'nowrap' }}>
                 {est.icon} {est.label}
               </span>
-              <span style={{ color: '#94a3b8', fontSize: '16px' }}>{expanded ? '▲' : '▼'}</span>
+              <span style={{ color: '#7E9389', fontSize: '16px' }}>{expanded ? '▲' : '▼'}</span>
             </div>
 
             {/* Expanded */}
             {expanded && (
-              <div style={{ padding: '0 16px 16px', borderTop: '1px solid #e2e8f0' }}>
+              <div style={{ padding: '0 16px 16px', borderTop: '1px solid #E1DDD0' }}>
                 {s.descripcion && (
-                  <div style={{ marginTop: '12px', background: '#f8fafc', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#334155' }}>
+                  <div style={{ marginTop: '12px', background: '#FAF7EF', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#3E5A4C' }}>
                     <strong>Descripción:</strong> {s.descripcion}
                   </div>
                 )}
@@ -397,7 +397,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
                 {/* Attached images */}
                 {s.imagenes && s.imagenes.length > 0 && (
                   <div style={{ marginTop: '12px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', marginBottom: '8px' }}>
                       🖼️ Imágenes adjuntas:
                     </div>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -425,14 +425,14 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
                 {s.estado === 'pendiente' && canEdit && (
                   <div style={{ marginTop: '14px', display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                     <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>Fecha autorizada</label>
+                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha autorizada</label>
                       <input
                         type="date" value={fechaAut} onChange={e => setFechaAut(e.target.value)}
                         onClick={e => e.stopPropagation()} style={fieldStyle}
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>Hora</label>
+                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora</label>
                       <input
                         type="time" value={horaAut} onChange={e => setHoraAut(e.target.value)}
                         onClick={e => e.stopPropagation()} style={fieldStyle}
@@ -453,11 +453,11 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
 
                 {/* Operational controls for aprobada/programada/en_curso/completada */}
                 {esOperativa && canEdit && (
-                  <div style={{ marginTop: '14px', padding: '12px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '10px' }}>🚚 Control operativo</div>
+                  <div style={{ marginTop: '14px', padding: '12px', background: '#FAF7EF', borderRadius: '10px', border: '1px solid #E1DDD0' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C', marginBottom: '10px' }}>🚚 Control operativo</div>
 
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '10px' }}>
-                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#475569' }}>Estado:</label>
+                      <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#3E5A4C' }}>Estado:</label>
                       <select
                         value={s.estado}
                         onChange={e => { e.stopPropagation(); cambiarEstado(s.id, e.target.value as EstadoSolicitudMudanza) }}
@@ -473,7 +473,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
                     </div>
 
                     <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151', cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#3E5A4C', cursor: 'pointer' }}>
                         <input
                           type="checkbox" checked={s.ascensor_reservado ?? false}
                           onChange={e => { e.stopPropagation(); toggleCampo(s.id, 'ascensor_reservado', e.target.checked) }}
@@ -481,7 +481,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
                         />
                         🛗 Ascensor reservado
                       </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151', cursor: 'pointer' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#3E5A4C', cursor: 'pointer' }}>
                         <input
                           type="checkbox" checked={s.deposito_requerido ?? false}
                           onChange={e => { e.stopPropagation(); toggleCampo(s.id, 'deposito_requerido', e.target.checked) }}
@@ -491,7 +491,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
                       </label>
                       {s.deposito_requerido && (
                         <>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151', cursor: 'pointer' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#3E5A4C', cursor: 'pointer' }}>
                             <input
                               type="checkbox" checked={s.deposito_pagado ?? false}
                               onChange={e => { e.stopPropagation(); toggleCampo(s.id, 'deposito_pagado', e.target.checked) }}
@@ -500,7 +500,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
                             Pagado
                           </label>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '12px', color: '#475569' }}>{moneda}</span>
+                            <span style={{ fontSize: '12px', color: '#3E5A4C' }}>{moneda}</span>
                             <input
                               type="number" min="0" step="0.01"
                               defaultValue={s.monto_deposito ?? ''}

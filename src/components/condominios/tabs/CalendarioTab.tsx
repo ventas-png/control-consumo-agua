@@ -25,12 +25,12 @@ interface CalEvent {
 }
 
 const TIPO_COLOR: Record<string, string> = {
-  evento:        '#0ea5e9',
+  evento:        '#1B3B36',
   mantenimiento: '#f59e0b',
-  asamblea:      '#8b5cf6',
+  asamblea:      '#B96A3F',
   vencimiento:   '#ef4444',
   recordatorio:  '#10b981',
-  agenda:        '#64748b',
+  agenda:        '#7E9389',
 }
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -52,12 +52,12 @@ function buildMonthGrid(year: number, month: number): (number | null)[] {
 function mergeAll(eventos: EventoCalendario[], asambleas: Asamblea[], agenda: AgendaItem[]): CalEvent[] {
   const result: CalEvent[] = []
   for (const e of eventos) result.push({ id: e.id, date: e.fecha_inicio, titulo: e.titulo, tipo: e.tipo, color: e.color, hora: e.hora_inicio ?? undefined, source: 'evento' })
-  for (const a of asambleas) result.push({ id: a.id, date: a.fecha, titulo: a.titulo, tipo: 'asamblea', color: '#8b5cf6', hora: a.hora_inicio, source: 'asamblea' })
+  for (const a of asambleas) result.push({ id: a.id, date: a.fecha, titulo: a.titulo, tipo: 'asamblea', color: '#B96A3F', hora: a.hora_inicio, source: 'asamblea' })
   for (const ag of agenda) result.push({ id: ag.id, date: ag.fecha, titulo: ag.titulo, tipo: 'agenda', color: TIPO_COLOR.agenda, hora: ag.hora_inicio ?? undefined, source: 'agenda' })
   return result
 }
 
-const BLANK_FORM = { titulo: '', tipo: 'evento' as TipoEvento, fecha_inicio: '', hora_inicio: '', fecha_fin: '', descripcion: '', color: '#0ea5e9', todo_el_dia: true }
+const BLANK_FORM = { titulo: '', tipo: 'evento' as TipoEvento, fecha_inicio: '', hora_inicio: '', fecha_fin: '', descripcion: '', color: '#1B3B36', todo_el_dia: true }
 
 export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
   const now = new Date()
@@ -118,25 +118,25 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
   }
 
   const selectedEvents = selectedDay ? eventsForDay(selectedDay) : []
-  const inputStyle: CSSProperties = { width: '100%', padding: '7px 10px', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '7px 10px', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Calendario Comunitario</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Calendario Comunitario</h2>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {/* Legend */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {[['evento','Evento'],['mantenimiento','Mant.'],['asamblea','Asamblea'],['recordatorio','Recordatorio']].map(([tipo, label]) => (
-              <span key={tipo} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#64748b' }}>
+              <span key={tipo} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#7E9389' }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: TIPO_COLOR[tipo], display: 'inline-block' }} />{label}
               </span>
             ))}
           </div>
           {canCreate && (
             <button onClick={() => { setShowForm(v => !v); setSelectedDay(null) }}
-              style={{ padding: '7px 14px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 14px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               + Evento
             </button>
           )}
@@ -145,15 +145,15 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
 
       {/* Add form */}
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nuevo evento</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Título *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Título *</label>
               <input style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Nombre del evento" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Tipo *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Tipo *</label>
               <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value as TipoEvento)}>
                 {(['evento','mantenimiento','asamblea','vencimiento','recordatorio'] as TipoEvento[]).map(t => (
                   <option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>
@@ -161,37 +161,37 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Fecha inicio *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha inicio *</label>
               <input style={inputStyle} type="date" value={form.fecha_inicio} onChange={e => setF('fecha_inicio', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>
                 <input type="checkbox" checked={form.todo_el_dia} onChange={e => setF('todo_el_dia', e.target.checked)} style={{ marginRight: '4px' }} />
                 Todo el día
               </label>
               {!form.todo_el_dia && <input style={inputStyle} type="time" value={form.hora_inicio} onChange={e => setF('hora_inicio', e.target.value)} />}
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Color</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Color</label>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
-                {['#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#0f172a'].map(c => (
+                {['#1B3B36','#10b981','#f59e0b','#ef4444','#B96A3F','#ec4899','#15291F'].map(c => (
                   <div key={c} onClick={() => setF('color', c)}
-                    style={{ width: '20px', height: '20px', borderRadius: '50%', background: c, cursor: 'pointer', border: form.color === c ? '2px solid #0f172a' : '2px solid transparent' }} />
+                    style={{ width: '20px', height: '20px', borderRadius: '50%', background: c, cursor: 'pointer', border: form.color === c ? '2px solid #15291F' : '2px solid transparent' }} />
                 ))}
               </div>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Descripción</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Descripción</label>
               <input style={inputStyle} value={form.descripcion} onChange={e => setF('descripcion', e.target.value)} placeholder="Descripción opcional" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -200,17 +200,17 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
 
       <div style={{ display: 'grid', gridTemplateColumns: selectedDay ? '1fr 280px' : '1fr', gap: '16px' }}>
         {/* Calendar grid */}
-        <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden' }}>
           {/* Month nav */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-            <button onClick={prevMonth} style={{ padding: '4px 10px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>‹</button>
-            <span style={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>{MESES[viewMonth]} {viewYear}</span>
-            <button onClick={nextMonth} style={{ padding: '4px 10px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>›</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#FAF7EF', borderBottom: '1px solid #E1DDD0' }}>
+            <button onClick={prevMonth} style={{ padding: '4px 10px', background: 'white', border: '1px solid #E1DDD0', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>‹</button>
+            <span style={{ fontWeight: 800, fontSize: '15px', color: '#15291F' }}>{MESES[viewMonth]} {viewYear}</span>
+            <button onClick={nextMonth} style={{ padding: '4px 10px', background: 'white', border: '1px solid #E1DDD0', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>›</button>
           </div>
           {/* Day headers */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#FAF7EF', borderBottom: '1px solid #E1DDD0' }}>
             {DIAS.map(d => (
-              <div key={d} style={{ padding: '6px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: '#64748b' }}>{d}</div>
+              <div key={d} style={{ padding: '6px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: '#7E9389' }}>{d}</div>
             ))}
           </div>
           {/* Days */}
@@ -223,14 +223,14 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
               return (
                 <div key={idx} onClick={() => day && setSelectedDay(isSelected ? null : dateStr)}
                   style={{
-                    minHeight: '70px', padding: '6px', borderRight: (idx + 1) % 7 !== 0 ? '1px solid #f1f5f9' : 'none',
-                    borderBottom: '1px solid #f1f5f9', cursor: day ? 'pointer' : 'default',
-                    background: isSelected ? '#eff6ff' : isToday ? '#fefce8' : day ? 'white' : '#fafafa',
+                    minHeight: '70px', padding: '6px', borderRight: (idx + 1) % 7 !== 0 ? '1px solid #EAE6D8' : 'none',
+                    borderBottom: '1px solid #EAE6D8', cursor: day ? 'pointer' : 'default',
+                    background: isSelected ? '#EEF2EC' : isToday ? '#fefce8' : day ? 'white' : '#FAF7EF',
                   }}>
                   {day && (
                     <>
                       <div style={{ fontSize: '12px', fontWeight: isToday ? 800 : 500, marginBottom: '4px',
-                        background: isToday ? '#0ea5e9' : 'transparent', color: isToday ? 'white' : '#0f172a',
+                        background: isToday ? '#1B3B36' : 'transparent', color: isToday ? 'white' : '#15291F',
                         width: isToday ? '22px' : 'auto', height: isToday ? '22px' : 'auto',
                         borderRadius: isToday ? '50%' : '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {day}
@@ -241,7 +241,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
                             {e.titulo}
                           </div>
                         ))}
-                        {dayEvents.length > 3 && <div style={{ fontSize: '10px', color: '#94a3b8' }}>+{dayEvents.length - 3}</div>}
+                        {dayEvents.length > 3 && <div style={{ fontSize: '10px', color: '#7E9389' }}>+{dayEvents.length - 3}</div>}
                       </div>
                     </>
                   )}
@@ -253,25 +253,25 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
 
         {/* Selected day panel */}
         {selectedDay && (
-          <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', alignSelf: 'start' }}>
-            <div style={{ padding: '12px 14px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>{selectedDay}</span>
-              <button onClick={() => setSelectedDay(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '16px' }}>×</button>
+          <div style={{ border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden', alignSelf: 'start' }}>
+            <div style={{ padding: '12px 14px', background: '#FAF7EF', borderBottom: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 700, fontSize: '13px', color: '#15291F' }}>{selectedDay}</span>
+              <button onClick={() => setSelectedDay(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', fontSize: '16px' }}>×</button>
             </div>
             {selectedEvents.length === 0 ? (
-              <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>Sin eventos este día.</div>
+              <div style={{ padding: '20px', textAlign: 'center', color: '#7E9389', fontSize: '12px' }}>Sin eventos este día.</div>
             ) : (
               <div style={{ padding: '8px' }}>
                 {selectedEvents.map(e => (
                   <div key={e.id} style={{ padding: '8px 10px', marginBottom: '6px', background: 'white', border: `1.5px solid ${e.color}30`, borderLeft: `4px solid ${e.color}`, borderRadius: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>{e.titulo}</div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#15291F' }}>{e.titulo}</div>
                       {canEdit && e.source === 'evento' && (
                         <button onClick={() => handleDelete(e.id)}
                           style={{ padding: '2px 6px', background: '#fee2e2', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', color: '#ef4444', flexShrink: 0, marginLeft: '6px' }}>🗑️</button>
                       )}
                     </div>
-                    {e.hora && <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>🕐 {e.hora}</div>}
+                    {e.hora && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>🕐 {e.hora}</div>}
                     <div style={{ fontSize: '10px', color: e.color, fontWeight: 600, marginTop: '2px', textTransform: 'capitalize' }}>{e.tipo}</div>
                   </div>
                 ))}

@@ -22,9 +22,9 @@ const ESTADO_CUOTA_CFG: Record<string, { color: string; bg: string; label: strin
 }
 
 const ESTADO_TICKET_CFG: Record<string, { color: string; bg: string }> = {
-  abierto:    { color: '#64748b', bg: '#f8fafc' },
+  abierto:    { color: '#7E9389', bg: '#FAF7EF' },
   en_proceso: { color: '#d97706', bg: '#fef3c7' },
-  resuelto:   { color: '#2563eb', bg: '#eff6ff' },
+  resuelto:   { color: '#1B3B36', bg: '#EEF2EC' },
   cerrado:    { color: '#16a34a', bg: '#dcfce7' },
 }
 
@@ -74,27 +74,27 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>Resumen Residente — ${unidad?.nombre}</title>
     <style>
-      body{font-family:Arial,sans-serif;padding:32px;max-width:700px;margin:auto;color:#0f172a;font-size:13px}
-      h1{font-size:20px;margin:0}h2{font-size:13px;color:#64748b;font-weight:normal;margin:4px 0 0}
-      .header{border-bottom:2px solid #0f172a;padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between}
+      body{font-family:Arial,sans-serif;padding:32px;max-width:700px;margin:auto;color:#15291F;font-size:13px}
+      h1{font-size:20px;margin:0}h2{font-size:13px;color:#7E9389;font-weight:normal;margin:4px 0 0}
+      .header{border-bottom:2px solid #15291F;padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between}
       .kpi{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:16px 0}
-      .kpi-card{background:#f8fafc;border-radius:8px;padding:10px 14px;border:1px solid #e5e7eb}
+      .kpi-card{background:#FAF7EF;border-radius:8px;padding:10px 14px;border:1px solid #E1DDD0}
       .kpi-val{font-size:18px;font-weight:800;margin:2px 0}
       table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px}
-      th{background:#f1f5f9;padding:7px 10px;text-align:left;color:#64748b;font-weight:600}
-      td{padding:7px 10px;border-bottom:1px solid #f1f5f9}
+      th{background:#EAE6D8;padding:7px 10px;text-align:left;color:#7E9389;font-weight:600}
+      td{padding:7px 10px;border-bottom:1px solid #EAE6D8}
       section{margin-top:20px}
-      h3{font-size:14px;font-weight:700;border-bottom:1px solid #e5e7eb;padding-bottom:6px;margin-bottom:12px}
-      .footer{margin-top:32px;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:8px}
+      h3{font-size:14px;font-weight:700;border-bottom:1px solid #E1DDD0;padding-bottom:6px;margin-bottom:12px}
+      .footer{margin-top:32px;font-size:10px;color:#7E9389;border-top:1px solid #E1DDD0;padding-top:8px}
     </style></head><body>
     <div class="header">
       <div><h1>${proyectoNombre ?? 'Condominio'}</h1><h2>Resumen de Residente — ${unidad?.nombre ?? unidadId}</h2></div>
-      <div style="font-size:11px;color:#64748b">Generado: ${new Date().toLocaleDateString('es')}</div>
+      <div style="font-size:11px;color:#7E9389">Generado: ${new Date().toLocaleDateString('es')}</div>
     </div>
     <div class="kpi">
-      <div class="kpi-card"><div style="font-size:10px;color:#6b7280">Saldo cuotas</div><div class="kpi-val" style="color:${saldoPendiente > 0 ? '#ef4444' : '#16a34a'}">${moneda} ${saldoPendiente.toFixed(2)}</div></div>
-      <div class="kpi-card"><div style="font-size:10px;color:#6b7280">Recargos pendientes</div><div class="kpi-val" style="color:${saldoRecargos > 0 ? '#d97706' : '#16a34a'}">${moneda} ${saldoRecargos.toFixed(2)}</div></div>
-      <div class="kpi-card"><div style="font-size:10px;color:#6b7280">Tickets activos</div><div class="kpi-val" style="color:#2563eb">${ticketsUnidad.length}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:#7E9389">Saldo cuotas</div><div class="kpi-val" style="color:${saldoPendiente > 0 ? '#ef4444' : '#16a34a'}">${moneda} ${saldoPendiente.toFixed(2)}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:#7E9389">Recargos pendientes</div><div class="kpi-val" style="color:${saldoRecargos > 0 ? '#d97706' : '#16a34a'}">${moneda} ${saldoRecargos.toFixed(2)}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:#7E9389">Tickets activos</div><div class="kpi-val" style="color:#1B3B36">${ticketsUnidad.length}</div></div>
     </div>
     <section><h3>Cuotas (últimos 12 meses)</h3>
     <table><tr><th>Concepto</th><th>Período</th><th>Monto</th><th>Estado</th></tr>
@@ -115,16 +115,16 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>Resumen del Residente</div>
-          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{proyectoNombre ?? 'Condominio'} — vista consolidada</div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Resumen del Residente</div>
+          <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>{proyectoNombre ?? 'Condominio'} — vista consolidada</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <select value={unidadId} onChange={e => setUnidadId(e.target.value)}
-            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, background: '#fff', fontWeight: 600 }}>
+            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, background: '#fff', fontWeight: 600 }}>
             {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
           </select>
           <button onClick={imprimir}
-            style={{ padding: '6px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            style={{ padding: '6px 14px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             🖨️ Imprimir
           </button>
         </div>
@@ -138,7 +138,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
             <div style={{ fontSize: 11, color: '#dc2626', marginTop: 2 }}>{pendientes.length} cuota{pendientes.length > 1 ? 's' : ''} por regularizar</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 11, color: '#6b7280' }}>Saldo pendiente</div>
+            <div style={{ fontSize: 11, color: '#7E9389' }}>Saldo pendiente</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#ef4444' }}>{moneda} {saldoPendiente.toFixed(2)}</div>
           </div>
         </div>
@@ -155,14 +155,14 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
       {/* Resumen cards */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
-          { label: 'Unidad', val: unidad?.nombre ?? '—', color: '#0f172a', bg: '#f8fafc' },
-          { label: 'Cuota este mes', val: cuotaMes ? ESTADO_CUOTA_CFG[cuotaMes.estado]?.label ?? cuotaMes.estado : 'Sin cuota', color: cuotaMes ? (ESTADO_CUOTA_CFG[cuotaMes.estado]?.color ?? '#6b7280') : '#6b7280', bg: cuotaMes ? (ESTADO_CUOTA_CFG[cuotaMes.estado]?.bg ?? '#f8fafc') : '#f8fafc' },
+          { label: 'Unidad', val: unidad?.nombre ?? '—', color: '#15291F', bg: '#FAF7EF' },
+          { label: 'Cuota este mes', val: cuotaMes ? ESTADO_CUOTA_CFG[cuotaMes.estado]?.label ?? cuotaMes.estado : 'Sin cuota', color: cuotaMes ? (ESTADO_CUOTA_CFG[cuotaMes.estado]?.color ?? '#7E9389') : '#7E9389', bg: cuotaMes ? (ESTADO_CUOTA_CFG[cuotaMes.estado]?.bg ?? '#FAF7EF') : '#FAF7EF' },
           { label: 'Recargos pend.', val: `${moneda} ${saldoRecargos.toFixed(2)}`, color: saldoRecargos > 0 ? '#d97706' : '#16a34a', bg: saldoRecargos > 0 ? '#fef3c7' : '#dcfce7' },
           { label: 'Tickets activos', val: String(ticketsUnidad.length), color: ticketsUnidad.length > 0 ? '#d97706' : '#16a34a', bg: ticketsUnidad.length > 0 ? '#fef3c7' : '#dcfce7' },
-          { label: 'Reservas próx.', val: String(reservasUnidad.length), color: '#2563eb', bg: '#eff6ff' },
+          { label: 'Reservas próx.', val: String(reservasUnidad.length), color: '#1B3B36', bg: '#EEF2EC' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '8px 12px' }}>
-            <div style={{ fontSize: 10, color: '#6b7280' }}>{k.label}</div>
+            <div style={{ fontSize: 10, color: '#7E9389' }}>{k.label}</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>
         ))}
@@ -170,20 +170,20 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         {/* Cuotas */}
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 12 }}>Cuotas — Últimos 12 meses</div>
+        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>Cuotas — Últimos 12 meses</div>
           {cuotasUnidad.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: '#9ca3af', fontSize: 12 }}>Sin cuotas registradas</div>
+            <div style={{ textAlign: 'center', padding: '20px 0', color: '#7E9389', fontSize: 12 }}>Sin cuotas registradas</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {cuotasUnidad.map(c => {
-                const cfg = ESTADO_CUOTA_CFG[c.estado] ?? { color: '#374151', bg: '#f1f5f9', label: c.estado }
+                const cfg = ESTADO_CUOTA_CFG[c.estado] ?? { color: '#3E5A4C', bg: '#EAE6D8', label: c.estado }
                 return (
                   <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     padding: '7px 10px', background: cfg.bg, borderRadius: 8, border: `1px solid ${cfg.color}22` }}>
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{c.concepto}</div>
-                      <div style={{ fontSize: 10, color: '#6b7280' }}>Período {c.periodo}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#15291F' }}>{c.concepto}</div>
+                      <div style={{ fontSize: 10, color: '#7E9389' }}>Período {c.periodo}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: cfg.color }}>{moneda} {c.monto.toFixed(2)}</div>
@@ -204,7 +204,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
               <div style={{ fontWeight: 700, fontSize: 13, color: '#d97706', marginBottom: 10 }}>⚡ Recargos por mora</div>
               {recargosUnidad.map(r => (
                 <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #fef3c7' }}>
-                  <div style={{ fontSize: 12, color: '#374151' }}>{r.motivo ?? r.tipo}</div>
+                  <div style={{ fontSize: 12, color: '#3E5A4C' }}>{r.motivo ?? r.tipo}</div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#d97706' }}>{moneda} {r.monto_calculado.toFixed(2)}</div>
                 </div>
               ))}
@@ -212,17 +212,17 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
           )}
 
           {/* Tickets activos */}
-          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 10 }}>🔧 Mis Solicitudes de Mantenimiento</div>
+          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>🔧 Mis Solicitudes de Mantenimiento</div>
             {ticketsUnidad.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '16px 0', color: '#9ca3af', fontSize: 12 }}>Sin solicitudes activas</div>
+              <div style={{ textAlign: 'center', padding: '16px 0', color: '#7E9389', fontSize: 12 }}>Sin solicitudes activas</div>
             ) : (
               ticketsUnidad.map(t => {
-                const cfg = ESTADO_TICKET_CFG[t.estado] ?? { color: '#374151', bg: '#f1f5f9' }
+                const cfg = ESTADO_TICKET_CFG[t.estado] ?? { color: '#3E5A4C', bg: '#EAE6D8' }
                 return (
                   <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     padding: '7px 10px', background: cfg.bg, borderRadius: 8, marginBottom: 6, border: `1px solid ${cfg.color}22` }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', flex: 1 }}>{t.titulo}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#15291F', flex: 1 }}>{t.titulo}</div>
                     <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'white', color: cfg.color, fontWeight: 600, flexShrink: 0 }}>
                       {t.estado.replace('_', ' ')}
                     </span>
@@ -233,15 +233,15 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
           </div>
 
           {/* Reservas próximas */}
-          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 10 }}>📅 Mis Reservas Próximas</div>
+          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>📅 Mis Reservas Próximas</div>
             {reservasUnidad.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '16px 0', color: '#9ca3af', fontSize: 12 }}>Sin reservas próximas</div>
+              <div style={{ textAlign: 'center', padding: '16px 0', color: '#7E9389', fontSize: 12 }}>Sin reservas próximas</div>
             ) : (
               reservasUnidad.map(r => (
-                <div key={r.id} style={{ padding: '7px 10px', background: '#eff6ff', borderRadius: 8, marginBottom: 6, border: '1px solid #bfdbfe' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1d4ed8' }}>{r.amenidad_nombre ?? 'Amenidad'}</div>
-                  <div style={{ fontSize: 11, color: '#3b82f6', marginTop: 2 }}>
+                <div key={r.id} style={{ padding: '7px 10px', background: '#EEF2EC', borderRadius: 8, marginBottom: 6, border: '1px solid #C2D2CA' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#102622' }}>{r.amenidad_nombre ?? 'Amenidad'}</div>
+                  <div style={{ fontSize: 11, color: '#2F5D4F', marginTop: 2 }}>
                     {r.fecha} · {r.hora_inicio}–{r.hora_fin}
                     {r.num_invitados > 0 && <span style={{ marginLeft: 6 }}>👥 {r.num_invitados}</span>}
                   </div>
@@ -253,26 +253,26 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
       </div>
 
       {/* Anuncios */}
-      <div style={{ marginTop: 14, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 12 }}>📋 Tablón de Anuncios</div>
+      <div style={{ marginTop: 14, background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>📋 Tablón de Anuncios</div>
         {anunciosActivos.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '16px 0', color: '#9ca3af', fontSize: 12 }}>Sin anuncios activos</div>
+          <div style={{ textAlign: 'center', padding: '16px 0', color: '#7E9389', fontSize: 12 }}>Sin anuncios activos</div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
             {anunciosActivos.map(a => {
               const isUrgente = a.tipo === 'urgente'
               return (
                 <div key={a.id} style={{ padding: '10px 14px', borderRadius: 10,
-                  border: `1px solid ${isUrgente ? '#fca5a5' : '#e5e7eb'}`,
-                  background: isUrgente ? '#fef2f2' : '#f8fafc' }}>
+                  border: `1px solid ${isUrgente ? '#fca5a5' : '#E1DDD0'}`,
+                  background: isUrgente ? '#fef2f2' : '#FAF7EF' }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
                     <span style={{ fontSize: 16 }}>{ANUNCIO_ICON[a.tipo] ?? '📢'}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: isUrgente ? '#ef4444' : '#0f172a' }}>{a.titulo}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: isUrgente ? '#ef4444' : '#15291F' }}>{a.titulo}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 11, color: '#3E5A4C', lineHeight: 1.5 }}>
                     {a.contenido.length > 100 ? a.contenido.slice(0, 100) + '…' : a.contenido}
                   </div>
-                  <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>
+                  <div style={{ fontSize: 10, color: '#7E9389', marginTop: 4 }}>
                     {new Date(a.created_at).toLocaleDateString('es')}
                   </div>
                 </div>

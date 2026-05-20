@@ -202,10 +202,10 @@ export function CalidadSection({
         const val = r.parametros[p.key]
         const cumple = r.cumplimiento[p.key]
         const rango = p.min === p.max && p.min === 0 ? '= 0' : p.min > 0 ? `${p.min} – ${p.max}` : `≤ ${p.max}`
-        const badge = cumple === null || val === undefined ? '<span style="color:#94a3b8;">—</span>'
+        const badge = cumple === null || val === undefined ? '<span style="color:#7E9389;">—</span>'
           : cumple ? '<span style="color:#166534;font-weight:600;">✅ CUMPLE</span>'
           : '<span style="color:#991b1b;font-weight:600;">❌ NO CUMPLE</span>'
-        filas += `<tr style="border-bottom:1px solid #f1f5f9;${cumple === false ? 'background:#fff5f5;' : cumple === true ? 'background:#f0fdf4;' : ''}">
+        filas += `<tr style="border-bottom:1px solid #EAE6D8;${cumple === false ? 'background:#fff5f5;' : cumple === true ? 'background:#f0fdf4;' : ''}">
           <td style="padding:8px;font-size:13px;">${p.label}</td>
           <td style="padding:8px;font-size:13px;text-align:center;">${p.unidad || '—'}</td>
           <td style="padding:8px;font-size:13px;text-align:center;">${val !== undefined ? val : '—'}</td>
@@ -224,7 +224,7 @@ export function CalidadSection({
       </div>
       <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead><tr style="background:#f1f5f9;">
+          <thead><tr style="background:#EAE6D8;">
             <th scope="col" style="padding:8px;text-align:left;">Parámetro</th>
             <th scope="col" style="padding:8px;text-align:center;">Unidad</th>
             <th scope="col" style="padding:8px;text-align:center;">Valor</th>
@@ -249,7 +249,7 @@ export function CalidadSection({
     link.click()
   }
 
-  const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid #E1DDD0', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '14px', fontWeight: 600, color: '#4a5568', marginBottom: '6px', display: 'block' }
 
   const cvl = cumplimientoEnVivo()
@@ -270,8 +270,8 @@ export function CalidadSection({
         {(['fuentes', 'analisis', 'historial'] as SubTab[]).map(t => (
           <button key={t} onClick={() => setSubTab(t)} style={{
             padding: '10px 20px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600,
-            background: subTab === t ? 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)' : '#f1f5f9',
-            color: subTab === t ? 'white' : '#475569',
+            background: subTab === t ? 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)' : '#EAE6D8',
+            color: subTab === t ? 'white' : '#3E5A4C',
           }}>
             {t === 'fuentes' ? '🗂️ Fuentes de Agua' : t === 'analisis' ? '🧪 Nuevo Análisis' : '📋 Historial Calidad'}
           </button>
@@ -307,10 +307,10 @@ export function CalidadSection({
               </div>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={guardarFuente} disabled={savingFuente} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={guardarFuente} disabled={savingFuente} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
                 {savingFuente ? 'Guardando...' : `💾 ${editandoId ? 'Actualizar Fuente' : 'Guardar Fuente'}`}
               </button>
-              <button onClick={() => { setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '' }); setEditandoId(null) }} style={{ padding: '12px 24px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => { setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '' }); setEditandoId(null) }} style={{ padding: '12px 24px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
                 ✕ Cancelar
               </button>
             </div>
@@ -320,16 +320,16 @@ export function CalidadSection({
             <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>Fuentes Registradas</div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                <thead><tr style={{ background: '#f1f5f9' }}>
-                  {['ID', 'Identificador', 'Nombre', 'Tipología', 'Estado', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #e2e8f0' }}>{h}</th>)}
+                <thead><tr style={{ background: '#EAE6D8' }}>
+                  {['ID', 'Identificador', 'Nombre', 'Tipología', 'Estado', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid #E1DDD0' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {fuentesAgua.map(f => {
                     const tipologia = TIPOLOGIAS_CALIDAD[f.tipo_agua]
                     return (
-                      <tr key={f.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '10px', fontSize: '12px', color: '#94a3b8' }}>{f.id.substring(0, 8)}…</td>
-                        <td style={{ padding: '10px', fontWeight: 600, color: '#0369a1' }}>{sanitizeHTML(f.identificador)}</td>
+                      <tr key={f.id} style={{ borderBottom: '1px solid #EAE6D8' }}>
+                        <td style={{ padding: '10px', fontSize: '12px', color: '#7E9389' }}>{f.id.substring(0, 8)}…</td>
+                        <td style={{ padding: '10px', fontWeight: 600, color: '#102622' }}>{sanitizeHTML(f.identificador)}</td>
                         <td style={{ padding: '10px' }}>{sanitizeHTML(f.nombre)}</td>
                         <td style={{ padding: '10px', fontSize: '13px' }}>{tipologia?.label ?? f.tipo_agua}</td>
                         <td style={{ padding: '10px' }}>
@@ -339,7 +339,7 @@ export function CalidadSection({
                         </td>
                         <td style={{ padding: '10px' }}>
                           <div style={{ display: 'flex', gap: '6px' }}>
-                            <button onClick={() => editarFuente(f)} style={{ background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>✏️ Editar</button>
+                            <button onClick={() => editarFuente(f)} style={{ background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>✏️ Editar</button>
                             <button onClick={() => toggleFuente(f.id, f.activo)} style={{ background: f.activo ? '#f59e0b' : '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>
                               {f.activo ? '⏸ Desactivar' : '▶ Activar'}
                             </button>
@@ -348,7 +348,7 @@ export function CalidadSection({
                       </tr>
                     )
                   })}
-                  {fuentesAgua.length === 0 && <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>Sin fuentes registradas</td></tr>}
+                  {fuentesAgua.length === 0 && <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: '#7E9389' }}>Sin fuentes registradas</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -376,8 +376,8 @@ export function CalidadSection({
 
           {tipologiaActual && (
             <div>
-              <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
-                <strong style={{ color: '#0369a1', fontSize: '14px' }}>Parámetros para: {tipologiaActual.label}</strong>
+              <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
+                <strong style={{ color: '#102622', fontSize: '14px' }}>Parámetros para: {tipologiaActual.label}</strong>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                 {tipologiaActual.parametros.map(p => {
@@ -389,23 +389,23 @@ export function CalidadSection({
                     <div key={p.key}>
                       <label style={{ ...labelStyle, fontSize: '13px' }}>
                         {p.label}{p.unidad ? ` (${p.unidad})` : ''}
-                        <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '11px' }}> [{rango}]</span>
+                        <span style={{ fontWeight: 400, color: '#7E9389', fontSize: '11px' }}> [{rango}]</span>
                       </label>
                       <input
                         type="number" step="any" value={val}
                         onChange={e => setParametroValues(prev => ({ ...prev, [p.key]: e.target.value }))}
                         placeholder="Ingrese valor"
-                        style={{ ...inputStyle, borderColor: ok === null ? '#e2e8f0' : ok ? '#10b981' : '#ef4444' }}
+                        style={{ ...inputStyle, borderColor: ok === null ? '#E1DDD0' : ok ? '#10b981' : '#ef4444' }}
                       />
                     </div>
                   )
                 })}
               </div>
 
-              <div style={{ marginBottom: '16px', padding: '14px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <div style={{ marginBottom: '16px', padding: '14px', borderRadius: '10px', background: '#FAF7EF', border: '1px solid #E1DDD0' }}>
                 <div style={{ fontWeight: 600, marginBottom: '8px', fontSize: '14px' }}>Resumen de Cumplimiento</div>
                 {cvl.total === 0
-                  ? <span style={{ color: '#94a3b8', fontSize: '13px' }}>Ingrese los valores para ver el cumplimiento.</span>
+                  ? <span style={{ color: '#7E9389', fontSize: '13px' }}>Ingrese los valores para ver el cumplimiento.</span>
                   : <span style={{ background: cvl.noCumple === 0 ? '#dcfce7' : '#fee2e2', color: cvl.noCumple === 0 ? '#166534' : '#991b1b', padding: '4px 12px', borderRadius: '8px', fontWeight: 600 }}>
                     {cvl.noCumple === 0 ? '✅ CUMPLE' : '❌ NO CUMPLE'} — {cvl.cumple}/{cvl.total + cvl.pendiente} parámetros OK{cvl.pendiente > 0 ? `, ${cvl.pendiente} pendiente(s)` : ''}
                   </span>
@@ -422,20 +422,20 @@ export function CalidadSection({
           <div style={{ marginBottom: '20px' }}>
             <label style={labelStyle}>Adjuntar Reporte (PDF o imagen, máx. 5 MB)</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <label style={{ cursor: 'pointer', background: '#0ea5e9', color: 'white', padding: '8px 16px', borderRadius: '8px', fontSize: '14px' }}>
+              <label style={{ cursor: 'pointer', background: '#1B3B36', color: 'white', padding: '8px 16px', borderRadius: '8px', fontSize: '14px' }}>
                 📎 Seleccionar archivo
                 <input type="file" accept=".pdf,image/*" hidden onChange={handleReporteFile} />
               </label>
-              <span style={{ fontSize: '13px', color: '#64748b' }}>{reporteNombre ?? 'Ningún archivo seleccionado'}</span>
+              <span style={{ fontSize: '13px', color: '#7E9389' }}>{reporteNombre ?? 'Ningún archivo seleccionado'}</span>
               {reporteNombre && <button onClick={() => { setReporteBase64(null); setReporteTipo(null); setReporteNombre(null) }} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '13px' }}>✕ Quitar</button>}
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button onClick={guardarAnalisis} disabled={savingAnalisis} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={guardarAnalisis} disabled={savingAnalisis} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               {savingAnalisis ? 'Guardando...' : '💾 Guardar Análisis'}
             </button>
-            <button onClick={() => { setAnalisisFuenteId(''); setParametroValues({}); setAnalisisObs('') }} style={{ padding: '12px 24px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => { setAnalisisFuenteId(''); setParametroValues({}); setAnalisisObs('') }} style={{ padding: '12px 24px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               ✕ Limpiar
             </button>
           </div>
@@ -482,44 +482,44 @@ export function CalidadSection({
             <button onClick={async () => {
               const { exportarPDFCalidad } = await import('../../lib/pdf')
               exportarPDFCalidad(historialFiltrado, empresa)
-            }} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+            }} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               📄 Exportar PDF
             </button>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-              <thead><tr style={{ background: '#f1f5f9' }}>
-                {['Fecha', 'Fuente', 'Tipología', 'Resultado', 'Observaciones', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: h === 'Resultado' || h === 'Acciones' ? 'center' : 'left', borderBottom: '2px solid #e2e8f0' }}>{h}</th>)}
+              <thead><tr style={{ background: '#EAE6D8' }}>
+                {['Fecha', 'Fuente', 'Tipología', 'Resultado', 'Observaciones', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: h === 'Resultado' || h === 'Acciones' ? 'center' : 'left', borderBottom: '2px solid #E1DDD0' }}>{h}</th>)}
               </tr></thead>
               <tbody>
                 {historialFiltrado.map(r => {
                   const fuente = r.fuentes_agua
                   const tipologia = fuente ? TIPOLOGIAS_CALIDAD[fuente.tipo_agua] : null
                   return (
-                    <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr key={r.id} style={{ borderBottom: '1px solid #EAE6D8' }}>
                       <td style={{ padding: '10px', fontSize: '13px' }}>{new Date(r.fecha).toLocaleString('es-GT')}</td>
-                      <td style={{ padding: '10px', fontWeight: 600, color: '#0369a1' }}>{fuente ? sanitizeHTML(fuente.identificador) : '—'}</td>
+                      <td style={{ padding: '10px', fontWeight: 600, color: '#102622' }}>{fuente ? sanitizeHTML(fuente.identificador) : '—'}</td>
                       <td style={{ padding: '10px', fontSize: '13px' }}>{tipologia?.label ?? fuente?.tipo_agua ?? '—'}</td>
                       <td style={{ padding: '10px', textAlign: 'center' }}>
                         <span style={{ background: r.cumple_total ? '#dcfce7' : '#fee2e2', color: r.cumple_total ? '#166534' : '#991b1b', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600 }}>
                           {r.cumple_total ? '✅ CUMPLE' : '❌ NO CUMPLE'}
                         </span>
                       </td>
-                      <td style={{ padding: '10px', fontSize: '13px', color: '#64748b' }}>{sanitizeHTML(r.observaciones ?? '—')}</td>
+                      <td style={{ padding: '10px', fontSize: '13px', color: '#7E9389' }}>{sanitizeHTML(r.observaciones ?? '—')}</td>
                       <td style={{ padding: '10px' }}>
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                          <button onClick={() => verDetalle(r)} style={{ background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>🔍 Detalle</button>
+                          <button onClick={() => verDetalle(r)} style={{ background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>🔍 Detalle</button>
                           <button onClick={async () => {
                             const { generarPDFAnalisis } = await import('../../lib/pdf')
                             generarPDFAnalisis(r, empresa)
                           }} style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
-                          {r.reporte_base64 && <button onClick={() => verReporte(r)} style={{ background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📎 Reporte</button>}
+                          {r.reporte_base64 && <button onClick={() => verReporte(r)} style={{ background: '#B96A3F', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📎 Reporte</button>}
                         </div>
                       </td>
                     </tr>
                   )
                 })}
-                {historialFiltrado.length === 0 && <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>Sin registros con esos filtros</td></tr>}
+                {historialFiltrado.length === 0 && <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: '#7E9389' }}>Sin registros con esos filtros</td></tr>}
               </tbody>
             </table>
           </div>

@@ -7,15 +7,15 @@ interface Props {
 export function ConfiguracionSection({ onLogout }: Props) {
   return (
     <div style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
-      <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', borderBottom: '2px solid #e2e8f0', paddingBottom: '12px' }}>
+      <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', borderBottom: '2px solid #E1DDD0', paddingBottom: '12px' }}>
         Configuración
       </div>
-      <p style={{ color: '#64748b', marginBottom: '20px' }}>
+      <p style={{ color: '#7E9389', marginBottom: '20px' }}>
         Las credenciales se gestionan a través de variables de entorno en el archivo <code>.env</code>.
         No es necesario editar el código fuente.
       </p>
-      <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', marginBottom: '20px', fontFamily: 'monospace', fontSize: '13px' }}>
-        <div style={{ marginBottom: '8px', color: '#64748b' }}>Variables de entorno configuradas:</div>
+      <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '20px', fontFamily: 'monospace', fontSize: '13px' }}>
+        <div style={{ marginBottom: '8px', color: '#7E9389' }}>Variables de entorno configuradas:</div>
         <div>✅ VITE_SUPABASE_URL</div>
         <div>✅ VITE_SUPABASE_ANON_KEY</div>
         <div>✅ VITE_EMAILJS_PUBLIC_KEY</div>
@@ -26,7 +26,7 @@ export function ConfiguracionSection({ onLogout }: Props) {
       <div style={{ display: 'flex', gap: '12px' }}>
         <button
           onClick={() => Swal.fire('Info', 'La configuración se gestiona via variables de entorno (.env)', 'info')}
-          style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+          style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
         >
           Ver Info
         </button>

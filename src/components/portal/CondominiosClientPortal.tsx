@@ -49,8 +49,8 @@ const PORTAL_CSS = `
   border-radius: 6px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.condo-tab:hover { background: rgba(99,102,241,0.08) !important; }
-.condo-tab.active { background: white !important; color: #4f46e5 !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.condo-tab:hover { background: rgba(185, 106, 63,0.08) !important; }
+.condo-tab.active { background: white !important; color: #9C5733 !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 `
 
 export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
@@ -168,7 +168,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #818cf8 100%)',
+        background: 'linear-gradient(135deg, #9C5733 0%, #B96A3F 50%, #CE8A63 100%)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
       }}>
         <div style={{
@@ -177,22 +177,22 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
           boxShadow: '0 24px 64px rgba(0,0,0,0.16)',
         }}>
           <div style={{ fontSize: '56px', marginBottom: '20px' }}>🏢</div>
-          <h2 style={{ margin: '0 0 12px', fontSize: '22px', fontWeight: 700, color: '#0f172a' }}>
+          <h2 style={{ margin: '0 0 12px', fontSize: '22px', fontWeight: 700, color: '#15291F' }}>
             Sin unidades asociadas
           </h2>
-          <p style={{ margin: '0 0 8px', fontSize: '15px', color: '#475569', lineHeight: 1.6 }}>
+          <p style={{ margin: '0 0 8px', fontSize: '15px', color: '#3E5A4C', lineHeight: 1.6 }}>
             No tiene unidades activas vinculadas a su cuenta en este condominio.
           </p>
-          <p style={{ margin: '0 0 32px', fontSize: '13.5px', color: '#94a3b8' }}>
+          <p style={{ margin: '0 0 32px', fontSize: '13.5px', color: '#7E9389' }}>
             Si cree que esto es un error, comuníquese con la administración.
           </p>
-          <div style={{ background: '#f1f5f9', borderRadius: '12px', padding: '16px', fontSize: '13px', color: '#64748b', marginBottom: '28px' }}>
-            <strong style={{ color: '#334155' }}>Sesión activa:</strong> {currentUser.name}<br />{currentUser.email}
+          <div style={{ background: '#EAE6D8', borderRadius: '12px', padding: '16px', fontSize: '13px', color: '#7E9389', marginBottom: '28px' }}>
+            <strong style={{ color: '#3E5A4C' }}>Sesión activa:</strong> {currentUser.name}<br />{currentUser.email}
           </div>
           <button
             onClick={onLogout}
             style={{
-              padding: '12px 32px', background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+              padding: '12px 32px', background: 'linear-gradient(135deg, #9C5733, #B96A3F)',
               color: 'white', border: 'none', borderRadius: '12px',
               fontSize: '14px', fontWeight: 600, cursor: 'pointer',
             }}
@@ -231,19 +231,19 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
 
   const kpiCards = [
     { label: 'Deuda Pendiente',   value: loading ? '' : `${moneda} ${deudaTotal.toFixed(2)}`, icon: '💳', bg: deudaTotal > 0 ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)' },
-    { label: 'Tickets Abiertos',  value: loading ? '' : String(ticketsAbiertos),              icon: '🔧', bg: 'linear-gradient(135deg, #6366f1, #4f46e5)' },
-    { label: 'Reservas Activas',  value: loading ? '' : String(reservasProx),                 icon: '🏊', bg: 'linear-gradient(135deg, #0ea5e9, #0284c7)' },
-    { label: 'Anuncios (7 días)', value: loading ? '' : String(anunciosNuevos),               icon: '📢', bg: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' },
+    { label: 'Tickets Abiertos',  value: loading ? '' : String(ticketsAbiertos),              icon: '🔧', bg: 'linear-gradient(135deg, #B96A3F, #9C5733)' },
+    { label: 'Reservas Activas',  value: loading ? '' : String(reservasProx),                 icon: '🏊', bg: 'linear-gradient(135deg, #1B3B36, #102622)' },
+    { label: 'Anuncios (7 días)', value: loading ? '' : String(anunciosNuevos),               icon: '📢', bg: 'linear-gradient(135deg, #B96A3F, #9C5733)' },
   ]
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f3ff' }}>
+    <div style={{ minHeight: '100vh', background: '#FAF1EA' }}>
       <style>{PORTAL_CSS}</style>
 
       {/* Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
-        boxShadow: '0 2px 12px rgba(79,70,229,0.3)',
+        background: 'linear-gradient(135deg, #9C5733, #B96A3F)',
+        boxShadow: '0 2px 12px rgba(156, 87, 51,0.3)',
       }}>
         <div style={{
           maxWidth: '960px', margin: '0 auto', padding: '16px 24px',
@@ -273,7 +273,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 }}
               >
                 {unidades.map(u => (
-                  <option key={u.id} value={u.id} style={{ color: '#0f172a', background: 'white' }}>
+                  <option key={u.id} value={u.id} style={{ color: '#15291F', background: 'white' }}>
                     🏠 {u.nombre}
                   </option>
                 ))}
@@ -308,7 +308,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               style={{
                 padding: '10px 16px', whiteSpace: 'nowrap',
                 background: tab === t.id ? 'white' : 'transparent',
-                color: tab === t.id ? '#4f46e5' : 'rgba(255,255,255,0.85)',
+                color: tab === t.id ? '#9C5733' : 'rgba(255,255,255,0.85)',
                 border: 'none', borderRadius: '10px 10px 0 0',
                 fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
               }}
@@ -354,10 +354,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
           }}>
             <div style={{
               width: '28px', height: '28px',
-              border: '3px solid #e2e8f0', borderTop: '3px solid #4f46e5',
+              border: '3px solid #E1DDD0', borderTop: '3px solid #9C5733',
               borderRadius: '50%', animation: 'spin 0.8s linear infinite',
             }} />
-            <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 500 }}>Cargando información…</span>
+            <span style={{ fontSize: '14px', color: '#7E9389', fontWeight: 500 }}>Cargando información…</span>
           </div>
         ) : !unidad ? null : (
           <div style={{ background: 'white', borderRadius: '20px', padding: '24px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
@@ -449,9 +449,9 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
 
 function EmptyState({ icon, title, text }: { icon: string; title: string; text: string }) {
   return (
-    <div style={{ textAlign: 'center', padding: '48px 24px', color: '#94a3b8' }}>
+    <div style={{ textAlign: 'center', padding: '48px 24px', color: '#7E9389' }}>
       <div style={{ fontSize: '48px', marginBottom: '14px' }}>{icon}</div>
-      <div style={{ fontWeight: 700, fontSize: '15px', color: '#64748b', marginBottom: '6px' }}>{title}</div>
+      <div style={{ fontWeight: 700, fontSize: '15px', color: '#7E9389', marginBottom: '6px' }}>{title}</div>
       <div style={{ fontSize: '13px' }}>{text}</div>
     </div>
   )

@@ -21,14 +21,14 @@ const TIPO_STYLE: Record<string, { bg: string; color: string; label: string }> =
   primer_aviso:       { bg: '#fef3c7', color: '#92400e', label: '1° Aviso' },
   segundo_aviso:      { bg: '#fed7aa', color: '#c2410c', label: '2° Aviso' },
   ultimo_aviso:       { bg: '#fee2e2', color: '#ef4444', label: 'Último Aviso' },
-  notificacion_legal: { bg: '#4b5563', color: '#f9fafb', label: 'Not. Legal' },
+  notificacion_legal: { bg: '#3E5A4C', color: '#FAF7EF', label: 'Not. Legal' },
 }
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  emitido:    { bg: '#e0f2fe', color: '#0369a1', label: 'Emitido' },
-  entregado:  { bg: '#f3e8ff', color: '#7c3aed', label: 'Entregado' },
+  emitido:    { bg: '#D9E2DC', color: '#102622', label: 'Emitido' },
+  entregado:  { bg: '#F4EBE3', color: '#9C5733', label: 'Entregado' },
   pagado:     { bg: '#dcfce7', color: '#16a34a', label: 'Pagado' },
-  anulado:    { bg: '#f1f5f9', color: '#94a3b8', label: 'Anulado' },
+  anulado:    { bg: '#EAE6D8', color: '#7E9389', label: 'Anulado' },
 }
 
 const BLANK = { unidad_id: '', tipo: 'primer_aviso', fecha_emision: new Date().toISOString().slice(0, 10), fecha_limite: '', enviado_por: '', notas: '' }
@@ -103,9 +103,9 @@ h1{font-size:20px;margin-bottom:2px}
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:${tipo?.bg};color:${tipo?.color};margin-bottom:16px}
 table{width:100%;border-collapse:collapse;margin:12px 0}
 th,td{border:1px solid #ccc;padding:7px 10px;text-align:left}
-th{background:#f8fafc}
-.total{font-size:16px;font-weight:800;color:#0f172a;margin-top:12px;text-align:right}
-.footer{margin-top:40px;border-top:1px solid #ccc;padding-top:16px;font-size:11px;color:#64748b}
+th{background:#FAF7EF}
+.total{font-size:16px;font-weight:800;color:#15291F;margin-top:12px;text-align:right}
+.footer{margin-top:40px;border-top:1px solid #ccc;padding-top:16px;font-size:11px;color:#7E9389}
 .sig{margin-top:60px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
 .sig-box{border-top:1px solid #000;padding-top:8px;font-size:11px}</style></head>
 <body>
@@ -133,18 +133,18 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
   if (filtroUnidad) filtered = filtered.filter(a => a.unidad_id === filtroUnidad)
 
   const pendientes = avisos.filter(a => a.estado === 'emitido' || a.estado === 'entregado').length
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Avisos de Cobro</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>{pendientes} aviso(s) pendiente(s) de resolución</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Avisos de Cobro</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>{pendientes} aviso(s) pendiente(s) de resolución</p>
         </div>
         {canCreate && !showForm && (
           <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setDetalle([{ ...BLANK_ITEM }]); setShowForm(true) }}
-            style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo Aviso
           </button>
         )}
@@ -153,45 +153,45 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', marginBottom: '16px' }}>
         {Object.entries(TIPO_STYLE).map(([tipo, s]) => (
-          <div key={tipo} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+          <div key={tipo} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color: s.color }}>{avisos.filter(a => a.tipo === tipo).length}</div>
-            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{s.label}</div>
+            <div style={{ fontSize: '10px', color: '#7E9389' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar aviso' : 'Nuevo Aviso de Cobro'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Unidad *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad *</label>
               <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">— Seleccionar —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Tipo de aviso</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Tipo de aviso</label>
               <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
                 {Object.entries(TIPO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Fecha emisión</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha emisión</label>
               <input style={inputStyle} type="date" value={form.fecha_emision} onChange={e => setF('fecha_emision', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Fecha límite pago</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha límite pago</label>
               <input style={inputStyle} type="date" value={form.fecha_limite} onChange={e => setF('fecha_limite', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Emitido por</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Emitido por</label>
               <input style={inputStyle} value={form.enviado_por} onChange={e => setF('enviado_por', e.target.value)} placeholder="Nombre del administrador" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Notas</label>
               <input style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Observaciones adicionales…" />
             </div>
           </div>
@@ -199,9 +199,9 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
           {/* Detalle de deuda */}
           <div style={{ marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '11px', fontWeight: 700, color: '#64748b' }}>Detalle de deuda *</label>
+              <label style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389' }}>Detalle de deuda *</label>
               <button onClick={addItem}
-                style={{ padding: '3px 9px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
+                style={{ padding: '3px 9px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
                 + Agregar concepto
               </button>
             </div>
@@ -214,7 +214,7 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
               </div>
             ))}
             {detalle.filter(it => it.monto).length > 0 && (
-              <div style={{ textAlign: 'right', fontSize: '12px', fontWeight: 700, color: '#0f172a', marginTop: '4px' }}>
+              <div style={{ textAlign: 'right', fontSize: '12px', fontWeight: 700, color: '#15291F', marginTop: '4px' }}>
                 Total: {fmt(detalle.reduce((s, it) => s + parseFloat(it.monto || '0'), 0), moneda)}
               </div>
             )}
@@ -222,11 +222,11 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
 
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -238,14 +238,14 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
         {(['todos', 'emitido', 'entregado', 'pagado', 'anulado'] as const).map(f => (
           <button key={f} onClick={() => setFiltroEstado(f)}
             style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '11px', cursor: 'pointer',
-              borderColor: filtroEstado === f ? '#0ea5e9' : '#e2e8f0',
-              background: filtroEstado === f ? '#e0f2fe' : 'white',
-              color: filtroEstado === f ? '#0369a1' : '#64748b',
+              borderColor: filtroEstado === f ? '#1B3B36' : '#E1DDD0',
+              background: filtroEstado === f ? '#D9E2DC' : 'white',
+              color: filtroEstado === f ? '#102622' : '#7E9389',
               fontWeight: filtroEstado === f ? 700 : 500 }}>
             {f === 'todos' ? 'Todos' : ESTADO_STYLE[f]?.label ?? f}
           </button>
         ))}
-        <select style={{ padding: '4px 8px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '12px', background: '#f8fafc', color: '#1e293b' }}
+        <select style={{ padding: '4px 8px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF', color: '#15291F' }}
           value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}>
           <option value="">Todas las unidades</option>
           {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
@@ -254,7 +254,7 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay avisos de cobro.</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay avisos de cobro.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.map(a => {
@@ -264,7 +264,7 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
             const today = new Date().toISOString().slice(0, 10)
             const vencido = a.estado === 'emitido' && a.fecha_limite && a.fecha_limite < today
             return (
-              <div key={a.id} style={{ background: 'white', border: `1.5px solid ${vencido ? '#fca5a5' : '#e2e8f0'}`, borderRadius: '10px', padding: '12px 14px' }}>
+              <div key={a.id} style={{ background: 'white', border: `1.5px solid ${vencido ? '#fca5a5' : '#E1DDD0'}`, borderRadius: '10px', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px', flexWrap: 'wrap' }}>
@@ -273,21 +273,21 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>
                       {vencido && <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 700 }}>⚠️ Vencido</span>}
                     </div>
-                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#0ea5e9' }}>{fmt(Number(a.monto_total), moneda)}</div>
-                    <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', gap: '10px', marginTop: '2px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#1B3B36' }}>{fmt(Number(a.monto_total), moneda)}</div>
+                    <div style={{ fontSize: '11px', color: '#7E9389', display: 'flex', gap: '10px', marginTop: '2px' }}>
                       <span>📅 Emitido: {a.fecha_emision}</span>
-                      {a.fecha_limite && <span style={{ color: vencido ? '#ef4444' : '#64748b' }}>⏰ Límite: {a.fecha_limite}</span>}
+                      {a.fecha_limite && <span style={{ color: vencido ? '#ef4444' : '#7E9389' }}>⏰ Límite: {a.fecha_limite}</span>}
                       {a.enviado_por && <span>👤 {a.enviado_por}</span>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
                     <button onClick={() => handlePrint(a)}
-                      style={{ padding: '3px 7px', background: '#f3e8ff', color: '#7c3aed', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
+                      style={{ padding: '3px 7px', background: '#F4EBE3', color: '#9C5733', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
                     {canEdit && (
                       <>
                         {a.estado === 'emitido' && (
                           <button onClick={() => cambiarEstado(a.id, 'entregado')}
-                            style={{ padding: '3px 7px', background: '#f3e8ff', color: '#7c3aed', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                            style={{ padding: '3px 7px', background: '#F4EBE3', color: '#9C5733', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
                             Entregado
                           </button>
                         )}
@@ -298,7 +298,7 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
                           </button>
                         )}
                         <button onClick={() => startEdit(a)}
-                          style={{ padding: '3px 7px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                          style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                         <button onClick={() => handleDelete(a.id)}
                           style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                       </>

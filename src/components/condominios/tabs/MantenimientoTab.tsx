@@ -20,16 +20,16 @@ interface Props {
 
 const PRIORIDAD_COLORS: Record<string, { bg: string; color: string }> = {
   baja:    { bg: '#f0fdf4', color: '#16a34a' },
-  media:   { bg: '#eff6ff', color: '#2563eb' },
+  media:   { bg: '#EEF2EC', color: '#1B3B36' },
   alta:    { bg: '#fff7ed', color: '#ea580c' },
   urgente: { bg: '#fef2f2', color: '#dc2626' },
 }
 
 const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
-  abierto:    { bg: '#eff6ff', color: '#2563eb' },
+  abierto:    { bg: '#EEF2EC', color: '#1B3B36' },
   en_proceso: { bg: '#fff7ed', color: '#ea580c' },
   resuelto:   { bg: '#f0fdf4', color: '#16a34a' },
-  cerrado:    { bg: '#f8fafc', color: '#64748b' },
+  cerrado:    { bg: '#FAF7EF', color: '#7E9389' },
 }
 
 export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, userId, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
@@ -161,22 +161,22 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Mantenimiento</h2>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '13.5px' }}>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#15291F' }}>Mantenimiento</h2>
+          <p style={{ margin: '4px 0 0', color: '#7E9389', fontSize: '13.5px' }}>
             {conteos.abierto} abiertos · {conteos.en_proceso} en proceso · <span style={{ color: '#dc2626', fontWeight: 600 }}>{conteos.urgentes} urgentes</span>
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={exportarPDF} disabled={filtrados.length === 0}
-            style={{ padding: '9px 14px', background: filtrados.length === 0 ? '#f1f5f9' : '#eff6ff', color: filtrados.length === 0 ? '#94a3b8' : '#2563eb', border: '1.5px solid #bfdbfe', borderRadius: '9px', fontSize: '12px', fontWeight: 600, cursor: filtrados.length === 0 ? 'not-allowed' : 'pointer' }}>
+            style={{ padding: '9px 14px', background: filtrados.length === 0 ? '#EAE6D8' : '#EEF2EC', color: filtrados.length === 0 ? '#7E9389' : '#1B3B36', border: '1.5px solid #C2D2CA', borderRadius: '9px', fontSize: '12px', fontWeight: 600, cursor: filtrados.length === 0 ? 'not-allowed' : 'pointer' }}>
             📄 PDF
           </button>
           <button onClick={exportarXlsx} disabled={filtrados.length === 0}
-            style={{ padding: '9px 14px', background: filtrados.length === 0 ? '#f1f5f9' : '#f0fdf4', color: filtrados.length === 0 ? '#94a3b8' : '#16a34a', border: '1.5px solid #bbf7d0', borderRadius: '9px', fontSize: '12px', fontWeight: 600, cursor: filtrados.length === 0 ? 'not-allowed' : 'pointer' }}>
+            style={{ padding: '9px 14px', background: filtrados.length === 0 ? '#EAE6D8' : '#f0fdf4', color: filtrados.length === 0 ? '#7E9389' : '#16a34a', border: '1.5px solid #bbf7d0', borderRadius: '9px', fontSize: '12px', fontWeight: 600, cursor: filtrados.length === 0 ? 'not-allowed' : 'pointer' }}>
             📊 Excel
           </button>
           {canCreate && (
-            <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               + Nuevo ticket
             </button>
           )}
@@ -186,7 +186,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
         {[
-          { label: 'Total tickets', val: tickets.length, color: '#2563eb', bg: '#eff6ff', icon: '🔧' },
+          { label: 'Total tickets', val: tickets.length, color: '#1B3B36', bg: '#EEF2EC', icon: '🔧' },
           { label: 'Urgentes activos', val: urgentesActivos, color: urgentesActivos > 0 ? '#dc2626' : '#16a34a', bg: urgentesActivos > 0 ? '#fef2f2' : '#f0fdf4', icon: '🚨' },
           { label: 'Costo estimado', val: costoEstimadoTotal > 0 ? costoEstimadoTotal.toFixed(2) : '—', color: '#ea580c', bg: '#fff7ed', icon: '💰' },
           { label: `% Resueltos`, val: `${pctResueltos}%`, color: pctResueltos >= 70 ? '#16a34a' : '#ea580c', bg: pctResueltos >= 70 ? '#f0fdf4' : '#fff7ed', icon: '✅' },
@@ -194,14 +194,14 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
           <div key={k.label} style={{ background: k.bg, borderRadius: '10px', padding: '12px 14px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', marginBottom: '3px' }}>{k.icon}</div>
             <div style={{ fontSize: '17px', fontWeight: 800, color: k.color }}>{k.val}</div>
-            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 600 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       {costoRealTotal > 0 && (
-        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 14px', marginBottom: '14px', fontSize: '12px', color: '#64748b' }}>
-          Costo real acumulado: <strong style={{ color: '#0f172a' }}>{costoRealTotal.toFixed(2)}</strong>
+        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '8px', padding: '8px 14px', marginBottom: '14px', fontSize: '12px', color: '#7E9389' }}>
+          Costo real acumulado: <strong style={{ color: '#15291F' }}>{costoRealTotal.toFixed(2)}</strong>
           {costoEstimadoTotal > 0 && (
             <span style={{ marginLeft: 10, color: costoRealTotal > costoEstimadoTotal ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
               ({costoRealTotal > costoEstimadoTotal ? '+' : ''}{((costoRealTotal - costoEstimadoTotal) / costoEstimadoTotal * 100).toFixed(1)}% vs estimado)
@@ -213,10 +213,10 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar ticket..."
-          style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13.5px', background: '#f8fafc' }} />
+          style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF' }} />
         {(['todos', 'activos', 'abierto', 'en_proceso', 'resuelto', 'cerrado'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
-            style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#0ea5e9' : '#e2e8f0', background: filtroEstado === e ? '#eff6ff' : 'white', color: filtroEstado === e ? '#0ea5e9' : '#64748b' }}>
+            style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0', background: filtroEstado === e ? '#EEF2EC' : 'white', color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
             {e === 'en_proceso' ? 'En proceso' : e.charAt(0).toUpperCase() + e.slice(1)}
           </button>
         ))}
@@ -227,8 +227,8 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
         {(['todos', 'urgente', 'alta', 'media', 'baja'] as const).map(p => (
           <button key={p} onClick={() => setFiltroPrioridad(p)}
             style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: 'none',
-              background: filtroPrioridad === p ? (p === 'todos' ? '#e2e8f0' : PRIORIDAD_COLORS[p]?.bg ?? '#e2e8f0') : 'transparent',
-              color: filtroPrioridad === p ? (p === 'todos' ? '#374151' : PRIORIDAD_COLORS[p]?.color ?? '#374151') : '#94a3b8' }}>
+              background: filtroPrioridad === p ? (p === 'todos' ? '#E1DDD0' : PRIORIDAD_COLORS[p]?.bg ?? '#E1DDD0') : 'transparent',
+              color: filtroPrioridad === p ? (p === 'todos' ? '#3E5A4C' : PRIORIDAD_COLORS[p]?.color ?? '#3E5A4C') : '#7E9389' }}>
             {p === 'todos' ? 'Todas' : p}
           </button>
         ))}
@@ -236,26 +236,26 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Nuevo ticket de mantenimiento</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Título *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Título *</label>
               <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Descripción breve del problema"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Tipo</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tipo</label>
               <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="correctivo">Correctivo</option>
                 <option value="preventivo">Preventivo</option>
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Prioridad</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Prioridad</label>
               <select value={form.prioridad} onChange={e => setForm(f => ({ ...f, prioridad: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="baja">Baja</option>
                 <option value="media">Media</option>
                 <option value="alta">Alta</option>
@@ -263,69 +263,69 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Unidad (opcional)</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Unidad (opcional)</label>
               <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="">Área común</option>
                 {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Fecha límite</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha límite</label>
               <input type="date" value={form.fecha_limite} onChange={e => setForm(f => ({ ...f, fecha_limite: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Costo estimado</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Costo estimado</label>
               <input type="number" value={form.costo_estimado} onChange={e => setForm(f => ({ ...f, costo_estimado: e.target.value }))}
                 placeholder="0.00" min="0" step="0.01"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Descripción</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Descripción</label>
               <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
                 placeholder="Detalle el problema o trabajo requerido..." rows={3}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc', resize: 'vertical' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <MultiImageUploader values={fotoUrls} onChange={setFotoUrls} folder="tickets" label="Fotos del problema" maxFiles={6} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Crear ticket'}
             </button>
-            <button onClick={resetForm} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* Lista */}
       {filtrados.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔧</div>
-          <p style={{ fontWeight: 600, color: '#64748b' }}>No hay tickets de mantenimiento</p>
+          <p style={{ fontWeight: 600, color: '#7E9389' }}>No hay tickets de mantenimiento</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filtrados.map(t => {
-            const pColor = PRIORIDAD_COLORS[t.prioridad] ?? { bg: '#f8fafc', color: '#64748b' }
-            const eColor = ESTADO_COLORS[t.estado] ?? { bg: '#f8fafc', color: '#64748b' }
+            const pColor = PRIORIDAD_COLORS[t.prioridad] ?? { bg: '#FAF7EF', color: '#7E9389' }
+            const eColor = ESTADO_COLORS[t.estado] ?? { bg: '#FAF7EF', color: '#7E9389' }
             const vencido = t.fecha_limite && t.fecha_limite < new Date().toISOString().slice(0, 10) && t.estado !== 'cerrado'
             return (
-              <div key={t.id} style={{ background: 'white', border: `1.5px solid ${t.prioridad === 'urgente' && t.estado !== 'cerrado' ? '#fecaca' : '#e2e8f0'}`, borderRadius: '14px', padding: '16px 18px' }}>
+              <div key={t.id} style={{ background: 'white', border: `1.5px solid ${t.prioridad === 'urgente' && t.estado !== 'cerrado' ? '#fecaca' : '#E1DDD0'}`, borderRadius: '14px', padding: '16px 18px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
                       <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: pColor.bg, color: pColor.color }}>{t.prioridad}</span>
-                      <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: '#f1f5f9', color: '#64748b' }}>{t.tipo}</span>
+                      <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: '#EAE6D8', color: '#7E9389' }}>{t.tipo}</span>
                       {vencido && <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#fef2f2', color: '#dc2626' }}>Vencido</span>}
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: '14.5px', color: '#0f172a', marginBottom: '4px' }}>{t.titulo}</div>
-                    {t.descripcion && <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>{t.descripcion}</div>}
-                    <div style={{ display: 'flex', gap: '14px', fontSize: '12px', color: '#94a3b8', flexWrap: 'wrap' }}>
+                    <div style={{ fontWeight: 700, fontSize: '14.5px', color: '#15291F', marginBottom: '4px' }}>{t.titulo}</div>
+                    {t.descripcion && <div style={{ fontSize: '13px', color: '#7E9389', marginBottom: '6px' }}>{t.descripcion}</div>}
+                    <div style={{ display: 'flex', gap: '14px', fontSize: '12px', color: '#7E9389', flexWrap: 'wrap' }}>
                       {t.unidad_nombre && <span>📍 {t.unidad_nombre}</span>}
-                      {t.fecha_limite && <span style={{ color: vencido ? '#dc2626' : '#94a3b8' }}>📅 {t.fecha_limite}</span>}
+                      {t.fecha_limite && <span style={{ color: vencido ? '#dc2626' : '#7E9389' }}>📅 {t.fecha_limite}</span>}
                       {t.costo_estimado && <span>💰 Est. {t.costo_estimado.toFixed(2)}</span>}
                       {t.costo_real && <span>✅ Real {t.costo_real.toFixed(2)}</span>}
                       <span>🕐 {new Date(t.created_at).toLocaleDateString('es')}</span>

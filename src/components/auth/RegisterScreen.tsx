@@ -87,7 +87,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #0d9488 100%)',
+      background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 50%, #577B69 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -100,13 +100,13 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
         }
         .reg-input:focus {
           outline: none;
-          border-color: #0ea5e9 !important;
-          box-shadow: 0 0 0 3px rgba(14,165,233,0.15);
+          border-color: #1B3B36 !important;
+          box-shadow: 0 0 0 3px rgba(27, 59, 54,0.15);
         }
         .reg-btn-primary:hover:not(:disabled) {
-          background: linear-gradient(135deg, #0284c7, #0891b2) !important;
+          background: linear-gradient(135deg, #102622, #102622) !important;
           transform: translateY(-1px);
-          box-shadow: 0 6px 20px rgba(14,165,233,0.4) !important;
+          box-shadow: 0 6px 20px rgba(27, 59, 54,0.4) !important;
         }
         .reg-btn-back:hover {
           background: rgba(255,255,255,0.12) !important;
@@ -139,10 +139,10 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
           }}>
             <BrandLogo size={56} />
           </div>
-          <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#0f172a' }}>
+          <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#15291F' }}>
             Crear cuenta de cliente
           </h1>
-          <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: '#64748b' }}>
+          <p style={{ margin: '6px 0 0', fontSize: '13.5px', color: '#7E9389' }}>
             Ingrese sus datos para verificar su identidad y crear acceso al portal
           </p>
         </div>
@@ -167,13 +167,13 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
           <>
             {/* Info banner */}
             <div style={{
-              background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
-              border: '1px solid #bfdbfe',
+              background: 'linear-gradient(135deg, #EEF2EC, #D9E2DC)',
+              border: '1px solid #C2D2CA',
               borderRadius: '12px',
               padding: '12px 16px',
               marginBottom: '24px',
               fontSize: '12.5px',
-              color: '#1e40af',
+              color: '#0E2A24',
               display: 'flex',
               gap: '8px',
               alignItems: 'flex-start',
@@ -185,7 +185,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
             {/* Form fields */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label htmlFor="reg-fullname" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+                <label htmlFor="reg-fullname" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>
                   Nombre completo
                 </label>
                 <input
@@ -199,15 +199,15 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                   style={{
                     width: '100%', boxSizing: 'border-box',
                     padding: '10px 14px', fontSize: '14px',
-                    border: '1.5px solid #e2e8f0', borderRadius: '10px',
-                    background: '#f8fafc', color: '#0f172a',
+                    border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                    background: '#FAF7EF', color: '#15291F',
                     transition: 'border-color 0.2s, box-shadow 0.2s',
                   }}
                 />
               </div>
 
               <div>
-                <label htmlFor="reg-email" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+                <label htmlFor="reg-email" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>
                   Correo electrónico
                 </label>
                 <input
@@ -221,8 +221,8 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                   style={{
                     width: '100%', boxSizing: 'border-box',
                     padding: '10px 14px', fontSize: '14px',
-                    border: '1.5px solid #e2e8f0', borderRadius: '10px',
-                    background: '#f8fafc', color: '#0f172a',
+                    border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                    background: '#FAF7EF', color: '#15291F',
                     transition: 'border-color 0.2s, box-shadow 0.2s',
                   }}
                 />
@@ -230,7 +230,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
 
               <div className="reg-two-col" style={{ display: 'grid', gap: '12px' }}>
                 <div>
-                  <label htmlFor="reg-cui" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+                  <label htmlFor="reg-cui" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>
                     DPI / CUI
                   </label>
                   <input
@@ -244,15 +244,15 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                     style={{
                       width: '100%', boxSizing: 'border-box',
                       padding: '10px 14px', fontSize: '14px',
-                      border: '1.5px solid #e2e8f0', borderRadius: '10px',
-                      background: '#f8fafc', color: '#0f172a',
+                      border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                      background: '#FAF7EF', color: '#15291F',
                       transition: 'border-color 0.2s, box-shadow 0.2s',
                     }}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="reg-birthdate" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+                  <label htmlFor="reg-birthdate" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>
                     Fecha de nacimiento
                   </label>
                   <input
@@ -264,8 +264,8 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                     style={{
                       width: '100%', boxSizing: 'border-box',
                       padding: '10px 14px', fontSize: '14px',
-                      border: '1.5px solid #e2e8f0', borderRadius: '10px',
-                      background: '#f8fafc', color: '#0f172a',
+                      border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                      background: '#FAF7EF', color: '#15291F',
                       transition: 'border-color 0.2s, box-shadow 0.2s',
                     }}
                   />
@@ -273,7 +273,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
               </div>
 
               <div>
-                <label htmlFor="reg-password" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+                <label htmlFor="reg-password" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>
                   Contraseña
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -288,8 +288,8 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                     style={{
                       width: '100%', boxSizing: 'border-box',
                       padding: '10px 44px 10px 14px', fontSize: '14px',
-                      border: '1.5px solid #e2e8f0', borderRadius: '10px',
-                      background: '#f8fafc', color: '#0f172a',
+                      border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                      background: '#FAF7EF', color: '#15291F',
                       transition: 'border-color 0.2s, box-shadow 0.2s',
                     }}
                   />
@@ -299,7 +299,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                     style={{
                       position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
                       background: 'none', border: 'none', cursor: 'pointer',
-                      fontSize: '15px', color: '#94a3b8', padding: '2px',
+                      fontSize: '15px', color: '#7E9389', padding: '2px',
                     }}
                   >
                     {showPassword ? '🙈' : '👁️'}
@@ -308,7 +308,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
               </div>
 
               <div>
-                <label htmlFor="reg-confirm-password" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#374151', marginBottom: '5px' }}>
+                <label htmlFor="reg-confirm-password" style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>
                   Confirmar contraseña
                 </label>
                 <input
@@ -322,9 +322,9 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                   style={{
                     width: '100%', boxSizing: 'border-box',
                     padding: '10px 14px', fontSize: '14px',
-                    border: `1.5px solid ${confirmPassword && confirmPassword !== password ? '#ef4444' : '#e2e8f0'}`,
+                    border: `1.5px solid ${confirmPassword && confirmPassword !== password ? '#ef4444' : '#E1DDD0'}`,
                     borderRadius: '10px',
-                    background: '#f8fafc', color: '#0f172a',
+                    background: '#FAF7EF', color: '#15291F',
                     transition: 'border-color 0.2s, box-shadow 0.2s',
                   }}
                 />
@@ -365,8 +365,8 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                 width: '100%',
                 padding: '13px',
                 background: loading
-                  ? '#94a3b8'
-                  : 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                  ? '#7E9389'
+                  : 'linear-gradient(135deg, #1B3B36, #577B69)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '12px',
@@ -374,7 +374,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                 fontWeight: 600,
                 cursor: loading ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s',
-                boxShadow: loading ? 'none' : '0 4px 14px rgba(14,165,233,0.35)',
+                boxShadow: loading ? 'none' : '0 4px 14px rgba(27, 59, 54,0.35)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -407,8 +407,8 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                 width: '100%',
                 padding: '10px',
                 background: 'transparent',
-                color: '#64748b',
-                border: '1.5px solid #e2e8f0',
+                color: '#7E9389',
+                border: '1.5px solid #E1DDD0',
                 borderRadius: '10px',
                 fontSize: '13.5px',
                 fontWeight: 500,

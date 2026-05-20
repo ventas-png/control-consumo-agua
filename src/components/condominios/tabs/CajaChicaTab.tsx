@@ -81,18 +81,18 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
   const totalEgresos  = selectedMovs.filter(m => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0)
   const saldo = (selected ? Number(selected.monto_inicial) : 0) + totalIngresos - totalEgresos
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Caja Chica</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>{cajas.filter(c => c.estado === 'abierta').length} caja(s) abierta(s)</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Caja Chica</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>{cajas.filter(c => c.estado === 'abierta').length} caja(s) abierta(s)</p>
         </div>
         {canCreate && !showCajaForm && (
           <button onClick={() => setShowCajaForm(true)}
-            style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Abrir Caja
           </button>
         )}
@@ -100,29 +100,29 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
 
       {/* Open caja form */}
       {showCajaForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Abrir nueva caja</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Responsable *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Responsable *</label>
               <input style={inputStyle} value={formCaja.responsable} onChange={e => setFC('responsable', e.target.value)} placeholder="Nombre del responsable" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Monto inicial ({moneda})</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Monto inicial ({moneda})</label>
               <input style={inputStyle} type="number" step="0.01" value={formCaja.monto_inicial} onChange={e => setFC('monto_inicial', e.target.value)} placeholder="0.00" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Notas</label>
               <input style={inputStyle} value={formCaja.notas} onChange={e => setFC('notas', e.target.value)} placeholder="Observaciones…" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleAbrirCaja} disabled={savingCaja}
-              style={{ padding: '7px 18px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {savingCaja ? 'Abriendo…' : 'Abrir caja'}
             </button>
             <button onClick={() => setShowCajaForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -133,7 +133,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
         {/* Cajas list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {cajas.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay cajas chicas.</div>
+            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay cajas chicas.</div>
           ) : cajas.map(c => {
             const movs = movimientos.filter(m => m.caja_id === c.id)
             const ing = movs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + Number(m.monto), 0)
@@ -141,19 +141,19 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
             const sal = Number(c.monto_inicial) + ing - egr
             return (
               <div key={c.id} onClick={() => setSelected(selected?.id === c.id ? null : c)}
-                style={{ background: 'white', border: `1.5px solid ${selected?.id === c.id ? '#0ea5e9' : '#e2e8f0'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
+                style={{ background: 'white', border: `1.5px solid ${selected?.id === c.id ? '#1B3B36' : '#E1DDD0'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px' }}>
                       <span style={{ fontWeight: 700, fontSize: '13px' }}>{c.responsable}</span>
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px',
-                        background: c.estado === 'abierta' ? '#dcfce7' : '#f1f5f9',
-                        color: c.estado === 'abierta' ? '#16a34a' : '#64748b' }}>
+                        background: c.estado === 'abierta' ? '#dcfce7' : '#EAE6D8',
+                        color: c.estado === 'abierta' ? '#16a34a' : '#7E9389' }}>
                         {c.estado === 'abierta' ? 'Abierta' : 'Cerrada'}
                       </span>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#64748b' }}>Apertura: {c.fecha_apertura}</div>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: sal >= 0 ? '#0ea5e9' : '#ef4444', marginTop: '3px' }}>
+                    <div style={{ fontSize: '11px', color: '#7E9389' }}>Apertura: {c.fecha_apertura}</div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: sal >= 0 ? '#1B3B36' : '#ef4444', marginTop: '3px' }}>
                       Saldo: {fmt(sal, moneda)}
                     </div>
                   </div>
@@ -171,17 +171,17 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
 
         {/* Movimientos panel */}
         {selected && (
-          <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px' }}>
             {/* Summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
               {[
-                { label: 'Monto inicial', value: fmt(Number(selected.monto_inicial), moneda), color: '#64748b' },
+                { label: 'Monto inicial', value: fmt(Number(selected.monto_inicial), moneda), color: '#7E9389' },
                 { label: 'Ingresos', value: fmt(totalIngresos, moneda), color: '#10b981' },
                 { label: 'Egresos', value: fmt(totalEgresos, moneda), color: '#ef4444' },
               ].map(k => (
-                <div key={k.label} style={{ background: 'white', borderRadius: '8px', padding: '8px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
+                <div key={k.label} style={{ background: 'white', borderRadius: '8px', padding: '8px', textAlign: 'center', border: '1px solid #E1DDD0' }}>
                   <div style={{ fontSize: '13px', fontWeight: 700, color: k.color }}>{k.value}</div>
-                  <div style={{ fontSize: '10px', color: '#94a3b8' }}>{k.label}</div>
+                  <div style={{ fontSize: '10px', color: '#7E9389' }}>{k.label}</div>
                 </div>
               ))}
             </div>
@@ -190,49 +190,49 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>Movimientos ({selectedMovs.length})</span>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C' }}>Movimientos ({selectedMovs.length})</span>
               {canCreate && selected.estado === 'abierta' && !showMovForm && (
                 <button onClick={() => setShowMovForm(true)}
-                  style={{ padding: '4px 10px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
+                  style={{ padding: '4px 10px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
                   + Movimiento
                 </button>
               )}
             </div>
 
             {showMovForm && (
-              <div style={{ background: 'white', borderRadius: '8px', padding: '10px', marginBottom: '10px', border: '1px solid #e2e8f0' }}>
+              <div style={{ background: 'white', borderRadius: '8px', padding: '10px', marginBottom: '10px', border: '1px solid #E1DDD0' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', marginBottom: '8px' }}>
                   <div>
-                    <label style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Tipo</label>
+                    <label style={{ fontSize: '10px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '2px' }}>Tipo</label>
                     <select style={{ ...inputStyle, fontSize: '12px' }} value={formMov.tipo} onChange={e => setFM('tipo', e.target.value)}>
                       <option value="egreso">Egreso</option>
                       <option value="ingreso">Ingreso</option>
                     </select>
                   </div>
                   <div>
-                    <label style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Concepto *</label>
+                    <label style={{ fontSize: '10px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '2px' }}>Concepto *</label>
                     <input style={{ ...inputStyle, fontSize: '12px' }} value={formMov.concepto} onChange={e => setFM('concepto', e.target.value)} placeholder="Descripción…" autoFocus />
                   </div>
                   <div>
-                    <label style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Monto *</label>
+                    <label style={{ fontSize: '10px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '2px' }}>Monto *</label>
                     <input style={{ ...inputStyle, fontSize: '12px' }} type="number" step="0.01" value={formMov.monto} onChange={e => setFM('monto', e.target.value)} placeholder="0.00" />
                   </div>
                   <div>
-                    <label style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Fecha</label>
+                    <label style={{ fontSize: '10px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '2px' }}>Fecha</label>
                     <input style={{ ...inputStyle, fontSize: '12px' }} type="date" value={formMov.fecha} onChange={e => setFM('fecha', e.target.value)} />
                   </div>
                   <div>
-                    <label style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Comprobante</label>
+                    <label style={{ fontSize: '10px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '2px' }}>Comprobante</label>
                     <input style={{ ...inputStyle, fontSize: '12px' }} value={formMov.comprobante} onChange={e => setFM('comprobante', e.target.value)} placeholder="Nº factura…" />
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button onClick={handleSaveMovimiento} disabled={savingMov}
-                    style={{ padding: '5px 12px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>
+                    style={{ padding: '5px 12px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>
                     {savingMov ? 'Guardando…' : 'Guardar'}
                   </button>
                   <button onClick={() => { setShowMovForm(false); setFormMov({ ...BLANK_MOV }) }}
-                    style={{ padding: '5px 10px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#64748b' }}>
+                    style={{ padding: '5px 10px', background: 'white', border: '1px solid #E1DDD0', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#7E9389' }}>
                     Cancelar
                   </button>
                 </div>
@@ -240,18 +240,18 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
             )}
 
             {selectedMovs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '12px' }}>Sin movimientos.</div>
+              <div style={{ textAlign: 'center', padding: '20px', color: '#7E9389', fontSize: '12px' }}>Sin movimientos.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                 {[...selectedMovs].sort((a, b) => b.fecha.localeCompare(a.fecha)).map(m => (
-                  <div key={m.id} style={{ background: 'white', borderRadius: '7px', padding: '7px 10px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div key={m.id} style={{ background: 'white', borderRadius: '7px', padding: '7px 10px', border: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <span style={{ fontSize: '12px', fontWeight: 600, color: m.tipo === 'ingreso' ? '#10b981' : '#ef4444' }}>
                         {m.tipo === 'ingreso' ? '+' : '-'}{fmt(Number(m.monto), moneda)}
                       </span>
-                      <span style={{ fontSize: '12px', color: '#374151', marginLeft: '8px' }}>{m.concepto}</span>
-                      {m.comprobante && <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: '6px' }}>#{m.comprobante}</span>}
-                      <div style={{ fontSize: '10px', color: '#94a3b8' }}>{m.fecha}</div>
+                      <span style={{ fontSize: '12px', color: '#3E5A4C', marginLeft: '8px' }}>{m.concepto}</span>
+                      {m.comprobante && <span style={{ fontSize: '11px', color: '#7E9389', marginLeft: '6px' }}>#{m.comprobante}</span>}
+                      <div style={{ fontSize: '10px', color: '#7E9389' }}>{m.fecha}</div>
                     </div>
                     {canEdit && (
                       <button onClick={() => handleDeleteMovimiento(m.id)}

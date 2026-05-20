@@ -111,11 +111,11 @@ const STATUS_LABELS: Record<ConversationStatus, string> = {
 }
 
 const STATUS_COLORS: Record<ConversationStatus, string> = {
-  abierta: '#3b82f6',
+  abierta: '#2F5D4F',
   en_progreso: '#f59e0b',
-  esperando_cliente: '#8b5cf6',
+  esperando_cliente: '#B96A3F',
   resuelta: '#10b981',
-  cerrada: '#6b7280',
+  cerrada: '#7E9389',
 }
 
 function formatDate(iso: string): string {
@@ -239,7 +239,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* ── Main tabs ── */}
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #e5e7eb', marginBottom: '-4px' }}>
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #E1DDD0', marginBottom: '-4px' }}>
         {(['conversaciones', 'comunicados'] as const).map(tab => {
           const active = mainTab === tab
           const unreadCount = tab === 'comunicados'
@@ -253,9 +253,9 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                 padding: '8px 16px',
                 background: 'none',
                 border: 'none',
-                borderBottom: active ? '2px solid #0ea5e9' : '2px solid transparent',
+                borderBottom: active ? '2px solid #1B3B36' : '2px solid transparent',
                 marginBottom: '-2px',
-                color: active ? '#0ea5e9' : '#6b7280',
+                color: active ? '#1B3B36' : '#7E9389',
                 fontWeight: active ? 700 : 500,
                 fontSize: '13.5px',
                 cursor: 'pointer',
@@ -299,8 +299,8 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#111827' }}>Mis Conversaciones</h3>
-          <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#6b7280' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#15291F' }}>Mis Conversaciones</h3>
+          <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#7E9389' }}>
             Comunícate directamente con nuestra empresa
           </p>
         </div>
@@ -309,7 +309,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
             onClick={() => setView('new')}
             style={{
               padding: '9px 16px',
-              background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
+              background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)',
               color: 'white',
               border: 'none',
               borderRadius: '10px',
@@ -319,7 +319,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 2px 8px rgba(14,165,233,0.3)',
+              boxShadow: '0 2px 8px rgba(27, 59, 54,0.3)',
             }}
           >
             + Nueva consulta
@@ -331,9 +331,9 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
             style={{
               padding: '8px 14px',
               background: 'white',
-              border: '1px solid #d1d5db',
+              border: '1px solid #C7C2B0',
               borderRadius: '10px',
-              color: '#374151',
+              color: '#3E5A4C',
               fontSize: '13px',
               cursor: 'pointer',
             }}
@@ -347,18 +347,18 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {view === 'new' && (
         <div style={{
           background: 'white',
-          border: '1px solid #e5e7eb',
+          border: '1px solid #E1DDD0',
           borderRadius: '14px',
           padding: '24px',
           boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
         }}>
-          <h4 style={{ margin: '0 0 20px', fontSize: '15px', fontWeight: 700, color: '#111827' }}>
+          <h4 style={{ margin: '0 0 20px', fontSize: '15px', fontWeight: 700, color: '#15291F' }}>
             Nueva consulta
           </h4>
 
           {/* Categorías */}
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '8px' }}>
+            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '8px' }}>
               Tipo de consulta
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
@@ -368,16 +368,16 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   onClick={() => setNewCategory(cat)}
                   style={{
                     padding: '10px 12px',
-                    border: `2px solid ${newCategory === cat ? '#0ea5e9' : '#e5e7eb'}`,
+                    border: `2px solid ${newCategory === cat ? '#1B3B36' : '#E1DDD0'}`,
                     borderRadius: '10px',
-                    background: newCategory === cat ? '#eff6ff' : 'white',
+                    background: newCategory === cat ? '#EEF2EC' : 'white',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
                     fontSize: '13px',
                     fontWeight: newCategory === cat ? 600 : 400,
-                    color: newCategory === cat ? '#0369a1' : '#374151',
+                    color: newCategory === cat ? '#102622' : '#3E5A4C',
                     transition: 'all 0.12s',
                     textAlign: 'left',
                   }}
@@ -391,7 +391,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
 
           {/* Asunto */}
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
+            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '6px' }}>
               Asunto *
             </label>
             <input
@@ -403,7 +403,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                border: '1px solid #d1d5db',
+                border: '1px solid #C7C2B0',
                 borderRadius: '9px',
                 fontSize: '13.5px',
                 outline: 'none',
@@ -415,7 +415,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
 
           {/* Prioridad */}
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
+            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '6px' }}>
               Urgencia
             </label>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -425,10 +425,10 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   onClick={() => setNewPriority(val as ConversationPriority)}
                   style={{
                     padding: '6px 14px',
-                    border: `2px solid ${newPriority === val ? color : '#e5e7eb'}`,
+                    border: `2px solid ${newPriority === val ? color : '#E1DDD0'}`,
                     borderRadius: '999px',
                     background: newPriority === val ? color + '18' : 'white',
-                    color: newPriority === val ? color : '#6b7280',
+                    color: newPriority === val ? color : '#7E9389',
                     fontSize: '12px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -442,7 +442,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
 
           {/* Mensaje */}
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>
+            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '6px' }}>
               Describe tu consulta *
             </label>
             <textarea
@@ -453,7 +453,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                border: '1px solid #d1d5db',
+                border: '1px solid #C7C2B0',
                 borderRadius: '9px',
                 fontSize: '13.5px',
                 resize: 'vertical',
@@ -480,9 +480,9 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               style={{
                 padding: '10px 18px',
                 background: 'white',
-                border: '1px solid #d1d5db',
+                border: '1px solid #C7C2B0',
                 borderRadius: '10px',
-                color: '#374151',
+                color: '#3E5A4C',
                 fontSize: '13px',
                 cursor: 'pointer',
                 fontWeight: 500,
@@ -495,14 +495,14 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               disabled={creating}
               style={{
                 padding: '10px 22px',
-                background: creating ? '#9ca3af' : 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
+                background: creating ? '#7E9389' : 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '10px',
                 fontWeight: 700,
                 fontSize: '13px',
                 cursor: creating ? 'not-allowed' : 'pointer',
-                boxShadow: creating ? 'none' : '0 2px 8px rgba(14,165,233,0.3)',
+                boxShadow: creating ? 'none' : '0 2px 8px rgba(27, 59, 54,0.3)',
               }}
             >
               {creating ? 'Enviando…' : 'Enviar consulta'}
@@ -515,29 +515,29 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {view === 'list' && (
         <div style={{
           background: 'white',
-          border: '1px solid #e5e7eb',
+          border: '1px solid #E1DDD0',
           borderRadius: '14px',
           overflow: 'hidden',
           boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
         }}>
           {loading ? (
-            <div style={{ padding: '48px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>
+            <div style={{ padding: '48px', textAlign: 'center', color: '#7E9389', fontSize: '14px' }}>
               Cargando tus conversaciones…
             </div>
           ) : conversations.length === 0 ? (
             <div style={{ padding: '48px 24px', textAlign: 'center' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>💬</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 600, color: '#3E5A4C', marginBottom: '6px' }}>
                 Aún no tienes conversaciones
               </div>
-              <div style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px' }}>
+              <div style={{ fontSize: '13px', color: '#7E9389', marginBottom: '20px' }}>
                 ¿Tienes alguna duda o consulta? Escríbenos.
               </div>
               <button
                 onClick={() => setView('new')}
                 style={{
                   padding: '10px 22px',
-                  background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
+                  background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '10px',
@@ -559,7 +559,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   textAlign: 'left',
                   padding: '14px 18px',
                   border: 'none',
-                  borderBottom: idx < conversations.length - 1 ? '1px solid #f1f5f9' : 'none',
+                  borderBottom: idx < conversations.length - 1 ? '1px solid #EAE6D8' : 'none',
                   background: 'white',
                   cursor: 'pointer',
                   display: 'flex',
@@ -567,17 +567,17 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   gap: '6px',
                   transition: 'background 0.12s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                onMouseEnter={e => (e.currentTarget.style.background = '#FAF7EF')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'white')}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
                     <span style={{ fontSize: '20px' }}>{CATEGORY_ICONS[conv.category]}</span>
-                    <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#111827', lineHeight: '1.3' }}>
+                    <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#15291F', lineHeight: '1.3' }}>
                       {conv.subject}
                     </span>
                   </div>
-                  <span style={{ fontSize: '11.5px', color: '#9ca3af', flexShrink: 0 }}>
+                  <span style={{ fontSize: '11.5px', color: '#7E9389', flexShrink: 0 }}>
                     {formatDate(conv.updated_at)}
                   </span>
                 </div>
@@ -591,13 +591,13 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   }}>
                     {STATUS_LABELS[conv.status]}
                   </span>
-                  <span style={{ fontSize: '11.5px', color: '#9ca3af' }}>
+                  <span style={{ fontSize: '11.5px', color: '#7E9389' }}>
                     {CATEGORY_LABELS[conv.category]}
                   </span>
                   {conv.status === 'esperando_cliente' && (
                     <span style={{
                       fontSize: '11px', padding: '2px 8px',
-                      background: '#ede9fe', color: '#7c3aed',
+                      background: '#F4EBE3', color: '#9C5733',
                       borderRadius: '999px', fontWeight: 600,
                     }}>
                       Tienes mensajes sin leer
@@ -614,7 +614,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {view === 'detail' && activeConversation && (
         <div style={{
           background: 'white',
-          border: '1px solid #e5e7eb',
+          border: '1px solid #E1DDD0',
           borderRadius: '14px',
           overflow: 'hidden',
           boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
@@ -624,12 +624,12 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
           {/* Header */}
           <div style={{
             padding: '14px 18px',
-            borderBottom: '1px solid #f1f5f9',
-            background: '#f8fafc',
+            borderBottom: '1px solid #EAE6D8',
+            background: '#FAF7EF',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '20px' }}>{CATEGORY_ICONS[activeConversation.category]}</span>
-              <span style={{ fontWeight: 700, fontSize: '14px', color: '#111827', flex: 1 }}>
+              <span style={{ fontWeight: 700, fontSize: '14px', color: '#15291F', flex: 1 }}>
                 {activeConversation.subject}
               </span>
               <span style={{
@@ -643,7 +643,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               </span>
             </div>
             {activeConversation.assigned_name && (
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px', paddingLeft: '28px' }}>
+              <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '4px', paddingLeft: '28px' }}>
                 Atendido por: {activeConversation.assigned_name}
               </div>
             )}
@@ -658,10 +658,10 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',
-            background: '#f9fafb',
+            background: '#FAF7EF',
           }}>
             {messages.filter(m => !m.is_internal_note).length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: '13px', paddingTop: '40px' }}>
+              <div style={{ textAlign: 'center', color: '#7E9389', fontSize: '13px', paddingTop: '40px' }}>
                 No hay mensajes aún
               </div>
             ) : (
@@ -678,7 +678,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                         <div style={{
                           width: '30px', height: '30px',
                           borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
+                          background: 'linear-gradient(135deg, #1B3B36, #577B69)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: 'white', fontSize: '12px', fontWeight: 700,
                           flexShrink: 0, marginRight: '8px', alignSelf: 'flex-end',
@@ -691,13 +691,13 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                         padding: '10px 14px',
                         borderRadius: isMe ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
                         background: isMe
-                          ? 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)'
+                          ? 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)'
                           : 'white',
-                        color: isMe ? 'white' : '#111827',
+                        color: isMe ? 'white' : '#15291F',
                         boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
                       }}>
                         {!isMe && (
-                          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: '#0ea5e9' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: '#1B3B36' }}>
                             {msg.sender_name ?? 'Empresa'}
                           </div>
                         )}
@@ -732,13 +732,13 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
 
           {/* Compositor */}
           {activeConversation.status !== 'cerrada' && activeConversation.status !== 'resuelta' ? (
-            <div style={{ padding: '14px 16px', borderTop: '1px solid #f1f5f9', background: 'white' }}>
+            <div style={{ padding: '14px 16px', borderTop: '1px solid #EAE6D8', background: 'white' }}>
               {/* Preview archivo pendiente */}
               {pendingFile && (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '8px',
                   padding: '7px 10px', marginBottom: '8px',
-                  background: '#f0f9ff', border: '1px solid #bae6fd',
+                  background: '#EEF2EC', border: '1px solid #C2D2CA',
                   borderRadius: '8px',
                 }}>
                   {pendingFile.type.startsWith('image/') ? (
@@ -751,14 +751,14 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     <span style={{ fontSize: '22px', flexShrink: 0 }}>{getFileIcon(pendingFile.type)}</span>
                   )}
                   <div style={{ flex: 1, overflow: 'hidden' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 500, color: '#0369a1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 500, color: '#102622', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {pendingFile.name}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#6b7280' }}>{formatBytes(pendingFile.size)}</div>
+                    <div style={{ fontSize: '11px', color: '#7E9389' }}>{formatBytes(pendingFile.size)}</div>
                   </div>
                   <button
                     onClick={() => setPendingFile(null)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '16px', lineHeight: 1, padding: '2px', flexShrink: 0 }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', fontSize: '16px', lineHeight: 1, padding: '2px', flexShrink: 0 }}
                   >
                     ×
                   </button>
@@ -773,20 +773,20 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   style={{
                     flex: 1,
                     padding: '10px 12px',
-                    border: '1px solid #e5e7eb',
+                    border: '1px solid #E1DDD0',
                     borderRadius: '12px',
                     fontSize: '13.5px',
                     resize: 'none',
                     outline: 'none',
                     fontFamily: 'inherit',
-                    background: '#f9fafb',
+                    background: '#FAF7EF',
                   }}
                   onKeyDown={e => {
                     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend()
                   }}
                 />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', border: '1px solid #e5e7eb', borderRadius: '12px', background: '#f9fafb', fontSize: '20px' }}>
+                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', border: '1px solid #E1DDD0', borderRadius: '12px', background: '#FAF7EF', fontSize: '20px' }}>
                     📎
                     <input
                       type="file"
@@ -810,8 +810,8 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     style={{
                       padding: '12px 18px',
                       background: (sending || (!messageText.trim() && !pendingFile))
-                        ? '#d1d5db'
-                        : 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
+                        ? '#C7C2B0'
+                        : 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '12px',
@@ -819,25 +819,25 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                       fontSize: '13px',
                       cursor: (sending || (!messageText.trim() && !pendingFile)) ? 'not-allowed' : 'pointer',
                       transition: 'all 0.15s',
-                      boxShadow: (sending || (!messageText.trim() && !pendingFile)) ? 'none' : '0 2px 8px rgba(14,165,233,0.3)',
+                      boxShadow: (sending || (!messageText.trim() && !pendingFile)) ? 'none' : '0 2px 8px rgba(27, 59, 54,0.3)',
                     }}
                   >
                     {sending ? '…' : 'Enviar'}
                   </button>
                 </div>
               </div>
-              <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '5px' }}>
+              <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '5px' }}>
                 Ctrl+Enter para enviar · Max 10 MB por adjunto
               </div>
             </div>
           ) : (
             <div style={{
               padding: '14px 18px',
-              background: '#f9fafb',
-              borderTop: '1px solid #f1f5f9',
+              background: '#FAF7EF',
+              borderTop: '1px solid #EAE6D8',
               textAlign: 'center',
               fontSize: '13px',
-              color: '#6b7280',
+              color: '#7E9389',
             }}>
               {activeConversation.status === 'resuelta'
                 ? '✅ Esta consulta fue marcada como resuelta.'
@@ -851,8 +851,8 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {mainTab === 'comunicados' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#111827' }}>Comunicados</h3>
-            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#6b7280' }}>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#15291F' }}>Comunicados</h3>
+            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#7E9389' }}>
               Mensajes informativos de la empresa
             </p>
           </div>
@@ -860,14 +860,14 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
             <div style={{
               padding: '48px 24px', textAlign: 'center',
               background: 'white', borderRadius: '14px',
-              border: '1px solid #e5e7eb',
+              border: '1px solid #E1DDD0',
               boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
             }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>📢</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 600, color: '#3E5A4C', marginBottom: '4px' }}>
                 Sin comunicados
               </div>
-              <div style={{ fontSize: '13px', color: '#9ca3af' }}>
+              <div style={{ fontSize: '13px', color: '#7E9389' }}>
                 Aquí aparecerán los mensajes informativos de la empresa.
               </div>
             </div>
@@ -881,10 +881,10 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   key={recipient.id}
                   style={{
                     background: 'white',
-                    border: `1px solid ${isUnread ? '#bfdbfe' : '#e5e7eb'}`,
+                    border: `1px solid ${isUnread ? '#C2D2CA' : '#E1DDD0'}`,
                     borderRadius: '14px',
                     overflow: 'hidden',
-                    boxShadow: isUnread ? '0 1px 8px rgba(59,130,246,0.12)' : '0 1px 4px rgba(0,0,0,0.04)',
+                    boxShadow: isUnread ? '0 1px 8px rgba(47, 93, 79,0.12)' : '0 1px 4px rgba(0,0,0,0.04)',
                   }}
                 >
                   <button
@@ -911,20 +911,20 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     {isUnread && (
                       <span style={{
                         width: '8px', height: '8px', borderRadius: '50%',
-                        background: '#3b82f6', flexShrink: 0,
+                        background: '#2F5D4F', flexShrink: 0,
                       }} />
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: isUnread ? 700 : 600, fontSize: '13.5px', color: '#111827' }}>
+                      <div style={{ fontWeight: isUnread ? 700 : 600, fontSize: '13.5px', color: '#15291F' }}>
                         {bc.title}
                       </div>
-                      <div style={{ fontSize: '11.5px', color: '#9ca3af', marginTop: '2px' }}>
+                      <div style={{ fontSize: '11.5px', color: '#7E9389', marginTop: '2px' }}>
                         {bc.sent_by_name} · {new Date(bc.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </div>
                     </div>
                     <svg
                       width="14" height="14"
-                      fill="none" stroke="#9ca3af" strokeWidth="2"
+                      fill="none" stroke="#7E9389" strokeWidth="2"
                       viewBox="0 0 24 24"
                       style={{ flexShrink: 0, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
                     >
@@ -932,10 +932,10 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     </svg>
                   </button>
                   {isExpanded && (
-                    <div style={{ padding: '0 18px 18px', borderTop: '1px solid #f1f5f9' }}>
+                    <div style={{ padding: '0 18px 18px', borderTop: '1px solid #EAE6D8' }}>
                       <div style={{
                         paddingTop: '14px',
-                        fontSize: '14px', color: '#374151',
+                        fontSize: '14px', color: '#3E5A4C',
                         lineHeight: '1.65', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                       }}>
                         {bc.body}

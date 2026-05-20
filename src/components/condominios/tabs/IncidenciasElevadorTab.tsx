@@ -15,14 +15,14 @@ interface Props {
 
 const TIPOS: { value: TipoIncidenciaElevador; label: string; icon: string; color: string }[] = [
   { value: 'falla',                    label: 'Falla',              icon: '⚠️', color: '#ef4444' },
-  { value: 'mantenimiento_preventivo', label: 'Mant. preventivo',  icon: '🔧', color: '#6366f1' },
+  { value: 'mantenimiento_preventivo', label: 'Mant. preventivo',  icon: '🔧', color: '#B96A3F' },
   { value: 'mantenimiento_correctivo', label: 'Mant. correctivo',  icon: '🛠️', color: '#f59e0b' },
   { value: 'inspeccion_legal',         label: 'Inspección legal',  icon: '🏛️', color: '#10b981' },
-  { value: 'otro',                     label: 'Otro',              icon: '📋', color: '#6b7280' },
+  { value: 'otro',                     label: 'Otro',              icon: '📋', color: '#7E9389' },
 ]
 
 const ESTADOS: { value: EstadoIncidenciaElevador; label: string; color: string; bg: string }[] = [
-  { value: 'reportado',            label: 'Reportado',           color: '#6366f1', bg: '#eef2ff' },
+  { value: 'reportado',            label: 'Reportado',           color: '#B96A3F', bg: '#F4EBE3' },
   { value: 'en_atencion',          label: 'En atención',         color: '#f59e0b', bg: '#fef3c7' },
   { value: 'resuelto',             label: 'Resuelto',            color: '#10b981', bg: '#d1fae5' },
   { value: 'requiere_seguimiento', label: 'Req. seguimiento',    color: '#ef4444', bg: '#fef2f2' },
@@ -104,14 +104,14 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 300, borderRight: '1px solid #e5e7eb', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #e5e7eb' }}>
+      <div style={{ width: 300, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div>
               <span style={{ fontWeight: 600, fontSize: 14 }}>Elevadores ({lista.length})</span>
@@ -119,7 +119,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
             </div>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nuevo
               </button>
             )}
@@ -139,30 +139,30 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
         </div>
 
         {proxInspecciones.length > 0 && (
-          <div style={{ padding: '8px 12px', background: '#eef2ff', borderBottom: '1px solid #e5e7eb' }}>
-            <div style={{ fontSize: 10, color: '#6366f1', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>🏛️ Próximas inspecciones</div>
+          <div style={{ padding: '8px 12px', background: '#F4EBE3', borderBottom: '1px solid #E1DDD0' }}>
+            <div style={{ fontSize: 10, color: '#B96A3F', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>🏛️ Próximas inspecciones</div>
             {proxInspecciones.map(r => (
-              <div key={r.id} style={{ fontSize: 11, color: '#374151', marginBottom: 2 }}>
+              <div key={r.id} style={{ fontSize: 11, color: '#3E5A4C', marginBottom: 2 }}>
                 {r.elevador} · <strong>{r.proxima_inspeccion}</strong>
               </div>
             ))}
           </div>
         )}
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#9ca3af', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
+        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
 
         {lista.map(r => {
           const tipo = TIPOS.find(t => t.value === r.tipo)
           const est = ESTADOS.find(e => e.value === r.estado)
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', background: selected?.id === r.id ? '#eef2ff' : '#fff', borderLeft: `3px solid ${tipo?.color}` }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === r.id ? '#F4EBE3' : '#fff', borderLeft: `3px solid ${tipo?.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 12 }}>{tipo?.icon} {r.elevador}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.label}</span>
               </div>
-              <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>{r.descripcion.length > 55 ? r.descripcion.slice(0, 55) + '…' : r.descripcion}</div>
-              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{r.fecha}{r.empresa_servicio ? ` · ${r.empresa_servicio}` : ''}</div>
+              <div style={{ fontSize: 12, color: '#3E5A4C', marginTop: 2 }}>{r.descripcion.length > 55 ? r.descripcion.slice(0, 55) + '…' : r.descripcion}</div>
+              <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>{r.fecha}{r.empresa_servicio ? ` · ${r.empresa_servicio}` : ''}</div>
             </div>
           )
         })}
@@ -233,7 +233,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
                 {saving ? 'Guardando…' : '✅ Registrar'}
               </button>
               <button onClick={() => setMostrarForm(false)}
-                style={{ padding: '8px 16px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -250,30 +250,30 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
                 <div>
                   <div style={{ fontSize: 12, color: tipo?.color, fontWeight: 700, marginBottom: 4 }}>{tipo?.icon} {tipo?.label}</div>
                   <div style={{ fontWeight: 700, fontSize: 20 }}>🛗 {selected.elevador}</div>
-                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: '#7E9389', marginTop: 4 }}>
                     {selected.fecha}
                     {selected.hora_inicio && <span> · {selected.hora_inicio.slice(0, 5)}</span>}
                     {selected.hora_fin && <span>–{selected.hora_fin.slice(0, 5)}</span>}
-                    {dur && <span style={{ color: '#6366f1' }}> · {dur}</span>}
+                    {dur && <span style={{ color: '#B96A3F' }}> · {dur}</span>}
                   </div>
                 </div>
                 <span style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, background: est?.bg, color: est?.color, fontWeight: 600 }}>{est?.label}</span>
               </div>
 
-              <div style={{ background: '#f9fafb', borderRadius: 10, padding: '14px 16px', marginBottom: 16, fontSize: 14, color: '#374151', lineHeight: 1.6 }}>
+              <div style={{ background: '#FAF7EF', borderRadius: 10, padding: '14px 16px', marginBottom: 16, fontSize: 14, color: '#3E5A4C', lineHeight: 1.6 }}>
                 {selected.descripcion}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
                 {selected.empresa_servicio && (
-                  <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#9ca3af' }}>Empresa</div>
+                  <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: '#7E9389' }}>Empresa</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.empresa_servicio}</div>
                   </div>
                 )}
                 {selected.tecnico && (
-                  <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#9ca3af' }}>Técnico</div>
+                  <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: '#7E9389' }}>Técnico</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.tecnico}</div>
                   </div>
                 )}
@@ -284,9 +284,9 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
                   </div>
                 )}
                 {selected.proxima_inspeccion && (
-                  <div style={{ background: '#eef2ff', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#6366f1' }}>Próx. inspección</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#6366f1' }}>{selected.proxima_inspeccion}</div>
+                  <div style={{ background: '#F4EBE3', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: '#B96A3F' }}>Próx. inspección</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#B96A3F' }}>{selected.proxima_inspeccion}</div>
                   </div>
                 )}
               </div>
@@ -308,7 +308,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
         })()}
 
         {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9ca3af', fontSize: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#7E9389', fontSize: 14 }}>
             Selecciona un registro o crea uno nuevo
           </div>
         )}

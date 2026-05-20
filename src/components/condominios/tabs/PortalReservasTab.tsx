@@ -12,7 +12,7 @@ import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSe
 function AmenidadHeroButton({ signedFotoUrl, onClick, children }: { signedFotoUrl: string | null; onClick: () => void; children: ReactNode }) {
   const fondo = signedFotoUrl
     ? `linear-gradient(180deg, rgba(15,23,42,0.05) 0%, rgba(15,23,42,0.85) 100%), center/cover no-repeat url(${signedFotoUrl})`
-    : 'linear-gradient(135deg,#0ea5e9 0%,#0d9488 100%)'
+    : 'linear-gradient(135deg,#1B3B36 0%,#577B69 100%)'
   return (
     <button
       onClick={onClick}
@@ -60,7 +60,7 @@ type EstadoReserva = 'confirmada' | 'cancelada' | 'pendiente'
 const ESTADO_RES: Record<EstadoReserva, { label: string; bg: string; color: string }> = {
   confirmada: { label: 'Confirmada', bg: '#f0fdf4', color: '#16a34a' },
   pendiente:  { label: 'Pendiente',  bg: '#fff7ed', color: '#c2410c' },
-  cancelada:  { label: 'Cancelada',  bg: '#f8fafc', color: '#94a3b8' },
+  cancelada:  { label: 'Cancelada',  bg: '#FAF7EF', color: '#7E9389' },
 }
 
 function blankForm(): { amenidad_id: string; fecha: string; hora_inicio: string; hora_fin: string; num_invitados: number; notas: string; metodo_pago_tarifa: MetodoPagoTarifa; reglamento_aceptado: boolean } {
@@ -199,7 +199,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
     <div>
       {/* Header del portal */}
       <div style={{
-        background: 'linear-gradient(135deg,#1d4ed8 0%,#0d9488 100%)',
+        background: 'linear-gradient(135deg,#102622 0%,#577B69 100%)',
         borderRadius: 16, padding: '18px 22px', marginBottom: 18,
         color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         flexWrap: 'wrap', gap: 12,
@@ -238,7 +238,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
                   <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(254,243,199,0.95)', color: '#92400e', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>Depósito {moneda} {a.monto_deposito.toFixed(0)}</span>
                 )}
                 {a.requiere_tarifa && a.tarifa_uso != null && (
-                  <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(219,234,254,0.95)', color: '#1d4ed8', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>
+                  <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(219,234,254,0.95)', color: '#102622', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>
                     Tarifa {moneda} {Number(a.tarifa_uso).toFixed(0)}
                     {a.tarifa_uso_finde != null && ` / ${Number(a.tarifa_uso_finde).toFixed(0)}`}
                   </span>
@@ -262,23 +262,23 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
           </AmenidadHeroButton>
         ))}
         {amenidadesActivas.length === 0 && (
-          <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,#f8fafc)', border: '1.5px dashed #cbd5e1', textAlign: 'center' }}>
-            <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#dbeafe,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>🏖</div>
-            <p style={{ fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>No hay amenidades disponibles</p>
-            <p style={{ fontSize: 12.5, color: '#64748b', margin: 0 }}>Cuando la administración active las áreas comunes, aparecerán aquí.</p>
+          <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,#FAF7EF)', border: '1.5px dashed #C7C2B0', textAlign: 'center' }}>
+            <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#D9E2DC,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>🏖</div>
+            <p style={{ fontWeight: 700, color: '#15291F', margin: '0 0 4px' }}>No hay amenidades disponibles</p>
+            <p style={{ fontSize: 12.5, color: '#7E9389', margin: 0 }}>Cuando la administración active las áreas comunes, aparecerán aquí.</p>
           </div>
         )}
       </div>
 
       {/* Formulario */}
       {showForm && (
-        <div style={{ background: 'white', border: '1.5px solid #bfdbfe', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
+        <div style={{ background: 'white', border: '1.5px solid #C2D2CA', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
           <h4 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700 }}>Solicitar reserva</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Amenidad *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Amenidad *</label>
               <select value={form.amenidad_id} onChange={e => setForm(f => ({ ...f, amenidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="">Seleccionar...</option>
                 {amenidadesActivas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
               </select>
@@ -305,18 +305,18 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
               if (tarifa <= 0) return null
               const finde = form.fecha && esFinDeSemana(form.fecha) && amenidadSel.tarifa_uso_finde != null
               return (
-              <div style={{ gridColumn: '1 / -1', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 10, padding: '12px 14px' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#1d4ed8', marginBottom: 8 }}>
+              <div style={{ gridColumn: '1 / -1', background: '#EEF2EC', border: '1.5px solid #C2D2CA', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#102622', marginBottom: 8 }}>
                   🎟 Tarifa por uso: {moneda} {tarifa.toFixed(2)} {finde && <span style={{ fontSize: 11, fontWeight: 600 }}>(fin de semana)</span>}
                 </div>
-                <div style={{ fontSize: 12, color: '#475569', marginBottom: 8 }}>¿Cómo deseas pagar la tarifa?</div>
+                <div style={{ fontSize: 12, color: '#3E5A4C', marginBottom: 8 }}>¿Cómo deseas pagar la tarifa?</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#3E5A4C', cursor: 'pointer' }}>
                     <input type="radio" name="metodo_pago" checked={form.metodo_pago_tarifa === 'cargar_unidad'}
                       onChange={() => setForm(f => ({ ...f, metodo_pago_tarifa: 'cargar_unidad' }))} />
                     <span><strong>Cargar a mi unidad</strong> — el monto aparecerá como cargo pendiente en mi cuenta.</span>
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#3E5A4C', cursor: 'pointer' }}>
                     <input type="radio" name="metodo_pago" checked={form.metodo_pago_tarifa === 'pagar_momento'}
                       onChange={() => setForm(f => ({ ...f, metodo_pago_tarifa: 'pagar_momento' }))} />
                     <span><strong>Pagar al momento</strong> — pagaré directamente a la administración antes de usar la amenidad.</span>
@@ -331,48 +331,48 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
               </div>
             )}
             {amenidadSel?.reglamento && (
-              <div style={{ gridColumn: '1 / -1', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>📜 Reglamento</div>
-                <div style={{ fontSize: 12, color: '#475569', whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto', padding: '6px 8px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, lineHeight: 1.5 }}>
+              <div style={{ gridColumn: '1 / -1', background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#15291F', marginBottom: 6 }}>📜 Reglamento</div>
+                <div style={{ fontSize: 12, color: '#3E5A4C', whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto', padding: '6px 8px', background: 'white', border: '1px solid #E1DDD0', borderRadius: 8, lineHeight: 1.5 }}>
                   {amenidadSel.reglamento}
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12.5, color: '#374151', cursor: 'pointer', fontWeight: 600 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12.5, color: '#3E5A4C', cursor: 'pointer', fontWeight: 600 }}>
                   <input type="checkbox" checked={form.reglamento_aceptado} onChange={e => setForm(f => ({ ...f, reglamento_aceptado: e.target.checked }))} />
                   He leído y acepto el reglamento
                 </label>
               </div>
             )}
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Fecha *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha *</label>
               <input type="date" value={form.fecha} min={hoy} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>No. invitados</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>No. invitados</label>
               <input type="number" min={0} value={form.num_invitados} onChange={e => setForm(f => ({ ...f, num_invitados: parseInt(e.target.value) || 0 }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Hora inicio *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora inicio *</label>
               <input type="time" value={form.hora_inicio} onChange={e => setForm(f => ({ ...f, hora_inicio: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Hora fin *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora fin *</label>
               <input type="time" value={form.hora_fin} onChange={e => setForm(f => ({ ...f, hora_fin: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Notas</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas</label>
               <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones adicionales..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
-            <button onClick={hacerReserva} disabled={saving} style={{ padding: '10px 22px', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={hacerReserva} disabled={saving} style={{ padding: '10px 22px', background: 'linear-gradient(135deg,#1B3B36,#102622)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Reservando...' : '📅 Confirmar reserva'}
             </button>
-            <button onClick={() => { setShowForm(false); setForm(blankForm()) }} style={{ padding: '10px 16px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={() => { setShowForm(false); setForm(blankForm()) }} style={{ padding: '10px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
@@ -381,19 +381,19 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
         {([true, false] as const).map(v => (
           <button key={String(v)} onClick={() => setVistaFutura(v)}
-            style={{ padding: '7px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vistaFutura === v ? '#2563eb' : '#e2e8f0', background: vistaFutura === v ? '#eff6ff' : 'white', color: vistaFutura === v ? '#2563eb' : '#64748b' }}>
+            style={{ padding: '7px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vistaFutura === v ? '#1B3B36' : '#E1DDD0', background: vistaFutura === v ? '#EEF2EC' : 'white', color: vistaFutura === v ? '#1B3B36' : '#7E9389' }}>
             {v ? `📅 Próximas (${futuras.length})` : `📋 Historial (${pasadas.length})`}
           </button>
         ))}
       </div>
 
       {(vistaFutura ? futuras : pasadas).length === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,#f8fafc)', border: '1.5px dashed #cbd5e1', textAlign: 'center' }}>
-          <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#dbeafe,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,#FAF7EF)', border: '1.5px dashed #C7C2B0', textAlign: 'center' }}>
+          <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#D9E2DC,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>
             {vistaFutura ? '📅' : '📜'}
           </div>
-          <p style={{ fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Sin reservas {vistaFutura ? 'próximas' : 'anteriores'}</p>
-          <p style={{ fontSize: 12.5, color: '#64748b', margin: 0, maxWidth: 320, lineHeight: 1.5 }}>
+          <p style={{ fontWeight: 700, color: '#15291F', margin: '0 0 4px' }}>Sin reservas {vistaFutura ? 'próximas' : 'anteriores'}</p>
+          <p style={{ fontSize: 12.5, color: '#7E9389', margin: 0, maxWidth: 320, lineHeight: 1.5 }}>
             {vistaFutura ? 'Reserva una amenidad arriba para que aparezca aquí.' : 'Tu historial de reservas pasadas se mostrará aquí.'}
           </p>
         </div>
@@ -402,21 +402,21 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
           {(vistaFutura ? futuras : pasadas).sort((a, b) => a.fecha < b.fecha ? -1 : 1).map(r => {
             const ec = ESTADO_RES[(r.estado as EstadoReserva) ?? 'confirmada']
             const amenidad = amenidades.find(a => a.id === r.amenidad_id)
-            const accent = r.estado === 'confirmada' ? '#16a34a' : r.estado === 'pendiente' ? '#c2410c' : '#94a3b8'
+            const accent = r.estado === 'confirmada' ? '#16a34a' : r.estado === 'pendiente' ? '#c2410c' : '#7E9389'
             return (
-              <div key={r.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: '14px 16px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease' }}
+              <div key={r.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: 14, padding: '14px 16px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease' }}
                 onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 16px -8px rgba(15,23,42,0.18)' }}
                 onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}>
                 <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: accent }} />
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,#dbeafe,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📅</div>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,#D9E2DC,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📅</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>{amenidad?.nombre ?? 'Amenidad'}</div>
-                  <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2, textTransform: 'capitalize' }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: '#15291F' }}>{amenidad?.nombre ?? 'Amenidad'}</div>
+                  <div style={{ fontSize: 12.5, color: '#7E9389', marginTop: 2, textTransform: 'capitalize' }}>
                     {new Date(r.fecha + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: '2-digit', month: 'long' })} · {r.hora_inicio} – {r.hora_fin}
                     {r.num_invitados > 0 && ` · ${r.num_invitados} invitado${r.num_invitados > 1 ? 's' : ''}`}
                   </div>
                   {r.monto_tarifa != null && r.monto_tarifa > 0 && (
-                    <div style={{ fontSize: 11.5, marginTop: 3, fontWeight: 700, color: r.metodo_pago_tarifa === 'cargar_unidad' ? '#1d4ed8' : (r.tarifa_pagada ? '#16a34a' : '#c2410c') }}>
+                    <div style={{ fontSize: 11.5, marginTop: 3, fontWeight: 700, color: r.metodo_pago_tarifa === 'cargar_unidad' ? '#102622' : (r.tarifa_pagada ? '#16a34a' : '#c2410c') }}>
                       🎟 {moneda} {Number(r.monto_tarifa).toFixed(2)}
                       {r.metodo_pago_tarifa === 'cargar_unidad' && ' · cargado a tu unidad'}
                       {r.metodo_pago_tarifa === 'pagar_momento' && (r.tarifa_pagada ? ' · pagado' : ' · pagar en sitio')}

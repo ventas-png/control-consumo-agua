@@ -100,7 +100,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
         title: '✅ Pago registrado',
         html: `
           <p>Tu pago de <strong>${moneda} ${montoNum.toFixed(2)}</strong> está en revisión.</p>
-          <p style="font-size: 13px; color: #64748b; margin-top: 12px;">
+          <p style="font-size: 13px; color: #7E9389; margin-top: 12px;">
             El gestor de cobros verificará tu comprobante en las próximas horas.
           </p>
         `,
@@ -148,30 +148,30 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>📄 Registrar Pago</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#15291F', margin: 0 }}>📄 Registrar Pago</h2>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}
+            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#7E9389' }}
           >
             ✕
           </button>
         </div>
 
-        <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
+        <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid #E1DDD0' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
             <div>
-              <div style={{ color: '#94a3b8', marginBottom: '2px' }}>Total Cargo</div>
-              <div style={{ fontWeight: 700, color: '#0f172a' }}>{moneda} {total.toFixed(2)}</div>
+              <div style={{ color: '#7E9389', marginBottom: '2px' }}>Total Cargo</div>
+              <div style={{ fontWeight: 700, color: '#15291F' }}>{moneda} {total.toFixed(2)}</div>
             </div>
             <div>
-              <div style={{ color: '#94a3b8', marginBottom: '2px' }}>Saldo Pendiente</div>
+              <div style={{ color: '#7E9389', marginBottom: '2px' }}>Saldo Pendiente</div>
               <div style={{ fontWeight: 700, color: '#ef4444', fontSize: '16px' }}>{moneda} {saldo.toFixed(2)}</div>
             </div>
           </div>
         </div>
 
         <div style={{ marginBottom: '18px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#3E5A4C', marginBottom: '8px' }}>
             Monto Pagado ({moneda}) *
           </label>
           <input
@@ -185,7 +185,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #e2e8f0',
+              border: '1.5px solid #E1DDD0',
               fontSize: '16px',
               fontWeight: 700,
               fontFamily: 'inherit',
@@ -194,7 +194,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
         </div>
 
         <div style={{ marginBottom: '18px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#3E5A4C', marginBottom: '8px' }}>
             Forma de Pago *
           </label>
           <select
@@ -204,7 +204,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #e2e8f0',
+              border: '1.5px solid #E1DDD0',
               fontSize: '14px',
               fontFamily: 'inherit',
               background: 'white',
@@ -219,9 +219,9 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
         </div>
 
         <div style={{ marginBottom: '18px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#3E5A4C', marginBottom: '8px' }}>
             Número de Comprobante *
-            <span style={{ fontSize: '11px', fontWeight: 400, color: '#94a3b8', marginLeft: '6px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 400, color: '#7E9389', marginLeft: '6px' }}>
               (# cheque, ref. transf., # depósito, etc.)
             </span>
           </label>
@@ -234,7 +234,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #e2e8f0',
+              border: '1.5px solid #E1DDD0',
               fontSize: '14px',
               fontFamily: 'inherit',
             }}
@@ -242,7 +242,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
         </div>
 
         <div style={{ marginBottom: '18px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#3E5A4C', marginBottom: '8px' }}>
             Banco / Referencia
           </label>
           <input
@@ -254,7 +254,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #e2e8f0',
+              border: '1.5px solid #E1DDD0',
               fontSize: '14px',
               fontFamily: 'inherit',
             }}
@@ -262,7 +262,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
         </div>
 
         <div style={{ marginBottom: '18px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#3E5A4C', marginBottom: '8px' }}>
             Adjuntar Comprobante (Imagen/PDF)
           </label>
           <input
@@ -273,16 +273,16 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #e2e8f0',
+              border: '1.5px solid #E1DDD0',
               fontSize: '13px',
             }}
           />
           {previewAdjunto && (
             <div style={{ marginTop: '12px' }}>
               {adjunto?.type.startsWith('image') ? (
-                <img src={previewAdjunto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                <img src={previewAdjunto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px', border: '1px solid #E1DDD0' }} />
               ) : (
-                <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center', color: '#64748b' }}>
+                <div style={{ padding: '12px', background: '#FAF7EF', borderRadius: '8px', border: '1px solid #E1DDD0', textAlign: 'center', color: '#7E9389' }}>
                   📄 PDF seleccionado
                 </div>
               )}
@@ -291,7 +291,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
         </div>
 
         <div style={{ marginBottom: '24px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '8px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#3E5A4C', marginBottom: '8px' }}>
             Notas (opcional)
           </label>
           <textarea
@@ -303,7 +303,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #e2e8f0',
+              border: '1.5px solid #E1DDD0',
               fontSize: '14px',
               fontFamily: 'inherit',
               resize: 'vertical',
@@ -318,9 +318,9 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               flex: 1,
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #e2e8f0',
+              border: '1.5px solid #E1DDD0',
               background: 'white',
-              color: '#64748b',
+              color: '#7E9389',
               fontWeight: 700,
               fontSize: '14px',
               cursor: 'pointer',
@@ -336,7 +336,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               padding: '12px',
               borderRadius: '8px',
               border: 'none',
-              background: loading ? '#cbd5e1' : 'linear-gradient(135deg, #10b981, #059669)',
+              background: loading ? '#C7C2B0' : 'linear-gradient(135deg, #10b981, #059669)',
               color: 'white',
               fontWeight: 700,
               fontSize: '14px',

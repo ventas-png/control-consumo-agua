@@ -21,7 +21,7 @@ export function ConversationList({ conversations, activeId, onSelect, filter, un
 
   if (filtered.length === 0) {
     return (
-      <div style={{ padding: '32px 16px', textAlign: 'center', color: '#9ca3af' }}>
+      <div style={{ padding: '32px 16px', textAlign: 'center', color: '#7E9389' }}>
         <div style={{ fontSize: '32px', marginBottom: '8px' }}>💬</div>
         <div style={{ fontSize: '13px' }}>No hay conversaciones</div>
       </div>
@@ -39,8 +39,8 @@ export function ConversationList({ conversations, activeId, onSelect, filter, un
             onClick={() => onSelect(conv.id)}
             style={{
               width: '100%', textAlign: 'left', padding: '12px 14px',
-              border: 'none', borderBottom: '1px solid #f1f5f9',
-              background: isActive ? '#eff6ff' : isUnseen ? '#fffbeb' : 'white',
+              border: 'none', borderBottom: '1px solid #EAE6D8',
+              background: isActive ? '#EEF2EC' : isUnseen ? '#fffbeb' : 'white',
               cursor: 'pointer', transition: 'background 0.12s',
               display: 'flex', flexDirection: 'column', gap: '4px',
             }}
@@ -48,7 +48,7 @@ export function ConversationList({ conversations, activeId, onSelect, filter, un
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
               <span style={{
                 fontSize: '13px', fontWeight: isUnseen ? 700 : 600,
-                color: isActive ? '#1d4ed8' : '#111827', lineHeight: '1.3',
+                color: isActive ? '#102622' : '#15291F', lineHeight: '1.3',
                 flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 display: 'flex', alignItems: 'center', gap: '6px',
               }}>
@@ -60,13 +60,13 @@ export function ConversationList({ conversations, activeId, onSelect, filter, un
                 )}
                 {conv.subject}
               </span>
-              <span style={{ fontSize: '11px', color: '#9ca3af', flexShrink: 0 }}>
+              <span style={{ fontSize: '11px', color: '#7E9389', flexShrink: 0 }}>
                 {formatDate(conv.updated_at)}
               </span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+              <span style={{ fontSize: '11px', color: '#7E9389', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                 {conv.cliente_nombre ?? 'Cliente'}
               </span>
               <span style={{
@@ -85,7 +85,7 @@ export function ConversationList({ conversations, activeId, onSelect, filter, un
               </span>
             </div>
 
-            <div style={{ fontSize: '11px', color: '#9ca3af' }}>
+            <div style={{ fontSize: '11px', color: '#7E9389' }}>
               {CATEGORY_LABELS[conv.category]}
               {conv.assigned_name && ` · Asignado: ${conv.assigned_name}`}
             </div>

@@ -9,7 +9,7 @@ export function AdminQuickActions({ onNavigate }: Props) {
       label: 'Ver Mapa',
       description: 'Ubicaciones de lecturas',
       icon: '🗺️',
-      color: '#0ea5e9',
+      color: '#1B3B36',
     },
     {
       id: 'rutas',
@@ -30,13 +30,13 @@ export function AdminQuickActions({ onNavigate }: Props) {
       label: 'Calidad de Agua',
       description: 'Parámetros de calidad',
       icon: '💧',
-      color: '#8b5cf6',
+      color: '#B96A3F',
     },
   ]
 
   return (
     <div style={{ marginTop: '32px', marginBottom: '32px' }}>
-      <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', color: '#0f172a' }}>
+      <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', color: '#15291F' }}>
         Acceso Rápido
       </h3>
       <div style={{
@@ -84,7 +84,7 @@ export function AdminQuickActions({ onNavigate }: Props) {
             </div>
             <div style={{
               fontSize: '11px',
-              color: '#64748b',
+              color: '#7E9389',
               fontWeight: '500',
             }}>
               {action.description}

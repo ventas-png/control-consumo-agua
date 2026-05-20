@@ -24,8 +24,8 @@ const CARGOS: { value: CargoPersonal; label: string; icon: string }[] = [
 
 const ESTADO_CONFIG: Record<EstadoPersonal, { label: string; color: string; bg: string }> = {
   activo:      { label: 'Activo',      color: '#10b981', bg: '#d1fae5' },
-  inactivo:    { label: 'Inactivo',    color: '#64748b', bg: '#f1f5f9' },
-  vacaciones:  { label: 'Vacaciones',  color: '#8b5cf6', bg: '#ede9fe' },
+  inactivo:    { label: 'Inactivo',    color: '#7E9389', bg: '#EAE6D8' },
+  vacaciones:  { label: 'Vacaciones',  color: '#B96A3F', bg: '#F4EBE3' },
   incapacidad: { label: 'Incapacidad', color: '#f59e0b', bg: '#fef3c7' },
 }
 
@@ -100,30 +100,30 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
   const cargoInfo = (c: CargoPersonal) => CARGOS.find(x => x.value === c) ?? CARGOS[CARGOS.length - 1]
   const turnoLabel: Record<TurnoPersonal, string> = { diurno: '☀️ Diurno', nocturno: '🌙 Nocturno', rotativo: '🔄 Rotativo' }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Personal del Condominio</h2>
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Personal del Condominio</h2>
           {planillaMensual > 0 && (
-            <span style={{ fontSize: '12px', color: '#64748b' }}>
-              Planilla mensual activa: <strong style={{ color: '#0ea5e9' }}>{moneda} {planillaMensual.toFixed(2)}</strong>
+            <span style={{ fontSize: '12px', color: '#7E9389' }}>
+              Planilla mensual activa: <strong style={{ color: '#1B3B36' }}>{moneda} {planillaMensual.toFixed(2)}</strong>
             </span>
           )}
         </div>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Agregar Personal
           </button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Empleado' : 'Nuevo Empleado'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '12px' }}>
             <div>
@@ -180,8 +180,8 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
           </div>
@@ -193,15 +193,15 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
         {(['todos', 'activo', 'inactivo', 'vacaciones', 'incapacidad'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: filtroEstado === e ? '#0ea5e9' : '#e2e8f0',
-              background: filtroEstado === e ? '#e0f2fe' : 'white',
-              color: filtroEstado === e ? '#0ea5e9' : '#64748b' }}>
+              borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0',
+              background: filtroEstado === e ? '#D9E2DC' : 'white',
+              color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
             {e === 'todos' ? `Todos (${personal.length})` : `${ESTADO_CONFIG[e as EstadoPersonal]?.label ?? e} (${personal.filter(p => p.estado === e).length})`}
           </button>
         ))}
-        <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 4px' }} />
+        <div style={{ width: '1px', height: '24px', background: '#E1DDD0', margin: '0 4px' }} />
         <select value={filtroCargo} onChange={e => setFiltroCargo(e.target.value as CargoPersonal | 'todos')}
-          style={{ padding: '5px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '12px', background: '#f8fafc' }}>
+          style={{ padding: '5px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
           <option value="todos">Todos los cargos</option>
           {CARGOS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
         </select>
@@ -209,7 +209,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
 
       {/* Cards grid */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>👥</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay personal registrado</p>
         </div>
@@ -219,15 +219,15 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
             const ci = cargoInfo(p.cargo)
             const est = ESTADO_CONFIG[p.estado]
             return (
-              <div key={p.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div key={p.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#EAE6D8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
                       {ci.icon}
                     </div>
                     <div>
-                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px' }}>{p.nombre}</div>
-                      <div style={{ fontSize: '12px', color: '#64748b' }}>{ci.label}</div>
+                      <div style={{ fontWeight: 700, color: '#15291F', fontSize: '14px' }}>{p.nombre}</div>
+                      <div style={{ fontSize: '12px', color: '#7E9389' }}>{ci.label}</div>
                     </div>
                   </div>
                   <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color, whiteSpace: 'nowrap' }}>
@@ -235,17 +235,17 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: '#64748b' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: '#7E9389' }}>
                   <div>{turnoLabel[p.turno]}</div>
                   {p.telefono && <div>📞 {p.telefono}</div>}
                   {p.fecha_ingreso && <div>📅 Desde: {p.fecha_ingreso}</div>}
-                  {p.salario != null && <div style={{ fontWeight: 600, color: '#0f172a' }}>{moneda} {p.salario.toFixed(2)}/mes</div>}
+                  {p.salario != null && <div style={{ fontWeight: 600, color: '#15291F' }}>{moneda} {p.salario.toFixed(2)}/mes</div>}
                 </div>
 
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
                     {p.estado === 'activo' && (
-                      <button onClick={() => handleEstado(p.id, 'vacaciones')} style={{ padding: '4px 8px', background: '#ede9fe', color: '#7c3aed', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                      <button onClick={() => handleEstado(p.id, 'vacaciones')} style={{ padding: '4px 8px', background: '#F4EBE3', color: '#9C5733', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                         Vacaciones
                       </button>
                     )}
@@ -254,7 +254,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
                         Reactivar
                       </button>
                     )}
-                    <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                    <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
                     <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
                   </div>
                 )}

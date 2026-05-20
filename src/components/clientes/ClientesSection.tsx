@@ -363,7 +363,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#64748b',
+      cancelButtonColor: '#7E9389',
       confirmButtonText: 'Sí, quitar',
       cancelButtonText: 'Cancelar',
     })
@@ -411,7 +411,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
         sortable: true,
         accessor: c => c.codigo,
         render: c => (
-          <span style={{ color: '#475569', fontFamily: 'monospace' }}>
+          <span style={{ color: '#3E5A4C', fontFamily: 'monospace' }}>
             {sanitizeHTML(c.codigo)}
           </span>
         ),
@@ -435,7 +435,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
         accessor: c => c.numero_facturacion ?? '',
         render: c => c.numero_facturacion
           ? <span style={{ fontSize: 13, fontFamily: 'monospace' }}>{sanitizeHTML(c.numero_facturacion)}</span>
-          : <span style={{ color: '#cbd5e1' }}>—</span>,
+          : <span style={{ color: '#C7C2B0' }}>—</span>,
       },
       {
         key: 'cuenta',
@@ -463,9 +463,9 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               title={count > 0 ? `${count} unidad${count !== 1 ? 'es' : ''} asignada${count !== 1 ? 's' : ''}` : 'Sin unidades asignadas'}
               style={{
                 padding: '4px 12px',
-                background: count > 0 ? '#f0fdf4' : '#f8fafc',
-                color: count > 0 ? '#16a34a' : '#94a3b8',
-                border: `1px solid ${count > 0 ? '#bbf7d0' : '#e2e8f0'}`,
+                background: count > 0 ? '#f0fdf4' : '#FAF7EF',
+                color: count > 0 ? '#16a34a' : '#7E9389',
+                border: `1px solid ${count > 0 ? '#bbf7d0' : '#E1DDD0'}`,
                 borderRadius: 20,
                 cursor: 'pointer',
                 fontWeight: 600,
@@ -489,7 +489,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
             <button
               onClick={() => startEdit(c)}
               style={{
-                padding: '5px 12px', background: '#eff6ff', color: '#1d4ed8',
+                padding: '5px 12px', background: '#EEF2EC', color: '#102622',
                 border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
               }}
             >
@@ -514,7 +514,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
 
   const inputStyle: CSSProperties = {
     padding: '10px 14px',
-    border: '2px solid #e2e8f0',
+    border: '2px solid #E1DDD0',
     borderRadius: '8px',
     fontSize: '14px',
     width: '100%',
@@ -531,7 +531,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
   const sectionHeaderStyle: CSSProperties = {
     fontSize: '12px',
     fontWeight: 600,
-    color: '#94a3b8',
+    color: '#7E9389',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     marginBottom: '10px',
@@ -557,8 +557,8 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>Clientes</h2>
-          <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>
+          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#15291F' }}>Clientes</h2>
+          <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#7E9389' }}>
             {clientes.length} cliente{clientes.length !== 1 ? 's' : ''} registrado{clientes.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -577,9 +577,9 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
                 onClick={() => setShowImportModal(true)}
                 style={{
                   padding: '10px 20px',
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  border: '1px solid #e2e8f0',
+                  background: '#EAE6D8',
+                  color: '#3E5A4C',
+                  border: '1px solid #E1DDD0',
                   borderRadius: '8px',
                   fontWeight: 600,
                   fontSize: '14px',
@@ -593,7 +593,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
                 onClick={startCreate}
                 style={{
                   padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                  background: 'linear-gradient(135deg, #1B3B36, #577B69)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
@@ -617,7 +617,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
       {/* Lookup Form - Step 1 */}
       {(onboardingStep === 'lookup' || onboardingStep === 'lookup_loading') && (
         <div>
-          <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748b' }}>
+          <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#7E9389' }}>
             Ingrese los datos del cliente para verificar si ya se encuentra registrado en la plataforma.
           </p>
 
@@ -666,7 +666,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               disabled={onboardingStep === 'lookup_loading'}
               style={{
                 padding: '10px 24px',
-                background: onboardingStep === 'lookup_loading' ? '#94a3b8' : 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                background: onboardingStep === 'lookup_loading' ? '#7E9389' : 'linear-gradient(135deg, #1B3B36, #577B69)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -682,8 +682,8 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               disabled={onboardingStep === 'lookup_loading'}
               style={{
                 padding: '10px 24px',
-                background: '#f1f5f9',
-                color: '#475569',
+                background: '#EAE6D8',
+                color: '#3E5A4C',
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: 600,
@@ -733,7 +733,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               onClick={() => setOnboardingStep('lookup')}
               style={{
                 padding: '10px 24px',
-                background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                background: 'linear-gradient(135deg, #1B3B36, #577B69)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -748,8 +748,8 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               onClick={cancelForm}
               style={{
                 padding: '10px 24px',
-                background: '#f1f5f9',
-                color: '#475569',
+                background: '#EAE6D8',
+                color: '#3E5A4C',
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: 600,
@@ -767,16 +767,16 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
       {onboardingStep === 'result_no_match' && (
         <div>
           <div style={{
-            background: '#f0f9ff',
-            border: '2px solid #0ea5e9',
+            background: '#EEF2EC',
+            border: '2px solid #1B3B36',
             borderRadius: '12px',
             padding: '20px',
             marginBottom: '20px',
           }}>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: '#0c4a6e', marginBottom: '8px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#0E2A24', marginBottom: '8px' }}>
               Cliente no encontrado
             </div>
-            <p style={{ margin: 0, fontSize: '14px', color: '#0369a1', lineHeight: '1.5' }}>
+            <p style={{ margin: 0, fontSize: '14px', color: '#102622', lineHeight: '1.5' }}>
               No se encontró un cliente con esos datos en la plataforma.
               Puede proceder a registrar un nuevo cliente con la información completa.
             </p>
@@ -787,7 +787,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               onClick={proceedToFullForm}
               style={{
                 padding: '10px 24px',
-                background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                background: 'linear-gradient(135deg, #1B3B36, #577B69)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -802,8 +802,8 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               onClick={() => setOnboardingStep('lookup')}
               style={{
                 padding: '10px 24px',
-                background: '#f1f5f9',
-                color: '#475569',
+                background: '#EAE6D8',
+                color: '#3E5A4C',
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: 600,
@@ -817,8 +817,8 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               onClick={cancelForm}
               style={{
                 padding: '10px 24px',
-                background: '#f1f5f9',
-                color: '#475569',
+                background: '#EAE6D8',
+                color: '#3E5A4C',
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: 600,
@@ -913,7 +913,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
                   placeholder="Ej. 55551234 o +15551234567"
                   maxLength={20}
                 />
-                <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
+                <span style={{ fontSize: '11px', color: '#7E9389', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
               </div>
               <div>
                 <label htmlFor="cli-telefono-alt" style={labelStyle}>Teléfono Alterno</label>
@@ -926,7 +926,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
                   placeholder="Ej. 44441234 o +15551234567"
                   maxLength={20}
                 />
-                <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
+                <span style={{ fontSize: '11px', color: '#7E9389', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
               </div>
               <div>
                 <label htmlFor="cli-whatsapp" style={labelStyle}>Número de WhatsApp</label>
@@ -939,7 +939,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
                   placeholder="Ej. 55551234 o +15551234567"
                   maxLength={20}
                 />
-                <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
+                <span style={{ fontSize: '11px', color: '#7E9389', marginTop: '3px', display: 'block' }}>Local: 8 dígitos — Internacional: +código+número</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <label style={{ ...labelStyle, marginBottom: 0 }}>Habilitar acceso / Crear cuenta:</label>
@@ -953,8 +953,8 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
                     cursor: 'pointer',
                     fontWeight: 600,
                     fontSize: '13px',
-                    background: form.puede_crear_cuenta ? '#dcfce7' : '#f1f5f9',
-                    color: form.puede_crear_cuenta ? '#166534' : '#64748b',
+                    background: form.puede_crear_cuenta ? '#dcfce7' : '#EAE6D8',
+                    color: form.puede_crear_cuenta ? '#166534' : '#7E9389',
                   }}
                 >
                   {form.puede_crear_cuenta ? 'Sí' : 'No'}
@@ -1009,7 +1009,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               disabled={loading}
               style={{
                 padding: '10px 24px',
-                background: loading ? '#94a3b8' : 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                background: loading ? '#7E9389' : 'linear-gradient(135deg, #1B3B36, #577B69)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -1024,8 +1024,8 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               onClick={cancelForm}
               style={{
                 padding: '10px 24px',
-                background: '#f1f5f9',
-                color: '#475569',
+                background: '#EAE6D8',
+                color: '#3E5A4C',
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: 600,
@@ -1096,14 +1096,14 @@ function ClienteCell({ cliente: c }: { cliente: Cliente }) {
   const tag = getEditedTagInfo(c.updated_at, c.updated_by_name)
   return (
     <div>
-      <div style={{ fontWeight: 600, color: '#1e293b' }}>{sanitizeHTML(c.nombre)}</div>
+      <div style={{ fontWeight: 600, color: '#15291F' }}>{sanitizeHTML(c.nombre)}</div>
       {c.direccion && (
-        <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400, marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: '#7E9389', fontWeight: 400, marginTop: 2 }}>
           {sanitizeHTML(c.direccion)}
         </div>
       )}
       {c.fecha_nacimiento && (
-        <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 1 }}>
+        <div style={{ fontSize: 11, color: '#C7C2B0', marginTop: 1 }}>
           Nac: {c.fecha_nacimiento}
         </div>
       )}
@@ -1124,12 +1124,12 @@ function ClienteCell({ cliente: c }: { cliente: Cliente }) {
 }
 
 function IdentificacionCell({ cliente: c }: { cliente: Cliente }) {
-  if (!c.cui_dui && !c.nacionalidad) return <span style={{ color: '#cbd5e1' }}>—</span>
+  if (!c.cui_dui && !c.nacionalidad) return <span style={{ color: '#C7C2B0' }}>—</span>
   return (
     <>
       {c.cui_dui && <div style={{ fontSize: 13, fontFamily: 'monospace' }}>{sanitizeHTML(c.cui_dui)}</div>}
       {c.nacionalidad && (
-        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{sanitizeHTML(c.nacionalidad)}</div>
+        <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>{sanitizeHTML(c.nacionalidad)}</div>
       )}
     </>
   )
@@ -1137,21 +1137,21 @@ function IdentificacionCell({ cliente: c }: { cliente: Cliente }) {
 
 function ContactoCell({ cliente: c }: { cliente: Cliente }) {
   if (!c.email && !c.telefono && !c.telefono_alterno && !c.whatsapp) {
-    return <span style={{ color: '#cbd5e1' }}>—</span>
+    return <span style={{ color: '#C7C2B0' }}>—</span>
   }
   return (
     <>
       {c.email && <div style={{ fontSize: 13 }}>✉️ {sanitizeHTML(c.email)}</div>}
       {c.telefono && (
         <div style={{ fontSize: 12, marginTop: 2 }}>
-          <a href={`tel:${c.telefono}`} style={{ color: '#0369a1', textDecoration: 'none' }} title="Llamar">
+          <a href={`tel:${c.telefono}`} style={{ color: '#102622', textDecoration: 'none' }} title="Llamar">
             📞 {sanitizeHTML(c.telefono)}
           </a>
         </div>
       )}
       {c.telefono_alterno && (
         <div style={{ fontSize: 12, marginTop: 2 }}>
-          <a href={`tel:${c.telefono_alterno}`} style={{ color: '#64748b', textDecoration: 'none' }} title="Llamar alterno">
+          <a href={`tel:${c.telefono_alterno}`} style={{ color: '#7E9389', textDecoration: 'none' }} title="Llamar alterno">
             📱 {sanitizeHTML(c.telefono_alterno)}
           </a>
         </div>
@@ -1189,14 +1189,14 @@ function CuentaCell({
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
       <span style={{
         ...pill,
-        background: c.puede_crear_cuenta ? '#dcfce7' : '#f1f5f9',
-        color: c.puede_crear_cuenta ? '#166534' : '#94a3b8',
+        background: c.puede_crear_cuenta ? '#dcfce7' : '#EAE6D8',
+        color: c.puede_crear_cuenta ? '#166534' : '#7E9389',
       }}>
         {c.puede_crear_cuenta ? 'Habilitado' : 'Deshabilitado'}
       </span>
       {hasAccount ? (
         <>
-          <span style={{ ...pill, background: '#dbeafe', color: '#1d4ed8' }}>Cuenta activa</span>
+          <span style={{ ...pill, background: '#D9E2DC', color: '#102622' }}>Cuenta activa</span>
           {canEdit && activoEntry && (
             <button
               onClick={() => onToggleActivo(c.id)}
@@ -1212,7 +1212,7 @@ function CuentaCell({
           )}
         </>
       ) : (
-        <span style={{ ...pill, color: '#94a3b8', background: '#f8fafc', fontWeight: 400 }}>Sin cuenta</span>
+        <span style={{ ...pill, color: '#7E9389', background: '#FAF7EF', fontWeight: 400 }}>Sin cuenta</span>
       )}
     </div>
   )

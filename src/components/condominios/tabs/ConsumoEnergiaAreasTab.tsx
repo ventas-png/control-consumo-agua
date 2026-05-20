@@ -15,13 +15,13 @@ interface Props {
 
 const TIPO_STYLE: Record<string, { label: string; icon: string; bg: string; color: string; unidadDefault: string }> = {
   electricidad: { label: 'Electricidad', icon: '⚡', bg: '#fef3c7', color: '#92400e', unidadDefault: 'kWh' },
-  agua:         { label: 'Agua',         icon: '💧', bg: '#e0f2fe', color: '#0369a1', unidadDefault: 'm3' },
+  agua:         { label: 'Agua',         icon: '💧', bg: '#D9E2DC', color: '#102622', unidadDefault: 'm3' },
   gas:          { label: 'Gas',          icon: '🔥', bg: '#fed7aa', color: '#c2410c', unidadDefault: 'm3' },
-  otro:         { label: 'Otro',         icon: '📊', bg: '#f3e8ff', color: '#7c3aed', unidadDefault: 'unidad' },
+  otro:         { label: 'Otro',         icon: '📊', bg: '#F4EBE3', color: '#9C5733', unidadDefault: 'unidad' },
 }
 
 const inputStyle: CSSProperties = {
-  width: '100%', padding: '7px 10px', border: '1.5px solid #e2e8f0',
+  width: '100%', padding: '7px 10px', border: '1.5px solid #E1DDD0',
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }
 
@@ -120,12 +120,12 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
           {[
             { label: `Costo total ${latestPeriodo}`, value: fmt(totalCostoPeriodo, moneda), icon: '💰', bg: '#f0fdf4', color: '#16a34a' },
             { label: `Electricidad ${latestPeriodo}`, value: `${totalElec.toFixed(1)} kWh`, icon: '⚡', bg: '#fef3c7', color: '#92400e' },
-            { label: `Agua ${latestPeriodo}`, value: `${totalAgua.toFixed(1)} m³`, icon: '💧', bg: '#e0f2fe', color: '#0369a1' },
+            { label: `Agua ${latestPeriodo}`, value: `${totalAgua.toFixed(1)} m³`, icon: '💧', bg: '#D9E2DC', color: '#102622' },
           ].map(k => (
             <div key={k.label} style={{ background: k.bg, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
               <div style={{ fontSize: '24px', marginBottom: '4px' }}>{k.icon}</div>
               <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
-              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>{k.label}</div>
+              <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 600 }}>{k.label}</div>
             </div>
           ))}
         </div>
@@ -134,7 +134,7 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         {canCreate && (
-          <button onClick={openNew} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+          <button onClick={openNew} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             + Nuevo registro
           </button>
         )}
@@ -154,47 +154,47 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar registro' : 'Nuevo registro de consumo'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Área *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Área *</label>
               <input style={inputStyle} value={form.area} onChange={e => setF('area', e.target.value)} placeholder="Ej. Lobby, Bomba principal" autoFocus list="areas-list" />
               <datalist id="areas-list">{areas.map(a => <option key={a} value={a} />)}</datalist>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Tipo *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Tipo *</label>
               <select style={inputStyle} value={form.tipo} onChange={e => { setF('tipo', e.target.value); setF('unidad', TIPO_STYLE[e.target.value]?.unidadDefault ?? 'unidad') }}>
                 {Object.entries(TIPO_STYLE).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Período *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Período *</label>
               <input style={inputStyle} type="month" value={form.periodo} onChange={e => setF('periodo', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Lectura anterior</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Lectura anterior</label>
               <input style={inputStyle} type="number" step="0.001" value={form.lectura_anterior} onChange={e => setF('lectura_anterior', e.target.value)} placeholder="0.000" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Lectura actual *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Lectura actual *</label>
               <input style={inputStyle} type="number" step="0.001" value={form.lectura_actual} onChange={e => setF('lectura_actual', e.target.value)} placeholder="0.000" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Unidad</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad</label>
               <input style={inputStyle} value={form.unidad} onChange={e => setF('unidad', e.target.value)} placeholder="kWh, m3..." />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Costo unitario</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Costo unitario</label>
               <input style={inputStyle} type="number" step="0.0001" value={form.costo_unitario} onChange={e => setF('costo_unitario', e.target.value)} placeholder="0.0000" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Fecha lectura</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha lectura</label>
               <input style={inputStyle} type="date" value={form.fecha_lectura} onChange={e => setF('fecha_lectura', e.target.value)} />
             </div>
             {form.lectura_anterior && form.lectura_actual && form.costo_unitario && (
               <div style={{ background: '#f0fdf4', borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Consumo calculado</div>
+                <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 600 }}>Consumo calculado</div>
                 <div style={{ fontSize: '14px', fontWeight: 800, color: '#16a34a' }}>
                   {(parseFloat(form.lectura_actual) - parseFloat(form.lectura_anterior)).toFixed(2)} {form.unidad}
                 </div>
@@ -204,32 +204,32 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
               </div>
             )}
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Notas</label>
               <input style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Observaciones" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
-            <button onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>
+            <button onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
           <div style={{ fontSize: '36px', marginBottom: '8px' }}>📊</div>
-          <p style={{ fontWeight: 600, color: '#64748b' }}>Sin registros de consumo</p>
+          <p style={{ fontWeight: 600, color: '#7E9389' }}>Sin registros de consumo</p>
         </div>
       ) : (
-        <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
+              <tr style={{ background: '#FAF7EF', borderBottom: '1.5px solid #E1DDD0' }}>
                 {['Tipo', 'Área', 'Período', 'Lect. Ant.', 'Lect. Act.', 'Consumo', 'Costo unit.', 'Total', 'Fecha', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#7E9389', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -238,27 +238,27 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
                 const ts = TIPO_STYLE[c.tipo]
                 const consumo = c.lectura_anterior != null ? c.lectura_actual - c.lectura_anterior : null
                 return (
-                  <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <tr key={c.id} style={{ borderBottom: '1px solid #EAE6D8' }}>
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, background: ts.bg, color: ts.color }}>{ts.icon} {ts.label}</span>
                     </td>
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>{c.area}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>{c.periodo}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b', textAlign: 'right' }}>{c.lectura_anterior != null ? c.lectura_anterior.toFixed(2) : '—'}</td>
+                    <td style={{ padding: '10px 12px', color: '#7E9389' }}>{c.periodo}</td>
+                    <td style={{ padding: '10px 12px', color: '#7E9389', textAlign: 'right' }}>{c.lectura_anterior != null ? c.lectura_anterior.toFixed(2) : '—'}</td>
                     <td style={{ padding: '10px 12px', fontWeight: 600, textAlign: 'right' }}>{c.lectura_actual.toFixed(2)}</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#0ea5e9' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#1B3B36' }}>
                       {consumo != null ? `${consumo.toFixed(2)} ${c.unidad}` : '—'}
                     </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', color: '#64748b' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', color: '#7E9389' }}>
                       {c.costo_unitario != null ? `${c.costo_unitario.toFixed(4)}` : '—'}
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
                       {c.total_costo != null ? fmt(c.total_costo, moneda) : '—'}
                     </td>
-                    <td style={{ padding: '10px 12px', color: '#64748b', whiteSpace: 'nowrap' }}>{c.fecha_lectura}</td>
+                    <td style={{ padding: '10px 12px', color: '#7E9389', whiteSpace: 'nowrap' }}>{c.fecha_lectura}</td>
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ display: 'flex', gap: '4px' }}>
-                        {canEdit && <button onClick={() => openEdit(c)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>✏️</button>}
+                        {canEdit && <button onClick={() => openEdit(c)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>✏️</button>}
                         <button onClick={() => handleDelete(c)} style={{ padding: '4px 8px', background: '#fef2f2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', color: '#ef4444' }}>🗑</button>
                       </div>
                     </td>

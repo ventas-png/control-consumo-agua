@@ -20,7 +20,7 @@ function ultimosMeses(n: number): { ym: string; label: string }[] {
 // Categorías de gasto asociadas a servicios/sostenibilidad
 const CAT_SOST = ['servicios', 'limpieza', 'obras'] as const
 const CAT_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  servicios: { label: 'Agua y Energía', color: '#2563eb', bg: '#eff6ff' },
+  servicios: { label: 'Agua y Energía', color: '#1B3B36', bg: '#EEF2EC' },
   limpieza:  { label: 'Limpieza',        color: '#16a34a', bg: '#dcfce7' },
   obras:     { label: 'Obras / Mejoras', color: '#d97706', bg: '#fef3c7' },
 }
@@ -71,22 +71,22 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 2 }}>Dashboard de Sostenibilidad</div>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 14 }}>
+      <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F', marginBottom: 2 }}>Dashboard de Sostenibilidad</div>
+      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 14 }}>
         Basado en gastos de servicios, limpieza y obras — últimos 12 meses
       </div>
 
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         {[
-          { label: 'Gasto total 12m', val: `${moneda} ${totalGeneral.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#2563eb', bg: '#eff6ff' },
-          { label: 'Promedio mensual', val: `${moneda} ${Math.round(promMensual).toLocaleString('es')}`, color: '#374151', bg: '#f8fafc' },
-          { label: 'Costo/unidad/mes', val: `${moneda} ${Math.round(costoUnitario).toLocaleString('es')}`, color: '#7c3aed', bg: '#f5f3ff' },
+          { label: 'Gasto total 12m', val: `${moneda} ${totalGeneral.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#1B3B36', bg: '#EEF2EC' },
+          { label: 'Promedio mensual', val: `${moneda} ${Math.round(promMensual).toLocaleString('es')}`, color: '#3E5A4C', bg: '#FAF7EF' },
+          { label: 'Costo/unidad/mes', val: `${moneda} ${Math.round(costoUnitario).toLocaleString('es')}`, color: '#9C5733', bg: '#FAF1EA' },
           { label: 'Variación este mes', val: `${pctVariacion >= 0 ? '+' : ''}${pctVariacion.toFixed(1)}%`, color: Math.abs(pctVariacion) < 10 ? '#16a34a' : pctVariacion > 0 ? '#ef4444' : '#16a34a', bg: Math.abs(pctVariacion) < 10 ? '#dcfce7' : pctVariacion > 0 ? '#fef2f2' : '#dcfce7' },
           { label: 'CO₂ estimado 12m', val: `${(co2Estimado / 1000).toFixed(2)} ton`, color: '#16a34a', bg: '#dcfce7' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 110px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
-            <div style={{ fontSize: 10, color: '#6b7280' }}>{k.label}</div>
+            <div style={{ fontSize: 10, color: '#7E9389' }}>{k.label}</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>
         ))}
@@ -100,7 +100,7 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
           const pct = totalGeneral > 0 ? (val / totalGeneral) * 100 : 0
           return (
             <div key={cat} style={{ flex: '1 1 150px', background: cfg.bg, border: `1px solid ${cfg.color}33`, borderRadius: 10, padding: '10px 14px' }}>
-              <div style={{ fontSize: 10, color: '#6b7280' }}>{cfg.label}</div>
+              <div style={{ fontSize: 10, color: '#7E9389' }}>{cfg.label}</div>
               <div style={{ fontSize: 14, fontWeight: 800, color: cfg.color, marginTop: 2 }}>{moneda} {val.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
               <div style={{ fontSize: 10, color: cfg.color, marginTop: 2 }}>{pct.toFixed(1)}% del total</div>
             </div>
@@ -109,8 +109,8 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
       </div>
 
       {/* Gráfica de tendencia apilada */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14, marginBottom: 14 }}>
-        <div style={{ fontWeight: 700, fontSize: 12, color: '#0f172a', marginBottom: 10 }}>Tendencia mensual por categoría</div>
+      <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 12, color: '#15291F', marginBottom: 10 }}>Tendencia mensual por categoría</div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 120 }}>
           {tendencia.map(t => (
             <div key={t.ym} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -122,7 +122,7 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
                   ) : null
                 })}
               </div>
-              <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 2 }}>{t.label}</div>
+              <div style={{ fontSize: 9, color: '#7E9389', marginTop: 2 }}>{t.label}</div>
             </div>
           ))}
         </div>
@@ -137,46 +137,46 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
       </div>
 
       {/* Tabla mensual */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead>
-            <tr style={{ background: '#f8fafc' }}>
-              <th style={{ padding: '8px 12px', textAlign: 'left', color: '#64748b', fontWeight: 600 }}>Mes</th>
+            <tr style={{ background: '#FAF7EF' }}>
+              <th style={{ padding: '8px 12px', textAlign: 'left', color: '#7E9389', fontWeight: 600 }}>Mes</th>
               {CAT_SOST.map(c => <th key={c} style={{ padding: '8px 10px', textAlign: 'right', color: CAT_CFG[c].color, fontWeight: 600 }}>{CAT_CFG[c].label}</th>)}
-              <th style={{ padding: '8px 12px', textAlign: 'right', color: '#374151', fontWeight: 700 }}>Total</th>
-              <th style={{ padding: '8px 12px', textAlign: 'right', color: '#7c3aed', fontWeight: 600 }}>por unidad</th>
+              <th style={{ padding: '8px 12px', textAlign: 'right', color: '#3E5A4C', fontWeight: 700 }}>Total</th>
+              <th style={{ padding: '8px 12px', textAlign: 'right', color: '#9C5733', fontWeight: 600 }}>por unidad</th>
             </tr>
           </thead>
           <tbody>
             {[...tendencia].reverse().map((t, i) => (
-              <tr key={t.ym} style={{ borderTop: '1px solid #f1f5f9', background: i === 0 ? '#fffbeb' : undefined }}>
-                <td style={{ padding: '7px 12px', color: '#374151', fontWeight: i === 0 ? 700 : 400 }}>{t.label}</td>
+              <tr key={t.ym} style={{ borderTop: '1px solid #EAE6D8', background: i === 0 ? '#fffbeb' : undefined }}>
+                <td style={{ padding: '7px 12px', color: '#3E5A4C', fontWeight: i === 0 ? 700 : 400 }}>{t.label}</td>
                 {CAT_SOST.map(c => (
-                  <td key={c} style={{ padding: '7px 10px', textAlign: 'right', color: t[c] as number > 0 ? CAT_CFG[c].color : '#d1d5db' }}>
+                  <td key={c} style={{ padding: '7px 10px', textAlign: 'right', color: t[c] as number > 0 ? CAT_CFG[c].color : '#C7C2B0' }}>
                     {(t[c] as number) > 0 ? `${moneda} ${(t[c] as number).toLocaleString('es', { minimumFractionDigits: 2 })}` : '—'}
                   </td>
                 ))}
-                <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: '#374151' }}>
+                <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: '#3E5A4C' }}>
                   {t.total > 0 ? `${moneda} ${t.total.toLocaleString('es', { minimumFractionDigits: 2 })}` : '—'}
                 </td>
-                <td style={{ padding: '7px 12px', textAlign: 'right', color: '#7c3aed' }}>
+                <td style={{ padding: '7px 12px', textAlign: 'right', color: '#9C5733' }}>
                   {t.total > 0 ? `${moneda} ${(t.total / unidadesActivas).toFixed(2)}` : '—'}
                 </td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr style={{ borderTop: '2px solid #e5e7eb', background: '#f8fafc' }}>
+            <tr style={{ borderTop: '2px solid #E1DDD0', background: '#FAF7EF' }}>
               <td style={{ padding: '8px 12px', fontWeight: 700 }}>12m Total</td>
               {CAT_SOST.map(c => (
                 <td key={c} style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: CAT_CFG[c].color }}>
                   {moneda} {totales12m[c].toLocaleString('es', { minimumFractionDigits: 2 })}
                 </td>
               ))}
-              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: '#374151' }}>
+              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 800, color: '#3E5A4C' }}>
                 {moneda} {totalGeneral.toLocaleString('es', { minimumFractionDigits: 2 })}
               </td>
-              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#7c3aed' }}>
+              <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#9C5733' }}>
                 {moneda} {(totalGeneral / 12 / unidadesActivas).toFixed(2)}
               </td>
             </tr>

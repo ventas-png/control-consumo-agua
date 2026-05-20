@@ -172,22 +172,22 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
   async function editTemplate(def: typeof TEMPLATE_DEFS[0]) {
     const existing = templates.find((t: EmailTemplate) => t.template_key === def.key)
 
-    const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;color:#0f172a;background:#fff;outline:none;font-family:inherit'
+    const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E1DDD0;border-radius:8px;font-size:13px;color:#15291F;background:#fff;outline:none;font-family:inherit'
 
     const { value: formValues } = await Swal.fire({
       title: `${def.icon} ${def.label}`,
       width: 700,
       html: `
         <div style="text-align:left;display:flex;flex-direction:column;gap:12px;">
-          <p style="margin:0;font-size:12px;color:#64748b;">${def.desc}</p>
+          <p style="margin:0;font-size:12px;color:#7E9389;">${def.desc}</p>
           <div>
-            <label style="display:block;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Asunto del correo</label>
+            <label style="display:block;font-size:11px;font-weight:700;color:#7E9389;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Asunto del correo</label>
             <input id="swal-subject" style="${inpStyle}" placeholder="Ej: Recibo de consumo — {{mes}} | {{empresa_nombre}}"
               value="${(existing?.subject ?? '').replace(/"/g, '&quot;')}" />
           </div>
           <div>
-            <label style="display:block;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Cuerpo HTML del correo</label>
-            <p style="margin:0 0 5px;font-size:11px;color:#94a3b8;">Usa <code>{{variable}}</code> para insertar valores dinámicos. Deja en blanco para usar el template predeterminado.</p>
+            <label style="display:block;font-size:11px;font-weight:700;color:#7E9389;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Cuerpo HTML del correo</label>
+            <p style="margin:0 0 5px;font-size:11px;color:#7E9389;">Usa <code>{{variable}}</code> para insertar valores dinámicos. Deja en blanco para usar el template predeterminado.</p>
             <textarea id="swal-body" style="${inpStyle};height:220px;resize:vertical;font-family:monospace;font-size:12px;">${existing?.html_body ?? ''}</textarea>
           </div>
         </div>
@@ -252,7 +252,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
 
   if (loading) {
     return (
-      <div style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>Cargando configuración…</div>
+      <div style={{ padding: '32px', textAlign: 'center', color: '#7E9389' }}>Cargando configuración…</div>
     )
   }
 
@@ -262,10 +262,10 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
         <span style={{ fontSize: '22px' }}>📧</span>
         <div>
-          <h3 style={{ margin: 0, color: '#0f172a', fontSize: '16px', fontWeight: 700 }}>
+          <h3 style={{ margin: 0, color: '#15291F', fontSize: '16px', fontWeight: 700 }}>
             Correo Electrónico con Google
           </h3>
-          <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#64748b' }}>
+          <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#7E9389' }}>
             Conecta una cuenta de Gmail o Google Workspace para enviar correos automáticos a tus clientes.
           </p>
         </div>
@@ -296,14 +296,14 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
             {config ? (
               <>
                 <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#166534' }}>Conectado</p>
-                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#7E9389' }}>
                   Enviando desde: <strong>{config.email}</strong>
                 </p>
               </>
             ) : (
               <>
-                <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#475569' }}>Sin cuenta conectada</p>
-                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#3E5A4C' }}>Sin cuenta conectada</p>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#7E9389' }}>
                   Conecta una cuenta de Google para habilitar el envío de correos.
                 </p>
               </>
@@ -330,7 +330,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
                 padding: '10px 20px', borderRadius: '8px', border: 'none',
-                background: connecting ? '#cbd5e1' : '#4285F4',
+                background: connecting ? '#C7C2B0' : '#4285F4',
                 color: 'white', cursor: connecting ? 'not-allowed' : 'pointer',
                 fontSize: '13px', fontWeight: 700, boxShadow: '0 2px 8px rgba(66,133,244,.35)',
               }}
@@ -353,8 +353,8 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
               onClick={() => void handleConnect()}
               disabled={connecting}
               style={{
-                padding: '8px 14px', borderRadius: '8px', border: '1.5px solid rgba(14,165,233,.3)',
-                background: 'rgba(14,165,233,.08)', color: '#0284c7',
+                padding: '8px 14px', borderRadius: '8px', border: '1.5px solid rgba(27, 59, 54,.3)',
+                background: 'rgba(27, 59, 54,.08)', color: '#102622',
                 cursor: 'pointer', fontSize: '12px', fontWeight: 600,
               }}
             >
@@ -367,10 +367,10 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
       {/* Test email */}
       {config && (
         <div style={{
-          background: 'rgba(14,165,233,.06)', border: '1px solid rgba(14,165,233,.2)',
+          background: 'rgba(27, 59, 54,.06)', border: '1px solid rgba(27, 59, 54,.2)',
           borderRadius: '12px', padding: '16px 20px', marginBottom: '24px',
         }}>
-          <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+          <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700, color: '#15291F' }}>
             Enviar correo de prueba
           </p>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -381,7 +381,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
               placeholder="correo@ejemplo.com"
               style={{
                 flex: 1, minWidth: '200px', padding: '9px 12px',
-                borderRadius: '8px', border: '1.5px solid #e2e8f0',
+                borderRadius: '8px', border: '1.5px solid #E1DDD0',
                 fontSize: '13px', outline: 'none',
               }}
             />
@@ -390,7 +390,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
               disabled={sendingTest}
               style={{
                 padding: '9px 18px', borderRadius: '8px', border: 'none',
-                background: sendingTest ? '#cbd5e1' : 'linear-gradient(135deg,#0ea5e9,#0d9488)',
+                background: sendingTest ? '#C7C2B0' : 'linear-gradient(135deg,#1B3B36,#577B69)',
                 color: 'white', cursor: sendingTest ? 'not-allowed' : 'pointer',
                 fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap',
               }}
@@ -403,10 +403,10 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
 
       {/* Email templates */}
       <div>
-        <h4 style={{ margin: '0 0 12px', color: '#0f172a', fontSize: '14px', fontWeight: 700 }}>
+        <h4 style={{ margin: '0 0 12px', color: '#15291F', fontSize: '14px', fontWeight: 700 }}>
           Templates de correo
         </h4>
-        <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#64748b' }}>
+        <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#7E9389' }}>
           Personaliza el diseño de cada correo. Si no defines un template, se usa el diseño predeterminado del sistema.
         </p>
 
@@ -423,31 +423,31 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
                 <div key={def.key} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   gap: '12px', flexWrap: 'wrap',
-                  background: '#f8fafc', borderRadius: '10px', padding: '12px 16px',
-                  border: `1px solid ${custom ? 'rgba(14,165,233,.3)' : '#e2e8f0'}`,
+                  background: '#FAF7EF', borderRadius: '10px', padding: '12px 16px',
+                  border: `1px solid ${custom ? 'rgba(27, 59, 54,.3)' : '#E1DDD0'}`,
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
                     <span style={{ fontSize: '20px', flexShrink: 0 }}>{def.icon}</span>
                     <div>
-                      <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                      <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#15291F' }}>
                         {def.label}
                         {custom && (
                           <span style={{
                             marginLeft: '8px', fontSize: '10px', fontWeight: 700,
                             padding: '2px 7px', borderRadius: '20px',
-                            background: 'rgba(14,165,233,.12)', color: '#0284c7',
+                            background: 'rgba(27, 59, 54,.12)', color: '#102622',
                           }}>Personalizado</span>
                         )}
                       </p>
-                      <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#94a3b8' }}>{def.desc}</p>
+                      <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#7E9389' }}>{def.desc}</p>
                     </div>
                   </div>
                   <button
                     onClick={() => void editTemplate(def)}
                     style={{
                       padding: '6px 14px', borderRadius: '7px',
-                      border: '1.5px solid rgba(14,165,233,.3)',
-                      background: 'rgba(14,165,233,.08)', color: '#0284c7',
+                      border: '1.5px solid rgba(27, 59, 54,.3)',
+                      background: 'rgba(27, 59, 54,.08)', color: '#102622',
                       cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                     }}
                   >

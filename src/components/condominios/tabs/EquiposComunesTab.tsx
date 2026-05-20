@@ -27,7 +27,7 @@ const ESTADOS: { value: EstadoEquipo; label: string; color: string }[] = [
   { value: 'operativo', label: 'Operativo', color: '#10b981' },
   { value: 'mantenimiento', label: 'En mantenimiento', color: '#f59e0b' },
   { value: 'fuera_servicio', label: 'Fuera de servicio', color: '#ef4444' },
-  { value: 'baja', label: 'De baja', color: '#6b7280' },
+  { value: 'baja', label: 'De baja', color: '#7E9389' },
 ]
 
 function diasParaManto(fecha?: string | null): number | null {
@@ -128,19 +128,19 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
     setForm({ nombre: '', categoria: 'otro', marca: '', modelo: '', serial: '', ubicacion: '', fecha_compra: '', valor_compra: '', vida_util_anios: '', estado: 'operativo', ultimo_mantenimiento: '', proximo_mantenimiento: '', notas: '' })
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 320, borderRight: '1px solid #e5e7eb', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #e5e7eb' }}>
+      <div style={{ width: 320, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Equipos ({lista.length})</span>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nuevo
               </button>
             )}
@@ -162,7 +162,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
           </div>
         )}
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#9ca3af', padding: '32px 16px', fontSize: 13 }}>Sin equipos</div>}
+        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 16px', fontSize: 13 }}>Sin equipos</div>}
 
         {lista.map(e => {
           const cat = CATEGORIAS.find(c => c.value === e.categoria)
@@ -171,17 +171,17 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
           const dias = diasParaManto(e.proximo_mantenimiento)
           return (
             <div key={e.id} onClick={() => { setSelected(e); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', background: selected?.id === e.id ? '#eef2ff' : '#fff', borderLeft: alerta === 'vencido' ? '3px solid #ef4444' : alerta === 'proximo' ? '3px solid #f59e0b' : '3px solid transparent' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === e.id ? '#F4EBE3' : '#fff', borderLeft: alerta === 'vencido' ? '3px solid #ef4444' : alerta === 'proximo' ? '3px solid #f59e0b' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {e.nombre}</span>
                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: est?.color + '20', color: est?.color }}>{est?.label}</span>
               </div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: '#7E9389', marginTop: 2 }}>
                 {e.marca && <span>{e.marca} {e.modelo} · </span>}
                 {e.ubicacion && <span>{e.ubicacion}</span>}
               </div>
               {dias !== null && (
-                <div style={{ fontSize: 11, color: alerta === 'vencido' ? '#ef4444' : alerta === 'proximo' ? '#f59e0b' : '#6b7280', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: alerta === 'vencido' ? '#ef4444' : alerta === 'proximo' ? '#f59e0b' : '#7E9389', marginTop: 2 }}>
                   {alerta === 'vencido' ? `⚠️ Manto vencido hace ${Math.abs(dias)} días` : alerta === 'proximo' ? `⏳ Manto en ${dias} días` : `Próx. manto: ${e.proximo_mantenimiento}`}
                 </div>
               )}
@@ -259,7 +259,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
                 {saving ? 'Guardando…' : '✅ Guardar equipo'}
               </button>
               <button onClick={() => { setMostrarForm(false); resetForm() }}
-                style={{ padding: '8px 16px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -276,7 +276,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 20 }}>{cat?.icon} {selected.nombre}</div>
-                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
+                  <div style={{ fontSize: 13, color: '#7E9389', marginTop: 4 }}>
                     {selected.marca && <span>{selected.marca} {selected.modelo} · </span>}
                     {selected.ubicacion && <span>{selected.ubicacion}</span>}
                   </div>
@@ -304,16 +304,16 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
                   { label: 'Último mantenimiento', value: selected.ultimo_mantenimiento || '—' },
                   { label: 'Próximo mantenimiento', value: selected.proximo_mantenimiento || '—' },
                 ].map(d => (
-                  <div key={d.label} style={{ background: '#f9fafb', borderRadius: 6, padding: '8px 12px' }}>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>{d.label}</div>
+                  <div key={d.label} style={{ background: '#FAF7EF', borderRadius: 6, padding: '8px 12px' }}>
+                    <div style={{ fontSize: 11, color: '#7E9389' }}>{d.label}</div>
                     <div style={{ fontSize: 14, fontWeight: 600 }}>{d.value}</div>
                   </div>
                 ))}
               </div>
 
               {selected.notas && (
-                <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 13 }}>
-                  <div style={{ fontWeight: 600, fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Notas</div>
+                <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 13 }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, color: '#7E9389', marginBottom: 4 }}>Notas</div>
                   {selected.notas}
                 </div>
               )}
@@ -326,7 +326,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
                   </button>
                   {ESTADOS.filter(s => s.value !== selected.estado).map(s => (
                     <button key={s.value} onClick={() => actualizarEstado(selected, s.value)}
-                      style={{ padding: '7px 14px', background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '7px 14px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid #E1DDD0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       → {s.label}
                     </button>
                   ))}
@@ -337,7 +337,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
         })()}
 
         {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9ca3af', fontSize: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#7E9389', fontSize: 14 }}>
             Selecciona un equipo o registra uno nuevo
           </div>
         )}

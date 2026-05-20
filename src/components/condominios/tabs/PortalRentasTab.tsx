@@ -41,13 +41,13 @@ type SubTab = 'arrendamiento' | 'str'
 const ESTADO_CONTRATO: Record<EstadoContrato, { label: string; bg: string; color: string }> = {
   activo:    { label: 'Activo',    bg: '#f0fdf4', color: '#16a34a' },
   vencido:   { label: 'Vencido',  bg: '#fff7ed', color: '#c2410c' },
-  terminado: { label: 'Terminado',bg: '#f8fafc', color: '#64748b' },
+  terminado: { label: 'Terminado',bg: '#FAF7EF', color: '#7E9389' },
 }
 
 const ESTADO_STR: Record<EstadoSTR, { label: string; bg: string; color: string }> = {
-  confirmada: { label: 'Confirmada',  bg: '#eff6ff', color: '#2563eb' },
+  confirmada: { label: 'Confirmada',  bg: '#EEF2EC', color: '#1B3B36' },
   en_curso:   { label: 'En curso',    bg: '#f0fdf4', color: '#16a34a' },
-  completada: { label: 'Completada',  bg: '#f8fafc', color: '#64748b' },
+  completada: { label: 'Completada',  bg: '#FAF7EF', color: '#7E9389' },
   cancelada:  { label: 'Cancelada',   bg: '#fef2f2', color: '#dc2626' },
 }
 
@@ -97,7 +97,7 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
 
   const fieldStyle: React.CSSProperties = {
     width: '100%', padding: '9px 12px', fontSize: '13.5px',
-    border: '1.5px solid #e2e8f0', borderRadius: '8px', outline: 'none',
+    border: '1.5px solid #E1DDD0', borderRadius: '8px', outline: 'none',
     boxSizing: 'border-box',
   }
 
@@ -120,10 +120,10 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
   return (
     <div style={{ maxWidth: '520px' }}>
       <div style={{ marginBottom: '20px' }}>
-        <h3 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>
+        <h3 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: 700, color: '#15291F' }}>
           🔑 Solicitar autorización de renta
         </h3>
-        <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+        <p style={{ margin: 0, fontSize: '13px', color: '#7E9389' }}>
           Para gestionar contratos o reservas en tu unidad, primero debes solicitar autorización a la administración.
         </p>
       </div>
@@ -137,12 +137,12 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
           {prevRechazada.comentario_admin && (
             <div style={{ color: '#7f1d1d' }}>Motivo: {prevRechazada.comentario_admin}</div>
           )}
-          <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '4px' }}>Puedes enviar una nueva solicitud.</div>
+          <div style={{ color: '#7E9389', fontSize: '12px', marginTop: '4px' }}>Puedes enviar una nueva solicitud.</div>
         </div>
       )}
 
       <div style={{ marginBottom: '14px' }}>
-        <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+        <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '6px' }}>
           Tipo de renta que deseas operar *
         </label>
         {(['arrendamiento', 'str', 'ambas'] as TipoRenta[]).map(t => (
@@ -150,15 +150,15 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
             <input
               type="radio" name="tipo_renta" value={t} checked={tipo === t}
               onChange={() => setTipo(t)}
-              style={{ accentColor: '#4f46e5', width: '16px', height: '16px' }}
+              style={{ accentColor: '#9C5733', width: '16px', height: '16px' }}
             />
-            <span style={{ fontSize: '13.5px', color: '#334155' }}>{TIPO_RENTA_LABEL[t]}</span>
+            <span style={{ fontSize: '13.5px', color: '#3E5A4C' }}>{TIPO_RENTA_LABEL[t]}</span>
           </label>
         ))}
       </div>
 
       <div style={{ marginBottom: '18px' }}>
-        <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+        <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>
           Motivo / descripción (opcional)
         </label>
         <textarea
@@ -173,7 +173,7 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
         onClick={submit}
         disabled={saving}
         style={{
-          padding: '10px 24px', background: '#4f46e5', color: 'white',
+          padding: '10px 24px', background: '#9C5733', color: 'white',
           border: 'none', borderRadius: '9px', fontWeight: 600, fontSize: '14px',
           cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
         }}
@@ -445,20 +445,20 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
 
   const fieldStyle: React.CSSProperties = {
     width: '100%', padding: '9px 12px', fontSize: '13.5px',
-    border: '1.5px solid #e2e8f0', borderRadius: '8px', outline: 'none',
+    border: '1.5px solid #E1DDD0', borderRadius: '8px', outline: 'none',
     boxSizing: 'border-box',
   }
-  const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '4px', display: 'block' }
+  const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#3E5A4C', marginBottom: '4px', display: 'block' }
   const rowStyle: React.CSSProperties   = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }
 
   // ── Header (always shown) ────────────────────────────────────────────────────
 
   const header = (
     <div style={{ marginBottom: '20px' }}>
-      <h3 style={{ margin: '0 0 4px', fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>
+      <h3 style={{ margin: '0 0 4px', fontSize: '17px', fontWeight: 700, color: '#15291F' }}>
         🏠 Rentas — {unidadNombre}
       </h3>
-      <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+      <p style={{ margin: 0, fontSize: '13px', color: '#7E9389' }}>
         Administra los contratos de arrendamiento y reservas de corto plazo de tu unidad.
       </p>
     </div>
@@ -526,7 +526,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       </div>
 
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '2px solid #f1f5f9' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '2px solid #EAE6D8' }}>
         {allowedSubTabs.map(id => (
           <button
             key={id}
@@ -534,9 +534,9 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
             style={{
               padding: '9px 18px', border: 'none', cursor: 'pointer', fontWeight: 600,
               fontSize: '13px', borderRadius: '8px 8px 0 0',
-              background: subTab === id ? '#4f46e5' : 'transparent',
-              color: subTab === id ? 'white' : '#64748b',
-              borderBottom: subTab === id ? '2px solid #4f46e5' : '2px solid transparent',
+              background: subTab === id ? '#9C5733' : 'transparent',
+              color: subTab === id ? 'white' : '#7E9389',
+              borderBottom: subTab === id ? '2px solid #9C5733' : '2px solid transparent',
               marginBottom: '-2px',
             }}
           >{id === 'arrendamiento' ? '📄 Arrendamiento' : '🏨 STR / Corto Plazo'}</button>
@@ -544,28 +544,28 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '14px' }}>Cargando…</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '14px' }}>Cargando…</div>
       ) : subTab === 'arrendamiento' ? (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
-            <button onClick={openNewCA} style={{ padding: '8px 18px', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo contrato</button>
+            <button onClick={openNewCA} style={{ padding: '8px 18px', background: '#9C5733', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo contrato</button>
           </div>
 
           {contratos.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389' }}>
               <div style={{ fontSize: '36px', marginBottom: '10px' }}>📄</div>
               <div style={{ fontSize: '14px' }}>Sin contratos de arrendamiento registrados</div>
             </div>
           ) : contratos.map(c => {
             const cfg = ESTADO_CONTRATO[c.estado]
             return (
-              <div key={c.id} style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
+              <div key={c.id} style={{ border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>👤 {c.arrendatario_nombre}</div>
-                    {c.arrendatario_telefono && <div style={{ fontSize: '12.5px', color: '#475569' }}>📞 {c.arrendatario_telefono}</div>}
-                    {c.arrendatario_email && <div style={{ fontSize: '12.5px', color: '#475569' }}>✉️ {c.arrendatario_email}</div>}
-                    <div style={{ fontSize: '12.5px', color: '#475569', marginTop: '4px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '4px' }}>👤 {c.arrendatario_nombre}</div>
+                    {c.arrendatario_telefono && <div style={{ fontSize: '12.5px', color: '#3E5A4C' }}>📞 {c.arrendatario_telefono}</div>}
+                    {c.arrendatario_email && <div style={{ fontSize: '12.5px', color: '#3E5A4C' }}>✉️ {c.arrendatario_email}</div>}
+                    <div style={{ fontSize: '12.5px', color: '#3E5A4C', marginTop: '4px' }}>
                       📅 {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' (indefinido)'}{'  '}|{'  '}💰 Renta: {c.monto_renta.toLocaleString()} · Día {c.dia_pago}
                     </div>
                   </div>
@@ -575,7 +575,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                     <button onClick={() => deleteCA(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px' }} title="Eliminar">🗑️</button>
                   </div>
                 </div>
-                {c.notas && <div style={{ marginTop: '8px', fontSize: '12px', color: '#64748b', background: '#f8fafc', borderRadius: '6px', padding: '8px' }}>{c.notas}</div>}
+                {c.notas && <div style={{ marginTop: '8px', fontSize: '12px', color: '#7E9389', background: '#FAF7EF', borderRadius: '6px', padding: '8px' }}>{c.notas}</div>}
               </div>
             )
           })}
@@ -585,7 +585,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
               <div style={{ background: 'white', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>{editCA ? 'Editar contrato' : 'Nuevo contrato de arrendamiento'}</h3>
-                  <button onClick={() => setShowCA(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#94a3b8' }}>✕</button>
+                  <button onClick={() => setShowCA(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#7E9389' }}>✕</button>
                 </div>
                 <div style={rowStyle}>
                   <div style={{ gridColumn: '1/-1' }}>
@@ -638,8 +638,8 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  <button onClick={() => setShowCA(false)} style={{ padding: '9px 20px', background: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: '#475569' }}>Cancelar</button>
-                  <button onClick={saveCA} disabled={savingCA} style={{ padding: '9px 22px', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '8px', cursor: savingCA ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px', opacity: savingCA ? 0.7 : 1 }}>
+                  <button onClick={() => setShowCA(false)} style={{ padding: '9px 20px', background: '#EAE6D8', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: '#3E5A4C' }}>Cancelar</button>
+                  <button onClick={saveCA} disabled={savingCA} style={{ padding: '9px 22px', background: '#9C5733', color: 'white', border: 'none', borderRadius: '8px', cursor: savingCA ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px', opacity: savingCA ? 0.7 : 1 }}>
                     {savingCA ? 'Guardando…' : editCA ? 'Actualizar' : 'Crear contrato'}
                   </button>
                 </div>
@@ -650,11 +650,11 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       ) : (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
-            <button onClick={openNewSTR} style={{ padding: '8px 18px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva reserva</button>
+            <button onClick={openNewSTR} style={{ padding: '8px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva reserva</button>
           </div>
 
           {reservas.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389' }}>
               <div style={{ fontSize: '36px', marginBottom: '10px' }}>🏨</div>
               <div style={{ fontSize: '14px' }}>Sin reservas STR registradas</div>
             </div>
@@ -664,21 +664,21 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
             const preregistrados = (reservaHuespedes[r.id] ?? []).length
             const capacidad = r.num_adultos + r.num_ninos
             return (
-              <div key={r.id} style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
+              <div key={r.id} style={{ border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '4px' }}>
                       👤 {r.huesped_nombre}
                       {preregistrados > 0 && (
-                        <span style={{ marginLeft: 8, padding: '2px 8px', background: '#eff6ff', color: '#2563eb', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                        <span style={{ marginLeft: 8, padding: '2px 8px', background: '#EEF2EC', color: '#1B3B36', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                           +{preregistrados} pre-reg
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: '12.5px', color: '#475569' }}>
+                    <div style={{ fontSize: '12.5px', color: '#3E5A4C' }}>
                       📅 {r.fecha_entrada} → {r.fecha_salida}{nights > 0 && ` (${nights} noche${nights !== 1 ? 's' : ''})`}
                     </div>
-                    <div style={{ fontSize: '12.5px', color: '#475569', marginTop: '2px' }}>
+                    <div style={{ fontSize: '12.5px', color: '#3E5A4C', marginTop: '2px' }}>
                       👥 {r.num_adultos} adulto{r.num_adultos !== 1 ? 's' : ''}{r.num_ninos > 0 ? `, ${r.num_ninos} niño${r.num_ninos !== 1 ? 's' : ''}` : ''}{'  ·  '}🌐 {PLATAFORMAS[r.plataforma]}{r.monto_total ? `  ·  💰 ${r.monto_total.toLocaleString()}` : ''}
                       {preregistrados > 0 && ` · ${1 + preregistrados}/${capacidad} personas pre-registradas`}
                     </div>
@@ -689,7 +689,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                     <button onClick={() => deleteSTR(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px' }} title="Eliminar">🗑️</button>
                   </div>
                 </div>
-                {r.notas && <div style={{ marginTop: '8px', fontSize: '12px', color: '#64748b', background: '#f8fafc', borderRadius: '6px', padding: '8px' }}>{r.notas}</div>}
+                {r.notas && <div style={{ marginTop: '8px', fontSize: '12px', color: '#7E9389', background: '#FAF7EF', borderRadius: '6px', padding: '8px' }}>{r.notas}</div>}
               </div>
             )
           })}
@@ -699,7 +699,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
               <div style={{ background: 'white', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>{editSTR ? 'Editar reserva STR' : 'Nueva reserva STR'}</h3>
-                  <button onClick={resetSTRForm} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#94a3b8' }}>✕</button>
+                  <button onClick={resetSTRForm} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#7E9389' }}>✕</button>
                 </div>
                 <div style={rowStyle}>
                   <div style={{ gridColumn: '1/-1' }}>
@@ -742,7 +742,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                     <label style={labelStyle}>
                       Tarifa por noche
                       {formSTR.fecha_entrada && formSTR.fecha_salida && (
-                        <span style={{ fontWeight: 400, color: '#94a3b8' }}>{' '}({calcNights(formSTR.fecha_entrada, formSTR.fecha_salida)} noches = {(calcNights(formSTR.fecha_entrada, formSTR.fecha_salida) * (Number(formSTR.monto_noche) || 0)).toLocaleString()})</span>
+                        <span style={{ fontWeight: 400, color: '#7E9389' }}>{' '}({calcNights(formSTR.fecha_entrada, formSTR.fecha_salida)} noches = {(calcNights(formSTR.fecha_entrada, formSTR.fecha_salida) * (Number(formSTR.monto_noche) || 0)).toLocaleString()})</span>
                       )}
                     </label>
                     <input style={fieldStyle} type="number" min={0} value={formSTR.monto_noche ?? 0} onChange={e => setFormSTR(p => ({ ...p, monto_noche: Number(e.target.value) }))} />
@@ -762,56 +762,56 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                   </div>
 
                   {/* Fotos del huésped principal */}
-                  <div style={{ gridColumn: '1/-1', paddingTop: '4px', borderTop: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', marginBottom: '8px' }}>
-                      Fotografías del huésped principal <span style={{ fontWeight: 400, color: '#94a3b8' }}>(opcional — se pueden completar al ingreso)</span>
+                  <div style={{ gridColumn: '1/-1', paddingTop: '4px', borderTop: '1px solid #E1DDD0' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389', marginBottom: '8px' }}>
+                      Fotografías del huésped principal <span style={{ fontWeight: 400, color: '#7E9389' }}>(opcional — se pueden completar al ingreso)</span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', maxWidth: '400px' }}>
                       <div>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>Foto del huésped</div>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', marginBottom: '4px' }}>Foto del huésped</div>
                         <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="str_guests" label="Foto del huésped" capture />
                       </div>
                       <div>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>Foto del documento / DPI</div>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', marginBottom: '4px' }}>Foto del documento / DPI</div>
                         <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="str_guests" label="DPI / Documento" capture />
                       </div>
                     </div>
                   </div>
 
                   {/* Personas del grupo */}
-                  <div style={{ gridColumn: '1/-1', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
+                  <div style={{ gridColumn: '1/-1', borderTop: '1px solid #E1DDD0', paddingTop: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389' }}>
                         Personas del grupo
-                        <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: 6 }}>
+                        <span style={{ fontWeight: 400, color: '#7E9389', marginLeft: 6 }}>
                           (principal + {huespedes.length}/{maxAdicionalesSTR} adicionales pre-registradas)
                         </span>
                       </div>
                       {!showHuespedForm && huespedes.length < maxAdicionalesSTR && (
                         <button type="button" onClick={() => setShowHuespedForm(true)}
-                          style={{ padding: '4px 12px', background: '#f8fafc', color: '#374151', border: '1.5px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                          style={{ padding: '4px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1.5px solid #E1DDD0', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                           + Agregar persona
                         </button>
                       )}
                     </div>
 
                     {/* Principal */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', marginBottom: '6px' }}>
-                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#0ea5e9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'white', fontWeight: 700, flexShrink: 0 }}>1</div>
-                      <div style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{formSTR.huesped_nombre || 'Huésped principal'}</div>
-                      <span style={{ fontSize: '10px', color: '#0369a1', fontWeight: 600, padding: '2px 8px', background: '#e0f2fe', borderRadius: '10px' }}>Principal</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '8px', marginBottom: '6px' }}>
+                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#1B3B36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'white', fontWeight: 700, flexShrink: 0 }}>1</div>
+                      <div style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: '#15291F' }}>{formSTR.huesped_nombre || 'Huésped principal'}</div>
+                      <span style={{ fontSize: '10px', color: '#102622', fontWeight: 600, padding: '2px 8px', background: '#D9E2DC', borderRadius: '10px' }}>Principal</span>
                     </div>
 
                     {/* Adicionales */}
                     {huespedes.map((h, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: h.visitante_id ? '#f0fdf4' : '#f8fafc', border: `1px solid ${h.visitante_id ? '#86efac' : '#e2e8f0'}`, borderRadius: '8px', marginBottom: '6px' }}>
-                        <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#475569', fontWeight: 700, flexShrink: 0 }}>{i + 2}</div>
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: h.visitante_id ? '#f0fdf4' : '#FAF7EF', border: `1px solid ${h.visitante_id ? '#86efac' : '#E1DDD0'}`, borderRadius: '8px', marginBottom: '6px' }}>
+                        <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#E1DDD0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#3E5A4C', fontWeight: 700, flexShrink: 0 }}>{i + 2}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#15291F' }}>
                             {h.es_menor ? '👶 ' : ''}{h.nombre}
                             {h.visitante_id && <span style={{ marginLeft: 6, fontSize: '10px', color: '#16a34a', fontWeight: 600 }}>✓ Ingresado</span>}
                           </div>
-                          <div style={{ fontSize: '11px', color: '#64748b' }}>
+                          <div style={{ fontSize: '11px', color: '#7E9389' }}>
                             {h.es_menor
                               ? `Menor${h.fecha_nacimiento ? ` · Nac. ${h.fecha_nacimiento}` : ''}`
                               : h.identificacion ? `DPI: ${h.identificacion}` : 'Sin documento'}
@@ -828,13 +828,13 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
 
                     {/* Sub-form */}
                     {showHuespedForm && (
-                      <div style={{ padding: '14px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>Nueva persona del grupo</div>
+                      <div style={{ padding: '14px', background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C' }}>Nueva persona del grupo</div>
                         <div>
                           <label style={labelStyle}>Nombre *</label>
                           <input style={fieldStyle} value={huespedForm.nombre} onChange={e => setHuespedForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre completo" />
                         </div>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#374151', cursor: 'pointer', fontWeight: 600 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#3E5A4C', cursor: 'pointer', fontWeight: 600 }}>
                           <input type="checkbox" checked={huespedForm.es_menor} onChange={e => setHuespedForm(f => ({ ...f, es_menor: e.target.checked, identificacion: '' }))} />
                           Es menor de edad
                           {huespedForm.es_menor && <span style={{ padding: '2px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '10px' }}>Menor</span>}
@@ -852,23 +852,23 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                         )}
                         <div style={{ display: 'grid', gridTemplateColumns: huespedForm.es_menor ? '1fr' : '1fr 1fr', gap: '10px' }}>
                           <div>
-                            <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '3px' }}>Foto de la persona</div>
+                            <div style={{ fontSize: '11px', color: '#7E9389', marginBottom: '3px' }}>Foto de la persona</div>
                             <ImageUploader value={huespedForm.foto_url} onChange={v => setHuespedForm(f => ({ ...f, foto_url: v }))} folder="str_guests" label="Foto" capture />
                           </div>
                           {!huespedForm.es_menor && (
                             <div>
-                              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '3px' }}>Foto del documento</div>
+                              <div style={{ fontSize: '11px', color: '#7E9389', marginBottom: '3px' }}>Foto del documento</div>
                               <ImageUploader value={huespedForm.foto_documento_url} onChange={v => setHuespedForm(f => ({ ...f, foto_documento_url: v }))} folder="str_guests" label="Documento" capture />
                             </div>
                           )}
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button type="button" onClick={agregarHuesped}
-                            style={{ padding: '7px 16px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
+                            style={{ padding: '7px 16px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
                             + Agregar
                           </button>
                           <button type="button" onClick={() => { setShowHuespedForm(false); setHuespedForm(defaultHuesped()) }}
-                            style={{ padding: '7px 14px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>
+                            style={{ padding: '7px 14px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>
                             Cancelar
                           </button>
                         </div>
@@ -877,8 +877,8 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  <button onClick={resetSTRForm} style={{ padding: '9px 20px', background: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: '#475569' }}>Cancelar</button>
-                  <button onClick={saveSTR} disabled={savingSTR} style={{ padding: '9px 22px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', cursor: savingSTR ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px', opacity: savingSTR ? 0.7 : 1 }}>
+                  <button onClick={resetSTRForm} style={{ padding: '9px 20px', background: '#EAE6D8', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: '#3E5A4C' }}>Cancelar</button>
+                  <button onClick={saveSTR} disabled={savingSTR} style={{ padding: '9px 22px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', cursor: savingSTR ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '13px', opacity: savingSTR ? 0.7 : 1 }}>
                     {savingSTR ? 'Guardando…' : editSTR ? 'Actualizar' : 'Crear reserva'}
                   </button>
                 </div>

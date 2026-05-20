@@ -19,8 +19,8 @@ interface Props {
 const TIPO_LABELS: Record<TipoAlerta, { label: string; color: string; bg: string }> = {
   urgente:       { label: 'Urgente',       color: '#ef4444', bg: '#fee2e2' },
   vencimiento:   { label: 'Vencimiento',   color: '#f59e0b', bg: '#fef3c7' },
-  recordatorio:  { label: 'Recordatorio',  color: '#0ea5e9', bg: '#e0f2fe' },
-  aviso:         { label: 'Aviso',         color: '#8b5cf6', bg: '#ede9fe' },
+  recordatorio:  { label: 'Recordatorio',  color: '#1B3B36', bg: '#D9E2DC' },
+  aviso:         { label: 'Aviso',         color: '#B96A3F', bg: '#F4EBE3' },
 }
 
 const DAYS_WARNING = 30
@@ -173,16 +173,16 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Alertas y Notificaciones</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Alertas y Notificaciones</h2>
         {canCreate && (
           <button onClick={() => setShowForm(v => !v)}
-            style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nueva Alerta
           </button>
         )}
@@ -193,24 +193,24 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
         {[
           { label: 'Urgentes activas',   value: totalUrgentes,    icon: '🚨', color: '#ef4444' },
           { label: 'Vencimientos próximos', value: totalVencimientos, icon: '⏰', color: '#f59e0b' },
-          { label: 'Auto-detectadas',    value: totalAuto,        icon: '🤖', color: '#0ea5e9' },
-          { label: 'Manuales activas',   value: alertas.filter(a => a.estado === 'activa').length, icon: '📌', color: '#8b5cf6' },
+          { label: 'Auto-detectadas',    value: totalAuto,        icon: '🤖', color: '#1B3B36' },
+          { label: 'Manuales activas',   value: alertas.filter(a => a.estado === 'activa').length, icon: '📌', color: '#B96A3F' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>Nueva alerta manual</h3>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>Nueva alerta manual</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '4px' }}>Tipo *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '4px' }}>Tipo *</label>
               <select value={form.tipo} onChange={e => setF('tipo', e.target.value as TipoAlerta)} style={inputStyle}>
                 {(Object.keys(TIPO_LABELS) as TipoAlerta[]).map(t => (
                   <option key={t} value={t}>{TIPO_LABELS[t].label}</option>
@@ -218,25 +218,25 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '4px' }}>Título *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '4px' }}>Título *</label>
               <input style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Descripción breve de la alerta" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '4px' }}>Fecha alerta *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '4px' }}>Fecha alerta *</label>
               <input style={inputStyle} type="date" value={form.fecha_alerta} onChange={e => setF('fecha_alerta', e.target.value)} />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '4px' }}>Descripción</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '4px' }}>Descripción</label>
               <input style={inputStyle} value={form.descripcion ?? ''} onChange={e => setF('descripcion', e.target.value)} placeholder="Detalles adicionales (opcional)" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '8px 20px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '8px 20px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '8px 14px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>
+              style={{ padding: '8px 14px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -246,7 +246,7 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
       {/* Auto-detected alerts */}
       {autoAlerts.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             🤖 Auto-detectadas ({autoAlerts.length})
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -256,13 +256,13 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
                 <div key={a.key} style={{ background: t.bg, border: `1.5px solid ${t.color}30`, borderRadius: '10px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: t.color, flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>{a.titulo}</div>
-                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{a.descripcion}</div>
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: '#15291F' }}>{a.titulo}</div>
+                    <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px' }}>{a.descripcion}</div>
                   </div>
                   <span style={{ fontSize: '11px', fontWeight: 700, color: t.color, background: 'white', padding: '3px 8px', borderRadius: '20px', flexShrink: 0 }}>
                     {t.label}
                   </span>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', flexShrink: 0 }}>{a.fecha_alerta}</span>
+                  <span style={{ fontSize: '11px', color: '#7E9389', flexShrink: 0 }}>{a.fecha_alerta}</span>
                 </div>
               )
             })}
@@ -273,16 +273,16 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
       {/* Manual stored alerts */}
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             📌 Alertas manuales ({alertas.length})
           </h3>
           <div style={{ display: 'flex', gap: '6px' }}>
             {(['activa', 'resuelta', 'ignorada', 'all'] as const).map(e => (
               <button key={e} onClick={() => setFiltroEstado(e)}
                 style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
-                  background: filtroEstado === e ? '#0f172a' : 'white',
-                  color: filtroEstado === e ? 'white' : '#64748b',
-                  borderColor: filtroEstado === e ? '#0f172a' : '#e2e8f0' }}>
+                  background: filtroEstado === e ? '#15291F' : 'white',
+                  color: filtroEstado === e ? 'white' : '#7E9389',
+                  borderColor: filtroEstado === e ? '#15291F' : '#E1DDD0' }}>
                 {e === 'all' ? 'Todas' : e.charAt(0).toUpperCase() + e.slice(1)}
               </button>
             ))}
@@ -290,7 +290,7 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
         </div>
 
         {storedActivas.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '13px' }}>
+          <div style={{ textAlign: 'center', padding: '32px', color: '#7E9389', fontSize: '13px' }}>
             No hay alertas manuales {filtroEstado !== 'all' ? `con estado "${filtroEstado}"` : ''}.
           </div>
         ) : (
@@ -299,20 +299,20 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
               const t = TIPO_LABELS[a.tipo]
               const d = daysUntil(a.fecha_alerta)
               return (
-                <div key={a.id} style={{ background: a.estado !== 'activa' ? '#f8fafc' : t.bg, border: `1.5px solid ${a.estado !== 'activa' ? '#e2e8f0' : t.color + '40'}`, borderRadius: '10px', padding: '12px 14px' }}>
+                <div key={a.id} style={{ background: a.estado !== 'activa' ? '#FAF7EF' : t.bg, border: `1.5px solid ${a.estado !== 'activa' ? '#E1DDD0' : t.color + '40'}`, borderRadius: '10px', padding: '12px 14px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: a.estado !== 'activa' ? '#cbd5e1' : t.color, flexShrink: 0, marginTop: '5px' }} />
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: a.estado !== 'activa' ? '#C7C2B0' : t.color, flexShrink: 0, marginTop: '5px' }} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: '13px', color: a.estado !== 'activa' ? '#94a3b8' : '#0f172a', textDecoration: a.estado === 'ignorada' ? 'line-through' : 'none' }}>
+                      <div style={{ fontWeight: 700, fontSize: '13px', color: a.estado !== 'activa' ? '#7E9389' : '#15291F', textDecoration: a.estado === 'ignorada' ? 'line-through' : 'none' }}>
                         {a.titulo}
                       </div>
-                      {a.descripcion && <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{a.descripcion}</div>}
-                      <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                      {a.descripcion && <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px' }}>{a.descripcion}</div>}
+                      <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '4px' }}>
                         {a.fecha_alerta} {a.estado === 'activa' && d <= 7 && d > 0 ? `— ⚠️ ${d} día(s)` : a.estado === 'activa' && d <= 0 ? '— ⛔ Vencida' : ''}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '6px', flexShrink: 0, alignItems: 'center' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: a.estado !== 'activa' ? '#94a3b8' : t.color, background: 'white', padding: '3px 8px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: a.estado !== 'activa' ? '#7E9389' : t.color, background: 'white', padding: '3px 8px', borderRadius: '20px', border: '1px solid #E1DDD0' }}>
                         {t.label}
                       </span>
                       {canEdit && a.estado === 'activa' && (
@@ -322,7 +322,7 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
                             ✓ Resolver
                           </button>
                           <button onClick={() => handleEstado(a.id, 'ignorada')}
-                            style={{ padding: '4px 8px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>
+                            style={{ padding: '4px 8px', background: '#EAE6D8', color: '#7E9389', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>
                             Ignorar
                           </button>
                         </>

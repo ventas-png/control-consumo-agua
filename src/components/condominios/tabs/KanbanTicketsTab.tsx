@@ -13,9 +13,9 @@ interface Props {
 }
 
 const COLUMNAS: { estado: EstadoTicket; label: string; color: string; bg: string; bgHeader: string }[] = [
-  { estado: 'abierto',    label: 'Abierto',    color: '#64748b', bg: '#f8fafc', bgHeader: '#f1f5f9' },
+  { estado: 'abierto',    label: 'Abierto',    color: '#7E9389', bg: '#FAF7EF', bgHeader: '#EAE6D8' },
   { estado: 'en_proceso', label: 'En proceso', color: '#d97706', bg: '#fffbeb', bgHeader: '#fef3c7' },
-  { estado: 'resuelto',   label: 'Resuelto',   color: '#2563eb', bg: '#eff6ff', bgHeader: '#dbeafe' },
+  { estado: 'resuelto',   label: 'Resuelto',   color: '#1B3B36', bg: '#EEF2EC', bgHeader: '#D9E2DC' },
   { estado: 'cerrado',    label: 'Cerrado',    color: '#16a34a', bg: '#f0fdf4', bgHeader: '#dcfce7' },
 ]
 
@@ -23,7 +23,7 @@ const PRIORIDAD_CFG: Record<PrioridadTicket, { label: string; color: string; bg:
   urgente: { label: 'Urgente', color: '#fff', bg: '#ef4444', order: 0 },
   alta:    { label: 'Alta',    color: '#fff', bg: '#f97316', order: 1 },
   media:   { label: 'Media',   color: '#fff', bg: '#d97706', order: 2 },
-  baja:    { label: 'Baja',    color: '#374151', bg: '#e5e7eb', order: 3 },
+  baja:    { label: 'Baja',    color: '#3E5A4C', bg: '#E1DDD0', order: 3 },
 }
 
 const SIGUIENTE: Partial<Record<EstadoTicket, EstadoTicket>> = {
@@ -85,7 +85,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
     }
     const { error } = await supabase.from('tickets_mantenimiento').update(updates).eq('id', ticket.id)
     setMoviendo(null)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: '#2563eb' })
+    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: '#1B3B36' })
     onRefresh()
   }
 
@@ -97,15 +97,15 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>Kanban de Tickets</div>
-          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Kanban de Tickets</div>
+          <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>
             {totalAbiertos} activos · {totalUrgentes > 0 && <span style={{ color: '#ef4444', fontWeight: 700 }}>{totalUrgentes} urgentes · </span>}
             {tickets.filter(t => t.estado === 'cerrado').length} cerrados
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value as PrioridadTicket | '')}
-            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, background: '#fff' }}>
+            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, background: '#fff' }}>
             <option value="">Todas las prioridades</option>
             {(Object.keys(PRIORIDAD_CFG) as PrioridadTicket[]).map(p => (
               <option key={p} value={p}>{PRIORIDAD_CFG[p].label}</option>
@@ -113,7 +113,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
           </select>
           {tecnicos.length > 0 && (
             <select value={filtroTecnico} onChange={e => setFiltroTecnico(e.target.value)}
-              style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, background: '#fff' }}>
+              style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, background: '#fff' }}>
               <option value="">Todos los técnicos</option>
               {tecnicos.map(t => <option key={t} value={t}>{t.slice(0, 20)}</option>)}
             </select>
@@ -136,7 +136,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
             {/* Cards */}
             <div style={{ background: col.bg, border: `1px solid ${col.color}22`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: 8, minHeight: 120, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {porColumna[col.estado].length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px 0', color: '#d1d5db', fontSize: 12 }}>Sin tickets</div>
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#C7C2B0', fontSize: 12 }}>Sin tickets</div>
               ) : (
                 porColumna[col.estado].map(ticket => {
                   const pCfg = PRIORIDAD_CFG[ticket.prioridad]
@@ -144,42 +144,42 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
                   const isMoving = moviendo === ticket.id
                   return (
                     <div key={ticket.id}
-                      style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '10px 12px', cursor: 'pointer', opacity: isMoving ? 0.6 : 1, transition: 'box-shadow 0.15s', boxShadow: exp ? '0 2px 8px rgba(0,0,0,0.1)' : undefined }}
+                      style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 10, padding: '10px 12px', cursor: 'pointer', opacity: isMoving ? 0.6 : 1, transition: 'box-shadow 0.15s', boxShadow: exp ? '0 2px 8px rgba(0,0,0,0.1)' : undefined }}
                       onClick={() => setExpandido(exp ? null : ticket.id)}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                        <div style={{ fontWeight: 600, fontSize: 12, color: '#0f172a', flex: 1, lineHeight: 1.3 }}>{ticket.titulo}</div>
+                        <div style={{ fontWeight: 600, fontSize: 12, color: '#15291F', flex: 1, lineHeight: 1.3 }}>{ticket.titulo}</div>
                         <span style={{ padding: '1px 7px', borderRadius: 20, background: pCfg.bg, color: pCfg.color, fontSize: 10, fontWeight: 700, marginLeft: 6, flexShrink: 0 }}>{pCfg.label}</span>
                       </div>
 
                       {ticket.unidad_nombre && (
-                        <div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 3 }}>📍 {ticket.unidad_nombre}</div>
+                        <div style={{ fontSize: 10, color: '#7E9389', marginBottom: 3 }}>📍 {ticket.unidad_nombre}</div>
                       )}
 
                       {ticket.asignado_a && (
-                        <div style={{ fontSize: 10, color: '#64748b', marginBottom: 3 }}>👤 {ticket.asignado_a.slice(0, 25)}</div>
+                        <div style={{ fontSize: 10, color: '#7E9389', marginBottom: 3 }}>👤 {ticket.asignado_a.slice(0, 25)}</div>
                       )}
 
-                      <div style={{ fontSize: 10, color: '#9ca3af' }}>
+                      <div style={{ fontSize: 10, color: '#7E9389' }}>
                         {ticket.tipo === 'preventivo' ? '🔩' : '🔧'} {ticket.tipo}
                         {ticket.fecha_limite && ` · ⏰ ${ticket.fecha_limite}`}
                       </div>
 
                       {exp && (
-                        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #f1f5f9' }}>
+                        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #EAE6D8' }}>
                           {ticket.descripcion && (
-                            <div style={{ fontSize: 11, color: '#374151', marginBottom: 8 }}>{ticket.descripcion}</div>
+                            <div style={{ fontSize: 11, color: '#3E5A4C', marginBottom: 8 }}>{ticket.descripcion}</div>
                           )}
                           {ticket.costo_estimado != null && (
-                            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
+                            <div style={{ fontSize: 11, color: '#7E9389', marginBottom: 8 }}>
                               Est.: <strong>{moneda} {ticket.costo_estimado.toFixed(2)}</strong>
-                              {ticket.costo_real != null && <> · Real: <strong style={{ color: '#0f172a' }}>{moneda} {ticket.costo_real.toFixed(2)}</strong></>}
+                              {ticket.costo_real != null && <> · Real: <strong style={{ color: '#15291F' }}>{moneda} {ticket.costo_real.toFixed(2)}</strong></>}
                             </div>
                           )}
                           {canEdit && (
                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
                               {ANTERIOR[ticket.estado] && (
                                 <button onClick={() => moverTicket(ticket, ANTERIOR[ticket.estado]!)} disabled={isMoving}
-                                  style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid #d1d5db', background: '#f8fafc', cursor: 'pointer', color: '#64748b' }}>
+                                  style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid #C7C2B0', background: '#FAF7EF', cursor: 'pointer', color: '#7E9389' }}>
                                   ← Retroceder
                                 </button>
                               )}

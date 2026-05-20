@@ -157,22 +157,22 @@ export default function IndiceCalidadTab({ cuotas, tickets, incidentes, encuesta
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 4 }}>Índice de Calidad Operativa</div>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16 }}>Score compuesto ponderado de 5 dimensiones clave</div>
+      <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F', marginBottom: 4 }}>Índice de Calidad Operativa</div>
+      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 16 }}>Score compuesto ponderado de 5 dimensiones clave</div>
 
       {/* Score global */}
       <div style={{ display: 'flex', gap: 20, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ background: semGlobal.bg, border: `2px solid ${semGlobal.color}`, borderRadius: 16, padding: '20px 32px', textAlign: 'center', minWidth: 160 }}>
           <svg width="160" height="90" viewBox="0 0 160 90" style={{ display: 'block', margin: '0 auto' }}>
-            <path d={`M ${x1} ${y1} A ${r} ${r} 0 1 1 ${cx + r} ${cy}`} fill="none" stroke="#e5e7eb" strokeWidth="12" strokeLinecap="round" />
+            <path d={`M ${x1} ${y1} A ${r} ${r} 0 1 1 ${cx + r} ${cy}`} fill="none" stroke="#E1DDD0" strokeWidth="12" strokeLinecap="round" />
             {scoreGlobal > 0 && (
               <path d={`M ${cx - r} ${cy} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`} fill="none" stroke={semGlobal.color} strokeWidth="12" strokeLinecap="round" />
             )}
             <text x={cx} y={cy - 2} textAnchor="middle" fontSize="26" fontWeight="800" fill={semGlobal.color}>{scoreGlobal}</text>
-            <text x={cx} y={cy + 14} textAnchor="middle" fontSize="10" fill="#64748b">/ 100</text>
+            <text x={cx} y={cy + 14} textAnchor="middle" fontSize="10" fill="#7E9389">/ 100</text>
           </svg>
           <div style={{ fontSize: 16, fontWeight: 800, color: semGlobal.color }}>{semGlobal.emoji} {semGlobal.label}</div>
-          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>Score global</div>
+          <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>Score global</div>
         </div>
 
         <div style={{ flex: 1, minWidth: 200 }}>
@@ -182,10 +182,10 @@ export default function IndiceCalidadTab({ cuotas, tickets, incidentes, encuesta
             return (
               <div key={s.nombre} style={{ marginBottom: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{s.nombre}</span>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: sem.color }}>{s.score}/100 <span style={{ fontSize: 10, color: '#9ca3af' }}>×{s.peso}%</span></span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C' }}>{s.nombre}</span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: sem.color }}>{s.score}/100 <span style={{ fontSize: 10, color: '#7E9389' }}>×{s.peso}%</span></span>
                 </div>
-                <div style={{ background: '#f1f5f9', borderRadius: 6, height: 10, overflow: 'hidden' }}>
+                <div style={{ background: '#EAE6D8', borderRadius: 6, height: 10, overflow: 'hidden' }}>
                   <div style={{ height: 10, borderRadius: 6, width: barW, background: sem.color, transition: 'width 0.4s' }} />
                 </div>
               </div>
@@ -202,15 +202,15 @@ export default function IndiceCalidadTab({ cuotas, tickets, incidentes, encuesta
             <div key={s.nombre} style={{ background: '#fff', border: `1px solid ${sem.color}33`, borderRadius: 12, padding: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>{s.nombre}</div>
-                  <div style={{ fontSize: 10, color: '#9ca3af' }}>{s.descripcion}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F' }}>{s.nombre}</div>
+                  <div style={{ fontSize: 10, color: '#7E9389' }}>{s.descripcion}</div>
                 </div>
                 <div style={{ background: sem.bg, color: sem.color, borderRadius: 8, padding: '4px 10px', fontWeight: 800, fontSize: 16 }}>{s.score}</div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {s.componentes.map((c, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', borderBottom: i < s.componentes.length - 1 ? '1px solid #f1f5f9' : undefined }}>
-                    <span style={{ color: '#64748b' }}>{c.label}</span>
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', borderBottom: i < s.componentes.length - 1 ? '1px solid #EAE6D8' : undefined }}>
+                    <span style={{ color: '#7E9389' }}>{c.label}</span>
                     <span style={{ fontWeight: 700, color: c.positivo ? '#16a34a' : '#ef4444' }}>{c.valor}</span>
                   </div>
                 ))}
@@ -220,7 +220,7 @@ export default function IndiceCalidadTab({ cuotas, tickets, incidentes, encuesta
         })}
       </div>
 
-      <div style={{ marginTop: 14, padding: '8px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 11, color: '#6b7280' }}>
+      <div style={{ marginTop: 14, padding: '8px 14px', background: '#FAF7EF', borderRadius: 8, fontSize: 11, color: '#7E9389' }}>
         ℹ️ El índice es calculado en tiempo real sobre los datos actuales. Pesos: Cobro 30% · Mantenimiento 25% · Seguridad 20% · Satisfacción 15% · Cumplimiento 10%.
       </div>
     </div>

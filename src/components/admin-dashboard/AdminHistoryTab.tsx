@@ -70,8 +70,8 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
       accessor: r => r.cliente?.nombre ?? '',
       render: r => (
         <div>
-          <div style={{ fontWeight: 600, color: '#0f172a' }}>{r.cliente?.nombre ?? '—'}</div>
-          <div style={{ fontSize: '12px', color: '#94a3b8' }}>{r.cliente?.codigo ?? ''}</div>
+          <div style={{ fontWeight: 600, color: '#15291F' }}>{r.cliente?.nombre ?? '—'}</div>
+          <div style={{ fontSize: '12px', color: '#7E9389' }}>{r.cliente?.codigo ?? ''}</div>
         </div>
       ),
     },
@@ -82,7 +82,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
       align: 'right',
       accessor: r => r.registro.consumo,
       render: r => (
-        <span style={{ color: '#0ea5e9', fontWeight: 600 }}>
+        <span style={{ color: '#1B3B36', fontWeight: 600 }}>
           {formatNumber(r.registro.consumo)} m³
         </span>
       ),
@@ -106,7 +106,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
       align: 'center',
       accessor: r => r.registro.estado,
       render: r => {
-        const style = ESTADO_STYLES[r.registro.estado] ?? { bg: '#f1f5f9', color: '#475569', label: r.registro.estado }
+        const style = ESTADO_STYLES[r.registro.estado] ?? { bg: '#EAE6D8', color: '#3E5A4C', label: r.registro.estado }
         return (
           <span style={{
             display: 'inline-block',
@@ -141,7 +141,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
           style={{
             padding: '12px 16px',
             borderRadius: '8px',
-            border: '2px solid #e2e8f0',
+            border: '2px solid #E1DDD0',
             fontSize: '14px',
             fontFamily: 'inherit',
           }}
@@ -153,7 +153,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
           style={{
             padding: '12px 16px',
             borderRadius: '8px',
-            border: '2px solid #e2e8f0',
+            border: '2px solid #E1DDD0',
             fontSize: '14px',
             fontFamily: 'inherit',
             background: 'white',
@@ -176,7 +176,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
         <StatCard
           label="Total Registros"
           value={String(stats.total)}
-          bg="#f0f9ff" border="#bae6fd" labelColor="#0369a1" valueColor="#0284c7"
+          bg="#EEF2EC" border="#C2D2CA" labelColor="#102622" valueColor="#102622"
         />
         <StatCard
           label="Consumo Total"

@@ -26,7 +26,7 @@ const CHECKLIST: { key: keyof OnboardingResidente; label: string; icon: string }
 const ESTADO_CONFIG: Record<EstadoOnboarding, { label: string; color: string; bg: string }> = {
   en_proceso: { label: 'En Proceso', color: '#f59e0b', bg: '#fef3c7' },
   completado: { label: 'Completado', color: '#10b981', bg: '#d1fae5' },
-  cancelado:  { label: 'Cancelado',  color: '#64748b', bg: '#f1f5f9' },
+  cancelado:  { label: 'Cancelado',  color: '#7E9389', bg: '#EAE6D8' },
 }
 
 const blank = (): Partial<OnboardingResidente> => ({
@@ -106,7 +106,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
     await Swal.fire({
       icon: 'success', title: '¡Portal activado!',
       html: `<p style="font-size:13px;margin-bottom:8px">Comparte este enlace con el residente:</p>
-             <code style="background:#f1f5f9;padding:6px 10px;border-radius:6px;font-size:12px;word-break:break-all">${url}</code>`,
+             <code style="background:#EAE6D8;padding:6px 10px;border-radius:6px;font-size:12px;word-break:break-all">${url}</code>`,
       confirmButtonText: 'Copiar y cerrar',
     }).then(() => navigator.clipboard.writeText(url).catch(() => {}))
     onRefresh()
@@ -120,8 +120,8 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -136,14 +136,14 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Onboarding de Residentes</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Onboarding de Residentes</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Ingreso</button>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Ingreso</button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Onboarding' : 'Nuevo Ingreso de Residente'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '12px' }}>
             <div>
@@ -175,11 +175,11 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
               </select>
             </div>
           </div>
-          <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', marginBottom: '10px' }}>CHECKLIST</div>
+          <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '8px', border: '1px solid #E1DDD0' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389', marginBottom: '10px' }}>CHECKLIST</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
               {CHECKLIST.map(c => (
-                <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#374151', cursor: 'pointer' }}>
+                <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#3E5A4C', cursor: 'pointer' }}>
                   <input type="checkbox" checked={(form[c.key] as boolean) ?? false} onChange={e => setForm(f => ({ ...f, [c.key]: e.target.checked }))} />
                   {c.icon} {c.label}
                 </label>
@@ -191,8 +191,8 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
             <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '50px' }} value={form.notas ?? ''} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear'}
             </button>
           </div>
@@ -203,16 +203,16 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
         {(['todos', 'en_proceso', 'completado', 'cancelado'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: filtroEstado === e ? '#0ea5e9' : '#e2e8f0',
-              background: filtroEstado === e ? '#e0f2fe' : 'white',
-              color: filtroEstado === e ? '#0ea5e9' : '#64748b' }}>
+              borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0',
+              background: filtroEstado === e ? '#D9E2DC' : 'white',
+              color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
             {e === 'todos' ? `Todos (${onboardings.length})` : `${ESTADO_CONFIG[e as EstadoOnboarding]?.label} (${onboardings.filter(o => o.estado === e).length})`}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>👋</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay procesos de onboarding</p>
         </div>
@@ -222,11 +222,11 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
             const pct = progreso(o)
             const est = ESTADO_CONFIG[o.estado]
             return (
-              <div key={o.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+              <div key={o.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>{o.nombre_residente}</div>
-                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F' }}>{o.nombre_residente}</div>
+                    <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px' }}>
                       {o.tipo === 'propietario' ? '🏠 Propietario' : '🔑 Arrendatario'}
                       {o.unidad_nombre && ` · ${o.unidad_nombre}`}
                       {' · '}{o.fecha_ingreso}
@@ -237,11 +237,11 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
                     {canEdit && o.unidad_id && o.estado === 'completado' && (
                       <button onClick={() => activarPortal(o)}
                         title="Generar enlace del portal para el residente"
-                        style={{ padding: '4px 9px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#2563eb', fontWeight: 600 }}>
+                        style={{ padding: '4px 9px', background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#1B3B36', fontWeight: 600 }}>
                         🔗 Portal
                       </button>
                     )}
-                    {canEdit && <button onClick={() => startEdit(o)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+                    {canEdit && <button onClick={() => startEdit(o)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
                     {canEdit && <button onClick={() => handleDelete(o.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
                   </div>
                 </div>
@@ -249,10 +249,10 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
                 {/* Progress bar */}
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Progreso</span>
+                    <span style={{ fontSize: '11px', color: '#7E9389', fontWeight: 600 }}>Progreso</span>
                     <span style={{ fontSize: '11px', fontWeight: 700, color: pct === 100 ? '#10b981' : '#f59e0b' }}>{pct}%</span>
                   </div>
-                  <div style={{ height: '6px', background: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ height: '6px', background: '#EAE6D8', borderRadius: '3px', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#10b981' : '#f59e0b', borderRadius: '3px', transition: 'width 0.3s' }} />
                   </div>
                 </div>
@@ -263,7 +263,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
                     const done = o[c.key] as boolean
                     return (
                       <button key={c.key} onClick={() => canEdit && toggleCheck(o.id, c.key, done)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 10px', background: done ? '#d1fae5' : '#f8fafc', border: `1.5px solid ${done ? '#10b981' : '#e2e8f0'}`, borderRadius: '8px', fontSize: '12px', cursor: canEdit ? 'pointer' : 'default', textAlign: 'left', fontWeight: done ? 600 : 400, color: done ? '#065f46' : '#64748b' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 10px', background: done ? '#d1fae5' : '#FAF7EF', border: `1.5px solid ${done ? '#10b981' : '#E1DDD0'}`, borderRadius: '8px', fontSize: '12px', cursor: canEdit ? 'pointer' : 'default', textAlign: 'left', fontWeight: done ? 600 : 400, color: done ? '#065f46' : '#7E9389' }}>
                         <span>{done ? '✅' : '⬜'}</span>
                         <span>{c.label}</span>
                       </button>

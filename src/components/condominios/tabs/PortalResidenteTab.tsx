@@ -83,7 +83,7 @@ export function PortalResidenteTab({
   return (
     <div>
       {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg,#1e40af,#1d4ed8)', borderRadius: '16px', padding: '20px 24px', marginBottom: '20px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ background: 'linear-gradient(135deg,#0E2A24,#102622)', borderRadius: '16px', padding: '20px 24px', marginBottom: '20px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <div style={{ fontSize: '22px', fontWeight: 800, marginBottom: '4px' }}>Portal del Residente</div>
           <div style={{ fontSize: '13px', opacity: 0.8 }}>Vista del propietario — selecciona una unidad para gestionar</div>
@@ -94,31 +94,31 @@ export function PortalResidenteTab({
             value={selectedUnidadId}
             onChange={e => { setSelectedUnidadId(e.target.value); setSubTab('cuenta') }}
             style={{ background: 'transparent', border: 'none', color: 'white', fontWeight: 700, fontSize: '14px', cursor: 'pointer', outline: 'none' }}>
-            <option value="" style={{ color: '#0f172a' }}>— Seleccionar —</option>
+            <option value="" style={{ color: '#15291F' }}>— Seleccionar —</option>
             {unidades.map(u => (
-              <option key={u.id} value={u.id} style={{ color: '#0f172a' }}>{u.nombre}</option>
+              <option key={u.id} value={u.id} style={{ color: '#15291F' }}>{u.nombre}</option>
             ))}
           </select>
         </div>
       </div>
 
       {!selectedUnidadId || !unidad ? (
-        <div style={{ textAlign: 'center', padding: '60px 24px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '60px 24px', color: '#7E9389' }}>
           <div style={{ fontSize: '48px', marginBottom: '14px' }}>🏠</div>
-          <div style={{ fontWeight: 700, fontSize: '15px', color: '#64748b', marginBottom: '6px' }}>Selecciona una unidad</div>
+          <div style={{ fontWeight: 700, fontSize: '15px', color: '#7E9389', marginBottom: '6px' }}>Selecciona una unidad</div>
           <div style={{ fontSize: '13px' }}>Elige una unidad del desplegable superior para ver su portal completo</div>
         </div>
       ) : (
         <>
           {/* Sub-tabs */}
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '20px', borderBottom: '2px solid #e2e8f0', paddingBottom: '10px' }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '20px', borderBottom: '2px solid #E1DDD0', paddingBottom: '10px' }}>
             {SUB_TABS.map(t => (
               <button key={t.id} onClick={() => setSubTab(t.id)}
                 style={{
                   padding: '8px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
                   fontSize: '13px', fontWeight: 700,
-                  background: subTab === t.id ? '#2563eb' : '#f1f5f9',
-                  color:      subTab === t.id ? 'white'    : '#64748b',
+                  background: subTab === t.id ? '#1B3B36' : '#EAE6D8',
+                  color:      subTab === t.id ? 'white'    : '#7E9389',
                   display: 'flex', alignItems: 'center', gap: '4px',
                 }}>
                 <span>{t.icon}</span>
@@ -131,7 +131,7 @@ export function PortalResidenteTab({
           </div>
 
           {/* Sub-tab content */}
-          <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '20px' }}>
+          <div style={{ background: '#FAF7EF', borderRadius: '14px', padding: '20px' }}>
             {subTab === 'cuenta' && (
               <PortalMiCuentaTab
                 cuotas={cuotasU}

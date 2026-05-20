@@ -33,12 +33,12 @@ interface Evento {
 }
 
 const TIPO_CFG: Record<TipoEvento, { icon: string; color: string; bg: string; label: string }> = {
-  cuota:        { icon: '💳', color: '#2563eb', bg: '#eff6ff',  label: 'Cuota' },
-  visitante:    { icon: '🚪', color: '#7c3aed', bg: '#f5f3ff',  label: 'Visitante' },
+  cuota:        { icon: '💳', color: '#1B3B36', bg: '#EEF2EC',  label: 'Cuota' },
+  visitante:    { icon: '🚪', color: '#9C5733', bg: '#FAF1EA',  label: 'Visitante' },
   ticket:       { icon: '🔧', color: '#d97706', bg: '#fef3c7',  label: 'Ticket' },
-  reserva:      { icon: '🏊', color: '#0891b2', bg: '#ecfeff',  label: 'Reserva' },
+  reserva:      { icon: '🏊', color: '#102622', bg: '#EEF2EC',  label: 'Reserva' },
   anuncio:      { icon: '📢', color: '#16a34a', bg: '#dcfce7',  label: 'Anuncio' },
-  conciliacion: { icon: '🔄', color: '#374151', bg: '#f8fafc',  label: 'Conciliación' },
+  conciliacion: { icon: '🔄', color: '#3E5A4C', bg: '#FAF7EF',  label: 'Conciliación' },
   fondo:        { icon: '🏦', color: '#059669', bg: '#d1fae5',  label: 'Fondo' },
   infraccion:   { icon: '⚖️', color: '#ef4444', bg: '#fef2f2',  label: 'Infracción' },
   sugerencia:   { icon: '💡', color: '#f59e0b', bg: '#fffbeb',  label: 'Sugerencia' },
@@ -87,7 +87,7 @@ export default function BitacoraActividadTab({
       fecha: fechaEvento(t.created_at),
       unidad: t.unidad_nombre,
       badge: t.prioridad,
-      badgeColor: t.prioridad === 'urgente' ? '#ef4444' : t.prioridad === 'alta' ? '#d97706' : '#6b7280',
+      badgeColor: t.prioridad === 'urgente' ? '#ef4444' : t.prioridad === 'alta' ? '#d97706' : '#7E9389',
     }))
 
     reservas.forEach(r => list.push({
@@ -134,7 +134,7 @@ export default function BitacoraActividadTab({
       fecha: fechaEvento(i.fecha_infraccion),
       unidad: i.unidad_nombre,
       badge: i.estado,
-      badgeColor: i.estado === 'resuelta' ? '#16a34a' : i.estado === 'anulada' ? '#9ca3af' : '#ef4444',
+      badgeColor: i.estado === 'resuelta' ? '#16a34a' : i.estado === 'anulada' ? '#7E9389' : '#ef4444',
     }))
 
     sugerencias.forEach(s => list.push({
@@ -168,16 +168,16 @@ export default function BitacoraActividadTab({
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 2 }}>Bitácora de Actividad</div>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 14 }}>
+      <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F', marginBottom: 2 }}>Bitácora de Actividad</div>
+      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 14 }}>
         {eventos.length.toLocaleString('es')} eventos registrados en el sistema
       </div>
 
       {/* Filtros de tipo */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
         <button onClick={() => { setFiltro('todos'); setPagina(0) }}
-          style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid #d1d5db', fontSize: 11, cursor: 'pointer',
-            background: filtro === 'todos' ? '#0f172a' : '#f8fafc', color: filtro === 'todos' ? '#fff' : '#374151', fontWeight: filtro === 'todos' ? 700 : 400 }}>
+          style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid #C7C2B0', fontSize: 11, cursor: 'pointer',
+            background: filtro === 'todos' ? '#15291F' : '#FAF7EF', color: filtro === 'todos' ? '#fff' : '#3E5A4C', fontWeight: filtro === 'todos' ? 700 : 400 }}>
           Todos ({eventos.length})
         </button>
         {TODOS.map(t => {
@@ -196,19 +196,19 @@ export default function BitacoraActividadTab({
       {/* Búsqueda */}
       <div style={{ marginBottom: 12 }}>
         <input value={busqueda} onChange={e => { setBusqueda(e.target.value); setPagina(0) }}
-          placeholder="Buscar en bitácora..." style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+          placeholder="Buscar en bitácora..." style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
       </div>
 
       {/* Lista de eventos */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', marginBottom: 10 }}>
+      <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden', marginBottom: 10 }}>
         {pagActual.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: '#9ca3af', fontSize: 12 }}>Sin eventos.</div>
+          <div style={{ textAlign: 'center', padding: '32px 0', color: '#7E9389', fontSize: 12 }}>Sin eventos.</div>
         ) : (
           pagActual.map((ev, i) => {
             const cfg = TIPO_CFG[ev.tipo]
             return (
               <div key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px',
-                borderBottom: i < pagActual.length - 1 ? '1px solid #f1f5f9' : undefined }}>
+                borderBottom: i < pagActual.length - 1 ? '1px solid #EAE6D8' : undefined }}>
                 {/* Ícono */}
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: cfg.bg, border: `1px solid ${cfg.color}33`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
@@ -217,21 +217,21 @@ export default function BitacoraActividadTab({
                 {/* Contenido */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{ev.titulo}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#15291F' }}>{ev.titulo}</span>
                     {ev.badge && (
-                      <span style={{ fontSize: 9, fontWeight: 700, color: ev.badgeColor ?? '#6b7280', background: `${ev.badgeColor}1a`, padding: '1px 6px', borderRadius: 10, border: `1px solid ${ev.badgeColor}33` }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: ev.badgeColor ?? '#7E9389', background: `${ev.badgeColor}1a`, padding: '1px 6px', borderRadius: 10, border: `1px solid ${ev.badgeColor}33` }}>
                         {ev.badge}
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
+                  <div style={{ fontSize: 11, color: '#7E9389', marginTop: 1 }}>
                     {ev.detalle}
                     {ev.unidad && <span style={{ marginLeft: 6, color: cfg.color, fontWeight: 600 }}>· {ev.unidad}</span>}
                   </div>
                 </div>
                 {/* Fecha */}
                 <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                  <div style={{ fontSize: 10, color: '#9ca3af' }}>{ev.fecha}</div>
+                  <div style={{ fontSize: 10, color: '#7E9389' }}>{ev.fecha}</div>
                   <div style={{ fontSize: 9, color: cfg.color, fontWeight: 700, marginTop: 1 }}>{cfg.label}</div>
                 </div>
               </div>
@@ -244,12 +244,12 @@ export default function BitacoraActividadTab({
       {paginas > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center' }}>
           <button onClick={() => setPagina(p => Math.max(0, p - 1))} disabled={pagina === 0}
-            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 12, cursor: pagina === 0 ? 'not-allowed' : 'pointer', background: '#fff', opacity: pagina === 0 ? 0.4 : 1 }}>
+            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #C7C2B0', fontSize: 12, cursor: pagina === 0 ? 'not-allowed' : 'pointer', background: '#fff', opacity: pagina === 0 ? 0.4 : 1 }}>
             ‹ Ant.
           </button>
-          <span style={{ fontSize: 11, color: '#6b7280' }}>Pág. {pagina + 1} / {paginas} · {filtrados.length} eventos</span>
+          <span style={{ fontSize: 11, color: '#7E9389' }}>Pág. {pagina + 1} / {paginas} · {filtrados.length} eventos</span>
           <button onClick={() => setPagina(p => Math.min(paginas - 1, p + 1))} disabled={pagina === paginas - 1}
-            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 12, cursor: pagina === paginas - 1 ? 'not-allowed' : 'pointer', background: '#fff', opacity: pagina === paginas - 1 ? 0.4 : 1 }}>
+            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #C7C2B0', fontSize: 12, cursor: pagina === paginas - 1 ? 'not-allowed' : 'pointer', background: '#fff', opacity: pagina === paginas - 1 ? 0.4 : 1 }}>
             Sig. ›
           </button>
         </div>
