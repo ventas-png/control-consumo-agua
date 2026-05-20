@@ -292,7 +292,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
-              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'white',
+              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'var(--at-surface)',
               color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? 'Todos' : e.charAt(0).toUpperCase() + e.slice(1)}
             {e !== 'todos' && ` (${contratos.filter(c => c.estado === e).length})`}
@@ -328,7 +328,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
                 const si = servicioInfo(c.servicio)
                 const vencido = isVencido(c)
                 return (
-                  <tr key={c.id} style={{ borderBottom: '1px solid var(--at-chip)', background: vencido ? '#fff7ed' : 'white' }}>
+                  <tr key={c.id} style={{ borderBottom: '1px solid var(--at-chip)', background: vencido ? '#fff7ed' : 'var(--at-surface)' }}>
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{c.proveedor_nombre}</div>
                       {c.descripcion && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{c.descripcion.slice(0, 50)}{c.descripcion.length > 50 ? '…' : ''}</div>}

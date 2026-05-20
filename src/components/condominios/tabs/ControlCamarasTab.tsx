@@ -129,7 +129,7 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
             </div>
             {canCreate && (
               <button onClick={() => { resetForm(); setEditando(false); setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nueva
               </button>
             )}
@@ -159,7 +159,7 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
           const est = ESTADOS.find(e => e.value === c.estado)
           return (
             <div key={c.id} onClick={() => { setSelected(c); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === c.id ? 'var(--at-accent-tint)' : '#fff', borderLeft: `3px solid ${est?.color}`, opacity: c.activo ? 1 : 0.5 }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === c.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: `3px solid ${est?.color}`, opacity: c.activo ? 1 : 0.5 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 12 }}>{tipo?.icon} {c.codigo} — {c.nombre}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.icon}</span>
@@ -236,7 +236,7 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : `✅ ${editando ? 'Actualizar' : 'Registrar'}`}
               </button>
               <button onClick={() => { setMostrarForm(false); setEditando(false); resetForm() }}

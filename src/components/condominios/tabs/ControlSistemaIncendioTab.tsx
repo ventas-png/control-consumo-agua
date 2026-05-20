@@ -112,7 +112,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
             </div>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nuevo
               </button>
             )}
@@ -147,7 +147,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
           const vencido = r.fecha_vencimiento && new Date(r.fecha_vencimiento) < new Date()
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? '#fef2f2' : '#fff', borderLeft: `3px solid ${vencido ? '#ef4444' : tipo?.color}` }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? '#fef2f2' : 'var(--at-surface)', borderLeft: `3px solid ${vencido ? '#ef4444' : tipo?.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 12 }}>{tipo?.icon} {r.identificador}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: res?.bg, color: res?.color }}>{res?.icon} {res?.label}</span>
@@ -225,7 +225,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Registrar'}
               </button>
               <button onClick={() => setMostrarForm(false)}

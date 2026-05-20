@@ -114,14 +114,14 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
           {(['', 'pendiente', 'aprobado', 'rechazado'] as (EstadoFlujoAprobacion | '')[]).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
               style={{ padding: '4px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: filtroEstado === e ? 700 : 400,
-                background: filtroEstado === e ? 'var(--at-ink)' : '#fff', color: filtroEstado === e ? '#fff' : 'var(--at-ink-2)' }}>
+                background: filtroEstado === e ? 'var(--at-ink)' : 'var(--at-surface)', color: filtroEstado === e ? 'white' : 'var(--at-ink-2)' }}>
               {e === '' ? 'Todas' : ESTADO_CFG[e].label}
             </button>
           ))}
         </div>
         {canCreate && (
           <button onClick={() => setShowForm(s => !s)}
-            style={{ padding: '6px 14px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            style={{ padding: '6px 14px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             {showForm ? '✕ Cancelar' : '+ Nueva solicitud'}
           </button>
         )}
@@ -159,7 +159,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
               style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
           </div>
           <button onClick={crear} disabled={saving}
-            style={{ padding: '8px 18px', background: 'var(--at-primary-hover)', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
+            style={{ padding: '8px 18px', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
             {saving ? 'Enviando…' : 'Enviar solicitud'}
           </button>
         </div>
@@ -203,11 +203,11 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
                   {canEdit && f.estado === 'pendiente' && (
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 10 }}>
                       <button onClick={() => resolver(f, 'aprobado')}
-                        style={{ padding: '5px 12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                        style={{ padding: '5px 12px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
                         ✓ Aprobar
                       </button>
                       <button onClick={() => resolver(f, 'rechazado')}
-                        style={{ padding: '5px 12px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                        style={{ padding: '5px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
                         ✕ Rechazar
                       </button>
                     </div>

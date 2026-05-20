@@ -196,7 +196,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
-              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'white',
+              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'var(--at-surface)',
               color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? `Todos (${servicios.length})` : `${ESTADO_CONFIG[e as EstadoHousekeeping]?.label} (${servicios.filter(s => s.estado === e).length})`}
           </button>
@@ -216,7 +216,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                 <div style={{ height: '1px', flex: 1, background: 'var(--at-line)' }} />
                 <span style={{ fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap',
-                  background: fecha === today ? '#fef3c7' : 'white', padding: '2px 8px', borderRadius: '10px',
+                  background: fecha === today ? '#fef3c7' : 'var(--at-surface)', padding: '2px 8px', borderRadius: '10px',
                   border: `1.5px solid ${fecha === today ? '#fcd34d' : 'var(--at-line)'}`,
                   color: fecha === today ? '#92400e' : 'var(--at-ink-3)' }}>
                   {fecha === today ? '⭐ Hoy' : ''} {fecha}

@@ -204,7 +204,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
               const stStyle = STATUS[st]
               return (
                 <div key={p.id} onClick={() => setSelected(selected === p.id ? null : p.id)}
-                  style={{ background: selected === p.id ? 'var(--at-primary-tint)' : 'white', border: `1.5px solid ${selected === p.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px', cursor: 'pointer', opacity: p.activo ? 1 : 0.6 }}>
+                  style={{ background: selected === p.id ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${selected === p.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px', cursor: 'pointer', opacity: p.activo ? 1 : 0.6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{p.equipo}</div>

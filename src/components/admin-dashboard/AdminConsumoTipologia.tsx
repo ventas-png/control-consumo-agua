@@ -180,7 +180,7 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
                 return (
                   <tr
                     key={p.id}
-                    style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)' }}
+                    style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)' }}
                   >
                     <td style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)', borderBottom: '1px solid var(--at-chip)', whiteSpace: 'nowrap' }}>
                       {p.nombre}

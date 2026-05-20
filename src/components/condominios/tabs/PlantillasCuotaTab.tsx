@@ -185,7 +185,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nueva plantilla'}
           </button>
         )}
@@ -235,12 +235,12 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
             <div style={{ display: 'flex', gap: 8, marginBottom: usarRubros ? 0 : 12 }}>
               <button type="button" onClick={() => setUsarRubros(false)}
                 style={{ padding: '6px 14px', fontSize: 12, border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer',
-                  background: !usarRubros ? 'var(--at-primary)' : 'var(--at-surface-2)', color: !usarRubros ? '#fff' : 'var(--at-ink-2)', fontWeight: !usarRubros ? 700 : 400 }}>
+                  background: !usarRubros ? 'var(--at-primary)' : 'var(--at-surface-2)', color: !usarRubros ? 'white' : 'var(--at-ink-2)', fontWeight: !usarRubros ? 700 : 400 }}>
                 Monto fijo simple
               </button>
               <button type="button" onClick={() => setUsarRubros(true)}
                 style={{ padding: '6px 14px', fontSize: 12, border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer',
-                  background: usarRubros ? 'var(--at-primary)' : 'var(--at-surface-2)', color: usarRubros ? '#fff' : 'var(--at-ink-2)', fontWeight: usarRubros ? 700 : 400 }}>
+                  background: usarRubros ? 'var(--at-primary)' : 'var(--at-surface-2)', color: usarRubros ? 'white' : 'var(--at-ink-2)', fontWeight: usarRubros ? 700 : 400 }}>
                 Rubros desglozados
               </button>
             </div>
@@ -260,7 +260,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
           </div>
 
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Guardar plantilla'}
           </button>
         </div>
@@ -277,7 +277,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
           {plantillas.map(p => {
             const tieneRubros = p.rubros && p.rubros.length > 0
             return (
-              <div key={p.id} style={{ background: p.activa ? '#fff' : 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 14, opacity: p.activa ? 1 : 0.65 }}>
+              <div key={p.id} style={{ background: p.activa ? 'var(--at-surface)' : 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 14, opacity: p.activa ? 1 : 0.65 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)' }}>{p.nombre}</span>
@@ -300,7 +300,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                   {canCreate && p.activa && (
                     <button onClick={() => generarCuotas(p)} disabled={generando === p.id}
-                      style={{ padding: '7px 14px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      style={{ padding: '7px 14px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                       {generando === p.id ? '⏳' : '⚡ Generar'}
                     </button>
                   )}

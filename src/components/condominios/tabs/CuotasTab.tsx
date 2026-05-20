@@ -409,7 +409,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {canEdit && seleccionadas.size > 0 && (
             <button onClick={pagoMasivo}
-              style={{ padding: '10px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+              style={{ padding: '10px 16px', background: '#16a34a', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
               ✅ Pagar {seleccionadas.size} · {moneda} {montoSeleccionado.toFixed(2)}
             </button>
           )}
@@ -448,7 +448,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
         {([['pendiente', 'var(--at-primary)', 'var(--at-primary-tint)'], ['moroso', '#dc2626', '#fef2f2'], ['pagado', '#16a34a', '#f0fdf4']] as const).map(([estado, color, bg]) => (
           <button key={estado} onClick={() => { setFiltroEstado(filtroEstado === estado ? 'todos' : estado); setSeleccionadas(new Set()) }}
-            style={{ padding: '14px', background: filtroEstado === estado ? bg : 'white', border: `1.5px solid ${filtroEstado === estado ? color : 'var(--at-line)'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'left' }}>
+            style={{ padding: '14px', background: filtroEstado === estado ? bg : 'var(--at-surface)', border: `1.5px solid ${filtroEstado === estado ? color : 'var(--at-line)'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'left' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color }}>{moneda} {totales[estado].toFixed(2)}</div>
             <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px', textTransform: 'capitalize' }}>{cuotas.filter(c => c.estado === estado).length} cuotas {estado}s</div>
           </button>

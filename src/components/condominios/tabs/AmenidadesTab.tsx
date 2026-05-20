@@ -1438,7 +1438,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                                       position: 'absolute', left: 6, right: 6,
                                       top: `${top}%`, height: `${Math.max(bottom - top, 4)}%`,
                                       borderRadius: 8, padding: '4px 8px',
-                                      background: pend ? 'white' : `linear-gradient(135deg, ${paleta.bg}, ${paleta.border})`,
+                                      background: pend ? 'var(--at-surface)' : `linear-gradient(135deg, ${paleta.bg}, ${paleta.border})`,
                                       border: `${pend ? '1.5px dashed' : '1px solid'} ${paleta.border}`,
                                       color: paleta.color, cursor: 'pointer',
                                       boxShadow: pend ? 'none' : '0 2px 6px -2px rgba(0,0,0,0.15)',

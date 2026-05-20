@@ -435,7 +435,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                 padding: '8px 14px',
                 border: '1px solid var(--at-line-strong)',
                 borderRadius: '8px',
-                background: view === 'config' ? 'var(--at-primary-tint)' : 'white',
+                background: view === 'config' ? 'var(--at-primary-tint)' : 'var(--at-surface)',
                 color: 'var(--at-ink-2)',
                 fontSize: '13px',
                 cursor: 'pointer',
@@ -840,7 +840,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                         resize: 'none',
                         outline: 'none',
                         fontFamily: 'inherit',
-                        background: isInternalNote ? '#fffbeb' : 'white',
+                        background: isInternalNote ? '#fffbeb' : 'var(--at-surface)',
                       }}
                       onKeyDown={e => {
                         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSendMessage()

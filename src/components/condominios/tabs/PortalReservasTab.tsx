@@ -381,7 +381,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
         {([true, false] as const).map(v => (
           <button key={String(v)} onClick={() => setVistaFutura(v)}
-            style={{ padding: '7px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vistaFutura === v ? 'var(--at-primary)' : 'var(--at-line)', background: vistaFutura === v ? 'var(--at-primary-tint)' : 'white', color: vistaFutura === v ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+            style={{ padding: '7px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vistaFutura === v ? 'var(--at-primary)' : 'var(--at-line)', background: vistaFutura === v ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: vistaFutura === v ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {v ? `📅 Próximas (${futuras.length})` : `📋 Historial (${pasadas.length})`}
           </button>
         ))}

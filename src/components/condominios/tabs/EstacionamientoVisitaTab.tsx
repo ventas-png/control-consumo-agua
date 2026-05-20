@@ -108,7 +108,7 @@ export default function EstacionamientoVisitaTab({
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Registrar entrada'}
           </button>
         )}
@@ -154,7 +154,7 @@ export default function EstacionamientoVisitaTab({
             <input style={inp} placeholder="Observaciones opcionales" value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} />
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Registrar entrada'}
           </button>
         </div>
@@ -196,7 +196,7 @@ export default function EstacionamientoVisitaTab({
                   </div>
                   {canEdit && (
                     <button onClick={() => registrarSalida(r.id, r.placa)}
-                      style={{ padding: '6px 12px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                       Registrar salida
                     </button>
                   )}

@@ -134,14 +134,14 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(['', 'planificado', 'en_progreso', 'pausado', 'completado', 'cancelado'] as (EstadoProyectoCond | '')[]).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
-              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-primary-hover)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-primary-tint)' : '#fff', color: filtroEstado === e ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>
+              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-primary-hover)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: filtroEstado === e ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>
               {e === '' ? 'Todos' : ESTADO_CFG[e].label}
             </button>
           ))}
         </div>
         {canCreate && (
           <button onClick={mostrarForm && !editId ? cancelar : abrirNuevo}
-            style={{ padding: '8px 16px', background: 'var(--at-primary-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm && !editId ? '✕ Cancelar' : '+ Nuevo proyecto'}
           </button>
         )}
@@ -203,7 +203,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={guardar} disabled={saving}
-              style={{ padding: '8px 20px', background: 'var(--at-primary-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+              style={{ padding: '8px 20px', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
               {saving ? 'Guardando…' : editId ? '💾 Actualizar' : '✅ Crear proyecto'}
             </button>
             <button onClick={cancelar} style={{ padding: '8px 16px', background: 'var(--at-chip)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
@@ -226,7 +226,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
               const sobrePresupuesto = p.presupuesto && p.costo_real && p.costo_real > p.presupuesto
               return (
                 <div key={p.id} onClick={() => setSelected(p === selected ? null : p)}
-                  style={{ background: selected?.id === p.id ? 'var(--at-primary-tint)' : '#fff', border: `1.5px solid ${selected?.id === p.id ? 'var(--at-primary-hover)' : 'var(--at-line)'}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === p.id ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${selected?.id === p.id ? 'var(--at-primary-hover)' : 'var(--at-line)'}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                     <div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 3 }}>

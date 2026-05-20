@@ -40,7 +40,7 @@ export function ConversationList({ conversations, activeId, onSelect, filter, un
             style={{
               width: '100%', textAlign: 'left', padding: '12px 14px',
               border: 'none', borderBottom: '1px solid var(--at-chip)',
-              background: isActive ? 'var(--at-primary-tint)' : isUnseen ? '#fffbeb' : 'white',
+              background: isActive ? 'var(--at-primary-tint)' : isUnseen ? '#fffbeb' : 'var(--at-surface)',
               cursor: 'pointer', transition: 'background 0.12s',
               display: 'flex', flexDirection: 'column', gap: '4px',
             }}

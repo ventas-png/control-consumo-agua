@@ -185,7 +185,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
             </thead>
             <tbody>
               {sorted.map((c, i) => (
-                <tr key={c.id} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
+                <tr key={c.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
                   <td style={{ padding: '10px 12px', fontWeight: 700 }}>{c.periodo}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--at-ink-3)' }}>{moneda} {c.total_cuotas_emitidas.toFixed(2)}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>{moneda} {c.total_cuotas_cobradas.toFixed(2)}</td>

@@ -179,7 +179,7 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
           <button key={String(v)} onClick={() => setFiltroVigente(v)}
             style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               borderColor: filtroVigente === v ? 'var(--at-primary)' : 'var(--at-line)',
-              background: filtroVigente === v ? 'var(--at-primary-soft)' : 'white',
+              background: filtroVigente === v ? 'var(--at-primary-soft)' : 'var(--at-surface)',
               color: filtroVigente === v ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {v === 'todos' ? 'Todos' : v ? 'Vigentes' : 'Histórico'}
           </button>

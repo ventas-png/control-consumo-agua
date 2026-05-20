@@ -194,7 +194,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
         <button onClick={() => setFiltroEstado('todos')}
           style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
             borderColor: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-line)',
-            background: filtroEstado === 'todos' ? 'var(--at-primary-soft)' : 'white',
+            background: filtroEstado === 'todos' ? 'var(--at-primary-soft)' : 'var(--at-surface)',
             color: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
           Todos ({objetos.length})
         </button>
@@ -204,7 +204,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
             <button key={k} onClick={() => setFiltroEstado(k)}
               style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
                 borderColor: filtroEstado === k ? v.color : 'var(--at-line)',
-                background: filtroEstado === k ? v.bg : 'white',
+                background: filtroEstado === k ? v.bg : 'var(--at-surface)',
                 color: filtroEstado === k ? v.color : 'var(--at-ink-3)' }}>
               {v.label} ({count})
             </button>

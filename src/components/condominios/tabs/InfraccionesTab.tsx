@@ -109,12 +109,12 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
       {/* Filtro estado */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => setFiltroEstado('todos')}
-          style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEstado === 'todos' ? 'var(--at-primary-tint)' : 'white', color: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+          style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEstado === 'todos' ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
           Todas ({infracciones.length})
         </button>
         {(Object.entries(ESTADO_CONFIG) as [EstadoInfraccion, typeof ESTADO_CONFIG[EstadoInfraccion]][]).map(([e, cfg]) => (
           <button key={e} onClick={() => setFiltroEstado(e)}
-            style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? cfg.color : 'var(--at-line)', background: filtroEstado === e ? cfg.bg : 'white', color: filtroEstado === e ? cfg.color : 'var(--at-ink-3)' }}>
+            style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? cfg.color : 'var(--at-line)', background: filtroEstado === e ? cfg.bg : 'var(--at-surface)', color: filtroEstado === e ? cfg.color : 'var(--at-ink-3)' }}>
             {cfg.label} ({infracciones.filter(i => i.estado === e).length})
           </button>
         ))}

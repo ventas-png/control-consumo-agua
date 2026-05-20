@@ -221,7 +221,7 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
           <div style={{ fontWeight: 700, fontSize: 12, color: '#92400e', marginBottom: 8 }}>💡 Acciones recomendadas</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {recomendaciones.map((r, i) => (
-              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '5px 8px', background: r.prioridad === 'alta' ? '#fef2f2' : '#fff', borderRadius: 7, border: `1px solid ${r.prioridad === 'alta' ? '#fecaca' : 'var(--at-line)'}` }}>
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '5px 8px', background: r.prioridad === 'alta' ? '#fef2f2' : 'var(--at-surface)', borderRadius: 7, border: `1px solid ${r.prioridad === 'alta' ? '#fecaca' : 'var(--at-line)'}` }}>
                 <span style={{ fontSize: 14 }}>{r.icono}</span>
                 <span style={{ fontSize: 11, color: r.prioridad === 'alta' ? '#b91c1c' : 'var(--at-ink-2)', fontWeight: r.prioridad === 'alta' ? 700 : 500 }}>{r.texto}</span>
                 {r.prioridad === 'alta' && <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, background: '#fef2f2', color: '#ef4444', padding: '1px 5px', borderRadius: 4, border: '1px solid #fecaca' }}>URGENTE</span>}

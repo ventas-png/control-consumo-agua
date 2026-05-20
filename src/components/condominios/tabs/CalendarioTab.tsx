@@ -225,7 +225,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
                   style={{
                     minHeight: '70px', padding: '6px', borderRight: (idx + 1) % 7 !== 0 ? '1px solid var(--at-chip)' : 'none',
                     borderBottom: '1px solid var(--at-chip)', cursor: day ? 'pointer' : 'default',
-                    background: isSelected ? 'var(--at-primary-tint)' : isToday ? '#fefce8' : day ? 'white' : 'var(--at-surface-2)',
+                    background: isSelected ? 'var(--at-primary-tint)' : isToday ? '#fefce8' : day ? 'var(--at-surface)' : 'var(--at-surface-2)',
                   }}>
                   {day && (
                     <>

@@ -119,7 +119,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
             <span style={{ fontWeight: 600, fontSize: 14 }}>Actividades ({lista.length})</span>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nueva
               </button>
             )}
@@ -142,7 +142,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
           const disp = disponibilidad(a)
           return (
             <div key={a.id} onClick={() => { setSelected(a); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === a.id ? 'var(--at-accent-tint)' : '#fff', borderLeft: `3px solid ${cat?.color}` }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === a.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: `3px solid ${cat?.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {a.nombre}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.label}</span>
@@ -222,7 +222,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
                 <div style={{ display: 'flex', gap: 6 }}>
                   {DIAS.map(d => (
                     <button key={d} type="button" onClick={() => toggleDia(d)}
-                      style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: form.dias_semana.includes(d) ? 'var(--at-accent)' : '#fff', color: form.dias_semana.includes(d) ? '#fff' : 'var(--at-ink-2)', borderColor: form.dias_semana.includes(d) ? 'var(--at-accent)' : 'var(--at-line-strong)' }}>
+                      style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: form.dias_semana.includes(d) ? 'var(--at-accent)' : 'var(--at-surface)', color: form.dias_semana.includes(d) ? 'white' : 'var(--at-ink-2)', borderColor: form.dias_semana.includes(d) ? 'var(--at-accent)' : 'var(--at-line-strong)' }}>
                       {DIAS_LABEL[d]}
                     </button>
                   ))}
@@ -235,7 +235,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Crear actividad'}
               </button>
               <button onClick={() => setMostrarForm(false)}

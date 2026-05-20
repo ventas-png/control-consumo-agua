@@ -307,7 +307,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               onClick={() => setTab(t.id)}
               style={{
                 padding: '10px 16px', whiteSpace: 'nowrap',
-                background: tab === t.id ? 'white' : 'transparent',
+                background: tab === t.id ? 'var(--at-surface)' : 'transparent',
                 color: tab === t.id ? 'var(--at-accent-hover)' : 'rgba(255,255,255,0.85)',
                 border: 'none', borderRadius: '10px 10px 0 0',
                 fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',

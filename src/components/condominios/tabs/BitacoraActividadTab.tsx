@@ -177,7 +177,7 @@ export default function BitacoraActividadTab({
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
         <button onClick={() => { setFiltro('todos'); setPagina(0) }}
           style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--at-line-strong)', fontSize: 11, cursor: 'pointer',
-            background: filtro === 'todos' ? 'var(--at-ink)' : 'var(--at-surface-2)', color: filtro === 'todos' ? '#fff' : 'var(--at-ink-2)', fontWeight: filtro === 'todos' ? 700 : 400 }}>
+            background: filtro === 'todos' ? 'var(--at-ink)' : 'var(--at-surface-2)', color: filtro === 'todos' ? 'white' : 'var(--at-ink-2)', fontWeight: filtro === 'todos' ? 700 : 400 }}>
           Todos ({eventos.length})
         </button>
         {TODOS.map(t => {
@@ -186,7 +186,7 @@ export default function BitacoraActividadTab({
           return (
             <button key={t} onClick={() => { setFiltro(t); setPagina(0) }}
               style={{ padding: '4px 10px', borderRadius: 20, border: `1px solid ${cfg.color}44`, fontSize: 11, cursor: 'pointer',
-                background: activo ? cfg.color : cfg.bg, color: activo ? '#fff' : cfg.color, fontWeight: activo ? 700 : 400 }}>
+                background: activo ? cfg.color : cfg.bg, color: activo ? 'white' : cfg.color, fontWeight: activo ? 700 : 400 }}>
               {cfg.icon} {cfg.label} ({conteosPorTipo[t]})
             </button>
           )

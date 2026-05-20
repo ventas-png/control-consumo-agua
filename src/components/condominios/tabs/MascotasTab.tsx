@@ -122,7 +122,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
           style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-surface-2)' }} />
         {(['todos', 'perro', 'gato', 'ave', 'otro'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEspecie(e)}
-            style={{ padding: '7px 13px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEspecie === e ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEspecie === e ? 'var(--at-primary-tint)' : 'white', color: filtroEspecie === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+            style={{ padding: '7px 13px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEspecie === e ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEspecie === e ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: filtroEspecie === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? 'Todas' : `${ESPECIE_ICON[e]} ${e.charAt(0).toUpperCase() + e.slice(1)}`}
           </button>
         ))}

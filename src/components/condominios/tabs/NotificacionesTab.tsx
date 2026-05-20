@@ -196,7 +196,7 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
           {reglas.map(r => {
             const canal = CANAL_LABELS[r.canal]
             return (
-              <div key={r.id} style={{ background: r.activo ? 'white' : 'var(--at-surface-2)', border: `1.5px solid ${r.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '10px', padding: '12px 14px' }}>
+              <div key={r.id} style={{ background: r.activo ? 'var(--at-surface)' : 'var(--at-surface-2)', border: `1.5px solid ${r.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '10px', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                   <div style={{ fontSize: '20px' }}>{canal.icon}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>

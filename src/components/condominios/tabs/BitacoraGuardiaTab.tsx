@@ -106,7 +106,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
           <span style={{ fontWeight: 600, fontSize: 14 }}>Bitácoras ({registros.length})</span>
           {canCreate && (
             <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-              style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+              style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
               + Nuevo turno
             </button>
           )}
@@ -118,7 +118,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
           const turno = TURNOS.find(t => t.value === b.turno)
           return (
             <div key={b.id} onClick={() => { setSelected(b); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === b.id ? 'var(--at-accent-tint)' : '#fff' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === b.id ? 'var(--at-accent-tint)' : 'var(--at-surface)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{b.fecha}</span>
                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: b.estado === 'cerrado' ? 'var(--at-chip)' : '#fef3c7', color: b.estado === 'cerrado' ? 'var(--at-ink-3)' : '#92400e' }}>
@@ -168,7 +168,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
               {novedades.map((n, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', background: 'var(--at-surface)', borderRadius: 6, marginBottom: 6, border: '1px solid var(--at-line)' }}>
                   <div>
-                    <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 8, background: TIPOS_NOV.find(t => t.value === n.tipo)?.color, color: '#fff', marginRight: 6 }}>{n.tipo}</span>
+                    <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 8, background: TIPOS_NOV.find(t => t.value === n.tipo)?.color, color: 'white', marginRight: 6 }}>{n.tipo}</span>
                     <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>{n.hora}</span>
                     <span style={{ fontSize: 13, marginLeft: 8 }}>{n.descripcion}</span>
                   </div>
@@ -181,7 +181,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
                 <select style={inp} value={novForm.tipo} onChange={e => setNovForm(p => ({ ...p, tipo: e.target.value as TipoNovedadGuardia }))}>
                   {TIPOS_NOV.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
-                <button onClick={addNovedad} style={{ padding: '7px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>+ Agregar</button>
+                <button onClick={addNovedad} style={{ padding: '7px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>+ Agregar</button>
               </div>
             </div>
             <div style={{ marginBottom: 12 }}>
@@ -190,7 +190,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Guardar turno'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -214,7 +214,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
               </div>
               {canEdit && selected.estado === 'abierto' && (
                 <button onClick={() => cerrarTurno(selected)}
-                  style={{ padding: '7px 14px', background: 'var(--at-ink)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                  style={{ padding: '7px 14px', background: 'var(--at-ink)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                   🔒 Cerrar turno
                 </button>
               )}
@@ -227,7 +227,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
                 const tipo = TIPOS_NOV.find(t => t.value === n.tipo)
                 return (
                   <div key={i} style={{ padding: '8px 10px', background: 'var(--at-surface)', borderRadius: 6, marginBottom: 6, border: `1px solid ${tipo?.color}30`, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <span style={{ padding: '2px 8px', borderRadius: 10, background: tipo?.color, color: '#fff', fontSize: 11, flexShrink: 0 }}>{tipo?.label}</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 10, background: tipo?.color, color: 'white', fontSize: 11, flexShrink: 0 }}>{tipo?.label}</span>
                     <span style={{ fontSize: 12, color: 'var(--at-ink-3)', flexShrink: 0 }}>{n.hora}</span>
                     <span style={{ fontSize: 13 }}>{n.descripcion}</span>
                   </div>
@@ -241,7 +241,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
                     {TIPOS_NOV.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                   <button onClick={() => agregarNovedadDetalle(selected)}
-                    style={{ padding: '7px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ padding: '7px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                     + Agregar
                   </button>
                 </div>

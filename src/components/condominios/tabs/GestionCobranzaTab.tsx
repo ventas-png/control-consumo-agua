@@ -180,7 +180,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
               <button onClick={exportarXlsx} disabled={cobranzas.length === 0} style={{ padding: '4px 8px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>📊</button>
               {canCreate && (
                 <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                  style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                  style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                   + Nueva
                 </button>
               )}
@@ -213,7 +213,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
           const pendiente = c.monto_adeudado - c.monto_pagado
           return (
             <div key={c.id} onClick={() => { setSelected(c); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === c.id ? 'var(--at-accent-tint)' : '#fff' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === c.id ? 'var(--at-accent-tint)' : 'var(--at-surface)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{c.responsable}</span>
                 <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: etapa?.bg, color: etapa?.color }}>{etapa?.label}</span>
@@ -270,7 +270,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Crear'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -301,16 +301,16 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     {siguienteEtapa && (
                       <button onClick={() => avanzarEtapa(selected)}
-                        style={{ padding: '7px 12px', background: '#f97316', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                        style={{ padding: '7px 12px', background: '#f97316', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                         ↑ {ETAPAS.find(e => e.value === siguienteEtapa)?.label}
                       </button>
                     )}
                     <button onClick={() => actualizarMontos(selected)}
-                      style={{ padding: '7px 12px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '7px 12px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       💰 Montos
                     </button>
                     <button onClick={() => marcarResuelto(selected)}
-                      style={{ padding: '7px 12px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '7px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ✅ Resolver
                     </button>
                   </div>
@@ -340,7 +340,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
                     const activa = selected.etapa === e.value
                     const pasada = i < etapasIdx
                     return (
-                      <span key={e.value} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 8, background: activa ? e.bg : pasada ? 'var(--at-chip)' : '#fff', color: activa ? e.color : pasada ? 'var(--at-ink-3)' : 'var(--at-line-strong)', border: `1px solid ${activa ? e.color : 'var(--at-line)'}`, fontWeight: activa ? 700 : 400 }}>
+                      <span key={e.value} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 8, background: activa ? e.bg : pasada ? 'var(--at-chip)' : 'var(--at-surface)', color: activa ? e.color : pasada ? 'var(--at-ink-3)' : 'var(--at-line-strong)', border: `1px solid ${activa ? e.color : 'var(--at-line)'}`, fontWeight: activa ? 700 : 400 }}>
                         {e.label}
                       </span>
                     )
@@ -375,7 +375,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 8 }}>
                     <input style={inp} placeholder="Siguiente acción (opcional)" value={contactoForm.siguiente_accion} onChange={e => setContactoForm(p => ({ ...p, siguiente_accion: e.target.value }))} />
                     <button onClick={() => registrarContacto(selected)}
-                      style={{ padding: '7px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '7px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                       + Agregar
                     </button>
                   </div>

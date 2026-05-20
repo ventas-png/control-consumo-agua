@@ -85,7 +85,7 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
             {(['categorias', 'meses'] as const).map(v => (
               <button key={v} onClick={() => setVista(v)}
                 style={{ padding: '6px 14px', border: 'none', cursor: 'pointer', fontSize: 12,
-                  background: vista === v ? 'var(--at-primary)' : 'transparent', color: vista === v ? '#fff' : 'var(--at-ink-2)', fontWeight: vista === v ? 700 : 400 }}>
+                  background: vista === v ? 'var(--at-primary)' : 'transparent', color: vista === v ? 'white' : 'var(--at-ink-2)', fontWeight: vista === v ? 700 : 400 }}>
                 {v === 'categorias' ? 'Por categoría' : 'Por mes'}
               </button>
             ))}

@@ -98,7 +98,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
           <span style={{ fontWeight: 600, fontSize: 14 }}>Registros ({registros.length})</span>
           {canCreate && (
             <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-              style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+              style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
               + Nuevo
             </button>
           )}
@@ -118,7 +118,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
           const diasProx = diasParaProxima(r.proxima_visita)
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-accent-tint)' : '#fff' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-accent-tint)' : 'var(--at-surface)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
                 <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: res?.color + '20', color: res?.color }}>{res?.label}</span>
@@ -195,7 +195,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                 {AREAS_COMUNES.map(a => (
                   <button key={a} type="button" onClick={() => toggleArea(a)}
-                    style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: areasSeleccionadas.includes(a) ? 'var(--at-accent)' : '#fff', color: areasSeleccionadas.includes(a) ? '#fff' : 'var(--at-ink-2)', borderColor: areasSeleccionadas.includes(a) ? 'var(--at-accent)' : 'var(--at-line-strong)' }}>
+                    style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: areasSeleccionadas.includes(a) ? 'var(--at-accent)' : 'var(--at-surface)', color: areasSeleccionadas.includes(a) ? 'white' : 'var(--at-ink-2)', borderColor: areasSeleccionadas.includes(a) ? 'var(--at-accent)' : 'var(--at-line-strong)' }}>
                     {a}
                   </button>
                 ))}
@@ -217,7 +217,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Guardar'}
               </button>
               <button onClick={() => { setMostrarForm(false); setAreasSeleccionadas([]) }}

@@ -213,7 +213,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
           <button key={f} onClick={() => setFiltroTurno(f)}
             style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '11px', cursor: 'pointer',
               borderColor: filtroTurno === f ? 'var(--at-primary)' : 'var(--at-line)',
-              background: filtroTurno === f ? 'var(--at-primary-soft)' : 'white',
+              background: filtroTurno === f ? 'var(--at-primary-soft)' : 'var(--at-surface)',
               color: filtroTurno === f ? 'var(--at-primary-hover)' : 'var(--at-ink-3)',
               fontWeight: filtroTurno === f ? 700 : 500 }}>
             {f === 'todos' ? 'Todos' : `${TURNO_STYLE[f]?.icon} ${TURNO_STYLE[f]?.label}`}
@@ -286,7 +286,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {canEdit && (
                     <button onClick={() => toggleFirmado(selected)}
-                      style={{ padding: '4px 9px', background: selected.firmado ? '#dcfce7' : 'white', border: `1px solid ${selected.firmado ? '#86efac' : 'var(--at-line)'}`, borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600, color: selected.firmado ? '#16a34a' : 'var(--at-ink-3)' }}>
+                      style={{ padding: '4px 9px', background: selected.firmado ? '#dcfce7' : 'var(--at-surface)', border: `1px solid ${selected.firmado ? '#86efac' : 'var(--at-line)'}`, borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600, color: selected.firmado ? '#16a34a' : 'var(--at-ink-3)' }}>
                       {selected.firmado ? '✓ Firmado' : 'Firmar'}
                     </button>
                   )}

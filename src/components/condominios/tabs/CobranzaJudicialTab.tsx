@@ -116,14 +116,14 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
         <div style={{ display: 'flex', gap: 6 }}>
           {(['', 'activo', 'resuelto', 'archivado'] as (EstadoCobranzaJudicial | '')[]).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
-              style={{ padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#ef4444' : 'var(--at-line)', background: filtroEstado === e ? '#fef2f2' : '#fff', color: filtroEstado === e ? '#ef4444' : 'var(--at-ink-3)' }}>
+              style={{ padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#ef4444' : 'var(--at-line)', background: filtroEstado === e ? '#fef2f2' : 'var(--at-surface)', color: filtroEstado === e ? '#ef4444' : 'var(--at-ink-3)' }}>
               {e === '' ? 'Todos' : ESTADO_CFG[e].label}
             </button>
           ))}
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nuevo caso'}
           </button>
         )}
@@ -169,7 +169,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear caso'}
           </button>
         </div>
@@ -191,7 +191,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
               const unidad = unidades.find(u => u.id === c.unidad_id)
               return (
                 <div key={c.id} onClick={() => setSelected(c === selected ? null : c)}
-                  style={{ background: selected?.id === c.id ? '#fff5f5' : '#fff', border: `1.5px solid ${selected?.id === c.id ? '#ef4444' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === c.id ? '#fff5f5' : 'var(--at-surface)', border: `1.5px solid ${selected?.id === c.id ? '#ef4444' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                     <div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
@@ -249,7 +249,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
                   {selected.etapa !== 'ejecutado' && selected.etapa !== 'archivado' && (
                     <button onClick={() => avanzarEtapa(selected)}
-                      style={{ padding: '7px 0', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '7px 0', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ▶ Avanzar etapa
                     </button>
                   )}

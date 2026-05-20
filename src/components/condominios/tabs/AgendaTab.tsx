@@ -246,7 +246,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
           <button key={v.id} onClick={() => setVistaMode(v.id)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               borderColor: vistaMode === v.id ? 'var(--at-primary)' : 'var(--at-line)',
-              background: vistaMode === v.id ? 'var(--at-primary-soft)' : 'white',
+              background: vistaMode === v.id ? 'var(--at-primary-soft)' : 'var(--at-surface)',
               color: vistaMode === v.id ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {v.label}
           </button>

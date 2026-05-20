@@ -103,7 +103,7 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
     toast.success('Configuración guardada')
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', color: 'var(--at-ink)', background: canEdit ? 'white' : 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', color: 'var(--at-ink)', background: canEdit ? 'var(--at-surface)' : 'var(--at-surface-2)', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>

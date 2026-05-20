@@ -179,7 +179,7 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
           <button key={t} onClick={() => setFiltroTipo(t)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               borderColor: filtroTipo === t ? 'var(--at-primary)' : 'var(--at-line)',
-              background: filtroTipo === t ? 'var(--at-primary-soft)' : 'white',
+              background: filtroTipo === t ? 'var(--at-primary-soft)' : 'var(--at-surface)',
               color: filtroTipo === t ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {t === 'todos' ? `Todas (${memorias.length})` : `${TIPO_PERIODO.find(x => x.value === t)?.label} (${memorias.filter(m => m.tipo_periodo === t).length})`}
           </button>
@@ -197,7 +197,7 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {filtered.map(m => (
               <div key={m.id} onClick={() => setSelected(selected?.id === m.id ? null : m)}
-                style={{ background: selected?.id === m.id ? 'var(--at-primary-soft)' : 'white', border: `1.5px solid ${selected?.id === m.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '14px', cursor: 'pointer' }}>
+                style={{ background: selected?.id === m.id ? 'var(--at-primary-soft)' : 'var(--at-surface)', border: `1.5px solid ${selected?.id === m.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '14px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{m.titulo}</div>

@@ -125,7 +125,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
             <span style={{ fontWeight: 600, fontSize: 14 }}>Suministros</span>
             {canCreate && (
               <button onClick={() => { setVista('nuevo'); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nuevo
               </button>
             )}
@@ -153,7 +153,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
           const alerta = s.stock_actual <= s.stock_minimo
           return (
             <div key={s.id} onClick={() => { setSelected(s); setVista('lista') }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? 'var(--at-accent-tint)' : '#fff', opacity: s.activo ? 1 : 0.5, borderLeft: alerta ? '3px solid #f59e0b' : '3px solid transparent' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', opacity: s.activo ? 1 : 0.5, borderLeft: alerta ? '3px solid #f59e0b' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {s.nombre}</span>
                 <span style={{ fontWeight: 700, fontSize: 14, color: alerta ? '#ef4444' : '#10b981' }}>
@@ -217,7 +217,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Guardar'}
               </button>
               <button onClick={() => setVista('lista')}
@@ -265,7 +265,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={registrarMovimiento} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Registrar'}
               </button>
               <button onClick={() => setVista('lista')}
@@ -292,7 +292,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
               {canEdit && (
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setVista('movimiento')}
-                    style={{ padding: '7px 14px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                    style={{ padding: '7px 14px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                     + Movimiento
                   </button>
                   <button onClick={() => toggleActivo(selected)}

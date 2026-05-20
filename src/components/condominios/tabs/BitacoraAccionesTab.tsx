@@ -43,7 +43,7 @@ export default function BitacoraAccionesTab({ bitacora }: Props) {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
           {resumenAcciones.map(({ accion, count, cfg }) => (
             <button key={accion} onClick={() => setFiltroAccion(filtroAccion === accion ? '' : accion)}
-              style={{ padding: '8px 14px', borderRadius: 10, border: `1.5px solid ${filtroAccion === accion ? cfg.color : 'var(--at-line)'}`, background: filtroAccion === accion ? cfg.bg : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              style={{ padding: '8px 14px', borderRadius: 10, border: `1.5px solid ${filtroAccion === accion ? cfg.color : 'var(--at-line)'}`, background: filtroAccion === accion ? cfg.bg : 'var(--at-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 14 }}>{cfg.icon}</span>
               <div style={{ textAlign: 'left' }}>
                 <div style={{ fontSize: 16, fontWeight: 700, color: cfg.color, lineHeight: 1 }}>{count}</div>

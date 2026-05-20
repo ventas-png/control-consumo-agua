@@ -120,7 +120,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
                 {(Object.entries(TIPO_CFG) as [TipoMov, typeof TIPO_CFG[TipoMov]][]).map(([t, cfg]) => (
                   <button key={t} onClick={() => setForm(f => ({ ...f, tipo: t }))}
                     style={{ padding: '4px 10px', borderRadius: 8, border: `1px solid ${cfg.color}44`, fontSize: 11, cursor: 'pointer',
-                      background: form.tipo === t ? cfg.bg : '#fff', color: cfg.color, fontWeight: form.tipo === t ? 700 : 400 }}>
+                      background: form.tipo === t ? cfg.bg : 'var(--at-surface)', color: cfg.color, fontWeight: form.tipo === t ? 700 : 400 }}>
                     {cfg.label}
                   </button>
                 ))}
@@ -148,7 +148,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
             </div>
 
             <button onClick={guardar} disabled={saving}
-              style={{ width: '100%', padding: '9px 0', background: TIPO_CFG[form.tipo].color, color: '#fff',
+              style={{ width: '100%', padding: '9px 0', background: TIPO_CFG[form.tipo].color, color: 'white',
                 border: 'none', borderRadius: 8, cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 13, opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : `+ Registrar ${TIPO_CFG[form.tipo].label}`}
             </button>

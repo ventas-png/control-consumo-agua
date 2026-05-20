@@ -127,7 +127,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
         </span>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nueva campaña'}
           </button>
         )}
@@ -167,7 +167,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
             </div>
           </div>
           <button onClick={crear} disabled={saving}
-            style={{ padding: '8px 20px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear campaña'}
           </button>
         </div>
@@ -188,7 +188,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
               const pct = c.total_destinatarios > 0 ? Math.round((c.enviadas / c.total_destinatarios) * 100) : 0
               return (
                 <div key={c.id} onClick={() => setSelected(c === selected ? null : c)}
-                  style={{ background: selected?.id === c.id ? 'var(--at-accent-tint-2)' : '#fff', border: `1.5px solid ${selected?.id === c.id ? 'var(--at-accent-light)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === c.id ? 'var(--at-accent-tint-2)' : 'var(--at-surface)', border: `1.5px solid ${selected?.id === c.id ? 'var(--at-accent-light)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                     <div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
@@ -205,7 +205,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
                     </div>
                     {c.estado === 'borrador' && canEdit && (
                       <button onClick={e => { e.stopPropagation(); enviar(c) }}
-                        style={{ padding: '6px 12px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                        style={{ padding: '6px 12px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                         🚀 Enviar
                       </button>
                     )}
@@ -244,7 +244,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
               <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
                 {selected.estado === 'enviada' && canEdit && (
                   <button onClick={() => completar(selected.id)}
-                    style={{ flex: 1, padding: '7px 0', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ flex: 1, padding: '7px 0', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     ✅ Completar
                   </button>
                 )}

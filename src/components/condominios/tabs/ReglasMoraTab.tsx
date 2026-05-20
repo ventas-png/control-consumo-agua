@@ -102,7 +102,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
         </span>
         {canCreate && (
           <button onClick={mostrarForm ? cancelar : abrirNueva}
-            style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm && !editId ? '✕ Cancelar' : '+ Nueva regla'}
           </button>
         )}
@@ -148,7 +148,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={guardar} disabled={saving}
-              style={{ padding: '8px 20px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+              style={{ padding: '8px 20px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
               {saving ? 'Guardando…' : editId ? '💾 Actualizar' : '✅ Crear regla'}
             </button>
             <button onClick={cancelar} style={{ padding: '8px 16px', background: 'var(--at-chip)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancelar</button>

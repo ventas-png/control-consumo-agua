@@ -194,7 +194,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
-              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'white',
+              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'var(--at-surface)',
               color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? `Todos (${personal.length})` : `${ESTADO_CONFIG[e as EstadoPersonal]?.label ?? e} (${personal.filter(p => p.estado === e).length})`}
           </button>

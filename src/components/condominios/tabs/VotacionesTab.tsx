@@ -193,7 +193,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
               const ec = ESTADO_COLORS[v.estado] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' }
               return (
                 <div key={v.id} onClick={() => setSelected(selected === v.id ? null : v.id)}
-                  style={{ background: selected === v.id ? 'var(--at-primary-tint)' : 'white', border: `1.5px solid ${selected === v.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px', cursor: 'pointer' }}>
+                  style={{ background: selected === v.id ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${selected === v.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)', marginBottom: '2px' }}>{v.titulo}</div>

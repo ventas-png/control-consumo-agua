@@ -147,7 +147,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         {(['todos', 'programada', 'en_curso', 'finalizada', 'cancelada'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
-            style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-primary-tint)' : 'white', color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+            style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? 'Todas' : ESTADO_CONFIG[e as EstadoAsamblea].label}
           </button>
         ))}
@@ -327,7 +327,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                                     <button key={v} onClick={() => registrarVoto(p.id, u.id, v)}
                                       style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: '1px solid',
                                         borderColor: votosMap[u.id] === v ? VOTO_CONFIG[v].color : 'var(--at-line)',
-                                        background: votosMap[u.id] === v ? VOTO_CONFIG[v].bg : 'white',
+                                        background: votosMap[u.id] === v ? VOTO_CONFIG[v].bg : 'var(--at-surface)',
                                         color: votosMap[u.id] === v ? VOTO_CONFIG[v].color : 'var(--at-ink-3)' }}>
                                       {v === 'a_favor' ? '✓' : v === 'en_contra' ? '✗' : '—'}
                                     </button>

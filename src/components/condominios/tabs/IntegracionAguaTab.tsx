@@ -161,7 +161,7 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
       {canCreate && conGenerables.length > 0 && (
         <div style={{ marginBottom: 14 }}>
           <button onClick={() => { setShowGenerar(!showGenerar); setSeleccionadas(new Set(conGenerables.map(r => r.contador_id))) }}
-            style={{ padding: '8px 18px', background: showGenerar ? 'var(--at-chip)' : 'var(--at-primary)', color: showGenerar ? 'var(--at-ink-2)' : '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            style={{ padding: '8px 18px', background: showGenerar ? 'var(--at-chip)' : 'var(--at-primary)', color: showGenerar ? 'var(--at-ink-2)' : 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             {showGenerar ? '✕ Cancelar' : '💧 Generar cuotas de agua'}
           </button>
         </div>
@@ -214,7 +214,7 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
           )}
 
           <button onClick={generarCuotasAgua} disabled={generando || tarifaNum <= 0 || seleccionadas.size === 0}
-            style={{ padding: '9px 20px', background: generando || tarifaNum <= 0 || seleccionadas.size === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: generando || tarifaNum <= 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600 }}>
+            style={{ padding: '9px 20px', background: generando || tarifaNum <= 0 || seleccionadas.size === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: generando || tarifaNum <= 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600 }}>
             {generando ? '⏳ Generando…' : `💧 Generar ${seleccionadas.size} cuota${seleccionadas.size !== 1 ? 's' : ''}`}
           </button>
         </div>

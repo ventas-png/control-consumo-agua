@@ -69,7 +69,7 @@ export function AdminQuickActions({ onNavigate }: Props) {
             }}
             onMouseLeave={(e) => {
               const el = e.currentTarget
-              el.style.background = 'white'
+              el.style.background = 'var(--at-surface)'
               el.style.transform = 'translateY(0)'
               el.style.boxShadow = 'none'
             }}

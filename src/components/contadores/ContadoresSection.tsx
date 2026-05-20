@@ -613,7 +613,7 @@ export function ContadoresSection({
                 key={r.value}
                 onClick={() => setFilterTipo(filterTipo === r.value ? '' : r.value as TipoAgua)}
                 style={{
-                  background: filterTipo === r.value ? col.bg : 'white',
+                  background: filterTipo === r.value ? col.bg : 'var(--at-surface)',
                   border: `2px solid ${filterTipo === r.value ? col.color : 'var(--at-line)'}`,
                   borderRadius: '12px',
                   padding: '12px 18px',

@@ -195,14 +195,14 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
 
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <button onClick={() => setFiltroEstado('todos')} style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEstado === 'todos' ? 'var(--at-primary-soft)' : 'white', color: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+        <button onClick={() => setFiltroEstado('todos')} style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEstado === 'todos' ? 'var(--at-primary-soft)' : 'var(--at-surface)', color: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
           Todas ({propuestas.length})
         </button>
         {(Object.entries(ESTADO_CONFIG) as [EstadoPropuesta, typeof ESTADO_CONFIG[EstadoPropuesta]][]).map(([k, v]) => {
           const cnt = propuestas.filter(p => p.estado === k).length
           if (cnt === 0) return null
           return (
-            <button key={k} onClick={() => setFiltroEstado(k)} style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroEstado === k ? v.color : 'var(--at-line)', background: filtroEstado === k ? v.bg : 'white', color: filtroEstado === k ? v.color : 'var(--at-ink-3)' }}>
+            <button key={k} onClick={() => setFiltroEstado(k)} style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroEstado === k ? v.color : 'var(--at-line)', background: filtroEstado === k ? v.bg : 'var(--at-surface)', color: filtroEstado === k ? v.color : 'var(--at-ink-3)' }}>
               {v.label} ({cnt})
             </button>
           )

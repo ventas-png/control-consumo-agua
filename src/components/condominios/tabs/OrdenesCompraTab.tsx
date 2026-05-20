@@ -119,7 +119,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
           const cfg = ESTADO_CFG[e]
           return (
             <div key={e} onClick={() => setFiltroEstado(filtroEstado === e ? '' : e)}
-              style={{ background: filtroEstado === e ? cfg.bg : '#fff', border: `1.5px solid ${filtroEstado === e ? cfg.color : 'var(--at-line)'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', textAlign: 'center' }}>
+              style={{ background: filtroEstado === e ? cfg.bg : 'var(--at-surface)', border: `1.5px solid ${filtroEstado === e ? cfg.color : 'var(--at-line)'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: cfg.color }}>{totalesPorEstado[e]}</div>
               <div style={{ fontSize: 10, color: cfg.color, fontWeight: 600 }}>{cfg.label}</div>
             </div>
@@ -134,7 +134,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
         </div>
         {canCreate && (
           <button onClick={abrirNueva}
-            style={{ padding: '6px 14px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            style={{ padding: '6px 14px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             + Nueva OC
           </button>
         )}
@@ -184,7 +184,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={guardar} disabled={saving}
-              style={{ padding: '8px 18px', background: 'var(--at-primary-hover)', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
+              style={{ padding: '8px 18px', background: 'var(--at-primary-hover)', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : 'Guardar como borrador'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}

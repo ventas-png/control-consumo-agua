@@ -80,7 +80,7 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
 
   const BTN = (active: boolean) => ({
     padding: '5px 14px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: 'pointer',
-    background: active ? 'var(--at-ink)' : '#fff', color: active ? '#fff' : 'var(--at-ink-2)', fontWeight: active ? 700 : 400,
+    background: active ? 'var(--at-ink)' : 'var(--at-surface)', color: active ? 'white' : 'var(--at-ink-2)', fontWeight: active ? 700 : 400,
   })
 
   return (
@@ -217,7 +217,7 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
                           minWidth: 24,
                         }}
                           title={`${t.titulo} · ${inicio} → ${fin} (${duracion} días)`}>
-                          <span style={{ fontSize: 9, color: '#fff', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: 9, color: 'white', fontWeight: 700, whiteSpace: 'nowrap' }}>
                             {duracion}d
                           </span>
                         </div>

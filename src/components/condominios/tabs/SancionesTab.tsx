@@ -157,7 +157,7 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
           <button key={f} onClick={() => setFiltro(f)}
             style={{ padding: '5px 12px', border: '1.5px solid', borderRadius: '20px', fontSize: '12px', fontWeight: filtro === f ? 700 : 500, cursor: 'pointer',
               borderColor: filtro === f ? 'var(--at-primary)' : 'var(--at-line)',
-              background: filtro === f ? 'var(--at-primary-soft)' : 'white',
+              background: filtro === f ? 'var(--at-primary-soft)' : 'var(--at-surface)',
               color: filtro === f ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>
             {f === 'todos' ? 'Todos' : ESTADO[f]?.label ?? f}
           </button>
@@ -181,7 +181,7 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
                 const est = ESTADO[s.estado]
                 const vencida = s.estado === 'pendiente' && s.fecha_vencimiento && s.fecha_vencimiento < today
                 return (
-                  <tr key={s.id} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
+                  <tr key={s.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>{s.unidad_nombre ?? '—'}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--at-ink-2)' }}>{s.concepto}</td>
                     <td style={{ padding: '10px 12px', fontWeight: 700, color: '#ef4444' }}>{moneda} {s.monto.toFixed(2)}</td>

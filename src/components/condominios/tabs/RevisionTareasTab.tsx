@@ -121,7 +121,7 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
             return (
               <div key={bloque.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${isOpen ? 'var(--at-accent)' : 'var(--at-line)'}`, borderRadius: '16px', overflow: 'hidden' }}>
                 {/* Header del bloque */}
-                <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', background: isOpen ? 'var(--at-accent-tint)' : 'white' }}
+                <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', background: isOpen ? 'var(--at-accent-tint)' : 'var(--at-surface)' }}
                   onClick={() => setBloqueAbierto(isOpen ? null : bloque.id)}>
                   <span style={{ fontSize: '22px' }}>🔍</span>
                   <div style={{ flex: 1, minWidth: 0 }}>

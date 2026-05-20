@@ -82,7 +82,7 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
 
   const INPUT = (disabled = false) => ({
     width: '100%', padding: '7px 10px', borderRadius: 8,
-    border: '1px solid var(--at-line-strong)', fontSize: 13, background: disabled ? 'var(--at-surface-2)' : '#fff',
+    border: '1px solid var(--at-line-strong)', fontSize: 13, background: disabled ? 'var(--at-surface-2)' : 'var(--at-surface)',
     outline: 'none', color: 'var(--at-ink)',
   })
 
@@ -99,7 +99,7 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
         </div>
         {canEdit && (
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: 'var(--at-ink)', color: '#fff', border: 'none', borderRadius: 8,
+            style={{ padding: '8px 20px', background: 'var(--at-ink)', color: 'white', border: 'none', borderRadius: 8,
               cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 13, opacity: saving ? 0.7 : 1 }}>
             {saving ? 'Guardando…' : '💾 Guardar cambios'}
           </button>
@@ -132,7 +132,7 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
                 <button key={m} onClick={() => canEdit && toggleMetodo(m)} disabled={!canEdit}
                   style={{ padding: '4px 10px', borderRadius: 20, border: '1px solid var(--at-line-strong)', fontSize: 11, cursor: canEdit ? 'pointer' : 'default',
                     background: form.metodos_pago.includes(m) ? 'var(--at-ink)' : 'var(--at-surface-2)',
-                    color: form.metodos_pago.includes(m) ? '#fff' : 'var(--at-ink-2)', fontWeight: form.metodos_pago.includes(m) ? 700 : 400 }}>
+                    color: form.metodos_pago.includes(m) ? 'white' : 'var(--at-ink-2)', fontWeight: form.metodos_pago.includes(m) ? 700 : 400 }}>
                   {m.replace('_', ' ')}
                 </button>
               ))}
@@ -181,7 +181,7 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
                 <button key={String(v)} onClick={() => canEdit && setForm(f => ({ ...f, permitir_reservas_online: v }))} disabled={!canEdit}
                   style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: canEdit ? 'pointer' : 'default',
                     background: form.permitir_reservas_online === v ? 'var(--at-ink)' : 'var(--at-surface-2)',
-                    color: form.permitir_reservas_online === v ? '#fff' : 'var(--at-ink-2)', fontWeight: form.permitir_reservas_online === v ? 700 : 400 }}>
+                    color: form.permitir_reservas_online === v ? 'white' : 'var(--at-ink-2)', fontWeight: form.permitir_reservas_online === v ? 700 : 400 }}>
                   {v ? '✅ Habilitado' : '❌ Deshabilitado'}
                 </button>
               ))}

@@ -161,7 +161,7 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
             const unidad = unidades.find(u => u.id === p.unidad_id)
             return (
               <div key={p.id} onClick={() => { setSelected(p); setShowForm(false) }}
-                style={{ padding: '12px 14px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === p.id ? 'var(--at-primary-tint)' : 'white', borderLeft: selected?.id === p.id ? '3px solid var(--at-primary)' : '3px solid transparent' }}>
+                style={{ padding: '12px 14px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === p.id ? 'var(--at-primary-tint)' : 'var(--at-surface)', borderLeft: selected?.id === p.id ? '3px solid var(--at-primary)' : '3px solid transparent' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)', display: 'flex', gap: '6px', alignItems: 'center' }}>

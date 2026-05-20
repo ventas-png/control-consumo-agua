@@ -54,7 +54,7 @@ export function RubrosBuilder({ rubros, onChange, disabled, moneda = '' }: Props
           <button
             type="button"
             onClick={agregar}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', fontSize: 12, fontWeight: 600, background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', fontSize: 12, fontWeight: 600, background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer' }}
           >
             <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Agregar rubro
           </button>
@@ -81,7 +81,7 @@ export function RubrosBuilder({ rubros, onChange, disabled, moneda = '' }: Props
             return (
               <div
                 key={idx}
-                style={{ display: 'grid', gridTemplateColumns: '2fr 130px 150px 32px', gap: 0, alignItems: 'center', borderBottom: idx < rubros.length - 1 ? '1px solid var(--at-chip)' : 'none', padding: '8px 10px', background: idx % 2 === 0 ? '#fff' : 'var(--at-surface-2)' }}
+                style={{ display: 'grid', gridTemplateColumns: '2fr 130px 150px 32px', gap: 0, alignItems: 'center', borderBottom: idx < rubros.length - 1 ? '1px solid var(--at-chip)' : 'none', padding: '8px 10px', background: idx % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)' }}
               >
                 {/* Nombre */}
                 <input
@@ -90,7 +90,7 @@ export function RubrosBuilder({ rubros, onChange, disabled, moneda = '' }: Props
                   onChange={e => actualizar(idx, 'nombre', e.target.value)}
                   disabled={disabled}
                   placeholder="Ej: Mantenimiento, Seguro…"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 13, border: '1px solid var(--at-line)', borderRadius: 6, background: disabled ? 'var(--at-surface-2)' : '#fff', outline: 'none', marginRight: 8 }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 13, border: '1px solid var(--at-line)', borderRadius: 6, background: disabled ? 'var(--at-surface-2)' : 'var(--at-surface)', outline: 'none', marginRight: 8 }}
                 />
 
                 {/* Método */}
@@ -116,7 +116,7 @@ export function RubrosBuilder({ rubros, onChange, disabled, moneda = '' }: Props
                     onChange={e => actualizar(idx, 'valor', parseFloat(e.target.value) || 0)}
                     disabled={disabled}
                     placeholder={VALOR_PLACEHOLDER[r.metodo]}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '6px 6px', fontSize: 13, border: '1px solid var(--at-line)', borderRadius: 6, background: disabled ? 'var(--at-surface-2)' : '#fff', textAlign: 'right' }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '6px 6px', fontSize: 13, border: '1px solid var(--at-line)', borderRadius: 6, background: disabled ? 'var(--at-surface-2)' : 'var(--at-surface)', textAlign: 'right' }}
                   />
                 </div>
 

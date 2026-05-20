@@ -103,12 +103,12 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
       {/* Filtros tipo */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => setFiltroTipo('todos')}
-          style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroTipo === 'todos' ? 'var(--at-primary)' : 'var(--at-line)', background: filtroTipo === 'todos' ? 'var(--at-primary-tint)' : 'white', color: filtroTipo === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+          style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroTipo === 'todos' ? 'var(--at-primary)' : 'var(--at-line)', background: filtroTipo === 'todos' ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: filtroTipo === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
           Todos
         </button>
         {(Object.entries(TIPO_CONFIG) as [TipoAnuncio, typeof TIPO_CONFIG[TipoAnuncio]][]).map(([tipo, cfg]) => (
           <button key={tipo} onClick={() => setFiltroTipo(tipo)}
-            style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroTipo === tipo ? cfg.color : 'var(--at-line)', background: filtroTipo === tipo ? cfg.bg : 'white', color: filtroTipo === tipo ? cfg.color : 'var(--at-ink-3)' }}>
+            style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroTipo === tipo ? cfg.color : 'var(--at-line)', background: filtroTipo === tipo ? cfg.bg : 'var(--at-surface)', color: filtroTipo === tipo ? cfg.color : 'var(--at-ink-3)' }}>
             {cfg.icon} {cfg.label}
           </button>
         ))}

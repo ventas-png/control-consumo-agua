@@ -149,7 +149,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
             {(Object.keys(TIPO_LABELS) as TipoComunicado[]).map(t => (
               <button key={t} onClick={() => applyTemplate(t)}
                 style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
-                  background: form.tipo === t ? 'var(--at-ink)' : 'white',
+                  background: form.tipo === t ? 'var(--at-ink)' : 'var(--at-surface)',
                   color: form.tipo === t ? 'white' : 'var(--at-ink-3)',
                   borderColor: form.tipo === t ? 'var(--at-ink)' : 'var(--at-line)' }}>
                 {TIPO_LABELS[t].icon} {TIPO_LABELS[t].label}
@@ -215,7 +215,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
         {(['all',...Object.keys(TIPO_LABELS)] as const).map(t => (
           <button key={t} onClick={() => setFiltroTipo(t as TipoComunicado | 'all')}
             style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
-              background: filtroTipo === t ? 'var(--at-ink)' : 'white',
+              background: filtroTipo === t ? 'var(--at-ink)' : 'var(--at-surface)',
               color: filtroTipo === t ? 'white' : 'var(--at-ink-3)',
               borderColor: filtroTipo === t ? 'var(--at-ink)' : 'var(--at-line)' }}>
             {t === 'all' ? 'Todos' : TIPO_LABELS[t as TipoComunicado].label}
@@ -234,7 +234,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
                 const tl = TIPO_LABELS[c.tipo]
                 return (
                   <div key={c.id} onClick={() => setSelectedId(selectedId === c.id ? null : c.id)}
-                    style={{ background: selectedId === c.id ? 'var(--at-primary-tint)' : 'white', border: `1.5px solid ${selectedId === c.id ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderLeft: `4px solid ${tl.color}`, borderRadius: '8px', padding: '12px 14px', cursor: 'pointer' }}>
+                    style={{ background: selectedId === c.id ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${selectedId === c.id ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderLeft: `4px solid ${tl.color}`, borderRadius: '8px', padding: '12px 14px', cursor: 'pointer' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{tl.icon} {c.titulo}</div>

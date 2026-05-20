@@ -35,7 +35,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
             />
             {i === maxVisible - 1 && extra > 0 && (
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>+{extra}</span>
+                <span style={{ color: 'white', fontWeight: 700, fontSize: 13 }}>+{extra}</span>
               </div>
             )}
           </div>
@@ -53,7 +53,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
           {/* Close */}
           <button
             onClick={() => setLightbox(null)}
-            style={{ position: 'absolute', top: 18, right: 22, background: 'none', border: 'none', color: '#fff', fontSize: 28, cursor: 'pointer', lineHeight: 1 }}>
+            style={{ position: 'absolute', top: 18, right: 22, background: 'none', border: 'none', color: 'white', fontSize: 28, cursor: 'pointer', lineHeight: 1 }}>
             ×
           </button>
 
@@ -61,7 +61,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
           {urls.length > 1 && (
             <button
               onClick={e => { e.stopPropagation(); prev() }}
-              style={{ position: 'absolute', left: 20, background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 22, borderRadius: 8, padding: '10px 14px', cursor: 'pointer' }}>
+              style={{ position: 'absolute', left: 20, background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', fontSize: 22, borderRadius: 8, padding: '10px 14px', cursor: 'pointer' }}>
               ‹
             </button>
           )}
@@ -78,7 +78,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
           {urls.length > 1 && (
             <button
               onClick={e => { e.stopPropagation(); next() }}
-              style={{ position: 'absolute', right: 20, background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 22, borderRadius: 8, padding: '10px 14px', cursor: 'pointer' }}>
+              style={{ position: 'absolute', right: 20, background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', fontSize: 22, borderRadius: 8, padding: '10px 14px', cursor: 'pointer' }}>
               ›
             </button>
           )}

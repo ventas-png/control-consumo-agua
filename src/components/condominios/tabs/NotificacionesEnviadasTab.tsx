@@ -51,7 +51,7 @@ export default function NotificacionesEnviadasTab({ notificaciones, unidades }: 
             const cfg = CANAL_CFG[canal]
             return (
               <button key={canal} onClick={() => setFiltroCanal(filtroCanal === canal ? '' : canal)}
-                style={{ padding: '10px 16px', borderRadius: 10, border: `1.5px solid ${filtroCanal === canal ? cfg.color : 'var(--at-line)'}`, background: filtroCanal === canal ? cfg.bg : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                style={{ padding: '10px 16px', borderRadius: 10, border: `1.5px solid ${filtroCanal === canal ? cfg.color : 'var(--at-line)'}`, background: filtroCanal === canal ? cfg.bg : 'var(--at-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 18 }}>{cfg.icon}</span>
                 <div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: cfg.color }}>{count}</div>

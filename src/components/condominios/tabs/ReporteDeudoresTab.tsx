@@ -108,7 +108,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={exportarExcelDeudores}
-            style={{ padding: '6px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            style={{ padding: '6px 14px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             📊 Excel
           </button>
           <button onClick={exportarCSV}

@@ -484,7 +484,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
-              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'white',
+              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'var(--at-surface)',
               color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? `Todas (${reservasSTR.length})` : `${ESTADO_CONFIG[e as EstadoSTR]?.label} (${reservasSTR.filter(r => r.estado === e).length})`}
           </button>

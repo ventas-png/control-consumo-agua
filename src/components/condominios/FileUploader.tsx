@@ -107,7 +107,7 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
           </div>
           {signedUrl && (
             <a href={signedUrl} target="_blank" rel="noreferrer"
-              style={{ padding: '4px 10px', background: '#16a34a', color: '#fff', borderRadius: '6px', fontSize: '11px', fontWeight: 600, textDecoration: 'none' }}>
+              style={{ padding: '4px 10px', background: '#16a34a', color: 'white', borderRadius: '6px', fontSize: '11px', fontWeight: 600, textDecoration: 'none' }}>
               Ver
             </a>
           )}

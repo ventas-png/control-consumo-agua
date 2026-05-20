@@ -80,7 +80,7 @@ function InputField({
             border: '1.5px solid var(--at-line)',
             borderRadius: '8px',
             fontSize: '14px',
-            background: disabled ? 'var(--at-surface-2)' : 'white',
+            background: disabled ? 'var(--at-surface-2)' : 'var(--at-surface)',
             color: disabled ? 'var(--at-ink-3)' : 'var(--at-ink)',
             boxSizing: 'border-box',
             outline: 'none',

@@ -139,7 +139,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
                 }} style={{
                   flex: 1, padding: '10px', borderRadius: '8px',
                   border: tipoAplicacion === val ? '2px solid var(--at-primary)' : '2px solid var(--at-line)',
-                  background: tipoAplicacion === val ? 'var(--at-primary-tint)' : 'white',
+                  background: tipoAplicacion === val ? 'var(--at-primary-tint)' : 'var(--at-surface)',
                   color: tipoAplicacion === val ? 'var(--at-primary-hover)' : 'var(--at-ink-2)',
                   fontWeight: tipoAplicacion === val ? 700 : 500,
                   fontSize: '13px', cursor: 'pointer',

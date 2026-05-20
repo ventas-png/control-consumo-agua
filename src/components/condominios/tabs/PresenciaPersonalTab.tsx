@@ -91,7 +91,7 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Registrar persona'}
           </button>
         )}
@@ -148,7 +148,7 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
             <input style={inp} placeholder="Opcional" value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Guardar'}
           </button>
         </div>
@@ -190,7 +190,7 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
                   <div style={{ display: 'flex', gap: 6 }}>
                     {!r.hora_salida && r.estado === 'presente' && (
                       <button onClick={() => registrarSalida(r.id)}
-                        style={{ padding: '5px 10px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                        style={{ padding: '5px 10px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                         Registrar salida
                       </button>
                     )}

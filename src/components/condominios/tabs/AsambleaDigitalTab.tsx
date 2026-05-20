@@ -157,7 +157,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         {(['lista', 'acta'] as const).map(t => (
           <button key={t} onClick={() => setSubTab(t)}
-            style={{ padding: '5px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: subTab === t ? 700 : 400, background: subTab === t ? 'var(--at-primary)' : 'var(--at-chip)', color: subTab === t ? '#fff' : 'var(--at-ink-2)', fontSize: 13 }}>
+            style={{ padding: '5px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: subTab === t ? 700 : 400, background: subTab === t ? 'var(--at-primary)' : 'var(--at-chip)', color: subTab === t ? 'white' : 'var(--at-ink-2)', fontSize: 13 }}>
             {t === 'lista' ? 'Asambleas' : actaAsamblea ? `Acta — ${actaAsamblea.titulo.slice(0, 20)}…` : 'Acta'}
           </button>
         ))}
@@ -177,7 +177,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
           />
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={guardarActa} disabled={savingActa}
-              style={{ padding: '8px 20px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+              style={{ padding: '8px 20px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
               {savingActa ? 'Guardando…' : '💾 Guardar acta'}
             </button>
             <button onClick={() => imprimirActa({ ...actaAsamblea, acta_url: actaTexto })}
@@ -193,7 +193,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
             <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)' }}>Asambleas Digitales</div>
             {canCreate && !showForm && (
               <button onClick={() => setShowForm(true)}
-                style={{ padding: '7px 16px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+                style={{ padding: '7px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
                 + Nueva asamblea
               </button>
             )}
@@ -261,7 +261,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button onClick={guardar} disabled={saving}
-                  style={{ padding: '8px 20px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                  style={{ padding: '8px 20px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
                   {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear asamblea'}
                 </button>
                 <button onClick={resetForm} style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer' }}>Cancelar</button>

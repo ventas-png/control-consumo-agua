@@ -181,7 +181,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
               </div>
             </div>
             <button onClick={generarQR}
-              style={{ width: '100%', padding: '9px 0', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+              style={{ width: '100%', padding: '9px 0', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
               📱 Generar código QR
             </button>
           </div>
@@ -206,7 +206,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                 </div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
                   <button onClick={guardarPreAutorizacion} disabled={registrando}
-                    style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                    style={{ padding: '8px 16px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
                     {registrando ? 'Guardando…' : '✓ Guardar pre-autorización'}
                   </button>
                   <button onClick={() => setQrGenerado(null)}
@@ -233,7 +233,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                 placeholder="Escribe o escanea el token (ej: AB3X7Y9Z)"
                 style={{ flex: 1, padding: '10px 12px', border: '1.5px solid var(--at-line-strong)', borderRadius: 8, fontSize: 14, letterSpacing: 2, fontFamily: 'monospace', boxSizing: 'border-box' }} />
               <button onClick={validarToken}
-                style={{ padding: '10px 16px', background: 'var(--at-ink)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                style={{ padding: '10px 16px', background: 'var(--at-ink)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
                 Validar
               </button>
             </div>
@@ -254,7 +254,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                 )}
                 {resultadoValidacion.ok && !resultadoValidacion.visitante?.hora_entrada && (
                   <button onClick={registrarEntradaDesdeQR} disabled={registrando}
-                    style={{ width: '100%', padding: '8px 0', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                    style={{ width: '100%', padding: '8px 0', background: '#16a34a', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
                     {registrando ? 'Registrando…' : '🚪 Registrar entrada'}
                   </button>
                 )}

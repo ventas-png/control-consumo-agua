@@ -153,7 +153,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
             <button key={t} onClick={() => setFiltroTipo(t)}
               style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid',
                 borderColor: filtroTipo === t ? 'var(--at-primary)' : 'var(--at-line)',
-                background: filtroTipo === t ? 'var(--at-primary-tint)' : 'white',
+                background: filtroTipo === t ? 'var(--at-primary-tint)' : 'var(--at-surface)',
                 color: filtroTipo === t ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
               {t === 'todos' ? 'Todos' : t === 'residente' ? '🏠 Residentes' : '👷 Personal'}
             </button>
@@ -228,7 +228,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
                 <div key={i} style={{
                   minHeight: '76px', padding: '5px 4px',
                   borderRight: '1px solid var(--at-chip)', borderBottom: '1px solid var(--at-chip)',
-                  background: hoyFlag ? 'var(--at-primary-tint)' : lista.length > 0 ? 'var(--at-surface-2)' : 'white',
+                  background: hoyFlag ? 'var(--at-primary-tint)' : lista.length > 0 ? 'var(--at-surface-2)' : 'var(--at-surface)',
                 }}>
                   {d && (
                     <>

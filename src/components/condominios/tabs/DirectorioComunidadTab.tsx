@@ -104,7 +104,7 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
         <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)' }}>Directorio de la Comunidad</div>
         <button onClick={exportarCSV}
-          style={{ padding: '6px 14px', background: 'var(--at-ink)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+          style={{ padding: '6px 14px', background: 'var(--at-ink)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
           📥 Exportar CSV
         </button>
       </div>
@@ -136,7 +136,7 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
           return (
             <button key={f} onClick={() => setFiltro(f)}
               style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${cfg.color}44`, fontSize: 11, cursor: 'pointer',
-                background: activo ? cfg.color : cfg.bg, color: activo ? '#fff' : cfg.color, fontWeight: activo ? 700 : 400 }}>
+                background: activo ? cfg.color : cfg.bg, color: activo ? 'white' : cfg.color, fontWeight: activo ? 700 : 400 }}>
               {cfg.label}
             </button>
           )

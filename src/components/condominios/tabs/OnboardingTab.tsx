@@ -204,7 +204,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
-              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'white',
+              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'var(--at-surface)',
               color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? `Todos (${onboardings.length})` : `${ESTADO_CONFIG[e as EstadoOnboarding]?.label} (${onboardings.filter(o => o.estado === e).length})`}
           </button>

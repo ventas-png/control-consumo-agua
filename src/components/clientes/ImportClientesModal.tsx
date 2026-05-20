@@ -383,7 +383,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
   }
   const btnPrimary: CSSProperties = {
     padding: '10px 22px', background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
-    color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600,
+    color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600,
     fontSize: '14px', cursor: 'pointer',
   }
   const btnSecondary: CSSProperties = {

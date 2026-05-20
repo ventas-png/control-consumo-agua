@@ -166,7 +166,7 @@ function NuevoComunicadoModal({
     padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px',
     fontWeight: 600, cursor: 'pointer', border: 'none',
     background: active ? 'var(--at-primary)' : 'var(--at-chip)',
-    color: active ? '#fff' : 'var(--at-ink-2)',
+    color: active ? 'white' : 'var(--at-ink-2)',
     transition: 'all 0.13s ease',
   })
 
