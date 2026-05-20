@@ -7,6 +7,7 @@ import { SecureImage } from '../shared/SecureImage'
 import { useSignedUrl } from '../../lib/storageUrls'
 import { CustomerPaymentsTab } from './CustomerPaymentsTab'
 import { CustomerComunicacion } from './CustomerComunicacion'
+import { BrandLogo } from '../shared/BrandLogo'
 
 interface Props {
   currentUser: UserSession
@@ -1095,12 +1096,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           gap: '12px', flexWrap: 'wrap',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '38px', height: '38px', borderRadius: '10px',
-              background: 'rgba(255,255,255,0.2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '20px',
-            }}>💧</div>
+            <div style={{ width: '38px', height: '38px', lineHeight: 0, flexShrink: 0 }}>
+              <BrandLogo size={38} />
+            </div>
             <div>
               <div style={{ color: 'white', fontWeight: 700, fontSize: '16px' }}>
                 {currentUser.name}
