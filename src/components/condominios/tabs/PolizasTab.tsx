@@ -133,7 +133,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
 
   const tipoInfo = (t: TipoPoliza) => TIPOS.find(x => x.value === t) ?? TIPOS[TIPOS.length - 1]
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   return (
@@ -154,7 +154,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
           {primaTotal > 0 && <span style={{ fontSize: '12px', color: '#7E9389' }}>Prima anual vigente: <strong style={{ color: '#1B3B36' }}>{moneda} {primaTotal.toFixed(2)}</strong></span>}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={exportarPDF} disabled={polizas.length === 0} style={{ padding: '7px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid #C2D2CA', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
+          <button onClick={exportarPDF} disabled={polizas.length === 0} style={{ padding: '7px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
           <button onClick={exportarXlsx} disabled={polizas.length === 0} style={{ padding: '7px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
           {canCreate && !showForm && (
             <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
@@ -165,7 +165,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Póliza' : 'Nueva Póliza'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: '12px' }}>
             <div>
@@ -230,7 +230,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear Póliza'}
             </button>
@@ -260,7 +260,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: '#FAF7EF', borderBottom: '2px solid #E1DDD0' }}>
+              <tr style={{ background: '#FAF7EF', borderBottom: '2px solid var(--at-line)' }}>
                 {['Póliza', 'Tipo', 'Suma Asegurada', 'Prima Anual', 'Vigencia', 'Estado', ''].map(h => (
                   <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#7E9389', fontSize: '12px' }}>{h}</th>
                 ))}
@@ -274,7 +274,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
                   ? Math.ceil((new Date(p.fecha_vencimiento).getTime() - Date.now()) / (24 * 3600 * 1000))
                   : null
                 return (
-                  <tr key={p.id} style={{ borderBottom: '1px solid #EAE6D8' }}>
+                  <tr key={p.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ fontWeight: 700, color: '#15291F' }}>{p.numero_poliza}</div>
                       <div style={{ fontSize: '12px', color: '#7E9389' }}>{p.aseguradora}</div>
@@ -302,7 +302,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
                     <td style={{ padding: '10px 12px' }}>
                       {canEdit ? (
                         <select value={p.estado} onChange={e => handleEstado(p.id, e.target.value as EstadoPoliza)}
-                          style={{ padding: '4px 8px', border: '1.5px solid #E1DDD0', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'white', cursor: 'pointer' }}>
+                          style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'white', cursor: 'pointer' }}>
                           {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                         </select>
                       ) : (

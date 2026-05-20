@@ -82,11 +82,11 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
 
   const INPUT = (disabled = false) => ({
     width: '100%', padding: '7px 10px', borderRadius: 8,
-    border: '1px solid #C7C2B0', fontSize: 13, background: disabled ? '#FAF7EF' : '#fff',
+    border: '1px solid var(--at-line-strong)', fontSize: 13, background: disabled ? '#FAF7EF' : '#fff',
     outline: 'none', color: '#15291F',
   })
 
-  const SECTION = { background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, marginBottom: 14 }
+  const SECTION = { background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, marginBottom: 14 }
 
   return (
     <div style={{ padding: 16 }}>
@@ -130,7 +130,7 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {METODOS_DISPONIBLES.map(m => (
                 <button key={m} onClick={() => canEdit && toggleMetodo(m)} disabled={!canEdit}
-                  style={{ padding: '4px 10px', borderRadius: 20, border: '1px solid #C7C2B0', fontSize: 11, cursor: canEdit ? 'pointer' : 'default',
+                  style={{ padding: '4px 10px', borderRadius: 20, border: '1px solid var(--at-line-strong)', fontSize: 11, cursor: canEdit ? 'pointer' : 'default',
                     background: form.metodos_pago.includes(m) ? '#15291F' : '#FAF7EF',
                     color: form.metodos_pago.includes(m) ? '#fff' : '#3E5A4C', fontWeight: form.metodos_pago.includes(m) ? 700 : 400 }}>
                   {m.replace('_', ' ')}
@@ -179,7 +179,7 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
             <div style={{ display: 'flex', gap: 8 }}>
               {[true, false].map(v => (
                 <button key={String(v)} onClick={() => canEdit && setForm(f => ({ ...f, permitir_reservas_online: v }))} disabled={!canEdit}
-                  style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, cursor: canEdit ? 'pointer' : 'default',
+                  style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: canEdit ? 'pointer' : 'default',
                     background: form.permitir_reservas_online === v ? '#15291F' : '#FAF7EF',
                     color: form.permitir_reservas_online === v ? '#fff' : '#3E5A4C', fontWeight: form.permitir_reservas_online === v ? 700 : 400 }}>
                   {v ? '✅ Habilitado' : '❌ Deshabilitado'}
@@ -210,7 +210,7 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
             { label: 'Reservas online', val: form.permitir_reservas_online ? 'Habilitadas' : 'Deshabilitadas' },
             { label: 'Máx. reservas/mes', val: `${form.max_reservas_por_unidad_mes} por unidad` },
           ].map(r => (
-            <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #EAE6D8', fontSize: 12 }}>
+            <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 12 }}>
               <span style={{ color: '#7E9389' }}>{r.label}</span>
               <span style={{ fontWeight: 600, color: '#15291F' }}>{r.val}</span>
             </div>

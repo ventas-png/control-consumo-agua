@@ -137,7 +137,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
           </p>
         </div>
         {canCreate && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
             + Convocar asamblea
           </button>
         )}
@@ -155,18 +155,18 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
 
       {/* Form nueva asamblea */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Convocar asamblea</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Título *</label>
               <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej. Asamblea Ordinaria Abril 2026"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tipo</label>
               <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoAsamblea }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="ordinaria">Ordinaria</option>
                 <option value="extraordinaria">Extraordinaria</option>
               </select>
@@ -174,31 +174,31 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Quórum requerido (%)</label>
               <input type="number" value={form.quorum_requerido} onChange={e => setForm(f => ({ ...f, quorum_requerido: e.target.value }))} min="1" max="100"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha *</label>
               <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora inicio *</label>
               <input type="time" value={form.hora_inicio} onChange={e => setForm(f => ({ ...f, hora_inicio: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora fin</label>
               <input type="time" value={form.hora_fin} onChange={e => setForm(f => ({ ...f, hora_fin: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Lugar</label>
               <input value={form.lugar} onChange={e => setForm(f => ({ ...f, lugar: e.target.value }))} placeholder="Salón de reuniones, Área BBQ..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : '📅 Convocar'}
             </button>
             <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -253,24 +253,24 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
 
         {/* Panel de puntos y votación */}
         {selectedId && selectedAsamblea && (
-          <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '16px', padding: '20px' }}>
+          <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '16px', padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#15291F' }}>Agenda: {selectedAsamblea.titulo}</h3>
                 <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: '#7E9389' }}>{puntos.length} puntos · {unidades.filter(u => u.activo).length} unidades</p>
               </div>
-              {canEdit && <button onClick={() => setShowPuntoForm(v => !v)} style={{ padding: '7px 14px', background: '#EAE6D8', border: '1.5px solid #E1DDD0', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C' }}>+ Punto</button>}
+              {canEdit && <button onClick={() => setShowPuntoForm(v => !v)} style={{ padding: '7px 14px', background: '#EAE6D8', border: '1.5px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C' }}>+ Punto</button>}
             </div>
 
             {showPuntoForm && (
               <div style={{ background: '#FAF7EF', borderRadius: '10px', padding: '14px', marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <input value={puntoForm.titulo} onChange={e => setPuntoForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Título del punto"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13.5px', background: 'white' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13.5px', background: 'white' }} />
                 <input value={puntoForm.descripcion} onChange={e => setPuntoForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Descripción (opcional)"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13.5px', background: 'white' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13.5px', background: 'white' }} />
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <select value={puntoForm.tipo} onChange={e => setPuntoForm(f => ({ ...f, tipo: e.target.value as TipoPunto }))}
-                    style={{ flex: 1, padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13.5px', background: 'white' }}>
+                    style={{ flex: 1, padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13.5px', background: 'white' }}>
                     <option value="informativo">Informativo</option>
                     <option value="votacion">Votación</option>
                     <option value="debate">Debate</option>
@@ -294,7 +294,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                   const totalVotos = Object.values(conteo).reduce((a, b) => a + b, 0)
 
                   return (
-                    <div key={p.id} style={{ border: '1px solid #E1DDD0', borderRadius: '10px', overflow: 'hidden' }}>
+                    <div key={p.id} style={{ border: '1px solid var(--at-line)', borderRadius: '10px', overflow: 'hidden' }}>
                       <div style={{ background: '#FAF7EF', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#1B3B36', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>{idx + 1}</span>
                         <div style={{ flex: 1 }}>
@@ -346,14 +346,14 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
 
             {/* Acta */}
             {canEdit && selectedAsamblea.estado === 'finalizada' && (
-              <div style={{ marginTop: '16px', borderTop: '1px solid #E1DDD0', paddingTop: '14px' }}>
+              <div style={{ marginTop: '16px', borderTop: '1px solid var(--at-line)', paddingTop: '14px' }}>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '6px' }}>📝 Acta de la asamblea</label>
                 <textarea defaultValue={selectedAsamblea.acta ?? ''} onBlur={e => guardarActa(selectedAsamblea.id, e.target.value)} rows={4} placeholder="Redacta el acta de la asamblea..."
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF', resize: 'vertical' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF', resize: 'vertical' }} />
               </div>
             )}
             {selectedAsamblea.acta && selectedAsamblea.estado !== 'en_curso' && !canEdit && (
-              <div style={{ marginTop: '14px', borderTop: '1px solid #E1DDD0', paddingTop: '12px' }}>
+              <div style={{ marginTop: '14px', borderTop: '1px solid var(--at-line)', paddingTop: '12px' }}>
                 <p style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', marginBottom: '6px' }}>📝 Acta</p>
                 <p style={{ fontSize: '13.5px', color: '#3E5A4C', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{selectedAsamblea.acta}</p>
               </div>

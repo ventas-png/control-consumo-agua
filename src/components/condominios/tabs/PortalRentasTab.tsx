@@ -97,7 +97,7 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
 
   const fieldStyle: React.CSSProperties = {
     width: '100%', padding: '9px 12px', fontSize: '13.5px',
-    border: '1.5px solid #E1DDD0', borderRadius: '8px', outline: 'none',
+    border: '1.5px solid var(--at-line)', borderRadius: '8px', outline: 'none',
     boxSizing: 'border-box',
   }
 
@@ -445,7 +445,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
 
   const fieldStyle: React.CSSProperties = {
     width: '100%', padding: '9px 12px', fontSize: '13.5px',
-    border: '1.5px solid #E1DDD0', borderRadius: '8px', outline: 'none',
+    border: '1.5px solid var(--at-line)', borderRadius: '8px', outline: 'none',
     boxSizing: 'border-box',
   }
   const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#3E5A4C', marginBottom: '4px', display: 'block' }
@@ -526,7 +526,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       </div>
 
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '2px solid #EAE6D8' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '2px solid var(--at-chip)' }}>
         {allowedSubTabs.map(id => (
           <button
             key={id}
@@ -536,7 +536,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
               fontSize: '13px', borderRadius: '8px 8px 0 0',
               background: subTab === id ? '#9C5733' : 'transparent',
               color: subTab === id ? 'white' : '#7E9389',
-              borderBottom: subTab === id ? '2px solid #9C5733' : '2px solid transparent',
+              borderBottom: subTab === id ? '2px solid var(--at-accent-hover)' : '2px solid transparent',
               marginBottom: '-2px',
             }}
           >{id === 'arrendamiento' ? '📄 Arrendamiento' : '🏨 STR / Corto Plazo'}</button>
@@ -559,7 +559,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
           ) : contratos.map(c => {
             const cfg = ESTADO_CONTRATO[c.estado]
             return (
-              <div key={c.id} style={{ border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
+              <div key={c.id} style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '4px' }}>👤 {c.arrendatario_nombre}</div>
@@ -664,7 +664,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
             const preregistrados = (reservaHuespedes[r.id] ?? []).length
             const capacidad = r.num_adultos + r.num_ninos
             return (
-              <div key={r.id} style={{ border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
+              <div key={r.id} style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '4px' }}>
@@ -762,7 +762,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                   </div>
 
                   {/* Fotos del huésped principal */}
-                  <div style={{ gridColumn: '1/-1', paddingTop: '4px', borderTop: '1px solid #E1DDD0' }}>
+                  <div style={{ gridColumn: '1/-1', paddingTop: '4px', borderTop: '1px solid var(--at-line)' }}>
                     <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389', marginBottom: '8px' }}>
                       Fotografías del huésped principal <span style={{ fontWeight: 400, color: '#7E9389' }}>(opcional — se pueden completar al ingreso)</span>
                     </div>
@@ -779,7 +779,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                   </div>
 
                   {/* Personas del grupo */}
-                  <div style={{ gridColumn: '1/-1', borderTop: '1px solid #E1DDD0', paddingTop: '14px' }}>
+                  <div style={{ gridColumn: '1/-1', borderTop: '1px solid var(--at-line)', paddingTop: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                       <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389' }}>
                         Personas del grupo
@@ -789,14 +789,14 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                       </div>
                       {!showHuespedForm && huespedes.length < maxAdicionalesSTR && (
                         <button type="button" onClick={() => setShowHuespedForm(true)}
-                          style={{ padding: '4px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1.5px solid #E1DDD0', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                          style={{ padding: '4px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1.5px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                           + Agregar persona
                         </button>
                       )}
                     </div>
 
                     {/* Principal */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '8px', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', marginBottom: '6px' }}>
                       <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#1B3B36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'white', fontWeight: 700, flexShrink: 0 }}>1</div>
                       <div style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: '#15291F' }}>{formSTR.huesped_nombre || 'Huésped principal'}</div>
                       <span style={{ fontSize: '10px', color: '#102622', fontWeight: 600, padding: '2px 8px', background: '#D9E2DC', borderRadius: '10px' }}>Principal</span>
@@ -828,7 +828,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
 
                     {/* Sub-form */}
                     {showHuespedForm && (
-                      <div style={{ padding: '14px', background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+                      <div style={{ padding: '14px', background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
                         <div style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C' }}>Nueva persona del grupo</div>
                         <div>
                           <label style={labelStyle}>Nombre *</label>
@@ -864,7 +864,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button type="button" onClick={agregarHuesped}
-                            style={{ padding: '7px 16px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
+                            style={{ padding: '7px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
                             + Agregar
                           </button>
                           <button type="button" onClick={() => { setShowHuespedForm(false); setHuespedForm(defaultHuesped()) }}

@@ -90,7 +90,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
@@ -114,12 +114,12 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoSugerencia | '')}
-            style={{ padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+            style={{ padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
             <option value="">Todos los estados</option>
             {(Object.keys(ESTADO_CFG) as EstadoSugerencia[]).map(e => <option key={e} value={e}>{ESTADO_CFG[e].label}</option>)}
           </select>
           <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value as CategoriaSugerencia | '')}
-            style={{ padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+            style={{ padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
             <option value="">Todas las categorías</option>
             {(Object.keys(CATEGORIA_CFG) as CategoriaSugerencia[]).map(c => <option key={c} value={c}>{CATEGORIA_CFG[c].icon} {CATEGORIA_CFG[c].label}</option>)}
           </select>
@@ -135,7 +135,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF1EA', border: '1px solid #E6CDBB', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF1EA', border: '1px solid var(--at-accent-soft)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nueva sugerencia / queja</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -210,7 +210,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
             })}
           </div>
           {selected && (
-            <div style={{ width: 280, flexShrink: 0, background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 280, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
                 <span style={{ fontSize: 18 }}>{CATEGORIA_CFG[selected.categoria].icon}</span>
                 <span style={{ fontWeight: 700, fontSize: 13 }}>{selected.titulo}</span>
@@ -225,7 +225,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
                 ['Fecha', new Date(selected.created_at).toLocaleDateString('es')],
                 ['Respondido por', selected.respondido_por ?? '—'],
               ].map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid #EAE6D8' }}>
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--at-chip)' }}>
                   <span style={{ color: '#7E9389' }}>{k}</span>
                   <span style={{ fontWeight: 600, color: '#3E5A4C' }}>{v}</span>
                 </div>

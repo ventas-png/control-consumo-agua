@@ -119,7 +119,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
         <p><strong>Disparador:</strong> ${TRIGGER_CFG[a.trigger_tipo].desc(a.trigger_valor)}</p>
         <p><strong>Acción:</strong> ${accion.icon} ${accion.label}</p>
         <p style="font-size:20px;font-weight:700;color:${afectados > 0 ? '#ef4444' : '#16a34a'};margin:12px 0">${afectados} elemento${afectados !== 1 ? 's' : ''} afectado${afectados !== 1 ? 's' : ''}</p>
-        ${afectados > 0 ? `<p style="color:#7E9389;font-size:12px">Esta acción genera notificaciones internas — revisa el Centro de Notificaciones.</p>` : `<p style="color:#16a34a;font-size:12px">✓ No hay elementos que cumplan el criterio actualmente.</p>`}
+        ${afectados > 0 ? `<p style="color:var(--at-ink-3);font-size:12px">Esta acción genera notificaciones internas — revisa el Centro de Notificaciones.</p>` : `<p style="color:#16a34a;font-size:12px">✓ No hay elementos que cumplan el criterio actualmente.</p>`}
       </div>`,
       icon: afectados > 0 ? 'warning' : 'success',
       confirmButtonText: 'Entendido',
@@ -135,7 +135,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   const activas = automatizaciones.filter(a => a.activa).length
@@ -170,7 +170,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Configurar nueva automatización</div>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 1' }}>

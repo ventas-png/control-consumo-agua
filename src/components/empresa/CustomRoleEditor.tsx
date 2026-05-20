@@ -164,7 +164,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
         display: 'flex', flexDirection: 'column', maxHeight: '92vh',
       }}>
         <div style={{
-          padding: '20px 24px 14px', borderBottom: '1px solid #E1DDD0',
+          padding: '20px 24px 14px', borderBottom: '1px solid var(--at-line)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ fontWeight: 700, fontSize: '16px', color: '#15291F' }}>
@@ -176,7 +176,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
           }}>×</button>
         </div>
 
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid #E1DDD0' }}>
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--at-line)' }}>
           <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
             <div style={{ flex: 1 }}>
               <Label>Nombre</Label>
@@ -191,7 +191,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
                 {PALETTE.map(c => (
                   <button key={c} onClick={() => setColor(c)} style={{
                     width: '20px', height: '20px', borderRadius: '4px', background: c,
-                    border: color === c ? '2px solid #15291F' : '1px solid #E1DDD0',
+                    border: color === c ? '2px solid var(--at-ink)' : '1px solid var(--at-line)',
                     cursor: 'pointer', padding: 0,
                   }} />
                 ))}
@@ -207,7 +207,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
           </div>
         </div>
 
-        <div style={{ padding: '12px 24px 8px', borderBottom: '1px solid #E1DDD0' }}>
+        <div style={{ padding: '12px 24px 8px', borderBottom: '1px solid var(--at-line)' }}>
           <input
             value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar permiso…"
             style={{ ...inputStyle, marginBottom: 0 }}
@@ -231,7 +231,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
                     </div>
                     <button onClick={() => toggleCategory(perms)} style={{
                       fontSize: '11px', color: '#2F5D4F', background: 'transparent',
-                      border: '1px solid #577B69', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer',
+                      border: '1px solid var(--at-accent-2)', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer',
                     }}>{allSelected ? 'Deseleccionar' : 'Seleccionar todo'}</button>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
@@ -256,7 +256,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
         </div>
 
         <div style={{
-          padding: '14px 24px', borderTop: '1px solid #E1DDD0',
+          padding: '14px 24px', borderTop: '1px solid var(--at-line)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ fontSize: '12px', color: error ? '#ef4444' : '#7E9389' }}>{error ?? ''}</div>
@@ -283,12 +283,12 @@ function Label({ children }: { children: React.ReactNode }) {
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 10px', borderRadius: '6px',
-  border: '1px solid #C7C2B0', fontSize: '13px', color: '#15291F',
+  border: '1px solid var(--at-line-strong)', fontSize: '13px', color: '#15291F',
   outline: 'none', marginBottom: 0, boxSizing: 'border-box',
 }
 
 const btnSecondary: React.CSSProperties = {
-  padding: '8px 18px', borderRadius: '8px', border: '1px solid #E1DDD0',
+  padding: '8px 18px', borderRadius: '8px', border: '1px solid var(--at-line)',
   background: '#fff', color: '#3E5A4C', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
 }
 

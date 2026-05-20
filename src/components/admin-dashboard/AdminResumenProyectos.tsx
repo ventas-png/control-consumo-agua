@@ -102,7 +102,7 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
     textAlign: center ? ('center' as const) : ('left' as const),
     fontWeight: 700,
     color: color ?? '#3E5A4C',
-    borderBottom: '2px solid #E1DDD0',
+    borderBottom: '2px solid var(--at-line)',
     whiteSpace: 'nowrap' as const,
     fontSize: '12px',
     background: '#FAF7EF',
@@ -111,7 +111,7 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
   const tdVal = (val: number | undefined, color?: string) => ({
     padding: '10px 12px',
     textAlign: 'center' as const,
-    borderBottom: '1px solid #EAE6D8',
+    borderBottom: '1px solid var(--at-chip)',
     fontWeight: val && val > 0 ? 600 : 400,
     color: val && val > 0 ? (color ?? '#15291F') : '#C7C2B0',
     fontSize: '12px',
@@ -157,7 +157,7 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
                   onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#EEF2EC'}
                   onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'white' : '#FAF7EF'}
                 >
-                  <td style={{ padding: '10px 12px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid #EAE6D8', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid var(--at-chip)', whiteSpace: 'nowrap' }}>
                     {p.nombre}
                   </td>
                   <td style={tdVal(ps.totalM3, '#1B3B36')}>
@@ -182,7 +182,7 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
             })}
 
             {/* Totals row */}
-            <tr style={{ background: '#EAE6D8', borderTop: '2px solid #E1DDD0' }}>
+            <tr style={{ background: '#EAE6D8', borderTop: '2px solid var(--at-line)' }}>
               <td style={{ padding: '10px 12px', fontWeight: 700, color: '#15291F', fontSize: '13px' }}>
                 Total
               </td>

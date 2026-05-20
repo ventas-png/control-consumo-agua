@@ -107,7 +107,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
           </button>
         </div>
 
-        <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid #E1DDD0' }}>
+        <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
             <div>
               <div style={{ color: '#7E9389', marginBottom: '2px' }}>Total Cargo</div>
@@ -136,7 +136,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #E1DDD0',
+              border: '1.5px solid var(--at-line)',
               fontSize: '16px',
               fontWeight: 700,
               fontFamily: 'inherit',
@@ -151,7 +151,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
               flex: 1,
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #E1DDD0',
+              border: '1.5px solid var(--at-line)',
               background: 'white',
               color: '#7E9389',
               fontWeight: 700,
@@ -169,7 +169,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
               padding: '12px',
               borderRadius: '8px',
               border: 'none',
-              background: loading ? '#C7C2B0' : 'linear-gradient(135deg, #1B3B36, #102622)',
+              background: loading ? '#C7C2B0' : 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
               color: 'white',
               fontWeight: 700,
               fontSize: '14px',

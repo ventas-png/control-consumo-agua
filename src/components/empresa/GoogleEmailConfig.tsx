@@ -172,22 +172,22 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
   async function editTemplate(def: typeof TEMPLATE_DEFS[0]) {
     const existing = templates.find((t: EmailTemplate) => t.template_key === def.key)
 
-    const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E1DDD0;border-radius:8px;font-size:13px;color:#15291F;background:#fff;outline:none;font-family:inherit'
+    const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--at-line);border-radius:8px;font-size:13px;color:var(--at-ink);background:#fff;outline:none;font-family:inherit'
 
     const { value: formValues } = await Swal.fire({
       title: `${def.icon} ${def.label}`,
       width: 700,
       html: `
         <div style="text-align:left;display:flex;flex-direction:column;gap:12px;">
-          <p style="margin:0;font-size:12px;color:#7E9389;">${def.desc}</p>
+          <p style="margin:0;font-size:12px;color:var(--at-ink-3);">${def.desc}</p>
           <div>
-            <label style="display:block;font-size:11px;font-weight:700;color:#7E9389;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Asunto del correo</label>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--at-ink-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Asunto del correo</label>
             <input id="swal-subject" style="${inpStyle}" placeholder="Ej: Recibo de consumo — {{mes}} | {{empresa_nombre}}"
               value="${(existing?.subject ?? '').replace(/"/g, '&quot;')}" />
           </div>
           <div>
-            <label style="display:block;font-size:11px;font-weight:700;color:#7E9389;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Cuerpo HTML del correo</label>
-            <p style="margin:0 0 5px;font-size:11px;color:#7E9389;">Usa <code>{{variable}}</code> para insertar valores dinámicos. Deja en blanco para usar el template predeterminado.</p>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--at-ink-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Cuerpo HTML del correo</label>
+            <p style="margin:0 0 5px;font-size:11px;color:var(--at-ink-3);">Usa <code>{{variable}}</code> para insertar valores dinámicos. Deja en blanco para usar el template predeterminado.</p>
             <textarea id="swal-body" style="${inpStyle};height:220px;resize:vertical;font-family:monospace;font-size:12px;">${existing?.html_body ?? ''}</textarea>
           </div>
         </div>
@@ -381,7 +381,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
               placeholder="correo@ejemplo.com"
               style={{
                 flex: 1, minWidth: '200px', padding: '9px 12px',
-                borderRadius: '8px', border: '1.5px solid #E1DDD0',
+                borderRadius: '8px', border: '1.5px solid var(--at-line)',
                 fontSize: '13px', outline: 'none',
               }}
             />
@@ -390,7 +390,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
               disabled={sendingTest}
               style={{
                 padding: '9px 18px', borderRadius: '8px', border: 'none',
-                background: sendingTest ? '#C7C2B0' : 'linear-gradient(135deg,#1B3B36,#577B69)',
+                background: sendingTest ? '#C7C2B0' : 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))',
                 color: 'white', cursor: sendingTest ? 'not-allowed' : 'pointer',
                 fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap',
               }}

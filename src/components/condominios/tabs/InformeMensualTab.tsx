@@ -31,7 +31,7 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
   async function generar() {
     const { value: periodo } = await Swal.fire({
       title: 'Generar informe mensual',
-      html: `<p style="font-size:13px;color:#3E5A4C;margin-bottom:8px">Período (YYYY-MM):</p>
+      html: `<p style="font-size:13px;color:var(--at-ink-2);margin-bottom:8px">Período (YYYY-MM):</p>
              <input id="periodo-inf" class="swal2-input" type="month" value="${new Date().toISOString().slice(0,7)}" style="font-size:14px">`,
       showCancelButton: true, confirmButtonText: 'Generar', cancelButtonText: 'Cancelar',
       preConfirm: () => (document.getElementById('periodo-inf') as HTMLInputElement)?.value,
@@ -143,7 +143,7 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
             })}
           </div>
           {selected && (
-            <div style={{ width: 280, flexShrink: 0, background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 280, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 15 }}>Informe {selected.periodo}</div>
               {([
                 ['Estado', <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ESTADO_CFG[selected.estado].bg, color: ESTADO_CFG[selected.estado].color }}>{ESTADO_CFG[selected.estado].label}</span>],
@@ -159,7 +159,7 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
                 ['Incidentes', selected.num_incidentes],
                 ['Firmado por', selected.firmado_por ?? '—'],
               ] as [string, ReactNode][]).map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, padding: '5px 0', borderBottom: '1px solid #EAE6D8' }}>
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--at-chip)' }}>
                   <span style={{ color: '#7E9389' }}>{k}</span>
                   <span style={{ fontWeight: 600, color: '#3E5A4C' }}>{v}</span>
                 </div>

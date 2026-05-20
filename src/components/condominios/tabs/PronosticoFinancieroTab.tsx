@@ -113,7 +113,7 @@ export default function PronosticoFinancieroTab({ cuotas, gastos, moneda }: Prop
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         {/* Histórico */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>Histórico (últimos 6 meses)</div>
           {promedios.historico.map((m, i) => (
             <div key={i} style={{ marginBottom: 12 }}>
@@ -131,7 +131,7 @@ export default function PronosticoFinancieroTab({ cuotas, gastos, moneda }: Prop
         </div>
 
         {/* Proyección */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 2 }}>Proyección (próximos 6 meses)</div>
           <div style={{ fontSize: 10, color: '#7E9389', marginBottom: 12 }}>Basada en promedio histórico</div>
           {proyeccion.map((p, i) => {

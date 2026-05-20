@@ -104,14 +104,14 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 300, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
+      <div style={{ width: 300, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div>
               <span style={{ fontWeight: 600, fontSize: 14 }}>Elevadores ({lista.length})</span>
@@ -139,7 +139,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
         </div>
 
         {proxInspecciones.length > 0 && (
-          <div style={{ padding: '8px 12px', background: '#F4EBE3', borderBottom: '1px solid #E1DDD0' }}>
+          <div style={{ padding: '8px 12px', background: '#F4EBE3', borderBottom: '1px solid var(--at-line)' }}>
             <div style={{ fontSize: 10, color: '#B96A3F', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>🏛️ Próximas inspecciones</div>
             {proxInspecciones.map(r => (
               <div key={r.id} style={{ fontSize: 11, color: '#3E5A4C', marginBottom: 2 }}>
@@ -156,7 +156,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
           const est = ESTADOS.find(e => e.value === r.estado)
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === r.id ? '#F4EBE3' : '#fff', borderLeft: `3px solid ${tipo?.color}` }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? '#F4EBE3' : '#fff', borderLeft: `3px solid ${tipo?.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 12 }}>{tipo?.icon} {r.elevador}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.label}</span>

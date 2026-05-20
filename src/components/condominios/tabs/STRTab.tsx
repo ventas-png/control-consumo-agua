@@ -249,7 +249,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   const maxAdicionales = (form.num_adultos ?? 1) + (form.num_ninos ?? 0) - 1
@@ -265,7 +265,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
           { label: 'Próximas',        value: String(proximas),              icon: '📅', color: '#f59e0b' },
           { label: 'Ingreso del mes', value: ingresoMes > 0 ? `${moneda} ${ingresoMes.toFixed(0)}` : '—', icon: '💰', color: '#10b981' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
@@ -281,7 +281,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Reserva' : 'Nueva Reserva STR'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
             <div>
@@ -350,7 +350,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
 
             {/* Fotos del huésped principal */}
             <div style={{ gridColumn: '1 / -1' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389', marginBottom: '8px', paddingTop: '4px', borderTop: '1px solid #E1DDD0' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389', marginBottom: '8px', paddingTop: '4px', borderTop: '1px solid var(--at-line)' }}>
                 Fotografías del huésped principal <span style={{ fontWeight: 400, color: '#7E9389' }}>(opcional — se pueden completar al ingreso)</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', maxWidth: '400px' }}>
@@ -366,7 +366,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
             </div>
 
             {/* Personas del grupo */}
-            <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #E1DDD0', paddingTop: '14px' }}>
+            <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--at-line)', paddingTop: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389' }}>
                   Personas del grupo
@@ -376,14 +376,14 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                 </div>
                 {!showHuespedForm && huespedes.length < maxAdicionales && (
                   <button onClick={() => setShowHuespedForm(true)}
-                    style={{ padding: '4px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1.5px solid #E1DDD0', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                    style={{ padding: '4px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1.5px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                     + Agregar persona
                   </button>
                 )}
               </div>
 
               {/* Principal (always shown) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '8px', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', marginBottom: '6px' }}>
                 <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#1B3B36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'white', fontWeight: 700, flexShrink: 0 }}>1</div>
                 <div style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: '#15291F' }}>{form.huesped_nombre || 'Huésped principal'}</div>
                 <span style={{ fontSize: '10px', color: '#102622', fontWeight: 600, padding: '2px 8px', background: '#D9E2DC', borderRadius: '10px' }}>Principal</span>
@@ -415,7 +415,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
 
               {/* Add guest form */}
               {showHuespedForm && (
-                <div style={{ padding: '14px', background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+                <div style={{ padding: '14px', background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
                   <div style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C' }}>Nueva persona del grupo</div>
                   <div>
                     <label style={labelStyle}>Nombre *</label>
@@ -451,7 +451,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={agregarHuesped}
-                      style={{ padding: '7px 16px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
+                      style={{ padding: '7px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
                       + Agregar
                     </button>
                     <button onClick={() => { setShowHuespedForm(false); setHuespedForm(defaultHuesped()) }}
@@ -470,7 +470,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
             </div>
           )}
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
@@ -506,11 +506,11 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
             const capacidad = r.num_adultos + r.num_ninos
             const lleno = ingresados >= capacidad
             return (
-              <div key={r.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '16px' }}>
+              <div key={r.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                     {r.foto_url
-                      ? <SecureImage src={r.foto_url} alt={r.huesped_nombre} style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid #E1DDD0' }} />
+                      ? <SecureImage src={r.foto_url} alt={r.huesped_nombre} style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid var(--at-line)' }} />
                       : <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#D9E2DC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🏠</div>
                     }
                     <div style={{ minWidth: 0 }}>

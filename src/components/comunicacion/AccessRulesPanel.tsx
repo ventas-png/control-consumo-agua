@@ -97,7 +97,7 @@ export function AccessRulesPanel({ companyId, accessRules, onSave, canEdit, serv
           const isDisabled = isBusy || !canEdit
           return (
             <div key={role} style={{
-              border: '1px solid #E1DDD0', borderRadius: '10px', padding: '14px 16px',
+              border: '1px solid var(--at-line)', borderRadius: '10px', padding: '14px 16px',
               background: 'white', opacity: isBusy ? 0.7 : 1,
             }}>
               <div style={{ fontWeight: 600, fontSize: '13px', color: '#3E5A4C', marginBottom: '10px' }}>

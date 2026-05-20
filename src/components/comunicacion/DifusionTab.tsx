@@ -158,7 +158,7 @@ function NuevoComunicadoModal({
     color: '#3E5A4C', marginBottom: '4px',
   }
   const inputStyle: CSSProperties = {
-    width: '100%', padding: '9px 12px', border: '1px solid #C7C2B0',
+    width: '100%', padding: '9px 12px', border: '1px solid var(--at-line-strong)',
     borderRadius: '8px', fontSize: '13.5px', boxSizing: 'border-box',
     outline: 'none', color: '#15291F',
   }
@@ -191,7 +191,7 @@ function NuevoComunicadoModal({
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px 14px', borderBottom: '1px solid #E1DDD0', flexShrink: 0,
+          padding: '16px 20px 14px', borderBottom: '1px solid var(--at-line)', flexShrink: 0,
         }}>
           <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#15291F' }}>
             Nuevo comunicado
@@ -338,13 +338,13 @@ function NuevoComunicadoModal({
 
         {/* Footer */}
         <div style={{
-          padding: '14px 20px', borderTop: '1px solid #E1DDD0',
+          padding: '14px 20px', borderTop: '1px solid var(--at-line)',
           display: 'flex', justifyContent: 'flex-end', gap: '10px', flexShrink: 0,
         }}>
           <button
             onClick={onClose}
             style={{
-              padding: '9px 20px', border: '1px solid #E1DDD0', borderRadius: '9px',
+              padding: '9px 20px', border: '1px solid var(--at-line)', borderRadius: '9px',
               background: 'white', color: '#3E5A4C', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px',
             }}
           >
@@ -395,7 +395,7 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
 
   return (
     <div style={{
-      background: 'white', border: '1px solid #E1DDD0', borderRadius: '12px',
+      background: 'white', border: '1px solid var(--at-line)', borderRadius: '12px',
       overflow: 'hidden', transition: 'box-shadow 0.15s ease',
     }}>
       <button
@@ -409,7 +409,7 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
         {/* Megaphone icon */}
         <div style={{
           width: '36px', height: '36px', borderRadius: '9px',
-          background: 'linear-gradient(135deg, #D9E2DC, #D9E2DC)',
+          background: 'linear-gradient(135deg, var(--at-primary-soft), var(--at-primary-soft))',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0, color: '#1B3B36',
         }}>
@@ -459,7 +459,7 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
       {expanded && (
         <div style={{
           padding: '0 18px 16px 66px',
-          borderTop: '1px solid #EAE6D8', paddingTop: '12px',
+          borderTop: '1px solid var(--at-chip)', paddingTop: '12px',
         }}>
           <p style={{ margin: 0, fontSize: '13.5px', color: '#3E5A4C', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
             {broadcast.body}
@@ -516,7 +516,7 @@ export default function DifusionTab({ currentUser, clientes, proyectos, unidades
       {!loading && broadcasts.length === 0 && (
         <div style={{
           textAlign: 'center', padding: '56px 24px',
-          background: 'white', border: '1px dashed #E1DDD0', borderRadius: '16px',
+          background: 'white', border: '1px dashed var(--at-line)', borderRadius: '16px',
         }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>📣</div>
           <p style={{ margin: 0, color: '#7E9389', fontWeight: 600, fontSize: '14px' }}>

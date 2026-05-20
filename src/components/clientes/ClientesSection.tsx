@@ -514,7 +514,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
 
   const inputStyle: CSSProperties = {
     padding: '10px 14px',
-    border: '2px solid #E1DDD0',
+    border: '2px solid var(--at-line)',
     borderRadius: '8px',
     fontSize: '14px',
     width: '100%',
@@ -579,7 +579,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
                   padding: '10px 20px',
                   background: '#EAE6D8',
                   color: '#3E5A4C',
-                  border: '1px solid #E1DDD0',
+                  border: '1px solid var(--at-line)',
                   borderRadius: '8px',
                   fontWeight: 600,
                   fontSize: '14px',
@@ -593,7 +593,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
                 onClick={startCreate}
                 style={{
                   padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+                  background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
@@ -666,7 +666,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               disabled={onboardingStep === 'lookup_loading'}
               style={{
                 padding: '10px 24px',
-                background: onboardingStep === 'lookup_loading' ? '#7E9389' : 'linear-gradient(135deg, #1B3B36, #577B69)',
+                background: onboardingStep === 'lookup_loading' ? '#7E9389' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -733,7 +733,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               onClick={() => setOnboardingStep('lookup')}
               style={{
                 padding: '10px 24px',
-                background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+                background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -768,7 +768,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
         <div>
           <div style={{
             background: '#EEF2EC',
-            border: '2px solid #1B3B36',
+            border: '2px solid var(--at-primary)',
             borderRadius: '12px',
             padding: '20px',
             marginBottom: '20px',
@@ -787,7 +787,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               onClick={proceedToFullForm}
               style={{
                 padding: '10px 24px',
-                background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+                background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -1009,7 +1009,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               disabled={loading}
               style={{
                 padding: '10px 24px',
-                background: loading ? '#7E9389' : 'linear-gradient(135deg, #1B3B36, #577B69)',
+                background: loading ? '#7E9389' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',

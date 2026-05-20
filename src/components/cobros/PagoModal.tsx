@@ -105,7 +105,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
         </div>
 
         {/* Info del cargo */}
-        <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid #E1DDD0' }}>
+        <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
           <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '8px' }}>
             {cliente?.nombre ?? registro.cliente_nombre}
           </div>
@@ -138,7 +138,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
                   if (val === 'pago_total') setMonto(saldo.toFixed(2))
                 }} style={{
                   flex: 1, padding: '10px', borderRadius: '8px',
-                  border: tipoAplicacion === val ? '2px solid #1B3B36' : '2px solid #E1DDD0',
+                  border: tipoAplicacion === val ? '2px solid var(--at-primary)' : '2px solid var(--at-line)',
                   background: tipoAplicacion === val ? '#EEF2EC' : 'white',
                   color: tipoAplicacion === val ? '#102622' : '#3E5A4C',
                   fontWeight: tipoAplicacion === val ? 700 : 500,
@@ -159,7 +159,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
               type="number" step="0.01" min="0.01" max={saldo}
               value={monto} onChange={e => setMonto(e.target.value)}
               required
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '16px', fontWeight: 700, fontFamily: 'inherit' }}
+              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '16px', fontWeight: 700, fontFamily: 'inherit' }}
             />
           </div>
 
@@ -171,7 +171,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
             <select
               value={formaPago} onChange={e => setFormaPago(e.target.value as FormaPago)}
               required
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit', background: 'white' }}
+              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', background: 'white' }}
             >
               {(Object.entries(formasPagoLabels) as [FormaPago, string][]).map(([val, lbl]) => (
                 <option key={val} value={val}>{lbl}</option>
@@ -190,7 +190,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
             <input
               type="text" value={numeroDocumento} onChange={e => setNumeroDocumento(e.target.value)}
               placeholder="Ej: TRF-001234 / CHQ-5678"
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit' }}
+              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
             />
           </div>
 
@@ -202,7 +202,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
             <input
               type="text" value={referencia} onChange={e => setReferencia(e.target.value)}
               placeholder="Ej: Banco Industrial, Cuenta XXX"
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit' }}
+              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
             />
           </div>
 
@@ -215,7 +215,7 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
               value={notas} onChange={e => setNotas(e.target.value)}
               placeholder="Observaciones sobre el pago..."
               rows={2}
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }}
+              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }}
             />
           </div>
 
@@ -237,14 +237,14 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
 
           <div style={{ display: 'flex', gap: '12px' }}>
             <button type="button" onClick={onClose} style={{
-              flex: 1, padding: '13px', borderRadius: '8px', border: '1.5px solid #E1DDD0',
+              flex: 1, padding: '13px', borderRadius: '8px', border: '1.5px solid var(--at-line)',
               background: 'white', color: '#7E9389', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
             }}>
               Cancelar
             </button>
             <button type="submit" disabled={saving} style={{
               flex: 2, padding: '13px', borderRadius: '8px', border: 'none',
-              background: saving ? '#C7C2B0' : 'linear-gradient(135deg,#1B3B36,#102622)',
+              background: saving ? '#C7C2B0' : 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))',
               color: 'white', fontWeight: 700, fontSize: '14px', cursor: saving ? 'not-allowed' : 'pointer',
             }}>
               {saving ? '⏳ Guardando...' : '💰 Confirmar Pago'}

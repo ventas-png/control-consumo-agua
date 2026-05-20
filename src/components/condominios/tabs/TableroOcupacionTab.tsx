@@ -101,7 +101,7 @@ export default function TableroOcupacionTab({ unidades, contratos, cuotas, moned
       </div>
 
       {/* Barra de distribución */}
-      <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
+      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
         <div style={{ fontSize: 11, color: '#7E9389', fontWeight: 600, marginBottom: 6 }}>Distribución de ocupación</div>
         <div style={{ display: 'flex', height: 14, borderRadius: 7, overflow: 'hidden', gap: 1 }}>
           {([['propietario', resumen.propiet], ['en_renta', resumen.enRenta], ['libre', resumen.libre], ['inactiva', resumen.inactiva]] as [EstadoOcupacion, number][]).map(([est, cnt]) =>
@@ -120,7 +120,7 @@ export default function TableroOcupacionTab({ unidades, contratos, cuotas, moned
 
       <div style={{ display: 'grid', gridTemplateColumns: hayPisos ? '1fr 220px' : '1fr', gap: 14 }}>
         {/* Cuadrícula de unidades */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>Unidades</div>
           {hayPisos ? (
             porPiso.map(({ piso, units }) => (
@@ -144,7 +144,7 @@ export default function TableroOcupacionTab({ unidades, contratos, cuotas, moned
 
         {/* Por tipo de unidad */}
         {porTipo.length > 0 && (
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>Por tipo</div>
             {porTipo.map(([tipo, { total, ocupadas }]) => (
               <div key={tipo} style={{ marginBottom: 12 }}>

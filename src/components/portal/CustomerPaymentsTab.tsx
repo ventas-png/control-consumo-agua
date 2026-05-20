@@ -98,7 +98,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
         </div>
 
         <div style={{
-          background: 'linear-gradient(135deg, #2F5D4F, #102622)',
+          background: 'linear-gradient(135deg, var(--at-primary-2), var(--at-primary-hover))',
           borderRadius: '16px',
           padding: '20px',
           color: 'white',
@@ -124,7 +124,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                 background: 'white',
                 borderRadius: '12px',
                 padding: '16px',
-                border: esMora ? '2px solid #dc2626' : '1px solid #E1DDD0',
+                border: esMora ? '2px solid #dc2626' : '1px solid var(--at-line)',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
               }}
             >
@@ -175,7 +175,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                         padding: '10px',
                         borderRadius: '8px',
                         border: 'none',
-                        background: 'linear-gradient(135deg, #1B3B36, #102622)',
+                        background: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
                         color: 'white',
                         fontWeight: 700,
                         fontSize: '13px',
@@ -215,7 +215,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                     style={{
                       padding: '10px',
                       borderRadius: '8px',
-                      border: '1.5px solid #E1DDD0',
+                      border: '1.5px solid var(--at-line)',
                       background: 'white',
                       color: '#7E9389',
                       fontWeight: 700,

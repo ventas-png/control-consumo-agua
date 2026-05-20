@@ -266,7 +266,7 @@ export default function App() {
   // Not authenticated
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #102622 0%, #1B3B36 55%, #2f5d4f 100%)' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--at-primary-hover) 0%, var(--at-primary) 55%, var(--at-primary-2) 100%)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px' }}>
           <div style={{ filter: 'drop-shadow(0 10px 24px rgba(0,0,0,0.35))' }}>
             <BrandLogo size={64} />

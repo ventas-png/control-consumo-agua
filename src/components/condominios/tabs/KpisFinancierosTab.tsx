@@ -85,7 +85,7 @@ export default function KpisFinancierosTab({ cuotas, gastos, unidades, moneda }:
       {/* Filtro período */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         <select value={filtroPeriodo} onChange={e => setFiltroPeriodo(e.target.value)}
-          style={{ padding: '7px 12px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+          style={{ padding: '7px 12px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
           <option value="">Todos los períodos</option>
           {periodos.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
@@ -101,7 +101,7 @@ export default function KpisFinancierosTab({ cuotas, gastos, unidades, moneda }:
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
         {/* Aging */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Antigüedad de deuda</div>
           {[
             { label: '0–30 días', items: aging30, color: '#fbbf24' },
@@ -125,7 +125,7 @@ export default function KpisFinancierosTab({ cuotas, gastos, unidades, moneda }:
         </div>
 
         {/* Top deudores */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Top 5 deudores</div>
           {deudoresList.length === 0
             ? <div style={{ color: '#7E9389', fontSize: 12, textAlign: 'center', padding: '8px 0' }}>Sin deudores</div>
@@ -145,7 +145,7 @@ export default function KpisFinancierosTab({ cuotas, gastos, unidades, moneda }:
 
       {/* Tendencia mensual */}
       {trend.length > 0 && (
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14 }}>Tendencia últimos {trend.length} períodos</div>
           <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 120, marginBottom: 8 }}>
             {trend.map(t => (

@@ -245,7 +245,7 @@ export function TarifasSection({
 
   const inputStyle: CSSProperties = {
     padding: '10px 14px',
-    border: '2px solid #E1DDD0',
+    border: '2px solid var(--at-line)',
     borderRadius: '8px',
     fontSize: '14px',
     width: '100%',
@@ -283,7 +283,7 @@ export function TarifasSection({
               onClick={startCreate}
               style={{
                 padding: '10px 20px',
-                background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+                background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -394,7 +394,7 @@ export function TarifasSection({
                 Si consumo ≤ este valor, se cobra solo el canon fijo
               </span>
             </div>
-            <div style={{ gridColumn: '1 / -1', background: '#FAF7EF', borderRadius: '8px', padding: '14px 16px', border: '1px solid #E1DDD0' }}>
+            <div style={{ gridColumn: '1 / -1', background: '#FAF7EF', borderRadius: '8px', padding: '14px 16px', border: '1px solid var(--at-line)' }}>
               <label style={{ ...labelStyle, color: '#15291F' }}>Fecha de Revisión</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <input
@@ -453,7 +453,7 @@ export function TarifasSection({
               disabled={loading}
               style={{
                 padding: '10px 24px',
-                background: loading ? '#7E9389' : 'linear-gradient(135deg, #1B3B36, #577B69)',
+                background: loading ? '#7E9389' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -499,7 +499,7 @@ export function TarifasSection({
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
               <thead>
-                <tr style={{ background: '#FAF7EF', borderBottom: '2px solid #E1DDD0' }}>
+                <tr style={{ background: '#FAF7EF', borderBottom: '2px solid var(--at-line)' }}>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C' }}>Nombre</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C' }}>Tipo de Agua</th>
                   <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#3E5A4C' }}>Precio/m³</th>
@@ -517,7 +517,7 @@ export function TarifasSection({
                 {filtered.map((t, idx) => (
                   <tr
                     key={t.id}
-                    style={{ borderBottom: '1px solid #EAE6D8', background: idx % 2 === 0 ? 'white' : '#fafbfc' }}
+                    style={{ borderBottom: '1px solid var(--at-chip)', background: idx % 2 === 0 ? 'white' : '#fafbfc' }}
                   >
                     <td style={{ padding: '12px 16px', fontWeight: 600, color: '#15291F' }}>
                       {t.nombre}
@@ -668,7 +668,7 @@ export function TarifasSection({
             </table>
           </div>
         )}
-        <div style={{ padding: '12px 16px', borderTop: '1px solid #EAE6D8', color: '#7E9389', fontSize: '12px' }}>
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--at-chip)', color: '#7E9389', fontSize: '12px' }}>
           {filtered.length} tarifa{filtered.length !== 1 ? 's' : ''} {search ? 'encontradas' : 'registradas'}
         </div>
       </div>

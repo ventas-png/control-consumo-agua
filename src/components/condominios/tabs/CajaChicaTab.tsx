@@ -81,7 +81,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
   const totalEgresos  = selectedMovs.filter(m => m.tipo === 'egreso').reduce((s, m) => s + Number(m.monto), 0)
   const saldo = (selected ? Number(selected.monto_inicial) : 0) + totalIngresos - totalEgresos
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -100,7 +100,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
 
       {/* Open caja form */}
       {showCajaForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Abrir nueva caja</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
             <div>
@@ -122,7 +122,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
               {savingCaja ? 'Abriendo…' : 'Abrir caja'}
             </button>
             <button onClick={() => setShowCajaForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -171,7 +171,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
 
         {/* Movimientos panel */}
         {selected && (
-          <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
             {/* Summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
               {[
@@ -179,7 +179,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
                 { label: 'Ingresos', value: fmt(totalIngresos, moneda), color: '#10b981' },
                 { label: 'Egresos', value: fmt(totalEgresos, moneda), color: '#ef4444' },
               ].map(k => (
-                <div key={k.label} style={{ background: 'white', borderRadius: '8px', padding: '8px', textAlign: 'center', border: '1px solid #E1DDD0' }}>
+                <div key={k.label} style={{ background: 'white', borderRadius: '8px', padding: '8px', textAlign: 'center', border: '1px solid var(--at-line)' }}>
                   <div style={{ fontSize: '13px', fontWeight: 700, color: k.color }}>{k.value}</div>
                   <div style={{ fontSize: '10px', color: '#7E9389' }}>{k.label}</div>
                 </div>
@@ -200,7 +200,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
             </div>
 
             {showMovForm && (
-              <div style={{ background: 'white', borderRadius: '8px', padding: '10px', marginBottom: '10px', border: '1px solid #E1DDD0' }}>
+              <div style={{ background: 'white', borderRadius: '8px', padding: '10px', marginBottom: '10px', border: '1px solid var(--at-line)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', marginBottom: '8px' }}>
                   <div>
                     <label style={{ fontSize: '10px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '2px' }}>Tipo</label>
@@ -232,7 +232,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
                     {savingMov ? 'Guardando…' : 'Guardar'}
                   </button>
                   <button onClick={() => { setShowMovForm(false); setFormMov({ ...BLANK_MOV }) }}
-                    style={{ padding: '5px 10px', background: 'white', border: '1px solid #E1DDD0', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#7E9389' }}>
+                    style={{ padding: '5px 10px', background: 'white', border: '1px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#7E9389' }}>
                     Cancelar
                   </button>
                 </div>
@@ -244,7 +244,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                 {[...selectedMovs].sort((a, b) => b.fecha.localeCompare(a.fecha)).map(m => (
-                  <div key={m.id} style={{ background: 'white', borderRadius: '7px', padding: '7px 10px', border: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div key={m.id} style={{ background: 'white', borderRadius: '7px', padding: '7px 10px', border: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <span style={{ fontSize: '12px', fontWeight: 600, color: m.tipo === 'ingreso' ? '#10b981' : '#ef4444' }}>
                         {m.tipo === 'ingreso' ? '+' : '-'}{fmt(Number(m.monto), moneda)}

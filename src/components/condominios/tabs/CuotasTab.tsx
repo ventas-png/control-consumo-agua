@@ -140,7 +140,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     }
     const { isConfirmed } = await Swal.fire({
       title: `Importar ${validas.length} cuota${validas.length > 1 ? 's' : ''}`,
-      html: `<p style="font-size:13px;color:#3E5A4C">${csvRows.length - validas.length > 0 ? `<strong>${csvRows.length - validas.length} fila(s) con errores serán omitidas.</strong><br>` : ''}Se insertarán ${validas.length} cuotas con estado <strong>pendiente</strong>.</p>`,
+      html: `<p style="font-size:13px;color:var(--at-ink-2)">${csvRows.length - validas.length > 0 ? `<strong>${csvRows.length - validas.length} fila(s) con errores serán omitidas.</strong><br>` : ''}Se insertarán ${validas.length} cuotas con estado <strong>pendiente</strong>.</p>`,
       icon: 'question', showCancelButton: true,
       confirmButtonText: '📥 Importar', cancelButtonText: 'Cancelar',
       confirmButtonColor: '#1B3B36',
@@ -237,9 +237,9 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
         title: 'Registrar pago',
         html: `
           <div style="text-align:left;font-size:13px">
-            <label style="font-weight:600;color:#3E5A4C;display:block;margin-bottom:4px">Fecha de pago</label>
+            <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Fecha de pago</label>
             <input id="sw-fecha" type="date" class="swal2-input" value="${hoy}" style="margin:0 0 12px;width:100%;box-sizing:border-box">
-            <label style="font-weight:600;color:#3E5A4C;display:block;margin-bottom:4px">Método de pago</label>
+            <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Método de pago</label>
             <select id="sw-metodo" class="swal2-select" style="margin:0 0 12px;width:100%;box-sizing:border-box">
               <option value="efectivo">Efectivo</option>
               <option value="transferencia">Transferencia bancaria</option>
@@ -248,7 +248,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
               <option value="deposito">Depósito</option>
               <option value="otro">Otro</option>
             </select>
-            <label style="font-weight:600;color:#3E5A4C;display:block;margin-bottom:4px">Referencia / No. transacción</label>
+            <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Referencia / No. transacción</label>
             <input id="sw-ref" type="text" class="swal2-input" placeholder="Opcional" style="margin:0;width:100%;box-sizing:border-box">
           </div>`,
         showCancelButton: true,
@@ -291,9 +291,9 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
           <span style="font-size:16px;font-weight:800;color:#16a34a">Total: ${moneda} ${totalMonto.toFixed(2)}</span>
         </div>
         <div style="text-align:left;font-size:13px">
-          <label style="font-weight:600;color:#3E5A4C;display:block;margin-bottom:4px">Fecha de pago</label>
+          <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Fecha de pago</label>
           <input id="sw-fecha" type="date" class="swal2-input" value="${hoy}" style="margin:0 0 12px;width:100%;box-sizing:border-box">
-          <label style="font-weight:600;color:#3E5A4C;display:block;margin-bottom:4px">Método de pago</label>
+          <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Método de pago</label>
           <select id="sw-metodo" class="swal2-select" style="margin:0 0 12px;width:100%;box-sizing:border-box">
             <option value="efectivo">Efectivo</option>
             <option value="transferencia">Transferencia bancaria</option>
@@ -302,7 +302,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             <option value="deposito">Depósito</option>
             <option value="otro">Otro</option>
           </select>
-          <label style="font-weight:600;color:#3E5A4C;display:block;margin-bottom:4px">Referencia / No. transacción</label>
+          <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Referencia / No. transacción</label>
           <input id="sw-ref" type="text" class="swal2-input" placeholder="Opcional" style="margin:0;width:100%;box-sizing:border-box">
         </div>`,
       showCancelButton: true,
@@ -346,7 +346,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     }
     const { isConfirmed } = await Swal.fire({
       title: `¿Marcar ${vencidas.length} cuota${vencidas.length > 1 ? 's' : ''} como morosas?`,
-      html: `<p style="font-size:13px;color:#3E5A4C">Cuotas <strong>pendientes</strong> cuya fecha de vencimiento ya pasó.<br>Esta acción se puede revertir cambiando el estado individualmente.</p>`,
+      html: `<p style="font-size:13px;color:var(--at-ink-2)">Cuotas <strong>pendientes</strong> cuya fecha de vencimiento ya pasó.<br>Esta acción se puede revertir cambiando el estado individualmente.</p>`,
       icon: 'warning', showCancelButton: true,
       confirmButtonText: '⚡ Aplicar mora', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626',
     })
@@ -433,10 +433,10 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             <>
               <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleCSVFile} />
               <button onClick={() => fileInputRef.current?.click()}
-                style={{ padding: '10px 16px', background: '#FAF1EA', color: '#9C5733', border: '1.5px solid #E6CDBB', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+                style={{ padding: '10px 16px', background: '#FAF1EA', color: '#9C5733', border: '1.5px solid var(--at-accent-soft)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
                 📥 Importar CSV
               </button>
-              <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}>
+              <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}>
                 + Nueva cuota
               </button>
             </>
@@ -457,13 +457,13 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Nueva cuota</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Unidad (opcional)</label>
               <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="">Todas las unidades</option>
                 {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
@@ -471,7 +471,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Concepto</label>
               <select value={form.concepto} onChange={e => setForm(f => ({ ...f, concepto: e.target.value as ConceptoCuota }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 {CONCEPTOS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
@@ -479,27 +479,27 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Monto ({moneda})</label>
               <input type="number" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))}
                 placeholder="0.00" min="0" step="0.01"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Período</label>
               <input type="month" value={form.periodo} onChange={e => setForm(f => ({ ...f, periodo: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha de vencimiento</label>
               <input type="date" value={form.fecha_vencimiento} onChange={e => setForm(f => ({ ...f, fecha_vencimiento: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas</label>
               <input type="text" value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
                 placeholder="Opcional"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
             <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -509,7 +509,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
 
       {/* CSV Preview */}
       {csvRows && (
-        <div style={{ background: 'white', border: '1.5px solid #E6CDBB', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-accent-soft)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: 8 }}>
             <div>
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#15291F' }}>Vista previa del CSV</h3>
@@ -531,7 +531,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
               <thead>
-                <tr style={{ background: '#FAF7EF', borderBottom: '1px solid #E1DDD0' }}>
+                <tr style={{ background: '#FAF7EF', borderBottom: '1px solid var(--at-line)' }}>
                   {['', 'Unidad', 'Concepto', 'Monto', 'Período', 'Vencimiento', 'Notas'].map(h => (
                     <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: '#7E9389', fontSize: '11px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
@@ -539,7 +539,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
               </thead>
               <tbody>
                 {csvRows.map((r, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #EAE6D8', background: r.status === 'error' ? '#fef2f2' : r.status === 'warn' ? '#fffbeb' : undefined }}>
+                  <tr key={i} style={{ borderBottom: '1px solid var(--at-chip)', background: r.status === 'error' ? '#fef2f2' : r.status === 'warn' ? '#fffbeb' : undefined }}>
                     <td style={{ padding: '7px 12px', fontSize: '14px' }}>
                       {r.status === 'ok' ? '✅' : r.status === 'warn' ? '⚠️' : '❌'}
                     </td>
@@ -575,10 +575,10 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
           <p style={{ fontWeight: 600, color: '#7E9389' }}>No hay cuotas {filtroEstado !== 'todos' ? `con estado "${filtroEstado}"` : 'registradas'}</p>
         </div>
       ) : (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', overflow: 'hidden' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
             <thead>
-              <tr style={{ background: '#FAF7EF', borderBottom: '1px solid #E1DDD0' }}>
+              <tr style={{ background: '#FAF7EF', borderBottom: '1px solid var(--at-line)' }}>
                 {canEdit && (
                   <th style={{ padding: '10px 14px', width: 36 }}>
                     <input type="checkbox"
@@ -604,7 +604,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                 const colCount = canEdit ? 9 : 8
 
                 const mainRow = (
-                  <tr key={c.id} style={{ borderBottom: expandido ? 'none' : '1px solid #EAE6D8', background: seleccionada ? '#f0fdf4' : undefined }}>
+                  <tr key={c.id} style={{ borderBottom: expandido ? 'none' : '1px solid var(--at-chip)', background: seleccionada ? '#f0fdf4' : undefined }}>
                     {canEdit && (
                       <td style={{ padding: '10px 14px' }}>
                         {esPagable && (
@@ -643,7 +643,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                     <td style={{ padding: '10px 14px' }}>
                       {tieneRubros ? (
                         <button onClick={() => toggleRubros(c.id)}
-                          style={{ fontSize: '11px', padding: '3px 8px', border: '1px solid #E6CDBB', borderRadius: '6px', cursor: 'pointer', background: expandido ? '#EEF2EC' : '#FAF7EF', color: '#9C5733', fontWeight: 600 }}>
+                          style={{ fontSize: '11px', padding: '3px 8px', border: '1px solid var(--at-accent-soft)', borderRadius: '6px', cursor: 'pointer', background: expandido ? '#EEF2EC' : '#FAF7EF', color: '#9C5733', fontWeight: 600 }}>
                           {expandido ? '▲' : '▼'} {rubrosDetalle!.length}
                         </button>
                       ) : <span style={{ color: '#C7C2B0', fontSize: 11 }}>—</span>}
@@ -671,9 +671,9 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                 if (!expandido || !tieneRubros) return [mainRow]
 
                 const detalleRow = (
-                  <tr key={`${c.id}-rubros`} style={{ borderBottom: '1px solid #EAE6D8', background: '#f8faff' }}>
+                  <tr key={`${c.id}-rubros`} style={{ borderBottom: '1px solid var(--at-chip)', background: '#f8faff' }}>
                     <td colSpan={colCount} style={{ padding: '0 14px 10px 48px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 12px', background: '#EEF2EC', borderRadius: 8, border: '1px solid #EFE0D5' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 12px', background: '#EEF2EC', borderRadius: 8, border: '1px solid var(--at-accent-soft-2)' }}>
                         {rubrosDetalle!.map((rd, ri) => (
                           <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#3E5A4C' }}>
                             <span>

@@ -91,7 +91,7 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
         </div>
 
         {/* Resumen de cargos */}
-        <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid #E1DDD0' }}>
+        <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
           <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '8px' }}>{cliente?.nombre}</div>
           <div style={{ fontSize: '13px', color: '#3E5A4C', marginBottom: '8px' }}>
             {registros.length} cargo{registros.length !== 1 ? 's' : ''} incluido{registros.length !== 1 ? 's' : ''}
@@ -109,7 +109,7 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
             <input
               type="text" value={numeroConvenio} onChange={e => setNumeroConvenio(e.target.value)}
               required
-              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit' }}
+              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
             />
           </div>
 
@@ -120,7 +120,7 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
             <input
               type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)}
               placeholder="Ej: Acuerdo de pago en 3 cuotas mensuales"
-              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit' }}
+              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
             />
           </div>
 
@@ -132,7 +132,7 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
               <input
                 type="number" min="1" value={cuotasPactadas} onChange={e => setCuotasPactadas(e.target.value)}
                 placeholder="Ej: 3"
-                style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit' }}
+                style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
               />
             </div>
             <div>
@@ -141,7 +141,7 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
               </label>
               <input
                 type="date" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)}
-                style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit' }}
+                style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
               />
             </div>
           </div>
@@ -154,20 +154,20 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
               value={notas} onChange={e => setNotas(e.target.value)}
               placeholder="Condiciones especiales, acuerdos adicionales..."
               rows={3}
-              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }}
+              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }}
             />
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
             <button type="button" onClick={onClose} style={{
-              flex: 1, padding: '13px', borderRadius: '8px', border: '1.5px solid #E1DDD0',
+              flex: 1, padding: '13px', borderRadius: '8px', border: '1.5px solid var(--at-line)',
               background: 'white', color: '#7E9389', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
             }}>
               Cancelar
             </button>
             <button type="submit" disabled={saving} style={{
               flex: 2, padding: '13px', borderRadius: '8px', border: 'none',
-              background: saving ? '#C7C2B0' : 'linear-gradient(135deg,#B96A3F,#9C5733)',
+              background: saving ? '#C7C2B0' : 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))',
               color: 'white', fontWeight: 700, fontSize: '14px', cursor: saving ? 'not-allowed' : 'pointer',
             }}>
               {saving ? '⏳ Creando...' : '🤝 Crear Convenio'}

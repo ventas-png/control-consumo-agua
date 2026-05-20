@@ -101,7 +101,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             justifyContent: 'center',
             width: '38px',
             height: '38px',
-            border: '1px solid #E1DDD0',
+            border: '1px solid var(--at-line)',
             background: '#FAF7EF',
             borderRadius: '9px',
             cursor: 'pointer',
@@ -121,7 +121,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             width: '30px',
             height: '30px',
             borderRadius: '8px',
-            background: 'linear-gradient(135deg, #D9E2DC, #D9E2DC)',
+            background: 'linear-gradient(135deg, var(--at-primary-soft), var(--at-primary-soft))',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -187,7 +187,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             padding: '5px 12px 5px 5px',
             borderRadius: '50px',
             background: '#FAF7EF',
-            border: '1px solid #E1DDD0',
+            border: '1px solid var(--at-line)',
           }}
         >
           <div
@@ -195,7 +195,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
               width: '30px',
               height: '30px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)',
+              background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

@@ -168,12 +168,12 @@ export function EmpresaSection({ currentUser }: Props) {
       `<option value="${m.simbolo}" ${(proyecto.moneda_condominios ?? proyecto.moneda) === m.simbolo ? 'selected' : ''}>${m.simbolo} — ${m.nombre}</option>`
     ).join('')
 
-    const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #E1DDD0;border-radius:8px;font-size:14px;color:#15291F;background:#fff;outline:none;transition:border-color .15s'
+    const inpStyle = 'width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--at-line);border-radius:8px;font-size:14px;color:var(--at-ink);background:#fff;outline:none;transition:border-color .15s'
     const selStyle = `${inpStyle};cursor:pointer;appearance:auto`
     const secTitle = (icon: string, text: string) =>
-      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:18px">${icon}</span><span style="font-size:13px;font-weight:700;color:#15291F;letter-spacing:.01em">${text}</span></div>`
+      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:18px">${icon}</span><span style="font-size:13px;font-weight:700;color:var(--at-ink);letter-spacing:.01em">${text}</span></div>`
     const lbl = (text: string, sub = '') =>
-      `<label style="display:block;font-size:11px;font-weight:700;color:#7E9389;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">${text}${sub ? `<span style="font-weight:400;text-transform:none;color:#7E9389;margin-left:4px">${sub}</span>` : ''}</label>`
+      `<label style="display:block;font-size:11px;font-weight:700;color:var(--at-ink-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">${text}${sub ? `<span style="font-weight:400;text-transform:none;color:var(--at-ink-3);margin-left:4px">${sub}</span>` : ''}</label>`
 
     const tiposLimites = TIPOS_UNIDAD_LABELS.map(t => {
       const val = (proyecto[t.key] as number | null) ?? ''
@@ -184,24 +184,24 @@ export function EmpresaSection({ currentUser }: Props) {
         max_unidades_otro: '📋',
       }
       return `
-        <div style="display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #EAE6D8;border-radius:10px;padding:10px 12px">
+        <div style="display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--at-chip);border-radius:10px;padding:10px 12px">
           <span style="font-size:18px;flex-shrink:0">${icons[t.key] ?? '📋'}</span>
-          <span style="font-size:13px;color:#3E5A4C;flex:1">${t.label}</span>
+          <span style="font-size:13px;color:var(--at-ink-2);flex:1">${t.label}</span>
           <input id="swal-${t.key}" type="number" min="0" step="1"
             placeholder="∞"
             value="${val}"
-            style="width:80px;padding:6px 8px;border:1.5px solid #E1DDD0;border-radius:8px;font-size:14px;font-weight:700;text-align:center;color:#15291F;background:#FAF7EF" />
+            style="width:80px;padding:6px 8px;border:1.5px solid var(--at-line);border-radius:8px;font-size:14px;font-weight:700;text-align:center;color:var(--at-ink);background:var(--at-surface-2)" />
         </div>`
     }).join('')
 
     const { value: formValues } = await Swal.fire({
-      title: '<span style="font-size:20px;font-weight:800;color:#15291F">Editar Proyecto</span>',
+      title: '<span style="font-size:20px;font-weight:800;color:var(--at-ink)">Editar Proyecto</span>',
       width: 620,
       html: `
         <div style="text-align:left;padding:0 2px;max-height:72vh;overflow-y:auto;display:flex;flex-direction:column;gap:16px">
 
           <!-- Info básica -->
-          <div style="background:#FAF7EF;border-radius:14px;padding:16px 18px">
+          <div style="background:var(--at-surface-2);border-radius:14px;padding:16px 18px">
             ${secTitle('📋', 'Información del proyecto')}
             ${lbl('Nombre', '(requerido)')}
             <input id="swal-nombre" value="${proyecto.nombre}" style="${inpStyle};margin-bottom:12px" />
@@ -210,7 +210,7 @@ export function EmpresaSection({ currentUser }: Props) {
           </div>
 
           <!-- Ubicación -->
-          <div style="background:#FAF7EF;border-radius:14px;padding:16px 18px">
+          <div style="background:var(--at-surface-2);border-radius:14px;padding:16px 18px">
             ${secTitle('📍', 'Ubicación')}
             ${lbl('Dirección')}
             <input id="swal-direccion" placeholder="Ej: Calle 123 #45-67" value="${proyecto.direccion ?? ''}" style="${inpStyle};margin-bottom:12px" />
@@ -218,13 +218,13 @@ export function EmpresaSection({ currentUser }: Props) {
               <div style="flex:1">${lbl('Latitud')}<input id="swal-lat" placeholder="0.000000" value="${proyecto.latitud ?? ''}" style="${inpStyle}" /></div>
               <div style="flex:1">${lbl('Longitud')}<input id="swal-lng" placeholder="0.000000" value="${proyecto.longitud ?? ''}" style="${inpStyle}" /></div>
             </div>
-            <button id="swal-geolocate" type="button" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;border:1.5px solid #1B3B36;background:#EEF2EC;color:#102622;cursor:pointer">
+            <button id="swal-geolocate" type="button" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;border:1.5px solid var(--at-primary);background:var(--at-primary-tint);color:var(--at-primary-hover);cursor:pointer">
               📍 Usar mi ubicación actual
             </button>
           </div>
 
           <!-- Configuración financiera y estado -->
-          <div style="background:#FAF7EF;border-radius:14px;padding:16px 18px">
+          <div style="background:var(--at-surface-2);border-radius:14px;padding:16px 18px">
             ${secTitle('⚙️', 'Configuración')}
             <div style="display:flex;flex-wrap:wrap;gap:12px">
               <div style="flex:1;min-width:140px">
@@ -247,9 +247,9 @@ export function EmpresaSection({ currentUser }: Props) {
           </div>
 
           <!-- Límite de unidades -->
-          <div style="background:#FAF7EF;border-radius:14px;padding:16px 18px">
+          <div style="background:var(--at-surface-2);border-radius:14px;padding:16px 18px">
             ${secTitle('🏗️', 'Límite de unidades por tipo')}
-            <p style="font-size:12px;color:#7E9389;margin:0 0 12px">Dejar vacío = sin límite (∞)</p>
+            <p style="font-size:12px;color:var(--at-ink-3);margin:0 0 12px">Dejar vacío = sin límite (∞)</p>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               ${tiposLimites}
             </div>
@@ -326,7 +326,7 @@ export function EmpresaSection({ currentUser }: Props) {
     const { value: nuevoEstado } = await Swal.fire({
       title: 'Cambiar estado del proyecto',
       html: `
-        <p style="color:#3E5A4C;margin-bottom:16px">Estado actual: <strong style="color:${config.color}">${config.label}</strong></p>
+        <p style="color:var(--at-ink-2);margin-bottom:16px">Estado actual: <strong style="color:${config.color}">${config.label}</strong></p>
         <div style="display:flex;flex-direction:column;gap:8px">
           ${estados.filter(e => e !== actual).map(e => {
             const c = ESTADO_CONFIG[e]
@@ -416,7 +416,7 @@ export function EmpresaSection({ currentUser }: Props) {
     const showAgua = currentUser.servicio_agua !== false
     const showCond = currentUser.servicio_condominios !== false
     const condOpts = CONDOMINIOS_ROLES.map(r => `<option value="${r.id}">${r.label}</option>`).join('')
-    const selStyle = 'width:100%;padding:8px 10px;border-radius:6px;border:1px solid #d0d3d4;font-size:13px;margin-top:8px;background:#fff;color:#15291F'
+    const selStyle = 'width:100%;padding:8px 10px;border-radius:6px;border:1px solid #d0d3d4;font-size:13px;margin-top:8px;background:#fff;color:var(--at-ink)'
     const cols = showAgua && showCond ? '1fr 1fr' : '1fr'
 
     const { value: formValues } = await Swal.fire({
@@ -429,14 +429,14 @@ export function EmpresaSection({ currentUser }: Props) {
             <input id="swal-email" class="swal2-input" placeholder="Correo electrónico" type="email" style="margin:0" />
             <input id="swal-password" class="swal2-input" placeholder="Contraseña temporal" type="password" style="margin:0" />
           </div>
-          <p style="font-size:11px;color:#7E9389;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin:0 0 10px">
+          <p style="font-size:11px;color:var(--at-ink-3);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin:0 0 10px">
             Acceso a aplicaciones
           </p>
           <div style="display:grid;grid-template-columns:${cols};gap:12px">
             ${showAgua ? `
             <div id="card-agua" style="border:1px solid #1B3B3633;border-radius:10px;padding:12px">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#15291F;margin-bottom:2px">
-                <input type="checkbox" id="chk-agua" style="width:16px;height:16px;cursor:pointer;accent-color:#1B3B36" />
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--at-ink);margin-bottom:2px">
+                <input type="checkbox" id="chk-agua" style="width:16px;height:16px;cursor:pointer;accent-color:var(--at-primary)" />
                 💧 Control de Agua
               </label>
               <select id="swal-rol-agua" disabled style="${selStyle};opacity:0.4">
@@ -449,8 +449,8 @@ export function EmpresaSection({ currentUser }: Props) {
             ` : ''}
             ${showCond ? `
             <div id="card-cond" style="border:1px solid #B96A3F33;border-radius:10px;padding:12px">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#15291F;margin-bottom:2px">
-                <input type="checkbox" id="chk-cond" style="width:16px;height:16px;cursor:pointer;accent-color:#B96A3F" />
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--at-ink);margin-bottom:2px">
+                <input type="checkbox" id="chk-cond" style="width:16px;height:16px;cursor:pointer;accent-color:var(--at-accent)" />
                 🏢 Condominios
               </label>
               <select id="swal-rol-cond" disabled style="${selStyle};opacity:0.4">
@@ -587,7 +587,7 @@ export function EmpresaSection({ currentUser }: Props) {
 
       {/* Header empresa */}
       <div className="empresa-card" style={{
-        background: 'linear-gradient(135deg, #15291F, #15291F)',
+        background: 'linear-gradient(135deg, var(--at-ink), var(--at-ink))',
         borderRadius: '16px', padding: '24px 24px 20px', marginBottom: '24px',
         border: '1px solid rgba(255,255,255,0.06)',
       }}>
@@ -608,7 +608,7 @@ export function EmpresaSection({ currentUser }: Props) {
               {empresa?.logo_url
                 ? <SecureImage bucket="company-logos" src={empresa.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : <div style={{
-                    background: 'linear-gradient(135deg,#1B3B36,#577B69)',
+                    background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))',
                     width: '100%', height: '100%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: 'white', fontSize: 22, fontWeight: 700,
@@ -686,7 +686,7 @@ export function EmpresaSection({ currentUser }: Props) {
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '9px 16px', borderRadius: '8px', border: 'none',
               background: empresa && proyectos.length >= empresa.max_projects
-                ? '#3E5A4C' : 'linear-gradient(135deg, #1B3B36, #577B69)',
+                ? '#3E5A4C' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
               color: empresa && proyectos.length >= empresa.max_projects ? '#7E9389' : 'white',
               cursor: empresa && proyectos.length >= empresa.max_projects ? 'not-allowed' : 'pointer',
               fontSize: '13px', fontWeight: 600,
@@ -741,7 +741,7 @@ export function EmpresaSection({ currentUser }: Props) {
                     {p.logo_url
                       ? <SecureImage bucket="project-logos" src={p.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <div style={{
-                          background: 'linear-gradient(135deg,#1B3B36,#577B69)',
+                          background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))',
                           width: '100%', height: '100%',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: 'white', fontSize: 16, fontWeight: 700,
@@ -886,7 +886,7 @@ export function EmpresaSection({ currentUser }: Props) {
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
                 padding: '9px 16px', borderRadius: '8px', border: 'none',
-                background: 'linear-gradient(135deg, #B96A3F, #9C5733)',
+                background: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))',
                 color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
               }}
             >
@@ -1032,7 +1032,7 @@ export function EmpresaSection({ currentUser }: Props) {
       {/* Configuración de Pagos Online */}
       {currentUser.company_id && (
         <div style={{
-          background: 'linear-gradient(135deg, #15291F, #15291F)',
+          background: 'linear-gradient(135deg, var(--at-ink), var(--at-ink))',
           borderRadius: '16px', padding: '24px',
           border: '1px solid rgba(255,255,255,0.06)',
           marginTop: '24px',
@@ -1049,7 +1049,7 @@ export function EmpresaSection({ currentUser }: Props) {
         <div style={{
           background: '#ffffff',
           borderRadius: '16px', padding: '28px',
-          border: '1px solid #E1DDD0',
+          border: '1px solid var(--at-line)',
           marginTop: '24px',
           boxShadow: '0 2px 12px rgba(0,0,0,.04)',
         }}>

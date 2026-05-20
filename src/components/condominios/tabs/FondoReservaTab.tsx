@@ -33,7 +33,7 @@ const BLANK = {
 }
 
 const inputStyle: CSSProperties = {
-  width: '100%', padding: '7px 10px', border: '1.5px solid #E1DDD0',
+  width: '100%', padding: '7px 10px', border: '1.5px solid var(--at-line)',
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }
 
@@ -175,7 +175,7 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
         </select>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
           <button onClick={exportarPDF} disabled={filtered.length === 0}
-            style={{ padding: '7px 14px', background: filtered.length === 0 ? '#EAE6D8' : '#EEF2EC', color: filtered.length === 0 ? '#7E9389' : '#1B3B36', border: '1px solid #C2D2CA', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: filtered.length === 0 ? 'not-allowed' : 'pointer' }}>
+            style={{ padding: '7px 14px', background: filtered.length === 0 ? '#EAE6D8' : '#EEF2EC', color: filtered.length === 0 ? '#7E9389' : '#1B3B36', border: '1px solid var(--at-primary-soft-2)', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: filtered.length === 0 ? 'not-allowed' : 'pointer' }}>
             📄 PDF
           </button>
           <button onClick={exportarXlsx} disabled={filtered.length === 0}
@@ -187,7 +187,7 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar movimiento' : 'Nuevo movimiento'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
@@ -254,7 +254,7 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
             const ts = TIPO_STYLE[m.tipo]
             const es = ESTADO_STYLE[m.estado]
             return (
-              <div key={m.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div key={m.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: ts.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <span style={{ fontSize: '20px', fontWeight: 800, color: ts.color }}>{ts.sign}</span>
                 </div>

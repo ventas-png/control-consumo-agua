@@ -324,7 +324,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
   // ── Styles ──────────────────────────────────────────────────────────────────
 
   const inputStyle = {
-    padding: '9px 12px', border: '2px solid #E1DDD0', borderRadius: '8px',
+    padding: '9px 12px', border: '2px solid var(--at-line)', borderRadius: '8px',
     fontSize: '14px', width: '100%', boxSizing: 'border-box' as const, outline: 'none',
   }
   const labelStyle = {
@@ -332,7 +332,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
     marginBottom: '4px', display: 'block',
   }
   const btnPrimary = {
-    padding: '9px 20px', background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+    padding: '9px 20px', background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
     color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600 as const,
     fontSize: '14px', cursor: 'pointer',
   }
@@ -380,7 +380,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
           </div>
 
           {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: '2px solid #E1DDD0', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', borderBottom: '2px solid var(--at-line)', marginBottom: '20px' }}>
             {(['arrendamiento', 'str'] as Tab[]).map(tab => (
               <button
                 key={tab}
@@ -388,7 +388,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                 style={{
                   padding: '10px 20px', border: 'none', cursor: 'pointer',
                   fontWeight: 600, fontSize: '14px', background: 'transparent',
-                  borderBottom: activeTab === tab ? '3px solid #1B3B36' : '3px solid transparent',
+                  borderBottom: activeTab === tab ? '3px solid var(--at-primary)' : '3px solid transparent',
                   color: activeTab === tab ? '#1B3B36' : '#7E9389',
                   marginBottom: '-2px',
                 }}
@@ -417,7 +417,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
 
                   {showContratoForm && (
                     <div style={{
-                      background: '#FAF7EF', border: '1px solid #E1DDD0',
+                      background: '#FAF7EF', border: '1px solid var(--at-line)',
                       borderRadius: '12px', padding: '20px', marginBottom: '20px',
                     }}>
                       <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '16px' }}>
@@ -568,7 +568,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                           <div
                             key={c.id}
                             style={{
-                              background: 'white', border: '1px solid #E1DDD0',
+                              background: 'white', border: '1px solid var(--at-line)',
                               borderRadius: '10px', padding: '14px 16px',
                               display: 'flex', justifyContent: 'space-between',
                               alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap',
@@ -640,7 +640,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
 
                   {showSTRForm && (
                     <div style={{
-                      background: '#FAF7EF', border: '1px solid #E1DDD0',
+                      background: '#FAF7EF', border: '1px solid var(--at-line)',
                       borderRadius: '12px', padding: '20px', marginBottom: '20px',
                     }}>
                       <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '16px' }}>
@@ -826,7 +826,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                           <div
                             key={r.id}
                             style={{
-                              background: 'white', border: '1px solid #E1DDD0',
+                              background: 'white', border: '1px solid var(--at-line)',
                               borderRadius: '10px', padding: '14px 16px',
                               display: 'flex', justifyContent: 'space-between',
                               alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap',

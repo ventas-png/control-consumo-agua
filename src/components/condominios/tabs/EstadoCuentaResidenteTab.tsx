@@ -107,26 +107,26 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>Estado de Cuenta — ${unidad?.nombre}</title>
     <style>
-      body{font-family:Arial,sans-serif;padding:32px;max-width:900px;margin:auto;color:#15291F}
-      h1{font-size:20px;margin:0}h2{font-size:13px;color:#7E9389;font-weight:normal;margin:4px 0 0}
-      .header{display:flex;justify-content:space-between;border-bottom:2px solid #15291F;padding-bottom:12px;margin-bottom:20px}
-      .meta{background:#FAF7EF;padding:12px 16px;border-radius:8px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px}
+      body{font-family:Arial,sans-serif;padding:32px;max-width:900px;margin:auto;color:var(--at-ink)}
+      h1{font-size:20px;margin:0}h2{font-size:13px;color:var(--at-ink-3);font-weight:normal;margin:4px 0 0}
+      .header{display:flex;justify-content:space-between;border-bottom:2px solid var(--at-ink);padding-bottom:12px;margin-bottom:20px}
+      .meta{background:var(--at-surface-2);padding:12px 16px;border-radius:8px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px}
       .meta strong{font-size:16px;display:block}
       table{width:100%;border-collapse:collapse;font-size:12px}
-      th{background:#EAE6D8;padding:8px 10px;text-align:left;color:#7E9389;font-weight:600}
-      td{padding:8px 10px;border-bottom:1px solid #EAE6D8}
-      tfoot td{font-weight:700;border-top:2px solid #15291F;background:#FAF7EF}
+      th{background:var(--at-chip);padding:8px 10px;text-align:left;color:var(--at-ink-3);font-weight:600}
+      td{padding:8px 10px;border-bottom:1px solid var(--at-chip)}
+      tfoot td{font-weight:700;border-top:2px solid var(--at-ink);background:var(--at-surface-2)}
       .saldo{font-size:18px;font-weight:800;color:${saldo <= 0 ? '#16a34a' : '#ef4444'}}
-      .footer{margin-top:32px;font-size:10px;color:#7E9389;border-top:1px solid #E1DDD0;padding-top:8px}
+      .footer{margin-top:32px;font-size:10px;color:var(--at-ink-3);border-top:1px solid var(--at-line);padding-top:8px}
     </style></head><body>
     <div class="header">
       <div><h1>Estado de Cuenta</h1><h2>${proyectoNombre ?? 'Condominio'}</h2></div>
-      <div style="text-align:right;font-size:12px;color:#7E9389">Generado: ${new Date().toLocaleDateString('es')}</div>
+      <div style="text-align:right;font-size:12px;color:var(--at-ink-3)">Generado: ${new Date().toLocaleDateString('es')}</div>
     </div>
     <div class="meta">
-      <div><span style="font-size:10px;color:#7E9389">Unidad</span><strong>${unidad?.nombre ?? unidadId}</strong></div>
-      <div><span style="font-size:10px;color:#7E9389">Período</span><strong>${anio}</strong></div>
-      <div><span style="font-size:10px;color:#7E9389">Saldo</span><strong class="saldo">${saldo <= 0 ? 'Al día' : moneda + ' ' + saldo.toFixed(2)}</strong></div>
+      <div><span style="font-size:10px;color:var(--at-ink-3)">Unidad</span><strong>${unidad?.nombre ?? unidadId}</strong></div>
+      <div><span style="font-size:10px;color:var(--at-ink-3)">Período</span><strong>${anio}</strong></div>
+      <div><span style="font-size:10px;color:var(--at-ink-3)">Saldo</span><strong class="saldo">${saldo <= 0 ? 'Al día' : moneda + ' ' + saldo.toFixed(2)}</strong></div>
     </div>
     <table>
       <thead><tr><th>Fecha</th><th>Descripción</th><th style="text-align:right">Cargo</th><th style="text-align:right">Abono</th><th style="text-align:center">Estado</th></tr></thead>
@@ -154,11 +154,11 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
         <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Estado de Cuenta por Residente</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select value={unidadId} onChange={e => setUnidadId(e.target.value)}
-            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, background: '#fff' }}>
+            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, background: '#fff' }}>
             {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
           </select>
           <select value={anio} onChange={e => setAnio(Number(e.target.value))}
-            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, background: '#fff' }}>
+            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, background: '#fff' }}>
             {aniosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
           <button onClick={() => exportarPDFEstadoCuenta(movimientos, unidad?.nombre ?? unidadId, anio, moneda, proyectoNombre)}
@@ -194,7 +194,7 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
           Sin movimientos para {unidad?.nombre} en {anio}.
         </div>
       ) : (
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ background: '#FAF7EF' }}>
@@ -208,7 +208,7 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
                 acc.saldoAcum += m.cargo - m.abono
                 const sCfg = ESTADO_CFG[m.estado] ?? { color: '#3E5A4C', bg: '#EAE6D8' }
                 acc.rows.push(
-                  <tr key={i} style={{ borderTop: i > 0 ? '1px solid #EAE6D8' : undefined }}>
+                  <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--at-chip)' : undefined }}>
                     <td style={{ padding: '9px 12px', color: '#7E9389' }}>{m.fecha}</td>
                     <td style={{ padding: '9px 12px', color: '#15291F' }}>{m.descripcion}</td>
                     <td style={{ padding: '9px 12px', textAlign: 'right', color: m.cargo > 0 ? '#ef4444' : '#7E9389' }}>{m.cargo > 0 ? `${moneda} ${m.cargo.toFixed(2)}` : '—'}</td>
@@ -225,7 +225,7 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
               }, { rows: [], saldoAcum: 0 }).rows}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: '2px solid #E1DDD0', background: '#FAF7EF' }}>
+              <tr style={{ borderTop: '2px solid var(--at-line)', background: '#FAF7EF' }}>
                 <td colSpan={2} style={{ padding: '9px 12px', fontWeight: 700 }}>TOTAL</td>
                 <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#ef4444' }}>{moneda} {totalCargos.toFixed(2)}</td>
                 <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{moneda} {totalAbonos.toFixed(2)}</td>

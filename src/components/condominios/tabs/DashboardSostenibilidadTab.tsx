@@ -109,7 +109,7 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
       </div>
 
       {/* Gráfica de tendencia apilada */}
-      <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14, marginBottom: 14 }}>
+      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, marginBottom: 14 }}>
         <div style={{ fontWeight: 700, fontSize: 12, color: '#15291F', marginBottom: 10 }}>Tendencia mensual por categoría</div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 120 }}>
           {tendencia.map(t => (
@@ -137,7 +137,7 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
       </div>
 
       {/* Tabla mensual */}
-      <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead>
             <tr style={{ background: '#FAF7EF' }}>
@@ -149,7 +149,7 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
           </thead>
           <tbody>
             {[...tendencia].reverse().map((t, i) => (
-              <tr key={t.ym} style={{ borderTop: '1px solid #EAE6D8', background: i === 0 ? '#fffbeb' : undefined }}>
+              <tr key={t.ym} style={{ borderTop: '1px solid var(--at-chip)', background: i === 0 ? '#fffbeb' : undefined }}>
                 <td style={{ padding: '7px 12px', color: '#3E5A4C', fontWeight: i === 0 ? 700 : 400 }}>{t.label}</td>
                 {CAT_SOST.map(c => (
                   <td key={c} style={{ padding: '7px 10px', textAlign: 'right', color: t[c] as number > 0 ? CAT_CFG[c].color : '#C7C2B0' }}>
@@ -166,7 +166,7 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
             ))}
           </tbody>
           <tfoot>
-            <tr style={{ borderTop: '2px solid #E1DDD0', background: '#FAF7EF' }}>
+            <tr style={{ borderTop: '2px solid var(--at-line)', background: '#FAF7EF' }}>
               <td style={{ padding: '8px 12px', fontWeight: 700 }}>12m Total</td>
               {CAT_SOST.map(c => (
                 <td key={c} style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: CAT_CFG[c].color }}>

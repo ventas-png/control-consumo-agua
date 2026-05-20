@@ -100,7 +100,7 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
           </p>
         </div>
         {canCreate && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
             + Registrar infracción
           </button>
         )}
@@ -122,13 +122,13 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Nueva infracción</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Unidad infractora *</label>
               <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="">Seleccionar...</option>
                 {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
@@ -136,7 +136,7 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tipo</label>
               <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoInfraccion }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 {(Object.entries(TIPO_CONFIG) as [TipoInfraccion, typeof TIPO_CONFIG[TipoInfraccion]][]).map(([v, c]) => (
                   <option key={v} value={v}>{c.icon} {c.label}</option>
                 ))}
@@ -146,26 +146,26 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Descripción *</label>
               <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
                 placeholder="Describe la infracción cometida..." rows={3}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Monto multa ({moneda})</label>
               <input type="number" value={form.monto_multa} onChange={e => setForm(f => ({ ...f, monto_multa: e.target.value }))} placeholder="0.00" min="0" step="0.01"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha infracción</label>
               <input type="date" value={form.fecha_infraccion} onChange={e => setForm(f => ({ ...f, fecha_infraccion: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha límite descargo</label>
               <input type="date" value={form.fecha_limite_descargo} onChange={e => setForm(f => ({ ...f, fecha_limite_descargo: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Registrar'}
             </button>
             <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -187,7 +187,7 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
             const hoy = new Date().toISOString().slice(0, 10)
             const vencida = i.fecha_limite_descargo && i.fecha_limite_descargo < hoy && i.estado === 'en_descargo'
             return (
-              <div key={i.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '14px', padding: '16px 18px' }}>
+              <div key={i.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '14px', padding: '16px 18px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                   <div style={{ fontSize: '24px', flexShrink: 0, marginTop: '2px' }}>{tipo.icon}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>

@@ -86,7 +86,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
   const aportacionesMes = movimientos.filter(m => m.fecha.startsWith(mesActual) && m.tipo === 'aportacion').reduce((s, m) => s + m.monto, 0)
   const retirosMes = movimientos.filter(m => m.fecha.startsWith(mesActual) && m.tipo === 'retiro').reduce((s, m) => s + m.monto, 0)
 
-  const INPUT = { width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, background: '#fff', outline: 'none' }
+  const INPUT = { width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, background: '#fff', outline: 'none' }
 
   return (
     <div style={{ padding: 16 }}>
@@ -111,7 +111,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 14 }}>
         {/* Formulario */}
         {canCreate && (
-          <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+          <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>Nuevo movimiento</div>
 
             <div style={{ marginBottom: 10 }}>
@@ -158,7 +158,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
         {/* Panel derecho */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Tendencia */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>Movimientos últimos 6 meses</div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80 }}>
               {tendencia.map(t => (
@@ -178,7 +178,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
           </div>
 
           {/* Historial */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ padding: '10px 14px', background: '#FAF7EF', fontWeight: 700, fontSize: 12, color: '#3E5A4C' }}>
               Historial de movimientos
             </div>
@@ -190,7 +190,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
                   const cfg = TIPO_CFG[m.tipo as TipoMov] ?? TIPO_CFG.ajuste
                   return (
                     <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '10px 14px', borderBottom: i < historial.length - 1 ? '1px solid #EAE6D8' : undefined }}>
+                      padding: '10px 14px', borderBottom: i < historial.length - 1 ? '1px solid var(--at-chip)' : undefined }}>
                       <div>
                         <div style={{ fontSize: 12, fontWeight: 600, color: '#15291F' }}>{m.concepto}</div>
                         <div style={{ fontSize: 10, color: '#7E9389', marginTop: 2 }}>

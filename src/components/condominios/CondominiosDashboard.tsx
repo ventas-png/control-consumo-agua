@@ -157,7 +157,7 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
             <select
               value={selectedProjectId}
               onChange={e => setSelectedProjectId(e.target.value)}
-              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #E1DDD0', fontSize: '14px', fontWeight: 500, background: 'white', cursor: 'pointer', minWidth: '200px' }}
+              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '14px', fontWeight: 500, background: 'white', cursor: 'pointer', minWidth: '200px' }}
             >
               <option value="">-- Todos los proyectos --</option>
               {proyectosActivos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
@@ -188,7 +188,7 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
             <button
               key={a.label}
               onClick={() => onNavigateSection(a.section)}
-              style={{ padding: '16px', background: 'white', border: '1px solid #E1DDD0', borderRadius: '12px', cursor: 'pointer', textAlign: 'center', transition: 'box-shadow 0.15s, transform 0.15s', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+              style={{ padding: '16px', background: 'white', border: '1px solid var(--at-line)', borderRadius: '12px', cursor: 'pointer', textAlign: 'center', transition: 'box-shadow 0.15s, transform 0.15s', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 20px rgba(0,0,0,0.1)'; (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)' }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; (e.currentTarget as HTMLButtonElement).style.transform = '' }}
             >
@@ -207,13 +207,13 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ background: '#FAF7EF' }}>
-                  <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C', borderBottom: '2px solid #E1DDD0' }}>Proyecto</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#9C5733', borderBottom: '2px solid #E1DDD0' }}>🏠 Ocupación</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#d97706', borderBottom: '2px solid #E1DDD0' }}>💰 Pendientes</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#dc2626', borderBottom: '2px solid #E1DDD0' }}>⚠️ Mora</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#102622', borderBottom: '2px solid #E1DDD0' }}>👥 Visitantes hoy</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#ea580c', borderBottom: '2px solid #E1DDD0' }}>🔧 Tickets</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#102622', borderBottom: '2px solid #E1DDD0' }}>💬 Sin asignar</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C', borderBottom: '2px solid var(--at-line)' }}>Proyecto</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#9C5733', borderBottom: '2px solid var(--at-line)' }}>🏠 Ocupación</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#d97706', borderBottom: '2px solid var(--at-line)' }}>💰 Pendientes</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#dc2626', borderBottom: '2px solid var(--at-line)' }}>⚠️ Mora</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#102622', borderBottom: '2px solid var(--at-line)' }}>👥 Visitantes hoy</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#ea580c', borderBottom: '2px solid var(--at-line)' }}>🔧 Tickets</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#102622', borderBottom: '2px solid var(--at-line)' }}>💬 Sin asignar</th>
                 </tr>
               </thead>
               <tbody>
@@ -228,16 +228,16 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
                       onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#EEF2EC'}
                       onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'white' : '#FAF7EF'}
                     >
-                      <td style={{ padding: '10px 14px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid #EAE6D8' }}>
+                      <td style={{ padding: '10px 14px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid var(--at-chip)' }}>
                         {hasMora && <span style={{ color: '#ef4444', marginRight: 6 }}>●</span>}
                         {p.nombre}
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', color: '#9C5733', fontWeight: 600 }}>{s.ocupadas}/{s.totalUnidades}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', fontWeight: s.cuotasPendientes > 0 ? 700 : 400, color: s.cuotasPendientes > 0 ? '#d97706' : '#7E9389' }}>{s.cuotasPendientes}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', fontWeight: s.cuotasMora > 0 ? 700 : 400, color: s.cuotasMora > 0 ? '#dc2626' : '#7E9389' }}>{s.cuotasMora}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', fontWeight: s.visitantesHoy > 0 ? 700 : 400, color: s.visitantesHoy > 0 ? '#102622' : '#7E9389' }}>{s.visitantesHoy}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', fontWeight: s.ticketsAbiertos > 0 ? 700 : 400, color: s.ticketsAbiertos > 0 ? '#ea580c' : '#7E9389' }}>{s.ticketsAbiertos}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', fontWeight: s.comunSinAsignar > 0 ? 700 : 400, color: s.comunSinAsignar > 0 ? '#102622' : '#7E9389' }}>{s.comunSinAsignar}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', color: '#9C5733', fontWeight: 600 }}>{s.ocupadas}/{s.totalUnidades}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cuotasPendientes > 0 ? 700 : 400, color: s.cuotasPendientes > 0 ? '#d97706' : '#7E9389' }}>{s.cuotasPendientes}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cuotasMora > 0 ? 700 : 400, color: s.cuotasMora > 0 ? '#dc2626' : '#7E9389' }}>{s.cuotasMora}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.visitantesHoy > 0 ? 700 : 400, color: s.visitantesHoy > 0 ? '#102622' : '#7E9389' }}>{s.visitantesHoy}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.ticketsAbiertos > 0 ? 700 : 400, color: s.ticketsAbiertos > 0 ? '#ea580c' : '#7E9389' }}>{s.ticketsAbiertos}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.comunSinAsignar > 0 ? 700 : 400, color: s.comunSinAsignar > 0 ? '#102622' : '#7E9389' }}>{s.comunSinAsignar}</td>
                     </tr>
                   )
                 })}

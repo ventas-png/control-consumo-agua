@@ -101,14 +101,14 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
     setMostrarForm(true)
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 320, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
+      <div style={{ width: 320, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Reglamento ({lista.length})</span>
             {canCreate && (
@@ -133,14 +133,14 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
 
         {Object.entries(porCapitulo).map(([cap, items]) => (
           <div key={cap}>
-            <div style={{ padding: '6px 12px', background: '#FAF7EF', fontSize: 11, fontWeight: 700, color: '#3E5A4C', borderBottom: '1px solid #E1DDD0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ padding: '6px 12px', background: '#FAF7EF', fontSize: 11, fontWeight: 700, color: '#3E5A4C', borderBottom: '1px solid var(--at-line)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {cap}
             </div>
             {items.map(a => {
               const cat = CATEGORIAS.find(c => c.value === a.categoria)
               return (
                 <div key={a.id} onClick={() => { setSelected(a); setMostrarForm(false) }}
-                  style={{ padding: '9px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === a.id ? '#F4EBE3' : '#fff', opacity: a.vigente ? 1 : 0.5, borderLeft: `3px solid ${cat?.color || '#E1DDD0'}` }}>
+                  style={{ padding: '9px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === a.id ? '#F4EBE3' : '#fff', opacity: a.vigente ? 1 : 0.5, borderLeft: `3px solid ${cat?.color || '#E1DDD0'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: cat?.color }}>{a.numero_articulo}</span>
                     {!a.vigente && <span style={{ fontSize: 10, color: '#7E9389' }}>derogado</span>}
@@ -227,7 +227,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
                 {canEdit && (
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button onClick={() => iniciarEdicion(selected)}
-                      style={{ padding: '6px 12px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid #E1DDD0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 12px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ✏️ Editar
                     </button>
                     <button onClick={() => toggleVigente(selected)}

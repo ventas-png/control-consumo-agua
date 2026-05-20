@@ -1199,7 +1199,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* Header */}
-      <div style={{ padding: '16px 24px 0', borderBottom: '1px solid #E1DDD0', background: 'white', flexShrink: 0 }}>
+      <div style={{ padding: '16px 24px 0', borderBottom: '1px solid var(--at-line)', background: 'white', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '20px' }}>🏢</span>
@@ -1207,7 +1207,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
           </div>
           {proyectosActivos.length > 1 && (
             <select value={selectedProyectoId} onChange={e => setSelectedProyectoId(e.target.value)}
-              style={{ padding: '6px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', color: '#3E5A4C', fontWeight: 500 }}>
+              style={{ padding: '6px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', color: '#3E5A4C', fontWeight: 500 }}>
               {proyectosActivos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           )}
@@ -1218,7 +1218,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
         </div>
 
         {/* Barra de secciones (nivel 1) */}
-        <div style={{ display: 'flex', gap: 1, overflowX: 'auto', marginTop: 8, borderBottom: '2px solid #E1DDD0' }}>
+        <div style={{ display: 'flex', gap: 1, overflowX: 'auto', marginTop: 8, borderBottom: '2px solid var(--at-line)' }}>
           {visibleSections.map(sec => {
             const activa = activeSection === sec.id
             return (
@@ -1235,7 +1235,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
                   background: activa ? '#15291F' : '#EAE6D8',
                   color: activa ? '#fff' : '#7E9389',
                   borderRadius: '6px 6px 0 0',
-                  borderBottom: activa ? '2px solid #15291F' : '2px solid transparent',
+                  borderBottom: activa ? '2px solid var(--at-ink)' : '2px solid transparent',
                   marginBottom: -2,
                 }}>
                 {sec.icon} {sec.label}
@@ -1256,7 +1256,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
           overflowY: 'auto',
           overflowX: 'hidden',
           background: '#FAF7EF',
-          borderRight: '1px solid #E1DDD0',
+          borderRight: '1px solid var(--at-line)',
           transition: 'width 0.18s ease, min-width 0.18s ease',
           flexShrink: 0,
         }}>
@@ -1292,7 +1292,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
           title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
           style={{
             flexShrink: 0, width: '18px',
-            background: '#EAE6D8', border: 'none', borderRight: '1px solid #E1DDD0',
+            background: '#EAE6D8', border: 'none', borderRight: '1px solid var(--at-line)',
             cursor: 'pointer', color: '#7E9389', fontSize: '10px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>

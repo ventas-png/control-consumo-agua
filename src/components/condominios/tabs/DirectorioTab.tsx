@@ -82,7 +82,7 @@ export function DirectorioTab({ personal, contactosEmergencia, proyectoId }: Pro
   })
 
   const cardStyle: CSSProperties = {
-    background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px 14px',
+    background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px',
     display: 'flex', gap: '12px', alignItems: 'flex-start',
   }
 
@@ -91,7 +91,7 @@ export function DirectorioTab({ personal, contactosEmergencia, proyectoId }: Pro
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Directorio</h2>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar…"
-          style={{ padding: '7px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', width: '200px' }} />
+          style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', width: '200px' }} />
       </div>
 
       {/* Sub-tabs */}

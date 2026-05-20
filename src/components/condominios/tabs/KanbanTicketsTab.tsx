@@ -105,7 +105,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value as PrioridadTicket | '')}
-            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, background: '#fff' }}>
+            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, background: '#fff' }}>
             <option value="">Todas las prioridades</option>
             {(Object.keys(PRIORIDAD_CFG) as PrioridadTicket[]).map(p => (
               <option key={p} value={p}>{PRIORIDAD_CFG[p].label}</option>
@@ -113,7 +113,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
           </select>
           {tecnicos.length > 0 && (
             <select value={filtroTecnico} onChange={e => setFiltroTecnico(e.target.value)}
-              style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, background: '#fff' }}>
+              style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, background: '#fff' }}>
               <option value="">Todos los técnicos</option>
               {tecnicos.map(t => <option key={t} value={t}>{t.slice(0, 20)}</option>)}
             </select>
@@ -144,7 +144,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
                   const isMoving = moviendo === ticket.id
                   return (
                     <div key={ticket.id}
-                      style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 10, padding: '10px 12px', cursor: 'pointer', opacity: isMoving ? 0.6 : 1, transition: 'box-shadow 0.15s', boxShadow: exp ? '0 2px 8px rgba(0,0,0,0.1)' : undefined }}
+                      style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer', opacity: isMoving ? 0.6 : 1, transition: 'box-shadow 0.15s', boxShadow: exp ? '0 2px 8px rgba(0,0,0,0.1)' : undefined }}
                       onClick={() => setExpandido(exp ? null : ticket.id)}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
                         <div style={{ fontWeight: 600, fontSize: 12, color: '#15291F', flex: 1, lineHeight: 1.3 }}>{ticket.titulo}</div>
@@ -165,7 +165,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
                       </div>
 
                       {exp && (
-                        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #EAE6D8' }}>
+                        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--at-chip)' }}>
                           {ticket.descripcion && (
                             <div style={{ fontSize: 11, color: '#3E5A4C', marginBottom: 8 }}>{ticket.descripcion}</div>
                           )}
@@ -179,7 +179,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
                               {ANTERIOR[ticket.estado] && (
                                 <button onClick={() => moverTicket(ticket, ANTERIOR[ticket.estado]!)} disabled={isMoving}
-                                  style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid #C7C2B0', background: '#FAF7EF', cursor: 'pointer', color: '#7E9389' }}>
+                                  style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid var(--at-line-strong)', background: '#FAF7EF', cursor: 'pointer', color: '#7E9389' }}>
                                   ← Retroceder
                                 </button>
                               )}

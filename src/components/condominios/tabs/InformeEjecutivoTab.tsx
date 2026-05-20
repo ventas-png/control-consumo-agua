@@ -72,25 +72,25 @@ export default function InformeEjecutivoTab({
 <title>Informe Ejecutivo — ${proyectoNombre ?? 'Condominio'}</title>
 <style>
   *{box-sizing:border-box}
-  body{font-family:Arial,sans-serif;padding:32px;max-width:960px;margin:auto;color:#15291F;font-size:13px;line-height:1.5}
-  .header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #15291F;padding-bottom:14px;margin-bottom:24px}
+  body{font-family:Arial,sans-serif;padding:32px;max-width:960px;margin:auto;color:var(--at-ink);font-size:13px;line-height:1.5}
+  .header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid var(--at-ink);padding-bottom:14px;margin-bottom:24px}
   h1{margin:0;font-size:22px}
-  h3{font-size:14px;font-weight:700;color:#15291F;border-bottom:1px solid #E1DDD0;padding-bottom:6px;margin:20px 0 12px}
+  h3{font-size:14px;font-weight:700;color:var(--at-ink);border-bottom:1px solid var(--at-line);padding-bottom:6px;margin:20px 0 12px}
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
-  .kpi{border-radius:10px;padding:12px 14px;border:1px solid #E1DDD0}
-  .kpi-label{font-size:10px;color:#7E9389;margin-bottom:4px}
+  .kpi{border-radius:10px;padding:12px 14px;border:1px solid var(--at-line)}
+  .kpi-label{font-size:10px;color:var(--at-ink-3);margin-bottom:4px}
   .kpi-val{font-size:18px;font-weight:800}
-  .section{background:#FAF7EF;border-radius:10px;padding:14px 18px;margin-bottom:16px}
-  .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #EAE6D8;font-size:12px}
+  .section{background:var(--at-surface-2);border-radius:10px;padding:14px 18px;margin-bottom:16px}
+  .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--at-chip);font-size:12px}
   .row:last-child{border-bottom:none}
-  .label{color:#7E9389}
+  .label{color:var(--at-ink-3)}
   .value{font-weight:700}
   .ok{color:#16a34a}.warn{color:#d97706}.bad{color:#ef4444}
   .chart{display:flex;gap:8px;align-items:flex-end;height:${BAR_H+20}px;margin-top:8px}
   .bar-wrap{flex:1;text-align:center}
   .bar-group{display:flex;gap:2px;justify-content:center;align-items:flex-end;height:${BAR_H}px}
-  .bar-label{font-size:9px;color:#7E9389;margin-top:4px}
-  .footer{margin-top:32px;font-size:10px;color:#7E9389;border-top:1px solid #E1DDD0;padding-top:10px;display:flex;justify-content:space-between}
+  .bar-label{font-size:9px;color:var(--at-ink-3);margin-top:4px}
+  .footer{margin-top:32px;font-size:10px;color:var(--at-ink-3);border-top:1px solid var(--at-line);padding-top:10px;display:flex;justify-content:space-between}
   .alert-box{background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:12px}
   .alert-title{font-weight:700;color:#ef4444;margin-bottom:2px}
   @media print{body{padding:20px}}
@@ -99,9 +99,9 @@ export default function InformeEjecutivoTab({
 <div class="header">
   <div>
     <h1>${proyectoNombre ?? 'Condominio'}</h1>
-    <div style="font-size:12px;color:#7E9389;margin-top:4px">Informe Ejecutivo Mensual — ${MESES[hoy.getMonth()]} ${hoy.getFullYear()}</div>
+    <div style="font-size:12px;color:var(--at-ink-3);margin-top:4px">Informe Ejecutivo Mensual — ${MESES[hoy.getMonth()]} ${hoy.getFullYear()}</div>
   </div>
-  <div style="text-align:right;font-size:11px;color:#7E9389">
+  <div style="text-align:right;font-size:11px;color:var(--at-ink-3)">
     Generado: ${hoy.toLocaleDateString('es', { day:'2-digit', month:'long', year:'numeric' })}<br>
     ${unidades.length} unidades registradas
   </div>
@@ -162,9 +162,9 @@ export default function InformeEjecutivoTab({
     <div class="kpi-label">Cerrados este mes</div>
     <div class="kpi-val ok">${ticketsCerradosMes}</div>
   </div>
-  <div class="kpi" style="background:#EEF2EC">
+  <div class="kpi" style="background:var(--at-primary-tint)">
     <div class="kpi-label">Costo manto. mes</div>
-    <div class="kpi-val" style="color:#1B3B36">${moneda} ${costoMantoMes.toLocaleString('es',{minimumFractionDigits:2})}</div>
+    <div class="kpi-val" style="color:var(--at-primary)">${moneda} ${costoMantoMes.toLocaleString('es',{minimumFractionDigits:2})}</div>
   </div>
 </div>
 
@@ -231,7 +231,7 @@ ${morosos > 5 ? `<div class="alert-box"><div class="alert-title">Alto nivel de m
       </div>
 
       {/* Secciones del informe */}
-      <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+      <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>El informe incluye:</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
@@ -242,7 +242,7 @@ ${morosos > 5 ? `<div class="alert-box"><div class="alert-title">Alto nivel de m
             '🏘️ Comunidad y operaciones (visitas, sugerencias)',
             '⚠️ Puntos de atención prioritaria (alertas automáticas)',
           ].map(s => (
-            <div key={s} style={{ fontSize: 12, color: '#3E5A4C', padding: '5px 0', borderBottom: '1px solid #EAE6D8' }}>
+            <div key={s} style={{ fontSize: 12, color: '#3E5A4C', padding: '5px 0', borderBottom: '1px solid var(--at-chip)' }}>
               {s}
             </div>
           ))}

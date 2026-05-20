@@ -112,7 +112,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
             📊 Excel
           </button>
           <button onClick={exportarCSV}
-            style={{ padding: '6px 14px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid #E1DDD0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+            style={{ padding: '6px 14px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
             CSV
           </button>
         </div>
@@ -137,7 +137,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
 
       {/* Barra proporcional por tramo */}
       {totales.total > 0 && (
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: '#7E9389', marginBottom: 6, fontWeight: 600 }}>Distribución de deuda por antigüedad</div>
           <div style={{ display: 'flex', height: 16, borderRadius: 8, overflow: 'hidden', gap: 1 }}>
             {columnas.map(col => {
@@ -169,7 +169,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
           No hay unidades con saldo pendiente. ¡Excelente nivel de cobro!
         </div>
       ) : (
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ background: '#FAF7EF' }}>
@@ -185,7 +185,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
             </thead>
             <tbody>
               {deudores.map((d, i) => (
-                <tr key={d.unidadId} style={{ borderTop: i > 0 ? '1px solid #EAE6D8' : undefined, background: d.t90plus > 0 ? '#fef2f200' : undefined }}>
+                <tr key={d.unidadId} style={{ borderTop: i > 0 ? '1px solid var(--at-chip)' : undefined, background: d.t90plus > 0 ? '#fef2f200' : undefined }}>
                   <td style={{ padding: '9px 12px', fontWeight: 600, color: '#15291F' }}>{d.unidadNombre}</td>
                   <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t0_30 > 0 ? '#d97706' : '#7E9389' }}>
                     {d.t0_30 > 0 ? `${moneda} ${d.t0_30.toFixed(2)}` : '—'}
@@ -205,7 +205,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
                   <td style={{ padding: '9px 12px', textAlign: 'center', color: '#7E9389' }}>{d.cuotasCount}</td>
                   <td style={{ padding: '9px 12px', textAlign: 'right' }}>
                     <button onClick={() => cartaCobro(d)}
-                      style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid #1B3B36', background: '#EEF2EC', color: '#1B3B36', cursor: 'pointer', fontWeight: 600 }}>
+                      style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid var(--at-primary)', background: '#EEF2EC', color: '#1B3B36', cursor: 'pointer', fontWeight: 600 }}>
                       🖨️ Carta
                     </button>
                   </td>
@@ -213,7 +213,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
               ))}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: '2px solid #E1DDD0', background: '#FAF7EF' }}>
+              <tr style={{ borderTop: '2px solid var(--at-line)', background: '#FAF7EF' }}>
                 <td style={{ padding: '9px 12px', fontWeight: 700 }}>TOTAL</td>
                 <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#d97706' }}>{moneda} {totales.t0_30.toFixed(2)}</td>
                 <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#ea580c' }}>{moneda} {totales.t31_60.toFixed(2)}</td>

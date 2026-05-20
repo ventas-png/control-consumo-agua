@@ -39,7 +39,7 @@ export function ConversationList({ conversations, activeId, onSelect, filter, un
             onClick={() => onSelect(conv.id)}
             style={{
               width: '100%', textAlign: 'left', padding: '12px 14px',
-              border: 'none', borderBottom: '1px solid #EAE6D8',
+              border: 'none', borderBottom: '1px solid var(--at-chip)',
               background: isActive ? '#EEF2EC' : isUnseen ? '#fffbeb' : 'white',
               cursor: 'pointer', transition: 'background 0.12s',
               display: 'flex', flexDirection: 'column', gap: '4px',

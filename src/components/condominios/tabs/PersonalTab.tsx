@@ -100,7 +100,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
   const cargoInfo = (c: CargoPersonal) => CARGOS.find(x => x.value === c) ?? CARGOS[CARGOS.length - 1]
   const turnoLabel: Record<TurnoPersonal, string> = { diurno: '☀️ Diurno', nocturno: '🌙 Nocturno', rotativo: '🔄 Rotativo' }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   return (
@@ -123,7 +123,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Empleado' : 'Nuevo Empleado'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '12px' }}>
             <div>
@@ -180,7 +180,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
@@ -201,7 +201,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
         ))}
         <div style={{ width: '1px', height: '24px', background: '#E1DDD0', margin: '0 4px' }} />
         <select value={filtroCargo} onChange={e => setFiltroCargo(e.target.value as CargoPersonal | 'todos')}
-          style={{ padding: '5px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
+          style={{ padding: '5px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
           <option value="todos">Todos los cargos</option>
           {CARGOS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
         </select>
@@ -219,7 +219,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
             const ci = cargoInfo(p.cargo)
             const est = ESTADO_CONFIG[p.estado]
             return (
-              <div key={p.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div key={p.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#EAE6D8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>

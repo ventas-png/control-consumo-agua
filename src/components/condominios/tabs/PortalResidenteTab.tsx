@@ -83,7 +83,7 @@ export function PortalResidenteTab({
   return (
     <div>
       {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg,#0E2A24,#102622)', borderRadius: '16px', padding: '20px 24px', marginBottom: '20px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ background: 'linear-gradient(135deg,var(--at-ink-deep),var(--at-primary-hover))', borderRadius: '16px', padding: '20px 24px', marginBottom: '20px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <div style={{ fontSize: '22px', fontWeight: 800, marginBottom: '4px' }}>Portal del Residente</div>
           <div style={{ fontSize: '13px', opacity: 0.8 }}>Vista del propietario — selecciona una unidad para gestionar</div>
@@ -111,7 +111,7 @@ export function PortalResidenteTab({
       ) : (
         <>
           {/* Sub-tabs */}
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '20px', borderBottom: '2px solid #E1DDD0', paddingBottom: '10px' }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '20px', borderBottom: '2px solid var(--at-line)', paddingBottom: '10px' }}>
             {SUB_TABS.map(t => (
               <button key={t.id} onClick={() => setSubTab(t.id)}
                 style={{

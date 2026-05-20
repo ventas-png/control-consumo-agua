@@ -21,7 +21,7 @@ const TIPO_STYLE: Record<string, { label: string; icon: string; bg: string; colo
 }
 
 const inputStyle: CSSProperties = {
-  width: '100%', padding: '7px 10px', border: '1.5px solid #E1DDD0',
+  width: '100%', padding: '7px 10px', border: '1.5px solid var(--at-line)',
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }
 
@@ -154,7 +154,7 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar registro' : 'Nuevo registro de consumo'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -224,10 +224,10 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
           <p style={{ fontWeight: 600, color: '#7E9389' }}>Sin registros de consumo</p>
         </div>
       ) : (
-        <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: '#FAF7EF', borderBottom: '1.5px solid #E1DDD0' }}>
+              <tr style={{ background: '#FAF7EF', borderBottom: '1.5px solid var(--at-line)' }}>
                 {['Tipo', 'Área', 'Período', 'Lect. Ant.', 'Lect. Act.', 'Consumo', 'Costo unit.', 'Total', 'Fecha', ''].map(h => (
                   <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#7E9389', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
@@ -238,7 +238,7 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
                 const ts = TIPO_STYLE[c.tipo]
                 const consumo = c.lectura_anterior != null ? c.lectura_actual - c.lectura_anterior : null
                 return (
-                  <tr key={c.id} style={{ borderBottom: '1px solid #EAE6D8' }}>
+                  <tr key={c.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, background: ts.bg, color: ts.color }}>{ts.icon} {ts.label}</span>
                     </td>

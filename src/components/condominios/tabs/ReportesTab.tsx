@@ -17,7 +17,7 @@ function fmt(n: number) { return n.toLocaleString('es-CR', { minimumFractionDigi
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: '28px', pageBreakInside: 'avoid' }}>
-      <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 800, color: '#15291F', borderBottom: '2px solid #E1DDD0', paddingBottom: '6px' }}>{title}</h3>
+      <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 800, color: '#15291F', borderBottom: '2px solid var(--at-line)', paddingBottom: '6px' }}>{title}</h3>
       {children}
     </div>
   )
@@ -27,7 +27,7 @@ function KpiGrid({ items }: { items: { label: string; value: string; color?: str
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
       {items.map(k => (
-        <div key={k.label} style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
+        <div key={k.label} style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
           <div style={{ fontSize: '18px', fontWeight: 800, color: k.color ?? '#15291F' }}>{k.value}</div>
           <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
         </div>
@@ -124,13 +124,13 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
         ]} />
 
         {topCategorias.length > 0 && (
-          <div style={{ marginTop: '14px', border: '1.5px solid #E1DDD0', borderRadius: '10px', overflow: 'hidden' }}>
+          <div style={{ marginTop: '14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
                 <tr style={{ background: '#FAF7EF' }}>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid #E1DDD0' }}>Categoría</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid #E1DDD0' }}>Gasto {currentYear}</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid #E1DDD0' }}>% del Total</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>Categoría</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>Gasto {currentYear}</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>% del Total</th>
                 </tr>
               </thead>
               <tbody>

@@ -98,10 +98,10 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
         }
         .login-input:focus {
           outline: none;
-          border-color: #1B3B36 !important;
+          border-color: var(--at-primary) !important;
           box-shadow: 0 0 0 3px rgba(27, 59, 54,0.15);
         }
-        .login-input::placeholder { color: #7E9389; }
+        .login-input::placeholder { color: var(--at-ink-3); }
         .login-btn-main:hover:not(:disabled) {
           filter: brightness(1.08);
           transform: translateY(-1px);
@@ -109,7 +109,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
         }
         .login-btn-main:active:not(:disabled) { transform: translateY(0); }
         .login-btn-google:hover:not(:disabled) {
-          background: #FAF7EF !important;
+          background: var(--at-surface-2) !important;
           box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
         }
         .feat-card:hover {
@@ -129,7 +129,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
 
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'linear-gradient(135deg, #102622 0%, #102622 45%, #577B69 100%)',
+        background: 'linear-gradient(135deg, var(--at-primary-hover) 0%, var(--at-primary-hover) 45%, var(--at-accent-2) 100%)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 2000, overflow: 'hidden',
       }}>
@@ -265,7 +265,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               style={{
                 width: '100%', padding: '13px', fontSize: '15px', fontWeight: 600,
                 background: 'white', color: '#3E5A4C',
-                border: '1.5px solid #E1DDD0', borderRadius: '14px',
+                border: '1.5px solid var(--at-line)', borderRadius: '14px',
                 cursor: 'pointer', display: 'flex', alignItems: 'center',
                 justifyContent: 'center', gap: '10px',
                 transition: 'all 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
@@ -275,7 +275,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               {googleLoading ? (
                 <span style={{
                   width: 20, height: 20, borderRadius: '50%',
-                  border: '2.5px solid #E1DDD0', borderTopColor: '#4285f4',
+                  border: '2.5px solid var(--at-line)', borderTopColor: '#4285f4',
                   display: 'inline-block', animation: 'spin 0.7s linear infinite',
                 }} />
               ) : (
@@ -311,7 +311,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
                 onKeyDown={e => e.key === 'Enter' && handleLogin()}
                 style={{
                   padding: '13px 14px 13px 44px',
-                  border: '1.5px solid #E1DDD0', borderRadius: '12px',
+                  border: '1.5px solid var(--at-line)', borderRadius: '12px',
                   width: '100%', fontSize: '15px', boxSizing: 'border-box',
                   background: '#FAF7EF', transition: 'border-color 0.2s, box-shadow 0.2s',
                   color: '#15291F',
@@ -334,7 +334,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
                 onKeyDown={e => e.key === 'Enter' && handleLogin()}
                 style={{
                   padding: '13px 44px 13px 44px',
-                  border: '1.5px solid #E1DDD0', borderRadius: '12px',
+                  border: '1.5px solid var(--at-line)', borderRadius: '12px',
                   width: '100%', fontSize: '15px', boxSizing: 'border-box',
                   background: '#FAF7EF', transition: 'border-color 0.2s, box-shadow 0.2s',
                   color: '#15291F',
@@ -374,7 +374,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               disabled={loading || googleLoading}
               style={{
                 width: '100%', padding: '14px', fontSize: '16px', fontWeight: 700,
-                background: 'linear-gradient(135deg, #1B3B36 0%, #102622 50%, #577B69 100%)',
+                background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-primary-hover) 50%, var(--at-accent-2) 100%)',
                 color: 'white', border: 'none', borderRadius: '14px',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.8 : 1,
@@ -413,8 +413,8 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
             <div style={{
               marginTop: '16px',
               padding: '14px 18px',
-              background: 'linear-gradient(135deg, #EEF2EC, #D9E2DC)',
-              border: '1px solid #C2D2CA',
+              background: 'linear-gradient(135deg, var(--at-primary-tint), var(--at-primary-soft))',
+              border: '1px solid var(--at-primary-soft-2)',
               borderRadius: '14px',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               gap: '10px', flexWrap: 'wrap',
@@ -430,7 +430,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               <button
                 onClick={onRegister}
                 style={{
-                  background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+                  background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                   color: 'white', border: 'none', borderRadius: '10px',
                   padding: '8px 18px', fontSize: '13px', fontWeight: 700,
                   cursor: 'pointer', whiteSpace: 'nowrap',

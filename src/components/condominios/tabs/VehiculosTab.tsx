@@ -79,7 +79,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
   if (filtroTipo !== 'todos') filtered = filtered.filter(v => v.tipo === filtroTipo)
   if (soloActivos) filtered = filtered.filter(v => v.activo)
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   const totalActivos = vehiculos.filter(v => v.activo).length
 
@@ -104,7 +104,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
           const count = vehiculos.filter(v => v.tipo === tipo && v.activo).length
           const style = TIPO_COLOR[tipo]
           return (
-            <div key={tipo} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+            <div key={tipo} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
               <div style={{ fontSize: '22px', fontWeight: 800, color: style.color }}>{count}</div>
               <div style={{ fontSize: '11px', color: '#7E9389' }}>{label}s</div>
             </div>
@@ -114,7 +114,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar vehículo' : 'Registrar Vehículo'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
             <div>
@@ -168,7 +168,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -222,7 +222,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
                         {v.activo ? 'Desactivar' : 'Activar'}
                       </button>
                       <button onClick={() => startEdit(v)}
-                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(v.id)}
                         style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                     </div>

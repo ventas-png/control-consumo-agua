@@ -50,7 +50,7 @@ const PORTAL_CSS = `
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .condo-tab:hover { background: rgba(185, 106, 63,0.08) !important; }
-.condo-tab.active { background: white !important; color: #9C5733 !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.condo-tab.active { background: white !important; color: var(--at-accent-hover) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 `
 
 export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
@@ -168,7 +168,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #9C5733 0%, #B96A3F 50%, #CE8A63 100%)',
+        background: 'linear-gradient(135deg, var(--at-accent-hover) 0%, var(--at-accent) 50%, var(--at-accent-light) 100%)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
       }}>
         <div style={{
@@ -192,7 +192,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
           <button
             onClick={onLogout}
             style={{
-              padding: '12px 32px', background: 'linear-gradient(135deg, #9C5733, #B96A3F)',
+              padding: '12px 32px', background: 'linear-gradient(135deg, var(--at-accent-hover), var(--at-accent))',
               color: 'white', border: 'none', borderRadius: '12px',
               fontSize: '14px', fontWeight: 600, cursor: 'pointer',
             }}
@@ -231,9 +231,9 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
 
   const kpiCards = [
     { label: 'Deuda Pendiente',   value: loading ? '' : `${moneda} ${deudaTotal.toFixed(2)}`, icon: '💳', bg: deudaTotal > 0 ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)' },
-    { label: 'Tickets Abiertos',  value: loading ? '' : String(ticketsAbiertos),              icon: '🔧', bg: 'linear-gradient(135deg, #B96A3F, #9C5733)' },
-    { label: 'Reservas Activas',  value: loading ? '' : String(reservasProx),                 icon: '🏊', bg: 'linear-gradient(135deg, #1B3B36, #102622)' },
-    { label: 'Anuncios (7 días)', value: loading ? '' : String(anunciosNuevos),               icon: '📢', bg: 'linear-gradient(135deg, #B96A3F, #9C5733)' },
+    { label: 'Tickets Abiertos',  value: loading ? '' : String(ticketsAbiertos),              icon: '🔧', bg: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' },
+    { label: 'Reservas Activas',  value: loading ? '' : String(reservasProx),                 icon: '🏊', bg: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))' },
+    { label: 'Anuncios (7 días)', value: loading ? '' : String(anunciosNuevos),               icon: '📢', bg: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' },
   ]
 
   return (
@@ -242,7 +242,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
 
       {/* Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #9C5733, #B96A3F)',
+        background: 'linear-gradient(135deg, var(--at-accent-hover), var(--at-accent))',
         boxShadow: '0 2px 12px rgba(156, 87, 51,0.3)',
       }}>
         <div style={{
@@ -354,7 +354,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
           }}>
             <div style={{
               width: '28px', height: '28px',
-              border: '3px solid #E1DDD0', borderTop: '3px solid #9C5733',
+              border: '3px solid var(--at-line)', borderTop: '3px solid var(--at-accent-hover)',
               borderRadius: '50%', animation: 'spin 0.8s linear infinite',
             }} />
             <span style={{ fontSize: '14px', color: '#7E9389', fontWeight: 500 }}>Cargando información…</span>

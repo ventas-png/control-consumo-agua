@@ -100,7 +100,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
         title: '✅ Pago registrado',
         html: `
           <p>Tu pago de <strong>${moneda} ${montoNum.toFixed(2)}</strong> está en revisión.</p>
-          <p style="font-size: 13px; color: #7E9389; margin-top: 12px;">
+          <p style="font-size: 13px; color: var(--at-ink-3); margin-top: 12px;">
             El gestor de cobros verificará tu comprobante en las próximas horas.
           </p>
         `,
@@ -157,7 +157,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
           </button>
         </div>
 
-        <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid #E1DDD0' }}>
+        <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
             <div>
               <div style={{ color: '#7E9389', marginBottom: '2px' }}>Total Cargo</div>
@@ -185,7 +185,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #E1DDD0',
+              border: '1.5px solid var(--at-line)',
               fontSize: '16px',
               fontWeight: 700,
               fontFamily: 'inherit',
@@ -204,7 +204,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #E1DDD0',
+              border: '1.5px solid var(--at-line)',
               fontSize: '14px',
               fontFamily: 'inherit',
               background: 'white',
@@ -234,7 +234,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #E1DDD0',
+              border: '1.5px solid var(--at-line)',
               fontSize: '14px',
               fontFamily: 'inherit',
             }}
@@ -254,7 +254,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #E1DDD0',
+              border: '1.5px solid var(--at-line)',
               fontSize: '14px',
               fontFamily: 'inherit',
             }}
@@ -273,16 +273,16 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #E1DDD0',
+              border: '1.5px solid var(--at-line)',
               fontSize: '13px',
             }}
           />
           {previewAdjunto && (
             <div style={{ marginTop: '12px' }}>
               {adjunto?.type.startsWith('image') ? (
-                <img src={previewAdjunto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px', border: '1px solid #E1DDD0' }} />
+                <img src={previewAdjunto} alt="Preview" style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px', border: '1px solid var(--at-line)' }} />
               ) : (
-                <div style={{ padding: '12px', background: '#FAF7EF', borderRadius: '8px', border: '1px solid #E1DDD0', textAlign: 'center', color: '#7E9389' }}>
+                <div style={{ padding: '12px', background: '#FAF7EF', borderRadius: '8px', border: '1px solid var(--at-line)', textAlign: 'center', color: '#7E9389' }}>
                   📄 PDF seleccionado
                 </div>
               )}
@@ -303,7 +303,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #E1DDD0',
+              border: '1.5px solid var(--at-line)',
               fontSize: '14px',
               fontFamily: 'inherit',
               resize: 'vertical',
@@ -318,7 +318,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               flex: 1,
               padding: '12px',
               borderRadius: '8px',
-              border: '1.5px solid #E1DDD0',
+              border: '1.5px solid var(--at-line)',
               background: 'white',
               color: '#7E9389',
               fontWeight: 700,

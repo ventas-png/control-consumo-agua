@@ -57,9 +57,9 @@ export default function BitacoraAccionesTab({ bitacora }: Props) {
       {/* Filtros */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por usuario o registro…"
-          style={{ flex: 1, minWidth: 180, padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }} />
+          style={{ flex: 1, minWidth: 180, padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }} />
         <select value={filtroModulo} onChange={e => setFiltroModulo(e.target.value)}
-          style={{ padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+          style={{ padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
           <option value="">Todos los módulos</option>
           {modulos.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
@@ -78,7 +78,7 @@ export default function BitacoraAccionesTab({ bitacora }: Props) {
             <thead>
               <tr style={{ background: '#FAF7EF' }}>
                 {['Fecha/Hora', 'Usuario', 'Acción', 'Módulo', 'Registro', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: '#7E9389', fontWeight: 600, fontSize: 11, borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: '#7E9389', fontWeight: 600, fontSize: 11, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -87,7 +87,7 @@ export default function BitacoraAccionesTab({ bitacora }: Props) {
                 const accionKey = b.accion as AccionBitacora
                 const cfg = ACCION_CFG[accionKey] ?? { label: b.accion, bg: '#EAE6D8', color: '#3E5A4C', icon: '•' }
                 return (
-                  <tr key={b.id} style={{ borderBottom: '1px solid #EAE6D8' }}>
+                  <tr key={b.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '8px 12px', color: '#7E9389', whiteSpace: 'nowrap' }}>
                       {new Date(b.created_at).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </td>

@@ -69,7 +69,7 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
   async function firmar(c: CierreAnual) {
     const { isConfirmed } = await Swal.fire({
       title: `¿Cerrar definitivamente el año ${c.anio}?`,
-      html: '<p style="font-size:13px;color:#3E5A4C">Esta acción marca el cierre como definitivo. No podrá volver a estado borrador.</p>',
+      html: '<p style="font-size:13px;color:var(--at-ink-2)">Esta acción marca el cierre como definitivo. No podrá volver a estado borrador.</p>',
       icon: 'warning', showCancelButton: true,
       confirmButtonText: 'Sí, cerrar', cancelButtonText: 'Cancelar',
     })
@@ -149,7 +149,7 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
             })}
           </div>
           {selected && (
-            <div style={{ width: 280, flexShrink: 0, background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 280, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 15 }}>Cierre {selected.anio}</div>
               {([
                 ['Estado', <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ESTADO_CFG[selected.estado].bg, color: ESTADO_CFG[selected.estado].color }}>{ESTADO_CFG[selected.estado].label}</span>],
@@ -164,7 +164,7 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
                 ['Firmado por', selected.firmado_por ?? '—'],
                 ['Fecha cierre', selected.fecha_cierre ? new Date(selected.fecha_cierre).toLocaleDateString('es') : '—'],
               ] as [string, ReactNode][]).map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, padding: '5px 0', borderBottom: '1px solid #EAE6D8' }}>
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--at-chip)' }}>
                   <span style={{ color: '#7E9389' }}>{k}</span>
                   <span style={{ fontWeight: 600, color: '#3E5A4C' }}>{v}</span>
                 </div>

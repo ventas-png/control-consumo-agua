@@ -537,8 +537,8 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
       ? (isSTRMember ? '#E6CDBB' : esAcompanante ? '#C2D2CA' : '#bbf7d0')
       : '#E1DDD0'
     const borderLeft = isSTRMember
-      ? '4px solid #B96A3F'
-      : esAcompanante ? '4px solid #577B69' : undefined
+      ? '4px solid var(--at-accent)'
+      : esAcompanante ? '4px solid var(--at-accent-2)' : undefined
 
     return (
       <div key={v.id}
@@ -558,9 +558,9 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                 background: v.es_menor
                   ? (enPremisa ? '#fef9c3' : '#fef3c7')
                   : isSTRMember
-                    ? (enPremisa ? 'linear-gradient(135deg,#B96A3F,#9C5733)' : '#F4EBE3')
+                    ? (enPremisa ? 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))' : '#F4EBE3')
                     : esAcompanante
-                      ? (enPremisa ? 'linear-gradient(135deg,#2F5D4F,#1B3B36)' : '#EFE0D5')
+                      ? (enPremisa ? 'linear-gradient(135deg,var(--at-primary-2),var(--at-primary))' : '#EFE0D5')
                       : (enPremisa ? 'linear-gradient(135deg,#10b981,#059669)' : '#E1DDD0'),
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: v.es_menor ? '#854d0e' : (enPremisa ? 'white' : '#7E9389'),
@@ -602,7 +602,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
             <button onClick={() => setVisitanteDetalle(v)}
-              style={{ padding: '6px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1px solid #E1DDD0', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+              style={{ padding: '6px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
               Ver detalle
             </button>
             {enPremisa && (
@@ -630,7 +630,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={exportarPDF} disabled={filtrados.length === 0}
-            style={{ padding: '9px 14px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid #C2D2CA', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+            style={{ padding: '9px 14px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             📄 PDF
           </button>
           <button onClick={exportarXlsx} disabled={filtrados.length === 0}
@@ -639,7 +639,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
           </button>
           {canCreate && reservasSTR.some(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy) && (
             <button onClick={() => setShowStrModal(true)}
-              style={{ padding: '10px 16px', background: 'linear-gradient(135deg,#9C5733,#7E461F)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              style={{ padding: '10px 16px', background: 'linear-gradient(135deg,var(--at-accent-hover),var(--at-accent-dark))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
               🏠 Renta corta
             </button>
           )}
@@ -651,7 +651,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
           )}
           {canCreate && (
             <button onClick={() => setShowForm(true)}
-              style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               + Registrar visita
             </button>
           )}
@@ -659,14 +659,14 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
       </div>
 
       {/* KPI Cards */}
-      <div style={{ display: 'flex', background: 'white', borderRadius: '12px', border: '1px solid #E1DDD0', overflow: 'hidden', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', background: 'white', borderRadius: '12px', border: '1px solid var(--at-line)', overflow: 'hidden', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', flexWrap: 'wrap' }}>
         {([
           { label: 'Hoy', value: visitasHoy, icon: '📅', color: '#1B3B36' },
           { label: 'En premisas', value: enPremisas, icon: '🟢', color: '#16a34a' },
           { label: 'Esta semana', value: estaSemana, icon: '📆', color: '#9C5733' },
           { label: 'Total histórico', value: totalHistorico, icon: '📊', color: '#3E5A4C' },
         ] as const).map((kpi, i) => (
-          <div key={kpi.label} style={{ flex: '1 1 120px', padding: '10px 16px', borderRight: i < 3 ? '1px solid #EAE6D8' : undefined, display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div key={kpi.label} style={{ flex: '1 1 120px', padding: '10px 16px', borderRight: i < 3 ? '1px solid var(--at-chip)' : undefined, display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '18px' }}>{kpi.icon}</span>
             <div>
               <div style={{ fontSize: '20px', fontWeight: 800, color: kpi.color, lineHeight: 1.1 }}>{kpi.value}</div>
@@ -679,7 +679,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar visitante o DPI..."
-          style={{ flex: 1, minWidth: '180px', padding: '9px 14px', border: '1.5px solid #E1DDD0', borderRadius: '10px', fontSize: '14px', background: '#FAF7EF' }} />
+          style={{ flex: 1, minWidth: '180px', padding: '9px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontSize: '14px', background: '#FAF7EF' }} />
         {(['hoy', 'semana', 'mes', 'todos'] as FiltroFecha[]).map(f => (
           <button key={f} onClick={() => setFiltroFecha(f)}
             style={{
@@ -691,7 +691,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
             {f === 'hoy' ? 'Hoy' : f === 'semana' ? 'Semana' : f === 'mes' ? 'Mes' : 'Todos'}
           </button>
         ))}
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', color: '#3E5A4C', cursor: 'pointer', padding: '9px 14px', border: '1.5px solid #E1DDD0', borderRadius: '10px', background: soloActivos ? '#f0fdf4' : '#FAF7EF', whiteSpace: 'nowrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', color: '#3E5A4C', cursor: 'pointer', padding: '9px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', background: soloActivos ? '#f0fdf4' : '#FAF7EF', whiteSpace: 'nowrap' }}>
           <input type="checkbox" checked={soloActivos} onChange={e => setSoloActivos(e.target.checked)} />
           Solo en premisas
         </label>
@@ -703,7 +703,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
           <div onClick={e => e.stopPropagation()}
             style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '660px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '16px', overflow: 'hidden' }}>
-            <div style={{ background: 'linear-gradient(135deg,#9C5733,#7E461F)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ background: 'linear-gradient(135deg,var(--at-accent-hover),var(--at-accent-dark))', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Renta Corta</div>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'white' }}>🏠 Registrar ingreso STR</h3>
@@ -717,7 +717,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
               <input value={strSearch} onChange={e => setStrSearch(e.target.value)}
                 placeholder="Buscar por nombre de huésped o unidad..."
                 autoFocus
-                style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid #E1DDD0', borderRadius: '10px', fontSize: '14px', background: '#FAF7EF', marginBottom: '14px' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontSize: '14px', background: '#FAF7EF', marginBottom: '14px' }} />
               {(() => {
                 const reservasFiltradas = reservasSTR
                   .filter(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy)
@@ -816,7 +816,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                           {noIngresados.length > 0 && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '6px' }}>
                               {noIngresados.map(h => (
-                                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '8px' }}>
+                                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px' }}>
                                   <div style={{ flex: 1, fontSize: '12px' }}>
                                     <span style={{ fontWeight: 600, color: '#15291F' }}>{h.es_menor ? '👶 ' : ''}{h.nombre}</span>
                                     {h.identificacion && <span style={{ color: '#7E9389' }}> · {h.identificacion}</span>}
@@ -825,7 +825,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                                   <button
                                     onClick={() => ingresoHabilitado && !lleno && abrirRegistroSTR(r, h)}
                                     disabled={!ingresoHabilitado || lleno}
-                                    style={{ padding: '5px 12px', background: ingresoHabilitado && !lleno ? 'linear-gradient(135deg,#9C5733,#7E461F)' : '#EAE6D8', color: ingresoHabilitado && !lleno ? 'white' : '#7E9389', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: ingresoHabilitado && !lleno ? 'pointer' : 'not-allowed', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                                    style={{ padding: '5px 12px', background: ingresoHabilitado && !lleno ? 'linear-gradient(135deg,var(--at-accent-hover),var(--at-accent-dark))' : '#EAE6D8', color: ingresoHabilitado && !lleno ? 'white' : '#7E9389', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: ingresoHabilitado && !lleno ? 'pointer' : 'not-allowed', fontSize: '11px', whiteSpace: 'nowrap' }}>
                                     Registrar ingreso
                                   </button>
                                 </div>
@@ -885,7 +885,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
               <input value={mudanzaSearch} onChange={e => setMudanzaSearch(e.target.value)}
                 placeholder="Buscar por unidad o empresa de mudanza..."
                 autoFocus
-                style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid #E1DDD0', borderRadius: '10px', fontSize: '14px', background: '#FAF7EF', marginBottom: '14px' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontSize: '14px', background: '#FAF7EF', marginBottom: '14px' }} />
               {(() => {
                 const lista = mudanzasElegibles
                   .filter(s => {
@@ -992,13 +992,13 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Nombre completo *</label>
                 <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
                   placeholder="Nombre del visitante"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 {sugerencias.length > 0 && (
                   <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                     <span style={{ fontSize: '11px', color: '#7E9389' }}>Frecuente:</span>
                     {sugerencias.map((v, i) => (
                       <button key={i} type="button" onClick={() => autocompletar(v)}
-                        style={{ padding: '3px 10px', background: '#EEF2EC', color: '#102622', border: '1px solid #C2D2CA', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        style={{ padding: '3px 10px', background: '#EEF2EC', color: '#102622', border: '1px solid var(--at-primary-soft-2)', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                         {v.nombre}{v.identificacion ? ` · ${v.identificacion}` : ''}
                       </button>
                     ))}
@@ -1008,7 +1008,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
                 <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                  style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                  style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                   <option value="">Seleccionar...</option>
                   {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
                 </select>
@@ -1027,20 +1027,20 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha de nacimiento (opcional)</label>
                     <input type="date" value={formFechaNacimiento} onChange={e => setFormFechaNacimiento(e.target.value)}
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                   </div>
                 ) : (
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
                     <input value={form.identificacion} onChange={e => setForm(f => ({ ...f, identificacion: e.target.value }))}
                       placeholder="Número de documento"
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                     {sugerencias.length > 0 && (
                       <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
                         <span style={{ fontSize: '11px', color: '#7E9389' }}>Frecuente:</span>
                         {sugerencias.map((v, i) => (
                           <button key={i} type="button" onClick={() => autocompletar(v)}
-                            style={{ padding: '3px 10px', background: '#EEF2EC', color: '#102622', border: '1px solid #C2D2CA', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                            style={{ padding: '3px 10px', background: '#EEF2EC', color: '#102622', border: '1px solid var(--at-primary-soft-2)', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                             {v.nombre}{v.identificacion ? ` · ${v.identificacion}` : ''}
                           </button>
                         ))}
@@ -1053,19 +1053,19 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
                 <input value={form.placa_vehiculo} onChange={e => setForm(f => ({ ...f, placa_vehiculo: e.target.value }))}
                   placeholder="Ej. ABC-123"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
               </div>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Motivo de visita</label>
                 <input value={form.motivo} onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}
                   placeholder="Ej. Entrega, Social, Mantenimiento..."
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
               </div>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas</label>
                 <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
                   placeholder="Opcional"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 {(fotosExpiradas.foto || fotosExpiradas.documento || fotosExpiradas.vehiculo) && (
@@ -1095,7 +1095,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
             </div>
 
             {/* Companions section */}
-            <div style={{ marginTop: '20px', borderTop: '1.5px solid #EAE6D8', paddingTop: '16px' }}>
+            <div style={{ marginTop: '20px', borderTop: '1.5px solid var(--at-chip)', paddingTop: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: '#3E5A4C', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   👥 Acompañantes
@@ -1107,7 +1107,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                 </div>
                 {!showAcompForm && (
                   <button type="button" onClick={() => setShowAcompForm(true)}
-                    style={{ padding: '5px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1.5px solid #E1DDD0', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                    style={{ padding: '5px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1.5px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                     + Agregar acompañante
                   </button>
                 )}
@@ -1116,7 +1116,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
               {acompanantes.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
                   {acompanantes.map(a => (
-                    <div key={a.tempId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '8px' }}>
+                    <div key={a.tempId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
                       <div style={{ width: 28, height: 28, borderRadius: '50%', background: a.es_menor ? '#fef9c3' : '#EEF2EC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', flexShrink: 0 }}>
                         {a.es_menor ? '👶' : '👤'}
                       </div>
@@ -1138,19 +1138,19 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
               )}
 
               {showAcompForm && (
-                <div style={{ padding: '14px', background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ padding: '14px', background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C' }}>Datos del acompañante</div>
                   <div>
                     <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '3px' }}>Nombre *</label>
                     <input value={acompForm.nombre} onChange={e => setAcompForm(f => ({ ...f, nombre: e.target.value }))}
                       placeholder="Nombre completo"
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
                     {acompSugerencias.length > 0 && (
                       <div style={{ marginTop: '5px', display: 'flex', flexWrap: 'wrap', gap: '5px', alignItems: 'center' }}>
                         <span style={{ fontSize: '11px', color: '#7E9389' }}>Frecuente:</span>
                         {acompSugerencias.map((v, i) => (
                           <button key={i} type="button" onClick={() => autocompletarAcompanante(v)}
-                            style={{ padding: '3px 10px', background: '#EEF2EC', color: '#102622', border: '1px solid #C2D2CA', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                            style={{ padding: '3px 10px', background: '#EEF2EC', color: '#102622', border: '1px solid var(--at-primary-soft-2)', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                             {v.nombre}{v.identificacion ? ` · ${v.identificacion}` : ''}
                           </button>
                         ))}
@@ -1166,20 +1166,20 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                     <div>
                       <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '3px' }}>Fecha de nacimiento (opcional)</label>
                       <input type="date" value={acompForm.fecha_nacimiento} onChange={e => setAcompForm(f => ({ ...f, fecha_nacimiento: e.target.value }))}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
                     </div>
                   ) : (
                     <div>
                       <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '3px' }}>DPI / Identificación (opcional)</label>
                       <input value={acompForm.identificacion} onChange={e => setAcompForm(f => ({ ...f, identificacion: e.target.value }))}
                         placeholder="Número de documento"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
                       {acompSugerencias.length > 0 && (
                         <div style={{ marginTop: '5px', display: 'flex', flexWrap: 'wrap', gap: '5px', alignItems: 'center' }}>
                           <span style={{ fontSize: '11px', color: '#7E9389' }}>Frecuente:</span>
                           {acompSugerencias.map((v, i) => (
                             <button key={i} type="button" onClick={() => autocompletarAcompanante(v)}
-                              style={{ padding: '3px 10px', background: '#EEF2EC', color: '#102622', border: '1px solid #C2D2CA', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                              style={{ padding: '3px 10px', background: '#EEF2EC', color: '#102622', border: '1px solid var(--at-primary-soft-2)', borderRadius: '20px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                               {v.nombre}{v.identificacion ? ` · ${v.identificacion}` : ''}
                             </button>
                           ))}
@@ -1204,7 +1204,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="button" onClick={agregarAcompanante}
-                      style={{ padding: '7px 16px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
+                      style={{ padding: '7px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
                       + Agregar
                     </button>
                     <button type="button" onClick={() => { setShowAcompForm(false); setAcompForm(defaultAcompForm()) }}
@@ -1218,7 +1218,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button onClick={handleRegistrar} disabled={saving}
-                style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Registrando...' : `✓ Registrar entrada${acompanantes.length > 0 ? ` (+${acompanantes.length})` : ''}`}
               </button>
               <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
@@ -1246,7 +1246,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
             return (
               <div key={reserva.id}>
                 {/* Group header */}
-                <div style={{ background: 'linear-gradient(to right,#FAF1EA,#F4EBE3)', border: '1.5px solid #E6CDBB', borderRadius: '12px', padding: '12px 16px', marginBottom: '4px' }}>
+                <div style={{ background: 'linear-gradient(to right,var(--at-accent-tint-2),var(--at-accent-tint))', border: '1.5px solid var(--at-accent-soft)', borderRadius: '12px', padding: '12px 16px', marginBottom: '4px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: '14px', color: '#5E3417' }}>
@@ -1311,9 +1311,9 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
           <div onClick={e => e.stopPropagation()}
             style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '500px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '18px 20px', borderBottom: '1px solid #EAE6D8' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '18px 20px', borderBottom: '1px solid var(--at-chip)' }}>
               {visitanteDetalle.foto_url
-                ? <SecureImage src={visitanteDetalle.foto_url} alt={visitanteDetalle.nombre} style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid #E1DDD0', flexShrink: 0 }} />
+                ? <SecureImage src={visitanteDetalle.foto_url} alt={visitanteDetalle.nombre} style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--at-line)', flexShrink: 0 }} />
                 : <div style={{ width: 52, height: 52, borderRadius: '50%', background: !visitanteDetalle.hora_salida ? 'linear-gradient(135deg,#10b981,#059669)' : '#E1DDD0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: !visitanteDetalle.hora_salida ? 'white' : '#7E9389', fontWeight: 800, fontSize: '20px', flexShrink: 0 }}>
                     {visitanteDetalle.es_menor ? '👶' : visitanteDetalle.nombre.charAt(0).toUpperCase()}
                   </div>
@@ -1358,7 +1358,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                     return p ? [{ label: 'Acompañante de', value: p.nombre }] : []
                   })() : []),
                 ].map(({ label, value }) => (
-                  <div key={label} style={{ background: '#FAF7EF', borderRadius: '10px', padding: '10px 12px', border: '1px solid #E1DDD0' }}>
+                  <div key={label} style={{ background: '#FAF7EF', borderRadius: '10px', padding: '10px 12px', border: '1px solid var(--at-line)' }}>
                     <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>{label}</div>
                     <div style={{ fontSize: '13px', color: '#3E5A4C', fontWeight: 600, wordBreak: 'break-word' }}>{value}</div>
                   </div>
@@ -1374,14 +1374,14 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                       { url: visitanteDetalle.foto_vehiculo_url, label: 'Vehículo' },
                     ].filter(f => f.url).map(f => (
                       <a key={f.label} href={f.url!} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
-                        <img src={f.url!} alt={f.label} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '8px', border: '1px solid #E1DDD0', display: 'block' }} />
+                        <img src={f.url!} alt={f.label} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)', display: 'block' }} />
                         <div style={{ fontSize: '10px', color: '#7E9389', textAlign: 'center', marginTop: '3px' }}>{f.label}</div>
                       </a>
                     ))}
                   </div>
                 </div>
               )}
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '4px', borderTop: '1px solid #EAE6D8' }}>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '4px', borderTop: '1px solid var(--at-chip)' }}>
                 {!visitanteDetalle.hora_salida && (() => {
                   const esSTR = visitanteDetalle.motivo?.startsWith('Renta corta')
                   const fechaSalidaSTR = (esSTR && !visitanteDetalle.reserva_str_id) ? (visitanteDetalle.notas?.match(/Salida: (\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null
@@ -1409,7 +1409,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
         return (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
             <div style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
-              <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #EAE6D8' }}>
+              <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--at-chip)' }}>
                 <div style={{ fontSize: '15px', fontWeight: 700, color: '#15291F' }}>Registrar salida</div>
                 <div style={{ fontSize: '13px', color: '#7E9389', marginTop: '2px' }}>
                   {salidaPendiente.nombre}
@@ -1436,7 +1436,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                 </div>
 
                 {acompsActivos.length > 0 && (
-                  <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#EEF2EC', border: '1.5px solid #C2D2CA', borderRadius: '10px' }}>
+                  <div style={{ marginBottom: '16px', padding: '12px 14px', background: '#EEF2EC', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '10px' }}>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#102622', fontWeight: 600 }}>
                       <input type="checkbox" checked={salidaConAcomp} onChange={e => setSalidaConAcomp(e.target.checked)} style={{ marginTop: '2px' }} />
                       <span>
@@ -1469,7 +1469,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                       <div>
                         <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tipo</label>
                         <select value={novedadForm.tipo} onChange={e => setNovedadForm(f => ({ ...f, tipo: e.target.value as TipoNovedad }))}
-                          style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
+                          style={{ width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
                           <option value="incidente">Incidente</option>
                           <option value="observacion">Observación</option>
                           <option value="alarma">Alarma</option>
@@ -1480,7 +1480,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                       <div>
                         <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Prioridad</label>
                         <select value={novedadForm.prioridad} onChange={e => setNovedadForm(f => ({ ...f, prioridad: e.target.value as PrioridadNovedad }))}
-                          style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
+                          style={{ width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
                           <option value="normal">Normal</option>
                           <option value="alta">Alta</option>
                           <option value="critica">Crítica</option>
@@ -1491,14 +1491,14 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                       <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Ubicación</label>
                       <input value={novedadForm.ubicacion} onChange={e => setNovedadForm(f => ({ ...f, ubicacion: e.target.value }))}
                         placeholder={`Ej. ${salidaPendiente.unidad_nombre ?? 'Entrada principal'}`}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Comentarios / descripción *</label>
                       <textarea value={novedadForm.comentarios} onChange={e => setNovedadForm(f => ({ ...f, comentarios: e.target.value }))}
                         placeholder="Describe con detalle lo ocurrido durante la salida..."
                         rows={3}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white', resize: 'vertical' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'white', resize: 'vertical' }} />
                     </div>
                     <div>
                       <MultiImageUploader values={fotosNovedad} onChange={setFotosNovedad} folder="novedades" label="Fotografías de evidencia" capture maxFiles={10} />

@@ -133,7 +133,7 @@ export default function ScoringUnidadesTab({ cuotas, infracciones, sanciones, un
       </div>
 
       {/* Distribución */}
-      <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Distribución de puntajes</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
           {(['A', 'B', 'C', 'D'] as const).map(g => {
@@ -154,7 +154,7 @@ export default function ScoringUnidadesTab({ cuotas, infracciones, sanciones, un
       </div>
 
       {/* Ranking */}
-      <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Ranking completo — de mayor a menor riesgo</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {scores.map((s, i) => {

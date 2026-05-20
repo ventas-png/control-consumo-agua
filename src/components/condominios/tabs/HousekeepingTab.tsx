@@ -104,7 +104,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   return (
@@ -118,7 +118,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
           { label: 'Completados (mes)',value: String(completados),                                                    icon: '✅', color: '#10b981' },
           { label: 'Costo del mes',    value: costoMes > 0 ? `${moneda} ${costoMes.toFixed(0)}` : '—',               icon: '💰', color: '#B96A3F' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
@@ -134,7 +134,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Servicio' : 'Nuevo Servicio de Housekeeping'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
             <div>
@@ -182,7 +182,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
@@ -228,7 +228,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
                   const est = ESTADO_CONFIG[s.estado]
                   const tipo = TIPO_CONFIG[s.tipo]
                   return (
-                    <div key={s.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '14px' }}>
+                    <div key={s.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '14px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                         <div style={{ fontWeight: 700, fontSize: '14px', color: '#15291F' }}>{tipo.icon} {tipo.label}</div>
                         <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>

@@ -97,7 +97,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
 
   const tipoInfo = (t: TipoInspeccion) => TIPOS.find(x => x.value === t) ?? TIPOS[TIPOS.length - 1]
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   return (
@@ -130,7 +130,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Inspección' : 'Nueva Inspección'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: '12px' }}>
             <div>
@@ -179,7 +179,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Registrar'}
             </button>
@@ -190,12 +190,12 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoInspeccion | 'todos')}
-          style={{ padding: '6px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
+          style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
           <option value="todos">Todos los tipos</option>
           {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
         </select>
         <select value={filtroResultado} onChange={e => setFiltroResultado(e.target.value as ResultadoInspeccion | 'todos')}
-          style={{ padding: '6px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
+          style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
           <option value="todos">Todos los resultados</option>
           {Object.entries(RESULTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>

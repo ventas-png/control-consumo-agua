@@ -97,7 +97,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
@@ -125,7 +125,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: 16, marginBottom: 20 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 20 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nueva visita frecuente</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -197,14 +197,14 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
           const unidad = unidades.find(u => u.id === unidadId)
           return (
             <div key={unidadId} style={{ marginBottom: 20 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#3E5A4C', marginBottom: 8, paddingBottom: 4, borderBottom: '2px solid #E1DDD0' }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#3E5A4C', marginBottom: 8, paddingBottom: 4, borderBottom: '2px solid var(--at-line)' }}>
                 🏠 {unidad?.nombre || 'Unidad desconocida'} — {items.length} autorizado(s)
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
                 {items.map(v => {
                   const rel = RELACIONES.find(r => r.value === v.relacion)
                   return (
-                    <div key={v.id} style={{ background: v.activo ? '#fff' : '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: '12px 14px', opacity: v.activo ? 1 : 0.6 }}>
+                    <div key={v.id} style={{ background: v.activo ? '#fff' : '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: '12px 14px', opacity: v.activo ? 1 : 0.6 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{rel?.icon} {v.nombre}</div>

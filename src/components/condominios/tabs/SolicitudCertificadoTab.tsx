@@ -84,13 +84,13 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
-      <div style={{ width: 320, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
+      <div style={{ width: 320, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Certificados ({lista.length})</span>
             {canCreate && (
@@ -118,7 +118,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
           const unidad = unidades.find(u => u.id === s.unidad_id)
           return (
             <div key={s.id} onClick={() => { setSelected(s); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === s.id ? '#F4EBE3' : '#fff' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? '#F4EBE3' : '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
                 <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: est?.bg, color: est?.color }}>{est?.label}</span>

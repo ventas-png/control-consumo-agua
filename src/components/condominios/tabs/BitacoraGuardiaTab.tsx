@@ -95,14 +95,14 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 320, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ width: 320, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontWeight: 600, fontSize: 14 }}>Bitácoras ({registros.length})</span>
           {canCreate && (
             <button onClick={() => { setMostrarForm(true); setSelected(null) }}
@@ -118,7 +118,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
           const turno = TURNOS.find(t => t.value === b.turno)
           return (
             <div key={b.id} onClick={() => { setSelected(b); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === b.id ? '#F4EBE3' : '#fff' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === b.id ? '#F4EBE3' : '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{b.fecha}</span>
                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: b.estado === 'cerrado' ? '#EAE6D8' : '#fef3c7', color: b.estado === 'cerrado' ? '#7E9389' : '#92400e' }}>
@@ -163,10 +163,10 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
               </div>
             </div>
             {/* Novedades */}
-            <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+            <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Novedades del turno</div>
               {novedades.map((n, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', background: '#fff', borderRadius: 6, marginBottom: 6, border: '1px solid #E1DDD0' }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', background: '#fff', borderRadius: 6, marginBottom: 6, border: '1px solid var(--at-line)' }}>
                   <div>
                     <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 8, background: TIPOS_NOV.find(t => t.value === n.tipo)?.color, color: '#fff', marginRight: 6 }}>{n.tipo}</span>
                     <span style={{ fontSize: 12, color: '#7E9389' }}>{n.hora}</span>

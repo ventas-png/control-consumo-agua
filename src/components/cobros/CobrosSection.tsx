@@ -278,7 +278,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
           { label: 'Total por Cobrar', value: `${moneda} ${totalPendiente.toFixed(2)}`, icon: '💰', bg: 'linear-gradient(135deg,#f59e0b,#d97706)', },
           { label: 'En Mora', value: `${countMora} cobro${countMora !== 1 ? 's' : ''}`, icon: '⚠️', bg: 'linear-gradient(135deg,#ef4444,#dc2626)', },
           { label: 'Pagos Hoy', value: pagos.filter(p => p.created_at?.startsWith(new Date().toISOString().split('T')[0])).length.toString(), icon: '✅', bg: 'linear-gradient(135deg,#10b981,#059669)', },
-          { label: 'Convenios Activos', value: convenios.filter(c => c.estado === 'activo').length.toString(), icon: '🤝', bg: 'linear-gradient(135deg,#B96A3F,#9C5733)', },
+          { label: 'Convenios Activos', value: convenios.filter(c => c.estado === 'activo').length.toString(), icon: '🤝', bg: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', },
         ].map((s, i) => (
           <div key={i} style={{ background: s.bg, borderRadius: '16px', padding: '20px', color: 'white', boxShadow: '0 8px 20px rgba(0,0,0,0.12)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -293,13 +293,13 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid #E1DDD0', marginBottom: '24px', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--at-line)', marginBottom: '24px', overflowX: 'auto' }}>
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
             padding: '10px 20px', fontSize: '14px', fontWeight: activeTab === tab.id ? 700 : 500,
             color: activeTab === tab.id ? '#1B3B36' : '#7E9389',
             background: 'transparent', border: 'none',
-            borderBottom: activeTab === tab.id ? '3px solid #1B3B36' : '3px solid transparent',
+            borderBottom: activeTab === tab.id ? '3px solid var(--at-primary)' : '3px solid transparent',
             cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
           }}>
             {tab.icon} {tab.label}
@@ -317,12 +317,12 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
               placeholder="Buscar cliente..."
               value={filtroBusqueda}
               onChange={e => setFiltroBusqueda(e.target.value)}
-              style={{ flex: 1, minWidth: '200px', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit' }}
+              style={{ flex: 1, minWidth: '200px', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
             />
             <select
               value={filtroEstado}
               onChange={e => setFiltroEstado(e.target.value as any)}
-              style={{ padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit', background: 'white' }}
+              style={{ padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', background: 'white' }}
             >
               <option value="todos">Todos</option>
               <option value="pendiente">Pendiente</option>
@@ -351,7 +351,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
           <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                <thead style={{ background: '#FAF7EF', borderBottom: '2px solid #E1DDD0' }}>
+                <thead style={{ background: '#FAF7EF', borderBottom: '2px solid var(--at-line)' }}>
                   <tr>
                     {canEdit && (
                       <th scope="col" style={{ padding: '14px 16px', textAlign: 'center', width: '44px' }}>
@@ -384,7 +384,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                     const saldo = getSaldo(r)
                     const isMora = r.estado === 'mora'
                     return (
-                      <tr key={r.id} style={{ borderBottom: '1px solid #EAE6D8', background: selectedRows.has(r.id) ? '#EEF2EC' : undefined }}
+                      <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: selectedRows.has(r.id) ? '#EEF2EC' : undefined }}
                         onMouseEnter={e => { if (!selectedRows.has(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = '#FAF7EF' }}
                         onMouseLeave={e => { if (!selectedRows.has(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'transparent' }}>
                         {canEdit && (
@@ -422,7 +422,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                           {canEdit && (
                             <button onClick={() => setPagoModal(r)} style={{
                               padding: '8px 14px', minHeight: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                              background: 'linear-gradient(135deg,#1B3B36,#102622)', color: 'white',
+                              background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white',
                               fontWeight: 600, fontSize: '13px', whiteSpace: 'nowrap',
                             }}>
                               💰 Aplicar Pago
@@ -452,7 +452,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                   borderRadius: '12px',
                   padding: '48px 24px',
                   textAlign: 'center',
-                  border: '1px solid #E1DDD0',
+                  border: '1px solid var(--at-line)',
                 }}>
                   <div style={{ fontSize: '32px', marginBottom: '12px' }}>✅</div>
                   <div style={{ fontSize: '16px', fontWeight: 700, color: '#15291F', marginBottom: '4px' }}>
@@ -677,7 +677,7 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
         const pct = conv.monto_total > 0 ? (conv.monto_pagado / conv.monto_total) * 100 : 0
         const est = ESTADO_CONFIG[conv.estado] ?? ESTADO_CONFIG.activo
         return (
-          <div key={conv.id} style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #E1DDD0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+          <div key={conv.id} style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid var(--at-line)', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '16px', color: '#15291F', marginBottom: '4px' }}>

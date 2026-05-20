@@ -56,7 +56,7 @@ export default function CentroCostosTab({ gastos, cuotas, moneda }: Props) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: '#15291F' }}>Centro de costos</div>
         <select value={anio} onChange={e => setAnio(e.target.value)}
-          style={{ padding: '7px 12px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+          style={{ padding: '7px 12px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
           {anios.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
       </div>
@@ -89,7 +89,7 @@ export default function CentroCostosTab({ gastos, cuotas, moneda }: Props) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         {/* Por categoría */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Distribución por categoría</div>
           {porCategoria.length === 0 ? (
             <div style={{ color: '#7E9389', fontSize: 12, textAlign: 'center', padding: '24px 0' }}>Sin gastos en {anio}</div>
@@ -112,7 +112,7 @@ export default function CentroCostosTab({ gastos, cuotas, moneda }: Props) {
         </div>
 
         {/* Tendencia mensual */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Gastos mensuales {anio}</div>
           <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 120, marginBottom: 6 }}>
             {meses.map(m => (

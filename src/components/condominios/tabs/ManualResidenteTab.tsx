@@ -61,7 +61,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   const totalActivos = articulos.filter(a => a.activo).length
@@ -104,7 +104,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Agregar artículo al manual</div>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -173,7 +173,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
                         <span style={{ fontSize: 11, color: '#7E9389' }}>{expandido === a.id ? '▲' : '▼'}</span>
                       </div>
                       {expandido === a.id && (
-                        <div style={{ padding: '0 14px 14px', fontSize: 13, color: '#3E5A4C', whiteSpace: 'pre-wrap', lineHeight: 1.6, borderTop: '1px solid #EAE6D8', paddingTop: 10 }}>
+                        <div style={{ padding: '0 14px 14px', fontSize: 13, color: '#3E5A4C', whiteSpace: 'pre-wrap', lineHeight: 1.6, borderTop: '1px solid var(--at-chip)', paddingTop: 10 }}>
                           {a.contenido}
                         </div>
                       )}

@@ -104,10 +104,10 @@ export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, ca
     const inv = (e.inventario_items ?? []) as ItemInventario[]
     const cond = CONDICION_STYLE[e.condicion_general]
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acta de ${e.tipo === 'entrega' ? 'Entrega' : 'Devolución'}</title>
-<style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;margin:16px 0 6px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#FAF7EF}
+<style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;margin:16px 0 6px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:var(--at-surface-2)}
 .sig{margin-top:40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}.sig-box{border-top:1px solid #000;padding-top:6px;font-size:11px}</style></head><body>
 <h1>Acta de ${e.tipo === 'entrega' ? 'Entrega' : 'Devolución'} de Unidad</h1>
-<p style="color:#7E9389">Fecha: ${e.fecha}</p>
+<p style="color:var(--at-ink-3)">Fecha: ${e.fecha}</p>
 <h2>Datos Generales</h2>
 <table><tr><th>Unidad</th><td>${unidad?.nombre ?? '—'}</td><th>Condición general</th><td>${cond?.label ?? e.condicion_general}</td></tr>
 <tr><th>Inquilino</th><td>${e.inquilino ?? '—'}</td><th>Propietario</th><td>${e.propietario ?? '—'}</td></tr>
@@ -123,7 +123,7 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
   if (filtroTipo !== 'todos') filtered = filtered.filter(e => e.tipo === filtroTipo)
   if (filtroUnidad) filtered = filtered.filter(e => e.unidad_id === filtroUnidad)
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -142,7 +142,7 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Acta' : 'Nueva Acta de Entrega/Devolución'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
@@ -215,12 +215,12 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-        <select style={{ padding: '7px 10px', borderRadius: '7px', border: '1.5px solid #E1DDD0', fontSize: '13px', background: '#FAF7EF' }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as typeof filtroTipo)}>
+        <select style={{ padding: '7px 10px', borderRadius: '7px', border: '1.5px solid var(--at-line)', fontSize: '13px', background: '#FAF7EF' }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as typeof filtroTipo)}>
           <option value="todos">Todos los tipos</option>
           <option value="entrega">Entregas</option>
           <option value="devolucion">Devoluciones</option>
         </select>
-        <select style={{ padding: '7px 10px', borderRadius: '7px', border: '1.5px solid #E1DDD0', fontSize: '13px', background: '#FAF7EF' }} value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}>
+        <select style={{ padding: '7px 10px', borderRadius: '7px', border: '1.5px solid var(--at-line)', fontSize: '13px', background: '#FAF7EF' }} value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}>
           <option value="">Todas las unidades</option>
           {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
         </select>
@@ -250,7 +250,7 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
                 </div>
 
                 {isSelected && (
-                  <div style={{ borderTop: '1px solid #E1DDD0', padding: '14px' }}>
+                  <div style={{ borderTop: '1px solid var(--at-line)', padding: '14px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px', marginBottom: '10px', fontSize: '13px' }}>
                       {e.inquilino && <div><span style={{ color: '#7E9389', fontSize: '11px', fontWeight: 600 }}>INQUILINO</span><br />{e.inquilino}</div>}
                       {e.propietario && <div><span style={{ color: '#7E9389', fontSize: '11px', fontWeight: 600 }}>PROPIETARIO</span><br />{e.propietario}</div>}

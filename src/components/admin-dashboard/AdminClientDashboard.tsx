@@ -210,7 +210,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
               style={{
                 padding: '8px 12px',
                 borderRadius: '8px',
-                border: '1px solid #E1DDD0',
+                border: '1px solid var(--at-line)',
                 fontSize: '14px',
                 fontWeight: '500',
                 background: 'white',
@@ -233,14 +233,14 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
             type="date"
             value={fechaDesde}
             onChange={e => setFechaDesde(e.target.value)}
-            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #E1DDD0', fontSize: '13px', background: 'white' }}
+            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '13px', background: 'white' }}
           />
           <span style={{ fontSize: '13px', color: '#7E9389' }}>—</span>
           <input
             type="date"
             value={fechaHasta}
             onChange={e => setFechaHasta(e.target.value)}
-            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #E1DDD0', fontSize: '13px', background: 'white' }}
+            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '13px', background: 'white' }}
           />
           {/* Quick presets */}
           {[
@@ -249,7 +249,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
             { label: 'Mes anterior', onClick: () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); const y = d.getFullYear(); const m = d.getMonth(); const last = new Date(y, m+1, 0); setFechaDesde(`${y}-${String(m+1).padStart(2,'0')}-01`); setFechaHasta(last.toISOString().slice(0,10)) } },
             { label: 'Últ. 3 meses', onClick: () => { const d = new Date(); const d90 = new Date(); d90.setDate(d.getDate() - 90); setFechaDesde(d90.toISOString().slice(0, 10)); setFechaHasta(d.toISOString().slice(0, 10)) } },
           ].map(p => (
-            <button key={p.label} onClick={p.onClick} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #E1DDD0', background: 'white', fontSize: '12px', fontWeight: 500, color: '#3E5A4C', cursor: 'pointer' }}>
+            <button key={p.label} onClick={p.onClick} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--at-line)', background: 'white', fontSize: '12px', fontWeight: 500, color: '#3E5A4C', cursor: 'pointer' }}>
               {p.label}
             </button>
           ))}
@@ -259,7 +259,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
         <div style={{
           display: 'flex',
           gap: '12px',
-          borderBottom: '2px solid #E1DDD0',
+          borderBottom: '2px solid var(--at-line)',
           overflowX: 'auto',
           paddingBottom: '12px',
         }}>
@@ -274,7 +274,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                 color: activeTab === tab.id ? '#1B3B36' : '#7E9389',
                 background: 'transparent',
                 border: 'none',
-                borderBottom: activeTab === tab.id ? '3px solid #1B3B36' : 'none',
+                borderBottom: activeTab === tab.id ? '3px solid var(--at-primary)' : 'none',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 whiteSpace: 'nowrap',
@@ -374,12 +374,12 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
                       <tr style={{ background: '#FAF7EF' }}>
-                        <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C', borderBottom: '2px solid #E1DDD0' }}>Proyecto</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#d97706', borderBottom: '2px solid #E1DDD0' }}>📥 Sin asignar</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#059669', borderBottom: '2px solid #E1DDD0' }}>✅ Cerradas hoy</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#dc2626', borderBottom: '2px solid #E1DDD0' }}>🚨 Críticas</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#ea580c', borderBottom: '2px solid #E1DDD0' }}>⚠️ Urgentes</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#102622', borderBottom: '2px solid #E1DDD0' }}>🔄 En proceso</th>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C', borderBottom: '2px solid var(--at-line)' }}>Proyecto</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#d97706', borderBottom: '2px solid var(--at-line)' }}>📥 Sin asignar</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#059669', borderBottom: '2px solid var(--at-line)' }}>✅ Cerradas hoy</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#dc2626', borderBottom: '2px solid var(--at-line)' }}>🚨 Críticas</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#ea580c', borderBottom: '2px solid var(--at-line)' }}>⚠️ Urgentes</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#102622', borderBottom: '2px solid var(--at-line)' }}>🔄 En proceso</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -394,15 +394,15 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                             onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#EEF2EC'}
                             onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'white' : '#FAF7EF'}
                           >
-                            <td style={{ padding: '10px 14px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid #EAE6D8' }}>
+                            <td style={{ padding: '10px 14px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid var(--at-chip)' }}>
                               {hasCritica && <span style={{ marginRight: 6, color: '#ef4444' }}>●</span>}
                               {p.nombre}
                             </td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', fontWeight: s.sinAsignar > 0 ? 700 : 400, color: s.sinAsignar > 0 ? '#d97706' : '#7E9389' }}>{s.sinAsignar}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', fontWeight: s.cerradasHoy > 0 ? 700 : 400, color: s.cerradasHoy > 0 ? '#059669' : '#7E9389' }}>{s.cerradasHoy}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', fontWeight: s.criticas > 0 ? 700 : 400, color: s.criticas > 0 ? '#dc2626' : '#7E9389' }}>{s.criticas}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', fontWeight: s.urgentes > 0 ? 700 : 400, color: s.urgentes > 0 ? '#ea580c' : '#7E9389' }}>{s.urgentes}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', fontWeight: s.enProceso > 0 ? 700 : 400, color: s.enProceso > 0 ? '#102622' : '#7E9389' }}>{s.enProceso}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.sinAsignar > 0 ? 700 : 400, color: s.sinAsignar > 0 ? '#d97706' : '#7E9389' }}>{s.sinAsignar}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cerradasHoy > 0 ? 700 : 400, color: s.cerradasHoy > 0 ? '#059669' : '#7E9389' }}>{s.cerradasHoy}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.criticas > 0 ? 700 : 400, color: s.criticas > 0 ? '#dc2626' : '#7E9389' }}>{s.criticas}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.urgentes > 0 ? 700 : 400, color: s.urgentes > 0 ? '#ea580c' : '#7E9389' }}>{s.urgentes}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.enProceso > 0 ? 700 : 400, color: s.enProceso > 0 ? '#102622' : '#7E9389' }}>{s.enProceso}</td>
                           </tr>
                         )
                       })}

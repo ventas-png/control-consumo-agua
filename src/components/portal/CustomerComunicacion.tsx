@@ -239,7 +239,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* ── Main tabs ── */}
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #E1DDD0', marginBottom: '-4px' }}>
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid var(--at-line)', marginBottom: '-4px' }}>
         {(['conversaciones', 'comunicados'] as const).map(tab => {
           const active = mainTab === tab
           const unreadCount = tab === 'comunicados'
@@ -253,7 +253,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                 padding: '8px 16px',
                 background: 'none',
                 border: 'none',
-                borderBottom: active ? '2px solid #1B3B36' : '2px solid transparent',
+                borderBottom: active ? '2px solid var(--at-primary)' : '2px solid transparent',
                 marginBottom: '-2px',
                 color: active ? '#1B3B36' : '#7E9389',
                 fontWeight: active ? 700 : 500,
@@ -309,7 +309,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
             onClick={() => setView('new')}
             style={{
               padding: '9px 16px',
-              background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)',
+              background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)',
               color: 'white',
               border: 'none',
               borderRadius: '10px',
@@ -331,7 +331,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
             style={{
               padding: '8px 14px',
               background: 'white',
-              border: '1px solid #C7C2B0',
+              border: '1px solid var(--at-line-strong)',
               borderRadius: '10px',
               color: '#3E5A4C',
               fontSize: '13px',
@@ -347,7 +347,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {view === 'new' && (
         <div style={{
           background: 'white',
-          border: '1px solid #E1DDD0',
+          border: '1px solid var(--at-line)',
           borderRadius: '14px',
           padding: '24px',
           boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
@@ -403,7 +403,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                border: '1px solid #C7C2B0',
+                border: '1px solid var(--at-line-strong)',
                 borderRadius: '9px',
                 fontSize: '13.5px',
                 outline: 'none',
@@ -453,7 +453,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                border: '1px solid #C7C2B0',
+                border: '1px solid var(--at-line-strong)',
                 borderRadius: '9px',
                 fontSize: '13.5px',
                 resize: 'vertical',
@@ -480,7 +480,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               style={{
                 padding: '10px 18px',
                 background: 'white',
-                border: '1px solid #C7C2B0',
+                border: '1px solid var(--at-line-strong)',
                 borderRadius: '10px',
                 color: '#3E5A4C',
                 fontSize: '13px',
@@ -495,7 +495,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               disabled={creating}
               style={{
                 padding: '10px 22px',
-                background: creating ? '#7E9389' : 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)',
+                background: creating ? '#7E9389' : 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '10px',
@@ -515,7 +515,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {view === 'list' && (
         <div style={{
           background: 'white',
-          border: '1px solid #E1DDD0',
+          border: '1px solid var(--at-line)',
           borderRadius: '14px',
           overflow: 'hidden',
           boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
@@ -537,7 +537,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                 onClick={() => setView('new')}
                 style={{
                   padding: '10px 22px',
-                  background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)',
+                  background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '10px',
@@ -559,7 +559,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   textAlign: 'left',
                   padding: '14px 18px',
                   border: 'none',
-                  borderBottom: idx < conversations.length - 1 ? '1px solid #EAE6D8' : 'none',
+                  borderBottom: idx < conversations.length - 1 ? '1px solid var(--at-chip)' : 'none',
                   background: 'white',
                   cursor: 'pointer',
                   display: 'flex',
@@ -614,7 +614,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {view === 'detail' && activeConversation && (
         <div style={{
           background: 'white',
-          border: '1px solid #E1DDD0',
+          border: '1px solid var(--at-line)',
           borderRadius: '14px',
           overflow: 'hidden',
           boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
@@ -624,7 +624,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
           {/* Header */}
           <div style={{
             padding: '14px 18px',
-            borderBottom: '1px solid #EAE6D8',
+            borderBottom: '1px solid var(--at-chip)',
             background: '#FAF7EF',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -678,7 +678,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                         <div style={{
                           width: '30px', height: '30px',
                           borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+                          background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: 'white', fontSize: '12px', fontWeight: 700,
                           flexShrink: 0, marginRight: '8px', alignSelf: 'flex-end',
@@ -691,7 +691,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                         padding: '10px 14px',
                         borderRadius: isMe ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
                         background: isMe
-                          ? 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)'
+                          ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)'
                           : 'white',
                         color: isMe ? 'white' : '#15291F',
                         boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
@@ -732,13 +732,13 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
 
           {/* Compositor */}
           {activeConversation.status !== 'cerrada' && activeConversation.status !== 'resuelta' ? (
-            <div style={{ padding: '14px 16px', borderTop: '1px solid #EAE6D8', background: 'white' }}>
+            <div style={{ padding: '14px 16px', borderTop: '1px solid var(--at-chip)', background: 'white' }}>
               {/* Preview archivo pendiente */}
               {pendingFile && (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '8px',
                   padding: '7px 10px', marginBottom: '8px',
-                  background: '#EEF2EC', border: '1px solid #C2D2CA',
+                  background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)',
                   borderRadius: '8px',
                 }}>
                   {pendingFile.type.startsWith('image/') ? (
@@ -773,7 +773,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   style={{
                     flex: 1,
                     padding: '10px 12px',
-                    border: '1px solid #E1DDD0',
+                    border: '1px solid var(--at-line)',
                     borderRadius: '12px',
                     fontSize: '13.5px',
                     resize: 'none',
@@ -786,7 +786,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   }}
                 />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', border: '1px solid #E1DDD0', borderRadius: '12px', background: '#FAF7EF', fontSize: '20px' }}>
+                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', border: '1px solid var(--at-line)', borderRadius: '12px', background: '#FAF7EF', fontSize: '20px' }}>
                     📎
                     <input
                       type="file"
@@ -811,7 +811,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                       padding: '12px 18px',
                       background: (sending || (!messageText.trim() && !pendingFile))
                         ? '#C7C2B0'
-                        : 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)',
+                        : 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '12px',
@@ -834,7 +834,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
             <div style={{
               padding: '14px 18px',
               background: '#FAF7EF',
-              borderTop: '1px solid #EAE6D8',
+              borderTop: '1px solid var(--at-chip)',
               textAlign: 'center',
               fontSize: '13px',
               color: '#7E9389',
@@ -860,7 +860,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
             <div style={{
               padding: '48px 24px', textAlign: 'center',
               background: 'white', borderRadius: '14px',
-              border: '1px solid #E1DDD0',
+              border: '1px solid var(--at-line)',
               boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
             }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>📢</div>
@@ -932,7 +932,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     </svg>
                   </button>
                   {isExpanded && (
-                    <div style={{ padding: '0 18px 18px', borderTop: '1px solid #EAE6D8' }}>
+                    <div style={{ padding: '0 18px 18px', borderTop: '1px solid var(--at-chip)' }}>
                       <div style={{
                         paddingTop: '14px',
                         fontSize: '14px', color: '#3E5A4C',

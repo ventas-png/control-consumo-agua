@@ -126,7 +126,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
   return (
     <div style={{ padding: 16 }}>
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid #E1DDD0', paddingBottom: 1 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--at-line)', paddingBottom: 1 }}>
         {[
           { id: 'generar', label: '📱 Generar QR', badge: 0 },
           { id: 'validar', label: '📷 Validar token', badge: 0 },
@@ -135,7 +135,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
           <button key={t.id} onClick={() => setTab(t.id as typeof tab)}
             style={{ padding: '7px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.id ? 700 : 500,
               background: tab === t.id ? '#FAF7EF' : 'transparent', color: tab === t.id ? '#1B3B36' : '#7E9389',
-              borderBottom: tab === t.id ? '2px solid #1B3B36' : '2px solid transparent', borderRadius: '6px 6px 0 0' }}>
+              borderBottom: tab === t.id ? '2px solid var(--at-primary)' : '2px solid transparent', borderRadius: '6px 6px 0 0' }}>
             {t.label}
           </button>
         ))}
@@ -144,25 +144,25 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
       {tab === 'generar' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
           {/* Formulario */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14 }}>Pre-autorizar visitante</div>
 
             <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Nombre del visitante *</label>
               <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
                 placeholder="Nombre completo"
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
             <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Identificación</label>
               <input value={form.identificacion} onChange={e => setForm(f => ({ ...f, identificacion: e.target.value }))}
                 placeholder="DPI / Pasaporte"
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
             <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Unidad a visitar *</label>
               <select value={form.unidadId} onChange={e => setForm(f => ({ ...f, unidadId: e.target.value }))}
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
                 <option value="">Selecciona unidad…</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
@@ -172,12 +172,12 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                 <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Motivo</label>
                 <input value={form.motivo} onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}
                   placeholder="Visita, entrega…"
-                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Válido hasta *</label>
                 <input type="date" value={form.validoHasta} min={hoy} onChange={e => setForm(f => ({ ...f, validoHasta: e.target.value }))}
-                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
               </div>
             </div>
             <button onClick={generarQR}
@@ -187,7 +187,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
           </div>
 
           {/* QR generado */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, textAlign: 'center' }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, textAlign: 'center' }}>
             {!qrGenerado ? (
               <div style={{ color: '#7E9389', padding: '50px 0' }}>
                 <div style={{ fontSize: 48, marginBottom: 8 }}>📱</div>
@@ -200,7 +200,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                   {qrGenerado.nombre} → {qrGenerado.unidadNombre} · válido hasta {qrGenerado.validoHasta}
                 </div>
                 <img src={qrGenerado.qrUrl} alt="QR" width={180} height={180}
-                  style={{ border: '2px solid #E1DDD0', borderRadius: 8, marginBottom: 12 }} />
+                  style={{ border: '2px solid var(--at-line)', borderRadius: 8, marginBottom: 12 }} />
                 <div style={{ padding: '6px 12px', background: '#EAE6D8', borderRadius: 6, fontSize: 12, fontWeight: 700, letterSpacing: 2, marginBottom: 12, color: '#15291F' }}>
                   Token: {qrGenerado.token}
                 </div>
@@ -210,7 +210,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                     {registrando ? 'Guardando…' : '✓ Guardar pre-autorización'}
                   </button>
                   <button onClick={() => setQrGenerado(null)}
-                    style={{ padding: '8px 12px', border: '1px solid #E1DDD0', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: '#FAF7EF' }}>
+                    style={{ padding: '8px 12px', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: '#FAF7EF' }}>
                     Descartar
                   </button>
                 </div>
@@ -225,13 +225,13 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
 
       {tab === 'validar' && (
         <div style={{ maxWidth: 480, margin: '0 auto' }}>
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 24 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 24 }}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16, textAlign: 'center' }}>📷 Validar token de acceso</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
               <input value={tokenValidar} onChange={e => setTokenValidar(e.target.value.toUpperCase())}
                 onKeyDown={e => e.key === 'Enter' && validarToken()}
                 placeholder="Escribe o escanea el token (ej: AB3X7Y9Z)"
-                style={{ flex: 1, padding: '10px 12px', border: '1.5px solid #C7C2B0', borderRadius: 8, fontSize: 14, letterSpacing: 2, fontFamily: 'monospace', boxSizing: 'border-box' }} />
+                style={{ flex: 1, padding: '10px 12px', border: '1.5px solid var(--at-line-strong)', borderRadius: 8, fontSize: 14, letterSpacing: 2, fontFamily: 'monospace', boxSizing: 'border-box' }} />
               <button onClick={validarToken}
                 style={{ padding: '10px 16px', background: '#15291F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
                 Validar
@@ -259,7 +259,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                   </button>
                 )}
                 <button onClick={() => { setResultadoValidacion(null); setTokenValidar('') }}
-                  style={{ width: '100%', padding: '6px 0', marginTop: 6, border: '1px solid #E1DDD0', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: '#FAF7EF' }}>
+                  style={{ width: '100%', padding: '6px 0', marginTop: 6, border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: '#FAF7EF' }}>
                   Limpiar
                 </button>
               </div>
@@ -278,7 +278,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {preAutorizados.map(v => (
-                <div key={v.id} style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div key={v.id} style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: v.hora_entrada ? '#dcfce7' : '#EEF2EC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
                     {v.hora_entrada ? '🟢' : '📱'}
                   </div>

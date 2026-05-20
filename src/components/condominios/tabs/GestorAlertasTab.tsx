@@ -217,7 +217,7 @@ export default function GestorAlertasTab({ cuotas, tickets, polizas, contratosPr
       {/* Filtros de categoría */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
         <button onClick={() => setFiltroCat('')}
-          style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid #C7C2B0', fontSize: 11, cursor: 'pointer',
+          style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--at-line-strong)', fontSize: 11, cursor: 'pointer',
             background: filtroCat === '' ? '#15291F' : '#fff', color: filtroCat === '' ? '#fff' : '#3E5A4C', fontWeight: 600 }}>
           Todas
         </button>
@@ -225,7 +225,7 @@ export default function GestorAlertasTab({ cuotas, tickets, polizas, contratosPr
           const count = alertas.filter(a => a.categoria === cat).length
           return count > 0 ? (
             <button key={cat} onClick={() => setFiltroCat(filtroCat === cat ? '' : cat)}
-              style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid #C7C2B0', fontSize: 11, cursor: 'pointer',
+              style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--at-line-strong)', fontSize: 11, cursor: 'pointer',
                 background: filtroCat === cat ? '#15291F' : '#fff', color: filtroCat === cat ? '#fff' : '#3E5A4C', fontWeight: 600 }}>
               {cfg.icon} {cfg.label} ({count})
             </button>

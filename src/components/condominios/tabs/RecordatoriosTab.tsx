@@ -92,7 +92,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
@@ -127,7 +127,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
             </button>
           ))}
           <select value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value as PrioridadRecordatorio | '')}
-            style={{ padding: '6px 10px', border: '1.5px solid #E1DDD0', borderRadius: 7, fontSize: 12 }}>
+            style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: 7, fontSize: 12 }}>
             <option value="">Todas las prioridades</option>
             {(Object.entries(PRIORIDAD_CFG) as [PrioridadRecordatorio, typeof PRIORIDAD_CFG[PrioridadRecordatorio]][]).map(([k, v]) => (
               <option key={k} value={k}>{v.icon} {v.label}</option>
@@ -144,7 +144,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nuevo recordatorio</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>

@@ -96,7 +96,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
     precio: avg(g.evals.map(e => e.precio)),
   })).sort((a, b) => b.promedio - a.promedio)
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -106,7 +106,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
           <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>{evaluaciones.length} evaluaciones · {ranking.length} proveedores</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <div style={{ display: 'flex', border: '1.5px solid #E1DDD0', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', border: '1.5px solid var(--at-line)', borderRadius: '8px', overflow: 'hidden' }}>
             {(['lista', 'ranking'] as const).map(v => (
               <button key={v} onClick={() => setView(v)}
                 style={{ padding: '6px 12px', border: 'none', fontSize: '12px', cursor: 'pointer', fontWeight: view === v ? 700 : 500,
@@ -126,7 +126,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar evaluación' : 'Nueva Evaluación'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
@@ -178,7 +178,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
               {saving ? 'Guardando…' : 'Guardar evaluación'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -191,7 +191,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
           {ranking.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>Sin evaluaciones.</div>
           ) : ranking.map((r, i) => (
-            <div key={r.nombre} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px 14px' }}>
+            <div key={r.nombre} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
@@ -229,7 +229,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtered.map(e => (
-                <div key={e.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px 14px' }}>
+                <div key={e.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
@@ -249,7 +249,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
                     {canEdit && (
                       <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
                         <button onClick={() => startEdit(e)}
-                          style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                          style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                         <button onClick={() => handleDelete(e.id)}
                           style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                       </div>

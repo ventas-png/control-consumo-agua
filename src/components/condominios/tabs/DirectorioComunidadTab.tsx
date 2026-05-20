@@ -146,11 +146,11 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
       <div style={{ marginBottom: 12 }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
           placeholder="Buscar por nombre, propietario, arrendatario, email, teléfono..."
-          style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+          style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
       </div>
 
       {/* Tabla */}
-      <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
         <div style={{ padding: '8px 14px', background: '#FAF7EF', fontSize: 11, color: '#7E9389', fontWeight: 600, display: 'flex', gap: 8 }}>
           <span style={{ width: 90 }}>Unidad</span>
           <span style={{ width: 70 }}>Estado</span>
@@ -169,7 +169,7 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
             <div key={d.u.id}>
               <div onClick={() => setExpandida(abierta ? null : d.u.id)}
                 style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 14px',
-                  borderTop: i > 0 ? '1px solid #EAE6D8' : undefined, cursor: 'pointer',
+                  borderTop: i > 0 ? '1px solid var(--at-chip)' : undefined, cursor: 'pointer',
                   background: abierta ? '#fafbff' : undefined }}>
                 <div style={{ width: 90 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#15291F' }}>
@@ -205,7 +205,7 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
 
               {/* Detalle expandido */}
               {abierta && (
-                <div style={{ background: '#FAF7EF', borderTop: '1px solid #E1DDD0', padding: '10px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div style={{ background: '#FAF7EF', borderTop: '1px solid var(--at-line)', padding: '10px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                   {/* Propietario */}
                   <div>
                     <div style={{ fontSize: 10, fontWeight: 700, color: '#7E9389', marginBottom: 4 }}>👤 PROPIETARIO</div>

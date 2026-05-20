@@ -99,7 +99,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   const totalVotos = votos.length
   const counts = votacion ? votacion.opciones.map(o => ({ id: o.id, texto: o.texto, count: votos.filter(v => v.opcion_id === o.id).length })) : []
@@ -121,7 +121,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nueva Votación</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -176,7 +176,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
               {saving ? 'Guardando…' : 'Crear Votación'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -212,7 +212,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
 
         {/* Detail */}
         {votacion && (
-          <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px' }}>
+          <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '8px' }}>
               <div>
                 <h3 style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: 700 }}>{votacion.titulo}</h3>
@@ -253,7 +253,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
 
             {/* Register vote */}
             {canCreate && votacion.estado === 'abierta' && (
-              <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
+              <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: '#15291F', marginBottom: '8px' }}>Registrar voto</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
                   <div>
@@ -288,7 +288,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
                   {votos.map(v => {
                     const op = votacion.opciones.find(o => o.id === v.opcion_id)
                     return (
-                      <div key={v.id} style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '6px', padding: '4px 8px', fontSize: '11px' }}>
+                      <div key={v.id} style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '6px', padding: '4px 8px', fontSize: '11px' }}>
                         <span style={{ fontWeight: 600 }}>{v.unidad_nombre ?? v.unidad_id.slice(0, 6)}</span>
                         <span style={{ color: '#7E9389', marginLeft: '4px' }}>→ {op?.texto ?? v.opcion_id}</span>
                       </div>

@@ -63,7 +63,7 @@ export function NuevaConversacionModal({ clientes, onClose, onConfirm, sending, 
         background: 'white', borderRadius: '14px', width: '100%', maxWidth: '520px',
         boxShadow: '0 20px 60px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', maxHeight: '90vh',
       }}>
-        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid #EAE6D8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--at-chip)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#15291F' }}>Nueva Conversación</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', fontSize: '20px', lineHeight: 1, padding: '2px' }}>×</button>
         </div>
@@ -78,15 +78,15 @@ export function NuevaConversacionModal({ clientes, onClose, onConfirm, sending, 
               placeholder="Buscar por nombre, código o email…"
               value={search}
               onChange={e => { setSearch(e.target.value); setClienteId('') }}
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
             />
             {search && !selectedCliente && (
-              <div style={{ border: '1px solid #E1DDD0', borderRadius: '8px', marginTop: '4px', maxHeight: '160px', overflowY: 'auto', background: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+              <div style={{ border: '1px solid var(--at-line)', borderRadius: '8px', marginTop: '4px', maxHeight: '160px', overflowY: 'auto', background: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
                 {filtered.length === 0 ? (
                   <div style={{ padding: '12px', fontSize: '12.5px', color: '#7E9389', textAlign: 'center' }}>Sin resultados</div>
                 ) : filtered.map(c => (
                   <button key={c.id} onClick={() => { setClienteId(c.id); setSearch(c.nombre) }}
-                    style={{ width: '100%', textAlign: 'left', padding: '9px 12px', border: 'none', borderBottom: '1px solid #EAE6D8', background: 'white', cursor: 'pointer', fontSize: '13px' }}>
+                    style={{ width: '100%', textAlign: 'left', padding: '9px 12px', border: 'none', borderBottom: '1px solid var(--at-chip)', background: 'white', cursor: 'pointer', fontSize: '13px' }}>
                     <span style={{ fontWeight: 600, color: '#15291F' }}>{c.nombre}</span>
                     <span style={{ color: '#7E9389', fontSize: '11.5px', marginLeft: '8px' }}>#{c.codigo}</span>
                     {c.email && <span style={{ color: '#7E9389', fontSize: '11.5px', marginLeft: '6px' }}>· {c.email}</span>}
@@ -109,7 +109,7 @@ export function NuevaConversacionModal({ clientes, onClose, onConfirm, sending, 
               placeholder="Ej: Revisión de medidor, Acuerdo de pago…"
               value={subject}
               onChange={e => setSubject(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
 
@@ -117,7 +117,7 @@ export function NuevaConversacionModal({ clientes, onClose, onConfirm, sending, 
             <div>
               <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>Categoría</label>
               <select value={category} onChange={e => setCategory(e.target.value as ConversationCategory)}
-                style={{ width: '100%', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
                 {(serviceType === 'condominios' ? CONDOMINIOS_CATEGORIES : AGUA_CATEGORIES).map(k => (
                   <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
                 ))}
@@ -126,7 +126,7 @@ export function NuevaConversacionModal({ clientes, onClose, onConfirm, sending, 
             <div>
               <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>Prioridad</label>
               <select value={priority} onChange={e => setPriority(e.target.value as ConversationPriority)}
-                style={{ width: '100%', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
                 <option value="baja">Baja</option>
                 <option value="media">Media</option>
                 <option value="alta">Alta</option>
@@ -142,14 +142,14 @@ export function NuevaConversacionModal({ clientes, onClose, onConfirm, sending, 
               onChange={e => setFirstMessage(e.target.value)}
               placeholder="Escribe el primer mensaje para el cliente…"
               rows={4}
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: '8px', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
             />
           </div>
         </div>
 
-        <div style={{ padding: '12px 20px 16px', borderTop: '1px solid #EAE6D8', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+        <div style={{ padding: '12px 20px 16px', borderTop: '1px solid var(--at-chip)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button onClick={onClose} disabled={sending}
-            style={{ padding: '8px 16px', border: '1px solid #C7C2B0', borderRadius: '8px', background: 'white', color: '#3E5A4C', fontSize: '13px', cursor: 'pointer', fontWeight: 500 }}>
+            style={{ padding: '8px 16px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', background: 'white', color: '#3E5A4C', fontSize: '13px', cursor: 'pointer', fontWeight: 500 }}>
             Cancelar
           </button>
           <button onClick={handleSubmit} disabled={sending || !clienteId || !subject.trim() || !firstMessage.trim()}

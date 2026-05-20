@@ -174,13 +174,13 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
         <div style={{ display: 'flex', gap: '8px' }}>
           {vista === 'areas' && canCreate && (
             <button onClick={() => { resetAreaForm(); setShowAreaForm(true) }}
-              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#B96A3F,#9C5733)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
               + Nueva área
             </button>
           )}
           {vista === 'rutas' && canCreate && (
             <button onClick={() => { resetRutaForm(); setShowRutaForm(true) }}
-              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#B96A3F,#9C5733)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
               + Nueva ruta
             </button>
           )}
@@ -201,17 +201,17 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
       {vista === 'areas' && (
         <>
           {showAreaForm && (
-            <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+            <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>{editAreaId ? 'Editar área' : 'Nueva área'}</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Nombre del área *</label>
                   <input value={areaForm.nombre} onChange={e => setAreaForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Ej. Lobby principal, Estacionamiento B2..."
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Ícono</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px', background: '#FAF7EF', borderRadius: '8px', border: '1.5px solid #E1DDD0' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px', background: '#FAF7EF', borderRadius: '8px', border: '1.5px solid var(--at-line)' }}>
                     {ICONOS_PREDEFINIDOS.map(ic => (
                       <button key={ic} onClick={() => setAreaForm(f => ({ ...f, icono: ic }))}
                         style={{ width: '36px', height: '36px', fontSize: '20px', borderRadius: '8px', border: '2px solid', borderColor: areaForm.icono === ic ? '#B96A3F' : 'transparent', background: areaForm.icono === ic ? '#F4EBE3' : 'transparent', cursor: 'pointer' }}>
@@ -223,16 +223,16 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Orden</label>
                   <input type="number" value={areaForm.orden} onChange={e => setAreaForm(f => ({ ...f, orden: parseInt(e.target.value) || 0 }))} min={0}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Descripción</label>
                   <input value={areaForm.descripcion ?? ''} onChange={e => setAreaForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Descripción opcional..."
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={saveArea} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#B96A3F,#9C5733)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={saveArea} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
                   {saving ? 'Guardando...' : editAreaId ? 'Actualizar' : 'Guardar'}
                 </button>
                 <button onClick={resetAreaForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -260,7 +260,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                   {a.descripcion && <p style={{ margin: '0 0 10px', fontSize: '12.5px', color: '#7E9389' }}>{a.descripcion}</p>}
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => startEditArea(a)} style={{ flex: 1, padding: '6px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#3E5A4C', fontWeight: 600 }}>✏️ Editar</button>
+                      <button onClick={() => startEditArea(a)} style={{ flex: 1, padding: '6px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#3E5A4C', fontWeight: 600 }}>✏️ Editar</button>
                       <button onClick={() => deleteArea(a.id)} style={{ padding: '6px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: '#dc2626' }}>🗑</button>
                     </div>
                   )}
@@ -275,27 +275,27 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
       {vista === 'rutas' && (
         <>
           {showRutaForm && (
-            <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+            <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>{editRutaId ? 'Editar ruta' : 'Nueva ruta de ronda'}</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Nombre de la ruta *</label>
                   <input value={rutaForm.nombre} onChange={e => setRutaForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Ej. Ronda nocturna, Ronda diurna..."
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tiempo estimado (min)</label>
                   <input type="number" value={rutaForm.tiempo_estimado_min} onChange={e => setRutaForm(f => ({ ...f, tiempo_estimado_min: e.target.value }))} placeholder="45"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Descripción</label>
                   <input value={rutaForm.descripcion} onChange={e => setRutaForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Descripción de la ruta..."
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={saveRuta} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#B96A3F,#9C5733)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={saveRuta} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
                   {saving ? 'Guardando...' : editRutaId ? 'Actualizar' : 'Guardar'}
                 </button>
                 <button onClick={resetRutaForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -330,7 +330,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                       </div>
                       {canEdit && (
                         <div style={{ display: 'flex', gap: '6px' }} onClick={e => e.stopPropagation()}>
-                          <button onClick={() => startEditRuta(ruta)} style={{ padding: '6px 12px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#3E5A4C', fontWeight: 600 }}>✏️</button>
+                          <button onClick={() => startEditRuta(ruta)} style={{ padding: '6px 12px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#3E5A4C', fontWeight: 600 }}>✏️</button>
                           <button onClick={() => deleteRuta(ruta.id)} style={{ padding: '6px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: '#dc2626' }}>🗑</button>
                         </div>
                       )}
@@ -339,7 +339,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
 
                     {/* Puntos de la ruta */}
                     {isOpen && (
-                      <div style={{ borderTop: '1px solid #E1DDD0', padding: '16px 20px' }}>
+                      <div style={{ borderTop: '1px solid var(--at-line)', padding: '16px 20px' }}>
                         {puntos.length === 0 ? (
                           <p style={{ color: '#7E9389', fontSize: '13px', margin: '0 0 12px' }}>Sin puntos de control. Agrega las áreas que componen esta ruta.</p>
                         ) : (
@@ -347,7 +347,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                             {puntos.map((p, idx) => {
                               const area = areas.find(a => a.id === p.area_id)
                               return (
-                                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#FAF7EF', borderRadius: '10px', border: '1px solid #E1DDD0' }}>
+                                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#FAF7EF', borderRadius: '10px', border: '1px solid var(--at-line)' }}>
                                   <span style={{ fontWeight: 800, fontSize: '13px', color: '#B96A3F', width: '22px', textAlign: 'center' }}>{idx + 1}</span>
                                   <span style={{ fontSize: '20px' }}>{area?.icono ?? '📍'}</span>
                                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -357,8 +357,8 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                                   </div>
                                   {canEdit && (
                                     <div style={{ display: 'flex', gap: '4px' }}>
-                                      <button onClick={() => movePunto(p, 'up')} disabled={idx === 0} style={{ padding: '4px 8px', background: 'white', border: '1px solid #E1DDD0', borderRadius: '6px', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, fontSize: '12px' }}>▲</button>
-                                      <button onClick={() => movePunto(p, 'down')} disabled={idx === puntos.length - 1} style={{ padding: '4px 8px', background: 'white', border: '1px solid #E1DDD0', borderRadius: '6px', cursor: idx === puntos.length - 1 ? 'default' : 'pointer', opacity: idx === puntos.length - 1 ? 0.3 : 1, fontSize: '12px' }}>▼</button>
+                                      <button onClick={() => movePunto(p, 'up')} disabled={idx === 0} style={{ padding: '4px 8px', background: 'white', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, fontSize: '12px' }}>▲</button>
+                                      <button onClick={() => movePunto(p, 'down')} disabled={idx === puntos.length - 1} style={{ padding: '4px 8px', background: 'white', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: idx === puntos.length - 1 ? 'default' : 'pointer', opacity: idx === puntos.length - 1 ? 0.3 : 1, fontSize: '12px' }}>▼</button>
                                       <button onClick={() => deletePunto(p.id)} style={{ padding: '4px 8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', color: '#dc2626', fontSize: '12px' }}>✕</button>
                                     </div>
                                   )}
@@ -371,18 +371,18 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                         {/* Add punto */}
                         {canCreate && !addingPunto && (
                           <button onClick={() => setAddingPunto(true)}
-                            style={{ padding: '7px 14px', background: '#FAF1EA', color: '#B96A3F', border: '1.5px dashed #E6CDBB', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
+                            style={{ padding: '7px 14px', background: '#FAF1EA', color: '#B96A3F', border: '1.5px dashed var(--at-accent-soft)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
                             + Agregar punto de control
                           </button>
                         )}
 
                         {addingPunto && (
-                          <div style={{ background: '#FAF1EA', border: '1px solid #E6CDBB', borderRadius: '10px', padding: '14px', marginTop: '8px' }}>
+                          <div style={{ background: '#FAF1EA', border: '1px solid var(--at-accent-soft)', borderRadius: '10px', padding: '14px', marginTop: '8px' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                               <div style={{ gridColumn: '1 / -1' }}>
                                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Área *</label>
                                 <select value={newPuntoAreaId} onChange={e => setNewPuntoAreaId(e.target.value)}
-                                  style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #E6CDBB', borderRadius: '8px', fontSize: '13.5px', background: 'white' }}>
+                                  style={{ width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-accent-soft)', borderRadius: '8px', fontSize: '13.5px', background: 'white' }}>
                                   <option value="">Seleccionar área...</option>
                                   {areasActivas.map(a => <option key={a.id} value={a.id}>{a.icono} {a.nombre}</option>)}
                                 </select>
@@ -390,20 +390,20 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                               <div>
                                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Instrucciones</label>
                                 <input value={newPuntoInstrucciones} onChange={e => setNewPuntoInstrucciones(e.target.value)} placeholder="Verificar puertas, revisar cámaras..."
-                                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #E6CDBB', borderRadius: '8px', fontSize: '13.5px', background: 'white' }} />
+                                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-accent-soft)', borderRadius: '8px', fontSize: '13.5px', background: 'white' }} />
                               </div>
                               <div>
                                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tiempo est. (min)</label>
                                 <input type="number" value={newPuntoTiempo} onChange={e => setNewPuntoTiempo(e.target.value)} placeholder="5"
-                                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #E6CDBB', borderRadius: '8px', fontSize: '13.5px', background: 'white' }} />
+                                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-accent-soft)', borderRadius: '8px', fontSize: '13.5px', background: 'white' }} />
                               </div>
                             </div>
                             <div style={{ display: 'flex', gap: '8px' }}>
-                              <button onClick={addPunto} disabled={saving || !newPuntoAreaId} style={{ padding: '8px 18px', background: 'linear-gradient(135deg,#B96A3F,#9C5733)', color: 'white', border: 'none', borderRadius: '7px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+                              <button onClick={addPunto} disabled={saving || !newPuntoAreaId} style={{ padding: '8px 18px', background: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', color: 'white', border: 'none', borderRadius: '7px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
                                 {saving ? '...' : 'Agregar'}
                               </button>
                               <button onClick={() => { setAddingPunto(false); setNewPuntoAreaId(''); setNewPuntoInstrucciones(''); setNewPuntoTiempo('') }}
-                                style={{ padding: '8px 14px', background: 'white', color: '#3E5A4C', border: '1px solid #E1DDD0', borderRadius: '7px', cursor: 'pointer', fontSize: '13px' }}>
+                                style={{ padding: '8px 14px', background: 'white', color: '#3E5A4C', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px' }}>
                                 Cancelar
                               </button>
                             </div>

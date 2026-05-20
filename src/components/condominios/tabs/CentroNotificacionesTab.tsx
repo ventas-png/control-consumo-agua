@@ -205,7 +205,7 @@ export default function CentroNotificacionesTab({
             <div style={{ fontSize: 22, fontWeight: 900, color: URG[u].color, marginTop: 1 }}>{cnt}</div>
           </div>
         ))}
-        <div style={{ flex: '1 1 100px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: '10px 14px' }}>
+        <div style={{ flex: '1 1 100px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px' }}>
           <div style={{ fontSize: 10, color: '#7E9389' }}>Total pendientes</div>
           <div style={{ fontSize: 22, fontWeight: 900, color: '#3E5A4C', marginTop: 1 }}>{notificaciones.length}</div>
         </div>

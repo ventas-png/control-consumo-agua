@@ -136,7 +136,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
       {paso === 1 && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {/* Plantilla */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>1. Selecciona la plantilla</div>
             {plantillasActivas.length === 0 ? (
               <div style={{ textAlign: 'center', color: '#7E9389', padding: 30, fontSize: 12 }}>
@@ -163,7 +163,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
           </div>
 
           {/* Segmento */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>2. Selecciona el segmento</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {(Object.keys(SEGMENTO_CFG) as SegmentoEnvio[]).map(s => {
@@ -199,11 +199,11 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
 
       {paso === 2 && plantilla && (
         <div>
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, marginBottom: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 13 }}>Vista previa del envío</div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setPaso(1)} style={{ padding: '6px 14px', border: '1px solid #E1DDD0', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: '#FAF7EF' }}>← Volver</button>
+                <button onClick={() => setPaso(1)} style={{ padding: '6px 14px', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: '#FAF7EF' }}>← Volver</button>
                 <button onClick={enviar} disabled={enviando}
                   style={{ padding: '6px 18px', background: canalCfg?.color, color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: enviando ? 0.7 : 1 }}>
                   {enviando ? 'Registrando…' : `${canalCfg?.icon} Enviar a ${destinatarios.length} unidades`}
@@ -222,7 +222,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
             </div>
 
             {previewUnidad && plantilla && (
-              <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: '12px 14px' }}>
                 <div style={{ fontSize: 11, color: '#7E9389', marginBottom: 6 }}>
                   {canalCfg?.icon} {canalCfg?.label} → <strong>{previewUnidad.nombre}</strong>
                   {plantilla.asunto && <span> · Asunto: {plantilla.asunto}</span>}

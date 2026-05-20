@@ -96,7 +96,7 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
   const catInfo = (c: CategoriaDocumento) => CATEGORIAS.find(x => x.value === c) ?? CATEGORIAS[CATEGORIAS.length - 1]
   const visInfo = (v: VisibilidadDocumento) => VISIBILIDAD.find(x => x.value === v) ?? VISIBILIDAD[0]
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   // Group by category for display
@@ -119,7 +119,7 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Documento' : 'Nuevo Documento'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
@@ -158,7 +158,7 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
@@ -169,9 +169,9 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar documentos…"
-          style={{ padding: '6px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: '#FAF7EF', minWidth: '180px' }} />
+          style={{ padding: '6px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: '#FAF7EF', minWidth: '180px' }} />
         <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value as CategoriaDocumento | 'todos')}
-          style={{ padding: '6px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
+          style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
           <option value="todos">Todas las categorías</option>
           {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
         </select>

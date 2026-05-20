@@ -100,7 +100,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
           <p style={{ margin: '4px 0 0', color: '#7E9389', fontSize: '13.5px' }}>{mascotas.filter(m => m.activo).length} registradas</p>
         </div>
         {canCreate && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
             + Registrar mascota
           </button>
         )}
@@ -119,7 +119,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar mascota, raza, unidad..."
-          style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF' }} />
+          style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF' }} />
         {(['todos', 'perro', 'gato', 'ave', 'otro'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEspecie(e)}
             style={{ padding: '7px 13px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEspecie === e ? '#1B3B36' : '#E1DDD0', background: filtroEspecie === e ? '#EEF2EC' : 'white', color: filtroEspecie === e ? '#1B3B36' : '#7E9389' }}>
@@ -130,18 +130,18 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>{editingId ? 'Editar mascota' : 'Registrar mascota'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Nombre *</label>
               <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre de la mascota"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Unidad *</label>
               <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="">Seleccionar...</option>
                 {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
@@ -149,7 +149,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Especie</label>
               <select value={form.especie} onChange={e => setForm(f => ({ ...f, especie: e.target.value as EspecieMascota }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="perro">🐕 Perro</option>
                 <option value="gato">🐈 Gato</option>
                 <option value="ave">🦜 Ave</option>
@@ -159,34 +159,34 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Raza</label>
               <input value={form.raza} onChange={e => setForm(f => ({ ...f, raza: e.target.value }))} placeholder="Ej. Labrador"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Color</label>
               <input value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} placeholder="Ej. Café"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha nacimiento</label>
               <input type="date" value={form.fecha_nacimiento} onChange={e => setForm(f => ({ ...f, fecha_nacimiento: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Última vacuna</label>
               <input type="date" value={form.fecha_ultima_vacuna} onChange={e => setForm(f => ({ ...f, fecha_ultima_vacuna: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas</label>
               <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="mascotas" label="Foto de la mascota" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
             <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -211,7 +211,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
               <div key={m.id} style={{ background: 'white', border: `1.5px solid ${vacunaVencida ? '#fde68a' : '#E1DDD0'}`, borderRadius: '14px', padding: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                   {m.foto_url
-                    ? <SecureImage src={m.foto_url} alt={m.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid #E1DDD0', flexShrink: 0 }} />
+                    ? <SecureImage src={m.foto_url} alt={m.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--at-line)', flexShrink: 0 }} />
                     : <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
                         {ESPECIE_ICON[m.especie]}
                       </div>
@@ -232,7 +232,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
                 </div>
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-                    <button onClick={() => startEdit(m)} style={{ flex: 1, padding: '6px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#3E5A4C' }}>✏️ Editar</button>
+                    <button onClick={() => startEdit(m)} style={{ flex: 1, padding: '6px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#3E5A4C' }}>✏️ Editar</button>
                     <button onClick={() => eliminar(m.id)} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px' }}>🗑</button>
                   </div>
                 )}

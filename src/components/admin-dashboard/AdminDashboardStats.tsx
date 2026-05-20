@@ -74,7 +74,7 @@ function AdminDashboardStatsImpl({ registros, moneda, clientes, fechaDesde, fech
       value: `${consumoTotal.toFixed(2)}`,
       unit: 'm³',
       icon: '💧',
-      bg: 'linear-gradient(135deg, #1B3B36 0%, #102622 100%)',
+      bg: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-primary-hover) 100%)',
     },
     {
       label: 'Recaudo Estimado',
@@ -102,14 +102,14 @@ function AdminDashboardStatsImpl({ registros, moneda, clientes, fechaDesde, fech
       value: `${pagados}`,
       unit: 'lecturas',
       icon: '✓',
-      bg: 'linear-gradient(135deg, #B96A3F 0%, #9C5733 100%)',
+      bg: 'linear-gradient(135deg, var(--at-accent) 0%, var(--at-accent-hover) 100%)',
     },
     {
       label: 'Clientes Activos',
       value: `${clientesConLectura}`,
       unit: `de ${totalClientes}`,
       icon: '👥',
-      bg: 'linear-gradient(135deg, #577B69 0%, #102622 100%)',
+      bg: 'linear-gradient(135deg, var(--at-accent-2) 0%, var(--at-primary-hover) 100%)',
     },
   ]
 

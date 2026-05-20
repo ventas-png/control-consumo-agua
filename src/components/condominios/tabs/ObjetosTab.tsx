@@ -118,7 +118,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
   }
 
   const inputStyle: CSSProperties = {
-    width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px',
+    width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px',
     fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box',
   }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
@@ -137,7 +137,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>
             {editId ? 'Editar Registro' : 'Registrar Objeto Encontrado'}
           </h3>
@@ -166,7 +166,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Registrar'}
             </button>
@@ -182,7 +182,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
             <label style={labelStyle}>Reclamado por (nombre)</label>
             <input style={{ ...inputStyle, marginBottom: '16px' }} value={reclamadoPor} onChange={e => setReclamadoPor(e.target.value)} placeholder="Nombre de quien reclama…" autoFocus />
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setReclamoId(null)} style={{ padding: '8px 14px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={() => setReclamoId(null)} style={{ padding: '8px 14px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>Cancelar</button>
               <button onClick={confirmarReclamo} style={{ padding: '8px 14px', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Confirmar Reclamo</button>
             </div>
           </div>
@@ -223,7 +223,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
           {filtered.map(o => {
             const cfg = ESTADO_CONFIG[o.estado]
             return (
-              <div key={o.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div key={o.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, color: '#15291F', fontSize: '14px' }}>{o.descripcion}</div>

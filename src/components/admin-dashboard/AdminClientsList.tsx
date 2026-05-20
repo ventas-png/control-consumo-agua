@@ -52,7 +52,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
             width: '100%',
             padding: '12px 16px',
             borderRadius: '12px',
-            border: '2px solid #E1DDD0',
+            border: '2px solid var(--at-line)',
             fontSize: '14px',
             fontFamily: 'inherit',
           }}
@@ -83,7 +83,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
                   background: 'white',
                   borderRadius: '12px',
                   padding: '16px',
-                  border: '1px solid #E1DDD0',
+                  border: '1px solid var(--at-line)',
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr 1fr 1fr auto',
                   gap: '16px',
@@ -160,7 +160,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
           padding: '16px',
           background: '#EEF2EC',
           borderRadius: '12px',
-          border: '1px solid #C2D2CA',
+          border: '1px solid var(--at-primary-soft-2)',
           fontSize: '13px',
           color: '#102622',
         }}>

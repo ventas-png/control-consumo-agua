@@ -26,7 +26,7 @@ const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }>
 }
 
 const inputStyle: CSSProperties = {
-  width: '100%', padding: '7px 10px', border: '1.5px solid #E1DDD0',
+  width: '100%', padding: '7px 10px', border: '1.5px solid var(--at-line)',
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }
 
@@ -152,7 +152,7 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar residente' : 'Nuevo residente'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
@@ -221,8 +221,8 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
             const unidad = unidades.find(u => u.id === unidadId)
             const activo = residentes.find(r => r.estado === 'activo')
             return (
-              <div key={unidadId} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden' }}>
-                <div style={{ padding: '12px 16px', background: '#FAF7EF', borderBottom: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={unidadId} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', background: '#FAF7EF', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontWeight: 700, fontSize: '14px', color: '#15291F' }}>
                     {unidad?.nombre ?? 'Sin unidad asignada'}
                   </div>
@@ -237,7 +237,7 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
                     const ts = TIPO_STYLE[h.tipo]
                     const es = ESTADO_STYLE[h.estado]
                     return (
-                      <div key={h.id} style={{ padding: '12px 16px', borderBottom: '1px solid #FAF7EF', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div key={h.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--at-surface-2)', display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: ts.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
                           {ts.icon}
                         </div>

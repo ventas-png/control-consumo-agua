@@ -41,7 +41,7 @@ function KpiBox({ label, value, sub, color = '#15291F', bg = 'white', border = '
 function Section({ title, icon, children }: { title: string; icon: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: '28px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', paddingBottom: '8px', borderBottom: '2px solid #E1DDD0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', paddingBottom: '8px', borderBottom: '2px solid var(--at-line)' }}>
         <span style={{ fontSize: '18px' }}>{icon}</span>
         <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#15291F' }}>{title}</h3>
       </div>
@@ -128,11 +128,11 @@ export function ReporteConsolidadoTab({
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <select value={mes} onChange={e => setMes(parseInt(e.target.value))}
-            style={{ padding: '7px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: '#FAF7EF', fontWeight: 600 }}>
+            style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: '#FAF7EF', fontWeight: 600 }}>
             {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
           </select>
           <select value={anio} onChange={e => setAnio(parseInt(e.target.value))}
-            style={{ padding: '7px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: '#FAF7EF', fontWeight: 600 }}>
+            style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: '#FAF7EF', fontWeight: 600 }}>
             {aniosDisp.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <button onClick={imprimir}
@@ -145,7 +145,7 @@ export function ReporteConsolidadoTab({
       {/* Reporte */}
       <div id="reporte-ejecutivo">
         {/* Encabezado imprimible */}
-        <div style={{ background: 'linear-gradient(135deg,#0E2A24,#102622)', borderRadius: '16px', padding: '22px 26px', marginBottom: '26px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ background: 'linear-gradient(135deg,var(--at-ink-deep),var(--at-primary-hover))', borderRadius: '16px', padding: '22px 26px', marginBottom: '26px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <div style={{ fontSize: '13px', opacity: 0.75, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Informe Ejecutivo Mensual</div>
             <div style={{ fontSize: '24px', fontWeight: 900, marginTop: '4px' }}>{proyectoNombre ?? 'Condominio'}</div>
@@ -183,7 +183,7 @@ export function ReporteConsolidadoTab({
               <div style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C', marginBottom: '8px' }}>Gastos por categoría</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
                 {Object.entries(gastosXCat).sort((a,b) => b[1]-a[1]).map(([cat, monto]) => (
-                  <div key={cat} style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '8px', padding: '5px 10px', fontSize: '12px' }}>
+                  <div key={cat} style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px' }}>
                     <span style={{ color: '#7E9389' }}>{cat.replace(/_/g, ' ')}: </span>
                     <span style={{ fontWeight: 700, color: '#15291F' }}>{fmt(monto, moneda)}</span>
                   </div>
@@ -235,7 +235,7 @@ export function ReporteConsolidadoTab({
         </Section>
 
         {/* Footer */}
-        <div style={{ borderTop: '1.5px solid #E1DDD0', paddingTop: '14px', marginTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#7E9389', flexWrap: 'wrap', gap: '6px' }}>
+        <div style={{ borderTop: '1.5px solid var(--at-line)', paddingTop: '14px', marginTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#7E9389', flexWrap: 'wrap', gap: '6px' }}>
           <span>Reporte: {periodo.label} — {proyectoNombre ?? 'Condominio'}</span>
           <span>Generado automáticamente · {new Date().toLocaleString('es')}</span>
         </div>

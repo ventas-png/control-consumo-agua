@@ -164,7 +164,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
       {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px', marginBottom: '24px' }}>
         {kpis.map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '14px', padding: '18px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div key={k.label} style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '14px', padding: '18px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
             <div style={{ width: 34, height: 34, borderRadius: '10px', background: k.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', marginBottom: '10px' }}>
               {k.icon}
             </div>
@@ -176,7 +176,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
       </div>
 
       {/* Gráfica de recaudación */}
-      <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+      <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: 8 }}>
           <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#15291F' }}>📊 Recaudación — últimos 6 meses</h3>
           <div style={{ display: 'flex', gap: 14, fontSize: '11px', color: '#7E9389' }}>
@@ -226,7 +226,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
         {/* Tickets abiertos */}
         {ticketsAbiertos.length > 0 && (
-          <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '14px', padding: '18px' }}>
+          <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '14px', padding: '18px' }}>
             <h3 style={{ margin: '0 0 14px', fontSize: '13.5px', fontWeight: 700, color: '#15291F' }}>🔧 Tickets abiertos</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
               {ticketsAbiertos.slice(0, 5).map(t => (
@@ -253,12 +253,12 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
 
         {/* Visitas de hoy */}
         {visitantesHoy.length > 0 && (
-          <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '14px', padding: '18px' }}>
+          <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '14px', padding: '18px' }}>
             <h3 style={{ margin: '0 0 14px', fontSize: '13.5px', fontWeight: 700, color: '#15291F' }}>🚪 Visitas de hoy</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
               {visitantesHoy.slice(0, 5).map(v => (
                 <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: '#FAF7EF', borderRadius: '9px' }}>
-                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,#1B3B36,#577B69)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
                     {v.nombre.charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -280,7 +280,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
 
         {/* Reservas de hoy */}
         {reservasHoy.length > 0 && (
-          <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '14px', padding: '18px' }}>
+          <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '14px', padding: '18px' }}>
             <h3 style={{ margin: '0 0 14px', fontSize: '13.5px', fontWeight: 700, color: '#15291F' }}>🏊 Reservas de hoy</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
               {reservasHoy.map(r => (

@@ -76,7 +76,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
@@ -132,7 +132,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nueva lectura de gas</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -213,7 +213,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
             <thead>
               <tr style={{ background: '#FAF7EF' }}>
                 {['Unidad/Área', 'Período', 'Fecha', 'Lect. anterior', 'Lect. actual', 'Consumo', 'Costo', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#7E9389', fontWeight: 600, borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#7E9389', fontWeight: 600, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -221,7 +221,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
               {lista.map(l => {
                 const unidad = unidades.find(u => u.id === l.unidad_id)
                 return (
-                  <tr key={l.id} style={{ borderBottom: '1px solid #EAE6D8', background: l.alerta_fuga ? '#fef2f2' : '#fff' }}>
+                  <tr key={l.id} style={{ borderBottom: '1px solid var(--at-chip)', background: l.alerta_fuga ? '#fef2f2' : '#fff' }}>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>
                       {l.alerta_fuga && <span style={{ color: '#ef4444', marginRight: 4 }}>🚨</span>}
                       {unidad?.nombre ?? l.area ?? 'Área común'}

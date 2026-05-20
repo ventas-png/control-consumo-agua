@@ -495,7 +495,7 @@ export function ContadoresSection({
 
   const inputStyle: CSSProperties = {
     padding: '10px 14px',
-    border: '2px solid #E1DDD0',
+    border: '2px solid var(--at-line)',
     borderRadius: '8px',
     fontSize: '14px',
     width: '100%',
@@ -566,7 +566,7 @@ export function ContadoresSection({
                   padding: '10px 18px',
                   background: '#ffffff',
                   color: '#1B3B36',
-                  border: '2px solid #1B3B36',
+                  border: '2px solid var(--at-primary)',
                   borderRadius: '8px',
                   fontWeight: 600,
                   fontSize: '14px',
@@ -586,7 +586,7 @@ export function ContadoresSection({
                 onClick={startCreate}
                 style={{
                   padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+                  background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
@@ -738,7 +738,7 @@ export function ContadoresSection({
               />
             </div>
             {/* Technical fields — separator */}
-            <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #E1DDD0', paddingTop: '16px', marginTop: '4px' }}>
+            <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--at-line)', paddingTop: '16px', marginTop: '4px' }}>
               <div style={{ fontSize: '13px', fontWeight: 700, color: '#1B3B36', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Características Técnicas e Instalación
               </div>
@@ -918,7 +918,7 @@ export function ContadoresSection({
               disabled={loading}
               style={{
                 padding: '10px 24px',
-                background: loading ? '#7E9389' : 'linear-gradient(135deg, #1B3B36, #577B69)',
+                background: loading ? '#7E9389' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',

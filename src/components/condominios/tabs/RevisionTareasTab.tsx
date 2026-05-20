@@ -90,14 +90,14 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={selectedPersonalId} onChange={e => setSelectedPersonalId(e.target.value)}
-          style={{ padding: '7px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
+          style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
           <option value="todos">Todos los empleados</option>
           {personalActivo.map(p => <option key={p.id} value={p.id}>{p.nombre} — {p.cargo}</option>)}
         </select>
         <input type="date" value={selectedFecha} onChange={e => setSelectedFecha(e.target.value)}
-          style={{ padding: '7px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+          style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
         {selectedFecha !== hoy && (
-          <button onClick={() => setSelectedFecha(hoy)} style={{ padding: '7px 12px', background: '#EAE6D8', border: '1px solid #E1DDD0', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: '#3E5A4C' }}>
+          <button onClick={() => setSelectedFecha(hoy)} style={{ padding: '7px 12px', background: '#EAE6D8', border: '1px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: '#3E5A4C' }}>
             Hoy
           </button>
         )}
@@ -161,7 +161,7 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
 
                 {/* Detalle de tareas para revisar */}
                 {isOpen && (
-                  <div style={{ borderTop: '1px solid #E6CDBB', padding: '16px 18px', background: '#F4EBE3' }}>
+                  <div style={{ borderTop: '1px solid var(--at-accent-soft)', padding: '16px 18px', background: '#F4EBE3' }}>
                     {ts.length === 0 ? (
                       <p style={{ color: '#7E9389', fontSize: '13px' }}>Este turno no tenía tareas asignadas.</p>
                     ) : (

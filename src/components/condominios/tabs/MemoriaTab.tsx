@@ -90,7 +90,7 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
   const textareaStyle: CSSProperties = { ...inputStyle, resize: 'vertical', minHeight: '80px' }
 
@@ -105,7 +105,7 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Memoria' : 'Nueva Memoria de Labores'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '12px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
@@ -132,7 +132,7 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
           </div>
 
           {/* Métricas */}
-          <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '8px', border: '1px solid #E1DDD0' }}>
+          <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '8px', border: '1px solid var(--at-line)' }}>
             <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389', marginBottom: '10px' }}>MÉTRICAS DEL PERÍODO</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
               {[
@@ -165,7 +165,7 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
           </div>
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear'}
             </button>
@@ -229,7 +229,7 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
 
           {/* Detalle */}
           {selected && (
-            <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', position: 'sticky', top: '16px' }}>
+            <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', position: 'sticky', top: '16px' }}>
               <div style={{ marginBottom: '16px' }}>
                 <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>{selected.titulo}</h3>
                 <div style={{ fontSize: '12px', color: '#7E9389' }}>{selected.periodo} · {TIPO_PERIODO.find(t => t.value === selected.tipo_periodo)?.label}</div>

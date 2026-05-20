@@ -140,12 +140,12 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
   return (
     <div style={{ padding: 16 }}>
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid #E1DDD0', paddingBottom: 1 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--at-line)', paddingBottom: 1 }}>
         {(['generar', 'historial'] as const).map(t => (
           <button key={t} onClick={() => cambiarTab(t)}
             style={{ padding: '7px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: tab === t ? 700 : 500,
               background: tab === t ? '#FAF7EF' : 'transparent', color: tab === t ? '#1B3B36' : '#7E9389',
-              borderBottom: tab === t ? '2px solid #1B3B36' : '2px solid transparent', borderRadius: '6px 6px 0 0' }}>
+              borderBottom: tab === t ? '2px solid var(--at-primary)' : '2px solid transparent', borderRadius: '6px 6px 0 0' }}>
             {t === 'generar' ? '🏭 Generar cuotas' : '📋 Historial de generaciones'}
           </button>
         ))}
@@ -154,25 +154,25 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
       {tab === 'generar' && (
         <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 16, alignItems: 'start' }}>
           {/* Configuración */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14, color: '#15291F' }}>⚙️ Parámetros de generación</div>
 
             <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Período *</label>
               <input type="month" value={periodo} onChange={e => setPeriodo(e.target.value)}
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
 
             <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Concepto *</label>
               <select value={concepto} onChange={e => setConcepto(e.target.value)}
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
                 {CONCEPTOS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
               {concepto === 'Otro' && (
                 <input value={conceptoCustom} onChange={e => setConceptoCustom(e.target.value)}
                   placeholder="Escribe el concepto…"
-                  style={{ marginTop: 6, width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ marginTop: 6, width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
               )}
             </div>
 
@@ -181,12 +181,12 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
                 <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Monto ({moneda}) *</label>
                 <input type="number" min="0" step="0.01" value={monto} onChange={e => setMonto(e.target.value)}
                   placeholder="0.00"
-                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Fecha vencimiento *</label>
                 <input type="date" value={fechaVenc} onChange={e => setFechaVenc(e.target.value)}
-                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
               </div>
             </div>
 
@@ -200,7 +200,7 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
                 <span style={{ color: '#102622' }}>Ya tienen cuota este período</span>
                 <span style={{ fontWeight: 700, color: '#d97706' }}>{unidadesYaTienen.length}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #C2D2CA', marginTop: 4, paddingTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--at-primary-soft-2)', marginTop: 4, paddingTop: 4 }}>
                 <span style={{ fontWeight: 700, color: '#102622' }}>Total a generar</span>
                 <span style={{ fontWeight: 800, color: '#102622' }}>{moneda} {totalGenerar.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
               </div>
@@ -215,12 +215,12 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
           </div>
 
           {/* Lista de unidades */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 13 }}>Unidades disponibles ({unidadesFiltradas.length})</div>
               {unidadesFiltradas.length > 0 && (
                 <button onClick={toggleAll}
-                  style={{ fontSize: 11, padding: '4px 12px', border: '1px solid #C7C2B0', borderRadius: 6, cursor: 'pointer', background: '#FAF7EF' }}>
+                  style={{ fontSize: 11, padding: '4px 12px', border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer', background: '#FAF7EF' }}>
                   {seleccionadas.size === unidadesFiltradas.length ? 'Deseleccionar todas' : 'Seleccionar todas'}
                 </button>
               )}
@@ -258,7 +258,7 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
       )}
 
       {tab === 'historial' && (
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Historial de generaciones masivas</div>
           {loadingLogs ? (
             <div style={{ textAlign: 'center', color: '#7E9389', padding: 30 }}>Cargando…</div>

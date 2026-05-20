@@ -81,7 +81,7 @@ export default function AnalisisCarteraTab({ cuotas, unidades, moneda }: Props) 
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         {/* Aging buckets */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14 }}>Antigüedad de la cartera vencida</div>
           {vencidas.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#7E9389', padding: '30px 0', fontSize: 13 }}>Sin cartera vencida</div>
@@ -105,7 +105,7 @@ export default function AnalisisCarteraTab({ cuotas, unidades, moneda }: Props) 
         </div>
 
         {/* Top deudores */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Principales unidades morosas</div>
           {porUnidad.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#7E9389', padding: '30px 0', fontSize: 13 }}>Sin morosidad registrada</div>

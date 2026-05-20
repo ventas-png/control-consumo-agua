@@ -81,7 +81,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
@@ -121,7 +121,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nuevo convenio de pago</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -204,7 +204,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
           </div>
           {/* Detalle */}
           {selected && (
-            <div style={{ width: 260, flexShrink: 0, background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 260, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 14 }}>Detalle del convenio</div>
               {[
                 ['Monto total', `${moneda} ${selected.monto_total.toFixed(2)}`],
@@ -214,7 +214,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
                 ['Pagadas', `${selected.cuotas_pagadas} de ${selected.num_cuotas}`],
                 ['Aprobado por', selected.aprobado_por ?? '—'],
               ].map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid #EAE6D8' }}>
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--at-chip)' }}>
                   <span style={{ color: '#7E9389' }}>{k}</span>
                   <span style={{ fontWeight: 600, color: '#3E5A4C' }}>{v}</span>
                 </div>

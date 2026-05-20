@@ -109,7 +109,7 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
           { label: '% Reciclaje',         value: `${pctReciclaje.toFixed(0)}%`,  icon: '♻️', color: '#10b981' },
           { label: 'CO₂ ahorrado',        value: `${co2Ahorrado.toFixed(0)} kg`, icon: '🌱', color: '#16a34a' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
@@ -120,7 +120,7 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
 
         {/* Consumo agua por mes */}
-        <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>💧 Consumo de Agua (últimos 6 meses)</h3>
           {loadingAgua ? (
             <div style={{ textAlign: 'center', color: '#7E9389', padding: '20px' }}>Cargando...</div>
@@ -144,7 +144,7 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
         </div>
 
         {/* Residuos por mes */}
-        <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>♻️ Residuos por Mes (últimos 6 meses)</h3>
           {residuosMeses.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#7E9389', padding: '20px', fontSize: '13px' }}>Sin datos de residuos</div>
@@ -166,7 +166,7 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
         </div>
 
         {/* Residuos por tipo */}
-        <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>🗑️ Residuos por Tipo</h3>
           {tipoEntries.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#7E9389', padding: '20px', fontSize: '13px' }}>Sin datos</div>

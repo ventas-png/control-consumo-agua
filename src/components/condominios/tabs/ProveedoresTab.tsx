@@ -171,7 +171,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
   }
 
   const inputStyle: CSSProperties = {
-    width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px',
+    width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px',
     fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box',
   }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
@@ -200,7 +200,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
           )}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={exportarPDF} disabled={contratos.length === 0} style={{ padding: '7px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid #C2D2CA', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
+          <button onClick={exportarPDF} disabled={contratos.length === 0} style={{ padding: '7px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
           <button onClick={exportarXlsx} disabled={contratos.length === 0} style={{ padding: '7px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
           {canCreate && !showForm && (
             <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
@@ -212,7 +212,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>
             {editId ? 'Editar Contrato' : 'Nuevo Contrato'}
           </h3>
@@ -277,7 +277,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear Contrato'}
             </button>
@@ -301,7 +301,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
         <div style={{ width: '1px', height: '24px', background: '#E1DDD0', margin: '0 4px' }} />
         {/* Servicio */}
         <select value={filtroServicio} onChange={e => setFiltroServicio(e.target.value as ServicioProveedor | 'todos')}
-          style={{ padding: '5px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
+          style={{ padding: '5px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
           <option value="todos">Todos los servicios</option>
           {SERVICIOS.map(s => <option key={s.value} value={s.value}>{s.icon} {s.label}</option>)}
         </select>
@@ -317,7 +317,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: '#FAF7EF', borderBottom: '2px solid #E1DDD0' }}>
+              <tr style={{ background: '#FAF7EF', borderBottom: '2px solid var(--at-line)' }}>
                 {['Proveedor', 'Servicio', 'Contacto', 'Monto/mes', 'Vigencia', 'Estado', ''].map(h => (
                   <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#7E9389', fontSize: '12px' }}>{h}</th>
                 ))}
@@ -328,7 +328,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
                 const si = servicioInfo(c.servicio)
                 const vencido = isVencido(c)
                 return (
-                  <tr key={c.id} style={{ borderBottom: '1px solid #EAE6D8', background: vencido ? '#fff7ed' : 'white' }}>
+                  <tr key={c.id} style={{ borderBottom: '1px solid var(--at-chip)', background: vencido ? '#fff7ed' : 'white' }}>
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ fontWeight: 600, color: '#15291F' }}>{c.proveedor_nombre}</div>
                       {c.descripcion && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>{c.descripcion.slice(0, 50)}{c.descripcion.length > 50 ? '…' : ''}</div>}
@@ -353,7 +353,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
                     <td style={{ padding: '10px 12px' }}>
                       {canEdit ? (
                         <select value={c.estado} onChange={e => handleEstado(c.id, e.target.value)}
-                          style={{ padding: '4px 8px', border: '1.5px solid #E1DDD0', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: ESTADO_COLORS[c.estado] ?? '#7E9389', background: 'white', cursor: 'pointer' }}>
+                          style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: ESTADO_COLORS[c.estado] ?? '#7E9389', background: 'white', cursor: 'pointer' }}>
                           <option value="activo">Activo</option>
                           <option value="vencido">Vencido</option>
                           <option value="terminado">Terminado</option>

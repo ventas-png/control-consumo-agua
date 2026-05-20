@@ -256,12 +256,12 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
   return (
     <div style={{ padding: 16 }}>
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid #E1DDD0', paddingBottom: 1 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--at-line)', paddingBottom: 1 }}>
         {(['generar', 'historial'] as const).map(t => (
           <button key={t} onClick={() => cambiarTab(t)}
             style={{ padding: '7px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: tab === t ? 700 : 500,
               background: tab === t ? '#FAF7EF' : 'transparent', color: tab === t ? '#1B3B36' : '#7E9389',
-              borderBottom: tab === t ? '2px solid #1B3B36' : '2px solid transparent', borderRadius: '6px 6px 0 0' }}>
+              borderBottom: tab === t ? '2px solid var(--at-primary)' : '2px solid transparent', borderRadius: '6px 6px 0 0' }}>
             {t === 'generar' ? '🏭 Generar cuotas' : '📋 Historial de generaciones'}
           </button>
         ))}
@@ -297,32 +297,32 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
           {paso === 'config' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
               {/* Panel izquierdo: parámetros base */}
-              <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 20 }}>
+              <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 20 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 16, color: '#15291F' }}>⚙️ Parámetros del período</div>
 
                 <div style={{ marginBottom: 12 }}>
                   <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Período *</label>
                   <input type="month" value={periodo} onChange={e => setPeriodo(e.target.value)}
-                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
                 </div>
 
                 <div style={{ marginBottom: 12 }}>
                   <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Concepto *</label>
                   <select value={concepto} onChange={e => setConcepto(e.target.value)}
-                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
                     {CONCEPTOS.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                   {concepto === 'Otro' && (
                     <input value={conceptoCustom} onChange={e => setConceptoCustom(e.target.value)}
                       placeholder="Escribe el concepto…"
-                      style={{ marginTop: 6, width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                      style={{ marginTop: 6, width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
                   )}
                 </div>
 
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Fecha de vencimiento *</label>
                   <input type="date" value={fechaVenc} onChange={e => setFechaVenc(e.target.value)}
-                    style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
                 </div>
 
                 <div style={{ background: '#EEF2EC', borderRadius: 8, padding: '10px 12px', fontSize: 12 }}>
@@ -340,7 +340,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
               </div>
 
               {/* Panel derecho: rubros */}
-              <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 20 }}>
+              <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 20 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 16, color: '#15291F' }}>💰 Rubros y métodos de cálculo</div>
                 <RubrosBuilder rubros={rubros} onChange={setRubros} moneda={moneda} />
 
@@ -357,7 +357,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
 
           {/* ─── PASO B: Preview ─── */}
           {paso === 'preview' && (
-            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 20 }}>
+            <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: '#15291F' }}>
@@ -368,7 +368,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                   </div>
                 </div>
                 <button onClick={() => setPaso('config')}
-                  style={{ padding: '6px 14px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 12, cursor: 'pointer', background: '#FAF7EF' }}>
+                  style={{ padding: '6px 14px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 12, cursor: 'pointer', background: '#FAF7EF' }}>
                   ← Volver a configurar
                 </button>
               </div>
@@ -395,12 +395,12 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                 <div style={{ flex: 1, textAlign: 'right' }}>Total</div>
               </div>
 
-              <div style={{ maxHeight: 420, overflowY: 'auto', border: '1px solid #EAE6D8', borderRadius: 8 }}>
+              <div style={{ maxHeight: 420, overflowY: 'auto', border: '1px solid var(--at-chip)', borderRadius: 8 }}>
                 {calculos.map(({ unidad, rubrosDetalle, total }, idx) => {
                   const sel = seleccionadas.has(unidad.id)
                   const exp = expandidas.has(unidad.id)
                   return (
-                    <div key={unidad.id} style={{ borderBottom: idx < calculos.length - 1 ? '1px solid #EAE6D8' : 'none' }}>
+                    <div key={unidad.id} style={{ borderBottom: idx < calculos.length - 1 ? '1px solid var(--at-chip)' : 'none' }}>
                       <div onClick={() => toggleUnidad(unidad.id)}
                         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 8px', cursor: 'pointer', background: sel ? '#EEF2EC' : idx % 2 === 0 ? '#fff' : '#FAF7EF' }}>
                         <div style={{ width: 20 }} onClick={e => { e.stopPropagation(); toggleUnidad(unidad.id) }}>
@@ -418,7 +418,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                         </div>
                         <div style={{ flex: 1, textAlign: 'center' }}>
                           <button onClick={e => { e.stopPropagation(); toggleExpandir(unidad.id) }}
-                            style={{ fontSize: 10, padding: '2px 8px', border: '1px solid #C7C2B0', borderRadius: 5, cursor: 'pointer', background: '#FAF7EF', color: '#7E9389' }}>
+                            style={{ fontSize: 10, padding: '2px 8px', border: '1px solid var(--at-line-strong)', borderRadius: 5, cursor: 'pointer', background: '#FAF7EF', color: '#7E9389' }}>
                             {exp ? '▲ ocultar' : '▼ detalle'}
                           </button>
                         </div>
@@ -429,7 +429,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
 
                       {/* Detalle de rubros expandido */}
                       {exp && (
-                        <div style={{ background: '#f8faff', borderTop: '1px solid #EFE0D5', padding: '8px 12px 8px 48px' }}>
+                        <div style={{ background: '#f8faff', borderTop: '1px solid var(--at-accent-soft-2)', padding: '8px 12px 8px 48px' }}>
                           {rubrosDetalle.map((rd, ri) => (
                             <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#3E5A4C', marginBottom: 3 }}>
                               <span style={{ color: '#3E5A4C' }}>
@@ -441,7 +441,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                               <span style={{ fontWeight: 600 }}>{moneda} {rd.monto_calculado.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
                             </div>
                           ))}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: '#102622', borderTop: '1px solid #E6CDBB', marginTop: 4, paddingTop: 4 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: '#102622', borderTop: '1px solid var(--at-accent-soft)', marginTop: 4, paddingTop: 4 }}>
                             <span>Total</span>
                             <span>{moneda} {total.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
                           </div>
@@ -460,7 +460,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
               )}
 
               {/* Footer */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, padding: '12px 16px', background: '#FAF7EF', borderRadius: 8, border: '1px solid #E1DDD0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, padding: '12px 16px', background: '#FAF7EF', borderRadius: 8, border: '1px solid var(--at-line)' }}>
                 <div style={{ fontSize: 13, color: '#3E5A4C' }}>
                   <span style={{ fontWeight: 700 }}>{seleccionadas.size}</span> unidades seleccionadas
                 </div>
@@ -488,7 +488,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
               </div>
               <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
                 <button onClick={reiniciar}
-                  style={{ padding: '10px 20px', border: '1px solid #C7C2B0', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: '#FAF7EF' }}>
+                  style={{ padding: '10px 20px', border: '1px solid var(--at-line-strong)', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: '#FAF7EF' }}>
                   Generar otro período
                 </button>
                 {onVerCuotas && (
@@ -505,7 +505,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
 
       {/* ─── Historial ─── */}
       {tab === 'historial' && (
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Historial de generaciones masivas</div>
           {loadingLogs ? (
             <div style={{ textAlign: 'center', color: '#7E9389', padding: 30 }}>Cargando…</div>
@@ -520,7 +520,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                 const expLog = logExpandidas.has(l.id)
                 const rubrosLog = (l.rubros as RubroConfig[] | null) ?? null
                 return (
-                  <div key={l.id} style={{ background: '#FAF7EF', borderRadius: 8, border: '1px solid #EAE6D8', overflow: 'hidden' }}>
+                  <div key={l.id} style={{ background: '#FAF7EF', borderRadius: 8, border: '1px solid var(--at-chip)', overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', fontSize: 12 }}>
                       <div style={{ width: 40, height: 40, borderRadius: 10, background: '#EEF2EC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏭</div>
                       <div style={{ flex: 1 }}>
@@ -535,13 +535,13 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                       </div>
                       {rubrosLog && rubrosLog.length > 0 && (
                         <button onClick={() => toggleLogExpandir(l.id)}
-                          style={{ fontSize: 10, padding: '2px 8px', border: '1px solid #C7C2B0', borderRadius: 5, cursor: 'pointer', background: '#fff', color: '#7E9389', flexShrink: 0 }}>
+                          style={{ fontSize: 10, padding: '2px 8px', border: '1px solid var(--at-line-strong)', borderRadius: 5, cursor: 'pointer', background: '#fff', color: '#7E9389', flexShrink: 0 }}>
                           {expLog ? '▲' : '▼'} rubros
                         </button>
                       )}
                     </div>
                     {expLog && rubrosLog && (
-                      <div style={{ background: '#EEF2EC', borderTop: '1px solid #EFE0D5', padding: '8px 14px 10px 66px' }}>
+                      <div style={{ background: '#EEF2EC', borderTop: '1px solid var(--at-accent-soft-2)', padding: '8px 14px 10px 66px' }}>
                         {rubrosLog.map((rb, ri) => (
                           <div key={ri} style={{ fontSize: 11, color: '#3E5A4C', display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
                             <span>{rb.nombre} <span style={{ color: '#7E9389' }}>({rb.metodo})</span></span>

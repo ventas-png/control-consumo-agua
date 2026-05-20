@@ -64,25 +64,25 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
           {abiertos > 0 && <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#1B3B36' }}>{abiertos} solicitud{abiertos !== 1 ? 'es' : ''} en proceso</p>}
         </div>
         <button onClick={() => setShowForm(true)}
-          style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#1B3B36,#102622)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+          style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
           + Nueva solicitud
         </button>
       </div>
 
       {/* Formulario */}
       {showForm && (
-        <div style={{ background: 'white', border: '1.5px solid #C2D2CA', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
           <h4 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700 }}>Reportar problema</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>¿Qué necesita atención? *</label>
               <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej. Fuga de agua en baño, Luz quemada en pasillo..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Descripción detallada</label>
               <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Cuéntenos más detalles del problema..." rows={3}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '6px' }}>Urgencia</label>
@@ -100,7 +100,7 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
-            <button onClick={enviarSolicitud} disabled={saving} style={{ padding: '10px 22px', background: 'linear-gradient(135deg,#1B3B36,#102622)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={enviarSolicitud} disabled={saving} style={{ padding: '10px 22px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Enviando...' : '📤 Enviar solicitud'}
             </button>
             <button onClick={() => { setShowForm(false); setForm(blankForm()) }} style={{ padding: '10px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>

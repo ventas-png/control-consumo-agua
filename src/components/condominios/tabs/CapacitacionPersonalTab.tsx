@@ -84,7 +84,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   // Group by employee
@@ -111,9 +111,9 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar empleado o curso…"
-            style={{ padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, minWidth: 200 }} />
+            style={{ padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, minWidth: 200 }} />
           <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoCapacitacion | '')}
-            style={{ padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+            style={{ padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
             <option value="">Todos los estados</option>
             {(Object.keys(ESTADO_CFG) as EstadoCapacitacion[]).map(e => <option key={e} value={e}>{ESTADO_CFG[e].label}</option>)}
           </select>
@@ -129,7 +129,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Registrar capacitación</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -208,7 +208,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
                     const diasCert = certVence ? Math.floor((new Date(certVence).getTime() - Date.now()) / 86400000) : null
                     const certAlerta = diasCert !== null && diasCert >= 0 && diasCert <= 30
                     return (
-                      <div key={c.id} style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div key={c.id} style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontWeight: 600, fontSize: 13 }}>{c.curso}</span>

@@ -49,7 +49,7 @@ export default function EncuestaDashboardTab({ encuestas, respuestas }: Props) {
     }).sort((a, b) => b.total - a.total)
   , [encuestas, respuestas])
 
-  const SEL = { padding: '6px 12px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, background: '#fff' }
+  const SEL = { padding: '6px 12px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, background: '#fff' }
 
   return (
     <div style={{ padding: 16 }}>
@@ -65,7 +65,7 @@ export default function EncuestaDashboardTab({ encuestas, respuestas }: Props) {
       ) : (
         <>
           {/* Resumen de todas las encuestas */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14, marginBottom: 14 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, marginBottom: 14 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>Todas las encuestas</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {resumenEncuestas.map(({ e, total, unidades }) => {
@@ -138,8 +138,8 @@ export default function EncuestaDashboardTab({ encuestas, respuestas }: Props) {
                   Esta encuesta aún no tiene respuestas.
                 </div>
               ) : (
-                <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
-                  <div style={{ padding: '10px 14px', background: '#FAF7EF', borderBottom: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ padding: '10px 14px', background: '#FAF7EF', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#3E5A4C' }}>Respuestas recibidas</span>
                     <select value={encuestaId} onChange={e => setEncuestaId(e.target.value)} style={{ ...SEL, fontSize: 11 }}>
                       {encuestas.map(e => <option key={e.id} value={e.id}>{e.titulo}</option>)}
@@ -147,7 +147,7 @@ export default function EncuestaDashboardTab({ encuestas, respuestas }: Props) {
                   </div>
                   <div style={{ maxHeight: 380, overflowY: 'auto' }}>
                     {respuestasParsed.map((r, i) => (
-                      <div key={r.id} style={{ padding: '10px 14px', borderBottom: '1px solid #EAE6D8' }}>
+                      <div key={r.id} style={{ padding: '10px 14px', borderBottom: '1px solid var(--at-chip)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C' }}>
                             {r.unidad_nombre ?? r.nombre_respondente ?? `Respuesta #${i + 1}`}

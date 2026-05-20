@@ -148,8 +148,8 @@ export function SuperAdminSection() {
           <option value="profesional" ${empresa.plan === 'profesional' ? 'selected' : ''}>Plan Profesional</option>
           <option value="enterprise" ${empresa.plan === 'enterprise' ? 'selected' : ''}>Plan Enterprise</option>
         </select>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;justify-content:center;color:#7E9389;font-size:14px;">
-          <input id="swal-activa" type="checkbox" ${empresa.activa ? 'checked' : ''} style="width:16px;height:16px;accent-color:#1B3B36;" />
+        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;justify-content:center;color:var(--at-ink-3);font-size:14px;">
+          <input id="swal-activa" type="checkbox" ${empresa.activa ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--at-primary);" />
           Empresa activa
         </label>
       `,
@@ -295,7 +295,7 @@ export function SuperAdminSection() {
     <div style={{ maxWidth: '960px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #15291F, #15291F)',
+        background: 'linear-gradient(135deg, var(--at-ink), var(--at-ink))',
         borderRadius: '16px', padding: '28px 32px', marginBottom: '28px',
         border: '1px solid rgba(255,255,255,0.06)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px',
@@ -313,7 +313,7 @@ export function SuperAdminSection() {
           style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '10px 18px', borderRadius: '8px', border: 'none',
-            background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+            background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
             color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
           }}
         >
@@ -421,7 +421,7 @@ export function SuperAdminSection() {
                     />
                     {isEditingProj && (
                       <>
-                        <button onClick={() => void actualizarMaxProyectos(e.id)} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
+                        <button onClick={() => void actualizarMaxProyectos(e.id)} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
                           Guardar
                         </button>
                         <button onClick={() => setEditingMax(prev => { const n = { ...prev }; delete n[e.id]; return n })} style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#7E9389', cursor: 'pointer', fontSize: '11px' }}>
@@ -475,7 +475,7 @@ export function SuperAdminSection() {
                       />
                       <span style={{
                         position: 'absolute', inset: 0,
-                        background: e.servicio_agua ? 'linear-gradient(135deg,#1B3B36,#102622)' : 'rgba(255,255,255,0.1)',
+                        background: e.servicio_agua ? 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))' : 'rgba(255,255,255,0.1)',
                         borderRadius: '20px',
                         transition: 'background 0.2s',
                         boxShadow: e.servicio_agua ? '0 0 8px rgba(27, 59, 54,0.4)' : 'none',
@@ -510,7 +510,7 @@ export function SuperAdminSection() {
                       />
                       <span style={{
                         position: 'absolute', inset: 0,
-                        background: e.servicio_condominios ? 'linear-gradient(135deg,#CE8A63,#9C5733)' : 'rgba(255,255,255,0.1)',
+                        background: e.servicio_condominios ? 'linear-gradient(135deg,var(--at-accent-light),var(--at-accent-hover))' : 'rgba(255,255,255,0.1)',
                         borderRadius: '20px',
                         transition: 'background 0.2s',
                         boxShadow: e.servicio_condominios ? '0 0 8px rgba(167,139,250,0.4)' : 'none',
@@ -541,7 +541,7 @@ export function SuperAdminSection() {
       <div style={{
         background: '#ffffff',
         borderRadius: '16px', padding: '28px',
-        border: '1px solid #E1DDD0',
+        border: '1px solid var(--at-line)',
         marginTop: '32px',
         boxShadow: '0 2px 12px rgba(0,0,0,.04)',
       }}>

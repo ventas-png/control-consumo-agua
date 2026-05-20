@@ -109,9 +109,9 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
 
     const { isConfirmed } = await Swal.fire({
       title: `Generar ${items.length} cuotas de agua`,
-      html: `<p style="font-size:13px;color:#3E5A4C;margin:0 0 8px">Período: <strong>${periodo}</strong></p>
-             <p style="font-size:13px;color:#3E5A4C;margin:0 0 8px">Tarifa: <strong>${moneda} ${tarifaNum.toFixed(4)}/m³</strong></p>
-             <p style="font-size:16px;font-weight:800;color:#1B3B36">Total a generar: ${moneda} ${total.toFixed(2)}</p>`,
+      html: `<p style="font-size:13px;color:var(--at-ink-2);margin:0 0 8px">Período: <strong>${periodo}</strong></p>
+             <p style="font-size:13px;color:var(--at-ink-2);margin:0 0 8px">Tarifa: <strong>${moneda} ${tarifaNum.toFixed(4)}/m³</strong></p>
+             <p style="font-size:16px;font-weight:800;color:var(--at-primary)">Total a generar: ${moneda} ${total.toFixed(2)}</p>`,
       icon: 'question', showCancelButton: true,
       confirmButtonText: '💧 Generar cuotas', cancelButtonText: 'Cancelar', confirmButtonColor: '#1B3B36',
     })
@@ -169,30 +169,30 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
 
       {/* Panel generación */}
       {showGenerar && (
-        <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14, color: '#0E2A24' }}>Generar cuotas de agua por consumo</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Tarifa por m³ ({moneda}) *</label>
               <input type="number" step="0.0001" min="0" value={tarifa}
                 onChange={e => setTarifa(e.target.value)} placeholder="0.0000"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #577B69', borderRadius: 6, fontSize: 13 }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-accent-2)', borderRadius: 6, fontSize: 13 }} />
             </div>
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Período (YYYY-MM) *</label>
               <input type="month" value={periodo} onChange={e => setPeriodo(e.target.value)}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #577B69', borderRadius: 6, fontSize: 13 }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-accent-2)', borderRadius: 6, fontSize: 13 }} />
             </div>
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Fecha vencimiento</label>
               <input type="date" value={fechaVenc} onChange={e => setFechaVenc(e.target.value)}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #577B69', borderRadius: 6, fontSize: 13 }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-accent-2)', borderRadius: 6, fontSize: 13 }} />
             </div>
           </div>
 
           {tarifaNum > 0 && (
-            <div style={{ background: '#fff', border: '1px solid #C2D2CA', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#D9E2DC', borderBottom: '1px solid #C2D2CA' }}>
+            <div style={{ background: '#fff', border: '1px solid var(--at-primary-soft-2)', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#D9E2DC', borderBottom: '1px solid var(--at-primary-soft-2)' }}>
                 <label style={{ fontSize: 12, fontWeight: 700, color: '#102622', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                   <input type="checkbox" checked={seleccionadas.size === conGenerables.length} onChange={toggleAll} />
                   {seleccionadas.size} de {conGenerables.length} unidades · Total: {moneda} {conGenerables.filter(r => seleccionadas.has(r.contador_id)).reduce((s, r) => s + (r.consumo_ultimo ?? 0) * tarifaNum, 0).toFixed(2)}
@@ -201,7 +201,7 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
               {conGenerables.map(r => {
                 const monto = ((r.consumo_ultimo ?? 0) * tarifaNum).toFixed(2)
                 return (
-                  <div key={r.contador_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid #EAE6D8' }}>
+                  <div key={r.contador_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--at-chip)' }}>
                     <input type="checkbox" checked={seleccionadas.has(r.contador_id)} onChange={() => toggle(r.contador_id)} />
                     <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#15291F' }}>{r.unidad_nombre}</span>
                     <span style={{ fontSize: 12, color: '#7E9389' }}>#{r.numero_medidor}</span>
@@ -230,7 +230,7 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
           <div style={{ fontSize: 11, marginTop: 4 }}>Crea contadores en el módulo principal de agua.</div>
         </div>
       ) : (
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14 }}>Consumo por unidad — última lectura disponible</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {resumen.map(r => {

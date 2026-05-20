@@ -57,7 +57,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
 
   const inputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box',
-    padding: '10px 14px', border: '1.5px solid #E1DDD0',
+    padding: '10px 14px', border: '1.5px solid var(--at-line)',
     borderRadius: '10px', fontSize: '14px',
     background: '#FAF7EF', color: '#15291F',
     transition: 'border-color 0.15s, box-shadow 0.15s',
@@ -66,13 +66,13 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 50%, #577B69 100%)',
+      background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 50%, var(--at-accent-2) 100%)',
       padding: '16px',
     }}>
       <style>{`
         .oauth-input:focus {
           outline: none;
-          border-color: #1B3B36 !important;
+          border-color: var(--at-primary) !important;
           box-shadow: 0 0 0 3px rgba(27, 59, 54,0.15);
         }
         .reg-card { padding: 40px; }
@@ -162,7 +162,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
             disabled={loading}
             style={{
               width: '100%', padding: '12px',
-              background: loading ? '#7E9389' : 'linear-gradient(135deg, #1B3B36, #577B69)',
+              background: loading ? '#7E9389' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
               color: 'white', border: 'none', borderRadius: '12px',
               fontSize: '15px', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
               marginBottom: '10px',
@@ -178,7 +178,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
             style={{
               width: '100%', padding: '10px',
               background: 'transparent', color: '#7E9389',
-              border: '1.5px solid #E1DDD0', borderRadius: '12px',
+              border: '1.5px solid var(--at-line)', borderRadius: '12px',
               fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >

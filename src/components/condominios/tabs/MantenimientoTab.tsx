@@ -168,7 +168,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={exportarPDF} disabled={filtrados.length === 0}
-            style={{ padding: '9px 14px', background: filtrados.length === 0 ? '#EAE6D8' : '#EEF2EC', color: filtrados.length === 0 ? '#7E9389' : '#1B3B36', border: '1.5px solid #C2D2CA', borderRadius: '9px', fontSize: '12px', fontWeight: 600, cursor: filtrados.length === 0 ? 'not-allowed' : 'pointer' }}>
+            style={{ padding: '9px 14px', background: filtrados.length === 0 ? '#EAE6D8' : '#EEF2EC', color: filtrados.length === 0 ? '#7E9389' : '#1B3B36', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '9px', fontSize: '12px', fontWeight: 600, cursor: filtrados.length === 0 ? 'not-allowed' : 'pointer' }}>
             📄 PDF
           </button>
           <button onClick={exportarXlsx} disabled={filtrados.length === 0}
@@ -176,7 +176,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             📊 Excel
           </button>
           {canCreate && (
-            <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               + Nuevo ticket
             </button>
           )}
@@ -200,7 +200,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
       </div>
 
       {costoRealTotal > 0 && (
-        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '8px', padding: '8px 14px', marginBottom: '14px', fontSize: '12px', color: '#7E9389' }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '8px', padding: '8px 14px', marginBottom: '14px', fontSize: '12px', color: '#7E9389' }}>
           Costo real acumulado: <strong style={{ color: '#15291F' }}>{costoRealTotal.toFixed(2)}</strong>
           {costoEstimadoTotal > 0 && (
             <span style={{ marginLeft: 10, color: costoRealTotal > costoEstimadoTotal ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
@@ -213,7 +213,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar ticket..."
-          style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF' }} />
+          style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF' }} />
         {(['todos', 'activos', 'abierto', 'en_proceso', 'resuelto', 'cerrado'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0', background: filtroEstado === e ? '#EEF2EC' : 'white', color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
@@ -236,18 +236,18 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Nuevo ticket de mantenimiento</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Título *</label>
               <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Descripción breve del problema"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tipo</label>
               <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="correctivo">Correctivo</option>
                 <option value="preventivo">Preventivo</option>
               </select>
@@ -255,7 +255,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Prioridad</label>
               <select value={form.prioridad} onChange={e => setForm(f => ({ ...f, prioridad: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="baja">Baja</option>
                 <option value="media">Media</option>
                 <option value="alta">Alta</option>
@@ -265,7 +265,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Unidad (opcional)</label>
               <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="">Área común</option>
                 {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
@@ -273,26 +273,26 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha límite</label>
               <input type="date" value={form.fecha_limite} onChange={e => setForm(f => ({ ...f, fecha_limite: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Costo estimado</label>
               <input type="number" value={form.costo_estimado} onChange={e => setForm(f => ({ ...f, costo_estimado: e.target.value }))}
                 placeholder="0.00" min="0" step="0.01"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Descripción</label>
               <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
                 placeholder="Detalle el problema o trabajo requerido..." rows={3}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <MultiImageUploader values={fotoUrls} onChange={setFotoUrls} folder="tickets" label="Fotos del problema" maxFiles={6} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Crear ticket'}
             </button>
             <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>

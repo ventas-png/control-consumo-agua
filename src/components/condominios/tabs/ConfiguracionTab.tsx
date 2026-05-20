@@ -103,7 +103,7 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
     toast.success('Configuración guardada')
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', color: '#15291F', background: canEdit ? 'white' : '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', color: '#15291F', background: canEdit ? 'white' : '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -119,7 +119,7 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
 
       {GROUPS.map(group => (
         <div key={group} style={{ marginBottom: '24px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #EAE6D8', paddingBottom: '6px' }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--at-chip)', paddingBottom: '6px' }}>
             {group}
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>

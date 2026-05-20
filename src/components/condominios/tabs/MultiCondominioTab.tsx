@@ -106,7 +106,7 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
             const tasaRec = r.cuotasTotales > 0 ? Math.round((r.cuotasPagadas / r.cuotasTotales) * 100) : 0
             const tasaMora = r.cuotasTotales > 0 ? Math.round((r.cuotasMorosas / r.cuotasTotales) * 100) : 0
             return (
-              <div key={r.proyecto.id} style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+              <div key={r.proyecto.id} style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 14, color: '#15291F' }}>🏢 {r.proyecto.nombre}</div>

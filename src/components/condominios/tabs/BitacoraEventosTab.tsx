@@ -154,20 +154,20 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
       {/* Filtros */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={filtroTipo} onChange={e => { setFiltroTipo(e.target.value as TipoEvento | ''); setPagina(1) }}
-          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, background: '#fff' }}>
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, background: '#fff' }}>
           <option value="">Todos los tipos</option>
           {(Object.keys(TIPO_CFG) as TipoEvento[]).map(t => (
             <option key={t} value={t}>{TIPO_CFG[t].icon} {TIPO_CFG[t].label} ({conteoPorTipo[t] ?? 0})</option>
           ))}
         </select>
         <input type="date" value={fechaDesde} onChange={e => { setFechaDesde(e.target.value); setPagina(1) }}
-          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12 }} />
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12 }} />
         <span style={{ fontSize: 12, color: '#7E9389' }}>—</span>
         <input type="date" value={fechaHasta} onChange={e => { setFechaHasta(e.target.value); setPagina(1) }}
-          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12 }} />
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12 }} />
         {(filtroTipo || fechaDesde || fechaHasta) && (
           <button onClick={() => { setFiltroTipo(''); setFechaDesde(''); setFechaHasta(''); setPagina(1) }}
-            style={{ padding: '6px 12px', background: '#EAE6D8', border: '1px solid #C7C2B0', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#3E5A4C' }}>
+            style={{ padding: '6px 12px', background: '#EAE6D8', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#3E5A4C' }}>
             Limpiar filtros
           </button>
         )}
@@ -209,7 +209,7 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
                     <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fff', border: `2px solid ${cfg.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0, zIndex: 1, boxShadow: `0 0 0 2px ${cfg.color}22` }}>
                       {cfg.icon}
                     </div>
-                    <div style={{ flex: 1, background: '#fff', border: '1px solid #E1DDD0', borderRadius: 10, padding: '10px 14px', marginBottom: 0 }}>
+                    <div style={{ flex: 1, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px', marginBottom: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 12, color: '#15291F' }}>{e.titulo}</div>
@@ -234,12 +234,12 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
       {totalPaginas > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 16 }}>
           <button onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={pagina === 1}
-            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #C7C2B0', cursor: pagina === 1 ? 'default' : 'pointer', background: '#fff', color: pagina === 1 ? '#C7C2B0' : '#3E5A4C', fontSize: 12 }}>
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--at-line-strong)', cursor: pagina === 1 ? 'default' : 'pointer', background: '#fff', color: pagina === 1 ? '#C7C2B0' : '#3E5A4C', fontSize: 12 }}>
             ← Ant.
           </button>
           <span style={{ padding: '6px 14px', fontSize: 12, color: '#7E9389' }}>Pág. {pagina} de {totalPaginas}</span>
           <button onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas}
-            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #C7C2B0', cursor: pagina === totalPaginas ? 'default' : 'pointer', background: '#fff', color: pagina === totalPaginas ? '#C7C2B0' : '#3E5A4C', fontSize: 12 }}>
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--at-line-strong)', cursor: pagina === totalPaginas ? 'default' : 'pointer', background: '#fff', color: pagina === totalPaginas ? '#C7C2B0' : '#3E5A4C', fontSize: 12 }}>
             Sig. →
           </button>
         </div>

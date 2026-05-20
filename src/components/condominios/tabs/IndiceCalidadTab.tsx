@@ -209,7 +209,7 @@ export default function IndiceCalidadTab({ cuotas, tickets, incidentes, encuesta
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {s.componentes.map((c, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', borderBottom: i < s.componentes.length - 1 ? '1px solid #EAE6D8' : undefined }}>
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', borderBottom: i < s.componentes.length - 1 ? '1px solid var(--at-chip)' : undefined }}>
                     <span style={{ color: '#7E9389' }}>{c.label}</span>
                     <span style={{ fontWeight: 700, color: c.positivo ? '#16a34a' : '#ef4444' }}>{c.valor}</span>
                   </div>

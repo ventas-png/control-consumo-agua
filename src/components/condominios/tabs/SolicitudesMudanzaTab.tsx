@@ -22,7 +22,7 @@ function SignedMudanzaImageLink({ url, idx }: { url: string; idx: number }) {
         alt={`Imagen ${idx + 1}`}
         style={{
           width: 84, height: 84, objectFit: 'cover',
-          borderRadius: 6, border: '1.5px solid #E1DDD0',
+          borderRadius: 6, border: '1.5px solid var(--at-line)',
           cursor: 'zoom-in',
         }}
       />
@@ -221,7 +221,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
 
   const fieldStyle: CSSProperties = {
     padding: '7px 10px', fontSize: '13px', borderRadius: '8px',
-    border: '1.5px solid #E1DDD0', background: 'white',
+    border: '1.5px solid var(--at-line)', background: 'white',
   }
 
   return (
@@ -238,7 +238,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
 
       {/* Alertas operativas */}
       {mudanzasHoy.length > 0 && (
-        <div style={{ background: '#F4EBE3', border: '1px solid #B96A3F', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: '#F4EBE3', border: '1px solid var(--at-accent)', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>🚚</span>
           <span style={{ fontSize: '13px', color: '#5E3417', fontWeight: 600 }}>
             {mudanzasHoy.length} mudanza{mudanzasHoy.length > 1 ? 's' : ''} programada{mudanzasHoy.length > 1 ? 's' : ''} para hoy
@@ -255,7 +255,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
       )}
 
       {/* Terms configuration section */}
-      <div style={{ marginBottom: '20px', border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden' }}>
+      <div style={{ marginBottom: '20px', border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
         <button
           onClick={() => setTerminosOpen(o => !o)}
           style={{
@@ -277,7 +277,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
         </button>
 
         {terminosOpen && (
-          <div style={{ padding: '16px', borderTop: '1px solid #E1DDD0' }}>
+          <div style={{ padding: '16px', borderTop: '1px solid var(--at-line)' }}>
             <p style={{ margin: '0 0 10px', fontSize: '12.5px', color: '#7E9389' }}>
               Este texto se mostrará al cliente cuando solicite una mudanza. Si está configurado, el cliente deberá aceptarlo para poder enviar la solicitud.
             </p>
@@ -287,7 +287,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
               placeholder="Escribe aquí los términos y condiciones para autorización de mudanzas…"
               style={{
                 width: '100%', minHeight: '120px', padding: '10px 12px',
-                fontSize: '13px', borderRadius: '8px', border: '1.5px solid #E1DDD0',
+                fontSize: '13px', borderRadius: '8px', border: '1.5px solid var(--at-line)',
                 resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit',
                 lineHeight: 1.6, color: '#3E5A4C',
               }}
@@ -387,7 +387,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
 
             {/* Expanded */}
             {expanded && (
-              <div style={{ padding: '0 16px 16px', borderTop: '1px solid #E1DDD0' }}>
+              <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--at-line)' }}>
                 {s.descripcion && (
                   <div style={{ marginTop: '12px', background: '#FAF7EF', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#3E5A4C' }}>
                     <strong>Descripción:</strong> {s.descripcion}
@@ -453,7 +453,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
 
                 {/* Operational controls for aprobada/programada/en_curso/completada */}
                 {esOperativa && canEdit && (
-                  <div style={{ marginTop: '14px', padding: '12px', background: '#FAF7EF', borderRadius: '10px', border: '1px solid #E1DDD0' }}>
+                  <div style={{ marginTop: '14px', padding: '12px', background: '#FAF7EF', borderRadius: '10px', border: '1px solid var(--at-line)' }}>
                     <div style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C', marginBottom: '10px' }}>🚚 Control operativo</div>
 
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '10px' }}>

@@ -154,7 +154,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
       <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
         {([['infracciones', `⚖️ Infracciones (${infracciones.length})`], ['sugerencias', `💡 Sugerencias/Quejas (${sugerencias.length})`]] as const).map(([f, lbl]) => (
           <button key={f} onClick={() => setFuente(f)}
-            style={{ padding: '6px 16px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, cursor: 'pointer',
+            style={{ padding: '6px 16px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: 'pointer',
               background: fuente === f ? '#15291F' : '#FAF7EF', color: fuente === f ? '#fff' : '#3E5A4C', fontWeight: fuente === f ? 700 : 400 }}>
             {lbl}
           </button>
@@ -166,19 +166,19 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
         <div style={{ display: 'flex', gap: 4 }}>
           {(['todos', 'activos', 'resueltos'] as const).map(f => (
             <button key={f} onClick={() => setFiltroEstado(f)}
-              style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid #C7C2B0', fontSize: 11, cursor: 'pointer',
+              style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--at-line-strong)', fontSize: 11, cursor: 'pointer',
                 background: filtroEstado === f ? '#3E5A4C' : '#FAF7EF', color: filtroEstado === f ? '#fff' : '#3E5A4C', fontWeight: filtroEstado === f ? 700 : 400 }}>
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
-          placeholder="Buscar..." style={{ flex: 1, minWidth: 180, padding: '5px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, outline: 'none' }} />
+          placeholder="Buscar..." style={{ flex: 1, minWidth: 180, padding: '5px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, outline: 'none' }} />
       </div>
 
       {/* Lista de infracciones */}
       {fuente === 'infracciones' && (
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
           {infFiltradas.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 0', color: '#7E9389', fontSize: 12 }}>Sin infracciones en este filtro.</div>
           ) : infFiltradas.map((inf, i) => {
@@ -187,7 +187,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
             const puedeAvanzar = canEdit && !!sig[inf.estado]
             return (
               <div key={inf.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-                padding: '12px 14px', borderBottom: i < infFiltradas.length - 1 ? '1px solid #EAE6D8' : undefined }}>
+                padding: '12px 14px', borderBottom: i < infFiltradas.length - 1 ? '1px solid var(--at-chip)' : undefined }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color, background: cfg.bg,
@@ -217,13 +217,13 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
 
       {/* Lista de sugerencias */}
       {fuente === 'sugerencias' && (
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
           {sugFiltradas.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 0', color: '#7E9389', fontSize: 12 }}>Sin sugerencias en este filtro.</div>
           ) : sugFiltradas.map((sug, i) => {
             const cfg = ESTADO_SUG_CFG[sug.estado]
             return (
-              <div key={sug.id} style={{ padding: '12px 14px', borderBottom: i < sugFiltradas.length - 1 ? '1px solid #EAE6D8' : undefined }}>
+              <div key={sug.id} style={{ padding: '12px 14px', borderBottom: i < sugFiltradas.length - 1 ? '1px solid var(--at-chip)' : undefined }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
@@ -250,7 +250,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
                         {resolviendo === sug.id ? '…' : '✏ Responder'}
                       </button>
                       <button onClick={() => archivarSugerencia(sug)} disabled={resolviendo === sug.id}
-                        style={{ padding: '4px 10px', borderRadius: 7, border: '1px solid #C7C2B0', fontSize: 11,
+                        style={{ padding: '4px 10px', borderRadius: 7, border: '1px solid var(--at-line-strong)', fontSize: 11,
                           background: '#FAF7EF', color: '#7E9389', cursor: 'pointer', fontWeight: 600 }}>
                         Archivar
                       </button>

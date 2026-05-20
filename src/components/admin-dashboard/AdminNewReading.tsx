@@ -154,7 +154,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '2px solid #E1DDD0',
+              border: '2px solid var(--at-line)',
               fontSize: '14px',
               fontFamily: 'inherit',
             }}
@@ -182,7 +182,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
                 width: '100%',
                 padding: '12px',
                 borderRadius: '8px',
-                border: '2px solid #E1DDD0',
+                border: '2px solid var(--at-line)',
                 fontSize: '14px',
                 fontFamily: 'inherit',
               }}
@@ -203,7 +203,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
                 width: '100%',
                 padding: '12px',
                 borderRadius: '8px',
-                border: '2px solid #E1DDD0',
+                border: '2px solid var(--at-line)',
                 fontSize: '14px',
                 fontFamily: 'inherit',
               }}
@@ -216,7 +216,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
           <div style={{
             padding: '12px',
             background: '#EEF2EC',
-            border: '1px solid #C2D2CA',
+            border: '1px solid var(--at-primary-soft-2)',
             borderRadius: '8px',
             fontSize: '14px',
             color: '#102622',
@@ -242,7 +242,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
                 width: '100%',
                 padding: '12px',
                 borderRadius: '8px',
-                border: '2px solid #E1DDD0',
+                border: '2px solid var(--at-line)',
                 fontSize: '14px',
                 fontFamily: 'inherit',
                 background: '#FAF7EF',
@@ -263,7 +263,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
                 width: '100%',
                 padding: '12px',
                 borderRadius: '8px',
-                border: '2px solid #E1DDD0',
+                border: '2px solid var(--at-line)',
                 fontSize: '14px',
                 fontFamily: 'inherit',
               }}
@@ -299,7 +299,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '2px solid #E1DDD0',
+              border: '2px solid var(--at-line)',
               fontSize: '14px',
               fontFamily: 'inherit',
               minHeight: '80px',
@@ -322,7 +322,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
               width: '100%',
               padding: '12px',
               borderRadius: '8px',
-              border: '2px solid #E1DDD0',
+              border: '2px solid var(--at-line)',
               fontSize: '14px',
               fontFamily: 'inherit',
             }}
@@ -336,7 +336,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
                   maxWidth: '100%',
                   maxHeight: '200px',
                   borderRadius: '8px',
-                  border: '1px solid #E1DDD0',
+                  border: '1px solid var(--at-line)',
                 }}
               />
             </div>
@@ -350,7 +350,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
           style={{
             width: '100%',
             padding: '14px',
-            background: loading ? '#C7C2B0' : 'linear-gradient(135deg, #1B3B36 0%, #102622 100%)',
+            background: loading ? '#C7C2B0' : 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-primary-hover) 100%)',
             color: 'white',
             border: 'none',
             borderRadius: '8px',
