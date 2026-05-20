@@ -214,10 +214,10 @@ export function ImportModal<T>({
       <div style={modalStyle}>
         <div style={headerStyle}>
           <div>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#15291F' }}>
               Importar {plural} desde Excel
             </h2>
-            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
+            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#7E9389' }}>
               {step === 'upload' && 'Descarga la plantilla, complétala y sube el archivo.'}
               {step === 'preview' && `${rows.length} fila${rows.length !== 1 ? 's' : ''} — ${validCount} válida${validCount !== 1 ? 's' : ''}, ${invalidCount} con error${invalidCount !== 1 ? 'es' : ''}`}
               {step === 'importing' && `Guardando ${plural} en la base de datos…`}
@@ -249,7 +249,7 @@ export function ImportModal<T>({
           )}
 
           {step === 'importing' && (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#7E9389' }}>
               <div style={{ fontSize: '32px', marginBottom: '10px' }}>⏳</div>
               <p>Guardando {validCount} {plural} en la base de datos…</p>
             </div>
@@ -310,8 +310,8 @@ function UploadStep({
     <div>
       <div style={uploadBannerStyle}>
         <div>
-          <div style={{ fontWeight: 600, color: '#0369a1', fontSize: '14px' }}>Paso 1 — Descarga la plantilla</div>
-          <div style={{ fontSize: '13px', color: '#0ea5e9', marginTop: '2px' }}>
+          <div style={{ fontWeight: 600, color: '#102622', fontSize: '14px' }}>Paso 1 — Descarga la plantilla</div>
+          <div style={{ fontSize: '13px', color: '#1B3B36', marginTop: '2px' }}>
             Incluye encabezados y ejemplos de filas válidas.
           </div>
         </div>
@@ -326,10 +326,10 @@ function UploadStep({
         style={dropZoneStyle(dragOver)}
       >
         <div style={{ fontSize: '32px', marginBottom: '10px' }}>📤</div>
-        <p style={{ margin: 0, fontWeight: 600, color: '#475569' }}>
+        <p style={{ margin: 0, fontWeight: 600, color: '#3E5A4C' }}>
           Arrastra el archivo aquí o haz clic para seleccionar
         </p>
-        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
+        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#7E9389' }}>
           .xlsx, .xls o .csv
         </p>
       </div>
@@ -372,7 +372,7 @@ function PreviewStep<T>({
 
       {invalidCount > 0 && (
         <div>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: '#3E5A4C', marginBottom: '8px' }}>
             Filas con error:
           </div>
           <div style={{ maxHeight: '280px', overflowY: 'auto', border: '1px solid #fecaca', borderRadius: '8px' }}>
@@ -393,7 +393,7 @@ function PreviewStep<T>({
               </div>
             ))}
             {invalidCount > 100 && (
-              <div style={{ padding: '12px', textAlign: 'center', fontSize: '11px', color: '#94a3b8' }}>
+              <div style={{ padding: '12px', textAlign: 'center', fontSize: '11px', color: '#7E9389' }}>
                 +{invalidCount - 100} más — descarga el archivo de errores para ver todas
               </div>
             )}
@@ -425,39 +425,39 @@ const modalStyle: CSSProperties = {
   boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
 }
 const headerStyle: CSSProperties = {
-  padding: '24px 28px 20px', borderBottom: '1px solid #e2e8f0',
+  padding: '24px 28px 20px', borderBottom: '1px solid #E1DDD0',
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
 }
 const bodyStyle: CSSProperties = { padding: '24px 28px', overflowY: 'auto', flex: 1 }
 const footerStyle: CSSProperties = {
-  padding: '16px 28px', borderTop: '1px solid #e2e8f0',
+  padding: '16px 28px', borderTop: '1px solid #E1DDD0',
   display: 'flex', justifyContent: 'flex-end', gap: '10px',
 }
 const btnPrimary: CSSProperties = {
-  padding: '10px 22px', background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+  padding: '10px 22px', background: 'linear-gradient(135deg, #1B3B36, #577B69)',
   color: '#fff', border: 'none', borderRadius: '8px',
   fontWeight: 600, fontSize: '14px', cursor: 'pointer',
 }
 const btnSecondary: CSSProperties = {
-  padding: '10px 22px', background: '#f1f5f9', color: '#475569',
-  border: '1px solid #e2e8f0', borderRadius: '8px',
+  padding: '10px 22px', background: '#EAE6D8', color: '#3E5A4C',
+  border: '1px solid #E1DDD0', borderRadius: '8px',
   fontWeight: 600, fontSize: '14px', cursor: 'pointer',
 }
 const closeBtnStyle: CSSProperties = {
   background: 'none', border: 'none', cursor: 'pointer',
-  color: '#94a3b8', fontSize: '22px', lineHeight: 1, padding: '4px',
+  color: '#7E9389', fontSize: '22px', lineHeight: 1, padding: '4px',
 }
 const uploadBannerStyle: CSSProperties = {
   marginBottom: '24px', padding: '16px 20px',
-  background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px',
+  background: '#FAF7EF', border: '1px solid #bae6fd', borderRadius: '10px',
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   gap: '12px', flexWrap: 'wrap',
 }
 function dropZoneStyle(dragOver: boolean): CSSProperties {
   return {
-    border: `2.5px dashed ${dragOver ? '#0ea5e9' : '#cbd5e1'}`,
+    border: `2.5px dashed ${dragOver ? '#1B3B36' : '#C7C2B0'}`,
     borderRadius: '12px', padding: '40px 20px', textAlign: 'center',
-    cursor: 'pointer', background: dragOver ? '#f0f9ff' : '#fafafa',
+    cursor: 'pointer', background: dragOver ? '#FAF7EF' : '#fafafa',
     transition: 'all 0.15s',
   }
 }

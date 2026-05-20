@@ -219,7 +219,7 @@ export function DataTable<T>({
                 minWidth: '180px',
                 padding: '8px 12px',
                 borderRadius: '8px',
-                border: '1px solid #e2e8f0',
+                border: '1px solid #E1DDD0',
                 fontSize: '13px',
                 outline: 'none',
               }}
@@ -234,7 +234,7 @@ export function DataTable<T>({
               style={{
                 padding: '8px 12px',
                 borderRadius: '8px',
-                border: '1px solid #e2e8f0',
+                border: '1px solid #E1DDD0',
                 fontSize: '13px',
                 background: 'white',
                 cursor: 'pointer',
@@ -267,7 +267,7 @@ export function DataTable<T>({
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
               <thead>
-                <tr style={{ background: '#f8fafc' }}>
+                <tr style={{ background: '#FAF7EF' }}>
                   {columns.map(col => {
                     const isSorted = sortConfig?.key === col.key
                     const arrow = !isSorted ? '' : sortConfig.direction === 'asc' ? ' ↑' : ' ↓'
@@ -281,11 +281,11 @@ export function DataTable<T>({
                           padding: '12px 14px',
                           textAlign: col.align ?? 'left',
                           fontWeight: 600,
-                          color: '#475569',
+                          color: '#3E5A4C',
                           fontSize: '12px',
                           textTransform: 'uppercase',
                           letterSpacing: '0.04em',
-                          borderBottom: '2px solid #e2e8f0',
+                          borderBottom: '2px solid #E1DDD0',
                           cursor: col.sortable ? 'pointer' : 'default',
                           userSelect: col.sortable ? 'none' : 'auto',
                           width: col.width,
@@ -304,12 +304,12 @@ export function DataTable<T>({
                     key={getRowKey(row, idx)}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
                     style={{
-                      borderBottom: '1px solid #f1f5f9',
+                      borderBottom: '1px solid #EAE6D8',
                       cursor: onRowClick ? 'pointer' : 'default',
                       transition: 'background 0.12s',
                       ...(rowStyle ? rowStyle(row) : {}),
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#FAF7EF' }}
                     onMouseLeave={e => { e.currentTarget.style.background = '' }}
                   >
                     {columns.map(col => (
@@ -318,7 +318,7 @@ export function DataTable<T>({
                         style={{
                           padding: '10px 14px',
                           textAlign: col.align ?? 'left',
-                          color: '#0f172a',
+                          color: '#15291F',
                         }}
                       >
                         {col.render ? col.render(row) : String(getAccessorValue(col, row) ?? '')}
@@ -339,9 +339,9 @@ export function DataTable<T>({
               justifyContent: 'space-between',
               alignItems: 'center',
               padding: '12px 16px',
-              borderTop: '1px solid #f1f5f9',
+              borderTop: '1px solid #EAE6D8',
               fontSize: '12px',
-              color: '#94a3b8',
+              color: '#7E9389',
               flexWrap: 'wrap',
               gap: '8px',
             }}
@@ -381,9 +381,9 @@ function paginationBtnStyle(disabled: boolean): CSSProperties {
     padding: '4px 10px',
     fontSize: '12px',
     borderRadius: '6px',
-    border: '1px solid #e2e8f0',
-    background: disabled ? '#f1f5f9' : 'white',
-    color: disabled ? '#cbd5e1' : '#475569',
+    border: '1px solid #E1DDD0',
+    background: disabled ? '#EAE6D8' : 'white',
+    color: disabled ? '#C7C2B0' : '#3E5A4C',
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontWeight: 600,
   }
