@@ -76,7 +76,7 @@ export function AccessRulesPanel({ companyId, accessRules, onSave, canEdit, serv
 
   return (
     <div>
-      <div style={{ fontSize: '13px', color: '#7E9389', marginBottom: '16px' }}>
+      <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginBottom: '16px' }}>
         Configure qué roles pueden ver y responder conversaciones, y en qué categorías.
       </div>
       {!canEdit && (
@@ -98,9 +98,9 @@ export function AccessRulesPanel({ companyId, accessRules, onSave, canEdit, serv
           return (
             <div key={role} style={{
               border: '1px solid var(--at-line)', borderRadius: '10px', padding: '14px 16px',
-              background: 'white', opacity: isBusy ? 0.7 : 1,
+              background: 'var(--at-surface)', opacity: isBusy ? 0.7 : 1,
             }}>
-              <div style={{ fontWeight: 600, fontSize: '13px', color: '#3E5A4C', marginBottom: '10px' }}>
+              <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--at-ink-2)', marginBottom: '10px' }}>
                 {ROLE_LABELS[role] ?? role}
               </div>
               <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '10px' }}>
@@ -108,20 +108,20 @@ export function AccessRulesPanel({ companyId, accessRules, onSave, canEdit, serv
                   const val = rule ? rule[field] : false
                   const label = field === 'can_view_all' ? 'Ver todas' : field === 'can_respond' ? 'Responder' : 'Asignar'
                   return (
-                    <label key={field} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: isDisabled ? 'not-allowed' : 'pointer', fontSize: '12.5px', color: '#3E5A4C', opacity: !canEdit ? 0.6 : 1 }}>
+                    <label key={field} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: isDisabled ? 'not-allowed' : 'pointer', fontSize: '12.5px', color: 'var(--at-ink-2)', opacity: !canEdit ? 0.6 : 1 }}>
                       <input
                         type="checkbox"
                         checked={val}
                         disabled={isDisabled}
                         onChange={() => !isDisabled && handleToggle(role, field, val)}
-                        style={{ width: '14px', height: '14px', accentColor: '#1B3B36' }}
+                        style={{ width: '14px', height: '14px', accentColor: 'var(--at-primary)' }}
                       />
                       {label}
                     </label>
                   )
                 })}
               </div>
-              <div style={{ fontSize: '11.5px', color: '#7E9389', marginBottom: '6px' }}>
+              <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginBottom: '6px' }}>
                 Categorías visibles ({categories === null ? 'Todas' : `${categories.length}`}):
               </div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -134,9 +134,9 @@ export function AccessRulesPanel({ companyId, accessRules, onSave, canEdit, serv
                       onClick={() => !isDisabled && handleCategoryToggle(role, cat)}
                       style={{
                         padding: '3px 10px', borderRadius: '999px',
-                        border: `1px solid ${active ? '#1B3B36' : '#C7C2B0'}`,
-                        background: active ? '#D9E2DC' : 'white',
-                        color: active ? '#102622' : '#7E9389',
+                        border: `1px solid ${active ? 'var(--at-primary)' : 'var(--at-line-strong)'}`,
+                        background: active ? 'var(--at-primary-soft)' : 'white',
+                        color: active ? 'var(--at-primary-hover)' : 'var(--at-ink-3)',
                         fontSize: '11px', fontWeight: 500, cursor: 'pointer',
                       }}
                     >

@@ -26,8 +26,8 @@ const SEGMENTO_CFG: Record<SegmentoEnvio, { label: string; icon: string; desc: s
 
 const CANAL_CFG: Record<CanalPlantilla, { label: string; icon: string; color: string }> = {
   whatsapp: { label: 'WhatsApp', icon: '💬', color: '#16a34a' },
-  email:    { label: 'Email',    icon: '📧', color: '#1B3B36' },
-  sms:      { label: 'SMS',      icon: '📱', color: '#9C5733' },
+  email:    { label: 'Email',    icon: '📧', color: 'var(--at-primary)' },
+  sms:      { label: 'SMS',      icon: '📱', color: 'var(--at-accent-hover)' },
 }
 
 function resolverVariables(cuerpo: string, unidad: Unidad, cuotasU: CuotaCondominio[], moneda: string, proyecto = ''): string {
@@ -123,12 +123,12 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
         ].map((s, i) => (
           <div key={s.n} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: paso >= s.n ? '#1B3B36' : '#E1DDD0', color: paso >= s.n ? '#fff' : '#7E9389', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: paso >= s.n ? 'var(--at-primary)' : 'var(--at-line)', color: paso >= s.n ? '#fff' : 'var(--at-ink-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
                 {paso > s.n ? '✓' : s.n}
               </div>
-              <div style={{ fontSize: 10, color: paso >= s.n ? '#1B3B36' : '#7E9389', fontWeight: 600, marginTop: 3 }}>{s.label}</div>
+              <div style={{ fontSize: 10, color: paso >= s.n ? 'var(--at-primary)' : 'var(--at-ink-3)', fontWeight: 600, marginTop: 3 }}>{s.label}</div>
             </div>
-            {i < 2 && <div style={{ height: 2, flex: 1, background: paso > s.n ? '#1B3B36' : '#E1DDD0', margin: '0 4px', marginBottom: 16 }} />}
+            {i < 2 && <div style={{ height: 2, flex: 1, background: paso > s.n ? 'var(--at-primary)' : 'var(--at-line)', margin: '0 4px', marginBottom: 16 }} />}
           </div>
         ))}
       </div>
@@ -136,10 +136,10 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
       {paso === 1 && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {/* Plantilla */}
-          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>1. Selecciona la plantilla</div>
             {plantillasActivas.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#7E9389', padding: 30, fontSize: 12 }}>
+              <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: 30, fontSize: 12 }}>
                 No hay plantillas activas. Crea una en la pestaña "Plantillas msg."
               </div>
             ) : (
@@ -149,12 +149,12 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
                   const sel = plantillaId === p.id
                   return (
                     <div key={p.id} onClick={() => setPlantillaId(p.id)}
-                      style={{ padding: '10px 12px', border: `1.5px solid ${sel ? c.color : '#E1DDD0'}`, borderRadius: 8, cursor: 'pointer', background: sel ? c.color + '11' : '#FAF7EF' }}>
+                      style={{ padding: '10px 12px', border: `1.5px solid ${sel ? c.color : 'var(--at-line)'}`, borderRadius: 8, cursor: 'pointer', background: sel ? c.color + '11' : 'var(--at-surface-2)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                         <span style={{ fontSize: 10, fontWeight: 700, color: c.color }}>{c.icon} {c.label}</span>
                       </div>
-                      <div style={{ fontWeight: 600, fontSize: 12, color: '#15291F' }}>{p.nombre}</div>
-                      <div style={{ fontSize: 10, color: '#7E9389', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.cuerpo.slice(0, 60)}…</div>
+                      <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--at-ink)' }}>{p.nombre}</div>
+                      <div style={{ fontSize: 10, color: 'var(--at-ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.cuerpo.slice(0, 60)}…</div>
                     </div>
                   )
                 })}
@@ -163,7 +163,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
           </div>
 
           {/* Segmento */}
-          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>2. Selecciona el segmento</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {(Object.keys(SEGMENTO_CFG) as SegmentoEnvio[]).map(s => {
@@ -175,13 +175,13 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
                 const sel = segmento === s
                 return (
                   <div key={s} onClick={() => setSegmento(s)}
-                    style={{ padding: '10px 12px', border: `1.5px solid ${sel ? '#1B3B36' : '#E1DDD0'}`, borderRadius: 8, cursor: 'pointer', background: sel ? '#EEF2EC' : '#FAF7EF', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    style={{ padding: '10px 12px', border: `1.5px solid ${sel ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: 8, cursor: 'pointer', background: sel ? 'var(--at-primary-tint)' : 'var(--at-surface-2)', display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 18 }}>{cfg.icon}</span>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 12, color: sel ? '#102622' : '#15291F' }}>{cfg.label}</div>
-                      <div style={{ fontSize: 10, color: '#7E9389' }}>{cfg.desc}</div>
+                      <div style={{ fontWeight: 600, fontSize: 12, color: sel ? 'var(--at-primary-hover)' : 'var(--at-ink)' }}>{cfg.label}</div>
+                      <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{cfg.desc}</div>
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: sel ? '#1B3B36' : '#7E9389' }}>{count}</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: sel ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>{count}</div>
                   </div>
                 )
               })}
@@ -189,7 +189,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
 
             <div style={{ marginTop: 14 }}>
               <button onClick={() => setPaso(2)} disabled={!plantillaId || destinatarios.length === 0}
-                style={{ width: '100%', padding: '10px 0', background: !plantillaId || destinatarios.length === 0 ? '#7E9389' : '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: !plantillaId || destinatarios.length === 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>
+                style={{ width: '100%', padding: '10px 0', background: !plantillaId || destinatarios.length === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: !plantillaId || destinatarios.length === 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>
                 Ver vista previa → ({destinatarios.length} destinatarios)
               </button>
             </div>
@@ -199,11 +199,11 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
 
       {paso === 2 && plantilla && (
         <div>
-          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, marginBottom: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 13 }}>Vista previa del envío</div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setPaso(1)} style={{ padding: '6px 14px', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: '#FAF7EF' }}>← Volver</button>
+                <button onClick={() => setPaso(1)} style={{ padding: '6px 14px', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: 'var(--at-surface-2)' }}>← Volver</button>
                 <button onClick={enviar} disabled={enviando}
                   style={{ padding: '6px 18px', background: canalCfg?.color, color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: enviando ? 0.7 : 1 }}>
                   {enviando ? 'Registrando…' : `${canalCfg?.icon} Enviar a ${destinatarios.length} unidades`}
@@ -214,20 +214,20 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               {previews.map(p => (
                 <button key={p.unidad.id} onClick={() => setPreviewUnidadId(p.unidad.id)}
-                  style={{ padding: '4px 10px', border: `1px solid ${previewUnidad?.id === p.unidad.id ? canalCfg?.color ?? '#1B3B36' : '#E1DDD0'}`, borderRadius: 6, cursor: 'pointer', fontSize: 11, background: previewUnidad?.id === p.unidad.id ? (canalCfg?.color ?? '#1B3B36') + '11' : '#FAF7EF' }}>
+                  style={{ padding: '4px 10px', border: `1px solid ${previewUnidad?.id === p.unidad.id ? canalCfg?.color ?? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: 6, cursor: 'pointer', fontSize: 11, background: previewUnidad?.id === p.unidad.id ? (canalCfg?.color ?? 'var(--at-primary)') + '11' : 'var(--at-surface-2)' }}>
                   {p.unidad.nombre}
                 </button>
               ))}
-              {destinatarios.length > 5 && <span style={{ fontSize: 11, color: '#7E9389', alignSelf: 'center' }}>+{destinatarios.length - 5} más</span>}
+              {destinatarios.length > 5 && <span style={{ fontSize: 11, color: 'var(--at-ink-3)', alignSelf: 'center' }}>+{destinatarios.length - 5} más</span>}
             </div>
 
             {previewUnidad && plantilla && (
-              <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: '12px 14px' }}>
-                <div style={{ fontSize: 11, color: '#7E9389', marginBottom: 6 }}>
+              <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 6 }}>
                   {canalCfg?.icon} {canalCfg?.label} → <strong>{previewUnidad.nombre}</strong>
                   {plantilla.asunto && <span> · Asunto: {plantilla.asunto}</span>}
                 </div>
-                <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6, color: '#15291F' }}>
+                <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--at-ink)' }}>
                   {resolverVariables(plantilla.cuerpo, previewUnidad, cuotas.filter(c => c.unidad_id === previewUnidad.id), moneda, proyectoNombre)}
                 </div>
               </div>
@@ -245,11 +245,11 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
           <div style={{ textAlign: 'center', padding: '32px 0 20px' }}>
             <div style={{ fontSize: 48, marginBottom: 10 }}>✅</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: '#16a34a', marginBottom: 6 }}>Envío registrado</div>
-            <div style={{ fontSize: 13, color: '#7E9389', marginBottom: 20 }}>
+            <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginBottom: 20 }}>
               Se registraron <strong>{destinatarios.length}</strong> mensajes en el log de notificaciones enviadas.
             </div>
             <button onClick={() => { setPaso(1); setPlantillaId(''); }}
-              style={{ padding: '9px 22px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+              style={{ padding: '9px 22px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
               Nuevo envío
             </button>
           </div>
@@ -267,8 +267,8 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
                   const msg = resolverVariables(plantilla.cuerpo, u, cuotas.filter(c => c.unidad_id === u.id), moneda)
                   const url = `https://wa.me/?text=${encodeURIComponent(msg)}`
                   return (
-                    <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: '#fff', border: '1px solid #bbf7d0', borderRadius: 8 }}>
-                      <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: '#15291F' }}>{u.nombre}</span>
+                    <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'var(--at-surface)', border: '1px solid #bbf7d0', borderRadius: 8 }}>
+                      <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--at-ink)' }}>{u.nombre}</span>
                       <a href={url} target="_blank" rel="noreferrer"
                         style={{ padding: '5px 12px', background: '#16a34a', color: '#fff', borderRadius: 6, fontSize: 11, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
                         💬 Abrir WhatsApp

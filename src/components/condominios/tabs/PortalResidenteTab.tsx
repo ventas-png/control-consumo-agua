@@ -94,18 +94,18 @@ export function PortalResidenteTab({
             value={selectedUnidadId}
             onChange={e => { setSelectedUnidadId(e.target.value); setSubTab('cuenta') }}
             style={{ background: 'transparent', border: 'none', color: 'white', fontWeight: 700, fontSize: '14px', cursor: 'pointer', outline: 'none' }}>
-            <option value="" style={{ color: '#15291F' }}>— Seleccionar —</option>
+            <option value="" style={{ color: 'var(--at-ink)' }}>— Seleccionar —</option>
             {unidades.map(u => (
-              <option key={u.id} value={u.id} style={{ color: '#15291F' }}>{u.nombre}</option>
+              <option key={u.id} value={u.id} style={{ color: 'var(--at-ink)' }}>{u.nombre}</option>
             ))}
           </select>
         </div>
       </div>
 
       {!selectedUnidadId || !unidad ? (
-        <div style={{ textAlign: 'center', padding: '60px 24px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '60px 24px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '48px', marginBottom: '14px' }}>🏠</div>
-          <div style={{ fontWeight: 700, fontSize: '15px', color: '#7E9389', marginBottom: '6px' }}>Selecciona una unidad</div>
+          <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink-3)', marginBottom: '6px' }}>Selecciona una unidad</div>
           <div style={{ fontSize: '13px' }}>Elige una unidad del desplegable superior para ver su portal completo</div>
         </div>
       ) : (
@@ -117,8 +117,8 @@ export function PortalResidenteTab({
                 style={{
                   padding: '8px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
                   fontSize: '13px', fontWeight: 700,
-                  background: subTab === t.id ? '#1B3B36' : '#EAE6D8',
-                  color:      subTab === t.id ? 'white'    : '#7E9389',
+                  background: subTab === t.id ? 'var(--at-primary)' : 'var(--at-chip)',
+                  color:      subTab === t.id ? 'white'    : 'var(--at-ink-3)',
                   display: 'flex', alignItems: 'center', gap: '4px',
                 }}>
                 <span>{t.icon}</span>
@@ -131,7 +131,7 @@ export function PortalResidenteTab({
           </div>
 
           {/* Sub-tab content */}
-          <div style={{ background: '#FAF7EF', borderRadius: '14px', padding: '20px' }}>
+          <div style={{ background: 'var(--at-surface-2)', borderRadius: '14px', padding: '20px' }}>
             {subTab === 'cuenta' && (
               <PortalMiCuentaTab
                 cuotas={cuotasU}

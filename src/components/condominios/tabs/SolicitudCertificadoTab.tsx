@@ -23,10 +23,10 @@ const TIPOS: { value: TipoCertificado; label: string; icon: string }[] = [
 
 const ESTADOS: { value: EstadoCertificado; label: string; color: string; bg: string }[] = [
   { value: 'pendiente',   label: 'Pendiente',   color: '#f59e0b', bg: '#fef3c7' },
-  { value: 'en_proceso',  label: 'En proceso',  color: '#B96A3F', bg: '#F4EBE3' },
+  { value: 'en_proceso',  label: 'En proceso',  color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
   { value: 'aprobado',    label: 'Aprobado',    color: '#10b981', bg: '#d1fae5' },
   { value: 'rechazado',   label: 'Rechazado',   color: '#ef4444', bg: '#fef2f2' },
-  { value: 'entregado',   label: 'Entregado',   color: '#7E9389', bg: '#EAE6D8' },
+  { value: 'entregado',   label: 'Entregado',   color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 ]
 
 const FLUJO: EstadoCertificado[] = ['pendiente', 'en_proceso', 'aprobado', 'entregado']
@@ -85,7 +85,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
@@ -95,7 +95,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
             <span style={{ fontWeight: 600, fontSize: 14 }}>Certificados ({lista.length})</span>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nueva
               </button>
             )}
@@ -103,7 +103,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 3, marginBottom: 8 }}>
             {kpis.map(k => (
               <div key={k.value} onClick={() => setFiltroEstado(filtroEstado === k.value ? '' : k.value)}
-                style={{ textAlign: 'center', padding: '4px 2px', borderRadius: 6, cursor: 'pointer', background: filtroEstado === k.value ? k.bg : '#FAF7EF', border: `1px solid ${filtroEstado === k.value ? k.color : '#E1DDD0'}` }}>
+                style={{ textAlign: 'center', padding: '4px 2px', borderRadius: 6, cursor: 'pointer', background: filtroEstado === k.value ? k.bg : 'var(--at-surface-2)', border: `1px solid ${filtroEstado === k.value ? k.color : 'var(--at-line)'}` }}>
                 <div style={{ fontWeight: 700, color: k.color, fontSize: 13 }}>{k.count}</div>
                 <div style={{ fontSize: 9, color: k.color, lineHeight: 1.1 }}>{k.label}</div>
               </div>
@@ -111,20 +111,20 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
           </div>
         </div>
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 16px', fontSize: 13 }}>Sin solicitudes</div>}
+        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin solicitudes</div>}
         {lista.map(s => {
           const est = ESTADOS.find(e => e.value === s.estado)
           const tipo = TIPOS.find(t => t.value === s.tipo)
           const unidad = unidades.find(u => u.id === s.unidad_id)
           return (
             <div key={s.id} onClick={() => { setSelected(s); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? '#F4EBE3' : '#fff' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? 'var(--at-accent-tint)' : '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
                 <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: est?.bg, color: est?.color }}>{est?.label}</span>
               </div>
-              <div style={{ fontSize: 12, color: '#3E5A4C', marginTop: 2 }}>{s.solicitante}</div>
-              <div style={{ fontSize: 11, color: '#7E9389' }}>
+              <div style={{ fontSize: 12, color: 'var(--at-ink-2)', marginTop: 2 }}>{s.solicitante}</div>
+              <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>
                 {unidad && <span>{unidad.nombre} · </span>}
                 {s.fecha_solicitud}
               </div>
@@ -174,7 +174,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
                 {saving ? 'Guardando…' : '✅ Crear solicitud'}
               </button>
               <button onClick={() => setMostrarForm(false)}
-                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -192,8 +192,8 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 20 }}>{tipo?.icon} {tipo?.label}</div>
-                  <div style={{ fontSize: 14, color: '#3E5A4C', marginTop: 4 }}>{selected.solicitante}</div>
-                  {unidad && <div style={{ fontSize: 12, color: '#7E9389' }}>Unidad: {unidad.nombre}</div>}
+                  <div style={{ fontSize: 14, color: 'var(--at-ink-2)', marginTop: 4 }}>{selected.solicitante}</div>
+                  {unidad && <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Unidad: {unidad.nombre}</div>}
                   <div style={{ marginTop: 6 }}>
                     <span style={{ padding: '4px 12px', borderRadius: 10, background: est?.bg, color: est?.color, fontSize: 13, fontWeight: 600 }}>{est?.label}</span>
                   </div>
@@ -202,7 +202,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
                   <div style={{ display: 'flex', gap: 6 }}>
                     {siguiente && (
                       <button onClick={() => avanzar(selected)}
-                        style={{ padding: '7px 14px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                        style={{ padding: '7px 14px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                         → {ESTADOS.find(e => e.value === siguiente)?.label}
                       </button>
                     )}
@@ -223,12 +223,12 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
                   return (
                     <div key={f} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                       <div style={{ textAlign: 'center', minWidth: 80 }}>
-                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: actual ? e.color : pasado ? '#d1fae5' : '#EAE6D8', margin: '0 auto 4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: actual ? '#fff' : pasado ? '#10b981' : '#7E9389', fontWeight: 700 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: actual ? e.color : pasado ? '#d1fae5' : 'var(--at-chip)', margin: '0 auto 4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: actual ? '#fff' : pasado ? '#10b981' : 'var(--at-ink-3)', fontWeight: 700 }}>
                           {pasado ? '✓' : i + 1}
                         </div>
-                        <div style={{ fontSize: 10, color: actual ? e.color : '#7E9389', fontWeight: actual ? 700 : 400 }}>{e.label}</div>
+                        <div style={{ fontSize: 10, color: actual ? e.color : 'var(--at-ink-3)', fontWeight: actual ? 700 : 400 }}>{e.label}</div>
                       </div>
-                      {i < FLUJO.length - 1 && <div style={{ width: 24, height: 2, background: pasado ? '#10b981' : '#E1DDD0', marginBottom: 16 }} />}
+                      {i < FLUJO.length - 1 && <div style={{ width: 24, height: 2, background: pasado ? '#10b981' : 'var(--at-line)', marginBottom: 16 }} />}
                     </div>
                   )
                 })}
@@ -242,8 +242,8 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
                   { label: 'Aprobado por', value: selected.aprobado_por || '—' },
                   { label: 'Fecha entrega', value: selected.fecha_entrega || '—' },
                 ].map(d => (
-                  <div key={d.label} style={{ background: '#FAF7EF', borderRadius: 6, padding: '7px 12px' }}>
-                    <div style={{ fontSize: 11, color: '#7E9389' }}>{d.label}</div>
+                  <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 6, padding: '7px 12px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{d.label}</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{d.value}</div>
                   </div>
                 ))}
@@ -260,7 +260,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
         })()}
 
         {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#7E9389', fontSize: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
             Selecciona una solicitud o crea una nueva
           </div>
         )}

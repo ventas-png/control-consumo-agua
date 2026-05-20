@@ -103,7 +103,7 @@ export default function ScoringUnidadesTab({ cuotas, infracciones, sanciones, un
 
   if (unidades.length === 0) {
     return (
-      <div style={{ padding: 16, textAlign: 'center', color: '#7E9389', paddingTop: 60 }}>
+      <div style={{ padding: 16, textAlign: 'center', color: 'var(--at-ink-3)', paddingTop: 60 }}>
         <div style={{ fontSize: 36, marginBottom: 8 }}>🎯</div>
         No hay unidades en este proyecto
       </div>
@@ -114,9 +114,9 @@ export default function ScoringUnidadesTab({ cuotas, infracciones, sanciones, un
     <div style={{ padding: 16 }}>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
-        <div style={{ background: '#EEF2EC', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#102622' }}>{promedio}</div>
-          <div style={{ fontSize: 11, color: '#102622', fontWeight: 600 }}>Puntaje promedio del condominio</div>
+        <div style={{ background: 'var(--at-primary-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--at-primary-hover)' }}>{promedio}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-primary-hover)', fontWeight: 600 }}>Puntaje promedio del condominio</div>
         </div>
         <div style={{ background: '#dcfce7', borderRadius: 10, padding: '12px 16px' }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>{distribucion.A + distribucion.B}</div>
@@ -133,7 +133,7 @@ export default function ScoringUnidadesTab({ cuotas, infracciones, sanciones, un
       </div>
 
       {/* Distribución */}
-      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+      <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Distribución de puntajes</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
           {(['A', 'B', 'C', 'D'] as const).map(g => {
@@ -144,7 +144,7 @@ export default function ScoringUnidadesTab({ cuotas, infracciones, sanciones, un
                 <div style={{ fontSize: 24, fontWeight: 900, color: cfg.color }}>{g}</div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: cfg.color }}>{n}</div>
                 <div style={{ fontSize: 10, color: cfg.color, fontWeight: 600 }}>{cfg.label}</div>
-                <div style={{ fontSize: 10, color: '#7E9389' }}>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>
                   {g === 'A' ? '80–100' : g === 'B' ? '60–79' : g === 'C' ? '40–59' : '0–39'} pts
                 </div>
               </div>
@@ -154,27 +154,27 @@ export default function ScoringUnidadesTab({ cuotas, infracciones, sanciones, un
       </div>
 
       {/* Ranking */}
-      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+      <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
         <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Ranking completo — de mayor a menor riesgo</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {scores.map((s, i) => {
             const cfg = GRADO_CFG[s.grado]
             return (
-              <div key={s.unidad.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#FAF7EF', borderRadius: 8 }}>
-                <div style={{ width: 22, color: '#7E9389', fontSize: 11, textAlign: 'right', flexShrink: 0 }}>{i + 1}</div>
+              <div key={s.unidad.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--at-surface-2)', borderRadius: 8 }}>
+                <div style={{ width: 22, color: 'var(--at-ink-3)', fontSize: 11, textAlign: 'right', flexShrink: 0 }}>{i + 1}</div>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: cfg.color, flexShrink: 0 }}>{s.grado}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#15291F' }}>{s.unidad.nombre}</div>
-                  <div style={{ fontSize: 10, color: '#7E9389' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink)' }}>{s.unidad.nombre}</div>
+                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>
                     {s.detalle.length > 0 ? s.detalle.join(' · ') : 'Sin observaciones'}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontSize: 16, fontWeight: 800, color: cfg.color }}>{s.score}</div>
-                  <div style={{ fontSize: 10, color: '#7E9389' }}>pts</div>
+                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>pts</div>
                 </div>
                 {/* Mini barra */}
-                <div style={{ width: 60, background: '#E1DDD0', borderRadius: 4, height: 6, flexShrink: 0 }}>
+                <div style={{ width: 60, background: 'var(--at-line)', borderRadius: 4, height: 6, flexShrink: 0 }}>
                   <div style={{ height: '100%', background: cfg.color, width: `${s.score}%`, borderRadius: 4 }} />
                 </div>
               </div>
@@ -183,7 +183,7 @@ export default function ScoringUnidadesTab({ cuotas, infracciones, sanciones, un
         </div>
       </div>
 
-      <div style={{ marginTop: 12, padding: '10px 14px', background: '#FAF7EF', borderRadius: 8, fontSize: 11, color: '#7E9389' }}>
+      <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--at-surface-2)', borderRadius: 8, fontSize: 11, color: 'var(--at-ink-3)' }}>
         Algoritmo: base 100 pts · −8 por cuota morosa · −10 por infracción · −12 por sanción vigente. El puntaje se actualiza en tiempo real con los datos del sistema.
         <span style={{ display: 'none' }}>{moneda}</span>
       </div>

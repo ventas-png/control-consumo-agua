@@ -127,16 +127,16 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
       {/* Header + filtros */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 3px', fontSize: '17px', fontWeight: 800, color: '#15291F' }}>Desempeño del Personal</h2>
-          <p style={{ margin: 0, fontSize: '13px', color: '#7E9389' }}>Rendimiento por colaborador en el período seleccionado</p>
+          <h2 style={{ margin: '0 0 3px', fontSize: '17px', fontWeight: 800, color: 'var(--at-ink)' }}>Desempeño del Personal</h2>
+          <p style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-3)' }}>Rendimiento por colaborador en el período seleccionado</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {(['7', '30', '90'] as Periodo[]).map(p => (
             <button key={p} onClick={() => setPeriodo(p)}
               style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid',
-                borderColor: periodo === p ? '#1B3B36' : '#E1DDD0',
-                background: periodo === p ? '#EEF2EC' : 'white',
-                color: periodo === p ? '#1B3B36' : '#7E9389' }}>
+                borderColor: periodo === p ? 'var(--at-primary)' : 'var(--at-line)',
+                background: periodo === p ? 'var(--at-primary-tint)' : 'white',
+                color: periodo === p ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
               {p === '7' ? 'Última semana' : p === '30' ? 'Último mes' : 'Últimos 3 meses'}
             </button>
           ))}
@@ -146,14 +146,14 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
       {/* KPIs globales */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: '12px', marginBottom: '24px' }}>
         {[
-          { label: 'Personal activo',      value: String(stats.length),           color: '#1B3B36' },
+          { label: 'Personal activo',      value: String(stats.length),           color: 'var(--at-primary)' },
           { label: 'Puntaje promedio',      value: avgGlobal ? `${avgGlobal}%` : '—', color: scoreColor(avgGlobal) },
-          { label: 'Turnos evaluados',      value: String(totalBloques),            color: '#102622' },
-          { label: 'Rondas realizadas',     value: String(rondasTotal),             color: '#9C5733' },
+          { label: 'Turnos evaluados',      value: String(totalBloques),            color: 'var(--at-primary-hover)' },
+          { label: 'Rondas realizadas',     value: String(rondasTotal),             color: 'var(--at-accent-hover)' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 16px' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 16px' }}>
             <div style={{ fontSize: '24px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#7E9389', marginTop: '2px' }}>{k.label}</div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginTop: '2px' }}>{k.label}</div>
           </div>
         ))}
       </div>
@@ -163,17 +163,17 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
         <div style={{ marginBottom: '16px', display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
           <button onClick={() => setFiltroCargo('')}
             style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid',
-              borderColor: !filtroCargo ? '#1B3B36' : '#E1DDD0',
-              background: !filtroCargo ? '#EEF2EC' : 'white',
-              color: !filtroCargo ? '#1B3B36' : '#7E9389' }}>
+              borderColor: !filtroCargo ? 'var(--at-primary)' : 'var(--at-line)',
+              background: !filtroCargo ? 'var(--at-primary-tint)' : 'white',
+              color: !filtroCargo ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             Todos los cargos
           </button>
           {cargos.map(c => (
             <button key={c} onClick={() => setFiltroCargo(c)}
               style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid',
-                borderColor: filtroCargo === c ? '#1B3B36' : '#E1DDD0',
-                background: filtroCargo === c ? '#EEF2EC' : 'white',
-                color: filtroCargo === c ? '#1B3B36' : '#7E9389' }}>
+                borderColor: filtroCargo === c ? 'var(--at-primary)' : 'var(--at-line)',
+                background: filtroCargo === c ? 'var(--at-primary-tint)' : 'white',
+                color: filtroCargo === c ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
               {c.replace(/_/g, ' ')}
             </button>
           ))}
@@ -181,9 +181,9 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
       )}
 
       {stats.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '50px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '50px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '42px', marginBottom: '12px' }}>📊</div>
-          <p style={{ fontWeight: 600, color: '#7E9389', fontSize: '14px' }}>Sin datos de desempeño en este período</p>
+          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)', fontSize: '14px' }}>Sin datos de desempeño en este período</p>
           <p style={{ fontSize: '13px' }}>Los datos aparecen una vez que el personal registre turnos o rondas.</p>
         </div>
       ) : (
@@ -191,14 +191,14 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
           {stats.map((s, i) => {
             const score = s.avgScore || (s.rondasTotal > 0 ? Math.round(s.rondasCompletadas / s.rondasTotal * 100) : 0)
             return (
-              <div key={s.persona.id} style={{ background: 'white', border: `1.5px solid ${i < 3 ? '#C2D2CA' : '#E1DDD0'}`, borderRadius: '14px', padding: '16px 18px' }}>
+              <div key={s.persona.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${i < 3 ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px 18px' }}>
                 <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                   {/* Rank + nombre */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '200px', flex: 1 }}>
-                    <div style={{ fontSize: '24px', flexShrink: 0 }}>{typeof medalla(i) === 'string' && medalla(i).startsWith('#') ? <span style={{ fontSize: '13px', fontWeight: 800, color: '#7E9389', background: '#EAE6D8', borderRadius: '8px', padding: '4px 8px' }}>{medalla(i)}</span> : medalla(i)}</div>
+                    <div style={{ fontSize: '24px', flexShrink: 0 }}>{typeof medalla(i) === 'string' && medalla(i).startsWith('#') ? <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--at-ink-3)', background: 'var(--at-chip)', borderRadius: '8px', padding: '4px 8px' }}>{medalla(i)}</span> : medalla(i)}</div>
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: '15px', color: '#15291F' }}>{s.persona.nombre}</div>
-                      <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '1px' }}>{s.persona.cargo.replace(/_/g, ' ')} · Turno {s.persona.turno}</div>
+                      <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--at-ink)' }}>{s.persona.nombre}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '1px' }}>{s.persona.cargo.replace(/_/g, ' ')} · Turno {s.persona.turno}</div>
                     </div>
                   </div>
 
@@ -206,7 +206,7 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
                   {score > 0 && (
                     <div style={{ background: scoreBg(score), border: `1.5px solid ${scoreColor(score)}33`, borderRadius: '12px', padding: '10px 18px', textAlign: 'center', flexShrink: 0 }}>
                       <div style={{ fontSize: '26px', fontWeight: 900, color: scoreColor(score), lineHeight: 1 }}>{score}%</div>
-                      <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>puntaje</div>
+                      <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>puntaje</div>
                     </div>
                   )}
 
@@ -214,7 +214,7 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
                   <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', flex: 2 }}>
                     {s.bloquesCerrados > 0 && (
                       <div style={{ minWidth: '110px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Turnos</div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Turnos</div>
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '12px', background: '#f0fdf4', color: '#16a34a', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>✅ {s.bloquesCompletados}</span>
                           {s.bloquesCerrados > s.bloquesCompletados && <span style={{ fontSize: '12px', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>⚠ {s.bloquesCerrados - s.bloquesCompletados}</span>}
@@ -223,17 +223,17 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
                     )}
                     {s.tareaTotal > 0 && (
                       <div style={{ minWidth: '140px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Tareas ({s.tareaTotal})</div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Tareas ({s.tareaTotal})</div>
                         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '12px', background: '#f0fdf4', color: '#16a34a', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>✅ {s.tareaCompletadas}</span>
                           {s.tareaObservacion > 0 && <span style={{ fontSize: '12px', background: '#fffbeb', color: '#d97706', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>⚠ {s.tareaObservacion}</span>}
-                          {s.tareaOmitidas > 0 && <span style={{ fontSize: '12px', background: '#FAF7EF', color: '#7E9389', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>⏭ {s.tareaOmitidas}</span>}
+                          {s.tareaOmitidas > 0 && <span style={{ fontSize: '12px', background: 'var(--at-surface-2)', color: 'var(--at-ink-3)', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>⏭ {s.tareaOmitidas}</span>}
                         </div>
                       </div>
                     )}
                     {s.tasaAprobacion !== null && (
                       <div style={{ minWidth: '110px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Revisión admin</div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Revisión admin</div>
                         <div style={{ display: 'flex', gap: '5px' }}>
                           <span style={{ fontSize: '12px', background: '#f0fdf4', color: '#16a34a', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>👍 {s.aprobadas}</span>
                           {s.rechazadas > 0 && <span style={{ fontSize: '12px', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>👎 {s.rechazadas}</span>}
@@ -243,13 +243,13 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
                     )}
                     {s.rondasTotal > 0 && (
                       <div style={{ minWidth: '110px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Rondas</div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Rondas</div>
                         <div style={{ display: 'flex', gap: '5px' }}>
                           <span style={{ fontSize: '12px', background: '#f0fdf4', color: '#16a34a', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>✅ {s.rondasCompletadas}</span>
                           {s.rondasTotal > s.rondasCompletadas && <span style={{ fontSize: '12px', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>❌ {s.rondasTotal - s.rondasCompletadas}</span>}
                         </div>
                         {(s.visitasOk + s.visitasNov) > 0 && (
-                          <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '3px' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '3px' }}>
                             {s.visitasOk} pts ok · {s.visitasNov > 0 ? `${s.visitasNov} novedades` : '0 novedades'}
                           </div>
                         )}
@@ -260,7 +260,7 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
 
                 {/* Progress bar */}
                 {score > 0 && (
-                  <div style={{ marginTop: '12px', background: '#EAE6D8', borderRadius: '6px', height: '6px', overflow: 'hidden' }}>
+                  <div style={{ marginTop: '12px', background: 'var(--at-chip)', borderRadius: '6px', height: '6px', overflow: 'hidden' }}>
                     <div style={{ width: `${score}%`, height: '100%', background: `linear-gradient(90deg,${scoreColor(score)},${scoreColor(score)}aa)`, borderRadius: '6px', transition: 'width 0.6s ease' }} />
                   </div>
                 )}

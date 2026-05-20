@@ -1188,9 +1188,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
   if (proyectosActivos.length === 0) {
     return (
-      <div style={{ padding: '48px', textAlign: 'center', color: '#7E9389' }}>
+      <div style={{ padding: '48px', textAlign: 'center', color: 'var(--at-ink-3)' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏢</div>
-        <p style={{ fontSize: '16px', fontWeight: 600, color: '#7E9389' }}>No hay proyectos activos</p>
+        <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay proyectos activos</p>
         <p style={{ fontSize: '13px' }}>Crea un proyecto en "Mis Proyectos" para comenzar a usar el módulo Condominios.</p>
       </div>
     )
@@ -1199,22 +1199,22 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* Header */}
-      <div style={{ padding: '16px 24px 0', borderBottom: '1px solid var(--at-line)', background: 'white', flexShrink: 0 }}>
+      <div style={{ padding: '16px 24px 0', borderBottom: '1px solid var(--at-line)', background: 'var(--at-surface)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '20px' }}>🏢</span>
-            <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#15291F' }}>Condominios</h1>
+            <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--at-ink)' }}>Condominios</h1>
           </div>
           {proyectosActivos.length > 1 && (
             <select value={selectedProyectoId} onChange={e => setSelectedProyectoId(e.target.value)}
-              style={{ padding: '6px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', color: '#3E5A4C', fontWeight: 500 }}>
+              style={{ padding: '6px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', fontWeight: 500 }}>
               {proyectosActivos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
             </select>
           )}
           {proyectosActivos.length === 1 && (
-            <span style={{ fontSize: '14px', color: '#7E9389', fontWeight: 500 }}>{proyectoActual?.nombre}</span>
+            <span style={{ fontSize: '14px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{proyectoActual?.nombre}</span>
           )}
-          {loading && <span style={{ fontSize: '12px', color: '#7E9389' }}>Cargando...</span>}
+          {loading && <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Cargando...</span>}
         </div>
 
         {/* Barra de secciones (nivel 1) */}
@@ -1232,8 +1232,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
                 style={{
                   padding: '7px 13px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
                   fontSize: 12, fontWeight: activa ? 700 : 500,
-                  background: activa ? '#15291F' : '#EAE6D8',
-                  color: activa ? '#fff' : '#7E9389',
+                  background: activa ? 'var(--at-ink)' : 'var(--at-chip)',
+                  color: activa ? '#fff' : 'var(--at-ink-3)',
                   borderRadius: '6px 6px 0 0',
                   borderBottom: activa ? '2px solid var(--at-ink)' : '2px solid transparent',
                   marginBottom: -2,
@@ -1255,7 +1255,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
           minWidth: sidebarCollapsed ? 0 : 200,
           overflowY: 'auto',
           overflowX: 'hidden',
-          background: '#FAF7EF',
+          background: 'var(--at-surface-2)',
           borderRight: '1px solid var(--at-line)',
           transition: 'width 0.18s ease, min-width 0.18s ease',
           flexShrink: 0,
@@ -1270,9 +1270,9 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
                     style={{
                       display: 'flex', alignItems: 'center', gap: '8px',
                       width: '100%', padding: '7px 14px', border: 'none',
-                      background: activeTab === tab.id ? '#D9E2DC' : 'transparent',
-                      color: activeTab === tab.id ? '#102622' : '#3E5A4C',
-                      borderLeft: `3px solid ${activeTab === tab.id ? '#1B3B36' : 'transparent'}`,
+                      background: activeTab === tab.id ? 'var(--at-primary-soft)' : 'transparent',
+                      color: activeTab === tab.id ? 'var(--at-primary-hover)' : 'var(--at-ink-2)',
+                      borderLeft: `3px solid ${activeTab === tab.id ? 'var(--at-primary)' : 'transparent'}`,
                       cursor: 'pointer', fontSize: '12px',
                       fontWeight: activeTab === tab.id ? 700 : 400,
                       textAlign: 'left',
@@ -1292,8 +1292,8 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
           title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
           style={{
             flexShrink: 0, width: '18px',
-            background: '#EAE6D8', border: 'none', borderRight: '1px solid var(--at-line)',
-            cursor: 'pointer', color: '#7E9389', fontSize: '10px',
+            background: 'var(--at-chip)', border: 'none', borderRight: '1px solid var(--at-line)',
+            cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '10px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
           {sidebarCollapsed ? '›' : '‹'}

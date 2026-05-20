@@ -173,12 +173,12 @@ export function HistorialSection({
     {
       key: 'lectAnt', header: 'Lect. Ant.', align: 'right',
       accessor: r => r.lectura_anterior,
-      render: r => <span style={{ color: '#7E9389' }}>{r.lectura_anterior}</span>,
+      render: r => <span style={{ color: 'var(--at-ink-3)' }}>{r.lectura_anterior}</span>,
     },
     {
       key: 'lectAct', header: 'Lect. Act.', align: 'right',
       accessor: r => r.lectura_actual,
-      render: r => <span style={{ color: '#1B3B36', fontWeight: 600 }}>{r.lectura_actual}</span>,
+      render: r => <span style={{ color: 'var(--at-primary)', fontWeight: 600 }}>{r.lectura_actual}</span>,
     },
     {
       key: 'consumo', header: 'Consumo (m³)', sortable: true, align: 'right',
@@ -188,13 +188,13 @@ export function HistorialSection({
     {
       key: 'total', header: `Total (${moneda})`, sortable: true, align: 'right',
       accessor: r => getTotal(r),
-      render: r => <span style={{ fontWeight: 700, color: '#1B3B36' }}>{formatCurrency(getTotal(r), moneda)}</span>,
+      render: r => <span style={{ fontWeight: 700, color: 'var(--at-primary)' }}>{formatCurrency(getTotal(r), moneda)}</span>,
     },
     {
       key: 'estado', header: 'Estado', sortable: true,
       accessor: r => r.estado,
       render: r => {
-        const p = ESTADO_PILL[r.estado] ?? { bg: '#EAE6D8', color: '#3E5A4C', icon: '' }
+        const p = ESTADO_PILL[r.estado] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-2)', icon: '' }
         return (
           <span style={pillStyle(p)}>
             {p.icon} {r.estado}
@@ -224,7 +224,7 @@ export function HistorialSection({
   ], [moneda, canEdit])
 
   return (
-    <div style={{ background: 'white', borderRadius: 24, padding: 32, boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+    <div style={{ background: 'var(--at-surface)', borderRadius: 24, padding: 32, boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 12, borderBottom: '2px solid var(--at-line)' }}>
         <span style={{ fontSize: 20, fontWeight: 700 }}>📊 Historial de Lecturas</span>
@@ -233,8 +233,8 @@ export function HistorialSection({
             onClick={() => setShowFilters(s => !s)}
             style={{
               padding: '10px 16px',
-              background: showFilters ? '#1B3B36' : '#EAE6D8',
-              color: showFilters ? 'white' : '#3E5A4C',
+              background: showFilters ? 'var(--at-primary)' : 'var(--at-chip)',
+              color: showFilters ? 'white' : 'var(--at-ink-2)',
               border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14,
             }}
           >⚙️ Filtros</button>
@@ -247,7 +247,7 @@ export function HistorialSection({
               const { exportarPDFGlobal } = await import('../../lib/pdf')
               exportarPDFGlobal(filtrados)
             }}
-            style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
+            style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
           >📄 PDF</button>
         </div>
       </div>
@@ -264,7 +264,7 @@ export function HistorialSection({
 
       {/* Filters Panel */}
       {showFilters && (
-        <div style={{ background: '#FAF7EF', padding: 16, marginBottom: 20, borderRadius: 12, border: '1px solid var(--at-line)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+        <div style={{ background: 'var(--at-surface-2)', padding: 16, marginBottom: 20, borderRadius: 12, border: '1px solid var(--at-line)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
           <input
             type="text"
             placeholder="🔍 Buscar cliente..."
@@ -302,13 +302,13 @@ export function HistorialSection({
           })()}
           <div>
             <input type="date" value={filtroFechaInicio} onChange={e => { setFiltroFechaInicio(e.target.value); setCurrentPage(1) }} style={{ ...filterFieldStyle, width: '100%' }} />
-            <small style={{ color: '#7E9389', marginTop: 4, display: 'block' }}>Desde</small>
+            <small style={{ color: 'var(--at-ink-3)', marginTop: 4, display: 'block' }}>Desde</small>
           </div>
           <div>
             <input type="date" value={filtroFechaFin} onChange={e => { setFiltroFechaFin(e.target.value); setCurrentPage(1) }} style={{ ...filterFieldStyle, width: '100%' }} />
-            <small style={{ color: '#7E9389', marginTop: 4, display: 'block' }}>Hasta</small>
+            <small style={{ color: 'var(--at-ink-3)', marginTop: 4, display: 'block' }}>Hasta</small>
           </div>
-          <button onClick={resetFiltros} style={{ padding: '10px 12px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+          <button onClick={resetFiltros} style={{ padding: '10px 12px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
             🔄 Limpiar Filtros
           </button>
         </div>
@@ -332,12 +332,12 @@ export function HistorialSection({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16, marginBottom: 20 }}>
           {paginados.map(r => {
             const total = getTotal(r)
-            const p = ESTADO_PILL[r.estado] ?? { bg: '#EAE6D8', color: '#3E5A4C', icon: '' }
+            const p = ESTADO_PILL[r.estado] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-2)', icon: '' }
             return (
               <div
                 key={r.id}
                 style={{
-                  background: 'white', border: '1px solid var(--at-line)', borderRadius: 12,
+                  background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12,
                   padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
                   transition: 'all 0.2s', cursor: 'pointer',
                 }}
@@ -345,14 +345,14 @@ export function HistorialSection({
                 onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)' }}
               >
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#15291F' }}>{r.cliente_nombre}</div>
-                  <div style={{ fontSize: 12, color: '#7E9389', marginTop: 4 }}>📅 {formatDate(r.fecha)}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--at-ink)' }}>{r.cliente_nombre}</div>
+                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>📅 {formatDate(r.fecha)}</div>
                 </div>
-                <div style={{ background: '#FAF7EF', padding: 12, borderRadius: 8, marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
-                  <div><span style={{ color: '#7E9389' }}>Anterior</span><div style={{ fontWeight: 600, color: '#1B3B36' }}>{r.lectura_anterior}</div></div>
-                  <div><span style={{ color: '#7E9389' }}>Actual</span><div style={{ fontWeight: 600, color: '#1B3B36' }}>{r.lectura_actual}</div></div>
-                  <div><span style={{ color: '#7E9389' }}>Consumo</span><div style={{ fontWeight: 600, color: '#B96A3F' }}>💧 {formatNumber(r.consumo)} m³</div></div>
-                  <div><span style={{ color: '#7E9389' }}>Total</span><div style={{ fontWeight: 700, color: '#1B3B36' }}>{formatCurrency(total, moneda)}</div></div>
+                <div style={{ background: 'var(--at-surface-2)', padding: 12, borderRadius: 8, marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
+                  <div><span style={{ color: 'var(--at-ink-3)' }}>Anterior</span><div style={{ fontWeight: 600, color: 'var(--at-primary)' }}>{r.lectura_anterior}</div></div>
+                  <div><span style={{ color: 'var(--at-ink-3)' }}>Actual</span><div style={{ fontWeight: 600, color: 'var(--at-primary)' }}>{r.lectura_actual}</div></div>
+                  <div><span style={{ color: 'var(--at-ink-3)' }}>Consumo</span><div style={{ fontWeight: 600, color: 'var(--at-accent)' }}>💧 {formatNumber(r.consumo)} m³</div></div>
+                  <div><span style={{ color: 'var(--at-ink-3)' }}>Total</span><div style={{ fontWeight: 700, color: 'var(--at-primary)' }}>{formatCurrency(total, moneda)}</div></div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={pillStyle(p)}>{p.icon} {r.estado}</span>
@@ -367,7 +367,7 @@ export function HistorialSection({
             )
           })}
           {paginados.length === 0 && (
-            <div style={{ gridColumn: '1 / -1', padding: 40, textAlign: 'center', color: '#7E9389' }}>
+            <div style={{ gridColumn: '1 / -1', padding: 40, textAlign: 'center', color: 'var(--at-ink-3)' }}>
               📭 Sin registros
             </div>
           )}
@@ -394,7 +394,7 @@ export function HistorialSection({
           }}
           onClick={e => e.target === e.currentTarget && setEditModal(null)}
         >
-          <div style={{ background: 'white', padding: 32, borderRadius: 16, width: '90%', maxWidth: 480 }}>
+          <div style={{ background: 'var(--at-surface)', padding: 32, borderRadius: 16, width: '90%', maxWidth: 480 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h3 style={{ margin: 0 }}>📝 Modificar Estado de Pago</h3>
               <button onClick={() => setEditModal(null)} aria-label="Cerrar modal" style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer' }}>×</button>
@@ -427,7 +427,7 @@ export function HistorialSection({
               </button>
               <button
                 onClick={() => setEditModal(null)}
-                style={{ flex: 1, padding: 12, background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer' }}
+                style={{ flex: 1, padding: 12, background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer' }}
               >
                 ✕ Cancelar
               </button>
@@ -451,7 +451,7 @@ function StatCard({ label, value, color, icon, moneda }: {
       borderLeft: `4px solid ${color}`,
       borderRadius: 12, border: `1px solid ${color}40`,
     }}>
-      <div style={{ fontSize: 12, color: '#7E9389', fontWeight: 600, marginBottom: 8 }}>
+      <div style={{ fontSize: 12, color: 'var(--at-ink-3)', fontWeight: 600, marginBottom: 8 }}>
         {icon} {label}
       </div>
       <div style={{ fontSize: 24, fontWeight: 700, color }}>
@@ -466,9 +466,9 @@ function Pagination({ currentPage, totalPages, onChange }: {
 }) {
   const btnStyle = (active: boolean, disabled = false): CSSProperties => ({
     minWidth: 40, height: 40, padding: '0 10px',
-    background: active ? '#1B3B36' : disabled ? '#EAE6D8' : '#FAF7EF',
-    color: active ? 'white' : disabled ? '#cbd5e0' : '#3E5A4C',
-    border: '1px solid', borderColor: active ? '#1B3B36' : '#E1DDD0',
+    background: active ? 'var(--at-primary)' : disabled ? 'var(--at-chip)' : 'var(--at-surface-2)',
+    color: active ? 'white' : disabled ? '#cbd5e0' : 'var(--at-ink-2)',
+    border: '1px solid', borderColor: active ? 'var(--at-primary)' : 'var(--at-line)',
     borderRadius: 8, fontSize: 13, fontWeight: active ? 700 : 400,
     cursor: disabled ? 'not-allowed' : 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -493,12 +493,12 @@ function Pagination({ currentPage, totalPages, onChange }: {
       <button onClick={() => onChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1} style={btnStyle(false, currentPage === 1)}>‹</button>
       {withEllipsis.map((p, idx) =>
         p === '…'
-          ? <span key={`e${idx}`} style={{ padding: '0 4px', color: '#7E9389', fontSize: 13 }}>…</span>
+          ? <span key={`e${idx}`} style={{ padding: '0 4px', color: 'var(--at-ink-3)', fontSize: 13 }}>…</span>
           : <button key={p} onClick={() => onChange(p as number)} style={btnStyle(currentPage === p)}>{p}</button>
       )}
       <button onClick={() => onChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} style={btnStyle(false, currentPage === totalPages)}>›</button>
       <button onClick={() => onChange(totalPages)} disabled={currentPage === totalPages} style={btnStyle(false, currentPage === totalPages)}>»</button>
-      <span style={{ fontSize: 12, color: '#7E9389', marginLeft: 6 }}>Pág. {currentPage} de {totalPages}</span>
+      <span style={{ fontSize: 12, color: 'var(--at-ink-3)', marginLeft: 6 }}>Pág. {currentPage} de {totalPages}</span>
     </div>
   )
 }
@@ -511,8 +511,8 @@ function pillStyle(p: { bg: string; color: string }): CSSProperties {
 
 function viewBtnStyle(active: boolean): CSSProperties {
   return {
-    padding: '8px 12px', background: active ? '#1B3B36' : 'transparent',
-    color: active ? 'white' : '#7E9389',
+    padding: '8px 12px', background: active ? 'var(--at-primary)' : 'transparent',
+    color: active ? 'white' : 'var(--at-ink-3)',
     border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
   }
 }

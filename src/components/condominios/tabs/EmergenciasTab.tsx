@@ -15,14 +15,14 @@ interface Props {
 
 const TIPOS: { value: TipoContactoEmergencia; label: string; icon: string; color: string }[] = [
   { value: 'bomberos',       label: 'Bomberos',       icon: '🚒', color: '#ef4444' },
-  { value: 'policia',        label: 'Policía',        icon: '🚔', color: '#102622' },
+  { value: 'policia',        label: 'Policía',        icon: '🚔', color: 'var(--at-primary-hover)' },
   { value: 'ambulancia',     label: 'Ambulancia',     icon: '🚑', color: '#dc2626' },
-  { value: 'hospital',       label: 'Hospital',       icon: '🏥', color: '#102622' },
+  { value: 'hospital',       label: 'Hospital',       icon: '🏥', color: 'var(--at-primary-hover)' },
   { value: 'electricidad',   label: 'Electricidad',   icon: '⚡', color: '#d97706' },
-  { value: 'agua',           label: 'Agua',           icon: '💧', color: '#1B3B36' },
+  { value: 'agua',           label: 'Agua',           icon: '💧', color: 'var(--at-primary)' },
   { value: 'gas',            label: 'Gas',            icon: '🔥', color: '#ea580c' },
-  { value: 'administracion', label: 'Administración', icon: '🏢', color: '#9C5733' },
-  { value: 'general',        label: 'General',        icon: '📞', color: '#7E9389' },
+  { value: 'administracion', label: 'Administración', icon: '🏢', color: 'var(--at-accent-hover)' },
+  { value: 'general',        label: 'General',        icon: '📞', color: 'var(--at-ink-3)' },
 ]
 
 const blank = (): Partial<ContactoEmergencia> => ({
@@ -90,8 +90,8 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
 
   const tipoInfo = (t: TipoContactoEmergencia) => TIPOS.find(x => x.value === t) ?? TIPOS[TIPOS.length - 1]
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -105,10 +105,10 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
               const ti = tipoInfo(c.tipo)
               return (
                 <a key={c.id} href={`tel:${c.telefono}`}
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'white', borderRadius: '8px', border: `1.5px solid ${ti.color}20`, textDecoration: 'none', cursor: 'pointer' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--at-surface)', borderRadius: '8px', border: `1.5px solid ${ti.color}20`, textDecoration: 'none', cursor: 'pointer' }}>
                   <span style={{ fontSize: '22px' }}>{ti.icon}</span>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '12px', color: '#15291F' }}>{c.nombre}</div>
+                    <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--at-ink)' }}>{c.nombre}</div>
                     <div style={{ fontSize: '13px', color: ti.color, fontWeight: 700 }}>{c.telefono}</div>
                     {c.disponible_24h && <div style={{ fontSize: '10px', color: '#10b981', fontWeight: 600 }}>24h</div>}
                   </div>
@@ -120,13 +120,13 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Gestión de Contactos</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Gestión de Contactos</h2>
         {canCreate && !showForm && (
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => setShowImportModal(true)} style={{ padding: '8px 14px', background: '#EEF2EC', color: '#102622', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => setShowImportModal(true)} style={{ padding: '8px 14px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               ⬆ Carga masiva
             </button>
-            <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               + Agregar Contacto
             </button>
           </div>
@@ -134,7 +134,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Contacto' : 'Nuevo Contacto'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: '12px' }}>
             <div>
@@ -160,11 +160,11 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
               <input style={inputStyle} type="number" min="0" value={form.orden ?? 0} onChange={e => setForm(f => ({ ...f, orden: Number(e.target.value) }))} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'flex-end' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#3E5A4C', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--at-ink-2)', cursor: 'pointer' }}>
                 <input type="checkbox" checked={form.disponible_24h ?? true} onChange={e => setForm(f => ({ ...f, disponible_24h: e.target.checked }))} />
                 Disponible 24h
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#3E5A4C', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--at-ink-2)', cursor: 'pointer' }}>
                 <input type="checkbox" checked={form.activo ?? true} onChange={e => setForm(f => ({ ...f, activo: e.target.checked }))} />
                 Activo
               </label>
@@ -175,8 +175,8 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
           </div>
@@ -186,19 +186,19 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
       {/* Filtro por tipo */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => setFiltroTipo('todos')}
-          style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroTipo === 'todos' ? '#1B3B36' : '#E1DDD0', background: filtroTipo === 'todos' ? '#D9E2DC' : 'white', color: filtroTipo === 'todos' ? '#1B3B36' : '#7E9389' }}>
+          style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroTipo === 'todos' ? 'var(--at-primary)' : 'var(--at-line)', background: filtroTipo === 'todos' ? 'var(--at-primary-soft)' : 'white', color: filtroTipo === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
           Todos ({contactos.length})
         </button>
         {TIPOS.filter(t => contactos.some(c => c.tipo === t.value)).map(t => (
           <button key={t.value} onClick={() => setFiltroTipo(t.value)}
-            style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroTipo === t.value ? t.color : '#E1DDD0', background: filtroTipo === t.value ? `${t.color}20` : 'white', color: filtroTipo === t.value ? t.color : '#7E9389' }}>
+            style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroTipo === t.value ? t.color : 'var(--at-line)', background: filtroTipo === t.value ? `${t.color}20` : 'white', color: filtroTipo === t.value ? t.color : 'var(--at-ink-3)' }}>
             {t.icon} {t.label}
           </button>
         ))}
       </div>
 
       {sorted.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>📞</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay contactos de emergencia</p>
         </div>
@@ -207,23 +207,23 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
           {sorted.map(c => {
             const ti = tipoInfo(c.tipo)
             return (
-              <div key={c.id} style={{ background: c.activo ? 'white' : '#FAF7EF', border: `1.5px solid ${c.activo ? '#E1DDD0' : '#EAE6D8'}`, borderRadius: '10px', padding: '14px', opacity: c.activo ? 1 : 0.6 }}>
+              <div key={c.id} style={{ background: c.activo ? 'white' : 'var(--at-surface-2)', border: `1.5px solid ${c.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '10px', padding: '14px', opacity: c.activo ? 1 : 0.6 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: `${ti.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>
                     {ti.icon}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, color: '#15291F', fontSize: '13px' }}>{c.nombre}</div>
+                    <div style={{ fontWeight: 700, color: 'var(--at-ink)', fontSize: '13px' }}>{c.nombre}</div>
                     <div style={{ fontSize: '14px', fontWeight: 700, color: ti.color, marginTop: '2px' }}>{c.telefono}</div>
-                    {c.telefono_alternativo && <div style={{ fontSize: '12px', color: '#7E9389' }}>Alt: {c.telefono_alternativo}</div>}
+                    {c.telefono_alternativo && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Alt: {c.telefono_alternativo}</div>}
                     <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
                       {c.disponible_24h && <span style={{ fontSize: '10px', fontWeight: 700, color: '#10b981', background: '#d1fae5', padding: '1px 6px', borderRadius: '4px' }}>24H</span>}
-                      <span style={{ fontSize: '10px', fontWeight: 600, color: '#7E9389', background: '#EAE6D8', padding: '1px 6px', borderRadius: '4px' }}>{ti.label}</span>
+                      <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--at-ink-3)', background: 'var(--at-chip)', padding: '1px 6px', borderRadius: '4px' }}>{ti.label}</span>
                     </div>
                   </div>
                   {canEdit && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <button onClick={() => startEdit(c)} style={{ padding: '4px 6px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                      <button onClick={() => startEdit(c)} style={{ padding: '4px 6px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => toggleActivo(c)} style={{ padding: '4px 6px', background: c.activo ? '#fef3c7' : '#d1fae5', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }} title={c.activo ? 'Desactivar' : 'Activar'}>
                         {c.activo ? '⏸️' : '▶️'}
                       </button>
@@ -231,7 +231,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
                     </div>
                   )}
                 </div>
-                {c.descripcion && <div style={{ marginTop: '8px', fontSize: '11px', color: '#7E9389', borderTop: '1px solid var(--at-chip)', paddingTop: '6px' }}>{c.descripcion}</div>}
+                {c.descripcion && <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--at-ink-3)', borderTop: '1px solid var(--at-chip)', paddingTop: '6px' }}>{c.descripcion}</div>}
               </div>
             )
           })}

@@ -35,13 +35,13 @@ function FeedbackMsg({ fb }: { fb: FeedbackState }) {
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{
-      background: 'white',
+      background: 'var(--at-surface)',
       borderRadius: '16px',
       padding: '24px',
       boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
       border: '1px solid var(--at-line)',
     }}>
-      <div style={{ fontSize: '15px', fontWeight: 700, color: '#15291F', marginBottom: '18px', paddingBottom: '12px', borderBottom: '1px solid var(--at-chip)' }}>
+      <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '18px', paddingBottom: '12px', borderBottom: '1px solid var(--at-chip)' }}>
         {title}
       </div>
       {children}
@@ -63,7 +63,7 @@ function InputField({
 }) {
   return (
     <div style={{ marginBottom: '14px' }}>
-      <label htmlFor={id} style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#3E5A4C', marginBottom: '6px' }}>
+      <label htmlFor={id} style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
         {label}
       </label>
       <div style={{ position: 'relative' }}>
@@ -80,8 +80,8 @@ function InputField({
             border: '1.5px solid var(--at-line)',
             borderRadius: '8px',
             fontSize: '14px',
-            background: disabled ? '#FAF7EF' : 'white',
-            color: disabled ? '#7E9389' : '#15291F',
+            background: disabled ? 'var(--at-surface-2)' : 'white',
+            color: disabled ? 'var(--at-ink-3)' : 'var(--at-ink)',
             boxSizing: 'border-box',
             outline: 'none',
           }}
@@ -96,14 +96,14 @@ function InputField({
   )
 }
 
-function SubmitBtn({ loading, label, color = '#1B3B36' }: { loading: boolean; label: string; color?: string }) {
+function SubmitBtn({ loading, label, color = 'var(--at-primary)' }: { loading: boolean; label: string; color?: string }) {
   return (
     <button
       type="submit"
       disabled={loading}
       style={{
         padding: '10px 22px',
-        background: loading ? '#7E9389' : `linear-gradient(135deg, ${color}, ${color}cc)`,
+        background: loading ? 'var(--at-ink-3)' : `linear-gradient(135deg, ${color}, ${color}cc)`,
         color: 'white',
         border: 'none',
         borderRadius: '8px',
@@ -209,7 +209,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   }
 
   const eyeBtn = (show: boolean, toggle: () => void) => (
-    <button type="button" onClick={toggle} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', padding: 0, fontSize: '16px', lineHeight: 1 }}>
+    <button type="button" onClick={toggle} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', padding: 0, fontSize: '16px', lineHeight: 1 }}>
       {show ? '🙈' : '👁️'}
     </button>
   )
@@ -239,7 +239,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
         </div>
         <div>
           <div style={{ color: 'white', fontWeight: 700, fontSize: '18px' }}>{currentUser.name}</div>
-          <div style={{ color: '#7E9389', fontSize: '13px', marginTop: '3px' }}>{currentUser.email}</div>
+          <div style={{ color: 'var(--at-ink-3)', fontSize: '13px', marginTop: '3px' }}>{currentUser.email}</div>
           <span style={{
             display: 'inline-block', marginTop: '8px',
             background: roleColor + '22',
@@ -273,7 +273,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
         {/* Card 2 — Contraseña */}
         {isOAuthUser ? (
           <Card title="Cambiar contraseña">
-            <div style={{ color: '#7E9389', fontSize: '14px', padding: '8px 0' }}>
+            <div style={{ color: 'var(--at-ink-3)', fontSize: '14px', padding: '8px 0' }}>
               ℹ️ Tu cuenta está vinculada con Google. El cambio de contraseña se gestiona desde tu cuenta de Google.
             </div>
           </Card>

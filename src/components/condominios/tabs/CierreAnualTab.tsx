@@ -96,20 +96,20 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
           <div style={{ fontSize: 20, fontWeight: 700, color: '#ef4444' }}>{moneda} {totalEgresos.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
           <div style={{ fontSize: 11, color: '#ef4444' }}>Egresos totales</div>
         </div>
-        <div style={{ background: saldoAcumulado >= 0 ? '#EEF2EC' : '#fef2f2', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: saldoAcumulado >= 0 ? '#1B3B36' : '#ef4444' }}>
+        <div style={{ background: saldoAcumulado >= 0 ? 'var(--at-primary-tint)' : '#fef2f2', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: saldoAcumulado >= 0 ? 'var(--at-primary)' : '#ef4444' }}>
             {moneda} {Math.abs(saldoAcumulado).toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </div>
-          <div style={{ fontSize: 11, color: '#7E9389' }}>Saldo acumulado {saldoAcumulado < 0 ? '(déficit)' : '(superávit)'}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Saldo acumulado {saldoAcumulado < 0 ? '(déficit)' : '(superávit)'}</div>
         </div>
       </div>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <span style={{ fontSize: 13, color: '#7E9389' }}>{cierres.length} cierre(s) registrado(s)</span>
+        <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>{cierres.length} cierre(s) registrado(s)</span>
         {canCreate && (
           <button onClick={generarCierre} disabled={saving}
-            style={{ padding: '8px 16px', background: '#577B69', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent-2)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             {saving ? '⏳ Generando…' : '📊 Generar cierre anual'}
           </button>
         )}
@@ -117,7 +117,7 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
 
       {/* Lista + Detalle */}
       {cierres.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📆</div>
           Sin cierres anuales — genera el primero con el botón superior
         </div>
@@ -129,16 +129,16 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
               const tasaColor = (c.tasa_recaudacion ?? 0) >= 80 ? '#16a34a' : (c.tasa_recaudacion ?? 0) >= 60 ? '#d97706' : '#ef4444'
               return (
                 <div key={c.id} onClick={() => setSelected(c === selected ? null : c)}
-                  style={{ background: selected?.id === c.id ? '#f0fdfa' : '#fff', border: `1.5px solid ${selected?.id === c.id ? '#577B69' : '#E1DDD0'}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === c.id ? '#f0fdfa' : '#fff', border: `1.5px solid ${selected?.id === c.id ? 'var(--at-accent-2)' : 'var(--at-line)'}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: '#15291F' }}>{c.anio}</div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--at-ink)' }}>{c.anio}</div>
                       <span style={{ padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: 20, fontSize: 12, color: '#7E9389' }}>
+                    <div style={{ display: 'flex', gap: 20, fontSize: 12, color: 'var(--at-ink-3)' }}>
                       <span>Ingresos: <strong style={{ color: '#16a34a' }}>{moneda} {c.total_ingresos.toFixed(2)}</strong></span>
                       <span>Egresos: <strong style={{ color: '#ef4444' }}>{moneda} {c.total_egresos.toFixed(2)}</strong></span>
-                      <span>Saldo: <strong style={{ color: c.saldo >= 0 ? '#1B3B36' : '#ef4444' }}>{moneda} {c.saldo.toFixed(2)}</strong></span>
+                      <span>Saldo: <strong style={{ color: c.saldo >= 0 ? 'var(--at-primary)' : '#ef4444' }}>{moneda} {c.saldo.toFixed(2)}</strong></span>
                       {c.tasa_recaudacion != null && (
                         <span>Recaudación: <strong style={{ color: tasaColor }}>{c.tasa_recaudacion}%</strong></span>
                       )}
@@ -149,7 +149,7 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
             })}
           </div>
           {selected && (
-            <div style={{ width: 280, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 280, flexShrink: 0, background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 15 }}>Cierre {selected.anio}</div>
               {([
                 ['Estado', <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ESTADO_CFG[selected.estado].bg, color: ESTADO_CFG[selected.estado].color }}>{ESTADO_CFG[selected.estado].label}</span>],
@@ -165,14 +165,14 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
                 ['Fecha cierre', selected.fecha_cierre ? new Date(selected.fecha_cierre).toLocaleDateString('es') : '—'],
               ] as [string, ReactNode][]).map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--at-chip)' }}>
-                  <span style={{ color: '#7E9389' }}>{k}</span>
-                  <span style={{ fontWeight: 600, color: '#3E5A4C' }}>{v}</span>
+                  <span style={{ color: 'var(--at-ink-3)' }}>{k}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--at-ink-2)' }}>{v}</span>
                 </div>
               ))}
-              {selected.notas && <div style={{ fontSize: 11, color: '#7E9389', marginTop: 8 }}>{selected.notas}</div>}
+              {selected.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 8 }}>{selected.notas}</div>}
               {selected.estado === 'borrador' && (
                 <button onClick={() => firmar(selected)}
-                  style={{ width: '100%', marginTop: 14, padding: '8px 0', background: '#577B69', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  style={{ width: '100%', marginTop: 14, padding: '8px 0', background: 'var(--at-accent-2)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                   🔒 Cerrar definitivamente
                 </button>
               )}

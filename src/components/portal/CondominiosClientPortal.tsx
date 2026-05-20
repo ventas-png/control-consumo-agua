@@ -172,22 +172,22 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
       }}>
         <div style={{
-          background: 'white', borderRadius: '24px', padding: '48px 40px',
+          background: 'var(--at-surface)', borderRadius: '24px', padding: '48px 40px',
           maxWidth: '480px', width: '100%', textAlign: 'center',
           boxShadow: '0 24px 64px rgba(0,0,0,0.16)',
         }}>
           <div style={{ fontSize: '56px', marginBottom: '20px' }}>🏢</div>
-          <h2 style={{ margin: '0 0 12px', fontSize: '22px', fontWeight: 700, color: '#15291F' }}>
+          <h2 style={{ margin: '0 0 12px', fontSize: '22px', fontWeight: 700, color: 'var(--at-ink)' }}>
             Sin unidades asociadas
           </h2>
-          <p style={{ margin: '0 0 8px', fontSize: '15px', color: '#3E5A4C', lineHeight: 1.6 }}>
+          <p style={{ margin: '0 0 8px', fontSize: '15px', color: 'var(--at-ink-2)', lineHeight: 1.6 }}>
             No tiene unidades activas vinculadas a su cuenta en este condominio.
           </p>
-          <p style={{ margin: '0 0 32px', fontSize: '13.5px', color: '#7E9389' }}>
+          <p style={{ margin: '0 0 32px', fontSize: '13.5px', color: 'var(--at-ink-3)' }}>
             Si cree que esto es un error, comuníquese con la administración.
           </p>
-          <div style={{ background: '#EAE6D8', borderRadius: '12px', padding: '16px', fontSize: '13px', color: '#7E9389', marginBottom: '28px' }}>
-            <strong style={{ color: '#3E5A4C' }}>Sesión activa:</strong> {currentUser.name}<br />{currentUser.email}
+          <div style={{ background: 'var(--at-chip)', borderRadius: '12px', padding: '16px', fontSize: '13px', color: 'var(--at-ink-3)', marginBottom: '28px' }}>
+            <strong style={{ color: 'var(--at-ink-2)' }}>Sesión activa:</strong> {currentUser.name}<br />{currentUser.email}
           </div>
           <button
             onClick={onLogout}
@@ -237,7 +237,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FAF1EA' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--at-accent-tint-2)' }}>
       <style>{PORTAL_CSS}</style>
 
       {/* Header */}
@@ -273,7 +273,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 }}
               >
                 {unidades.map(u => (
-                  <option key={u.id} value={u.id} style={{ color: '#15291F', background: 'white' }}>
+                  <option key={u.id} value={u.id} style={{ color: 'var(--at-ink)', background: 'var(--at-surface)' }}>
                     🏠 {u.nombre}
                   </option>
                 ))}
@@ -308,7 +308,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               style={{
                 padding: '10px 16px', whiteSpace: 'nowrap',
                 background: tab === t.id ? 'white' : 'transparent',
-                color: tab === t.id ? '#9C5733' : 'rgba(255,255,255,0.85)',
+                color: tab === t.id ? 'var(--at-accent-hover)' : 'rgba(255,255,255,0.85)',
                 border: 'none', borderRadius: '10px 10px 0 0',
                 fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
               }}
@@ -348,7 +348,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         {/* Tab content */}
         {loading ? (
           <div style={{
-            background: 'white', borderRadius: '20px', padding: '48px',
+            background: 'var(--at-surface)', borderRadius: '20px', padding: '48px',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px',
             boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
           }}>
@@ -357,10 +357,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
               border: '3px solid var(--at-line)', borderTop: '3px solid var(--at-accent-hover)',
               borderRadius: '50%', animation: 'spin 0.8s linear infinite',
             }} />
-            <span style={{ fontSize: '14px', color: '#7E9389', fontWeight: 500 }}>Cargando información…</span>
+            <span style={{ fontSize: '14px', color: 'var(--at-ink-3)', fontWeight: 500 }}>Cargando información…</span>
           </div>
         ) : !unidad ? null : (
-          <div style={{ background: 'white', borderRadius: '20px', padding: '24px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
+          <div style={{ background: 'var(--at-surface)', borderRadius: '20px', padding: '24px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
             {tab === 'mi_unidad' && (
               <PortalMiUnidadTab
                 unidad={unidad}
@@ -449,9 +449,9 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
 
 function EmptyState({ icon, title, text }: { icon: string; title: string; text: string }) {
   return (
-    <div style={{ textAlign: 'center', padding: '48px 24px', color: '#7E9389' }}>
+    <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--at-ink-3)' }}>
       <div style={{ fontSize: '48px', marginBottom: '14px' }}>{icon}</div>
-      <div style={{ fontWeight: 700, fontSize: '15px', color: '#7E9389', marginBottom: '6px' }}>{title}</div>
+      <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink-3)', marginBottom: '6px' }}>{title}</div>
       <div style={{ fontSize: '13px' }}>{text}</div>
     </div>
   )

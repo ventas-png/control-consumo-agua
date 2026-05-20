@@ -258,7 +258,7 @@ export default function TarifasTab({
               <label htmlFor="tarifa-activa">Activa</label>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
-              <button onClick={() => setEditingId(null)} style={{ padding: '0.5rem 1rem', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', background: 'white' }}>Cancelar</button>
+              <button onClick={() => setEditingId(null)} style={{ padding: '0.5rem 1rem', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', background: 'var(--at-surface)' }}>Cancelar</button>
               <button onClick={handleSaveEdit} style={{ padding: '0.5rem 1rem', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Guardar</button>
             </div>
           </div>

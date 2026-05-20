@@ -17,12 +17,12 @@ interface Props {
 }
 
 const ETAPAS: { value: EtapaCobranza; label: string; color: string; bg: string }[] = [
-  { value: 'aviso_amistoso',       label: 'Aviso amistoso',       color: '#2F5D4F', bg: '#D9E2DC' },
+  { value: 'aviso_amistoso',       label: 'Aviso amistoso',       color: 'var(--at-primary-2)', bg: 'var(--at-primary-soft)' },
   { value: 'recordatorio',         label: 'Recordatorio',         color: '#f59e0b', bg: '#fef3c7' },
   { value: 'carta_formal',         label: 'Carta formal',         color: '#f97316', bg: '#fff7ed' },
   { value: 'suspension_servicios', label: 'Susp. servicios',      color: '#ef4444', bg: '#fef2f2' },
   { value: 'cobro_juridico',       label: 'Cobro jurídico',       color: '#dc2626', bg: '#fef2f2' },
-  { value: 'acuerdo_pago',         label: 'Acuerdo de pago',      color: '#B96A3F', bg: '#FAF1EA' },
+  { value: 'acuerdo_pago',         label: 'Acuerdo de pago',      color: 'var(--at-accent)', bg: 'var(--at-accent-tint-2)' },
   { value: 'resuelto',             label: 'Resuelto',             color: '#10b981', bg: '#d1fae5' },
 ]
 
@@ -166,7 +166,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
@@ -176,11 +176,11 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 4 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Cobranza ({lista.length})</span>
             <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={exportarPDF} disabled={cobranzas.length === 0} style={{ padding: '4px 8px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid var(--at-primary-soft-2)', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>📄</button>
+              <button onClick={exportarPDF} disabled={cobranzas.length === 0} style={{ padding: '4px 8px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>📄</button>
               <button onClick={exportarXlsx} disabled={cobranzas.length === 0} style={{ padding: '4px 8px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>📊</button>
               {canCreate && (
                 <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                  style={{ padding: '5px 10px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                  style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                   + Nueva
                 </button>
               )}
@@ -205,7 +205,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
           </select>
         </div>
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
+        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
 
         {lista.map(c => {
           const unidad = unidades.find(u => u.id === c.unidad_id)
@@ -213,16 +213,16 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
           const pendiente = c.monto_adeudado - c.monto_pagado
           return (
             <div key={c.id} onClick={() => { setSelected(c); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === c.id ? '#F4EBE3' : '#fff' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === c.id ? 'var(--at-accent-tint)' : '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{c.responsable}</span>
                 <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: etapa?.bg, color: etapa?.color }}>{etapa?.label}</span>
               </div>
-              <div style={{ fontSize: 12, color: '#7E9389', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
                 {unidad && <span>{unidad.nombre} · </span>}
                 Pendiente: <span style={{ color: '#ef4444', fontWeight: 600 }}>{moneda} {pendiente.toLocaleString()}</span>
               </div>
-              <div style={{ fontSize: 11, color: '#7E9389', marginTop: 1 }}>{c.fecha_inicio} · {c.contactos.length} contactos</div>
+              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 1 }}>{c.fecha_inicio} · {c.contactos.length} contactos</div>
             </div>
           )
         })}
@@ -274,7 +274,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
                 {saving ? 'Guardando…' : '✅ Crear'}
               </button>
               <button onClick={() => setMostrarForm(false)}
-                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -292,7 +292,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 18 }}>{selected.responsable}</div>
-                  {unidad && <div style={{ fontSize: 13, color: '#7E9389', marginTop: 2 }}>Unidad: {unidad.nombre}</div>}
+                  {unidad && <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 2 }}>Unidad: {unidad.nombre}</div>}
                   <div style={{ marginTop: 6 }}>
                     <span style={{ padding: '4px 12px', borderRadius: 10, background: etapa?.bg, color: etapa?.color, fontSize: 13, fontWeight: 600 }}>{etapa?.label}</span>
                   </div>
@@ -306,7 +306,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
                       </button>
                     )}
                     <button onClick={() => actualizarMontos(selected)}
-                      style={{ padding: '7px 12px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '7px 12px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       💰 Montos
                     </button>
                     <button onClick={() => marcarResuelto(selected)}
@@ -324,23 +324,23 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
                   { label: 'Pagado', value: `${moneda} ${selected.monto_pagado.toLocaleString()}`, color: '#10b981' },
                   { label: 'Pendiente', value: `${moneda} ${pendiente.toLocaleString()}`, color: pendiente > 0 ? '#f59e0b' : '#10b981' },
                 ].map(k => (
-                  <div key={k.label} style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                  <div key={k.label} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: k.color }}>{k.value}</div>
-                    <div style={{ fontSize: 11, color: '#7E9389' }}>{k.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{k.label}</div>
                   </div>
                 ))}
               </div>
 
               {/* Progreso etapa */}
-              <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
-                <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 8 }}>Progresión de etapas</div>
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
+                <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 8 }}>Progresión de etapas</div>
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {ETAPAS.map((e, i) => {
                     const etapasIdx = ETAPAS.findIndex(et => et.value === selected.etapa)
                     const activa = selected.etapa === e.value
                     const pasada = i < etapasIdx
                     return (
-                      <span key={e.value} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 8, background: activa ? e.bg : pasada ? '#EAE6D8' : '#fff', color: activa ? e.color : pasada ? '#7E9389' : '#C7C2B0', border: `1px solid ${activa ? e.color : '#E1DDD0'}`, fontWeight: activa ? 700 : 400 }}>
+                      <span key={e.value} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 8, background: activa ? e.bg : pasada ? 'var(--at-chip)' : '#fff', color: activa ? e.color : pasada ? 'var(--at-ink-3)' : 'var(--at-line-strong)', border: `1px solid ${activa ? e.color : 'var(--at-line)'}`, fontWeight: activa ? 700 : 400 }}>
                         {e.label}
                       </span>
                     )
@@ -350,21 +350,21 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
 
               {/* Contactos */}
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Historial de contactos ({selected.contactos.length})</div>
-              {selected.contactos.length === 0 && <div style={{ color: '#7E9389', fontSize: 13, marginBottom: 12 }}>Sin contactos registrados</div>}
+              {selected.contactos.length === 0 && <div style={{ color: 'var(--at-ink-3)', fontSize: 13, marginBottom: 12 }}>Sin contactos registrados</div>}
               {selected.contactos.map((c, i) => (
-                <div key={i} style={{ background: '#FAF7EF', borderRadius: 8, padding: '8px 12px', marginBottom: 6, display: 'flex', gap: 12 }}>
+                <div key={i} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 12px', marginBottom: 6, display: 'flex', gap: 12 }}>
                   <div style={{ flexShrink: 0 }}>
                     <div style={{ fontSize: 12 }}>{TIPOS_CONTACTO.find(t => t.value === c.tipo)?.label}</div>
-                    <div style={{ fontSize: 11, color: '#7E9389' }}>{c.fecha}</div>
+                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{c.fecha}</div>
                   </div>
                   <div>
                     <div style={{ fontSize: 13 }}>{c.resultado}</div>
-                    {c.siguiente_accion && <div style={{ fontSize: 11, color: '#B96A3F', marginTop: 2 }}>→ {c.siguiente_accion}</div>}
+                    {c.siguiente_accion && <div style={{ fontSize: 11, color: 'var(--at-accent)', marginTop: 2 }}>→ {c.siguiente_accion}</div>}
                   </div>
                 </div>
               ))}
               {canEdit && selected.estado === 'activo' && (
-                <div style={{ background: '#FAF7EF', borderRadius: 8, padding: 12, marginTop: 8 }}>
+                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: 12, marginTop: 8 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Registrar contacto</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 8, marginBottom: 8 }}>
                     <select style={inp} value={contactoForm.tipo} onChange={e => setContactoForm(p => ({ ...p, tipo: e.target.value as TipoContactoCobranza }))}>
@@ -375,7 +375,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 8 }}>
                     <input style={inp} placeholder="Siguiente acción (opcional)" value={contactoForm.siguiente_accion} onChange={e => setContactoForm(p => ({ ...p, siguiente_accion: e.target.value }))} />
                     <button onClick={() => registrarContacto(selected)}
-                      style={{ padding: '7px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '7px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                       + Agregar
                     </button>
                   </div>
@@ -393,7 +393,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
         })()}
 
         {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#7E9389', fontSize: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
             Selecciona un expediente o crea uno nuevo
           </div>
         )}

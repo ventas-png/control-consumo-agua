@@ -120,7 +120,7 @@ export default function FacturaEnergiaModal({
     >
       <div
         style={{
-          backgroundColor: 'white',
+          backgroundColor: 'var(--at-surface)',
           borderRadius: '8px',
           padding: '2rem',
           maxWidth: '600px',

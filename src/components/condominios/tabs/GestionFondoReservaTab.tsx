@@ -16,7 +16,7 @@ type TipoMov = 'aportacion' | 'retiro' | 'rendimiento' | 'ajuste'
 
 const TIPO_CFG: Record<TipoMov, { label: string; color: string; bg: string; signo: 1 | -1 }> = {
   aportacion:  { label: 'Aportación',  color: '#16a34a', bg: '#dcfce7', signo:  1 },
-  rendimiento: { label: 'Rendimiento', color: '#1B3B36', bg: '#EEF2EC', signo:  1 },
+  rendimiento: { label: 'Rendimiento', color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', signo:  1 },
   retiro:      { label: 'Retiro',      color: '#ef4444', bg: '#fef2f2', signo: -1 },
   ajuste:      { label: 'Ajuste',      color: '#d97706', bg: '#fef3c7', signo:  1 },
 }
@@ -66,7 +66,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
 
   async function guardar() {
     if (!form.concepto.trim() || !form.monto || parseFloat(form.monto) <= 0) {
-      return Swal.fire({ icon: 'warning', title: 'Datos requeridos', text: 'Completa concepto y monto.', confirmButtonColor: '#1B3B36' })
+      return Swal.fire({ icon: 'warning', title: 'Datos requeridos', text: 'Completa concepto y monto.', confirmButtonColor: 'var(--at-primary)' })
     }
     setSaving(true)
     const { error } = await supabase.from('fondo_reserva').insert({
@@ -77,7 +77,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
       notas: form.notas.trim() || null,
     })
     setSaving(false)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: '#1B3B36' })
+    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: 'var(--at-primary)' })
     setForm({ tipo: 'aportacion', concepto: '', monto: '', fecha: new Date().toISOString().slice(0, 10), referencia: '', notas: '' })
     onRefresh()
   }
@@ -86,23 +86,23 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
   const aportacionesMes = movimientos.filter(m => m.fecha.startsWith(mesActual) && m.tipo === 'aportacion').reduce((s, m) => s + m.monto, 0)
   const retirosMes = movimientos.filter(m => m.fecha.startsWith(mesActual) && m.tipo === 'retiro').reduce((s, m) => s + m.monto, 0)
 
-  const INPUT = { width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, background: '#fff', outline: 'none' }
+  const INPUT = { width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, background: 'var(--at-surface)', outline: 'none' }
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F', marginBottom: 2 }}>Fondo de Reserva</div>
-      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 14 }}>{movimientos.length} movimientos registrados</div>
+      <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)', marginBottom: 2 }}>Fondo de Reserva</div>
+      <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 14 }}>{movimientos.length} movimientos registrados</div>
 
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         {[
           { label: 'Saldo actual', val: `${moneda} ${saldoActual.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: saldoActual >= 0 ? '#16a34a' : '#ef4444', bg: saldoActual >= 0 ? '#dcfce7' : '#fef2f2' },
           { label: 'Aportaciones este mes', val: `${moneda} ${aportacionesMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#16a34a', bg: '#dcfce7' },
-          { label: 'Retiros este mes', val: `${moneda} ${retirosMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: retirosMes > 0 ? '#ef4444' : '#7E9389', bg: retirosMes > 0 ? '#fef2f2' : '#FAF7EF' },
-          { label: 'Total movimientos', val: String(movimientos.length), color: '#3E5A4C', bg: '#FAF7EF' },
+          { label: 'Retiros este mes', val: `${moneda} ${retirosMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: retirosMes > 0 ? '#ef4444' : 'var(--at-ink-3)', bg: retirosMes > 0 ? '#fef2f2' : 'var(--at-surface-2)' },
+          { label: 'Total movimientos', val: String(movimientos.length), color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 130px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
-            <div style={{ fontSize: 10, color: '#7E9389' }}>{k.label}</div>
+            <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 15, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>
         ))}
@@ -111,11 +111,11 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 14 }}>
         {/* Formulario */}
         {canCreate && (
-          <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>Nuevo movimiento</div>
+          <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 12 }}>Nuevo movimiento</div>
 
             <div style={{ marginBottom: 10 }}>
-              <label style={{ fontSize: 11, color: '#3E5A4C', fontWeight: 600, display: 'block', marginBottom: 4 }}>Tipo</label>
+              <label style={{ fontSize: 11, color: 'var(--at-ink-2)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Tipo</label>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {(Object.entries(TIPO_CFG) as [TipoMov, typeof TIPO_CFG[TipoMov]][]).map(([t, cfg]) => (
                   <button key={t} onClick={() => setForm(f => ({ ...f, tipo: t }))}
@@ -134,7 +134,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
               { label: 'Referencia', key: 'referencia', type: 'text', placeholder: 'No. cheque / transferencia' },
             ].map(f => (
               <div key={f.key} style={{ marginBottom: 10 }}>
-                <label style={{ fontSize: 11, color: '#3E5A4C', fontWeight: 600, display: 'block', marginBottom: 4 }}>{f.label}</label>
+                <label style={{ fontSize: 11, color: 'var(--at-ink-2)', fontWeight: 600, display: 'block', marginBottom: 4 }}>{f.label}</label>
                 <input type={f.type} value={(form as Record<string, string>)[f.key]} placeholder={f.placeholder}
                   onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                   style={INPUT} />
@@ -142,7 +142,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
             ))}
 
             <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 11, color: '#3E5A4C', fontWeight: 600, display: 'block', marginBottom: 4 }}>Notas</label>
+              <label style={{ fontSize: 11, color: 'var(--at-ink-2)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Notas</label>
               <textarea value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
                 rows={2} style={{ ...INPUT, resize: 'vertical' }} placeholder="Observaciones opcionales" />
             </div>
@@ -158,8 +158,8 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
         {/* Panel derecho */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Tendencia */}
-          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>Movimientos últimos 6 meses</div>
+          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 10 }}>Movimientos últimos 6 meses</div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80 }}>
               {tendencia.map(t => (
                 <div key={t.mes} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
@@ -167,7 +167,7 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
                     <div style={{ flex: 1, background: '#16a34a', opacity: 0.8, borderRadius: '2px 2px 0 0', height: `${(t.ingresos / maxTend) * 60}px`, minHeight: t.ingresos > 0 ? 2 : 0 }} />
                     <div style={{ flex: 1, background: '#ef4444', opacity: 0.7, borderRadius: '2px 2px 0 0', height: `${(t.egresos / maxTend) * 60}px`, minHeight: t.egresos > 0 ? 2 : 0 }} />
                   </div>
-                  <div style={{ fontSize: 9, color: '#7E9389' }}>{t.label}</div>
+                  <div style={{ fontSize: 9, color: 'var(--at-ink-3)' }}>{t.label}</div>
                 </div>
               ))}
             </div>
@@ -178,12 +178,12 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
           </div>
 
           {/* Historial */}
-          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ padding: '10px 14px', background: '#FAF7EF', fontWeight: 700, fontSize: 12, color: '#3E5A4C' }}>
+          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '10px 14px', background: 'var(--at-surface-2)', fontWeight: 700, fontSize: 12, color: 'var(--at-ink-2)' }}>
               Historial de movimientos
             </div>
             {historial.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 0', color: '#7E9389', fontSize: 12 }}>Sin movimientos aún.</div>
+              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--at-ink-3)', fontSize: 12 }}>Sin movimientos aún.</div>
             ) : (
               <div style={{ maxHeight: 340, overflowY: 'auto' }}>
                 {historial.map((m, i) => {
@@ -192,8 +192,8 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
                     <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       padding: '10px 14px', borderBottom: i < historial.length - 1 ? '1px solid var(--at-chip)' : undefined }}>
                       <div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#15291F' }}>{m.concepto}</div>
-                        <div style={{ fontSize: 10, color: '#7E9389', marginTop: 2 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink)' }}>{m.concepto}</div>
+                        <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 2 }}>
                           {m.fecha} · <span style={{ color: cfg.color, fontWeight: 600 }}>{cfg.label}</span>
                           {m.referencia && ` · ${m.referencia}`}
                         </div>

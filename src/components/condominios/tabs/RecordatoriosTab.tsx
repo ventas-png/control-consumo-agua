@@ -15,7 +15,7 @@ interface Props {
 }
 
 const PRIORIDAD_CFG: Record<PrioridadRecordatorio, { label: string; bg: string; color: string; icon: string }> = {
-  normal:  { label: 'Normal',  bg: '#EAE6D8', color: '#3E5A4C', icon: '📌' },
+  normal:  { label: 'Normal',  bg: 'var(--at-chip)', color: 'var(--at-ink-2)', icon: '📌' },
   alta:    { label: 'Alta',    bg: '#fef3c7', color: '#92400e', icon: '⚠️' },
   critica: { label: 'Crítica', bg: '#fee2e2', color: '#ef4444', icon: '🚨' },
 }
@@ -93,7 +93,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
   }
 
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
@@ -111,9 +111,9 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
           <div style={{ fontSize: 22, fontWeight: 700, color: '#16a34a' }}>{recordatorios.filter(r => r.completado).length}</div>
           <div style={{ fontSize: 11, color: '#16a34a' }}>Completados</div>
         </div>
-        <div style={{ background: '#FAF7EF', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#3E5A4C' }}>{recordatorios.length}</div>
-          <div style={{ fontSize: 11, color: '#7E9389' }}>Total</div>
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--at-ink-2)' }}>{recordatorios.length}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Total</div>
         </div>
       </div>
 
@@ -122,7 +122,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {(['pendientes', 'completados', 'todos'] as const).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
-              style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#9C5733' : '#E1DDD0', background: filtroEstado === e ? '#F4EBE3' : 'white', color: filtroEstado === e ? '#9C5733' : '#7E9389' }}>
+              style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-accent-hover)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-accent-tint)' : 'white', color: filtroEstado === e ? 'var(--at-accent-hover)' : 'var(--at-ink-3)' }}>
               {e.charAt(0).toUpperCase() + e.slice(1)}
             </button>
           ))}
@@ -136,7 +136,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#9C5733', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Recordatorio'}
           </button>
         )}
@@ -144,7 +144,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nuevo recordatorio</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -174,7 +174,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#9C5733', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear recordatorio'}
           </button>
         </div>
@@ -182,7 +182,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
 
       {/* Lista */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>Sin recordatorios para los filtros seleccionados</div>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>Sin recordatorios para los filtros seleccionados</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {lista.sort((a, b) => a.fecha_limite.localeCompare(b.fecha_limite)).map(r => {
@@ -191,17 +191,17 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
             const urgente = !r.completado && dias >= 0 && dias <= 3
             const pcfg = PRIORIDAD_CFG[r.prioridad]
             return (
-              <div key={r.id} style={{ background: r.completado ? '#FAF7EF' : vencido ? '#fef2f2' : urgente ? '#fffbeb' : '#fff', border: `1px solid ${vencido ? '#fecaca' : urgente ? '#fde68a' : '#E1DDD0'}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div key={r.id} style={{ background: r.completado ? 'var(--at-surface-2)' : vencido ? '#fef2f2' : urgente ? '#fffbeb' : '#fff', border: `1px solid ${vencido ? '#fecaca' : urgente ? '#fde68a' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <input type="checkbox" checked={r.completado} onChange={() => marcarCompletado(r)}
                   style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                    <span style={{ fontWeight: 600, fontSize: 13, color: r.completado ? '#7E9389' : '#15291F', textDecoration: r.completado ? 'line-through' : 'none' }}>{r.titulo}</span>
+                    <span style={{ fontWeight: 600, fontSize: 13, color: r.completado ? 'var(--at-ink-3)' : 'var(--at-ink)', textDecoration: r.completado ? 'line-through' : 'none' }}>{r.titulo}</span>
                     <span style={{ padding: '1px 7px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: pcfg.bg, color: pcfg.color }}>{pcfg.icon} {pcfg.label}</span>
-                    {r.tipo_entidad && <span style={{ fontSize: 10, color: '#7E9389' }}>{TIPO_LABELS[r.tipo_entidad]}</span>}
+                    {r.tipo_entidad && <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{TIPO_LABELS[r.tipo_entidad]}</span>}
                   </div>
-                  {r.descripcion && <div style={{ fontSize: 12, color: '#7E9389' }}>{r.descripcion}</div>}
-                  <div style={{ fontSize: 11, marginTop: 3, color: vencido ? '#ef4444' : urgente ? '#d97706' : '#7E9389', fontWeight: vencido || urgente ? 600 : 400 }}>
+                  {r.descripcion && <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>{r.descripcion}</div>}
+                  <div style={{ fontSize: 11, marginTop: 3, color: vencido ? '#ef4444' : urgente ? '#d97706' : 'var(--at-ink-3)', fontWeight: vencido || urgente ? 600 : 400 }}>
                     {r.completado
                       ? `✓ Completado ${r.fecha_completado ? new Date(r.fecha_completado).toLocaleDateString('es') : ''}`
                       : vencido
@@ -213,7 +213,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
                   </div>
                 </div>
                 {canEdit && !r.completado && (
-                  <button onClick={() => eliminar(r.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', fontSize: 16, flexShrink: 0 }}>🗑</button>
+                  <button onClick={() => eliminar(r.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: 16, flexShrink: 0 }}>🗑</button>
                 )}
               </div>
             )

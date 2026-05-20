@@ -29,7 +29,7 @@ export function AccessDenied() {
       <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#991b1b', marginBottom: '8px' }}>
         Acceso Denegado
       </h2>
-      <p style={{ fontSize: '14px', color: '#7E9389', maxWidth: '400px' }}>
+      <p style={{ fontSize: '14px', color: 'var(--at-ink-3)', maxWidth: '400px' }}>
         No tienes permisos para acceder a esta seccion.
         Contacta a tu administrador si necesitas acceso.
       </p>

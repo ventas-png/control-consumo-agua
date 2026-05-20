@@ -12,7 +12,7 @@ interface Props {
   onSaved: () => void
 }
 
-const PALETTE = ['#1B3B36', '#B96A3F', '#10b981', '#f59e0b', '#ef4444', '#577B69', '#ec4899', '#7E9389', '#B96A3F', '#84cc16']
+const PALETTE = ['var(--at-primary)', 'var(--at-accent)', '#10b981', '#f59e0b', '#ef4444', 'var(--at-accent-2)', '#ec4899', 'var(--at-ink-3)', 'var(--at-accent)', '#84cc16']
 
 export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, onSaved }: Props) {
   const [name, setName] = useState('')
@@ -159,7 +159,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{
-        background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '780px',
+        background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '780px',
         boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
         display: 'flex', flexDirection: 'column', maxHeight: '92vh',
       }}>
@@ -167,12 +167,12 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
           padding: '20px 24px 14px', borderBottom: '1px solid var(--at-line)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <div style={{ fontWeight: 700, fontSize: '16px', color: '#15291F' }}>
+          <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--at-ink)' }}>
             {roleId ? 'Editar rol personalizado' : 'Crear rol personalizado'}
           </div>
           <button onClick={onClose} style={{
             background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px',
-            color: '#7E9389', padding: '4px 8px', borderRadius: '6px', lineHeight: 1,
+            color: 'var(--at-ink-3)', padding: '4px 8px', borderRadius: '6px', lineHeight: 1,
           }}>×</button>
         </div>
 
@@ -212,25 +212,25 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
             value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar permiso…"
             style={{ ...inputStyle, marginBottom: 0 }}
           />
-          <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '6px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '6px' }}>
             {selectedKeys.size} permisos seleccionados · {permissions.length} disponibles
           </div>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
           {loading ? (
-            <div style={{ textAlign: 'center', color: '#7E9389', marginTop: '40px' }}>Cargando…</div>
+            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', marginTop: '40px' }}>Cargando…</div>
           ) : (
             grouped.map(([category, perms]) => {
               const allSelected = perms.every(p => selectedKeys.has(p.key))
               return (
                 <div key={category} style={{ marginBottom: '14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                       {category}
                     </div>
                     <button onClick={() => toggleCategory(perms)} style={{
-                      fontSize: '11px', color: '#2F5D4F', background: 'transparent',
+                      fontSize: '11px', color: 'var(--at-primary-2)', background: 'transparent',
                       border: '1px solid var(--at-accent-2)', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer',
                     }}>{allSelected ? 'Deseleccionar' : 'Seleccionar todo'}</button>
                   </div>
@@ -238,7 +238,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
                     {perms.map(p => (
                       <label key={p.key} style={{
                         display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
-                        fontSize: '12px', color: '#3E5A4C', padding: '3px 0',
+                        fontSize: '12px', color: 'var(--at-ink-2)', padding: '3px 0',
                       }}>
                         <input
                           type="checkbox" checked={selectedKeys.has(p.key)}
@@ -259,11 +259,11 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
           padding: '14px 24px', borderTop: '1px solid var(--at-line)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <div style={{ fontSize: '12px', color: error ? '#ef4444' : '#7E9389' }}>{error ?? ''}</div>
+          <div style={{ fontSize: '12px', color: error ? '#ef4444' : 'var(--at-ink-3)' }}>{error ?? ''}</div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={onClose} style={btnSecondary}>Cancelar</button>
             <button onClick={() => void handleSave()} disabled={saving || loading} style={{
-              ...btnPrimary, background: saving ? '#577B69' : '#2F5D4F',
+              ...btnPrimary, background: saving ? 'var(--at-accent-2)' : 'var(--at-primary-2)',
               cursor: saving ? 'default' : 'pointer',
             }}>{saving ? 'Guardando…' : 'Guardar rol'}</button>
           </div>
@@ -275,7 +275,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
       {children}
     </div>
   )
@@ -283,13 +283,13 @@ function Label({ children }: { children: React.ReactNode }) {
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '8px 10px', borderRadius: '6px',
-  border: '1px solid var(--at-line-strong)', fontSize: '13px', color: '#15291F',
+  border: '1px solid var(--at-line-strong)', fontSize: '13px', color: 'var(--at-ink)',
   outline: 'none', marginBottom: 0, boxSizing: 'border-box',
 }
 
 const btnSecondary: React.CSSProperties = {
   padding: '8px 18px', borderRadius: '8px', border: '1px solid var(--at-line)',
-  background: '#fff', color: '#3E5A4C', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+  background: 'var(--at-surface)', color: 'var(--at-ink-2)', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
 }
 
 const btnPrimary: React.CSSProperties = {

@@ -15,10 +15,10 @@ interface Props {
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   pendiente:   { bg: '#fef3c7', color: '#92400e',  label: 'Pendiente' },
-  en_proceso:  { bg: '#D9E2DC', color: '#102622',  label: 'En proceso' },
+  en_proceso:  { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)',  label: 'En proceso' },
   cumplido:    { bg: '#dcfce7', color: '#16a34a',  label: 'Cumplido' },
   vencido:     { bg: '#fee2e2', color: '#ef4444',  label: 'Vencido' },
-  cancelado:   { bg: '#EAE6D8', color: '#7E9389',  label: 'Cancelado' },
+  cancelado:   { bg: 'var(--at-chip)', color: 'var(--at-ink-3)',  label: 'Cancelado' },
 }
 
 const BLANK = { acta_id: '', titulo: '', descripcion: '', responsable: '', fecha_limite: '', estado: 'pendiente', notas_seguimiento: '' }
@@ -87,18 +87,18 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
   const total      = enriched.length
   const tasaCumplimiento = total > 0 ? Math.round(cumplidos / total * 100) : 0
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Seguimiento de Acuerdos</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>Control de compromisos derivados de actas y reuniones</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Seguimiento de Acuerdos</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>Control de compromisos derivados de actas y reuniones</p>
         </div>
         {canCreate && !showForm && (
           <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setShowForm(true) }}
-            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo Acuerdo
           </button>
         )}
@@ -108,49 +108,49 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px', marginBottom: '16px' }}>
         {[
           { label: 'Pendientes',  value: String(pendientes), color: '#f59e0b' },
-          { label: 'En proceso',  value: String(enProceso),  color: '#1B3B36' },
+          { label: 'En proceso',  value: String(enProceso),  color: 'var(--at-primary)' },
           { label: 'Vencidos',    value: String(vencidos),   color: '#ef4444' },
           { label: 'Cumplimiento', value: `${tasaCumplimiento}%`, color: tasaCumplimiento >= 70 ? '#10b981' : '#f59e0b' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389' }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar acuerdo' : 'Nuevo Acuerdo'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Título *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Título *</label>
               <input style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Ej: Contratar empresa de mantenimiento eléctrico" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Acta de origen</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Acta de origen</label>
               <select style={inputStyle} value={form.acta_id} onChange={e => setF('acta_id', e.target.value)}>
                 <option value="">— Ninguna —</option>
                 {actas.map(a => <option key={a.id} value={a.id}>{a.titulo} ({a.fecha})</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Responsable</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Responsable</label>
               <input style={inputStyle} value={form.responsable} onChange={e => setF('responsable', e.target.value)} placeholder="Persona o área encargada" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha límite</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha límite</label>
               <input style={inputStyle} type="date" value={form.fecha_limite} onChange={e => setF('fecha_limite', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Estado</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Estado</label>
               <select style={inputStyle} value={form.estado} onChange={e => setF('estado', e.target.value)}>
                 {Object.entries(ESTADO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Descripción / Notas de seguimiento</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Descripción / Notas de seguimiento</label>
               <textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical', fontFamily: 'inherit' }}
                 value={form.notas_seguimiento} onChange={e => setF('notas_seguimiento', e.target.value)}
                 placeholder="Avances, observaciones, próximos pasos…" />
@@ -158,11 +158,11 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
               Cancelar
             </button>
           </div>
@@ -174,9 +174,9 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
         {(['todos', 'pendiente', 'en_proceso', 'cumplido', 'vencido', 'cancelado'] as const).map(f => (
           <button key={f} onClick={() => setFiltroEstado(f)}
             style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '11px', cursor: 'pointer', fontWeight: filtroEstado === f ? 700 : 500,
-              borderColor: filtroEstado === f ? '#1B3B36' : '#E1DDD0',
-              background: filtroEstado === f ? '#D9E2DC' : 'white',
-              color: filtroEstado === f ? '#102622' : '#7E9389' }}>
+              borderColor: filtroEstado === f ? 'var(--at-primary)' : 'var(--at-line)',
+              background: filtroEstado === f ? 'var(--at-primary-soft)' : 'white',
+              color: filtroEstado === f ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>
             {f === 'todos' ? 'Todos' : ESTADO_STYLE[f]?.label ?? f}
           </button>
         ))}
@@ -184,7 +184,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay acuerdos.</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay acuerdos.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.map(a => {
@@ -193,31 +193,31 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
             const diasRestantes = a.fecha_limite ? Math.ceil((new Date(a.fecha_limite).getTime() - new Date(today).getTime()) / 86400000) : null
 
             return (
-              <div key={a.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px' }}>
+              <div key={a.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '3px' }}>
                       <span style={{ fontWeight: 700, fontSize: '13px' }}>{a.titulo}</span>
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: est?.bg, color: est?.color }}>{est?.label}</span>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#7E9389', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                       {a.responsable && <span>👤 {a.responsable}</span>}
                       {acta && <span>📋 {acta.titulo}</span>}
                       {a.fecha_limite && (
-                        <span style={{ color: diasRestantes !== null && diasRestantes < 0 ? '#ef4444' : diasRestantes !== null && diasRestantes <= 7 ? '#f59e0b' : '#7E9389', fontWeight: diasRestantes !== null && diasRestantes <= 7 ? 700 : 400 }}>
+                        <span style={{ color: diasRestantes !== null && diasRestantes < 0 ? '#ef4444' : diasRestantes !== null && diasRestantes <= 7 ? '#f59e0b' : 'var(--at-ink-3)', fontWeight: diasRestantes !== null && diasRestantes <= 7 ? 700 : 400 }}>
                           📅 {a.fecha_limite}{diasRestantes !== null ? ` (${diasRestantes >= 0 ? `${diasRestantes}d` : 'vencido'})` : ''}
                         </span>
                       )}
                     </div>
                     {a.notas_seguimiento && (
-                      <div style={{ fontSize: '12px', color: '#3E5A4C', marginTop: '4px', fontStyle: 'italic' }}>{a.notas_seguimiento}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginTop: '4px', fontStyle: 'italic' }}>{a.notas_seguimiento}</div>
                     )}
                   </div>
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                       {a.estado === 'pendiente' && (
                         <button onClick={() => cambiarEstado(a.id, 'en_proceso')}
-                          style={{ padding: '3px 8px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                          style={{ padding: '3px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                           Iniciar
                         </button>
                       )}
@@ -228,7 +228,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
                         </button>
                       )}
                       <button onClick={() => startEdit(a as SeguimientoAcuerdo)}
-                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                        style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(a.id)}
                         style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                     </div>

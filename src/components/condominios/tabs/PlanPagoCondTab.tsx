@@ -16,10 +16,10 @@ interface Props {
 }
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  activo:      { bg: '#D9E2DC', color: '#102622', label: 'Activo' },
+  activo:      { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Activo' },
   completado:  { bg: '#dcfce7', color: '#16a34a', label: 'Completado' },
   incumplido:  { bg: '#fee2e2', color: '#ef4444', label: 'Incumplido' },
-  cancelado:   { bg: '#EAE6D8', color: '#7E9389', label: 'Cancelado' },
+  cancelado:   { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Cancelado' },
 }
 
 const BLANK = { unidad_id: '', concepto: '', monto_total: '', num_cuotas: '3', fecha_inicio: new Date().toISOString().slice(0, 10), notas: '', aprobado_por: '' }
@@ -117,18 +117,18 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
     ? (parseFloat(form.monto_total) / parseInt(form.num_cuotas)).toFixed(2)
     : ''
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Planes de Pago</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>Acuerdos de pago para unidades con saldo en mora</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Planes de Pago</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>Acuerdos de pago para unidades con saldo en mora</p>
         </div>
         {canCreate && !showForm && (
           <button onClick={() => setShowForm(true)}
-            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo Plan
           </button>
         )}
@@ -137,64 +137,64 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px', marginBottom: '16px' }}>
         {Object.entries(ESTADO_STYLE).map(([estado, s]) => (
-          <div key={estado} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+          <div key={estado} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, color: s.color }}>{planes.filter(p => p.estado === estado).length}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389' }}>{s.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nuevo Plan de Pago</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Unidad *</label>
               <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">— Seleccionar —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Concepto *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Concepto *</label>
               <input style={inputStyle} value={form.concepto} onChange={e => setF('concepto', e.target.value)} placeholder="Ej: Deuda cuotas mantenimiento Q1 2026" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Monto total ({moneda}) *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Monto total ({moneda}) *</label>
               <input style={inputStyle} type="number" step="0.01" value={form.monto_total} onChange={e => setF('monto_total', e.target.value)} placeholder="0.00" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Número de cuotas *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Número de cuotas *</label>
               <input style={inputStyle} type="number" min="1" max="60" value={form.num_cuotas} onChange={e => setF('num_cuotas', e.target.value)} />
             </div>
             {montoCuotaPreview && (
               <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ background: '#D9E2DC', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#102622', fontWeight: 700 }}>
+                <div style={{ background: 'var(--at-primary-soft)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: 'var(--at-primary-hover)', fontWeight: 700 }}>
                   ≈ {moneda} {montoCuotaPreview} / cuota
                 </div>
               </div>
             )}
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Primera cuota vence</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Primera cuota vence</label>
               <input style={inputStyle} type="date" value={form.fecha_inicio} onChange={e => setF('fecha_inicio', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Aprobado por</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Aprobado por</label>
               <input style={inputStyle} value={form.aprobado_por} onChange={e => setF('aprobado_por', e.target.value)} placeholder="Nombre del aprobador" />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Notas</label>
               <input style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Condiciones, observaciones…" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Creando…' : 'Crear plan'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
               Cancelar
             </button>
           </div>
@@ -206,9 +206,9 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
         {(['todos', 'activo', 'completado', 'incumplido', 'cancelado'] as const).map(f => (
           <button key={f} onClick={() => setFiltroEstado(f)}
             style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '11px', cursor: 'pointer',
-              borderColor: filtroEstado === f ? '#1B3B36' : '#E1DDD0',
-              background: filtroEstado === f ? '#D9E2DC' : 'white',
-              color: filtroEstado === f ? '#102622' : '#7E9389',
+              borderColor: filtroEstado === f ? 'var(--at-primary)' : 'var(--at-line)',
+              background: filtroEstado === f ? 'var(--at-primary-soft)' : 'white',
+              color: filtroEstado === f ? 'var(--at-primary-hover)' : 'var(--at-ink-3)',
               fontWeight: filtroEstado === f ? 700 : 500 }}>
             {f === 'todos' ? 'Todos' : ESTADO_STYLE[f]?.label ?? f}
           </button>
@@ -219,26 +219,26 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
         {/* Plans list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay planes de pago.</div>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay planes de pago.</div>
           ) : filtered.map(p => {
             const unidad = unidades.find(u => u.id === p.unidad_id)
             const es = ESTADO_STYLE[p.estado] ?? ESTADO_STYLE.activo
             return (
               <div key={p.id} onClick={() => setSelected(selected?.id === p.id ? null : p)}
-                style={{ background: 'white', border: `1.5px solid ${selected?.id === p.id ? '#1B3B36' : '#E1DDD0'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
+                style={{ background: 'var(--at-surface)', border: `1.5px solid ${selected?.id === p.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: '13px' }}>{p.concepto}</span>
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#7E9389', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                       {unidad && <span>🏠 {unidad.nombre}</span>}
                       <span>💰 {fmt(Number(p.monto_total), moneda)}</span>
                       <span>📋 {p.num_cuotas} cuotas de {fmt(Number(p.monto_cuota), moneda)}</span>
                       <span>📅 Desde {p.fecha_inicio}</span>
                     </div>
-                    {p.aprobado_por && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>Aprobado por: {p.aprobado_por}</div>}
+                    {p.aprobado_por && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>Aprobado por: {p.aprobado_por}</div>}
                   </div>
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
@@ -260,22 +260,22 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
 
         {/* Cuotas panel */}
         {selected && (
-          <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
             <h3 style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700 }}>
               Cuotas — {selected.concepto}
             </h3>
             {loadingCuotas ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#7E9389', fontSize: '12px' }}>Cargando…</div>
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--at-ink-3)', fontSize: '12px' }}>Cargando…</div>
             ) : (
               <>
                 {/* Progress */}
                 {cuotas.length > 0 && (
                   <div style={{ marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#7E9389', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>
                       <span>{cuotas.filter(c => c.pagado).length}/{cuotas.length} pagadas</span>
                       <span>{Math.round(cuotas.filter(c => c.pagado).length / cuotas.length * 100)}%</span>
                     </div>
-                    <div style={{ height: '6px', background: '#E1DDD0', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '6px', background: 'var(--at-line)', borderRadius: '3px', overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${cuotas.filter(c => c.pagado).length / cuotas.length * 100}%`, background: '#10b981', borderRadius: '3px', transition: 'width 0.3s' }} />
                     </div>
                   </div>
@@ -284,18 +284,18 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
                   {cuotas.map(c => {
                     const vencida = !c.pagado && c.fecha_vencimiento < today
                     return (
-                      <div key={c.id} style={{ background: 'white', borderRadius: '7px', padding: '8px 10px', border: `1px solid ${vencida ? '#fca5a5' : '#E1DDD0'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div key={c.id} style={{ background: 'var(--at-surface)', borderRadius: '7px', padding: '8px 10px', border: `1px solid ${vencida ? '#fca5a5' : 'var(--at-line)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C' }}>Cuota #{c.numero}</span>
-                          <span style={{ fontSize: '12px', color: '#1B3B36', fontWeight: 600, marginLeft: '8px' }}>{fmt(Number(c.monto), moneda)}</span>
-                          <div style={{ fontSize: '10px', color: vencida ? '#ef4444' : '#7E9389' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)' }}>Cuota #{c.numero}</span>
+                          <span style={{ fontSize: '12px', color: 'var(--at-primary)', fontWeight: 600, marginLeft: '8px' }}>{fmt(Number(c.monto), moneda)}</span>
+                          <div style={{ fontSize: '10px', color: vencida ? '#ef4444' : 'var(--at-ink-3)' }}>
                             Vence: {c.fecha_vencimiento}{vencida ? ' ⚠️ Vencida' : ''}
                           </div>
                           {c.fecha_pago && <div style={{ fontSize: '10px', color: '#10b981' }}>Pagado: {c.fecha_pago}</div>}
                         </div>
                         {canEdit && (
                           <button onClick={() => marcarCuotaPagada(c)}
-                            style={{ padding: '4px 9px', background: c.pagado ? '#dcfce7' : '#EAE6D8', color: c.pagado ? '#16a34a' : '#7E9389', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
+                            style={{ padding: '4px 9px', background: c.pagado ? '#dcfce7' : 'var(--at-chip)', color: c.pagado ? '#16a34a' : 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
                             {c.pagado ? '✓ Pagado' : 'Marcar pagado'}
                           </button>
                         )}

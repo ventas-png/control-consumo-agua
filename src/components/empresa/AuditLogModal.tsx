@@ -21,7 +21,7 @@ interface RoleMap { [id: string]: { name: string; color: string } }
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   assign_role:       { label: 'Asignó rol',       color: '#22c55e' },
   remove_role:       { label: 'Quitó rol',        color: '#ef4444' },
-  create_role:       { label: 'Creó rol',         color: '#2F5D4F' },
+  create_role:       { label: 'Creó rol',         color: 'var(--at-primary-2)' },
   update_role:       { label: 'Editó rol',        color: '#f59e0b' },
   delete_role:       { label: 'Eliminó rol',      color: '#ef4444' },
   grant_permission:  { label: 'Agregó permiso',   color: '#22c55e' },
@@ -97,7 +97,7 @@ export function AuditLogModal({ onClose }: Props) {
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{
-        background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '880px',
+        background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '880px',
         boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
         display: 'flex', flexDirection: 'column', maxHeight: '90vh',
       }}>
@@ -107,26 +107,26 @@ export function AuditLogModal({ onClose }: Props) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '16px', color: '#15291F' }}>Auditoría de roles y permisos</div>
-            <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px' }}>
+            <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--at-ink)' }}>Auditoría de roles y permisos</div>
+            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
               Cambios recientes ordenados por fecha (más recientes primero)
             </div>
           </div>
           <button onClick={onClose} style={{
             background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px',
-            color: '#7E9389', padding: '4px 8px', borderRadius: '6px', lineHeight: 1,
+            color: 'var(--at-ink-3)', padding: '4px 8px', borderRadius: '6px', lineHeight: 1,
           }}>×</button>
         </div>
 
         {/* Filters */}
         <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--at-line)', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span style={{ fontSize: '12px', color: '#7E9389', fontWeight: 600 }}>Filtrar acción:</span>
+          <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Filtrar acción:</span>
           <select
             value={filterAction}
             onChange={e => { setFilterAction(e.target.value); setPage(0) }}
             style={{
               padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--at-line-strong)',
-              fontSize: '12px', color: '#15291F', background: '#fff',
+              fontSize: '12px', color: 'var(--at-ink)', background: 'var(--at-surface)',
             }}
           >
             <option value="">Todas</option>
@@ -139,17 +139,17 @@ export function AuditLogModal({ onClose }: Props) {
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 24px' }}>
           {loading ? (
-            <div style={{ textAlign: 'center', color: '#7E9389', marginTop: '40px', fontSize: '13px' }}>Cargando…</div>
+            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', marginTop: '40px', fontSize: '13px' }}>Cargando…</div>
           ) : error ? (
             <div style={{ textAlign: 'center', color: '#ef4444', marginTop: '40px', fontSize: '13px' }}>{error}</div>
           ) : rows.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#7E9389', marginTop: '40px', fontSize: '13px' }}>
+            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', marginTop: '40px', fontSize: '13px' }}>
               {filterAction ? 'Sin eventos para este filtro.' : 'Sin eventos en el log.'}
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <tr style={{ textAlign: 'left', color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   <th style={th}>Fecha</th>
                   <th style={th}>Actor</th>
                   <th style={th}>Acción</th>
@@ -159,7 +159,7 @@ export function AuditLogModal({ onClose }: Props) {
               </thead>
               <tbody>
                 {rows.map(r => {
-                  const a = ACTION_LABELS[r.action] ?? { label: r.action, color: '#7E9389' }
+                  const a = ACTION_LABELS[r.action] ?? { label: r.action, color: 'var(--at-ink-3)' }
                   const actor = r.actor_id ? users[r.actor_id] ?? '—' : 'Sistema'
                   const targetUser = r.target_user_id ? users[r.target_user_id] : null
                   const targetRole = r.target_role_id ? roles[r.target_role_id] : null
@@ -174,14 +174,14 @@ export function AuditLogModal({ onClose }: Props) {
                         }}>{a.label}</span>
                       </td>
                       <td style={td}>
-                        {targetUser && <div style={{ color: '#15291F' }}>👤 {targetUser}</div>}
+                        {targetUser && <div style={{ color: 'var(--at-ink)' }}>👤 {targetUser}</div>}
                         {targetRole && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: targetUser ? '3px' : 0 }}>
                             <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: targetRole.color }} />
-                            <span style={{ color: '#3E5A4C' }}>{targetRole.name}</span>
+                            <span style={{ color: 'var(--at-ink-2)' }}>{targetRole.name}</span>
                           </div>
                         )}
-                        {!targetUser && !targetRole && <span style={{ color: '#C7C2B0' }}>—</span>}
+                        {!targetUser && !targetRole && <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
                       </td>
                       <td style={td}>
                         <DetailsCell details={r.details} />
@@ -199,7 +199,7 @@ export function AuditLogModal({ onClose }: Props) {
           padding: '12px 24px', borderTop: '1px solid var(--at-line)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <div style={{ fontSize: '12px', color: '#7E9389' }}>
+          <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
             Página {page + 1} · {rows.length} eventos
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -238,8 +238,8 @@ function DetailsCell({ details }: { details: Record<string, unknown> | null }) {
     if (details.expires_at)     parts.push(`expira: ${formatDate(String(details.expires_at))}`)
     return parts.length > 0 ? parts.join(' ') : JSON.stringify(details).slice(0, 60)
   }, [details])
-  if (!summary) return <span style={{ color: '#C7C2B0' }}>—</span>
-  return <span style={{ color: '#7E9389', fontFamily: 'monospace', fontSize: '11px' }}>{summary}</span>
+  if (!summary) return <span style={{ color: 'var(--at-line-strong)' }}>—</span>
+  return <span style={{ color: 'var(--at-ink-3)', fontFamily: 'monospace', fontSize: '11px' }}>{summary}</span>
 }
 
 function formatDate(iso: string): string {
@@ -251,8 +251,8 @@ function formatDate(iso: string): string {
 }
 
 const th: React.CSSProperties = { padding: '8px 6px', fontSize: '10px', fontWeight: 700 }
-const td: React.CSSProperties = { padding: '8px 6px', verticalAlign: 'top', color: '#3E5A4C' }
+const td: React.CSSProperties = { padding: '8px 6px', verticalAlign: 'top', color: 'var(--at-ink-2)' }
 const pageBtn: React.CSSProperties = {
   padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--at-line-strong)',
-  background: '#fff', color: '#3E5A4C', fontSize: '12px', fontWeight: 600,
+  background: 'var(--at-surface)', color: 'var(--at-ink-2)', fontSize: '12px', fontWeight: 600,
 }

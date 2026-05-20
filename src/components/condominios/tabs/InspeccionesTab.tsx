@@ -27,7 +27,7 @@ const RESULTADO_CONFIG: Record<ResultadoInspeccion, { label: string; color: stri
   aprobado:                      { label: 'Aprobado',          color: '#10b981', bg: '#d1fae5' },
   aprobado_con_observaciones:    { label: 'Con Observaciones', color: '#f59e0b', bg: '#fef3c7' },
   reprobado:                     { label: 'Reprobado',         color: '#ef4444', bg: '#fee2e2' },
-  pendiente:                     { label: 'Pendiente',         color: '#7E9389', bg: '#EAE6D8' },
+  pendiente:                     { label: 'Pendiente',         color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 
 const blank = (): Partial<InspeccionNormativa> => ({
@@ -97,8 +97,8 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
 
   const tipoInfo = (t: TipoInspeccion) => TIPOS.find(x => x.value === t) ?? TIPOS[TIPOS.length - 1]
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -121,16 +121,16 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Inspecciones Normativas</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Inspecciones Normativas</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Registrar Inspección
           </button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Inspección' : 'Nueva Inspección'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: '12px' }}>
             <div>
@@ -179,8 +179,8 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Registrar'}
             </button>
           </div>
@@ -190,20 +190,20 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoInspeccion | 'todos')}
-          style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
+          style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: 'var(--at-surface-2)' }}>
           <option value="todos">Todos los tipos</option>
           {TIPOS.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
         </select>
         <select value={filtroResultado} onChange={e => setFiltroResultado(e.target.value as ResultadoInspeccion | 'todos')}
-          style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
+          style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: 'var(--at-surface-2)' }}>
           <option value="todos">Todos los resultados</option>
           {Object.entries(RESULTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
-        <span style={{ fontSize: '12px', color: '#7E9389' }}>{filtered.length} registros</span>
+        <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{filtered.length} registros</span>
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏛️</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay inspecciones registradas</p>
         </div>
@@ -215,14 +215,14 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
             const proximaAlerta = ins.fecha_proxima && ins.fecha_proxima >= hoy &&
               new Date(ins.fecha_proxima).getTime() - Date.now() < 30 * 24 * 3600 * 1000
             return (
-              <div key={ins.id} style={{ background: 'white', border: `1.5px solid ${ins.resultado === 'reprobado' ? '#fca5a5' : '#E1DDD0'}`, borderRadius: '10px', padding: '14px 16px' }}>
+              <div key={ins.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${ins.resultado === 'reprobado' ? '#fca5a5' : 'var(--at-line)'}`, borderRadius: '10px', padding: '14px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '24px' }}>{ti.icon}</span>
                     <div>
-                      <div style={{ fontWeight: 700, color: '#15291F' }}>{ti.label}</div>
-                      {ins.entidad_inspectora && <div style={{ fontSize: '12px', color: '#7E9389' }}>{ins.entidad_inspectora}</div>}
-                      <div style={{ fontSize: '12px', color: '#7E9389' }}>
+                      <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{ti.label}</div>
+                      {ins.entidad_inspectora && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{ins.entidad_inspectora}</div>}
+                      <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
                         {ins.fecha}
                         {ins.inspector_nombre && ` · ${ins.inspector_nombre}`}
                       </div>
@@ -233,14 +233,14 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
                       {res.label}
                     </span>
                     {ins.certificado_url && (
-                      <a href={ins.certificado_url} target="_blank" rel="noreferrer" style={{ padding: '4px 8px', background: '#EAE6D8', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: '#3E5A4C' }}>📄</a>
+                      <a href={ins.certificado_url} target="_blank" rel="noreferrer" style={{ padding: '4px 8px', background: 'var(--at-chip)', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: 'var(--at-ink-2)' }}>📄</a>
                     )}
-                    {canEdit && <button onClick={() => startEdit(ins)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+                    {canEdit && <button onClick={() => startEdit(ins)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
                     {canEdit && <button onClick={() => handleDelete(ins.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
                   </div>
                 </div>
                 {ins.hallazgos && (
-                  <div style={{ marginTop: '10px', padding: '8px 12px', background: '#FAF7EF', borderRadius: '8px', fontSize: '12px', color: '#7E9389' }}>
+                  <div style={{ marginTop: '10px', padding: '8px 12px', background: 'var(--at-surface-2)', borderRadius: '8px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
                     <strong>Hallazgos:</strong> {ins.hallazgos}
                   </div>
                 )}
@@ -250,7 +250,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
                   </div>
                 )}
                 {ins.fecha_proxima && (
-                  <div style={{ marginTop: '6px', fontSize: '12px', color: proximaAlerta ? '#92400e' : '#7E9389', fontWeight: proximaAlerta ? 600 : 400 }}>
+                  <div style={{ marginTop: '6px', fontSize: '12px', color: proximaAlerta ? '#92400e' : 'var(--at-ink-3)', fontWeight: proximaAlerta ? 600 : 400 }}>
                     {proximaAlerta ? '⚠️' : '📅'} Próxima inspección: {ins.fecha_proxima}
                   </div>
                 )}

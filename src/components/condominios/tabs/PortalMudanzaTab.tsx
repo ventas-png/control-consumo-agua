@@ -23,10 +23,10 @@ const ESTADO_CFG: Record<EstadoSolicitudMudanza, { label: string; bg: string; co
   pendiente:  { label: 'Pendiente',  bg: '#fef3c7', color: '#d97706', icon: '⏳' },
   aprobada:   { label: 'Aprobada',   bg: '#f0fdf4', color: '#16a34a', icon: '✅' },
   rechazada:  { label: 'Rechazada',  bg: '#fef2f2', color: '#dc2626', icon: '❌' },
-  programada: { label: 'Programada', bg: '#D9E2DC', color: '#1B3B36', icon: '📅' },
+  programada: { label: 'Programada', bg: 'var(--at-primary-soft)', color: 'var(--at-primary)', icon: '📅' },
   en_curso:   { label: 'En Curso',   bg: '#fef3c7', color: '#f59e0b', icon: '🚚' },
   completada: { label: 'Completada', bg: '#d1fae5', color: '#10b981', icon: '🏁' },
-  cancelada:  { label: 'Cancelada',  bg: '#EAE6D8', color: '#7E9389', icon: '🚫' },
+  cancelada:  { label: 'Cancelada',  bg: 'var(--at-chip)', color: 'var(--at-ink-3)', icon: '🚫' },
 }
 
 function blankForm() {
@@ -150,24 +150,24 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
     width: '100%', padding: '9px 12px', fontSize: '13.5px',
     border: '1.5px solid var(--at-line)', borderRadius: '8px', outline: 'none', boxSizing: 'border-box',
   }
-  const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#3E5A4C', marginBottom: '4px', display: 'block' }
+  const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '4px', display: 'block' }
 
   return (
     <div>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h3 style={{ margin: '0 0 4px', fontSize: '17px', fontWeight: 700, color: '#15291F' }}>
+          <h3 style={{ margin: '0 0 4px', fontSize: '17px', fontWeight: 700, color: 'var(--at-ink)' }}>
             🚛 Mudanzas — {unidadNombre}
           </h3>
-          <p style={{ margin: 0, fontSize: '13px', color: '#7E9389' }}>
+          <p style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-3)' }}>
             Solicita autorización para mudanzas o movimiento de artículos en tu unidad.
           </p>
         </div>
         <button
           onClick={() => setShowForm(true)}
           style={{
-            padding: '9px 18px', background: '#9C5733', color: 'white',
+            padding: '9px 18px', background: 'var(--at-accent-hover)', color: 'white',
             border: 'none', borderRadius: '9px', fontWeight: 600,
             fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap',
           }}
@@ -177,10 +177,10 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
       {/* New request form */}
       {showForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px' }}>
-          <div style={{ background: 'white', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
+          <div style={{ background: 'var(--at-surface)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Nueva solicitud de mudanza</h3>
-              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#7E9389' }}>✕</button>
+              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--at-ink-3)' }}>✕</button>
             </div>
 
             {/* Tipo selector */}
@@ -193,13 +193,13 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
                     onClick={() => setForm(p => ({ ...p, tipo_mudanza: key }))}
                     style={{
                       padding: '10px 12px', borderRadius: '10px', cursor: 'pointer', textAlign: 'left',
-                      border: `2px solid ${form.tipo_mudanza === key ? '#9C5733' : '#E1DDD0'}`,
-                      background: form.tipo_mudanza === key ? '#F4EBE3' : 'white',
+                      border: `2px solid ${form.tipo_mudanza === key ? 'var(--at-accent-hover)' : 'var(--at-line)'}`,
+                      background: form.tipo_mudanza === key ? 'var(--at-accent-tint)' : 'white',
                     }}
                   >
                     <div style={{ fontSize: '18px', marginBottom: '2px' }}>{cfg.icon}</div>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: form.tipo_mudanza === key ? '#9C5733' : '#3E5A4C' }}>{cfg.label}</div>
-                    <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px', lineHeight: 1.3 }}>{cfg.desc}</div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: form.tipo_mudanza === key ? 'var(--at-accent-hover)' : 'var(--at-ink-2)' }}>{cfg.label}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px', lineHeight: 1.3 }}>{cfg.desc}</div>
                   </button>
                 ))}
               </div>
@@ -240,8 +240,8 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     style={{
-                      padding: '6px 14px', background: '#F4EBE3', border: '1.5px solid var(--at-accent-soft)',
-                      borderRadius: '7px', color: '#9C5733', fontWeight: 600, fontSize: '12px', cursor: 'pointer',
+                      padding: '6px 14px', background: 'var(--at-accent-tint)', border: '1.5px solid var(--at-accent-soft)',
+                      borderRadius: '7px', color: 'var(--at-accent-hover)', fontWeight: 600, fontSize: '12px', cursor: 'pointer',
                     }}
                   >
                     + Agregar imagen
@@ -280,7 +280,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
                   )
                 })}
                 {form.imagenes.length === 0 && (
-                  <span style={{ fontSize: '12px', color: '#7E9389' }}>Sin imágenes seleccionadas</span>
+                  <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Sin imágenes seleccionadas</span>
                 )}
               </div>
             </div>
@@ -290,19 +290,19 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
               <div style={{ marginBottom: '16px' }}>
                 <label style={labelStyle}>Términos y condiciones de mudanza</label>
                 <div style={{
-                  background: '#EAE6D8', borderRadius: '8px', padding: '12px',
+                  background: 'var(--at-chip)', borderRadius: '8px', padding: '12px',
                   maxHeight: '130px', overflowY: 'auto', fontSize: '12.5px',
-                  color: '#3E5A4C', lineHeight: 1.6, marginBottom: '10px',
+                  color: 'var(--at-ink-2)', lineHeight: 1.6, marginBottom: '10px',
                   border: '1px solid var(--at-line)', whiteSpace: 'pre-wrap',
                 }}>
                   {terminosMudanza}
                 </div>
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#15291F', fontWeight: 500 }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-ink)', fontWeight: 500 }}>
                   <input
                     type="checkbox"
                     checked={form.terminosAceptados}
                     onChange={e => setForm(p => ({ ...p, terminosAceptados: e.target.checked }))}
-                    style={{ marginTop: '2px', accentColor: '#9C5733', width: '15px', height: '15px', flexShrink: 0 }}
+                    style={{ marginTop: '2px', accentColor: 'var(--at-accent-hover)', width: '15px', height: '15px', flexShrink: 0 }}
                   />
                   He leído y acepto los términos de mudanza
                 </label>
@@ -310,12 +310,12 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
             )}
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowForm(false)} style={{ padding: '9px 20px', background: '#EAE6D8', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: '#3E5A4C' }}>Cancelar</button>
+              <button onClick={() => setShowForm(false)} style={{ padding: '9px 20px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: 'var(--at-ink-2)' }}>Cancelar</button>
               <button
                 onClick={enviar}
                 disabled={saving || (!!terminosMudanza && !form.terminosAceptados)}
                 style={{
-                  padding: '9px 22px', background: '#9C5733', color: 'white', border: 'none', borderRadius: '8px',
+                  padding: '9px 22px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: '8px',
                   cursor: (saving || (!!terminosMudanza && !form.terminosAceptados)) ? 'not-allowed' : 'pointer',
                   fontWeight: 600, fontSize: '13px',
                   opacity: (saving || (!!terminosMudanza && !form.terminosAceptados)) ? 0.6 : 1,
@@ -330,9 +330,9 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
 
       {/* List */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '14px' }}>Cargando…</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '14px' }}>Cargando…</div>
       ) : solicitudes.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '10px' }}>🚛</div>
           <div style={{ fontSize: '14px', marginBottom: '6px' }}>Sin solicitudes de mudanza</div>
           <div style={{ fontSize: '12.5px' }}>Usa el botón "+ Nueva solicitud" para solicitar autorización.</div>
@@ -342,18 +342,18 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
         const est   = ESTADO_CFG[s.estado]
         const fecha = s.created_at ? new Date(s.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' }) : ''
         return (
-          <div key={s.id} style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
+          <div key={s.id} style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'var(--at-surface)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '14px', color: '#15291F', marginBottom: '4px' }}>
+                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', marginBottom: '4px' }}>
                   {tipo.icon} {tipo.label}
                 </div>
-                <div style={{ fontSize: '12.5px', color: '#3E5A4C' }}>
+                <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)' }}>
                   📅 Solicitado: {fecha}
                   {s.fecha_solicitada && <span>{'  ·  '}Propuesto: {s.fecha_solicitada}{s.hora_solicitada ? ` ${s.hora_solicitada}` : ''}</span>}
                 </div>
                 {s.descripcion && (
-                  <div style={{ fontSize: '12.5px', color: '#7E9389', marginTop: '4px' }}>{s.descripcion}</div>
+                  <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginTop: '4px' }}>{s.descripcion}</div>
                 )}
               </div>
               <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 600, background: est.bg, color: est.color, whiteSpace: 'nowrap' }}>

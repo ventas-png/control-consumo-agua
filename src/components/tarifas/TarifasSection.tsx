@@ -208,7 +208,7 @@ export function TarifasSection({
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#7E9389',
+      cancelButtonColor: 'var(--at-ink-3)',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
     })
@@ -265,8 +265,8 @@ export function TarifasSection({
       {/* Header + search */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#15291F' }}>Tarifas Vigentes</h2>
-          <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#7E9389' }}>
+          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: 'var(--at-ink)' }}>Tarifas Vigentes</h2>
+          <p style={{ margin: '4px 0 0', fontSize: '14px', color: 'var(--at-ink-3)' }}>
             Gestiona las tarifas de consumo por tipo de agua
           </p>
         </div>
@@ -363,7 +363,7 @@ export function TarifasSection({
                 onChange={e => setForm(f => ({ ...f, precio_m3_exceso: e.target.value }))}
                 placeholder="0.0000"
               />
-              <span style={{ fontSize: '11px', color: '#7E9389', marginTop: '4px', display: 'block' }}>
+              <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px', display: 'block' }}>
                 Precio diferenciado para consumo que exceda el mínimo
               </span>
             </div>
@@ -390,15 +390,15 @@ export function TarifasSection({
                 onChange={e => setForm(f => ({ ...f, consumo_minimo: e.target.value }))}
                 placeholder="0.0000"
               />
-              <span style={{ fontSize: '11px', color: '#7E9389', marginTop: '4px', display: 'block' }}>
+              <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px', display: 'block' }}>
                 Si consumo ≤ este valor, se cobra solo el canon fijo
               </span>
             </div>
-            <div style={{ gridColumn: '1 / -1', background: '#FAF7EF', borderRadius: '8px', padding: '14px 16px', border: '1px solid var(--at-line)' }}>
-              <label style={{ ...labelStyle, color: '#15291F' }}>Fecha de Revisión</label>
+            <div style={{ gridColumn: '1 / -1', background: 'var(--at-surface-2)', borderRadius: '8px', padding: '14px 16px', border: '1px solid var(--at-line)' }}>
+              <label style={{ ...labelStyle, color: 'var(--at-ink)' }}>Fecha de Revisión</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <input
-                  style={{ ...inputStyle, width: 'auto', minWidth: '180px', background: 'white' }}
+                  style={{ ...inputStyle, width: 'auto', minWidth: '180px', background: 'var(--at-surface)' }}
                   type="date"
                   value={form.fecha_revision}
                   onChange={e => setForm(f => ({ ...f, fecha_revision: e.target.value }))}
@@ -407,12 +407,12 @@ export function TarifasSection({
                   <button
                     type="button"
                     onClick={() => setForm(f => ({ ...f, fecha_revision: '' }))}
-                    style={{ fontSize: '12px', color: '#7E9389', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                    style={{ fontSize: '12px', color: 'var(--at-ink-3)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
                   >
                     Quitar fecha
                   </button>
                 )}
-                <span style={{ fontSize: '11px', color: '#7E9389' }}>
+                <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
                   Si la fecha pasa sin renovar, la tarifa se desactivará automáticamente
                 </span>
               </div>
@@ -453,7 +453,7 @@ export function TarifasSection({
               disabled={loading}
               style={{
                 padding: '10px 24px',
-                background: loading ? '#7E9389' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+                background: loading ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -468,8 +468,8 @@ export function TarifasSection({
               onClick={cancelForm}
               style={{
                 padding: '10px 24px',
-                background: '#EAE6D8',
-                color: '#3E5A4C',
+                background: 'var(--at-chip)',
+                color: 'var(--at-ink-2)',
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: 600,
@@ -484,9 +484,9 @@ export function TarifasSection({
       )}
 
       {/* Table */}
-      <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--at-surface)', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
         {filtered.length === 0 ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: '#7E9389' }}>
+          <div style={{ padding: '60px', textAlign: 'center', color: 'var(--at-ink-3)' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>💰</div>
             <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '6px' }}>
               {search ? 'Sin resultados' : 'No hay tarifas registradas'}
@@ -499,17 +499,17 @@ export function TarifasSection({
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
               <thead>
-                <tr style={{ background: '#FAF7EF', borderBottom: '2px solid var(--at-line)' }}>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C' }}>Nombre</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C' }}>Tipo de Agua</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#3E5A4C' }}>Precio/m³</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#3E5A4C' }}>Precio Exceso/m³</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#3E5A4C' }}>Canon Fijo</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#3E5A4C' }}>Cons. Mínimo</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#3E5A4C' }}>Estado</th>
-                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#3E5A4C' }}>Revisión</th>
+                <tr style={{ background: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)' }}>Nombre</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)' }}>Tipo de Agua</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-2)' }}>Precio/m³</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-2)' }}>Precio Exceso/m³</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-2)' }}>Canon Fijo</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-2)' }}>Cons. Mínimo</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--at-ink-2)' }}>Estado</th>
+                  <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--at-ink-2)' }}>Revisión</th>
                   {canEdit && (
-                    <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: '#3E5A4C' }}>Acciones</th>
+                    <th scope="col" style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: 'var(--at-ink-2)' }}>Acciones</th>
                   )}
                 </tr>
               </thead>
@@ -519,10 +519,10 @@ export function TarifasSection({
                     key={t.id}
                     style={{ borderBottom: '1px solid var(--at-chip)', background: idx % 2 === 0 ? 'white' : '#fafbfc' }}
                   >
-                    <td style={{ padding: '12px 16px', fontWeight: 600, color: '#15291F' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--at-ink)' }}>
                       {t.nombre}
                       {t.descripcion && (
-                        <div style={{ fontSize: '12px', color: '#7E9389', fontWeight: 400, marginTop: '2px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 400, marginTop: '2px' }}>
                           {t.descripcion}
                         </div>
                       )}
@@ -553,26 +553,26 @@ export function TarifasSection({
                       <span style={{
                         padding: '3px 10px',
                         borderRadius: '12px',
-                        background: '#D9E2DC',
-                        color: '#102622',
+                        background: 'var(--at-primary-soft)',
+                        color: 'var(--at-primary-hover)',
                         fontSize: '12px',
                         fontWeight: 600,
                       }}>
                         {tipoLabel(t.tipo_agua)}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#15291F' }}>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--at-ink)' }}>
                       {moneda} {Number(t.precio_m3).toFixed(4)}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', color: '#3E5A4C' }}>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--at-ink-2)' }}>
                       {Number(t.precio_m3_exceso ?? 0) > 0
                         ? `${moneda} ${Number(t.precio_m3_exceso).toFixed(4)}`
                         : '—'}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', color: '#3E5A4C' }}>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--at-ink-2)' }}>
                       {moneda} {Number(t.canon_fijo).toFixed(2)}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', color: '#3E5A4C' }}>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--at-ink-2)' }}>
                       {Number(t.consumo_minimo ?? 0).toFixed(4)} m³
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
@@ -609,7 +609,7 @@ export function TarifasSection({
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                       {(() => {
                         const status = getRevisionStatus(t)
-                        if (status === 'none') return <span style={{ color: '#7E9389', fontSize: '12px' }}>—</span>
+                        if (status === 'none') return <span style={{ color: 'var(--at-ink-3)', fontSize: '12px' }}>—</span>
                         const cfg = {
                           expired: { bg: '#fee2e2', color: '#991b1b', prefix: 'Vencida: ' },
                           soon:    { bg: '#fef9c3', color: '#854d0e', prefix: 'Próxima: ' },
@@ -633,8 +633,8 @@ export function TarifasSection({
                             onClick={() => startEdit(t)}
                             style={{
                               padding: '5px 12px',
-                              background: '#EEF2EC',
-                              color: '#102622',
+                              background: 'var(--at-primary-tint)',
+                              color: 'var(--at-primary-hover)',
                               border: 'none',
                               borderRadius: '6px',
                               cursor: 'pointer',
@@ -668,7 +668,7 @@ export function TarifasSection({
             </table>
           </div>
         )}
-        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--at-chip)', color: '#7E9389', fontSize: '12px' }}>
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--at-chip)', color: 'var(--at-ink-3)', fontSize: '12px' }}>
           {filtered.length} tarifa{filtered.length !== 1 ? 's' : ''} {search ? 'encontradas' : 'registradas'}
         </div>
       </div>

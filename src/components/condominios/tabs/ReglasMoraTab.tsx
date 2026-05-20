@@ -75,7 +75,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
   }
 
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   const activas = reglas.filter(r => r.activa).length
 
@@ -84,9 +84,9 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Reglas activas', val: activas, bg: '#D9E2DC', color: '#102622' },
-          { label: 'Reglas inactivas', val: reglas.length - activas, bg: '#EAE6D8', color: '#7E9389' },
-          { label: 'Total reglas', val: reglas.length, bg: '#FAF7EF', color: '#3E5A4C' },
+          { label: 'Reglas activas', val: activas, bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
+          { label: 'Reglas inactivas', val: reglas.length - activas, bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
+          { label: 'Total reglas', val: reglas.length, bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: k.color }}>{k.val}</div>
@@ -97,7 +97,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <span style={{ fontSize: 13, color: '#7E9389' }}>
+        <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>
           Reglas que generan recargos automáticos cuando una cuota supera el plazo configurado
         </span>
         {canCreate && (
@@ -151,35 +151,35 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
               style={{ padding: '8px 20px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
               {saving ? 'Guardando…' : editId ? '💾 Actualizar' : '✅ Crear regla'}
             </button>
-            <button onClick={cancelar} style={{ padding: '8px 16px', background: '#EAE6D8', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
+            <button onClick={cancelar} style={{ padding: '8px 16px', background: 'var(--at-chip)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* Lista */}
       {reglas.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📏</div>
           Sin reglas de mora — crea una para generar recargos automáticamente
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {reglas.map(r => (
-            <div key={r.id} style={{ background: '#fff', border: `1px solid ${r.activa ? '#E1DDD0' : '#EAE6D8'}`, borderRadius: 10, padding: '12px 16px', opacity: r.activa ? 1 : 0.6 }}>
+            <div key={r.id} style={{ background: 'var(--at-surface)', border: `1px solid ${r.activa ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: 10, padding: '12px 16px', opacity: r.activa ? 1 : 0.6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <span style={{ fontWeight: 700, fontSize: 14 }}>{r.nombre}</span>
-                    <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: r.activa ? '#dcfce7' : '#EAE6D8', color: r.activa ? '#16a34a' : '#7E9389' }}>
+                    <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: r.activa ? '#dcfce7' : 'var(--at-chip)', color: r.activa ? '#16a34a' : 'var(--at-ink-3)' }}>
                       {r.activa ? 'Activa' : 'Inactiva'}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#7E9389', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--at-ink-3)', flexWrap: 'wrap' }}>
                     <span>⏱ A los <strong>{r.dias_vencimiento}</strong> días</span>
                     {r.periodo_gracia > 0 && <span>🕊 Gracia: <strong>{r.periodo_gracia}d</strong></span>}
                     <span>💸 {r.tipo === 'porcentaje' ? `${r.valor}%` : `${moneda} ${r.valor}`} sobre {SOBRE_LABEL[r.aplicar_sobre]}</span>
                   </div>
-                  {r.notas && <div style={{ fontSize: 11, color: '#7E9389', marginTop: 4 }}>{r.notas}</div>}
+                  {r.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 4 }}>{r.notas}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   <button onClick={() => toggleActiva(r)}
@@ -188,7 +188,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
                   </button>
                   {canEdit && (
                     <button onClick={() => abrirEditar(r)}
-                      style={{ padding: '5px 10px', background: '#EEF2EC', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#1B3B36' }}>
+                      style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-primary)' }}>
                       ✏️
                     </button>
                   )}

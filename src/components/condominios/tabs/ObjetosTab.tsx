@@ -14,10 +14,10 @@ interface Props {
 }
 
 const ESTADO_CONFIG: Record<EstadoObjeto, { label: string; color: string; bg: string }> = {
-  en_custodia: { label: 'En Custodia',  color: '#1B3B36', bg: '#D9E2DC' },
+  en_custodia: { label: 'En Custodia',  color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
   reclamado:   { label: 'Reclamado',    color: '#10b981', bg: '#d1fae5' },
-  donado:      { label: 'Donado',       color: '#B96A3F', bg: '#F4EBE3' },
-  descartado:  { label: 'Descartado',   color: '#7E9389', bg: '#EAE6D8' },
+  donado:      { label: 'Donado',       color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
+  descartado:  { label: 'Descartado',   color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 
 const blank = (): Partial<ObjetoPerdido> => ({
@@ -119,17 +119,17 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
 
   const inputStyle: CSSProperties = {
     width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px',
-    fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box',
+    fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box',
   }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Objetos Perdidos / Custodia</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Objetos Perdidos / Custodia</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Registrar Objeto
           </button>
         )}
@@ -137,8 +137,8 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>
             {editId ? 'Editar Registro' : 'Registrar Objeto Encontrado'}
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
@@ -166,8 +166,8 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Registrar'}
             </button>
           </div>
@@ -177,12 +177,12 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
       {/* Reclamo modal */}
       {reclamoId && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'white', borderRadius: '12px', padding: '24px', width: '360px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+          <div style={{ background: 'var(--at-surface)', borderRadius: '12px', padding: '24px', width: '360px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
             <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 700 }}>Registrar Reclamo</h3>
             <label style={labelStyle}>Reclamado por (nombre)</label>
             <input style={{ ...inputStyle, marginBottom: '16px' }} value={reclamadoPor} onChange={e => setReclamadoPor(e.target.value)} placeholder="Nombre de quien reclama…" autoFocus />
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button onClick={() => setReclamoId(null)} style={{ padding: '8px 14px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={() => setReclamoId(null)} style={{ padding: '8px 14px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>Cancelar</button>
               <button onClick={confirmarReclamo} style={{ padding: '8px 14px', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Confirmar Reclamo</button>
             </div>
           </div>
@@ -193,9 +193,9 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => setFiltroEstado('todos')}
           style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-            borderColor: filtroEstado === 'todos' ? '#1B3B36' : '#E1DDD0',
-            background: filtroEstado === 'todos' ? '#D9E2DC' : 'white',
-            color: filtroEstado === 'todos' ? '#1B3B36' : '#7E9389' }}>
+            borderColor: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-line)',
+            background: filtroEstado === 'todos' ? 'var(--at-primary-soft)' : 'white',
+            color: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
           Todos ({objetos.length})
         </button>
         {(Object.entries(ESTADO_CONFIG) as [EstadoObjeto, typeof ESTADO_CONFIG[EstadoObjeto]][]).map(([k, v]) => {
@@ -203,9 +203,9 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
           return (
             <button key={k} onClick={() => setFiltroEstado(k)}
               style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-                borderColor: filtroEstado === k ? v.color : '#E1DDD0',
+                borderColor: filtroEstado === k ? v.color : 'var(--at-line)',
                 background: filtroEstado === k ? v.bg : 'white',
-                color: filtroEstado === k ? v.color : '#7E9389' }}>
+                color: filtroEstado === k ? v.color : 'var(--at-ink-3)' }}>
               {v.label} ({count})
             </button>
           )
@@ -214,7 +214,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
 
       {/* Cards grid */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔍</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay objetos en esta categoría</p>
         </div>
@@ -223,24 +223,24 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
           {filtered.map(o => {
             const cfg = ESTADO_CONFIG[o.estado]
             return (
-              <div key={o.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div key={o.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, color: '#15291F', fontSize: '14px' }}>{o.descripcion}</div>
-                    {o.lugar_encontrado && <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px' }}>📍 {o.lugar_encontrado}</div>}
+                    <div style={{ fontWeight: 700, color: 'var(--at-ink)', fontSize: '14px' }}>{o.descripcion}</div>
+                    {o.lugar_encontrado && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>📍 {o.lugar_encontrado}</div>}
                   </div>
                   <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: cfg.bg, color: cfg.color, whiteSpace: 'nowrap' }}>
                     {cfg.label}
                   </span>
                 </div>
 
-                <div style={{ fontSize: '12px', color: '#7E9389' }}>
+                <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
                   Encontrado: {o.fecha_encontrado}
                   {o.reclamado_por && <span style={{ marginLeft: '8px' }}>· {o.reclamado_por}</span>}
                   {o.fecha_reclamo && <span style={{ marginLeft: '4px' }}>({o.fecha_reclamo})</span>}
                 </div>
 
-                {o.notas && <div style={{ fontSize: '12px', color: '#7E9389', fontStyle: 'italic' }}>{o.notas}</div>}
+                {o.notas && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontStyle: 'italic' }}>{o.notas}</div>}
 
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
@@ -249,15 +249,15 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
                         <button onClick={() => handleEstado(o.id, 'reclamado')} style={{ padding: '4px 10px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                           Reclamado
                         </button>
-                        <button onClick={() => handleEstado(o.id, 'donado')} style={{ padding: '4px 10px', background: '#F4EBE3', color: '#9C5733', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                        <button onClick={() => handleEstado(o.id, 'donado')} style={{ padding: '4px 10px', background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                           Donar
                         </button>
-                        <button onClick={() => handleEstado(o.id, 'descartado')} style={{ padding: '4px 10px', background: '#EAE6D8', color: '#7E9389', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                        <button onClick={() => handleEstado(o.id, 'descartado')} style={{ padding: '4px 10px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                           Descartar
                         </button>
                       </>
                     )}
-                    <button onClick={() => startEdit(o)} style={{ padding: '4px 10px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                    <button onClick={() => startEdit(o)} style={{ padding: '4px 10px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
                     <button onClick={() => handleDelete(o.id)} style={{ padding: '4px 10px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
                   </div>
                 )}

@@ -244,16 +244,16 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
           {/* RIGHT PANEL — Login form */}
           <div className="login-right-panel" style={{
             flex: 1,
-            background: 'rgba(255,255,255,0.98)',
+            background: 'var(--at-surface)',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
             minWidth: '300px',
           }}>
-            <h2 style={{ fontSize: '28px', fontWeight: 900, color: '#15291F', margin: '0 0 4px', letterSpacing: '-0.6px' }}>
+            <h2 style={{ fontSize: '28px', fontWeight: 900, color: 'var(--at-ink)', margin: '0 0 4px', letterSpacing: '-0.6px' }}>
               Bienvenido
             </h2>
-            <p style={{ color: '#7E9389', fontSize: '14.5px', margin: '0 0 32px' }}>
+            <p style={{ color: 'var(--at-ink-3)', fontSize: '14.5px', margin: '0 0 32px' }}>
               Inicia sesión para acceder al sistema
             </p>
 
@@ -264,7 +264,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               disabled={googleLoading || loading}
               style={{
                 width: '100%', padding: '13px', fontSize: '15px', fontWeight: 600,
-                background: 'white', color: '#3E5A4C',
+                background: 'var(--at-surface)', color: 'var(--at-ink-2)',
                 border: '1.5px solid var(--at-line)', borderRadius: '14px',
                 cursor: 'pointer', display: 'flex', alignItems: 'center',
                 justifyContent: 'center', gap: '10px',
@@ -291,9 +291,9 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
 
             {/* Divider */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
-              <div style={{ flex: 1, height: '1px', background: '#E1DDD0' }} />
-              <span style={{ fontSize: '13px', color: '#7E9389', fontWeight: 500 }}>o con tu correo</span>
-              <div style={{ flex: 1, height: '1px', background: '#E1DDD0' }} />
+              <div style={{ flex: 1, height: '1px', background: 'var(--at-line)' }} />
+              <span style={{ fontSize: '13px', color: 'var(--at-ink-3)', fontWeight: 500 }}>o con tu correo</span>
+              <div style={{ flex: 1, height: '1px', background: 'var(--at-line)' }} />
             </div>
 
             {/* Email input */}
@@ -313,8 +313,8 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
                   padding: '13px 14px 13px 44px',
                   border: '1.5px solid var(--at-line)', borderRadius: '12px',
                   width: '100%', fontSize: '15px', boxSizing: 'border-box',
-                  background: '#FAF7EF', transition: 'border-color 0.2s, box-shadow 0.2s',
-                  color: '#15291F',
+                  background: 'var(--at-surface-2)', transition: 'border-color 0.2s, box-shadow 0.2s',
+                  color: 'var(--at-ink)',
                 }}
               />
             </div>
@@ -336,8 +336,8 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
                   padding: '13px 44px 13px 44px',
                   border: '1.5px solid var(--at-line)', borderRadius: '12px',
                   width: '100%', fontSize: '15px', boxSizing: 'border-box',
-                  background: '#FAF7EF', transition: 'border-color 0.2s, box-shadow 0.2s',
-                  color: '#15291F',
+                  background: 'var(--at-surface-2)', transition: 'border-color 0.2s, box-shadow 0.2s',
+                  color: 'var(--at-ink)',
                 }}
               />
               <button
@@ -400,7 +400,7 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               <button
                 onClick={onForgotPassword}
                 style={{
-                  background: 'none', border: 'none', color: '#1B3B36',
+                  background: 'none', border: 'none', color: 'var(--at-primary)',
                   cursor: 'pointer', fontSize: '14px', fontWeight: 500,
                   textDecoration: 'underline', textUnderlineOffset: '3px',
                 }}
@@ -420,10 +420,10 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
               gap: '10px', flexWrap: 'wrap',
             }}>
               <div>
-                <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#102622' }}>
+                <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--at-primary-hover)' }}>
                   ¿Eres cliente?
                 </p>
-                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#102622' }}>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--at-primary-hover)' }}>
                   Consulta tu consumo en el portal
                 </p>
               </div>

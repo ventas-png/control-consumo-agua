@@ -6,16 +6,16 @@ interface Props {
 
 export function ConfiguracionSection({ onLogout }: Props) {
   return (
-    <div style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+    <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
       <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', borderBottom: '2px solid var(--at-line)', paddingBottom: '12px' }}>
         Configuración
       </div>
-      <p style={{ color: '#7E9389', marginBottom: '20px' }}>
+      <p style={{ color: 'var(--at-ink-3)', marginBottom: '20px' }}>
         Las credenciales se gestionan a través de variables de entorno en el archivo <code>.env</code>.
         No es necesario editar el código fuente.
       </p>
-      <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '20px', fontFamily: 'monospace', fontSize: '13px' }}>
-        <div style={{ marginBottom: '8px', color: '#7E9389' }}>Variables de entorno configuradas:</div>
+      <div style={{ background: 'var(--at-surface-2)', borderRadius: '12px', padding: '16px', marginBottom: '20px', fontFamily: 'monospace', fontSize: '13px' }}>
+        <div style={{ marginBottom: '8px', color: 'var(--at-ink-3)' }}>Variables de entorno configuradas:</div>
         <div>✅ VITE_SUPABASE_URL</div>
         <div>✅ VITE_SUPABASE_ANON_KEY</div>
         <div>✅ VITE_EMAILJS_PUBLIC_KEY</div>

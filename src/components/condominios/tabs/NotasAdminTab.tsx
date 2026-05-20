@@ -14,16 +14,16 @@ interface Props {
 }
 
 const CATEGORIAS: { value: CategoriaNota; label: string; icon: string; color: string }[] = [
-  { value: 'general',       label: 'General',       icon: '📝', color: '#7E9389' },
+  { value: 'general',       label: 'General',       icon: '📝', color: 'var(--at-ink-3)' },
   { value: 'urgente',       label: 'Urgente',       icon: '🚨', color: '#ef4444' },
   { value: 'recordatorio',  label: 'Recordatorio',  icon: '⏰', color: '#f59e0b' },
-  { value: 'seguimiento',   label: 'Seguimiento',   icon: '🔄', color: '#B96A3F' },
+  { value: 'seguimiento',   label: 'Seguimiento',   icon: '🔄', color: 'var(--at-accent)' },
   { value: 'reunion',       label: 'Reunión',       icon: '👥', color: '#10b981' },
-  { value: 'otro',          label: 'Otro',          icon: '📌', color: '#B96A3F' },
+  { value: 'otro',          label: 'Otro',          icon: '📌', color: 'var(--at-accent)' },
 ]
 
 const PRIORIDADES: { value: PrioridadNota; label: string; color: string; bg: string }[] = [
-  { value: 'normal',  label: 'Normal',  color: '#7E9389', bg: '#EAE6D8' },
+  { value: 'normal',  label: 'Normal',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
   { value: 'alta',    label: 'Alta',    color: '#f59e0b', bg: '#fef3c7' },
   { value: 'urgente', label: 'Urgente', color: '#ef4444', bg: '#fef2f2' },
 ]
@@ -122,7 +122,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   function NotaCard({ n, highlight = false }: { n: NotaAdmin; highlight?: boolean }) {
     const cat = CATEGORIAS.find(c => c.value === n.categoria)
@@ -130,7 +130,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
     const dias = diasHastaRecordatorio(n.fecha_recordatorio)
     return (
       <div onClick={() => { setSelected(n); setMostrarForm(false) }}
-        style={{ background: highlight ? '#fffbeb' : n.resuelta ? '#FAF7EF' : '#fff', border: `1px solid ${selected?.id === n.id ? '#B96A3F' : highlight ? '#fde68a' : '#E1DDD0'}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', opacity: n.resuelta ? 0.65 : 1, marginBottom: 8 }}>
+        style={{ background: highlight ? '#fffbeb' : n.resuelta ? 'var(--at-surface-2)' : '#fff', border: `1px solid ${selected?.id === n.id ? 'var(--at-accent)' : highlight ? '#fde68a' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', opacity: n.resuelta ? 0.65 : 1, marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
             {n.fijada && <span title="Fijada">📌</span>}
@@ -138,13 +138,13 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
           </div>
           <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: prio?.bg, color: prio?.color, marginLeft: 6, flexShrink: 0 }}>{prio?.label}</span>
         </div>
-        <div style={{ fontSize: 12, color: '#7E9389', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+        <div style={{ fontSize: 12, color: 'var(--at-ink-3)', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
           {n.contenido}
         </div>
         <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: cat?.color }}>{cat?.icon} {cat?.label}</span>
           {dias !== null && (
-            <span style={{ fontSize: 10, color: dias < 0 ? '#ef4444' : dias === 0 ? '#f59e0b' : '#7E9389' }}>
+            <span style={{ fontSize: 10, color: dias < 0 ? '#ef4444' : dias === 0 ? '#f59e0b' : 'var(--at-ink-3)' }}>
               ⏰ {dias < 0 ? `Vencido ${Math.abs(dias)}d` : dias === 0 ? 'Hoy' : `En ${dias}d`}
             </span>
           )}
@@ -163,7 +163,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
             <span style={{ fontWeight: 600, fontSize: 14 }}>Notas ({notas.filter(n => !n.resuelta).length} activas)</span>
             {canCreate && (
               <button onClick={() => { resetForm(); setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nueva
               </button>
             )}
@@ -187,7 +187,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
             </div>
           )}
           {lista.length === 0 && !fijadas.length && (
-            <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 0', fontSize: 13 }}>Sin notas</div>
+            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 0', fontSize: 13 }}>Sin notas</div>
           )}
           {lista.map(n => <NotaCard key={n.id} n={n} />)}
         </div>
@@ -234,7 +234,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
                 {saving ? 'Guardando…' : `✅ ${editando ? 'Actualizar' : 'Crear nota'}`}
               </button>
               <button onClick={resetForm}
-                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -256,7 +256,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
                     {selected.resuelta && <span style={{ fontSize: 11, color: '#10b981' }}>✓ Resuelta</span>}
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 18 }}>{selected.titulo}</div>
-                  <div style={{ fontSize: 12, color: '#7E9389', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>
                     {selected.autor && <span>{selected.autor} · </span>}
                     {new Date(selected.created_at).toLocaleDateString('es-ES')}
                   </div>
@@ -264,11 +264,11 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
                 {canEdit && !selected.resuelta && (
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button onClick={() => iniciarEdicion(selected)}
-                      style={{ padding: '6px 12px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 12px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ✏️ Editar
                     </button>
                     <button onClick={() => toggleFijada(selected)}
-                      style={{ padding: '6px 12px', background: selected.fijada ? '#fef3c7' : '#EAE6D8', color: selected.fijada ? '#f59e0b' : '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 12px', background: selected.fijada ? '#fef3c7' : 'var(--at-chip)', color: selected.fijada ? '#f59e0b' : 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       {selected.fijada ? '📌 Desfijar' : '📌 Fijar'}
                     </button>
                   </div>
@@ -276,18 +276,18 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
               </div>
 
               {dias !== null && (
-                <div style={{ background: dias < 0 ? '#fef2f2' : dias === 0 ? '#fef3c7' : '#F4EBE3', border: `1px solid ${dias < 0 ? '#fecaca' : dias === 0 ? '#fde68a' : '#E6CDBB'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ background: dias < 0 ? '#fef2f2' : dias === 0 ? '#fef3c7' : 'var(--at-accent-tint)', border: `1px solid ${dias < 0 ? '#fecaca' : dias === 0 ? '#fde68a' : 'var(--at-accent-soft)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 16 }}>⏰</span>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: dias < 0 ? '#ef4444' : dias === 0 ? '#f59e0b' : '#B96A3F' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: dias < 0 ? '#ef4444' : dias === 0 ? '#f59e0b' : 'var(--at-accent)' }}>
                       {dias < 0 ? `Recordatorio vencido hace ${Math.abs(dias)} días` : dias === 0 ? 'Recordatorio: hoy' : `Recordatorio en ${dias} días`}
                     </div>
-                    <div style={{ fontSize: 11, color: '#7E9389' }}>{selected.fecha_recordatorio}</div>
+                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{selected.fecha_recordatorio}</div>
                   </div>
                 </div>
               )}
 
-              <div style={{ background: '#FAF7EF', borderRadius: 10, padding: '16px 20px', fontSize: 14, lineHeight: 1.7, color: '#3E5A4C', whiteSpace: 'pre-wrap', marginBottom: 16 }}>
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: 10, padding: '16px 20px', fontSize: 14, lineHeight: 1.7, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap', marginBottom: 16 }}>
                 {selected.contenido}
               </div>
 
@@ -308,7 +308,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
         })()}
 
         {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#7E9389', fontSize: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
             Selecciona una nota o crea una nueva
           </div>
         )}

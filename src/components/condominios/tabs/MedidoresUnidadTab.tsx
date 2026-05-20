@@ -80,7 +80,7 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
 
   const activosCount  = medidores.filter(m => m.activo).length
   const totalConsumo  = consumos.reduce((s, c) => s + c.consumo_total, 0)
@@ -88,11 +88,11 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Medidores por Unidad</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Medidores por Unidad</h2>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '12px', color: '#7E9389', fontWeight: 600 }}>Mes:</span>
+          <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Mes:</span>
           <input type="month" value={mesFiltro} onChange={e => setMesFiltro(e.target.value)}
-            style={{ padding: '5px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', background: 'white' }} />
+            style={{ padding: '5px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', background: 'var(--at-surface)' }} />
         </div>
       </div>
 
@@ -100,30 +100,30 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
           { label: 'Vínculos activos', value: String(activosCount),        color: '#10b981' },
-          { label: 'Contadores disp.', value: String(contadores.length),   color: '#1B3B36' },
-          { label: `Consumo ${mesFiltro}`, value: `${totalConsumo.toFixed(1)} m³`, color: '#B96A3F' },
+          { label: 'Contadores disp.', value: String(contadores.length),   color: 'var(--at-primary)' },
+          { label: `Consumo ${mesFiltro}`, value: `${totalConsumo.toFixed(1)} m³`, color: 'var(--at-accent)' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       {/* Link form */}
       {canCreate && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700 }}>Vincular medidor a unidad</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Unidad *</label>
               <select style={inputStyle} value={selectedUnidad} onChange={e => setSelectedUnidad(e.target.value)}>
                 <option value="">— Seleccionar —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Contador *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Contador *</label>
               <select style={inputStyle} value={selectedContador} onChange={e => setSelectedContador(e.target.value)}>
                 <option value="">— Seleccionar —</option>
                 {(disponibles.length > 0 ? disponibles : contadores).map(c => (
@@ -132,12 +132,12 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Notas</label>
               <input style={inputStyle} value={notas} onChange={e => setNotas(e.target.value)} placeholder="Opcional" />
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <button onClick={handleVincular} disabled={saving}
-                style={{ padding: '8px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', width: '100%' }}>
+                style={{ padding: '8px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', width: '100%' }}>
                 {saving ? '…' : '+ Vincular'}
               </button>
             </div>
@@ -147,16 +147,16 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
 
       {/* Table */}
       {loadingCtrs ? (
-        <div style={{ textAlign: 'center', padding: '32px', color: '#7E9389' }}>Cargando contadores…</div>
+        <div style={{ textAlign: 'center', padding: '32px', color: 'var(--at-ink-3)' }}>Cargando contadores…</div>
       ) : medidores.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay medidores vinculados a unidades.</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay medidores vinculados a unidades.</div>
       ) : (
         <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: '#FAF7EF' }}>
+              <tr style={{ background: 'var(--at-surface-2)' }}>
                 {['Unidad','Contador','Tipo Agua',`Consumo ${mesFiltro}`,'Última lectura','Estado',''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -165,18 +165,18 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
                 const ctr = contadorMap[m.contador_id]
                 const cons = consumoMap[m.contador_id]
                 return (
-                  <tr key={m.id} style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF', borderBottom: '1px solid var(--at-chip)', opacity: m.activo ? 1 : 0.5 }}>
+                  <tr key={m.id} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)', opacity: m.activo ? 1 : 0.5 }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>{m.unidad_nombre ?? '—'}</td>
                     <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '12px' }}>{ctr?.numero_serie ?? m.contador_id.slice(0,8)}</td>
-                    <td style={{ padding: '10px 12px', color: '#7E9389', textTransform: 'capitalize' }}>{ctr?.tipo_agua ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: cons ? 700 : 400, color: cons ? '#B96A3F' : '#7E9389' }}>
+                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', textTransform: 'capitalize' }}>{ctr?.tipo_agua ?? '—'}</td>
+                    <td style={{ padding: '10px 12px', fontWeight: cons ? 700 : 400, color: cons ? 'var(--at-accent)' : 'var(--at-ink-3)' }}>
                       {cons ? `${cons.consumo_total.toFixed(2)} m³` : '—'}
                     </td>
-                    <td style={{ padding: '10px 12px', color: '#7E9389', fontSize: '12px' }}>{cons?.ultima_lectura ?? '—'}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', fontSize: '12px' }}>{cons?.ultima_lectura ?? '—'}</td>
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px',
-                        background: m.activo ? '#dcfce7' : '#EAE6D8',
-                        color: m.activo ? '#16a34a' : '#7E9389' }}>
+                        background: m.activo ? '#dcfce7' : 'var(--at-chip)',
+                        color: m.activo ? '#16a34a' : 'var(--at-ink-3)' }}>
                         {m.activo ? 'Activo' : 'Desvinculado'}
                       </span>
                     </td>

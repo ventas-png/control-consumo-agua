@@ -55,7 +55,7 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
     >
       <div
         style={{
-          background: 'white',
+          background: 'var(--at-surface)',
           borderRadius: '16px',
           width: '100%',
           maxWidth: `min(${maxWidth}, 95vw)`,
@@ -76,7 +76,7 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
             flexShrink: 0,
           }}
         >
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#15291F' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--at-ink)' }}>
             {title}
           </h2>
           <button
@@ -86,7 +86,7 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: '#7E9389',
+              color: 'var(--at-ink-3)',
               fontSize: '22px',
               lineHeight: 1,
               padding: '8px',

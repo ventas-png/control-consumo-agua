@@ -26,7 +26,7 @@ export function NavTabs({ activeSection, userRole, onSelect }: Props) {
   const visibleTabs = TABS.filter(t => t.roles.includes(userRole))
 
   return (
-    <div style={{ display: 'flex', gap: '8px', background: 'white', padding: '8px', borderRadius: '12px', marginBottom: '20px', overflowX: 'auto' }}>
+    <div style={{ display: 'flex', gap: '8px', background: 'var(--at-surface)', padding: '8px', borderRadius: '12px', marginBottom: '20px', overflowX: 'auto' }}>
       {visibleTabs.map(tab => (
         <button
           key={tab.id}

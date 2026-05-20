@@ -23,8 +23,8 @@ const CARGO_LABEL: Record<string, string> = {
 }
 
 const COLOR = {
-  residente: { bg: '#EEF2EC', color: '#1B3B36', border: '#C2D2CA', dot: '#1B3B36' },
-  personal:  { bg: '#FAF1EA', color: '#9C5733', border: '#EFE0D5', dot: '#9C5733' },
+  residente: { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'var(--at-primary-soft-2)', dot: 'var(--at-primary)' },
+  personal:  { bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)', border: 'var(--at-accent-soft-2)', dot: 'var(--at-accent-hover)' },
 }
 
 interface Cumpleanero {
@@ -143,8 +143,8 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#15291F' }}>🎂 Cumpleaños</h2>
-          <p style={{ margin: '4px 0 0', color: '#7E9389', fontSize: '13.5px' }}>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>🎂 Cumpleaños</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
             {todos.length} personas con fecha de nacimiento registrada · {proyectoNombre}
           </p>
         </div>
@@ -152,9 +152,9 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
           {(['todos', 'residente', 'personal'] as const).map(t => (
             <button key={t} onClick={() => setFiltroTipo(t)}
               style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid',
-                borderColor: filtroTipo === t ? '#1B3B36' : '#E1DDD0',
-                background: filtroTipo === t ? '#EEF2EC' : 'white',
-                color: filtroTipo === t ? '#1B3B36' : '#7E9389' }}>
+                borderColor: filtroTipo === t ? 'var(--at-primary)' : 'var(--at-line)',
+                background: filtroTipo === t ? 'var(--at-primary-tint)' : 'white',
+                color: filtroTipo === t ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
               {t === 'todos' ? 'Todos' : t === 'residente' ? '🏠 Residentes' : '👷 Personal'}
             </button>
           ))}
@@ -166,13 +166,13 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
         {[
           { label: 'Hoy', val: cumpleHoy.length, icon: '🎂', color: cumpleHoy.length > 0 ? '#dc2626' : '#16a34a', bg: cumpleHoy.length > 0 ? '#fef2f2' : '#f0fdf4' },
           { label: 'Esta semana', val: semanaMes.length, icon: '📅', color: '#d97706', bg: '#fef3c7' },
-          { label: 'Próximos 30d', val: proximos30.length, icon: '🗓️', color: '#1B3B36', bg: '#D9E2DC' },
-          { label: 'Registrados', val: todos.length, icon: '👤', color: '#9C5733', bg: '#FAF1EA' },
+          { label: 'Próximos 30d', val: proximos30.length, icon: '🗓️', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
+          { label: 'Registrados', val: todos.length, icon: '👤', color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, border: `1px solid ${k.color}33`, borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.val}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
@@ -201,22 +201,22 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 290px', gap: '20px', alignItems: 'start' }}>
 
         {/* Calendario mensual */}
-        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '14px', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '14px', overflow: 'hidden' }}>
           {/* Navegación */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: '#FAF7EF', borderBottom: '1px solid var(--at-line)' }}>
-            <button onClick={prevMes} style={{ padding: '6px 14px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '16px', color: '#3E5A4C' }}>‹</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)' }}>
+            <button onClick={prevMes} style={{ padding: '6px 14px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '16px', color: 'var(--at-ink-2)' }}>‹</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontWeight: 700, fontSize: '15px', color: '#15291F' }}>{MESES[mes]} {anio}</span>
+              <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-ink)' }}>{MESES[mes]} {anio}</span>
               {(mes !== hoy.getMonth() || anio !== hoy.getFullYear()) && (
-                <button onClick={irHoy} style={{ padding: '3px 10px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid var(--at-primary-soft-2)', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Hoy</button>
+                <button onClick={irHoy} style={{ padding: '3px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Hoy</button>
               )}
             </div>
-            <button onClick={nextMes} style={{ padding: '6px 14px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '16px', color: '#3E5A4C' }}>›</button>
+            <button onClick={nextMes} style={{ padding: '6px 14px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '16px', color: 'var(--at-ink-2)' }}>›</button>
           </div>
           {/* Encabezados días */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--at-line)' }}>
             {DIAS.map(d => (
-              <div key={d} style={{ textAlign: 'center', padding: '8px 2px', fontSize: '11px', fontWeight: 700, color: '#7E9389' }}>{d}</div>
+              <div key={d} style={{ textAlign: 'center', padding: '8px 2px', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)' }}>{d}</div>
             ))}
           </div>
           {/* Celdas */}
@@ -228,15 +228,15 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
                 <div key={i} style={{
                   minHeight: '76px', padding: '5px 4px',
                   borderRight: '1px solid var(--at-chip)', borderBottom: '1px solid var(--at-chip)',
-                  background: hoyFlag ? '#EEF2EC' : lista.length > 0 ? '#FAF7EF' : 'white',
+                  background: hoyFlag ? 'var(--at-primary-tint)' : lista.length > 0 ? 'var(--at-surface-2)' : 'white',
                 }}>
                   {d && (
                     <>
                       <div style={{
                         width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: '12px', fontWeight: hoyFlag ? 800 : 400, marginBottom: '3px',
-                        color: hoyFlag ? 'white' : lista.length > 0 ? '#15291F' : '#7E9389',
-                        background: hoyFlag ? '#1B3B36' : 'transparent',
+                        color: hoyFlag ? 'white' : lista.length > 0 ? 'var(--at-ink)' : 'var(--at-ink-3)',
+                        background: hoyFlag ? 'var(--at-primary)' : 'transparent',
                       }}>{d}</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         {lista.slice(0, 3).map(c => (
@@ -250,7 +250,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
                           </div>
                         ))}
                         {lista.length > 3 && (
-                          <div style={{ fontSize: '9px', color: '#7E9389', fontWeight: 600 }}>+{lista.length - 3} más</div>
+                          <div style={{ fontSize: '9px', color: 'var(--at-ink-3)', fontWeight: 600 }}>+{lista.length - 3} más</div>
                         )}
                       </div>
                     </>
@@ -265,27 +265,27 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
           {/* Leyenda */}
-          <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-            <div style={{ fontWeight: 700, fontSize: '12px', color: '#15291F', marginBottom: '8px' }}>Leyenda</div>
+          <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
+            <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--at-ink)', marginBottom: '8px' }}>Leyenda</div>
             {[
               { tipo: 'residente' as const, label: 'Residente / Propietario' },
               { tipo: 'personal' as const, label: 'Personal / Trabajador' },
             ].map(l => (
               <div key={l.tipo} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                 <div style={{ width: 12, height: 12, borderRadius: '3px', background: COLOR[l.tipo].bg, border: `2px solid ${COLOR[l.tipo].border}` }} />
-                <span style={{ fontSize: '12px', color: '#3E5A4C' }}>{l.label}</span>
+                <span style={{ fontSize: '12px', color: 'var(--at-ink-2)' }}>{l.label}</span>
               </div>
             ))}
           </div>
 
           {/* Próximos 30 días */}
-          <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-            <div style={{ fontWeight: 700, fontSize: '12px', color: '#15291F', marginBottom: '10px' }}>
+          <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
+            <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--at-ink)', marginBottom: '10px' }}>
               📅 Próximos 30 días
-              {proximos30.length > 0 && <span style={{ marginLeft: 6, background: '#D9E2DC', color: '#1B3B36', borderRadius: '12px', padding: '1px 8px', fontSize: '11px' }}>{proximos30.length}</span>}
+              {proximos30.length > 0 && <span style={{ marginLeft: 6, background: 'var(--at-primary-soft)', color: 'var(--at-primary)', borderRadius: '12px', padding: '1px 8px', fontSize: '11px' }}>{proximos30.length}</span>}
             </div>
             {proximos30.length === 0 ? (
-              <p style={{ fontSize: '12px', color: '#7E9389', textAlign: 'center', margin: '16px 0' }}>Sin cumpleaños en los próximos 30 días</p>
+              <p style={{ fontSize: '12px', color: 'var(--at-ink-3)', textAlign: 'center', margin: '16px 0' }}>Sin cumpleaños en los próximos 30 días</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', maxHeight: '420px', overflowY: 'auto' }}>
                 {proximos30.map(c => {
@@ -294,15 +294,15 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
                   return (
                     <div key={c.id} style={{
                       display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px',
-                      background: c.dias === 0 ? '#fef2f2' : c.dias <= 7 ? '#fff7ed' : '#FAF7EF',
-                      borderRadius: '8px', border: `1px solid ${c.dias === 0 ? '#fca5a5' : c.dias <= 7 ? '#fed7aa' : '#E1DDD0'}`,
+                      background: c.dias === 0 ? '#fef2f2' : c.dias <= 7 ? '#fff7ed' : 'var(--at-surface-2)',
+                      borderRadius: '8px', border: `1px solid ${c.dias === 0 ? '#fca5a5' : c.dias <= 7 ? '#fed7aa' : 'var(--at-line)'}`,
                     }}>
                       <span style={{ fontSize: '18px', flexShrink: 0 }}>{c.dias === 0 ? '🎂' : '🎁'}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#15291F', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontWeight: 600, fontSize: '12.5px', color: 'var(--at-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {c.nombre}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#7E9389' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
                           {dd}/{mm} · {c.subtitulo}{edad ? ` · ${edad}` : ''}
                         </div>
                       </div>
@@ -310,7 +310,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
                         <div style={{ padding: '2px 7px', borderRadius: '20px', fontSize: '10px', fontWeight: 700, background: COLOR[c.tipo].bg, color: COLOR[c.tipo].color, marginBottom: '3px' }}>
                           {c.tipo === 'residente' ? 'Residente' : 'Personal'}
                         </div>
-                        <div style={{ fontSize: '10px', fontWeight: 700, color: c.dias === 0 ? '#dc2626' : c.dias <= 7 ? '#ea580c' : '#7E9389' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 700, color: c.dias === 0 ? '#dc2626' : c.dias <= 7 ? '#ea580c' : 'var(--at-ink-3)' }}>
                           {c.dias === 0 ? '¡Hoy! 🎉' : `en ${c.dias}d`}
                         </div>
                       </div>

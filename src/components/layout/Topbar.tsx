@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { AppSection, UserSession } from '../../types'
 import { useOffline } from '../../hooks/useOffline'
+import { useTheme } from '../../hooks/useTheme'
 import { getDisplayRoleLabel } from '../../lib/permissions'
 
 const PAGE_TITLES: Record<AppSection, string> = {
@@ -72,12 +73,15 @@ interface Props {
 
 export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
   const { isOnline } = useOffline()
+  const { pref, cycle } = useTheme()
+  const themeIcon = pref === 'auto' ? '🌗' : pref === 'light' ? '☀️' : '🌙'
+  const themeLabel = pref === 'auto' ? 'automático' : pref === 'light' ? 'claro' : 'oscuro'
 
   return (
     <header
       className="app-topbar"
       style={{
-        background: '#ffffff',
+        background: 'var(--at-surface)',
         boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 1px 12px rgba(0,0,0,0.04)',
         padding: '0 24px',
         height: '62px',
@@ -102,10 +106,10 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             width: '38px',
             height: '38px',
             border: '1px solid var(--at-line)',
-            background: '#FAF7EF',
+            background: 'var(--at-surface-2)',
             borderRadius: '9px',
             cursor: 'pointer',
-            color: '#3E5A4C',
+            color: 'var(--at-ink-2)',
             flexShrink: 0,
             transition: 'background 0.13s',
           }}
@@ -125,7 +129,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#1B3B36',
+            color: 'var(--at-primary)',
             flexShrink: 0,
           }}>
             {PAGE_ICONS[activeSection]}
@@ -133,7 +137,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
           <h1 style={{
             fontSize: '16px',
             fontWeight: 650,
-            color: '#15291F',
+            color: 'var(--at-ink)',
             margin: 0,
             letterSpacing: '-0.2px',
           }}>
@@ -175,8 +179,24 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
           {isOnline ? 'Conectado' : 'Sin conexión'}
         </span>
 
+        {/* Theme toggle (auto → claro → oscuro) */}
+        <button
+          onClick={cycle}
+          aria-label="Cambiar tema"
+          title={`Tema: ${themeLabel} (clic para cambiar)`}
+          style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: '34px', height: '34px', flexShrink: 0,
+            border: '1px solid var(--at-line)',
+            background: 'var(--at-surface-2)',
+            borderRadius: '9px', cursor: 'pointer', fontSize: '15px', lineHeight: 1,
+          }}
+        >
+          {themeIcon}
+        </button>
+
         {/* Divider */}
-        <div style={{ width: '1px', height: '24px', background: '#E1DDD0' }} />
+        <div style={{ width: '1px', height: '24px', background: 'var(--at-line)' }} />
 
         {/* User chip */}
         <div
@@ -186,7 +206,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             gap: '9px',
             padding: '5px 12px 5px 5px',
             borderRadius: '50px',
-            background: '#FAF7EF',
+            background: 'var(--at-surface-2)',
             border: '1px solid var(--at-line)',
           }}
         >
@@ -209,10 +229,10 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             {getInitials(currentUser.name)}
           </div>
           <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: '#15291F', lineHeight: '1.25' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--at-ink)', lineHeight: '1.25' }}>
               {currentUser.name.split(' ')[0]}
             </div>
-            <div style={{ fontSize: '10.5px', color: '#7E9389', lineHeight: '1' }}>
+            <div style={{ fontSize: '10.5px', color: 'var(--at-ink-3)', lineHeight: '1' }}>
               {getDisplayRoleLabel(currentUser)}
             </div>
           </div>

@@ -24,18 +24,18 @@ const CATEGORIAS: { value: CategoriaPropuesta; label: string; icon: string }[] =
 ]
 
 const PRIORIDAD_CONFIG: Record<PrioridadPropuesta, { label: string; color: string; bg: string }> = {
-  baja:  { label: 'Baja',  color: '#7E9389', bg: '#EAE6D8' },
+  baja:  { label: 'Baja',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
   media: { label: 'Media', color: '#f59e0b', bg: '#fef3c7' },
   alta:  { label: 'Alta',  color: '#ef4444', bg: '#fee2e2' },
 }
 
 const ESTADO_CONFIG: Record<EstadoPropuesta, { label: string; color: string; bg: string }> = {
-  propuesta:     { label: 'Propuesta',     color: '#7E9389', bg: '#EAE6D8' },
-  en_evaluacion: { label: 'En Evaluación', color: '#1B3B36', bg: '#D9E2DC' },
+  propuesta:     { label: 'Propuesta',     color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
+  en_evaluacion: { label: 'En Evaluación', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
   aprobada:      { label: 'Aprobada',      color: '#10b981', bg: '#d1fae5' },
   rechazada:     { label: 'Rechazada',     color: '#ef4444', bg: '#fee2e2' },
-  en_ejecucion:  { label: 'En Ejecución',  color: '#B96A3F', bg: '#F4EBE3' },
-  completada:    { label: 'Completada',    color: '#15291F', bg: '#E1DDD0' },
+  en_ejecucion:  { label: 'En Ejecución',  color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
+  completada:    { label: 'Completada',    color: 'var(--at-ink)', bg: 'var(--at-line)' },
 }
 
 const blank = (): Partial<PropuestaInversion> => ({
@@ -121,24 +121,24 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
 
   const catInfo = (c: CategoriaPropuesta) => CATEGORIAS.find(x => x.value === c) ?? CATEGORIAS[CATEGORIAS.length - 1]
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Propuestas de Inversión</h2>
-          {montoTotal > 0 && <span style={{ fontSize: '12px', color: '#7E9389' }}>Comprometido (aprobadas + ejecución): <strong style={{ color: '#1B3B36' }}>{moneda} {montoTotal.toLocaleString()}</strong></span>}
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Propuestas de Inversión</h2>
+          {montoTotal > 0 && <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Comprometido (aprobadas + ejecución): <strong style={{ color: 'var(--at-primary)' }}>{moneda} {montoTotal.toLocaleString()}</strong></span>}
         </div>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Propuesta</button>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Propuesta</button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Propuesta' : 'Nueva Propuesta'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '12px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
@@ -185,8 +185,8 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear'}
             </button>
           </div>
@@ -195,14 +195,14 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
 
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <button onClick={() => setFiltroEstado('todos')} style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroEstado === 'todos' ? '#1B3B36' : '#E1DDD0', background: filtroEstado === 'todos' ? '#D9E2DC' : 'white', color: filtroEstado === 'todos' ? '#1B3B36' : '#7E9389' }}>
+        <button onClick={() => setFiltroEstado('todos')} style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEstado === 'todos' ? 'var(--at-primary-soft)' : 'white', color: filtroEstado === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
           Todas ({propuestas.length})
         </button>
         {(Object.entries(ESTADO_CONFIG) as [EstadoPropuesta, typeof ESTADO_CONFIG[EstadoPropuesta]][]).map(([k, v]) => {
           const cnt = propuestas.filter(p => p.estado === k).length
           if (cnt === 0) return null
           return (
-            <button key={k} onClick={() => setFiltroEstado(k)} style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroEstado === k ? v.color : '#E1DDD0', background: filtroEstado === k ? v.bg : 'white', color: filtroEstado === k ? v.color : '#7E9389' }}>
+            <button key={k} onClick={() => setFiltroEstado(k)} style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroEstado === k ? v.color : 'var(--at-line)', background: filtroEstado === k ? v.bg : 'white', color: filtroEstado === k ? v.color : 'var(--at-ink-3)' }}>
               {v.label} ({cnt})
             </button>
           )
@@ -210,7 +210,7 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>💡</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay propuestas registradas</p>
         </div>
@@ -222,29 +222,29 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
             const est = ESTADO_CONFIG[p.estado]
             const totalVotos = p.votos_favor + p.votos_contra
             return (
-              <div key={p.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px' }}>
+              <div key={p.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '18px' }}>{cat.icon}</span>
-                      <span style={{ fontWeight: 700, fontSize: '14px', color: '#15291F' }}>{p.titulo}</span>
+                      <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{p.titulo}</span>
                       <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: prio.bg, color: prio.color }}>{prio.label}</span>
                       <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
                     </div>
-                    {p.descripcion && <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '4px' }}>{p.descripcion}</div>}
-                    <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '4px' }}>
+                    {p.descripcion && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '4px' }}>{p.descripcion}</div>}
+                    <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '4px' }}>
                       {p.fecha_propuesta}
-                      {p.monto_estimado && <span style={{ marginLeft: '8px', fontWeight: 600, color: '#15291F' }}>{moneda} {p.monto_estimado.toLocaleString()}</span>}
+                      {p.monto_estimado && <span style={{ marginLeft: '8px', fontWeight: 600, color: 'var(--at-ink)' }}>{moneda} {p.monto_estimado.toLocaleString()}</span>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                     {canEdit && (
                       <select value={p.estado} onChange={e => handleEstado(p.id, e.target.value as EstadoPropuesta)}
-                        style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'white', cursor: 'pointer' }}>
+                        style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'var(--at-surface)', cursor: 'pointer' }}>
                         {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                       </select>
                     )}
-                    {canEdit && <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+                    {canEdit && <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
                     {canEdit && <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
                   </div>
                 </div>

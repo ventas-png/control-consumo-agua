@@ -34,7 +34,7 @@ interface Notificacion {
 const URG: Record<Urgencia, { color: string; bg: string; border: string; label: string; order: number }> = {
   critico: { color: '#ef4444', bg: '#fef2f2', border: '#fca5a5', label: 'Crítico', order: 0 },
   alto:    { color: '#d97706', bg: '#fef3c7', border: '#fcd34d', label: 'Alto',    order: 1 },
-  medio:   { color: '#1B3B36', bg: '#EEF2EC', border: '#577B69', label: 'Medio',   order: 2 },
+  medio:   { color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', border: 'var(--at-accent-2)', label: 'Medio',   order: 2 },
   info:    { color: '#16a34a', bg: '#dcfce7', border: '#86efac', label: 'Info',    order: 3 },
 }
 
@@ -192,8 +192,8 @@ export default function CentroNotificacionesTab({
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F', marginBottom: 2 }}>Centro de Notificaciones</div>
-      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 14 }}>
+      <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)', marginBottom: 2 }}>Centro de Notificaciones</div>
+      <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 14 }}>
         Acciones pendientes en toda la plataforma · actualizado al {hoy}
       </div>
 
@@ -201,13 +201,13 @@ export default function CentroNotificacionesTab({
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         {([['critico', criticos], ['alto', altos], ['medio', medios], ['info', infos]] as [Urgencia, number][]).map(([u, cnt]) => (
           <div key={u} style={{ flex: '1 1 100px', background: URG[u].bg, border: `1px solid ${URG[u].border}`, borderRadius: 10, padding: '10px 14px' }}>
-            <div style={{ fontSize: 10, color: '#7E9389' }}>{URG[u].label}</div>
+            <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{URG[u].label}</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: URG[u].color, marginTop: 1 }}>{cnt}</div>
           </div>
         ))}
-        <div style={{ flex: '1 1 100px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px' }}>
-          <div style={{ fontSize: 10, color: '#7E9389' }}>Total pendientes</div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: '#3E5A4C', marginTop: 1 }}>{notificaciones.length}</div>
+        <div style={{ flex: '1 1 100px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px' }}>
+          <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>Total pendientes</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--at-ink-2)', marginTop: 1 }}>{notificaciones.length}</div>
         </div>
       </div>
 
@@ -215,7 +215,7 @@ export default function CentroNotificacionesTab({
         <div style={{ textAlign: 'center', padding: '48px 0', background: '#f0fdf4', borderRadius: 12, border: '1px solid #86efac' }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
           <div style={{ fontWeight: 700, color: '#16a34a', fontSize: 15 }}>Todo en orden</div>
-          <div style={{ fontSize: 12, color: '#7E9389', marginTop: 4 }}>No hay acciones pendientes en este momento</div>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>No hay acciones pendientes en este momento</div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -232,10 +232,10 @@ export default function CentroNotificacionesTab({
                       {cfg.label}
                     </span>
                     {n.conteo && n.conteo > 1 && (
-                      <span style={{ fontSize: 10, color: '#7E9389' }}>({n.conteo})</span>
+                      <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>({n.conteo})</span>
                     )}
                   </div>
-                  <div style={{ fontSize: 11, color: '#3E5A4C' }}>{n.detalle}</div>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-2)' }}>{n.detalle}</div>
                   {n.accion && <div style={{ fontSize: 10, color: cfg.color, marginTop: 4, fontStyle: 'italic' }}>→ {n.accion}</div>}
                 </div>
               </div>

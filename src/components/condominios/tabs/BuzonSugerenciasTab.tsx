@@ -16,16 +16,16 @@ interface Props {
 
 const CATEGORIA_CFG: Record<CategoriaSugerencia, { label: string; icon: string; color: string }> = {
   instalaciones: { label: 'Instalaciones', icon: '🔧', color: '#d97706' },
-  seguridad:     { label: 'Seguridad',     icon: '🛡️', color: '#9C5733' },
-  servicios:     { label: 'Servicios',     icon: '🧹', color: '#102622' },
+  seguridad:     { label: 'Seguridad',     icon: '🛡️', color: 'var(--at-accent-hover)' },
+  servicios:     { label: 'Servicios',     icon: '🧹', color: 'var(--at-primary-hover)' },
   convivencia:   { label: 'Convivencia',   icon: '🤝', color: '#16a34a' },
-  otro:          { label: 'Otro',          icon: '💬', color: '#7E9389' },
+  otro:          { label: 'Otro',          icon: '💬', color: 'var(--at-ink-3)' },
 }
 const ESTADO_CFG: Record<EstadoSugerencia, { label: string; bg: string; color: string; next?: EstadoSugerencia }> = {
   pendiente:   { label: 'Pendiente',   bg: '#fef3c7', color: '#d97706', next: 'en_revision' },
-  en_revision: { label: 'En revisión', bg: '#D9E2DC', color: '#1B3B36', next: 'respondida' },
+  en_revision: { label: 'En revisión', bg: 'var(--at-primary-soft)', color: 'var(--at-primary)', next: 'respondida' },
   respondida:  { label: 'Respondida',  bg: '#dcfce7', color: '#16a34a', next: 'archivada' },
-  archivada:   { label: 'Archivada',   bg: '#EAE6D8', color: '#7E9389' },
+  archivada:   { label: 'Archivada',   bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
 
 const BLANK = {
@@ -91,7 +91,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
   }
 
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
@@ -99,9 +99,9 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
           { label: 'Pendientes', val: pendientes, bg: '#fef3c7', color: '#d97706' },
-          { label: 'En revisión', val: enRevision, bg: '#D9E2DC', color: '#1B3B36' },
+          { label: 'En revisión', val: enRevision, bg: 'var(--at-primary-soft)', color: 'var(--at-primary)' },
           { label: 'Respondidas', val: sugerencias.filter(s => s.estado === 'respondida').length, bg: '#dcfce7', color: '#16a34a' },
-          { label: 'Total', val: sugerencias.length, bg: '#FAF7EF', color: '#3E5A4C' },
+          { label: 'Total', val: sugerencias.length, bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: k.color }}>{k.val}</div>
@@ -123,11 +123,11 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
             <option value="">Todas las categorías</option>
             {(Object.keys(CATEGORIA_CFG) as CategoriaSugerencia[]).map(c => <option key={c} value={c}>{CATEGORIA_CFG[c].icon} {CATEGORIA_CFG[c].label}</option>)}
           </select>
-          <span style={{ fontSize: 12, color: '#7E9389', alignSelf: 'center' }}>{lista.length} registros</span>
+          <span style={{ fontSize: 12, color: 'var(--at-ink-3)', alignSelf: 'center' }}>{lista.length} registros</span>
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nueva sugerencia'}
           </button>
         )}
@@ -135,7 +135,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF1EA', border: '1px solid var(--at-accent-soft)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: 'var(--at-accent-tint-2)', border: '1px solid var(--at-accent-soft)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nueva sugerencia / queja</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -161,11 +161,11 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" id="anonima" checked={form.anonima} onChange={e => setForm(p => ({ ...p, anonima: e.target.checked, unidad_id: e.target.checked ? '' : p.unidad_id }))} />
-              <label htmlFor="anonima" style={{ fontSize: 13, color: '#3E5A4C', cursor: 'pointer' }}>Enviar de forma anónima</label>
+              <label htmlFor="anonima" style={{ fontSize: 13, color: 'var(--at-ink-2)', cursor: 'pointer' }}>Enviar de forma anónima</label>
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Enviar sugerencia'}
           </button>
         </div>
@@ -173,7 +173,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
 
       {/* Lista + Detalle */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
           Sin sugerencias registradas
         </div>
@@ -186,21 +186,21 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
               const unidad = unidades.find(u => u.id === s.unidad_id)
               return (
                 <div key={s.id} onClick={() => setSelected(s === selected ? null : s)}
-                  style={{ background: selected?.id === s.id ? '#FAF1EA' : '#fff', border: `1.5px solid ${selected?.id === s.id ? '#CE8A63' : '#E1DDD0'}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === s.id ? 'var(--at-accent-tint-2)' : '#fff', border: `1.5px solid ${selected?.id === s.id ? 'var(--at-accent-light)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 3, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 15 }}>{cat.icon}</span>
-                        <span style={{ fontWeight: 600, fontSize: 13, color: '#15291F' }}>{s.titulo}</span>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-ink)' }}>{s.titulo}</span>
                         <span style={{ padding: '1px 7px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
-                        {s.anonima && <span style={{ padding: '1px 7px', borderRadius: 20, fontSize: 10, background: '#EAE6D8', color: '#7E9389' }}>Anónima</span>}
+                        {s.anonima && <span style={{ padding: '1px 7px', borderRadius: 20, fontSize: 10, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}>Anónima</span>}
                       </div>
-                      <div style={{ fontSize: 12, color: '#7E9389' }}>
+                      <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
                         {cat.label}
                         {!s.anonima && unidad && ` · ${unidad.nombre}`}
                         {` · ${new Date(s.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}`}
                       </div>
-                      <div style={{ fontSize: 12, color: '#3E5A4C', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 500 }}>
+                      <div style={{ fontSize: 12, color: 'var(--at-ink-2)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 500 }}>
                         {s.descripcion}
                       </div>
                     </div>
@@ -210,12 +210,12 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
             })}
           </div>
           {selected && (
-            <div style={{ width: 280, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 280, flexShrink: 0, background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
                 <span style={{ fontSize: 18 }}>{CATEGORIA_CFG[selected.categoria].icon}</span>
                 <span style={{ fontWeight: 700, fontSize: 13 }}>{selected.titulo}</span>
               </div>
-              <div style={{ fontSize: 12, color: '#3E5A4C', background: '#FAF7EF', borderRadius: 8, padding: '10px 12px', marginBottom: 10, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 12, color: 'var(--at-ink-2)', background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 10, lineHeight: 1.5 }}>
                 {selected.descripcion}
               </div>
               {[
@@ -226,8 +226,8 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
                 ['Respondido por', selected.respondido_por ?? '—'],
               ].map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--at-chip)' }}>
-                  <span style={{ color: '#7E9389' }}>{k}</span>
-                  <span style={{ fontWeight: 600, color: '#3E5A4C' }}>{v}</span>
+                  <span style={{ color: 'var(--at-ink-3)' }}>{k}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--at-ink-2)' }}>{v}</span>
                 </div>
               ))}
               {selected.respuesta && (
@@ -240,7 +240,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
                   {selected.estado === 'pendiente' && (
                     <button onClick={() => cambiarEstado(selected, 'en_revision')}
-                      style={{ padding: '7px 0', background: '#D9E2DC', color: '#1B3B36', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      style={{ padding: '7px 0', background: 'var(--at-primary-soft)', color: 'var(--at-primary)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                       🔍 Marcar en revisión
                     </button>
                   )}
@@ -251,7 +251,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
                     </button>
                   )}
                   <button onClick={() => cambiarEstado(selected, 'archivada')}
-                    style={{ padding: '7px 0', background: '#EAE6D8', color: '#7E9389', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ padding: '7px 0', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     📁 Archivar
                   </button>
                 </div>

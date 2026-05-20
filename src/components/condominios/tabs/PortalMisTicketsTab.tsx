@@ -16,16 +16,16 @@ type PrioridadTicket = 'baja' | 'media' | 'alta' | 'urgente'
 
 const ESTADO_CONFIG: Record<EstadoTicket, { label: string; icon: string; bg: string; color: string }> = {
   abierto:    { label: 'Abierto',     icon: '🟡', bg: '#fff7ed', color: '#c2410c' },
-  en_proceso: { label: 'En proceso',  icon: '🔵', bg: '#EEF2EC', color: '#1B3B36' },
+  en_proceso: { label: 'En proceso',  icon: '🔵', bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
   resuelto:   { label: 'Resuelto',    icon: '🟢', bg: '#f0fdf4', color: '#16a34a' },
-  cerrado:    { label: 'Cerrado',     icon: '⚪', bg: '#FAF7EF', color: '#7E9389' },
+  cerrado:    { label: 'Cerrado',     icon: '⚪', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
 const PRIORIDAD_CONFIG: Record<PrioridadTicket, { label: string; bg: string; color: string }> = {
   baja:    { label: 'Baja',    bg: '#f0fdf4', color: '#16a34a' },
   media:   { label: 'Media',   bg: '#fff7ed', color: '#c2410c' },
   alta:    { label: 'Alta',    bg: '#fef2f2', color: '#dc2626' },
-  urgente: { label: 'Urgente', bg: '#fdf2f8', color: '#9C5733' },
+  urgente: { label: 'Urgente', bg: '#fdf2f8', color: 'var(--at-accent-hover)' },
 }
 
 function blankForm() {
@@ -60,8 +60,8 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#15291F' }}>Mis solicitudes de mantenimiento</h3>
-          {abiertos > 0 && <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#1B3B36' }}>{abiertos} solicitud{abiertos !== 1 ? 'es' : ''} en proceso</p>}
+          <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: 'var(--at-ink)' }}>Mis solicitudes de mantenimiento</h3>
+          {abiertos > 0 && <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'var(--at-primary)' }}>{abiertos} solicitud{abiertos !== 1 ? 'es' : ''} en proceso</p>}
         </div>
         <button onClick={() => setShowForm(true)}
           style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
@@ -71,27 +71,27 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
 
       {/* Formulario */}
       {showForm && (
-        <div style={{ background: 'white', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
+        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
           <h4 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700 }}>Reportar problema</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>¿Qué necesita atención? *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>¿Qué necesita atención? *</label>
               <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej. Fuga de agua en baño, Luz quemada en pasillo..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Descripción detallada</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Descripción detallada</label>
               <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Cuéntenos más detalles del problema..." rows={3}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)', resize: 'vertical' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '6px' }}>Urgencia</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '6px' }}>Urgencia</label>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {(['baja', 'media', 'alta', 'urgente'] as PrioridadTicket[]).map(p => {
                   const pc = PRIORIDAD_CONFIG[p]
                   return (
                     <button key={p} onClick={() => setForm(f => ({ ...f, prioridad: p }))}
-                      style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid', borderColor: form.prioridad === p ? pc.color : '#E1DDD0', background: form.prioridad === p ? pc.bg : 'white', color: form.prioridad === p ? pc.color : '#7E9389' }}>
+                      style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid', borderColor: form.prioridad === p ? pc.color : 'var(--at-line)', background: form.prioridad === p ? pc.bg : 'white', color: form.prioridad === p ? pc.color : 'var(--at-ink-3)' }}>
                       {pc.label}
                     </button>
                   )
@@ -103,7 +103,7 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
             <button onClick={enviarSolicitud} disabled={saving} style={{ padding: '10px 22px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Enviando...' : '📤 Enviar solicitud'}
             </button>
-            <button onClick={() => { setShowForm(false); setForm(blankForm()) }} style={{ padding: '10px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={() => { setShowForm(false); setForm(blankForm()) }} style={{ padding: '10px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
@@ -113,16 +113,16 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
         {(['todos', 'abierto', 'en_proceso', 'resuelto', 'cerrado'] as const).map(f => (
           <button key={f} onClick={() => setFiltro(f)}
             style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: 'none',
-              background: filtro === f ? '#EEF2EC' : 'transparent', color: filtro === f ? '#1B3B36' : '#7E9389' }}>
+              background: filtro === f ? 'var(--at-primary-tint)' : 'transparent', color: filtro === f ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {f === 'todos' ? `Todos (${tickets.length})` : `${ESTADO_CONFIG[f].icon} ${ESTADO_CONFIG[f].label}`}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '10px' }}>🔧</div>
-          <p style={{ fontWeight: 600, color: '#7E9389' }}>Sin solicitudes{filtro !== 'todos' ? ' con este estado' : ''}</p>
+          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>Sin solicitudes{filtro !== 'todos' ? ' con este estado' : ''}</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -130,16 +130,16 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
             const ec = ESTADO_CONFIG[t.estado as EstadoTicket] ?? ESTADO_CONFIG.abierto
             const pc = PRIORIDAD_CONFIG[t.prioridad as PrioridadTicket] ?? PRIORIDAD_CONFIG.media
             return (
-              <div key={t.id} style={{ background: 'white', border: `1.5px solid ${t.estado === 'resuelto' || t.estado === 'cerrado' ? '#E1DDD0' : '#C2D2CA'}`, borderRadius: '12px', padding: '14px 16px' }}>
+              <div key={t.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${t.estado === 'resuelto' || t.estado === 'cerrado' ? 'var(--at-line)' : 'var(--at-primary-soft-2)'}`, borderRadius: '12px', padding: '14px 16px' }}>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '20px', flexShrink: 0 }}>{ec.icon}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#15291F', marginBottom: '3px' }}>{t.titulo}</div>
-                    {t.descripcion && <div style={{ fontSize: '12.5px', color: '#7E9389', marginBottom: '5px' }}>{t.descripcion}</div>}
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', marginBottom: '3px' }}>{t.titulo}</div>
+                    {t.descripcion && <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginBottom: '5px' }}>{t.descripcion}</div>}
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                       <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                       <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: pc.bg, color: pc.color }}>{pc.label}</span>
-                      <span style={{ fontSize: '11.5px', color: '#7E9389' }}>{new Date(t.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                      <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>{new Date(t.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                     </div>
                     {t.fecha_cierre && <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '4px' }}>✅ Resuelto el {new Date(t.fecha_cierre).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</div>}
                   </div>

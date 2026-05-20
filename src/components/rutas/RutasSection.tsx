@@ -343,7 +343,7 @@ export function RutasSection({
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#7E9389',
+      cancelButtonColor: 'var(--at-ink-3)',
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar',
     })
@@ -391,13 +391,13 @@ export function RutasSection({
     if (ruta.fecha_programada && ruta.fecha_programada < hoy)
       return { label: 'Vencida', color: '#dc2626', bg: '#fef2f2' }
     if (ruta.fecha_programada === hoy) return { label: 'Hoy', color: '#d97706', bg: '#fef9c3' }
-    return { label: 'Pendiente', color: '#102622', bg: '#D9E2DC' }
+    return { label: 'Pendiente', color: 'var(--at-primary-hover)', bg: 'var(--at-primary-soft)' }
   }
 
   // ─── EDITOR ────────────────────────────────────────────────────────────────
   if (creando) {
     return (
-      <div style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+      <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
         <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '24px', borderBottom: '2px solid var(--at-line)', paddingBottom: '12px' }}>
           {editando ? 'Editar Ruta' : 'Nueva Ruta de Lecturas'}
         </div>
@@ -434,8 +434,8 @@ export function RutasSection({
         </div>
 
         {/* Asignación de operador */}
-        <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '20px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
-          <div style={{ fontWeight: 700, marginBottom: '16px', color: '#3E5A4C' }}>Asignar Operador</div>
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: '12px', padding: '20px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
+          <div style={{ fontWeight: 700, marginBottom: '16px', color: 'var(--at-ink-2)' }}>Asignar Operador</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
             <div>
               <label style={labelStyle}>Operador</label>
@@ -477,7 +477,7 @@ export function RutasSection({
 
         {/* Selector de tipo de ruta */}
         <div style={{ marginBottom: '20px' }}>
-          <div style={{ fontWeight: 700, marginBottom: '10px', color: '#3E5A4C', fontSize: '14px' }}>Tipo de Ruta</div>
+          <div style={{ fontWeight: 700, marginBottom: '10px', color: 'var(--at-ink-2)', fontSize: '14px' }}>Tipo de Ruta</div>
           <div style={{ display: 'flex', gap: '8px' }}>
             {(['clientes', 'contadores', 'unidades'] as const).map(tipo => {
               const labels = { clientes: 'Por cliente', contadores: 'Por contador', unidades: 'Por unidad' }
@@ -493,8 +493,8 @@ export function RutasSection({
                     fontWeight: 600,
                     fontSize: '13px',
                     cursor: 'pointer',
-                    background: active ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)' : '#FAF7EF',
-                    color: active ? 'white' : '#3E5A4C',
+                    background: active ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)' : 'var(--at-surface-2)',
+                    color: active ? 'white' : 'var(--at-ink-2)',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -512,7 +512,7 @@ export function RutasSection({
           {tipoRuta === 'clientes' && (
             <>
               <div>
-                <div style={{ fontWeight: 700, marginBottom: '10px', color: '#3E5A4C' }}>
+                <div style={{ fontWeight: 700, marginBottom: '10px', color: 'var(--at-ink-2)' }}>
                   Clientes disponibles ({clientesDisponibles.length})
                 </div>
                 <input
@@ -523,7 +523,7 @@ export function RutasSection({
                 />
                 <div style={{ maxHeight: '320px', overflowY: 'auto', border: '2px solid var(--at-line)', borderRadius: '10px' }}>
                   {clientesDisponibles.length === 0 && (
-                    <div style={{ padding: '16px', color: '#7E9389', textAlign: 'center', fontSize: '13px' }}>
+                    <div style={{ padding: '16px', color: 'var(--at-ink-3)', textAlign: 'center', fontSize: '13px' }}>
                       {busqueda ? 'Sin resultados' : 'Todos los clientes ya están en la ruta'}
                     </div>
                   )}
@@ -531,20 +531,20 @@ export function RutasSection({
                     <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)' }}>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: '13px' }}>{c.nombre}</div>
-                        <div style={{ fontSize: '11px', color: '#7E9389' }}>{c.codigo}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{c.codigo}</div>
                       </div>
-                      <button onClick={() => agregarCliente(c)} style={{ padding: '4px 10px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>+</button>
+                      <button onClick={() => agregarCliente(c)} style={{ padding: '4px 10px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>+</button>
                     </div>
                   ))}
                 </div>
               </div>
               <div>
-                <div style={{ fontWeight: 700, marginBottom: '10px', color: '#3E5A4C' }}>
+                <div style={{ fontWeight: 700, marginBottom: '10px', color: 'var(--at-ink-2)' }}>
                   En esta ruta ({clientesEnRuta.length}) — arrastra para reordenar
                 </div>
                 <div style={{ maxHeight: '370px', overflowY: 'auto', border: '2px solid var(--at-line)', borderRadius: '10px', minHeight: '60px' }}>
                   {clientesEnRuta.length === 0 && (
-                    <div style={{ padding: '20px', color: '#7E9389', textAlign: 'center', fontSize: '13px' }}>Agrega clientes desde el panel izquierdo</div>
+                    <div style={{ padding: '20px', color: 'var(--at-ink-3)', textAlign: 'center', fontSize: '13px' }}>Agrega clientes desde el panel izquierdo</div>
                   )}
                   {clientesEnRuta.map((c, idx) => (
                     <div
@@ -553,14 +553,14 @@ export function RutasSection({
                       onDragStart={() => handleDragStart(idx)}
                       onDragOver={e => handleDragOver(e, idx)}
                       onDrop={handleDrop}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)', background: draggingIdx === idx ? '#EEF2EC' : 'white', cursor: 'grab', userSelect: 'none' }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)', background: draggingIdx === idx ? 'var(--at-primary-tint)' : 'white', cursor: 'grab', userSelect: 'none' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ color: '#7E9389', fontSize: '16px' }}>⠿</span>
+                        <span style={{ color: 'var(--at-ink-3)', fontSize: '16px' }}>⠿</span>
                         <div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#1B3B36', marginRight: '6px' }}>#{idx + 1}</span>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-primary)', marginRight: '6px' }}>#{idx + 1}</span>
                           <span style={{ fontWeight: 600, fontSize: '13px' }}>{c.nombre}</span>
-                          <div style={{ fontSize: '11px', color: '#7E9389' }}>{c.codigo}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{c.codigo}</div>
                         </div>
                       </div>
                       <button onClick={() => quitarCliente(idx)} style={{ padding: '2px 8px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
@@ -575,7 +575,7 @@ export function RutasSection({
           {tipoRuta === 'contadores' && (
             <>
               <div>
-                <div style={{ fontWeight: 700, marginBottom: '10px', color: '#3E5A4C' }}>
+                <div style={{ fontWeight: 700, marginBottom: '10px', color: 'var(--at-ink-2)' }}>
                   Contadores disponibles ({contadoresDisponibles.length})
                 </div>
                 <select
@@ -594,7 +594,7 @@ export function RutasSection({
                 />
                 <div style={{ maxHeight: '280px', overflowY: 'auto', border: '2px solid var(--at-line)', borderRadius: '10px' }}>
                   {contadoresDisponibles.length === 0 && (
-                    <div style={{ padding: '16px', color: '#7E9389', textAlign: 'center', fontSize: '13px' }}>
+                    <div style={{ padding: '16px', color: 'var(--at-ink-3)', textAlign: 'center', fontSize: '13px' }}>
                       {busqueda || proyectoFiltro ? 'Sin resultados' : 'Todos los contadores ya están en la ruta'}
                     </div>
                   )}
@@ -604,21 +604,21 @@ export function RutasSection({
                       <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)' }}>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: '13px' }}>{c.numero_serie}</div>
-                          <div style={{ fontSize: '11px', color: '#7E9389' }}>{proyecto?.nombre ?? ''}{c.descripcion ? ` · ${c.descripcion}` : ''} · {c.tipo_agua}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{proyecto?.nombre ?? ''}{c.descripcion ? ` · ${c.descripcion}` : ''} · {c.tipo_agua}</div>
                         </div>
-                        <button onClick={() => agregarContador(c)} style={{ padding: '4px 10px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>+</button>
+                        <button onClick={() => agregarContador(c)} style={{ padding: '4px 10px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>+</button>
                       </div>
                     )
                   })}
                 </div>
               </div>
               <div>
-                <div style={{ fontWeight: 700, marginBottom: '10px', color: '#3E5A4C' }}>
+                <div style={{ fontWeight: 700, marginBottom: '10px', color: 'var(--at-ink-2)' }}>
                   En esta ruta ({contadoresEnRuta.length}) — arrastra para reordenar
                 </div>
                 <div style={{ maxHeight: '370px', overflowY: 'auto', border: '2px solid var(--at-line)', borderRadius: '10px', minHeight: '60px' }}>
                   {contadoresEnRuta.length === 0 && (
-                    <div style={{ padding: '20px', color: '#7E9389', textAlign: 'center', fontSize: '13px' }}>Agrega contadores desde el panel izquierdo</div>
+                    <div style={{ padding: '20px', color: 'var(--at-ink-3)', textAlign: 'center', fontSize: '13px' }}>Agrega contadores desde el panel izquierdo</div>
                   )}
                   {contadoresEnRuta.map((c, idx) => (
                     <div
@@ -637,14 +637,14 @@ export function RutasSection({
                         setDraggingIdx(null)
                         dragOver.current = null
                       }}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)', background: draggingIdx === idx ? '#EEF2EC' : 'white', cursor: 'grab', userSelect: 'none' }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)', background: draggingIdx === idx ? 'var(--at-primary-tint)' : 'white', cursor: 'grab', userSelect: 'none' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ color: '#7E9389', fontSize: '16px' }}>⠿</span>
+                        <span style={{ color: 'var(--at-ink-3)', fontSize: '16px' }}>⠿</span>
                         <div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#1B3B36', marginRight: '6px' }}>#{idx + 1}</span>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-primary)', marginRight: '6px' }}>#{idx + 1}</span>
                           <span style={{ fontWeight: 600, fontSize: '13px' }}>{c.numero_serie}</span>
-                          <div style={{ fontSize: '11px', color: '#7E9389' }}>{c.tipo_agua}{c.descripcion ? ` · ${c.descripcion}` : ''}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{c.tipo_agua}{c.descripcion ? ` · ${c.descripcion}` : ''}</div>
                         </div>
                       </div>
                       <button onClick={() => quitarContador(idx)} style={{ padding: '2px 8px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
@@ -659,7 +659,7 @@ export function RutasSection({
           {tipoRuta === 'unidades' && (
             <>
               <div>
-                <div style={{ fontWeight: 700, marginBottom: '10px', color: '#3E5A4C' }}>
+                <div style={{ fontWeight: 700, marginBottom: '10px', color: 'var(--at-ink-2)' }}>
                   Unidades disponibles ({unidadesDisponibles.length})
                 </div>
                 <select
@@ -678,7 +678,7 @@ export function RutasSection({
                 />
                 <div style={{ maxHeight: '280px', overflowY: 'auto', border: '2px solid var(--at-line)', borderRadius: '10px' }}>
                   {unidadesDisponibles.length === 0 && (
-                    <div style={{ padding: '16px', color: '#7E9389', textAlign: 'center', fontSize: '13px' }}>
+                    <div style={{ padding: '16px', color: 'var(--at-ink-3)', textAlign: 'center', fontSize: '13px' }}>
                       {busqueda || proyectoFiltro ? 'Sin resultados' : 'Todas las unidades ya están en la ruta'}
                     </div>
                   )}
@@ -688,21 +688,21 @@ export function RutasSection({
                       <div key={u.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)' }}>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: '13px' }}>{u.nombre}</div>
-                          <div style={{ fontSize: '11px', color: '#7E9389' }}>{proyecto?.nombre ?? ''} · {u.tipo}{u.piso != null ? ` · Piso ${u.piso}` : ''}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{proyecto?.nombre ?? ''} · {u.tipo}{u.piso != null ? ` · Piso ${u.piso}` : ''}</div>
                         </div>
-                        <button onClick={() => agregarUnidad(u)} style={{ padding: '4px 10px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>+</button>
+                        <button onClick={() => agregarUnidad(u)} style={{ padding: '4px 10px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700, fontSize: '16px' }}>+</button>
                       </div>
                     )
                   })}
                 </div>
               </div>
               <div>
-                <div style={{ fontWeight: 700, marginBottom: '10px', color: '#3E5A4C' }}>
+                <div style={{ fontWeight: 700, marginBottom: '10px', color: 'var(--at-ink-2)' }}>
                   En esta ruta ({unidadesEnRuta.length}) — arrastra para reordenar
                 </div>
                 <div style={{ maxHeight: '370px', overflowY: 'auto', border: '2px solid var(--at-line)', borderRadius: '10px', minHeight: '60px' }}>
                   {unidadesEnRuta.length === 0 && (
-                    <div style={{ padding: '20px', color: '#7E9389', textAlign: 'center', fontSize: '13px' }}>Agrega unidades desde el panel izquierdo</div>
+                    <div style={{ padding: '20px', color: 'var(--at-ink-3)', textAlign: 'center', fontSize: '13px' }}>Agrega unidades desde el panel izquierdo</div>
                   )}
                   {unidadesEnRuta.map((u, idx) => (
                     <div
@@ -721,14 +721,14 @@ export function RutasSection({
                         setDraggingIdx(null)
                         dragOver.current = null
                       }}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)', background: draggingIdx === idx ? '#EEF2EC' : 'white', cursor: 'grab', userSelect: 'none' }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)', background: draggingIdx === idx ? 'var(--at-primary-tint)' : 'white', cursor: 'grab', userSelect: 'none' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ color: '#7E9389', fontSize: '16px' }}>⠿</span>
+                        <span style={{ color: 'var(--at-ink-3)', fontSize: '16px' }}>⠿</span>
                         <div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#1B3B36', marginRight: '6px' }}>#{idx + 1}</span>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-primary)', marginRight: '6px' }}>#{idx + 1}</span>
                           <span style={{ fontWeight: 600, fontSize: '13px' }}>{u.nombre}</span>
-                          <div style={{ fontSize: '11px', color: '#7E9389' }}>{u.tipo}{u.piso != null ? ` · Piso ${u.piso}` : ''}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{u.tipo}{u.piso != null ? ` · Piso ${u.piso}` : ''}</div>
                         </div>
                       </div>
                       <button onClick={() => quitarUnidad(idx)} style={{ padding: '2px 8px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
@@ -761,7 +761,7 @@ export function RutasSection({
           )}
           <button
             onClick={cancelar}
-            style={{ padding: '12px 24px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+            style={{ padding: '12px 24px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
           >
             Cancelar
           </button>
@@ -786,7 +786,7 @@ export function RutasSection({
       </div>
 
       {rutas.length === 0 && (
-        <div style={{ background: 'white', borderRadius: '24px', padding: '48px', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', color: '#7E9389' }}>
+        <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '48px', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '48px', marginBottom: '12px' }}>🗺️</div>
           <div style={{ fontSize: '18px', fontWeight: 600, marginBottom: '8px' }}>No hay rutas creadas</div>
           <div>Crea una ruta para planificar el orden de lecturas</div>
@@ -812,14 +812,14 @@ export function RutasSection({
           return (
             <div
               key={ruta.id}
-              style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid var(--at-line)' }}
+              style={{ background: 'var(--at-surface)', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid var(--at-line)' }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '16px', marginBottom: '2px' }}>{ruta.nombre}</div>
-                  <div style={{ fontSize: '11px', color: '#7E9389', marginBottom: '2px' }}>{tipoLabel}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '2px' }}>{tipoLabel}</div>
                   {ruta.descripcion && (
-                    <div style={{ fontSize: '12px', color: '#7E9389' }}>{ruta.descripcion}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{ruta.descripcion}</div>
                   )}
                 </div>
                 <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: estado.bg, color: estado.color, whiteSpace: 'nowrap' }}>
@@ -827,14 +827,14 @@ export function RutasSection({
                 </span>
               </div>
 
-              <div style={{ fontSize: '13px', color: '#3E5A4C', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ fontSize: '13px', color: 'var(--at-ink-2)', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div>📅 {ruta.fecha_programada ? new Date(ruta.fecha_programada + 'T12:00:00').toLocaleDateString('es-GT') : 'Sin fecha'}</div>
                 <div>👤 {ruta.asignado_nombre ?? 'Sin asignar'}</div>
                 <div>📍 {itemCount} {itemLabel}{itemCount !== 1 ? 's' : ''}</div>
               </div>
 
               {preview.length > 0 && (
-                <div style={{ fontSize: '11px', color: '#7E9389', marginBottom: '14px', lineHeight: '1.6' }}>
+                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '14px', lineHeight: '1.6' }}>
                   {preview.join(' → ')}
                   {itemCount > 4 && ` → +${itemCount - 4} más`}
                 </div>
@@ -853,7 +853,7 @@ export function RutasSection({
                   <>
                     <button
                       onClick={() => abrirEditar(ruta)}
-                      style={{ padding: '8px 14px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
+                      style={{ padding: '8px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
                     >
                       Editar
                     </button>

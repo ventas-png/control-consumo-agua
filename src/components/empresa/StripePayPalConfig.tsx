@@ -6,7 +6,7 @@ import type { CompanyPaymentConfig } from '../../types'
 // -- Reusable style objects --------------------------------------------------
 const s = {
   card: {
-    background: '#FAF7EF',
+    background: 'var(--at-surface-2)',
     borderRadius: '12px',
     padding: '24px',
     marginBottom: '24px',
@@ -21,17 +21,17 @@ const s = {
   title: {
     fontSize: '16px',
     fontWeight: 700,
-    color: '#15291F',
+    color: 'var(--at-ink)',
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
   } as CSSProperties,
-  subtitle: { fontSize: '13px', color: '#7E9389', marginTop: '4px' },
+  subtitle: { fontSize: '13px', color: 'var(--at-ink-3)', marginTop: '4px' },
   label: {
     display: 'block',
     fontSize: '13px',
     fontWeight: 700,
-    color: '#3E5A4C',
+    color: 'var(--at-ink-2)',
     marginBottom: '8px',
   } as CSSProperties,
   input: {
@@ -51,9 +51,9 @@ const s = {
     fontSize: '14px',
     fontFamily: 'monospace',
   },
-  hint: { fontSize: '11px', color: '#7E9389', marginTop: '6px' },
+  hint: { fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '6px' },
   warning: { fontSize: '11px', color: '#ef4444', marginTop: '6px', fontWeight: 600 } as CSSProperties,
-  link: { color: '#1B3B36' },
+  link: { color: 'var(--at-primary)' },
   toggleSecretBtn: {
     position: 'absolute',
     right: '12px',
@@ -63,11 +63,11 @@ const s = {
     border: 'none',
     cursor: 'pointer',
     fontSize: '16px',
-    color: '#7E9389',
+    color: 'var(--at-ink-3)',
   } as CSSProperties,
   editBtn: {
     fontSize: '13px',
-    color: '#1B3B36',
+    color: 'var(--at-primary)',
     background: 'none',
     border: 'none',
     cursor: 'pointer',
@@ -95,8 +95,8 @@ function toggleBtn(active: boolean, saving: boolean) {
     padding: '10px 16px',
     borderRadius: '8px',
     border: 'none',
-    background: active ? '#10b981' : '#E1DDD0',
-    color: active ? 'white' : '#7E9389',
+    background: active ? '#10b981' : 'var(--at-line)',
+    color: active ? 'white' : 'var(--at-ink-3)',
     fontWeight: 700,
     fontSize: '13px',
     cursor: saving ? 'not-allowed' : 'pointer',
@@ -110,7 +110,7 @@ function primaryBtn(disabled: boolean) {
     padding: '12px',
     borderRadius: '8px',
     border: 'none',
-    background: disabled ? '#C7C2B0' : 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))',
+    background: disabled ? 'var(--at-line-strong)' : 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))',
     color: 'white',
     fontWeight: 700,
     fontSize: '14px',
@@ -354,7 +354,7 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
 
   return (
     <div>
-      <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '24px', color: '#15291F' }}>
+      <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '24px', color: 'var(--at-ink)' }}>
         Configuración de Pagos Online
       </h2>
 
@@ -549,8 +549,8 @@ function StripeConfigForm({ config, saving, testing, onSave, onTest }: StripeFor
               padding: '12px 20px',
               borderRadius: '8px',
               border: '1.5px solid var(--at-primary)',
-              background: 'white',
-              color: '#1B3B36',
+              background: 'var(--at-surface)',
+              color: 'var(--at-primary)',
               fontWeight: 700,
               fontSize: '14px',
               cursor: testing ? 'not-allowed' : 'pointer',

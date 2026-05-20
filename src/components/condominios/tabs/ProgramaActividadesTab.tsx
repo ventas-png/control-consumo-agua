@@ -14,18 +14,18 @@ interface Props {
 }
 
 const CATEGORIAS: { value: CategoriaActividad; label: string; icon: string; color: string }[] = [
-  { value: 'recreativa',  label: 'Recreativa',  icon: '🎉', color: '#B96A3F' },
+  { value: 'recreativa',  label: 'Recreativa',  icon: '🎉', color: 'var(--at-accent)' },
   { value: 'deportiva',   label: 'Deportiva',   icon: '⚽', color: '#10b981' },
-  { value: 'cultural',    label: 'Cultural',    icon: '🎭', color: '#B96A3F' },
-  { value: 'educativa',   label: 'Educativa',   icon: '📚', color: '#2F5D4F' },
+  { value: 'cultural',    label: 'Cultural',    icon: '🎭', color: 'var(--at-accent)' },
+  { value: 'educativa',   label: 'Educativa',   icon: '📚', color: 'var(--at-primary-2)' },
   { value: 'salud',       label: 'Salud',       icon: '💪', color: '#ef4444' },
-  { value: 'otro',        label: 'Otro',        icon: '📌', color: '#7E9389' },
+  { value: 'otro',        label: 'Otro',        icon: '📌', color: 'var(--at-ink-3)' },
 ]
 
 const ESTADOS: { value: EstadoActividad; label: string; color: string; bg: string }[] = [
-  { value: 'programada', label: 'Programada', color: '#B96A3F', bg: '#F4EBE3' },
+  { value: 'programada', label: 'Programada', color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
   { value: 'activa',     label: 'Activa',     color: '#10b981', bg: '#d1fae5' },
-  { value: 'completada', label: 'Completada', color: '#7E9389', bg: '#EAE6D8' },
+  { value: 'completada', label: 'Completada', color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
   { value: 'cancelada',  label: 'Cancelada',  color: '#ef4444', bg: '#fef2f2' },
 ]
 
@@ -108,7 +108,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
@@ -119,7 +119,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
             <span style={{ fontWeight: 600, fontSize: 14 }}>Actividades ({lista.length})</span>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nueva
               </button>
             )}
@@ -134,7 +134,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
           </select>
         </div>
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 16px', fontSize: 13 }}>Sin actividades</div>}
+        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin actividades</div>}
 
         {lista.map(a => {
           const cat = CATEGORIAS.find(c => c.value === a.categoria)
@@ -142,22 +142,22 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
           const disp = disponibilidad(a)
           return (
             <div key={a.id} onClick={() => { setSelected(a); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === a.id ? '#F4EBE3' : '#fff', borderLeft: `3px solid ${cat?.color}` }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === a.id ? 'var(--at-accent-tint)' : '#fff', borderLeft: `3px solid ${cat?.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {a.nombre}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.label}</span>
               </div>
-              {a.instructor && <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>👤 {a.instructor}</div>}
-              <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>
+              {a.instructor && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>👤 {a.instructor}</div>}
+              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>
                 {a.fecha_inicio}{a.fecha_fin ? ` → ${a.fecha_fin}` : ''}
                 {a.hora_inicio && <span> · {a.hora_inicio.slice(0, 5)}{a.hora_fin ? `–${a.hora_fin.slice(0, 5)}` : ''}</span>}
               </div>
               {disp !== null && (
                 <div style={{ marginTop: 4 }}>
-                  <div style={{ height: 4, background: '#E1DDD0', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: 4, background: 'var(--at-line)', borderRadius: 2, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${Math.min(disp.pct, 100)}%`, background: disp.pct >= 100 ? '#ef4444' : disp.pct >= 80 ? '#f59e0b' : '#10b981', transition: 'width 0.3s' }} />
                   </div>
-                  <div style={{ fontSize: 10, color: '#7E9389', marginTop: 1 }}>{a.inscritos}/{a.cupo_maximo} inscritos</div>
+                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 1 }}>{a.inscritos}/{a.cupo_maximo} inscritos</div>
                 </div>
               )}
             </div>
@@ -222,7 +222,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
                 <div style={{ display: 'flex', gap: 6 }}>
                   {DIAS.map(d => (
                     <button key={d} type="button" onClick={() => toggleDia(d)}
-                      style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: form.dias_semana.includes(d) ? '#B96A3F' : '#fff', color: form.dias_semana.includes(d) ? '#fff' : '#3E5A4C', borderColor: form.dias_semana.includes(d) ? '#B96A3F' : '#C7C2B0' }}>
+                      style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: form.dias_semana.includes(d) ? 'var(--at-accent)' : '#fff', color: form.dias_semana.includes(d) ? '#fff' : 'var(--at-ink-2)', borderColor: form.dias_semana.includes(d) ? 'var(--at-accent)' : 'var(--at-line-strong)' }}>
                       {DIAS_LABEL[d]}
                     </button>
                   ))}
@@ -239,7 +239,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
                 {saving ? 'Guardando…' : '✅ Crear actividad'}
               </button>
               <button onClick={() => setMostrarForm(false)}
-                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -256,35 +256,35 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
                 <div>
                   <div style={{ fontSize: 12, color: cat?.color, fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>{cat?.icon} {cat?.label}</div>
                   <div style={{ fontWeight: 700, fontSize: 20 }}>{selected.nombre}</div>
-                  {selected.instructor && <div style={{ fontSize: 13, color: '#7E9389', marginTop: 4 }}>👤 {selected.instructor}</div>}
-                  {selected.lugar && <div style={{ fontSize: 13, color: '#7E9389' }}>📍 {selected.lugar}</div>}
+                  {selected.instructor && <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>👤 {selected.instructor}</div>}
+                  {selected.lugar && <div style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>📍 {selected.lugar}</div>}
                 </div>
                 <span style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, background: est?.bg, color: est?.color, fontWeight: 600 }}>{est?.label}</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
-                <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 11, color: '#7E9389' }}>Período</div>
+                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Período</div>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.fecha_inicio}{selected.fecha_fin ? ` → ${selected.fecha_fin}` : ''}</div>
                 </div>
                 {(selected.hora_inicio || selected.hora_fin) && (
-                  <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#7E9389' }}>Horario</div>
+                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Horario</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.hora_inicio?.slice(0, 5) || '—'} – {selected.hora_fin?.slice(0, 5) || '—'}</div>
                   </div>
                 )}
-                <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 11, color: '#7E9389' }}>Costo</div>
+                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Costo</div>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.costo === 0 ? 'Gratuita' : `${moneda} ${selected.costo.toLocaleString()}`}</div>
                 </div>
               </div>
 
               {selected.dias_semana && selected.dias_semana.length > 0 && (
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 4 }}>Días</div>
+                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Días</div>
                   <div style={{ display: 'flex', gap: 4 }}>
                     {DIAS.map(d => (
-                      <span key={d} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, background: selected.dias_semana!.includes(d) ? '#F4EBE3' : '#EAE6D8', color: selected.dias_semana!.includes(d) ? '#B96A3F' : '#C7C2B0', fontWeight: selected.dias_semana!.includes(d) ? 700 : 400 }}>
+                      <span key={d} style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, background: selected.dias_semana!.includes(d) ? 'var(--at-accent-tint)' : 'var(--at-chip)', color: selected.dias_semana!.includes(d) ? 'var(--at-accent)' : 'var(--at-line-strong)', fontWeight: selected.dias_semana!.includes(d) ? 700 : 400 }}>
                         {DIAS_LABEL[d]}
                       </span>
                     ))}
@@ -293,20 +293,20 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
               )}
 
               {disp !== null && (
-                <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontSize: 13, fontWeight: 600 }}>Inscritos</span>
-                    <span style={{ fontSize: 13, color: disp.pct >= 100 ? '#ef4444' : '#3E5A4C' }}>{selected.inscritos} / {selected.cupo_maximo}</span>
+                    <span style={{ fontSize: 13, color: disp.pct >= 100 ? '#ef4444' : 'var(--at-ink-2)' }}>{selected.inscritos} / {selected.cupo_maximo}</span>
                   </div>
-                  <div style={{ height: 6, background: '#E1DDD0', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
+                  <div style={{ height: 6, background: 'var(--at-line)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
                     <div style={{ height: '100%', width: `${Math.min(disp.pct, 100)}%`, background: disp.pct >= 100 ? '#ef4444' : disp.pct >= 80 ? '#f59e0b' : '#10b981' }} />
                   </div>
-                  <div style={{ fontSize: 11, color: '#7E9389' }}>{disp.libre > 0 ? `${disp.libre} cupos disponibles` : 'Sin cupos disponibles'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{disp.libre > 0 ? `${disp.libre} cupos disponibles` : 'Sin cupos disponibles'}</div>
                 </div>
               )}
 
               {selected.descripcion && (
-                <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#3E5A4C', lineHeight: 1.6 }}>
+                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: 'var(--at-ink-2)', lineHeight: 1.6 }}>
                   {selected.descripcion}
                 </div>
               )}
@@ -328,11 +328,11 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
                   {selected.estado === 'activa' && (
                     <>
                       <button onClick={() => registrarInscripcion(selected)}
-                        style={{ padding: '6px 14px', background: '#F4EBE3', color: '#B96A3F', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                        style={{ padding: '6px 14px', background: 'var(--at-accent-tint)', color: 'var(--at-accent)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                         + Inscribir
                       </button>
                       <button onClick={() => cambiarEstado(selected, 'completada')}
-                        style={{ padding: '6px 14px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                        style={{ padding: '6px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                         ✓ Completar
                       </button>
                     </>
@@ -350,7 +350,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
         })()}
 
         {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#7E9389', fontSize: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
             Selecciona una actividad o crea una nueva
           </div>
         )}

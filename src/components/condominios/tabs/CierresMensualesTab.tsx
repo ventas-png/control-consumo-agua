@@ -56,7 +56,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
         <p>Saldo: <b style="color:${calc.saldo >= 0 ? '#10b981' : '#ef4444'}">${moneda} ${calc.saldo.toFixed(2)}</b></p>
         <p>Unidades morosas: <b>${calc.unidadesMorosas}</b></p>
       </div>`,
-      icon: 'question', showCancelButton: true, confirmButtonText: 'Confirmar Cierre', confirmButtonColor: '#1B3B36',
+      icon: 'question', showCancelButton: true, confirmButtonText: 'Confirmar Cierre', confirmButtonColor: 'var(--at-primary)',
     })
     if (!r.isConfirmed) return
     setSaving(true)
@@ -109,29 +109,29 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: 'white', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface)', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Cierres Mensuales</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Cierres Mensuales</h2>
       </div>
 
       {/* Generate new close */}
       {canCreate && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Generar nuevo cierre</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Período *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Período *</label>
               <input style={inputStyle} type="month" value={periodoNuevo} onChange={e => { setPeriodoNuevo(e.target.value); setPreviewing(false) }} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Cerrado por</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Cerrado por</label>
               <input style={inputStyle} value={cerradoPor} onChange={e => setCerradoPor(e.target.value)} placeholder="Administración" />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Notas</label>
               <input style={inputStyle} value={notas} onChange={e => setNotas(e.target.value)} placeholder="Observaciones del período (opcional)" />
             </div>
           </div>
@@ -139,28 +139,28 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
           {/* Preview */}
           {periodoNuevo && (
             <div>
-              <button onClick={() => setPreviewing(v => !v)} style={{ padding: '6px 12px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', marginRight: '8px' }}>
+              <button onClick={() => setPreviewing(v => !v)} style={{ padding: '6px 12px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', marginRight: '8px' }}>
                 {previewing ? '▾ Ocultar' : '▸ Vista previa'}
               </button>
               <button onClick={handleGenerar} disabled={saving || periodosCerrados.has(periodoNuevo)}
-                style={{ padding: '6px 18px', background: periodosCerrados.has(periodoNuevo) ? '#E1DDD0' : '#1B3B36', color: periodosCerrados.has(periodoNuevo) ? '#7E9389' : 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: periodosCerrados.has(periodoNuevo) ? 'not-allowed' : 'pointer' }}>
+                style={{ padding: '6px 18px', background: periodosCerrados.has(periodoNuevo) ? 'var(--at-line)' : 'var(--at-primary)', color: periodosCerrados.has(periodoNuevo) ? 'var(--at-ink-3)' : 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: periodosCerrados.has(periodoNuevo) ? 'not-allowed' : 'pointer' }}>
                 {saving ? 'Generando…' : periodosCerrados.has(periodoNuevo) ? '✓ Ya existe' : '⚡ Generar cierre'}
               </button>
             </div>
           )}
 
           {previewing && preview && (
-            <div style={{ marginTop: '12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px' }}>
+            <div style={{ marginTop: '12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
                 {[
-                  { label: 'Cuotas emitidas', value: preview.totalEmitidas,    color: '#1B3B36' },
+                  { label: 'Cuotas emitidas', value: preview.totalEmitidas,    color: 'var(--at-primary)' },
                   { label: 'Cuotas cobradas', value: preview.totalCobradas,    color: '#10b981' },
                   { label: 'Gastos del mes',  value: preview.totalGastos,      color: '#ef4444' },
                   { label: 'Saldo neto',      value: preview.saldo,            color: preview.saldo >= 0 ? '#10b981' : '#ef4444' },
                 ].map(k => (
                   <div key={k.label} style={{ textAlign: 'center', padding: '8px' }}>
                     <div style={{ fontSize: '15px', fontWeight: 800, color: k.color }}>{moneda} {k.value.toFixed(2)}</div>
-                    <div style={{ fontSize: '11px', color: '#7E9389' }}>{k.label}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{k.label}</div>
                   </div>
                 ))}
               </div>
@@ -172,28 +172,28 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
 
       {/* Table */}
       {sorted.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay cierres mensuales registrados.</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay cierres mensuales registrados.</div>
       ) : (
         <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: '#FAF7EF' }}>
+              <tr style={{ background: 'var(--at-surface-2)' }}>
                 {['Período','Cuotas emitidas','Cuotas cobradas','Gastos','Saldo','Morosas','Estado',''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Período' || h === 'Estado' || h === '' ? 'left' : 'right', fontSize: '11px', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Período' || h === 'Estado' || h === '' ? 'left' : 'right', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {sorted.map((c, i) => (
-                <tr key={c.id} style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF', borderBottom: '1px solid var(--at-chip)' }}>
+                <tr key={c.id} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
                   <td style={{ padding: '10px 12px', fontWeight: 700 }}>{c.periodo}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: '#7E9389' }}>{moneda} {c.total_cuotas_emitidas.toFixed(2)}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--at-ink-3)' }}>{moneda} {c.total_cuotas_emitidas.toFixed(2)}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>{moneda} {c.total_cuotas_cobradas.toFixed(2)}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', color: '#ef4444' }}>{moneda} {c.total_gastos.toFixed(2)}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: c.saldo_periodo >= 0 ? '#10b981' : '#ef4444' }}>
                     {c.saldo_periodo >= 0 ? '+' : ''}{moneda} {c.saldo_periodo.toFixed(2)}
                   </td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: c.unidades_morosas > 0 ? '#ef4444' : '#7E9389', fontWeight: c.unidades_morosas > 0 ? 700 : 400 }}>{c.unidades_morosas}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', color: c.unidades_morosas > 0 ? '#ef4444' : 'var(--at-ink-3)', fontWeight: c.unidades_morosas > 0 ? 700 : 400 }}>{c.unidades_morosas}</td>
                   <td style={{ padding: '10px 12px' }}>
                     <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
                       background: c.estado === 'cerrado' ? '#dcfce7' : '#fef3c7',
@@ -204,7 +204,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
                   <td style={{ padding: '10px 12px' }}>
                     <div style={{ display: 'flex', gap: '4px' }}>
                       <button onClick={() => exportarPDF(c)}
-                        style={{ padding: '3px 7px', background: '#EEF2EC', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#1B3B36', fontWeight: 600 }} title="Exportar PDF">
+                        style={{ padding: '3px 7px', background: 'var(--at-primary-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-primary)', fontWeight: 600 }} title="Exportar PDF">
                         📄
                       </button>
                       {canEdit && (

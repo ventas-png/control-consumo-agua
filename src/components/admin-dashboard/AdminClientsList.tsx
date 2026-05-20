@@ -35,7 +35,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
       case 'mora':
         return { bg: 'rgba(239, 68, 68, 0.15)', color: '#dc2626', label: '⚠ Mora' }
       default:
-        return { bg: 'rgba(148, 163, 184, 0.15)', color: '#7E9389', label: 'Sin lectura' }
+        return { bg: 'rgba(148, 163, 184, 0.15)', color: 'var(--at-ink-3)', label: 'Sin lectura' }
     }
   }
 
@@ -64,10 +64,10 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
         {clientesFiltrados.length === 0 ? (
           <div style={{
             padding: '32px',
-            background: 'white',
+            background: 'var(--at-surface)',
             borderRadius: '12px',
             textAlign: 'center',
-            color: '#7E9389',
+            color: 'var(--at-ink-3)',
           }}>
             No se encontraron clientes
           </div>
@@ -80,7 +80,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
               <div
                 key={cliente.id}
                 style={{
-                  background: 'white',
+                  background: 'var(--at-surface)',
                   borderRadius: '12px',
                   padding: '16px',
                   border: '1px solid var(--at-line)',
@@ -92,27 +92,27 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
               >
                 {/* Nombre y código */}
                 <div>
-                  <div style={{ fontWeight: '600', color: '#15291F', marginBottom: '4px' }}>
+                  <div style={{ fontWeight: '600', color: 'var(--at-ink)', marginBottom: '4px' }}>
                     {cliente.nombre}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#7E9389' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
                     Cód: {cliente.codigo}
                   </div>
                 </div>
 
                 {/* Consumo total */}
                 <div>
-                  <div style={{ fontSize: '12px', color: '#7E9389', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>
                     Consumo Total
                   </div>
-                  <div style={{ fontWeight: '700', fontSize: '16px', color: '#1B3B36' }}>
+                  <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--at-primary)' }}>
                     {stats.consumoTotal.toFixed(2)} m³
                   </div>
                 </div>
 
                 {/* Recaudo total */}
                 <div>
-                  <div style={{ fontSize: '12px', color: '#7E9389', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>
                     Recaudo Total
                   </div>
                   <div style={{ fontWeight: '700', fontSize: '16px', color: '#10b981' }}>
@@ -122,10 +122,10 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
 
                 {/* Última lectura */}
                 <div>
-                  <div style={{ fontSize: '12px', color: '#7E9389', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>
                     Última Lectura
                   </div>
-                  <div style={{ fontWeight: '500', fontSize: '13px', color: '#3E5A4C' }}>
+                  <div style={{ fontWeight: '500', fontSize: '13px', color: 'var(--at-ink-2)' }}>
                     {stats.ultimaLectura
                       ? new Date(stats.ultimaLectura.fecha).toLocaleDateString('es-GT')
                       : 'Sin lecturas'
@@ -158,11 +158,11 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
         <div style={{
           marginTop: '24px',
           padding: '16px',
-          background: '#EEF2EC',
+          background: 'var(--at-primary-tint)',
           borderRadius: '12px',
           border: '1px solid var(--at-primary-soft-2)',
           fontSize: '13px',
-          color: '#102622',
+          color: 'var(--at-primary-hover)',
         }}>
           <strong>{clientesFiltrados.length}</strong> clientes mostrados
         </div>

@@ -111,11 +111,11 @@ const STATUS_LABELS: Record<ConversationStatus, string> = {
 }
 
 const STATUS_COLORS: Record<ConversationStatus, string> = {
-  abierta: '#2F5D4F',
+  abierta: 'var(--at-primary-2)',
   en_progreso: '#f59e0b',
-  esperando_cliente: '#B96A3F',
+  esperando_cliente: 'var(--at-accent)',
   resuelta: '#10b981',
-  cerrada: '#7E9389',
+  cerrada: 'var(--at-ink-3)',
 }
 
 function formatDate(iso: string): string {
@@ -255,7 +255,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                 border: 'none',
                 borderBottom: active ? '2px solid var(--at-primary)' : '2px solid transparent',
                 marginBottom: '-2px',
-                color: active ? '#1B3B36' : '#7E9389',
+                color: active ? 'var(--at-primary)' : 'var(--at-ink-3)',
                 fontWeight: active ? 700 : 500,
                 fontSize: '13.5px',
                 cursor: 'pointer',
@@ -299,8 +299,8 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#15291F' }}>Mis Conversaciones</h3>
-          <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#7E9389' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--at-ink)' }}>Mis Conversaciones</h3>
+          <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>
             Comunícate directamente con nuestra empresa
           </p>
         </div>
@@ -330,10 +330,10 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
             onClick={() => setView('list')}
             style={{
               padding: '8px 14px',
-              background: 'white',
+              background: 'var(--at-surface)',
               border: '1px solid var(--at-line-strong)',
               borderRadius: '10px',
-              color: '#3E5A4C',
+              color: 'var(--at-ink-2)',
               fontSize: '13px',
               cursor: 'pointer',
             }}
@@ -346,19 +346,19 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {/* ── Vista: Nueva conversación ── */}
       {view === 'new' && (
         <div style={{
-          background: 'white',
+          background: 'var(--at-surface)',
           border: '1px solid var(--at-line)',
           borderRadius: '14px',
           padding: '24px',
           boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
         }}>
-          <h4 style={{ margin: '0 0 20px', fontSize: '15px', fontWeight: 700, color: '#15291F' }}>
+          <h4 style={{ margin: '0 0 20px', fontSize: '15px', fontWeight: 700, color: 'var(--at-ink)' }}>
             Nueva consulta
           </h4>
 
           {/* Categorías */}
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '8px' }}>
+            <label style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '8px' }}>
               Tipo de consulta
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
@@ -368,16 +368,16 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   onClick={() => setNewCategory(cat)}
                   style={{
                     padding: '10px 12px',
-                    border: `2px solid ${newCategory === cat ? '#1B3B36' : '#E1DDD0'}`,
+                    border: `2px solid ${newCategory === cat ? 'var(--at-primary)' : 'var(--at-line)'}`,
                     borderRadius: '10px',
-                    background: newCategory === cat ? '#EEF2EC' : 'white',
+                    background: newCategory === cat ? 'var(--at-primary-tint)' : 'white',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
                     fontSize: '13px',
                     fontWeight: newCategory === cat ? 600 : 400,
-                    color: newCategory === cat ? '#102622' : '#3E5A4C',
+                    color: newCategory === cat ? 'var(--at-primary-hover)' : 'var(--at-ink-2)',
                     transition: 'all 0.12s',
                     textAlign: 'left',
                   }}
@@ -391,7 +391,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
 
           {/* Asunto */}
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '6px' }}>
+            <label style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '6px' }}>
               Asunto *
             </label>
             <input
@@ -415,7 +415,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
 
           {/* Prioridad */}
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '6px' }}>
+            <label style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '6px' }}>
               Urgencia
             </label>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -425,10 +425,10 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   onClick={() => setNewPriority(val as ConversationPriority)}
                   style={{
                     padding: '6px 14px',
-                    border: `2px solid ${newPriority === val ? color : '#E1DDD0'}`,
+                    border: `2px solid ${newPriority === val ? color : 'var(--at-line)'}`,
                     borderRadius: '999px',
                     background: newPriority === val ? color + '18' : 'white',
-                    color: newPriority === val ? color : '#7E9389',
+                    color: newPriority === val ? color : 'var(--at-ink-3)',
                     fontSize: '12px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -442,7 +442,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
 
           {/* Mensaje */}
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '6px' }}>
+            <label style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '6px' }}>
               Describe tu consulta *
             </label>
             <textarea
@@ -479,10 +479,10 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               onClick={() => { setView('list'); setFormError('') }}
               style={{
                 padding: '10px 18px',
-                background: 'white',
+                background: 'var(--at-surface)',
                 border: '1px solid var(--at-line-strong)',
                 borderRadius: '10px',
-                color: '#3E5A4C',
+                color: 'var(--at-ink-2)',
                 fontSize: '13px',
                 cursor: 'pointer',
                 fontWeight: 500,
@@ -495,7 +495,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               disabled={creating}
               style={{
                 padding: '10px 22px',
-                background: creating ? '#7E9389' : 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)',
+                background: creating ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '10px',
@@ -514,23 +514,23 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {/* ── Vista: Lista de conversaciones ── */}
       {view === 'list' && (
         <div style={{
-          background: 'white',
+          background: 'var(--at-surface)',
           border: '1px solid var(--at-line)',
           borderRadius: '14px',
           overflow: 'hidden',
           boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
         }}>
           {loading ? (
-            <div style={{ padding: '48px', textAlign: 'center', color: '#7E9389', fontSize: '14px' }}>
+            <div style={{ padding: '48px', textAlign: 'center', color: 'var(--at-ink-3)', fontSize: '14px' }}>
               Cargando tus conversaciones…
             </div>
           ) : conversations.length === 0 ? (
             <div style={{ padding: '48px 24px', textAlign: 'center' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>💬</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: '#3E5A4C', marginBottom: '6px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px' }}>
                 Aún no tienes conversaciones
               </div>
-              <div style={{ fontSize: '13px', color: '#7E9389', marginBottom: '20px' }}>
+              <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginBottom: '20px' }}>
                 ¿Tienes alguna duda o consulta? Escríbenos.
               </div>
               <button
@@ -560,24 +560,24 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   padding: '14px 18px',
                   border: 'none',
                   borderBottom: idx < conversations.length - 1 ? '1px solid var(--at-chip)' : 'none',
-                  background: 'white',
+                  background: 'var(--at-surface)',
                   cursor: 'pointer',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '6px',
                   transition: 'background 0.12s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#FAF7EF')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--at-surface-2)')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'white')}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
                     <span style={{ fontSize: '20px' }}>{CATEGORY_ICONS[conv.category]}</span>
-                    <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#15291F', lineHeight: '1.3' }}>
+                    <span style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--at-ink)', lineHeight: '1.3' }}>
                       {conv.subject}
                     </span>
                   </div>
-                  <span style={{ fontSize: '11.5px', color: '#7E9389', flexShrink: 0 }}>
+                  <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', flexShrink: 0 }}>
                     {formatDate(conv.updated_at)}
                   </span>
                 </div>
@@ -591,13 +591,13 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   }}>
                     {STATUS_LABELS[conv.status]}
                   </span>
-                  <span style={{ fontSize: '11.5px', color: '#7E9389' }}>
+                  <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>
                     {CATEGORY_LABELS[conv.category]}
                   </span>
                   {conv.status === 'esperando_cliente' && (
                     <span style={{
                       fontSize: '11px', padding: '2px 8px',
-                      background: '#F4EBE3', color: '#9C5733',
+                      background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)',
                       borderRadius: '999px', fontWeight: 600,
                     }}>
                       Tienes mensajes sin leer
@@ -613,7 +613,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {/* ── Vista: Detalle / Chat ── */}
       {view === 'detail' && activeConversation && (
         <div style={{
-          background: 'white',
+          background: 'var(--at-surface)',
           border: '1px solid var(--at-line)',
           borderRadius: '14px',
           overflow: 'hidden',
@@ -625,11 +625,11 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
           <div style={{
             padding: '14px 18px',
             borderBottom: '1px solid var(--at-chip)',
-            background: '#FAF7EF',
+            background: 'var(--at-surface-2)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '20px' }}>{CATEGORY_ICONS[activeConversation.category]}</span>
-              <span style={{ fontWeight: 700, fontSize: '14px', color: '#15291F', flex: 1 }}>
+              <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)', flex: 1 }}>
                 {activeConversation.subject}
               </span>
               <span style={{
@@ -643,7 +643,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               </span>
             </div>
             {activeConversation.assigned_name && (
-              <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '4px', paddingLeft: '28px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '4px', paddingLeft: '28px' }}>
                 Atendido por: {activeConversation.assigned_name}
               </div>
             )}
@@ -658,10 +658,10 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',
-            background: '#FAF7EF',
+            background: 'var(--at-surface-2)',
           }}>
             {messages.filter(m => !m.is_internal_note).length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#7E9389', fontSize: '13px', paddingTop: '40px' }}>
+              <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', fontSize: '13px', paddingTop: '40px' }}>
                 No hay mensajes aún
               </div>
             ) : (
@@ -693,11 +693,11 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                         background: isMe
                           ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)'
                           : 'white',
-                        color: isMe ? 'white' : '#15291F',
+                        color: isMe ? 'white' : 'var(--at-ink)',
                         boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
                       }}>
                         {!isMe && (
-                          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: '#1B3B36' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--at-primary)' }}>
                             {msg.sender_name ?? 'Empresa'}
                           </div>
                         )}
@@ -732,13 +732,13 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
 
           {/* Compositor */}
           {activeConversation.status !== 'cerrada' && activeConversation.status !== 'resuelta' ? (
-            <div style={{ padding: '14px 16px', borderTop: '1px solid var(--at-chip)', background: 'white' }}>
+            <div style={{ padding: '14px 16px', borderTop: '1px solid var(--at-chip)', background: 'var(--at-surface)' }}>
               {/* Preview archivo pendiente */}
               {pendingFile && (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '8px',
                   padding: '7px 10px', marginBottom: '8px',
-                  background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)',
+                  background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)',
                   borderRadius: '8px',
                 }}>
                   {pendingFile.type.startsWith('image/') ? (
@@ -751,14 +751,14 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     <span style={{ fontSize: '22px', flexShrink: 0 }}>{getFileIcon(pendingFile.type)}</span>
                   )}
                   <div style={{ flex: 1, overflow: 'hidden' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 500, color: '#102622', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--at-primary-hover)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {pendingFile.name}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#7E9389' }}>{formatBytes(pendingFile.size)}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{formatBytes(pendingFile.size)}</div>
                   </div>
                   <button
                     onClick={() => setPendingFile(null)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', fontSize: '16px', lineHeight: 1, padding: '2px', flexShrink: 0 }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '16px', lineHeight: 1, padding: '2px', flexShrink: 0 }}
                   >
                     ×
                   </button>
@@ -779,14 +779,14 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     resize: 'none',
                     outline: 'none',
                     fontFamily: 'inherit',
-                    background: '#FAF7EF',
+                    background: 'var(--at-surface-2)',
                   }}
                   onKeyDown={e => {
                     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend()
                   }}
                 />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', border: '1px solid var(--at-line)', borderRadius: '12px', background: '#FAF7EF', fontSize: '20px' }}>
+                  <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', border: '1px solid var(--at-line)', borderRadius: '12px', background: 'var(--at-surface-2)', fontSize: '20px' }}>
                     📎
                     <input
                       type="file"
@@ -810,7 +810,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     style={{
                       padding: '12px 18px',
                       background: (sending || (!messageText.trim() && !pendingFile))
-                        ? '#C7C2B0'
+                        ? 'var(--at-line-strong)'
                         : 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)',
                       color: 'white',
                       border: 'none',
@@ -826,18 +826,18 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   </button>
                 </div>
               </div>
-              <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '5px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '5px' }}>
                 Ctrl+Enter para enviar · Max 10 MB por adjunto
               </div>
             </div>
           ) : (
             <div style={{
               padding: '14px 18px',
-              background: '#FAF7EF',
+              background: 'var(--at-surface-2)',
               borderTop: '1px solid var(--at-chip)',
               textAlign: 'center',
               fontSize: '13px',
-              color: '#7E9389',
+              color: 'var(--at-ink-3)',
             }}>
               {activeConversation.status === 'resuelta'
                 ? '✅ Esta consulta fue marcada como resuelta.'
@@ -851,23 +851,23 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
       {mainTab === 'comunicados' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#15291F' }}>Comunicados</h3>
-            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#7E9389' }}>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--at-ink)' }}>Comunicados</h3>
+            <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>
               Mensajes informativos de la empresa
             </p>
           </div>
           {clienteBroadcasts.length === 0 ? (
             <div style={{
               padding: '48px 24px', textAlign: 'center',
-              background: 'white', borderRadius: '14px',
+              background: 'var(--at-surface)', borderRadius: '14px',
               border: '1px solid var(--at-line)',
               boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
             }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>📢</div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: '#3E5A4C', marginBottom: '4px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '4px' }}>
                 Sin comunicados
               </div>
-              <div style={{ fontSize: '13px', color: '#7E9389' }}>
+              <div style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>
                 Aquí aparecerán los mensajes informativos de la empresa.
               </div>
             </div>
@@ -880,8 +880,8 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                 <div
                   key={recipient.id}
                   style={{
-                    background: 'white',
-                    border: `1px solid ${isUnread ? '#C2D2CA' : '#E1DDD0'}`,
+                    background: 'var(--at-surface)',
+                    border: `1px solid ${isUnread ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`,
                     borderRadius: '14px',
                     overflow: 'hidden',
                     boxShadow: isUnread ? '0 1px 8px rgba(47, 93, 79,0.12)' : '0 1px 4px rgba(0,0,0,0.04)',
@@ -911,14 +911,14 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     {isUnread && (
                       <span style={{
                         width: '8px', height: '8px', borderRadius: '50%',
-                        background: '#2F5D4F', flexShrink: 0,
+                        background: 'var(--at-primary-2)', flexShrink: 0,
                       }} />
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: isUnread ? 700 : 600, fontSize: '13.5px', color: '#15291F' }}>
+                      <div style={{ fontWeight: isUnread ? 700 : 600, fontSize: '13.5px', color: 'var(--at-ink)' }}>
                         {bc.title}
                       </div>
-                      <div style={{ fontSize: '11.5px', color: '#7E9389', marginTop: '2px' }}>
+                      <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                         {bc.sent_by_name} · {new Date(bc.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </div>
                     </div>
@@ -935,7 +935,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     <div style={{ padding: '0 18px 18px', borderTop: '1px solid var(--at-chip)' }}>
                       <div style={{
                         paddingTop: '14px',
-                        fontSize: '14px', color: '#3E5A4C',
+                        fontSize: '14px', color: 'var(--at-ink-2)',
                         lineHeight: '1.65', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                       }}>
                         {bc.body}

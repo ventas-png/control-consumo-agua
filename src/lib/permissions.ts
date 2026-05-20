@@ -52,12 +52,12 @@ export const PLATFORM_ROLE_LABELS: Record<UserRole, string> = {
 }
 
 export const PLATFORM_ROLE_COLORS: Record<UserRole, string> = {
-  super_admin: '#7c3aed',
-  company_owner: '#0ea5e9',
-  admin: '#0ea5e9',
-  operator: '#0d9488',
-  viewer: '#64748b',
-  cliente: '#64748b',
+  super_admin: '#9C5733',
+  company_owner: '#1B3B36',
+  admin: '#1B3B36',
+  operator: '#577B69',
+  viewer: '#7E9389',
+  cliente: '#7E9389',
   collector: '#f59e0b',
 }
 
@@ -102,10 +102,10 @@ export function getDisplayRoleLabel(session: UserSession | null | undefined): st
  * Falls back to the platform-role palette when no service-scoped role applies.
  */
 export function getDisplayRoleColor(session: UserSession | null | undefined): string {
-  if (!session) return '#64748b'
+  if (!session) return '#7E9389'
   const primary = pickPrimaryAssignedRole(session)
   if (primary?.color) return primary.color
-  return PLATFORM_ROLE_COLORS[session.role] ?? '#64748b'
+  return PLATFORM_ROLE_COLORS[session.role] ?? '#7E9389'
 }
 
 /**

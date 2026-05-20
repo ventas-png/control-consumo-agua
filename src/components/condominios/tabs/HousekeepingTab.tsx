@@ -16,7 +16,7 @@ interface Props {
 
 const ESTADO_CONFIG: Record<EstadoHousekeeping, { label: string; color: string; bg: string }> = {
   pendiente:  { label: 'Pendiente',  color: '#f59e0b', bg: '#fef3c7' },
-  en_proceso: { label: 'En proceso', color: '#1B3B36', bg: '#D9E2DC' },
+  en_proceso: { label: 'En proceso', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
   completado: { label: 'Completado', color: '#10b981', bg: '#d1fae5' },
   cancelado:  { label: 'Cancelado',  color: '#ef4444', bg: '#fee2e2' },
 }
@@ -104,8 +104,8 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -114,27 +114,27 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
           { label: 'Pendientes',       value: String(pendientes),                                                     icon: '⏳', color: '#f59e0b' },
-          { label: 'En proceso',       value: String(enProceso),                                                      icon: '🔄', color: '#1B3B36' },
+          { label: 'En proceso',       value: String(enProceso),                                                      icon: '🔄', color: 'var(--at-primary)' },
           { label: 'Completados (mes)',value: String(completados),                                                    icon: '✅', color: '#10b981' },
-          { label: 'Costo del mes',    value: costoMes > 0 ? `${moneda} ${costoMes.toFixed(0)}` : '—',               icon: '💰', color: '#B96A3F' },
+          { label: 'Costo del mes',    value: costoMes > 0 ? `${moneda} ${costoMes.toFixed(0)}` : '—',               icon: '💰', color: 'var(--at-accent)' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Housekeeping</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Housekeeping</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Servicio</button>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Servicio</button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Servicio' : 'Nuevo Servicio de Housekeeping'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
             <div>
@@ -182,8 +182,8 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
           </div>
@@ -195,9 +195,9 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
         {(['todos', 'pendiente', 'en_proceso', 'completado', 'cancelado'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0',
-              background: filtroEstado === e ? '#D9E2DC' : 'white',
-              color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
+              borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
+              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'white',
+              color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? `Todos (${servicios.length})` : `${ESTADO_CONFIG[e as EstadoHousekeeping]?.label} (${servicios.filter(s => s.estado === e).length})`}
           </button>
         ))}
@@ -205,7 +205,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
 
       {/* Vista agrupada por fecha */}
       {fechas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>🧹</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay servicios de housekeeping</p>
         </div>
@@ -214,40 +214,40 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
           {fechas.map(fecha => (
             <div key={fecha}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                <div style={{ height: '1px', flex: 1, background: '#E1DDD0' }} />
+                <div style={{ height: '1px', flex: 1, background: 'var(--at-line)' }} />
                 <span style={{ fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap',
                   background: fecha === today ? '#fef3c7' : 'white', padding: '2px 8px', borderRadius: '10px',
-                  border: `1.5px solid ${fecha === today ? '#fcd34d' : '#E1DDD0'}`,
-                  color: fecha === today ? '#92400e' : '#7E9389' }}>
+                  border: `1.5px solid ${fecha === today ? '#fcd34d' : 'var(--at-line)'}`,
+                  color: fecha === today ? '#92400e' : 'var(--at-ink-3)' }}>
                   {fecha === today ? '⭐ Hoy' : ''} {fecha}
                 </span>
-                <div style={{ height: '1px', flex: 1, background: '#E1DDD0' }} />
+                <div style={{ height: '1px', flex: 1, background: 'var(--at-line)' }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '10px' }}>
                 {byFecha[fecha].map(s => {
                   const est = ESTADO_CONFIG[s.estado]
                   const tipo = TIPO_CONFIG[s.tipo]
                   return (
-                    <div key={s.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '14px' }}>
+                    <div key={s.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '14px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#15291F' }}>{tipo.icon} {tipo.label}</div>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{tipo.icon} {tipo.label}</div>
                         <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: '#7E9389', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '10px' }}>
                         {s.unidad_nombre && <div>🏠 {s.unidad_nombre}</div>}
                         {s.responsable && <div>👤 {s.responsable}</div>}
                         {(s.hora_inicio || s.hora_fin) && <div>🕐 {s.hora_inicio ?? '?'} — {s.hora_fin ?? '?'}</div>}
-                        {s.costo && <div style={{ fontWeight: 600, color: '#15291F' }}>💰 {moneda} {s.costo.toFixed(2)}</div>}
+                        {s.costo && <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>💰 {moneda} {s.costo.toFixed(2)}</div>}
                       </div>
                       {canEdit && (
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                           {s.estado === 'pendiente' && (
-                            <button onClick={() => handleEstado(s.id, 'en_proceso')} style={{ flex: 1, padding: '4px 8px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Iniciar</button>
+                            <button onClick={() => handleEstado(s.id, 'en_proceso')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Iniciar</button>
                           )}
                           {s.estado === 'en_proceso' && (
                             <button onClick={() => handleEstado(s.id, 'completado')} style={{ flex: 1, padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Completar</button>
                           )}
-                          <button onClick={() => startEdit(s)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                          <button onClick={() => startEdit(s)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
                           <button onClick={() => handleDelete(s.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                         </div>
                       )}

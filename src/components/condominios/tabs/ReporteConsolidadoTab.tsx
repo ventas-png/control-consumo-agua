@@ -28,12 +28,12 @@ function fmt(n: number, moneda: string) { return `${moneda} ${n.toLocaleString('
 
 function pct(a: number, b: number): string { return b === 0 ? '—' : `${Math.round(a / b * 100)}%` }
 
-function KpiBox({ label, value, sub, color = '#15291F', bg = 'white', border = '#E1DDD0' }: { label: string; value: string; sub?: string; color?: string; bg?: string; border?: string }) {
+function KpiBox({ label, value, sub, color = 'var(--at-ink)', bg = 'white', border = 'var(--at-line)' }: { label: string; value: string; sub?: string; color?: string; bg?: string; border?: string }) {
   return (
     <div style={{ background: bg, border: `1.5px solid ${border}`, borderRadius: '10px', padding: '13px 15px' }}>
       <div style={{ fontSize: '20px', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', marginTop: '3px' }}>{label}</div>
-      {sub && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>{sub}</div>}
+      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', marginTop: '3px' }}>{label}</div>
+      {sub && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{sub}</div>}
     </div>
   )
 }
@@ -43,7 +43,7 @@ function Section({ title, icon, children }: { title: string; icon: string; child
     <div style={{ marginBottom: '28px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', paddingBottom: '8px', borderBottom: '2px solid var(--at-line)' }}>
         <span style={{ fontSize: '18px' }}>{icon}</span>
-        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#15291F' }}>{title}</h3>
+        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: 'var(--at-ink)' }}>{title}</h3>
       </div>
       {children}
     </div>
@@ -123,20 +123,20 @@ export function ReporteConsolidadoTab({
       {/* Controls */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px', flexWrap: 'wrap', gap: '12px' }} className="no-print">
         <div>
-          <h2 style={{ margin: '0 0 3px', fontSize: '17px', fontWeight: 800, color: '#15291F' }}>Reporte Ejecutivo Consolidado</h2>
-          <p style={{ margin: 0, fontSize: '13px', color: '#7E9389' }}>Vista integrada de todos los módulos del condominio</p>
+          <h2 style={{ margin: '0 0 3px', fontSize: '17px', fontWeight: 800, color: 'var(--at-ink)' }}>Reporte Ejecutivo Consolidado</h2>
+          <p style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-3)' }}>Vista integrada de todos los módulos del condominio</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <select value={mes} onChange={e => setMes(parseInt(e.target.value))}
-            style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: '#FAF7EF', fontWeight: 600 }}>
+            style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface-2)', fontWeight: 600 }}>
             {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
           </select>
           <select value={anio} onChange={e => setAnio(parseInt(e.target.value))}
-            style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: '#FAF7EF', fontWeight: 600 }}>
+            style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface-2)', fontWeight: 600 }}>
             {aniosDisp.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <button onClick={imprimir}
-            style={{ padding: '7px 16px', background: '#15291F', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+            style={{ padding: '7px 16px', background: 'var(--at-ink)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
             🖨️ Imprimir / PDF
           </button>
         </div>
@@ -179,13 +179,13 @@ export function ReporteConsolidadoTab({
             <KpiBox label="% Cobrado vs ppto."   value={presupuestoPeriodo > 0 ? pct(cobrado, presupuestoPeriodo) : '—'} color={cobrado >= presupuestoPeriodo ? '#16a34a' : '#dc2626'} />
           </div>
           {Object.keys(gastosXCat).length > 0 && (
-            <div style={{ background: '#FAF7EF', borderRadius: '10px', padding: '12px 14px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C', marginBottom: '8px' }}>Gastos por categoría</div>
+            <div style={{ background: 'var(--at-surface-2)', borderRadius: '10px', padding: '12px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>Gastos por categoría</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
                 {Object.entries(gastosXCat).sort((a,b) => b[1]-a[1]).map(([cat, monto]) => (
-                  <div key={cat} style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px' }}>
-                    <span style={{ color: '#7E9389' }}>{cat.replace(/_/g, ' ')}: </span>
-                    <span style={{ fontWeight: 700, color: '#15291F' }}>{fmt(monto, moneda)}</span>
+                  <div key={cat} style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px' }}>
+                    <span style={{ color: 'var(--at-ink-3)' }}>{cat.replace(/_/g, ' ')}: </span>
+                    <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{fmt(monto, moneda)}</span>
                   </div>
                 ))}
               </div>
@@ -235,7 +235,7 @@ export function ReporteConsolidadoTab({
         </Section>
 
         {/* Footer */}
-        <div style={{ borderTop: '1.5px solid var(--at-line)', paddingTop: '14px', marginTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#7E9389', flexWrap: 'wrap', gap: '6px' }}>
+        <div style={{ borderTop: '1.5px solid var(--at-line)', paddingTop: '14px', marginTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: 'var(--at-ink-3)', flexWrap: 'wrap', gap: '6px' }}>
           <span>Reporte: {periodo.label} — {proyectoNombre ?? 'Condominio'}</span>
           <span>Generado automáticamente · {new Date().toLocaleString('es')}</span>
         </div>

@@ -270,8 +270,8 @@ export function CalidadSection({
         {(['fuentes', 'analisis', 'historial'] as SubTab[]).map(t => (
           <button key={t} onClick={() => setSubTab(t)} style={{
             padding: '10px 20px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600,
-            background: subTab === t ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)' : '#EAE6D8',
-            color: subTab === t ? 'white' : '#3E5A4C',
+            background: subTab === t ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)' : 'var(--at-chip)',
+            color: subTab === t ? 'white' : 'var(--at-ink-2)',
           }}>
             {t === 'fuentes' ? '🗂️ Fuentes de Agua' : t === 'analisis' ? '🧪 Nuevo Análisis' : '📋 Historial Calidad'}
           </button>
@@ -281,7 +281,7 @@ export function CalidadSection({
       {/* FUENTES */}
       {subTab === 'fuentes' && (
         <div>
-          <div style={{ background: 'white', borderRadius: '24px', padding: '32px', marginBottom: '20px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+          <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', marginBottom: '20px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>
               {editandoId ? '✏️ Editar Fuente' : '🗂️ Fuentes de Agua'}
             </div>
@@ -310,17 +310,17 @@ export function CalidadSection({
               <button onClick={guardarFuente} disabled={savingFuente} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
                 {savingFuente ? 'Guardando...' : `💾 ${editandoId ? 'Actualizar Fuente' : 'Guardar Fuente'}`}
               </button>
-              <button onClick={() => { setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '' }); setEditandoId(null) }} style={{ padding: '12px 24px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => { setFuenteForm({ identificador: '', nombre: '', tipo_agua: '', descripcion: '' }); setEditandoId(null) }} style={{ padding: '12px 24px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
                 ✕ Cancelar
               </button>
             </div>
           </div>
 
-          <div style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+          <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>Fuentes Registradas</div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                <thead><tr style={{ background: '#EAE6D8' }}>
+                <thead><tr style={{ background: 'var(--at-chip)' }}>
                   {['ID', 'Identificador', 'Nombre', 'Tipología', 'Estado', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: 'left', borderBottom: '2px solid var(--at-line)' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
@@ -328,8 +328,8 @@ export function CalidadSection({
                     const tipologia = TIPOLOGIAS_CALIDAD[f.tipo_agua]
                     return (
                       <tr key={f.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
-                        <td style={{ padding: '10px', fontSize: '12px', color: '#7E9389' }}>{f.id.substring(0, 8)}…</td>
-                        <td style={{ padding: '10px', fontWeight: 600, color: '#102622' }}>{sanitizeHTML(f.identificador)}</td>
+                        <td style={{ padding: '10px', fontSize: '12px', color: 'var(--at-ink-3)' }}>{f.id.substring(0, 8)}…</td>
+                        <td style={{ padding: '10px', fontWeight: 600, color: 'var(--at-primary-hover)' }}>{sanitizeHTML(f.identificador)}</td>
                         <td style={{ padding: '10px' }}>{sanitizeHTML(f.nombre)}</td>
                         <td style={{ padding: '10px', fontSize: '13px' }}>{tipologia?.label ?? f.tipo_agua}</td>
                         <td style={{ padding: '10px' }}>
@@ -339,7 +339,7 @@ export function CalidadSection({
                         </td>
                         <td style={{ padding: '10px' }}>
                           <div style={{ display: 'flex', gap: '6px' }}>
-                            <button onClick={() => editarFuente(f)} style={{ background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>✏️ Editar</button>
+                            <button onClick={() => editarFuente(f)} style={{ background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>✏️ Editar</button>
                             <button onClick={() => toggleFuente(f.id, f.activo)} style={{ background: f.activo ? '#f59e0b' : '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>
                               {f.activo ? '⏸ Desactivar' : '▶ Activar'}
                             </button>
@@ -348,7 +348,7 @@ export function CalidadSection({
                       </tr>
                     )
                   })}
-                  {fuentesAgua.length === 0 && <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: '#7E9389' }}>Sin fuentes registradas</td></tr>}
+                  {fuentesAgua.length === 0 && <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: 'var(--at-ink-3)' }}>Sin fuentes registradas</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -358,7 +358,7 @@ export function CalidadSection({
 
       {/* ANÁLISIS */}
       {subTab === 'analisis' && (
-        <div style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+        <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
           <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>🧪 Nuevo Análisis de Calidad</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '20px' }}>
             <div>
@@ -376,8 +376,8 @@ export function CalidadSection({
 
           {tipologiaActual && (
             <div>
-              <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
-                <strong style={{ color: '#102622', fontSize: '14px' }}>Parámetros para: {tipologiaActual.label}</strong>
+              <div style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
+                <strong style={{ color: 'var(--at-primary-hover)', fontSize: '14px' }}>Parámetros para: {tipologiaActual.label}</strong>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                 {tipologiaActual.parametros.map(p => {
@@ -389,23 +389,23 @@ export function CalidadSection({
                     <div key={p.key}>
                       <label style={{ ...labelStyle, fontSize: '13px' }}>
                         {p.label}{p.unidad ? ` (${p.unidad})` : ''}
-                        <span style={{ fontWeight: 400, color: '#7E9389', fontSize: '11px' }}> [{rango}]</span>
+                        <span style={{ fontWeight: 400, color: 'var(--at-ink-3)', fontSize: '11px' }}> [{rango}]</span>
                       </label>
                       <input
                         type="number" step="any" value={val}
                         onChange={e => setParametroValues(prev => ({ ...prev, [p.key]: e.target.value }))}
                         placeholder="Ingrese valor"
-                        style={{ ...inputStyle, borderColor: ok === null ? '#E1DDD0' : ok ? '#10b981' : '#ef4444' }}
+                        style={{ ...inputStyle, borderColor: ok === null ? 'var(--at-line)' : ok ? '#10b981' : '#ef4444' }}
                       />
                     </div>
                   )
                 })}
               </div>
 
-              <div style={{ marginBottom: '16px', padding: '14px', borderRadius: '10px', background: '#FAF7EF', border: '1px solid var(--at-line)' }}>
+              <div style={{ marginBottom: '16px', padding: '14px', borderRadius: '10px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)' }}>
                 <div style={{ fontWeight: 600, marginBottom: '8px', fontSize: '14px' }}>Resumen de Cumplimiento</div>
                 {cvl.total === 0
-                  ? <span style={{ color: '#7E9389', fontSize: '13px' }}>Ingrese los valores para ver el cumplimiento.</span>
+                  ? <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>Ingrese los valores para ver el cumplimiento.</span>
                   : <span style={{ background: cvl.noCumple === 0 ? '#dcfce7' : '#fee2e2', color: cvl.noCumple === 0 ? '#166534' : '#991b1b', padding: '4px 12px', borderRadius: '8px', fontWeight: 600 }}>
                     {cvl.noCumple === 0 ? '✅ CUMPLE' : '❌ NO CUMPLE'} — {cvl.cumple}/{cvl.total + cvl.pendiente} parámetros OK{cvl.pendiente > 0 ? `, ${cvl.pendiente} pendiente(s)` : ''}
                   </span>
@@ -422,11 +422,11 @@ export function CalidadSection({
           <div style={{ marginBottom: '20px' }}>
             <label style={labelStyle}>Adjuntar Reporte (PDF o imagen, máx. 5 MB)</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <label style={{ cursor: 'pointer', background: '#1B3B36', color: 'white', padding: '8px 16px', borderRadius: '8px', fontSize: '14px' }}>
+              <label style={{ cursor: 'pointer', background: 'var(--at-primary)', color: 'white', padding: '8px 16px', borderRadius: '8px', fontSize: '14px' }}>
                 📎 Seleccionar archivo
                 <input type="file" accept=".pdf,image/*" hidden onChange={handleReporteFile} />
               </label>
-              <span style={{ fontSize: '13px', color: '#7E9389' }}>{reporteNombre ?? 'Ningún archivo seleccionado'}</span>
+              <span style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>{reporteNombre ?? 'Ningún archivo seleccionado'}</span>
               {reporteNombre && <button onClick={() => { setReporteBase64(null); setReporteTipo(null); setReporteNombre(null) }} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '13px' }}>✕ Quitar</button>}
             </div>
           </div>
@@ -435,7 +435,7 @@ export function CalidadSection({
             <button onClick={guardarAnalisis} disabled={savingAnalisis} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               {savingAnalisis ? 'Guardando...' : '💾 Guardar Análisis'}
             </button>
-            <button onClick={() => { setAnalisisFuenteId(''); setParametroValues({}); setAnalisisObs('') }} style={{ padding: '12px 24px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => { setAnalisisFuenteId(''); setParametroValues({}); setAnalisisObs('') }} style={{ padding: '12px 24px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               ✕ Limpiar
             </button>
           </div>
@@ -444,7 +444,7 @@ export function CalidadSection({
 
       {/* HISTORIAL */}
       {subTab === 'historial' && (
-        <div style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+        <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
           <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>📋 Historial de Análisis de Calidad</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '16px' }}>
             <div>
@@ -482,13 +482,13 @@ export function CalidadSection({
             <button onClick={async () => {
               const { exportarPDFCalidad } = await import('../../lib/pdf')
               exportarPDFCalidad(historialFiltrado, empresa)
-            }} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+            }} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               📄 Exportar PDF
             </button>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-              <thead><tr style={{ background: '#EAE6D8' }}>
+              <thead><tr style={{ background: 'var(--at-chip)' }}>
                 {['Fecha', 'Fuente', 'Tipología', 'Resultado', 'Observaciones', 'Acciones'].map(h => <th scope="col" key={h} style={{ padding: '10px', textAlign: h === 'Resultado' || h === 'Acciones' ? 'center' : 'left', borderBottom: '2px solid var(--at-line)' }}>{h}</th>)}
               </tr></thead>
               <tbody>
@@ -498,28 +498,28 @@ export function CalidadSection({
                   return (
                     <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                       <td style={{ padding: '10px', fontSize: '13px' }}>{new Date(r.fecha).toLocaleString('es-GT')}</td>
-                      <td style={{ padding: '10px', fontWeight: 600, color: '#102622' }}>{fuente ? sanitizeHTML(fuente.identificador) : '—'}</td>
+                      <td style={{ padding: '10px', fontWeight: 600, color: 'var(--at-primary-hover)' }}>{fuente ? sanitizeHTML(fuente.identificador) : '—'}</td>
                       <td style={{ padding: '10px', fontSize: '13px' }}>{tipologia?.label ?? fuente?.tipo_agua ?? '—'}</td>
                       <td style={{ padding: '10px', textAlign: 'center' }}>
                         <span style={{ background: r.cumple_total ? '#dcfce7' : '#fee2e2', color: r.cumple_total ? '#166534' : '#991b1b', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600 }}>
                           {r.cumple_total ? '✅ CUMPLE' : '❌ NO CUMPLE'}
                         </span>
                       </td>
-                      <td style={{ padding: '10px', fontSize: '13px', color: '#7E9389' }}>{sanitizeHTML(r.observaciones ?? '—')}</td>
+                      <td style={{ padding: '10px', fontSize: '13px', color: 'var(--at-ink-3)' }}>{sanitizeHTML(r.observaciones ?? '—')}</td>
                       <td style={{ padding: '10px' }}>
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                          <button onClick={() => verDetalle(r)} style={{ background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>🔍 Detalle</button>
+                          <button onClick={() => verDetalle(r)} style={{ background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>🔍 Detalle</button>
                           <button onClick={async () => {
                             const { generarPDFAnalisis } = await import('../../lib/pdf')
                             generarPDFAnalisis(r, empresa)
                           }} style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
-                          {r.reporte_base64 && <button onClick={() => verReporte(r)} style={{ background: '#B96A3F', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📎 Reporte</button>}
+                          {r.reporte_base64 && <button onClick={() => verReporte(r)} style={{ background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📎 Reporte</button>}
                         </div>
                       </td>
                     </tr>
                   )
                 })}
-                {historialFiltrado.length === 0 && <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: '#7E9389' }}>Sin registros con esos filtros</td></tr>}
+                {historialFiltrado.length === 0 && <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: 'var(--at-ink-3)' }}>Sin registros con esos filtros</td></tr>}
               </tbody>
             </table>
           </div>

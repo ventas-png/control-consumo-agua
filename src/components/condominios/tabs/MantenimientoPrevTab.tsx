@@ -40,9 +40,9 @@ function getStatus(p: PlanMantenimiento): 'vencido' | 'urgente' | 'proximo' | 'o
 const STATUS: Record<string, { bg: string; color: string; label: string }> = {
   vencido:   { bg: '#fee2e2', color: '#ef4444', label: 'Vencido' },
   urgente:   { bg: '#fef3c7', color: '#d97706', label: 'Urgente' },
-  proximo:   { bg: '#D9E2DC', color: '#102622', label: 'Próximo' },
+  proximo:   { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Próximo' },
   ok:        { bg: '#dcfce7', color: '#16a34a', label: 'Al día' },
-  sin_fecha: { bg: '#EAE6D8', color: '#7E9389', label: 'Sin fecha' },
+  sin_fecha: { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Sin fecha' },
 }
 
 const BLANK_PLAN = { equipo: '', descripcion: '', frecuencia: 'mensual', responsable: '', ultima_ejecucion: '', proxima_ejecucion: '', costo_estimado: 0 }
@@ -119,15 +119,15 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
   const vencidos = planesActivos.filter(p => getStatus(p) === 'vencido').length
   const proximos = planesActivos.filter(p => ['urgente', 'proximo'].includes(getStatus(p))).length
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Mantenimiento Preventivo</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Mantenimiento Preventivo</h2>
         {canCreate && !showForm && (
           <button onClick={() => setShowForm(true)}
-            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo Plan
           </button>
         )}
@@ -140,52 +140,52 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
           { label: 'Vencidos',       value: String(vencidos),            color: '#ef4444' },
           { label: 'Próximos 7d',    value: String(proximos),            color: '#f59e0b' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nuevo Plan de Mantenimiento</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Equipo / Área *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Equipo / Área *</label>
               <input style={inputStyle} value={form.equipo} onChange={e => setForm(f => ({ ...f, equipo: e.target.value }))} placeholder="Ej: Bomba de agua, Ascensor, Jardines" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Frecuencia</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Frecuencia</label>
               <select style={inputStyle} value={form.frecuencia} onChange={e => setForm(f => ({ ...f, frecuencia: e.target.value }))}>
                 {Object.entries(FREQ_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Responsable</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Responsable</label>
               <input style={inputStyle} value={form.responsable} onChange={e => setForm(f => ({ ...f, responsable: e.target.value }))} placeholder="Nombre o empresa" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Última ejecución</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Última ejecución</label>
               <input style={inputStyle} type="date" value={form.ultima_ejecucion} onChange={e => setForm(f => ({ ...f, ultima_ejecucion: e.target.value }))} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Próxima ejecución</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Próxima ejecución</label>
               <input style={inputStyle} type="date" value={form.proxima_ejecucion} onChange={e => setForm(f => ({ ...f, proxima_ejecucion: e.target.value }))} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Costo estimado ({moneda})</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Costo estimado ({moneda})</label>
               <input style={inputStyle} type="number" min="0" step="0.01" value={form.costo_estimado} onChange={e => setForm(f => ({ ...f, costo_estimado: parseFloat(e.target.value) || 0 }))} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSavePlan} disabled={saving}
-              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
               Cancelar
             </button>
           </div>
@@ -197,18 +197,18 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
         {/* Plans list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {planes.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay planes. Crea uno para comenzar.</div>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay planes. Crea uno para comenzar.</div>
           ) : (
             planes.map(p => {
               const st = getStatus(p)
               const stStyle = STATUS[st]
               return (
                 <div key={p.id} onClick={() => setSelected(selected === p.id ? null : p.id)}
-                  style={{ background: selected === p.id ? '#EEF2EC' : 'white', border: `1.5px solid ${selected === p.id ? '#1B3B36' : '#E1DDD0'}`, borderRadius: '10px', padding: '12px', cursor: 'pointer', opacity: p.activo ? 1 : 0.6 }}>
+                  style={{ background: selected === p.id ? 'var(--at-primary-tint)' : 'white', border: `1.5px solid ${selected === p.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px', cursor: 'pointer', opacity: p.activo ? 1 : 0.6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '13px', color: '#15291F' }}>{p.equipo}</div>
-                      <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{p.equipo}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                         {FREQ_LABELS[p.frecuencia]}{p.responsable ? ` · ${p.responsable}` : ''}
                       </div>
                       {p.proxima_ejecucion && (
@@ -229,11 +229,11 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
 
         {/* Detail */}
         {plan && (
-          <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px' }}>
+          <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
               <div>
                 <h3 style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: 700 }}>{plan.equipo}</h3>
-                <div style={{ fontSize: '12px', color: '#7E9389' }}>
+                <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
                   {FREQ_LABELS[plan.frecuencia]}
                   {plan.responsable ? ` · ${plan.responsable}` : ''}
                   {plan.costo_estimado ? ` · Est. ${moneda} ${plan.costo_estimado.toFixed(2)}` : ''}
@@ -248,7 +248,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
                 )}
                 {canCreate && plan.activo && (
                   <button onClick={() => setShowEjecForm(v => !v)}
-                    style={{ padding: '4px 12px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                    style={{ padding: '4px 12px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                     + Registrar ejecución
                   </button>
                 )}
@@ -257,22 +257,22 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
 
             {/* Execution form */}
             {showEjecForm && (
-              <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
+              <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px' }}>
                   <div>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha *</label>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha *</label>
                     <input style={inputStyle} type="date" value={ejecForm.fecha} onChange={e => setEjecForm(f => ({ ...f, fecha: e.target.value }))} />
                   </div>
                   <div>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Realizado por</label>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Realizado por</label>
                     <input style={inputStyle} value={ejecForm.realizado_por} onChange={e => setEjecForm(f => ({ ...f, realizado_por: e.target.value }))} />
                   </div>
                   <div>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Costo real ({moneda})</label>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Costo real ({moneda})</label>
                     <input style={inputStyle} type="number" min="0" step="0.01" value={ejecForm.costo_real} onChange={e => setEjecForm(f => ({ ...f, costo_real: parseFloat(e.target.value) || 0 }))} />
                   </div>
                   <div>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Estado</label>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Estado</label>
                     <select style={inputStyle} value={ejecForm.estado} onChange={e => setEjecForm(f => ({ ...f, estado: e.target.value }))}>
                       <option value="completado">Completado</option>
                       <option value="parcial">Parcial</option>
@@ -280,7 +280,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
                     </select>
                   </div>
                   <div style={{ gridColumn: 'span 2' }}>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Observaciones</label>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Observaciones</label>
                     <input style={inputStyle} value={ejecForm.observaciones} onChange={e => setEjecForm(f => ({ ...f, observaciones: e.target.value }))} placeholder="Notas de la ejecución" />
                   </div>
                 </div>
@@ -290,10 +290,10 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
                     {savingEjec ? '…' : 'Guardar'}
                   </button>
                   <button onClick={() => setShowEjecForm(false)}
-                    style={{ padding: '6px 10px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#7E9389' }}>
+                    style={{ padding: '6px 10px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
                     Cancelar
                   </button>
-                  <span style={{ fontSize: '11px', color: '#7E9389' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
                     → Próxima auto: {ejecForm.fecha ? addDays(ejecForm.fecha, FREQ_DAYS[plan.frecuencia] ?? 30) : '—'}
                   </span>
                 </div>
@@ -301,28 +301,28 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
             )}
 
             {/* History */}
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389', marginBottom: '8px' }}>Historial de ejecuciones</div>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '8px' }}>Historial de ejecuciones</div>
             {loadingEj ? (
-              <div style={{ fontSize: '12px', color: '#7E9389' }}>Cargando…</div>
+              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Cargando…</div>
             ) : ejecuciones.length === 0 ? (
-              <div style={{ fontSize: '12px', color: '#7E9389' }}>Sin ejecuciones registradas.</div>
+              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Sin ejecuciones registradas.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {ejecuciones.map(e => {
-                  const bg = e.estado === 'completado' ? '#dcfce7' : e.estado === 'parcial' ? '#fef3c7' : '#EAE6D8'
-                  const color = e.estado === 'completado' ? '#16a34a' : e.estado === 'parcial' ? '#92400e' : '#7E9389'
+                  const bg = e.estado === 'completado' ? '#dcfce7' : e.estado === 'parcial' ? '#fef3c7' : 'var(--at-chip)'
+                  const color = e.estado === 'completado' ? '#16a34a' : e.estado === 'parcial' ? '#92400e' : 'var(--at-ink-3)'
                   return (
-                    <div key={e.id} style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '8px', padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div key={e.id} style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '8px', padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: '12px' }}>{e.fecha}</div>
-                        {e.realizado_por && <div style={{ fontSize: '11px', color: '#7E9389' }}>{e.realizado_por}</div>}
-                        {e.observaciones && <div style={{ fontSize: '11px', color: '#7E9389', fontStyle: 'italic', marginTop: '2px' }}>{e.observaciones}</div>}
+                        {e.realizado_por && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{e.realizado_por}</div>}
+                        {e.observaciones && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontStyle: 'italic', marginTop: '2px' }}>{e.observaciones}</div>}
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '10px', background: bg, color, display: 'block', marginBottom: '2px' }}>
                           {e.estado}
                         </span>
-                        {e.costo_real != null && <div style={{ fontSize: '11px', color: '#7E9389' }}>{moneda} {e.costo_real.toFixed(2)}</div>}
+                        {e.costo_real != null && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{moneda} {e.costo_real.toFixed(2)}</div>}
                       </div>
                     </div>
                   )

@@ -20,7 +20,7 @@ function Stars({ value, onChange, readOnly = false }: { value: number; onChange?
     <div style={{ display: 'flex', gap: '2px' }}>
       {[1, 2, 3, 4, 5].map(n => (
         <span key={n} onClick={() => !readOnly && onChange?.(n)}
-          style={{ fontSize: readOnly ? '14px' : '18px', cursor: readOnly ? 'default' : 'pointer', color: n <= value ? '#f59e0b' : '#E1DDD0', lineHeight: 1 }}>
+          style={{ fontSize: readOnly ? '14px' : '18px', cursor: readOnly ? 'default' : 'pointer', color: n <= value ? '#f59e0b' : 'var(--at-line)', lineHeight: 1 }}>
           ★
         </span>
       ))}
@@ -96,28 +96,28 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
     precio: avg(g.evals.map(e => e.precio)),
   })).sort((a, b) => b.promedio - a.promedio)
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Evaluación de Proveedores</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>{evaluaciones.length} evaluaciones · {ranking.length} proveedores</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Evaluación de Proveedores</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>{evaluaciones.length} evaluaciones · {ranking.length} proveedores</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <div style={{ display: 'flex', border: '1.5px solid var(--at-line)', borderRadius: '8px', overflow: 'hidden' }}>
             {(['lista', 'ranking'] as const).map(v => (
               <button key={v} onClick={() => setView(v)}
                 style={{ padding: '6px 12px', border: 'none', fontSize: '12px', cursor: 'pointer', fontWeight: view === v ? 700 : 500,
-                  background: view === v ? '#1B3B36' : 'white', color: view === v ? 'white' : '#7E9389' }}>
+                  background: view === v ? 'var(--at-primary)' : 'white', color: view === v ? 'white' : 'var(--at-ink-3)' }}>
                 {v === 'lista' ? '📋 Lista' : '🏆 Ranking'}
               </button>
             ))}
           </div>
           {canCreate && !showForm && (
             <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setShowForm(true) }}
-              style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               + Evaluar
             </button>
           )}
@@ -126,11 +126,11 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar evaluación' : 'Nueva Evaluación'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Proveedor (contrato)</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Proveedor (contrato)</label>
               <select style={inputStyle} value={form.proveedor_id} onChange={e => {
                 const p = proveedores.find(p => p.id === e.target.value)
                 setF('proveedor_id', e.target.value)
@@ -141,15 +141,15 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Nombre proveedor *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Nombre proveedor *</label>
               <input style={inputStyle} value={form.nombre_proveedor} onChange={e => setF('nombre_proveedor', e.target.value)} placeholder="Nombre de la empresa" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha evaluación</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha evaluación</label>
               <input style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Evaluado por</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Evaluado por</label>
               <input style={inputStyle} value={form.evaluado_por} onChange={e => setF('evaluado_por', e.target.value)} placeholder="Nombre del evaluador" />
             </div>
           </div>
@@ -161,24 +161,24 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
               { k: 'precio' as const, label: 'Precio / valor' },
             ]).map(({ k, label }) => (
               <div key={k}>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '5px' }}>{label}</label>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '5px' }}>{label}</label>
                 <Stars value={form[k] as number} onChange={n => setF(k, n)} />
-                <div style={{ fontSize: '10px', color: '#7E9389', marginTop: '2px' }}>{form[k]}/5</div>
+                <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{form[k]}/5</div>
               </div>
             ))}
           </div>
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Comentarios</label>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Comentarios</label>
             <textarea style={{ ...inputStyle, minHeight: '55px', resize: 'vertical', fontFamily: 'inherit' }}
               value={form.comentarios} onChange={e => setF('comentarios', e.target.value)} placeholder="Observaciones, recomendaciones, aspectos positivos/negativos…" />
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar evaluación'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
               Cancelar
             </button>
           </div>
@@ -189,15 +189,15 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
         /* Ranking view */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {ranking.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>Sin evaluaciones.</div>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>Sin evaluaciones.</div>
           ) : ranking.map((r, i) => (
-            <div key={r.nombre} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px' }}>
+            <div key={r.nombre} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '16px', fontWeight: 800, color: i === 0 ? '#f59e0b' : i === 1 ? '#7E9389' : i === 2 ? '#b45309' : '#7E9389' }}>#{i + 1}</span>
+                    <span style={{ fontSize: '16px', fontWeight: 800, color: i === 0 ? '#f59e0b' : i === 1 ? 'var(--at-ink-3)' : i === 2 ? '#b45309' : 'var(--at-ink-3)' }}>#{i + 1}</span>
                     <span style={{ fontWeight: 700, fontSize: '14px' }}>{r.nombre}</span>
-                    <span style={{ fontSize: '10px', color: '#7E9389' }}>{r.count} evaluación(es)</span>
+                    <span style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>{r.count} evaluación(es)</span>
                   </div>
                   <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                     {[
@@ -207,7 +207,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
                       { label: 'Precio', val: r.precio },
                     ].map(f => (
                       <div key={f.label} style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: '10px', color: '#7E9389' }}>{f.label}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>{f.label}</div>
                         <Stars value={Math.round(f.val)} readOnly />
                         <div style={{ fontSize: '10px', fontWeight: 700, color: f.val >= 4 ? '#10b981' : f.val >= 3 ? '#f59e0b' : '#ef4444' }}>{f.val}</div>
                       </div>
@@ -225,11 +225,11 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
             <input style={{ ...inputStyle, maxWidth: '220px' }} value={filtroProveedor} onChange={e => setFiltroProveedor(e.target.value)} placeholder="Buscar proveedor…" />
           </div>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay evaluaciones.</div>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay evaluaciones.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtered.map(e => (
-                <div key={e.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px' }}>
+                <div key={e.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
@@ -237,19 +237,19 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
                         <Stars value={e.calificacion} readOnly />
                         <span style={{ fontSize: '11px', fontWeight: 700, color: e.calificacion >= 4 ? '#10b981' : e.calificacion >= 3 ? '#f59e0b' : '#ef4444' }}>{e.calificacion}/5</span>
                       </div>
-                      <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: '#7E9389', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--at-ink-3)', flexWrap: 'wrap' }}>
                         {e.puntualidad != null && <span>⏱ Puntualidad: {e.puntualidad}/5</span>}
                         {e.calidad != null && <span>⭐ Calidad: {e.calidad}/5</span>}
                         {e.precio != null && <span>💰 Precio: {e.precio}/5</span>}
                         <span>📅 {e.fecha}</span>
                         {e.evaluado_por && <span>👤 {e.evaluado_por}</span>}
                       </div>
-                      {e.comentarios && <div style={{ fontSize: '12px', color: '#3E5A4C', marginTop: '4px', fontStyle: 'italic' }}>{e.comentarios}</div>}
+                      {e.comentarios && <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginTop: '4px', fontStyle: 'italic' }}>{e.comentarios}</div>}
                     </div>
                     {canEdit && (
                       <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
                         <button onClick={() => startEdit(e)}
-                          style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                          style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                         <button onClick={() => handleDelete(e.id)}
                           style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                       </div>

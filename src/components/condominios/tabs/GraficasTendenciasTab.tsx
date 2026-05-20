@@ -49,7 +49,7 @@ function BarChart({ datos, color, bg: _bg, formatVal, height = 80 }: BarChartPro
               <rect
                 x={`${x + w * 0.1}%`} y={height - 20 - barH}
                 width={`${w * 0.8}%`} height={barH}
-                rx="3" fill={d.val === 0 ? '#E1DDD0' : color}
+                rx="3" fill={d.val === 0 ? 'var(--at-line)' : color}
               />
               {d.val > 0 && barH > 14 && (
                 <text x={`${x + w / 2}%`} y={height - 23 - barH + 12} textAnchor="middle" fontSize="8" fill="#fff" fontWeight="700">
@@ -62,7 +62,7 @@ function BarChart({ datos, color, bg: _bg, formatVal, height = 80 }: BarChartPro
       </svg>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
         {datos.map(d => (
-          <div key={d.mes} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: '#7E9389' }}>{labelMes(d.mes)}</div>
+          <div key={d.mes} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: 'var(--at-ink-3)' }}>{labelMes(d.mes)}</div>
         ))}
       </div>
       {/* Hover tooltip via title */}
@@ -108,7 +108,7 @@ function LineChart({ datos, color, height = 80, formatVal: _formatVal }: LineCha
       </svg>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
         {datos.map(d => (
-          <div key={d.mes} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: '#7E9389' }}>{labelMes(d.mes)}</div>
+          <div key={d.mes} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: 'var(--at-ink-3)' }}>{labelMes(d.mes)}</div>
         ))}
       </div>
     </div>
@@ -170,14 +170,14 @@ export default function GraficasTendenciasTab({ cuotas, tickets, gastos, inciden
     },
     {
       titulo: `Gastos mensuales (${moneda})`, subtitulo: `Total 12m: ${moneda} ${totalGastos12.toLocaleString('es', { maximumFractionDigits: 0 })}`,
-      color: '#1B3B36', bg: '#EEF2EC',
+      color: 'var(--at-primary)', bg: 'var(--at-primary-tint)',
       resumen: `${moneda} ${gastosM[11].val.toLocaleString('es', { maximumFractionDigits: 0 })}`,
       tendencia: tendenciaGastos,
       tipo: 'bar', datos: gastosM, fmt: v => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v)),
     },
     {
       titulo: 'Tickets abiertos por mes', subtitulo: `Total 12m: ${totalTickets12} tickets`,
-      color: '#9C5733', bg: '#FAF1EA',
+      color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)',
       resumen: `${ticketsM[11].val} este mes`,
       tipo: 'bar', datos: ticketsM, fmt: v => String(v),
     },
@@ -189,7 +189,7 @@ export default function GraficasTendenciasTab({ cuotas, tickets, gastos, inciden
     },
     {
       titulo: 'Tendencia de cobro (línea)', subtitulo: 'Evolución % cobrado por período',
-      color: '#102622', bg: '#EEF2EC',
+      color: 'var(--at-primary-hover)', bg: 'var(--at-primary-tint)',
       resumen: tendenciaTasa >= 0 ? `↑ ${tendenciaTasa}pp vs hace 12m` : `↓ ${Math.abs(tendenciaTasa)}pp vs hace 12m`,
       tipo: 'line', datos: tasaCobro, fmt: v => `${v}%`,
     },
@@ -197,16 +197,16 @@ export default function GraficasTendenciasTab({ cuotas, tickets, gastos, inciden
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: '#15291F' }}>Tendencias — últimos 12 meses</div>
-      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 16 }}>Datos actualizados en tiempo real desde el sistema</div>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: 'var(--at-ink)' }}>Tendencias — últimos 12 meses</div>
+      <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 16 }}>Datos actualizados en tiempo real desde el sistema</div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
         {graficas.map(g => (
-          <div key={g.titulo} style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+          <div key={g.titulo} style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 12, color: '#15291F' }}>{g.titulo}</div>
-                <div style={{ fontSize: 10, color: '#7E9389' }}>{g.subtitulo}</div>
+                <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--at-ink)' }}>{g.titulo}</div>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{g.subtitulo}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 16, fontWeight: 800, color: g.color }}>{g.resumen}</div>
@@ -227,7 +227,7 @@ export default function GraficasTendenciasTab({ cuotas, tickets, gastos, inciden
         ))}
       </div>
 
-      <div style={{ marginTop: 14, padding: '8px 14px', background: '#FAF7EF', borderRadius: 8, fontSize: 11, color: '#7E9389' }}>
+      <div style={{ marginTop: 14, padding: '8px 14px', background: 'var(--at-surface-2)', borderRadius: 8, fontSize: 11, color: 'var(--at-ink-3)' }}>
         📊 Las gráficas muestran los últimos 12 meses. La tasa de cobro se calcula sobre cuotas del período; los gastos e incidentes sobre fecha de registro.
       </div>
     </div>

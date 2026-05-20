@@ -19,10 +19,10 @@ interface Evento {
 
 const TIPO_CFG = {
   ticket:      { color: '#ef4444', bg: '#fef2f2',  icon: '🔧', label: 'Ticket' },
-  reserva:     { color: '#1B3B36', bg: '#EEF2EC',  icon: '📅', label: 'Reserva' },
+  reserva:     { color: 'var(--at-primary)', bg: 'var(--at-primary-tint)',  icon: '📅', label: 'Reserva' },
   plan:        { color: '#16a34a', bg: '#dcfce7',  icon: '🗓️', label: 'Plan manto.' },
   inspeccion:  { color: '#d97706', bg: '#fef3c7',  icon: '🔍', label: 'Inspección' },
-  vencimiento: { color: '#9C5733', bg: '#FAF1EA',  icon: '⚠️', label: 'Vencimiento' },
+  vencimiento: { color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)',  icon: '⚠️', label: 'Vencimiento' },
 }
 
 const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -117,15 +117,15 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Calendario de Mantenimiento</div>
-          <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>{totalMes} evento{totalMes !== 1 ? 's' : ''} este mes</div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)' }}>Calendario de Mantenimiento</div>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{totalMes} evento{totalMes !== 1 ? 's' : ''} este mes</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={() => navMes(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--at-line-strong)', background: '#fff', cursor: 'pointer', fontSize: 14 }}>‹</button>
-          <span style={{ fontWeight: 700, fontSize: 14, color: '#15291F', minWidth: 140, textAlign: 'center' }}>{MESES[mes]} {anio}</span>
-          <button onClick={() => navMes(1)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--at-line-strong)', background: '#fff', cursor: 'pointer', fontSize: 14 }}>›</button>
+          <button onClick={() => navMes(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--at-line-strong)', background: 'var(--at-surface)', cursor: 'pointer', fontSize: 14 }}>‹</button>
+          <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)', minWidth: 140, textAlign: 'center' }}>{MESES[mes]} {anio}</span>
+          <button onClick={() => navMes(1)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--at-line-strong)', background: 'var(--at-surface)', cursor: 'pointer', fontSize: 14 }}>›</button>
           <button onClick={() => { setAnio(hoy.getFullYear()); setMes(hoy.getMonth()); setDiaDetalle(null) }}
-            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--at-line-strong)', background: '#fff', cursor: 'pointer', fontSize: 12 }}>
+            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--at-line-strong)', background: 'var(--at-surface)', cursor: 'pointer', fontSize: 12 }}>
             Hoy
           </button>
         </div>
@@ -138,8 +138,8 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
           return (
             <button key={tipo} onClick={() => toggleFiltro(tipo)}
               style={{ padding: '4px 12px', borderRadius: 20, border: `1px solid ${cfg.color}44`, fontSize: 11, cursor: 'pointer',
-                background: activo ? cfg.bg : '#FAF7EF',
-                color: activo ? cfg.color : '#7E9389', fontWeight: activo ? 600 : 400 }}>
+                background: activo ? cfg.bg : 'var(--at-surface-2)',
+                color: activo ? cfg.color : 'var(--at-ink-3)', fontWeight: activo ? 600 : 400 }}>
               {cfg.icon} {cfg.label}
             </button>
           )
@@ -148,11 +148,11 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
 
       <div style={{ display: 'grid', gridTemplateColumns: diaDetalle ? '1fr 280px' : '1fr', gap: 14 }}>
         {/* Calendario */}
-        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
           {/* Días semana header */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#FAF7EF' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: 'var(--at-surface-2)' }}>
             {DIAS_SEMANA.map(d => (
-              <div key={d} style={{ padding: '8px 4px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#7E9389' }}>{d}</div>
+              <div key={d} style={{ padding: '8px 4px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--at-ink-3)' }}>{d}</div>
             ))}
           </div>
 
@@ -169,15 +169,15 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
                   style={{
                     minHeight: 72, padding: '4px 6px', borderTop: '1px solid var(--at-chip)',
                     borderRight: (i + 1) % 7 !== 0 ? '1px solid var(--at-chip)' : undefined,
-                    background: seleccionado ? '#EEF2EC' : esHoy ? '#fefce8' : dia ? '#fff' : '#FAF7EF',
+                    background: seleccionado ? 'var(--at-primary-tint)' : esHoy ? '#fefce8' : dia ? '#fff' : 'var(--at-surface-2)',
                     cursor: dia ? 'pointer' : 'default',
                   }}>
                   {dia && (
                     <>
                       <div style={{ fontSize: 12, fontWeight: esHoy ? 800 : 500,
                         width: 22, height: 22, borderRadius: '50%',
-                        background: esHoy ? '#1B3B36' : undefined,
-                        color: esHoy ? '#fff' : '#3E5A4C',
+                        background: esHoy ? 'var(--at-primary)' : undefined,
+                        color: esHoy ? '#fff' : 'var(--at-ink-2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 2 }}>
                         {dia}
                       </div>
@@ -188,7 +188,7 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
                         </div>
                       ))}
                       {evs.length > 3 && (
-                        <div style={{ fontSize: 9, color: '#7E9389', paddingLeft: 4 }}>+{evs.length - 3} más</div>
+                        <div style={{ fontSize: 9, color: 'var(--at-ink-3)', paddingLeft: 4 }}>+{evs.length - 3} más</div>
                       )}
                     </>
                   )}
@@ -200,16 +200,16 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
 
         {/* Panel de detalle */}
         {diaDetalle && (
-          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
+          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)' }}>
                 {new Date(diaDetalle + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })}
               </div>
               <button onClick={() => setDiaDetalle(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#7E9389' }}>×</button>
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--at-ink-3)' }}>×</button>
             </div>
             {detalleEventos.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px 0', color: '#7E9389', fontSize: 12 }}>Sin eventos</div>
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--at-ink-3)', fontSize: 12 }}>Sin eventos</div>
             ) : (
               detalleEventos.map((ev, i) => {
                 const cfg = TIPO_CFG[ev.tipo]
@@ -219,7 +219,7 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
                     <span style={{ fontSize: 16, lineHeight: 1 }}>{cfg.icon}</span>
                     <div>
                       <div style={{ fontSize: 11, fontWeight: 700, color: ev.color }}>{cfg.label}</div>
-                      <div style={{ fontSize: 12, color: '#3E5A4C', marginTop: 2 }}>{ev.label}</div>
+                      <div style={{ fontSize: 12, color: 'var(--at-ink-2)', marginTop: 2 }}>{ev.label}</div>
                     </div>
                   </div>
                 )

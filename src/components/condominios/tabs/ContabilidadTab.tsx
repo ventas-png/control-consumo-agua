@@ -16,19 +16,19 @@ interface Props {
 }
 
 const CAT_CONFIG: Record<CategoriaGasto, { label: string; icon: string; color: string }> = {
-  mantenimiento: { label: 'Mantenimiento', icon: '🔧', color: '#1B3B36' },
+  mantenimiento: { label: 'Mantenimiento', icon: '🔧', color: 'var(--at-primary)' },
   servicios:     { label: 'Servicios',     icon: '💡', color: '#f59e0b' },
-  administrativo:{ label: 'Administrativo',icon: '📋', color: '#B96A3F' },
+  administrativo:{ label: 'Administrativo',icon: '📋', color: 'var(--at-accent)' },
   seguridad:     { label: 'Seguridad',     icon: '🛡️', color: '#ef4444' },
   limpieza:      { label: 'Limpieza',      icon: '🧹', color: '#10b981' },
   obras:         { label: 'Obras',         icon: '🏗️', color: '#f97316' },
-  otros:         { label: 'Otros',         icon: '📁', color: '#7E9389' },
+  otros:         { label: 'Otros',         icon: '📁', color: 'var(--at-ink-3)' },
 }
 
 const ESTADO_CONFIG: Record<EstadoGasto, { label: string; color: string; bg: string }> = {
   pendiente: { label: 'Pendiente', color: '#f59e0b', bg: '#fef3c7' },
   pagado:    { label: 'Pagado',    color: '#10b981', bg: '#d1fae5' },
-  anulado:   { label: 'Anulado',   color: '#7E9389', bg: '#EAE6D8' },
+  anulado:   { label: 'Anulado',   color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 
 const blank = (): Partial<GastoCondominio> => ({
@@ -132,23 +132,23 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: `Gastos ${thisYear}`, value: `${moneda} ${totalAnio.toFixed(0)}`,     icon: '📊', color: '#1B3B36' },
-          { label: 'Gastos del mes',    value: `${moneda} ${totalMes.toFixed(0)}`,       icon: '📅', color: '#B96A3F' },
+          { label: `Gastos ${thisYear}`, value: `${moneda} ${totalAnio.toFixed(0)}`,     icon: '📊', color: 'var(--at-primary)' },
+          { label: 'Gastos del mes',    value: `${moneda} ${totalMes.toFixed(0)}`,       icon: '📅', color: 'var(--at-accent)' },
           { label: 'Pendientes pago',   value: `${moneda} ${pendientes.reduce((s,g) => s+g.monto,0).toFixed(0)}`, icon: '⏳', color: '#f59e0b' },
           { label: 'Registros',         value: String(gastos.length),                    icon: '🗂️', color: '#10b981' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '17px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
@@ -156,18 +156,18 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 240px', gap: '20px', marginBottom: '20px', alignItems: 'start' }}>
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-            <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Gastos del Condominio</h2>
+            <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Gastos del Condominio</h2>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={exportarPDF} disabled={filtered.length === 0} style={{ padding: '6px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
+              <button onClick={exportarPDF} disabled={filtered.length === 0} style={{ padding: '6px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
               <button onClick={exportarXlsx} disabled={gastos.length === 0} style={{ padding: '6px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
               {canCreate && !showForm && (
-                <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Gasto</button>
+                <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Gasto</button>
               )}
             </div>
           </div>
 
           {showForm && (
-            <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+            <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Gasto' : 'Registrar Gasto'}</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '12px' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
@@ -218,8 +218,8 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-                <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
-                <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+                <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+                <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
                   {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Registrar'}
                 </button>
               </div>
@@ -231,9 +231,9 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
             {(['todos', ...Object.keys(CAT_CONFIG)] as const).map(c => (
               <button key={c} onClick={() => setFiltroCat(c as CategoriaGasto | 'todos')}
                 style={{ padding: '4px 10px', borderRadius: '16px', border: '1.5px solid', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-                  borderColor: filtroCat === c ? '#1B3B36' : '#E1DDD0',
-                  background: filtroCat === c ? '#D9E2DC' : 'white',
-                  color: filtroCat === c ? '#1B3B36' : '#7E9389' }}>
+                  borderColor: filtroCat === c ? 'var(--at-primary)' : 'var(--at-line)',
+                  background: filtroCat === c ? 'var(--at-primary-soft)' : 'white',
+                  color: filtroCat === c ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
                 {c === 'todos' ? `Todos (${gastos.length})` : `${CAT_CONFIG[c as CategoriaGasto].icon} ${CAT_CONFIG[c as CategoriaGasto].label}`}
               </button>
             ))}
@@ -242,9 +242,9 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
             {(['todos', 'pendiente', 'pagado', 'anulado'] as const).map(e => (
               <button key={e} onClick={() => setFiltroEstado(e)}
                 style={{ padding: '4px 10px', borderRadius: '16px', border: '1.5px solid', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
-                  borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0',
-                  background: filtroEstado === e ? '#D9E2DC' : 'white',
-                  color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
+                  borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
+                  background: filtroEstado === e ? 'var(--at-primary-soft)' : 'white',
+                  color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
                 {e === 'todos' ? 'Todos' : ESTADO_CONFIG[e as EstadoGasto].label}
               </button>
             ))}
@@ -252,7 +252,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
 
           {/* Tabla de gastos */}
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389' }}>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)' }}>
               <div style={{ fontSize: '36px', marginBottom: '10px' }}>🧾</div>
               <p style={{ margin: 0, fontWeight: 600 }}>No hay gastos registrados</p>
             </div>
@@ -260,9 +260,9 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
             <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '10px', overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ background: '#FAF7EF' }}>
+                  <tr style={{ background: 'var(--at-surface-2)' }}>
                     {['Fecha', 'Concepto', 'Categoría', 'Monto', 'Estado', ''].map(h => (
-                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
+                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -271,23 +271,23 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
                     const cat = CAT_CONFIG[g.categoria]
                     const est = ESTADO_CONFIG[g.estado]
                     return (
-                      <tr key={g.id} style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF', borderBottom: '1px solid var(--at-chip)' }}>
-                        <td style={{ padding: '10px 12px', color: '#7E9389', whiteSpace: 'nowrap' }}>{g.fecha}</td>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#15291F' }}>
+                      <tr key={g.id} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
+                        <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>{g.fecha}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--at-ink)' }}>
                           {g.concepto}
-                          {g.proveedor_nombre && <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 400 }}>{g.proveedor_nombre}</div>}
+                          {g.proveedor_nombre && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 400 }}>{g.proveedor_nombre}</div>}
                         </td>
                         <td style={{ padding: '10px 12px' }}>
                           <span style={{ fontSize: '11px', fontWeight: 600, color: cat.color }}>{cat.icon} {cat.label}</span>
                         </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#15291F', whiteSpace: 'nowrap' }}>{moneda} {g.monto.toFixed(2)}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--at-ink)', whiteSpace: 'nowrap' }}>{moneda} {g.monto.toFixed(2)}</td>
                         <td style={{ padding: '10px 12px' }}>
                           <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
                         </td>
                         <td style={{ padding: '10px 12px' }}>
                           {canEdit && (
                             <div style={{ display: 'flex', gap: '4px' }}>
-                              <button onClick={() => startEdit(g)} style={{ padding: '3px 7px', background: '#EAE6D8', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                              <button onClick={() => startEdit(g)} style={{ padding: '3px 7px', background: 'var(--at-chip)', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
                               <button onClick={() => handleDelete(g.id)} style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                             </div>
                           )}
@@ -302,10 +302,10 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
         </div>
 
         {/* Panel de categorías */}
-        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', position: 'sticky', top: '20px' }}>
-          <h3 style={{ margin: '0 0 14px', fontSize: '13px', fontWeight: 700, color: '#15291F' }}>📊 Gastos por categoría ({thisYear})</h3>
+        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', position: 'sticky', top: '20px' }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)' }}>📊 Gastos por categoría ({thisYear})</h3>
           {catEntries.length === 0 ? (
-            <p style={{ fontSize: '12px', color: '#7E9389', textAlign: 'center', margin: '20px 0' }}>Sin datos</p>
+            <p style={{ fontSize: '12px', color: 'var(--at-ink-3)', textAlign: 'center', margin: '20px 0' }}>Sin datos</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {catEntries.map(([cat, total]) => {
@@ -313,16 +313,16 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
                 return (
                   <div key={cat}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                      <span style={{ color: '#7E9389', fontWeight: 600 }}>{c.icon} {c.label}</span>
-                      <span style={{ fontWeight: 700, color: '#15291F' }}>{moneda} {total.toFixed(0)}</span>
+                      <span style={{ color: 'var(--at-ink-3)', fontWeight: 600 }}>{c.icon} {c.label}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {total.toFixed(0)}</span>
                     </div>
-                    <div style={{ background: '#EAE6D8', borderRadius: '4px', height: '7px' }}>
+                    <div style={{ background: 'var(--at-chip)', borderRadius: '4px', height: '7px' }}>
                       <div style={{ background: c.color, height: '7px', borderRadius: '4px', width: barWidth(total, maxCat), transition: 'width 0.3s' }} />
                     </div>
                   </div>
                 )
               })}
-              <div style={{ borderTop: '1px solid var(--at-line)', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, color: '#15291F' }}>
+              <div style={{ borderTop: '1px solid var(--at-line)', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, color: 'var(--at-ink)' }}>
                 <span>Total pagado</span>
                 <span>{moneda} {totalAnio.toFixed(0)}</span>
               </div>

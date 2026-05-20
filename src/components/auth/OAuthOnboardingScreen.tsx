@@ -59,7 +59,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
     width: '100%', boxSizing: 'border-box',
     padding: '10px 14px', border: '1.5px solid var(--at-line)',
     borderRadius: '10px', fontSize: '14px',
-    background: '#FAF7EF', color: '#15291F',
+    background: 'var(--at-surface-2)', color: 'var(--at-ink)',
     transition: 'border-color 0.15s, box-shadow 0.15s',
   }
 
@@ -80,7 +80,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
       `}</style>
 
       <div className="reg-card" style={{
-        background: 'rgba(255,255,255,0.97)', borderRadius: '24px',
+        background: 'var(--at-surface)', borderRadius: '24px',
         width: '100%', maxWidth: '440px',
         boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
       }}>
@@ -92,10 +92,10 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
           }}>
             <BrandLogo size={56} />
           </div>
-          <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#15291F' }}>
+          <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>
             Completa tu registro
           </h1>
-          <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#7E9389' }}>
+          <p style={{ margin: '6px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>
             Confirma tu identidad para vincular tu cuenta de Google
           </p>
         </div>
@@ -118,7 +118,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '5px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '5px' }}>
                 DPI / CUI *
               </label>
               <input
@@ -133,7 +133,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
             </div>
 
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '5px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '5px' }}>
                 Fecha de nacimiento *
               </label>
               <input
@@ -162,7 +162,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
             disabled={loading}
             style={{
               width: '100%', padding: '12px',
-              background: loading ? '#7E9389' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+              background: loading ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
               color: 'white', border: 'none', borderRadius: '12px',
               fontSize: '15px', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
               marginBottom: '10px',
@@ -177,7 +177,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
             disabled={loading}
             style={{
               width: '100%', padding: '10px',
-              background: 'transparent', color: '#7E9389',
+              background: 'transparent', color: 'var(--at-ink-3)',
               border: '1.5px solid var(--at-line)', borderRadius: '12px',
               fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer',
             }}

@@ -42,17 +42,17 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
 
   const METODO_COLOR: Record<string, { bg: string; color: string }> = {
     efectivo:       { bg: '#dcfce7', color: '#15803d' },
-    transferencia:  { bg: '#D9E2DC', color: '#102622' },
-    deposito:       { bg: '#D9E2DC', color: '#102622' },
-    tarjeta_credito:{ bg: '#F4EBE3', color: '#9C5733' },
+    transferencia:  { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
+    deposito:       { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
+    tarjeta_credito:{ bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)' },
     tarjeta_debito: { bg: '#f5d0fe', color: '#a21caf' },
     cheque:         { bg: '#fef9c3', color: '#854d0e' },
     convenio_pago:  { bg: '#fce7f3', color: '#be185d' },
-    otro:           { bg: '#EAE6D8', color: '#3E5A4C' },
+    otro:           { bg: 'var(--at-chip)', color: 'var(--at-ink-2)' },
   }
 
   if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: '#7E9389' }}>Cargando pagos...</div>
+    return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--at-ink-3)' }}>Cargando pagos...</div>
   }
 
   return (
@@ -65,14 +65,14 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
           style={{ flex: 1, minWidth: '220px', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
         />
         <select value={filtroMetodo} onChange={e => setFiltroMetodo(e.target.value)}
-          style={{ padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', background: 'white' }}>
+          style={{ padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', background: 'var(--at-surface)' }}>
           <option value="todos">Todas las formas</option>
           {(Object.entries(formasPagoLabels) as [FormaPago, string][]).map(([val, lbl]) => (
             <option key={val} value={val}>{lbl}</option>
           ))}
         </select>
         <select value={filtroFecha} onChange={e => setFiltroFecha(e.target.value as any)}
-          style={{ padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', background: 'white' }}>
+          style={{ padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', background: 'var(--at-surface)' }}>
           <option value="todos">Todas las fechas</option>
           <option value="hoy">Hoy</option>
           <option value="semana">Últimos 7 días</option>
@@ -91,17 +91,17 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
       </div>
 
       {pagosFiltrados.length === 0 ? (
-        <div style={{ padding: '48px', textAlign: 'center', color: '#7E9389', background: 'white', borderRadius: '12px' }}>
+        <div style={{ padding: '48px', textAlign: 'center', color: 'var(--at-ink-3)', background: 'var(--at-surface)', borderRadius: '12px' }}>
           No hay pagos registrados
         </div>
       ) : (
-        <div style={{ background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.07)' }}>
+        <div style={{ background: 'var(--at-surface)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.07)' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-              <thead style={{ background: '#FAF7EF', borderBottom: '2px solid var(--at-line)' }}>
+              <thead style={{ background: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
                 <tr>
                   {['Fecha','Cliente','Monto','Forma de Pago','N° Documento','Referencia / Banco','Notas'].map(h => (
-                    <th scope="col" key={h} style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th scope="col" key={h} style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -111,14 +111,14 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
                   const mc = METODO_COLOR[p.metodo] ?? METODO_COLOR.otro
                   return (
                     <tr key={p.id} style={{ borderBottom: '1px solid var(--at-chip)' }}
-                      onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#FAF7EF'}
+                      onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-surface-2)'}
                       onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}>
-                      <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', color: '#3E5A4C' }}>
+                      <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', color: 'var(--at-ink-2)' }}>
                         {new Date(p.created_at).toLocaleDateString('es-GT')}
                       </td>
                       <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontWeight: 600, color: '#15291F' }}>{cliente?.nombre ?? '—'}</div>
-                        <div style={{ fontSize: '12px', color: '#7E9389' }}>{cliente?.codigo}</div>
+                        <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{cliente?.nombre ?? '—'}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{cliente?.codigo}</div>
                       </td>
                       <td style={{ padding: '14px 16px', fontWeight: 700, color: '#10b981', whiteSpace: 'nowrap' }}>
                         {moneda} {p.monto.toFixed(2)}
@@ -128,14 +128,14 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
                           {formasPagoLabels[p.metodo] ?? p.metodo}
                         </span>
                       </td>
-                      <td style={{ padding: '14px 16px', fontFamily: 'monospace', fontSize: '13px', color: '#15291F' }}>
-                        {p.numero_documento ?? <span style={{ color: '#C7C2B0' }}>—</span>}
+                      <td style={{ padding: '14px 16px', fontFamily: 'monospace', fontSize: '13px', color: 'var(--at-ink)' }}>
+                        {p.numero_documento ?? <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
                       </td>
-                      <td style={{ padding: '14px 16px', color: '#3E5A4C', fontSize: '13px' }}>
-                        {p.referencia ?? <span style={{ color: '#C7C2B0' }}>—</span>}
+                      <td style={{ padding: '14px 16px', color: 'var(--at-ink-2)', fontSize: '13px' }}>
+                        {p.referencia ?? <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
                       </td>
-                      <td style={{ padding: '14px 16px', color: '#7E9389', fontSize: '13px', maxWidth: '200px' }}>
-                        {p.notas ?? <span style={{ color: '#C7C2B0' }}>—</span>}
+                      <td style={{ padding: '14px 16px', color: 'var(--at-ink-3)', fontSize: '13px', maxWidth: '200px' }}>
+                        {p.notas ?? <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
                       </td>
                     </tr>
                   )

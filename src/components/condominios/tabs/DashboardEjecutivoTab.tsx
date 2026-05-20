@@ -20,10 +20,10 @@ interface Props {
 
 function KpiCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
   return (
-    <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 16px' }}>
+    <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 16px' }}>
       <div style={{ fontSize: '22px', fontWeight: 800, color }}>{value}</div>
-      <div style={{ fontSize: '12px', fontWeight: 600, color: '#15291F', marginTop: '2px' }}>{label}</div>
-      {sub && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>{sub}</div>}
+      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink)', marginTop: '2px' }}>{label}</div>
+      {sub && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{sub}</div>}
     </div>
   )
 }
@@ -31,7 +31,7 @@ function KpiCard({ label, value, sub, color }: { label: string; value: string; s
 function ProgressBar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.min(value / max * 100, 100) : 0
   return (
-    <div style={{ height: '8px', background: '#EAE6D8', borderRadius: '4px', overflow: 'hidden' }}>
+    <div style={{ height: '8px', background: 'var(--at-chip)', borderRadius: '4px', overflow: 'hidden' }}>
       <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '4px', transition: 'width 0.4s' }} />
     </div>
   )
@@ -42,8 +42,8 @@ function MiniBar({ label, value, total, color }: { label: string; value: number;
   return (
     <div style={{ marginBottom: '10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' }}>
-        <span style={{ color: '#3E5A4C', fontWeight: 500 }}>{label}</span>
-        <span style={{ color: '#7E9389' }}>{value} · {pct}%</span>
+        <span style={{ color: 'var(--at-ink-2)', fontWeight: 500 }}>{label}</span>
+        <span style={{ color: 'var(--at-ink-3)' }}>{value} · {pct}%</span>
       </div>
       <ProgressBar value={value} max={total} color={color} />
     </div>
@@ -87,8 +87,8 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
   const ticketsPorPrio  = [
     { label: 'Urgente', count: tickets.filter(t => t.prioridad === 'urgente' && t.estado !== 'cerrado').length, color: '#ef4444' },
     { label: 'Alta',    count: tickets.filter(t => t.prioridad === 'alta'    && t.estado !== 'cerrado').length, color: '#f59e0b' },
-    { label: 'Media',   count: tickets.filter(t => t.prioridad === 'media'   && t.estado !== 'cerrado').length, color: '#1B3B36' },
-    { label: 'Baja',    count: tickets.filter(t => t.prioridad === 'baja'    && t.estado !== 'cerrado').length, color: '#7E9389' },
+    { label: 'Media',   count: tickets.filter(t => t.prioridad === 'media'   && t.estado !== 'cerrado').length, color: 'var(--at-primary)' },
+    { label: 'Baja',    count: tickets.filter(t => t.prioridad === 'baja'    && t.estado !== 'cerrado').length, color: 'var(--at-ink-3)' },
   ]
   const planesVencidos = planesMantenimiento.filter(p => p.activo && p.proxima_ejecucion && p.proxima_ejecucion < periodoActual + '-01').length
 
@@ -105,13 +105,13 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ marginBottom: '20px' }}>
-        <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Dashboard Ejecutivo</h2>
-        <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>{proyectoNombre ?? 'Proyecto'} · {periodoActual}</p>
+        <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Dashboard Ejecutivo</h2>
+        <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>{proyectoNombre ?? 'Proyecto'} · {periodoActual}</p>
       </div>
 
       {/* Financiero */}
       <div style={{ marginBottom: '24px' }}>
-        <h3 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Financiero</h3>
+        <h3 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💰 Financiero</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginBottom: '16px' }}>
           <KpiCard label="Cobranza del mes" value={`${tasaCobranza}%`}
             sub={`${moneda} ${totalCobrado.toFixed(0)} / ${totalEmitido.toFixed(0)}`}
@@ -124,8 +124,8 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
         </div>
 
         {/* Trend chart */}
-        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389', marginBottom: '12px' }}>Tendencia de cuotas (últimos 6 meses)</div>
+        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '12px' }}>Tendencia de cuotas (últimos 6 meses)</div>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end', height: '80px' }}>
             {trend.map(t => {
               const hEmitido = maxTrend > 0 ? Math.round(t.emitido / maxTrend * 72) : 0
@@ -134,21 +134,21 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
                 <div key={t.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                   <div style={{ display: 'flex', gap: '2px', alignItems: 'flex-end', height: '72px' }}>
                     <div title={`Emitido: ${moneda} ${t.emitido.toFixed(0)}`}
-                      style={{ width: '14px', height: `${hEmitido}px`, background: '#D9E2DC', borderRadius: '3px 3px 0 0', minHeight: '2px' }} />
+                      style={{ width: '14px', height: `${hEmitido}px`, background: 'var(--at-primary-soft)', borderRadius: '3px 3px 0 0', minHeight: '2px' }} />
                     <div title={`Cobrado: ${moneda} ${t.cobrado.toFixed(0)}`}
-                      style={{ width: '14px', height: `${hCobrado}px`, background: '#1B3B36', borderRadius: '3px 3px 0 0', minHeight: '2px' }} />
+                      style={{ width: '14px', height: `${hCobrado}px`, background: 'var(--at-primary)', borderRadius: '3px 3px 0 0', minHeight: '2px' }} />
                   </div>
-                  <span style={{ fontSize: '10px', color: '#7E9389' }}>{t.label}</span>
+                  <span style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>{t.label}</span>
                 </div>
               )
             })}
           </div>
           <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '11px', color: '#7E9389' }}>
-              <div style={{ width: '10px', height: '10px', background: '#D9E2DC', borderRadius: '2px' }} /> Emitido
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '11px', color: 'var(--at-ink-3)' }}>
+              <div style={{ width: '10px', height: '10px', background: 'var(--at-primary-soft)', borderRadius: '2px' }} /> Emitido
             </div>
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '11px', color: '#7E9389' }}>
-              <div style={{ width: '10px', height: '10px', background: '#1B3B36', borderRadius: '2px' }} /> Cobrado
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', fontSize: '11px', color: 'var(--at-ink-3)' }}>
+              <div style={{ width: '10px', height: '10px', background: 'var(--at-primary)', borderRadius: '2px' }} /> Cobrado
             </div>
           </div>
         </div>
@@ -156,21 +156,21 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
         {/* Mantenimiento */}
-        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#15291F', marginBottom: '12px' }}>🔧 Mantenimiento</div>
+        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '12px' }}>🔧 Mantenimiento</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-            <div style={{ textAlign: 'center', padding: '8px', background: '#FAF7EF', borderRadius: '8px' }}>
+            <div style={{ textAlign: 'center', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px' }}>
               <div style={{ fontSize: '20px', fontWeight: 800, color: ticketsAbiertos > 0 ? '#f59e0b' : '#10b981' }}>{ticketsAbiertos}</div>
-              <div style={{ fontSize: '11px', color: '#7E9389' }}>tickets abiertos</div>
+              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>tickets abiertos</div>
             </div>
-            <div style={{ textAlign: 'center', padding: '8px', background: '#FAF7EF', borderRadius: '8px' }}>
+            <div style={{ textAlign: 'center', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px' }}>
               <div style={{ fontSize: '20px', fontWeight: 800, color: planesVencidos > 0 ? '#ef4444' : '#10b981' }}>{planesVencidos}</div>
-              <div style={{ fontSize: '11px', color: '#7E9389' }}>planes vencidos</div>
+              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>planes vencidos</div>
             </div>
           </div>
           {ticketsTotal > 0 && (
             <>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', marginBottom: '8px' }}>Tickets abiertos por prioridad</div>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '8px' }}>Tickets abiertos por prioridad</div>
               {ticketsPorPrio.filter(p => p.count > 0).map(p => (
                 <MiniBar key={p.label} label={p.label} value={p.count} total={ticketsAbiertos || 1} color={p.color} />
               ))}
@@ -179,34 +179,34 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
         </div>
 
         {/* Convivencia */}
-        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#15291F', marginBottom: '12px' }}>👥 Convivencia</div>
+        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '12px' }}>👥 Convivencia</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-            <div style={{ textAlign: 'center', padding: '8px', background: '#FAF7EF', borderRadius: '8px' }}>
-              <div style={{ fontSize: '20px', fontWeight: 800, color: '#1B3B36' }}>{visitantesEsteMes}</div>
-              <div style={{ fontSize: '11px', color: '#7E9389' }}>visitas este mes</div>
+            <div style={{ textAlign: 'center', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px' }}>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--at-primary)' }}>{visitantesEsteMes}</div>
+              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>visitas este mes</div>
             </div>
-            <div style={{ textAlign: 'center', padding: '8px', background: '#FAF7EF', borderRadius: '8px' }}>
+            <div style={{ textAlign: 'center', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px' }}>
               <div style={{ fontSize: '20px', fontWeight: 800, color: infraccionesAbiertas > 0 ? '#f59e0b' : '#10b981' }}>{infraccionesAbiertas}</div>
-              <div style={{ fontSize: '11px', color: '#7E9389' }}>infracciones abiertas</div>
+              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>infracciones abiertas</div>
             </div>
           </div>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', marginBottom: '8px' }}>Unidades ({totalUnidades} total)</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '8px' }}>Unidades ({totalUnidades} total)</div>
           <MiniBar label="Con deuda" value={conDeuda} total={totalUnidades} color="#ef4444" />
           <MiniBar label="Al día" value={totalUnidades - conDeuda} total={totalUnidades} color="#10b981" />
         </div>
 
         {/* Resumen ejecutivo */}
-        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#15291F', marginBottom: '12px' }}>📋 Resumen ejecutivo</div>
+        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '12px' }}>📋 Resumen ejecutivo</div>
           {[
             { label: `Cobranza ${periodoActual}`, pct: tasaCobranza, color: tasaCobranza >= 80 ? '#10b981' : '#f59e0b' },
-            { label: 'Ejecución presupuesto', pct: ejecucionPpto, color: ejecucionPpto <= 90 ? '#1B3B36' : '#ef4444' },
-            { label: 'Tickets resueltos', pct: ticketsTotal > 0 ? Math.round((ticketsTotal - ticketsAbiertos) / ticketsTotal * 100) : 100, color: '#B96A3F' },
+            { label: 'Ejecución presupuesto', pct: ejecucionPpto, color: ejecucionPpto <= 90 ? 'var(--at-primary)' : '#ef4444' },
+            { label: 'Tickets resueltos', pct: ticketsTotal > 0 ? Math.round((ticketsTotal - ticketsAbiertos) / ticketsTotal * 100) : 100, color: 'var(--at-accent)' },
           ].map(r => (
             <div key={r.label} style={{ marginBottom: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                <span style={{ color: '#3E5A4C' }}>{r.label}</span>
+                <span style={{ color: 'var(--at-ink-2)' }}>{r.label}</span>
                 <span style={{ fontWeight: 700, color: r.color }}>{r.pct}%</span>
               </div>
               <ProgressBar value={r.pct} max={100} color={r.color} />

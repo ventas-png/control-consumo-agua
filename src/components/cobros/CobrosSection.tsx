@@ -20,7 +20,7 @@ function ComprobanteLink({ src, tipo }: { src: string; tipo?: string | null }) {
       rel="noopener noreferrer"
       style={{
         fontSize: '13px',
-        color: '#1B3B36',
+        color: 'var(--at-primary)',
         textDecoration: 'none',
         fontWeight: 600,
       }}
@@ -297,7 +297,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
             padding: '10px 20px', fontSize: '14px', fontWeight: activeTab === tab.id ? 700 : 500,
-            color: activeTab === tab.id ? '#1B3B36' : '#7E9389',
+            color: activeTab === tab.id ? 'var(--at-primary)' : 'var(--at-ink-3)',
             background: 'transparent', border: 'none',
             borderBottom: activeTab === tab.id ? '3px solid var(--at-primary)' : '3px solid transparent',
             cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
@@ -322,7 +322,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
             <select
               value={filtroEstado}
               onChange={e => setFiltroEstado(e.target.value as any)}
-              style={{ padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', background: 'white' }}
+              style={{ padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', background: 'var(--at-surface)' }}
             >
               <option value="todos">Todos</option>
               <option value="pendiente">Pendiente</option>
@@ -339,7 +339,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                 </button>
                 <button onClick={abrirConvenioGrupal} style={{
                   padding: '10px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  background: '#F4EBE3', color: '#9C5733', fontWeight: 600, fontSize: '13px',
+                  background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', fontWeight: 600, fontSize: '13px',
                 }}>
                   🤝 Crear convenio ({selectedRows.size})
                 </button>
@@ -348,10 +348,10 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
           </div>
 
           {/* Tabla */}
-          <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+          <div style={{ background: 'var(--at-surface)', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                <thead style={{ background: '#FAF7EF', borderBottom: '2px solid var(--at-line)' }}>
+                <thead style={{ background: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
                   <tr>
                     {canEdit && (
                       <th scope="col" style={{ padding: '14px 16px', textAlign: 'center', width: '44px' }}>
@@ -368,13 +368,13 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                       { label: 'Estado', secondary: false },
                       { label: 'Acciones', secondary: false },
                     ].map(({ label: h, secondary }) => (
-                      <th scope="col" key={h} className={secondary ? 'table-col-secondary' : undefined} style={{ padding: '14px 16px', textAlign: h === 'Cargo ('+moneda+')' || h === 'Abonado' || h === 'Saldo' ? 'right' : 'left', fontWeight: 700, color: '#3E5A4C', whiteSpace: 'nowrap' }}>{h}</th>
+                      <th scope="col" key={h} className={secondary ? 'table-col-secondary' : undefined} style={{ padding: '14px 16px', textAlign: h === 'Cargo ('+moneda+')' || h === 'Abonado' || h === 'Saldo' ? 'right' : 'left', fontWeight: 700, color: 'var(--at-ink-2)', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {registrosFiltrados.length === 0 ? (
-                    <tr><td colSpan={canEdit ? 8 : 7} style={{ padding: '40px', textAlign: 'center', color: '#7E9389' }}>
+                    <tr><td colSpan={canEdit ? 8 : 7} style={{ padding: '40px', textAlign: 'center', color: 'var(--at-ink-3)' }}>
                       No hay cargos pendientes
                     </td></tr>
                   ) : registrosFiltrados.map(r => {
@@ -384,8 +384,8 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                     const saldo = getSaldo(r)
                     const isMora = r.estado === 'mora'
                     return (
-                      <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: selectedRows.has(r.id) ? '#EEF2EC' : undefined }}
-                        onMouseEnter={e => { if (!selectedRows.has(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = '#FAF7EF' }}
+                      <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: selectedRows.has(r.id) ? 'var(--at-primary-tint)' : undefined }}
+                        onMouseEnter={e => { if (!selectedRows.has(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-surface-2)' }}
                         onMouseLeave={e => { if (!selectedRows.has(r.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'transparent' }}>
                         {canEdit && (
                           <td style={{ padding: '14px 16px', textAlign: 'center' }}>
@@ -394,16 +394,16 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                           </td>
                         )}
                         <td style={{ padding: '14px 16px' }}>
-                          <div style={{ fontWeight: 600, color: '#15291F' }}>{cliente?.nombre ?? r.cliente_nombre}</div>
-                          <div style={{ fontSize: '12px', color: '#7E9389' }}>{cliente?.codigo}</div>
+                          <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{cliente?.nombre ?? r.cliente_nombre}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{cliente?.codigo}</div>
                         </td>
-                        <td className="table-col-secondary" style={{ padding: '14px 16px', color: '#3E5A4C', whiteSpace: 'nowrap' }}>
+                        <td className="table-col-secondary" style={{ padding: '14px 16px', color: 'var(--at-ink-2)', whiteSpace: 'nowrap' }}>
                           {new Date(r.fecha).toLocaleDateString('es-GT')}
                         </td>
-                        <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 600, color: '#15291F' }}>
+                        <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--at-ink)' }}>
                           {total.toFixed(2)}
                         </td>
-                        <td className="table-col-secondary" style={{ padding: '14px 16px', textAlign: 'right', color: abonado > 0 ? '#10b981' : '#7E9389' }}>
+                        <td className="table-col-secondary" style={{ padding: '14px 16px', textAlign: 'right', color: abonado > 0 ? '#10b981' : 'var(--at-ink-3)' }}>
                           {abonado > 0 ? abonado.toFixed(2) : '—'}
                         </td>
                         <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: isMora ? '#dc2626' : '#f59e0b', fontSize: '15px' }}>
@@ -448,17 +448,17 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
             if (pagosParaVerificar.length === 0) {
               return (
                 <div style={{
-                  background: '#FAF7EF',
+                  background: 'var(--at-surface-2)',
                   borderRadius: '12px',
                   padding: '48px 24px',
                   textAlign: 'center',
                   border: '1px solid var(--at-line)',
                 }}>
                   <div style={{ fontSize: '32px', marginBottom: '12px' }}>✅</div>
-                  <div style={{ fontSize: '16px', fontWeight: 700, color: '#15291F', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '4px' }}>
                     Sin verificaciones pendientes
                   </div>
-                  <div style={{ color: '#7E9389', fontSize: '14px' }}>
+                  <div style={{ color: 'var(--at-ink-3)', fontSize: '14px' }}>
                     Todos los pagos manuales han sido verificados
                   </div>
                 </div>
@@ -475,7 +475,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                     <div
                       key={pago.id}
                       style={{
-                        background: 'white',
+                        background: 'var(--at-surface)',
                         borderRadius: '12px',
                         padding: '16px',
                         border: '2px solid #fbbf24',
@@ -486,10 +486,10 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
                             <div>
-                              <div style={{ fontSize: '14px', fontWeight: 700, color: '#15291F' }}>
+                              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>
                                 {cliente?.nombre ?? 'Cliente desconocido'}
                               </div>
-                              <div style={{ fontSize: '12px', color: '#7E9389' }}>
+                              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
                                 Lectura: {registro ? new Date(registro.fecha).toLocaleDateString('es-GT') : 'N/A'}
                               </div>
                             </div>
@@ -507,16 +507,16 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
 
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', fontSize: '13px', marginTop: '12px' }}>
                             <div>
-                              <div style={{ color: '#7E9389', marginBottom: '2px' }}>Monto Pagado</div>
-                              <div style={{ fontWeight: 700, color: '#15291F' }}>{moneda} {pago.monto.toFixed(2)}</div>
+                              <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Monto Pagado</div>
+                              <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {pago.monto.toFixed(2)}</div>
                             </div>
                             <div>
-                              <div style={{ color: '#7E9389', marginBottom: '2px' }}>Forma de Pago</div>
-                              <div style={{ fontWeight: 700, color: '#15291F' }}>{FORMA_PAGO_LABELS[pago.metodo] ?? pago.metodo}</div>
+                              <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Forma de Pago</div>
+                              <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{FORMA_PAGO_LABELS[pago.metodo] ?? pago.metodo}</div>
                             </div>
                             <div>
-                              <div style={{ color: '#7E9389', marginBottom: '2px' }}>Comprobante</div>
-                              <div style={{ fontWeight: 700, color: pago.numero_documento ? '#15291F' : '#7E9389' }}>
+                              <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Comprobante</div>
+                              <div style={{ fontWeight: 700, color: pago.numero_documento ? 'var(--at-ink)' : 'var(--at-ink-3)' }}>
                                 {pago.numero_documento ?? 'Sin número'}
                               </div>
                             </div>
@@ -537,7 +537,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                               padding: '10px',
                               borderRadius: '8px',
                               border: 'none',
-                              background: verificando === pago.id ? '#C7C2B0' : '#10b981',
+                              background: verificando === pago.id ? 'var(--at-line-strong)' : '#10b981',
                               color: 'white',
                               fontWeight: 700,
                               fontSize: '13px',
@@ -554,7 +554,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                               padding: '10px',
                               borderRadius: '8px',
                               border: '1.5px solid #ef4444',
-                              background: 'white',
+                              background: 'var(--at-surface)',
                               color: '#ef4444',
                               fontWeight: 700,
                               fontSize: '13px',
@@ -648,9 +648,9 @@ interface ConveniosListaProps {
 function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: ConveniosListaProps) {
   const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
     activo:     { label: 'Activo',      bg: '#dcfce7', color: '#15803d' },
-    completado: { label: 'Completado',  bg: '#D9E2DC', color: '#102622' },
+    completado: { label: 'Completado',  bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
     incumplido: { label: 'Incumplido',  bg: '#fee2e2', color: '#dc2626' },
-    cancelado:  { label: 'Cancelado',   bg: '#EAE6D8', color: '#7E9389' },
+    cancelado:  { label: 'Cancelado',   bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
   }
 
   async function cambiarEstado(id: string, estado: string) {
@@ -663,7 +663,7 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
 
   if (convenios.length === 0) {
     return (
-      <div style={{ padding: '48px', textAlign: 'center', color: '#7E9389', background: 'white', borderRadius: '12px' }}>
+      <div style={{ padding: '48px', textAlign: 'center', color: 'var(--at-ink-3)', background: 'var(--at-surface)', borderRadius: '12px' }}>
         <div style={{ fontSize: '48px', marginBottom: '12px' }}>🤝</div>
         <div style={{ fontWeight: 600 }}>No hay convenios registrados</div>
       </div>
@@ -677,17 +677,17 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
         const pct = conv.monto_total > 0 ? (conv.monto_pagado / conv.monto_total) * 100 : 0
         const est = ESTADO_CONFIG[conv.estado] ?? ESTADO_CONFIG.activo
         return (
-          <div key={conv.id} style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid var(--at-line)', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+          <div key={conv.id} style={{ background: 'var(--at-surface)', borderRadius: '12px', padding: '20px', border: '1px solid var(--at-line)', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '16px', color: '#15291F', marginBottom: '4px' }}>
+                <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--at-ink)', marginBottom: '4px' }}>
                   {cliente?.nombre ?? '—'}
-                  <span style={{ marginLeft: '8px', fontSize: '12px', color: '#7E9389', fontWeight: 400 }}>
+                  <span style={{ marginLeft: '8px', fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 400 }}>
                     Convenio #{conv.numero_convenio}
                   </span>
                 </div>
-                {conv.descripcion && <div style={{ fontSize: '13px', color: '#7E9389', marginBottom: '8px' }}>{conv.descripcion}</div>}
-                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: '#3E5A4C' }}>
+                {conv.descripcion && <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginBottom: '8px' }}>{conv.descripcion}</div>}
+                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: 'var(--at-ink-2)' }}>
                   <span>📅 Inicio: <strong>{new Date(conv.fecha_inicio + 'T12:00:00').toLocaleDateString('es-GT')}</strong></span>
                   {conv.fecha_vencimiento && <span>⏰ Vence: <strong>{new Date(conv.fecha_vencimiento + 'T12:00:00').toLocaleDateString('es-GT')}</strong></span>}
                   {conv.cuotas_pactadas && <span>📋 Cuotas: <strong>{conv.cuotas_pactadas}</strong></span>}
@@ -699,7 +699,7 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
                 </span>
                 {canEdit && conv.estado === 'activo' && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '8px', justifyContent: 'flex-end' }}>
-                    <button onClick={() => cambiarEstado(conv.id, 'completado')} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: '#D9E2DC', color: '#102622', fontSize: '12px', fontWeight: 600 }}>
+                    <button onClick={() => cambiarEstado(conv.id, 'completado')} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', fontSize: '12px', fontWeight: 600 }}>
                       ✓ Completar
                     </button>
                     <button onClick={() => cambiarEstado(conv.id, 'incumplido')} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: '#fee2e2', color: '#dc2626', fontSize: '12px', fontWeight: 600 }}>
@@ -713,13 +713,13 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
             {/* Barra de progreso */}
             <div style={{ marginTop: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
-                <span style={{ color: '#7E9389' }}>Pagado: <strong style={{ color: '#10b981' }}>{moneda} {conv.monto_pagado.toFixed(2)}</strong></span>
-                <span style={{ color: '#7E9389' }}>Total: <strong style={{ color: '#15291F' }}>{moneda} {conv.monto_total.toFixed(2)}</strong></span>
+                <span style={{ color: 'var(--at-ink-3)' }}>Pagado: <strong style={{ color: '#10b981' }}>{moneda} {conv.monto_pagado.toFixed(2)}</strong></span>
+                <span style={{ color: 'var(--at-ink-3)' }}>Total: <strong style={{ color: 'var(--at-ink)' }}>{moneda} {conv.monto_total.toFixed(2)}</strong></span>
               </div>
-              <div style={{ height: '8px', background: '#E1DDD0', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: pct >= 100 ? '#10b981' : '#1B3B36', borderRadius: '4px', transition: 'width 0.3s' }} />
+              <div style={{ height: '8px', background: 'var(--at-line)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: pct >= 100 ? '#10b981' : 'var(--at-primary)', borderRadius: '4px', transition: 'width 0.3s' }} />
               </div>
-              <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '4px', textAlign: 'right' }}>{pct.toFixed(1)}% completado</div>
+              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '4px', textAlign: 'right' }}>{pct.toFixed(1)}% completado</div>
             </div>
           </div>
         )

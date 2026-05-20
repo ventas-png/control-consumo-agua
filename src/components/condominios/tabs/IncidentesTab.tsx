@@ -19,15 +19,15 @@ const TIPO_STYLE: Record<string, { bg: string; color: string; label: string; ico
   vandalismo: { bg: '#fef3c7', color: '#92400e', label: 'Vandalismo', icon: '🔨' },
   accidente:  { bg: '#fed7aa', color: '#c2410c', label: 'Accidente',  icon: '🩺' },
   incendio:   { bg: '#fecaca', color: '#b91c1c', label: 'Incendio',   icon: '🔥' },
-  pelea:      { bg: '#F4EBE3', color: '#9C5733', label: 'Pelea',      icon: '⚡' },
-  otro:       { bg: '#EAE6D8', color: '#7E9389', label: 'Otro',       icon: '📋' },
+  pelea:      { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', label: 'Pelea',      icon: '⚡' },
+  otro:       { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Otro',       icon: '📋' },
 }
 
 const ESTADO_FLOW: Record<string, { bg: string; color: string; label: string; next?: string; nextLabel?: string }> = {
   reportado:    { bg: '#fee2e2', color: '#dc2626', label: 'Reportado',    next: 'investigando', nextLabel: 'Iniciar Investigación' },
   investigando: { bg: '#fef3c7', color: '#92400e', label: 'Investigando', next: 'resuelto',     nextLabel: 'Marcar Resuelto' },
   resuelto:     { bg: '#dcfce7', color: '#16a34a', label: 'Resuelto',     next: 'cerrado',      nextLabel: 'Cerrar' },
-  cerrado:      { bg: '#EAE6D8', color: '#7E9389', label: 'Cerrado' },
+  cerrado:      { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Cerrado' },
 }
 
 const BLANK = {
@@ -132,16 +132,16 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
     <div style={{ display: 'flex', height: '100%', minHeight: 0 }}>
       {/* LEFT */}
       <div style={{ width: '360px', flexShrink: 0, borderRight: '1.5px solid var(--at-line)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '14px', borderBottom: '1px solid var(--at-line)', background: '#FAF7EF' }}>
+        <div style={{ padding: '14px', borderBottom: '1px solid var(--at-line)', background: 'var(--at-surface-2)' }}>
           {/* KPI strip */}
           <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '60px', background: abiertos > 0 ? '#fee2e2' : '#f0fdf4', borderRadius: '8px', padding: '6px', textAlign: 'center' }}>
               <div style={{ fontWeight: 800, fontSize: '18px', color: abiertos > 0 ? '#dc2626' : '#16a34a' }}>{abiertos}</div>
-              <div style={{ fontSize: '10px', color: '#7E9389', fontWeight: 600 }}>Abiertos</div>
+              <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Abiertos</div>
             </div>
-            <div style={{ flex: 1, minWidth: '60px', background: '#EAE6D8', borderRadius: '8px', padding: '6px', textAlign: 'center' }}>
-              <div style={{ fontWeight: 800, fontSize: '18px', color: '#15291F' }}>{incidentes.length}</div>
-              <div style={{ fontSize: '10px', color: '#7E9389', fontWeight: 600 }}>Total</div>
+            <div style={{ flex: 1, minWidth: '60px', background: 'var(--at-chip)', borderRadius: '8px', padding: '6px', textAlign: 'center' }}>
+              <div style={{ fontWeight: 800, fontSize: '18px', color: 'var(--at-ink)' }}>{incidentes.length}</div>
+              <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Total</div>
             </div>
           </div>
 
@@ -151,7 +151,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
                 🚨 Registrar
               </button>
             )}
-            <button onClick={exportarPDF} disabled={incidentes.length === 0} style={{ padding: '8px 10px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="PDF">📄</button>
+            <button onClick={exportarPDF} disabled={incidentes.length === 0} style={{ padding: '8px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="PDF">📄</button>
             <button onClick={exportarXlsx} disabled={incidentes.length === 0} style={{ padding: '8px 10px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="Excel">📊</button>
           </div>
 
@@ -172,7 +172,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {filtered.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '32px', color: '#7E9389', fontSize: '13px' }}>Sin incidentes</div>
+            <div style={{ textAlign: 'center', padding: '32px', color: 'var(--at-ink-3)', fontSize: '13px' }}>Sin incidentes</div>
           )}
           {filtered.map(i => {
             const ts = TIPO_STYLE[i.tipo]
@@ -184,9 +184,9 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       <span style={{ fontSize: '16px' }}>{ts.icon}</span>
-                      <span style={{ fontWeight: 700, fontSize: '13px', color: '#15291F', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.descripcion}</span>
+                      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.descripcion}</span>
                     </div>
-                    <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                       {i.fecha}{i.hora ? ` ${i.hora}` : ''}{i.area ? ` · ${i.area}` : ''}
                     </div>
                   </div>
@@ -205,47 +205,47 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
         {/* Form */}
         {showForm && (
-          <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+          <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
             <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar incidente' : 'Registrar incidente'}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
               <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Tipo *</label>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Tipo *</label>
                 <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
                   {Object.entries(TIPO_STYLE).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha</label>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha</label>
                 <input style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
               </div>
               <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Hora</label>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Hora</label>
                 <input style={inputStyle} type="time" value={form.hora} onChange={e => setF('hora', e.target.value)} />
               </div>
               <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Área</label>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Área</label>
                 <input style={inputStyle} value={form.area} onChange={e => setF('area', e.target.value)} placeholder="Ej. Lobby, Parqueo 3" />
               </div>
               <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Descripción *</label>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Descripción *</label>
                 <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '60px' }} value={form.descripcion} onChange={e => setF('descripcion', e.target.value)} placeholder="Descripción detallada del incidente" autoFocus />
               </div>
               <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Reportado por</label>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Reportado por</label>
                 <input style={inputStyle} value={form.reportado_por} onChange={e => setF('reportado_por', e.target.value)} placeholder="Nombre o cargo" />
               </div>
               <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Estado</label>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Estado</label>
                 <select style={inputStyle} value={form.estado} onChange={e => setF('estado', e.target.value)}>
                   {Object.entries(ESTADO_FLOW).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
               <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Involucrados</label>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Involucrados</label>
                 <input style={inputStyle} value={form.involucrados} onChange={e => setF('involucrados', e.target.value)} placeholder="Personas o unidades involucradas" />
               </div>
               <div style={{ gridColumn: 'span 2' }}>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Seguimiento</label>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Seguimiento</label>
                 <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '60px' }} value={form.seguimiento} onChange={e => setF('seguimiento', e.target.value)} placeholder="Acciones tomadas, estado de la investigación..." />
               </div>
             </div>
@@ -253,7 +253,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
               <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
                 {saving ? 'Guardando…' : 'Guardar'}
               </button>
-              <button onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
+              <button onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
                 Cancelar
               </button>
             </div>
@@ -265,7 +265,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
           const ts = TIPO_STYLE[selected.tipo]
           const es = ESTADO_FLOW[selected.estado]
           return (
-            <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '24px' }}>
+            <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -275,21 +275,21 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
                         <span style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 700, background: ts.bg, color: ts.color }}>{ts.label}</span>
                         <span style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '12px', fontWeight: 700, background: es.bg, color: es.color }}>{es.label}</span>
                       </div>
-                      <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#7E9389' }}>
+                      <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>
                         {selected.fecha}{selected.hora ? ` a las ${selected.hora}` : ''}{selected.area ? ` · ${selected.area}` : ''}
                       </p>
                     </div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  {canEdit && <button onClick={() => openEdit(selected)} style={{ padding: '6px 14px', background: '#EAE6D8', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>✏️ Editar</button>}
+                  {canEdit && <button onClick={() => openEdit(selected)} style={{ padding: '6px 14px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>✏️ Editar</button>}
                   <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>
                 </div>
               </div>
 
-              <div style={{ background: '#FAF7EF', borderRadius: '8px', padding: '14px', marginBottom: '14px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', marginBottom: '6px' }}>Descripción</div>
-                <p style={{ margin: 0, fontSize: '14px', color: '#15291F', lineHeight: 1.6 }}>{selected.descripcion}</p>
+              <div style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '14px', marginBottom: '14px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '6px' }}>Descripción</div>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--at-ink)', lineHeight: 1.6 }}>{selected.descripcion}</p>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '14px' }}>
@@ -297,9 +297,9 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
                   { label: 'Reportado por', val: selected.reportado_por ?? '—' },
                   { label: 'Involucrados', val: selected.involucrados ?? '—' },
                 ].map(row => (
-                  <div key={row.label} style={{ background: '#FAF7EF', borderRadius: '8px', padding: '10px 12px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', marginBottom: '2px' }}>{row.label}</div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#3E5A4C' }}>{row.val}</div>
+                  <div key={row.label} style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '10px 12px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '2px' }}>{row.label}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)' }}>{row.val}</div>
                   </div>
                 ))}
               </div>
@@ -307,13 +307,13 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
               {selected.seguimiento && (
                 <div style={{ background: '#fefce8', borderRadius: '8px', padding: '12px', marginBottom: '16px', border: '1px solid #fde68a' }}>
                   <div style={{ fontSize: '11px', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>Seguimiento</div>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#3E5A4C' }}>{selected.seguimiento}</p>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-2)' }}>{selected.seguimiento}</p>
                 </div>
               )}
 
               {/* Estado actions */}
               {canEdit && es.next && (
-                <button onClick={() => avanzarEstado(selected)} style={{ padding: '9px 20px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+                <button onClick={() => avanzarEstado(selected)} style={{ padding: '9px 20px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
                   → {es.nextLabel}
                 </button>
               )}
@@ -322,9 +322,9 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
         })()}
 
         {!showForm && !selected && (
-          <div style={{ textAlign: 'center', padding: '60px', color: '#7E9389' }}>
+          <div style={{ textAlign: 'center', padding: '60px', color: 'var(--at-ink-3)' }}>
             <div style={{ fontSize: '40px', marginBottom: '10px' }}>🚨</div>
-            <p style={{ fontWeight: 600, color: '#7E9389' }}>Selecciona un incidente o registra uno nuevo</p>
+            <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>Selecciona un incidente o registra uno nuevo</p>
           </div>
         )}
       </div>

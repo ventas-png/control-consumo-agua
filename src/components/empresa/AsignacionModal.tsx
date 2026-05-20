@@ -97,23 +97,23 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
     >
       <div
         style={{
-          background: '#15291F', borderRadius: '16px', padding: '28px',
+          background: 'var(--at-ink)', borderRadius: '16px', padding: '28px',
           width: '480px', maxWidth: '95vw', boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
         }}
       >
         <div style={{ marginBottom: '20px' }}>
-          <h2 style={{ color: '#EAE6D8', fontSize: '18px', fontWeight: 700, margin: 0 }}>
+          <h2 style={{ color: 'var(--at-chip)', fontSize: '18px', fontWeight: 700, margin: 0 }}>
             Asignar Acceso a Proyectos
           </h2>
-          <p style={{ color: '#7E9389', fontSize: '14px', marginTop: '6px' }}>
+          <p style={{ color: 'var(--at-ink-3)', fontSize: '14px', marginTop: '6px' }}>
             {usuario.full_name} · {roleLabel[usuario.role] ?? usuario.role}
           </p>
         </div>
 
         {loading ? (
-          <div style={{ color: '#7E9389', textAlign: 'center', padding: '20px' }}>Cargando...</div>
+          <div style={{ color: 'var(--at-ink-3)', textAlign: 'center', padding: '20px' }}>Cargando...</div>
         ) : proyectos.length === 0 ? (
-          <div style={{ color: '#7E9389', textAlign: 'center', padding: '20px' }}>
+          <div style={{ color: 'var(--at-ink-3)', textAlign: 'center', padding: '20px' }}>
             No hay proyectos en esta empresa.
           </div>
         ) : (
@@ -127,7 +127,7 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
                     display: 'flex', alignItems: 'center', gap: '12px',
                     padding: '12px 16px', borderRadius: '10px', cursor: 'pointer',
                     background: checked ? 'rgba(27, 59, 54,0.12)' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${checked ? '#1B3B36' : 'transparent'}`,
+                    border: `1px solid ${checked ? 'var(--at-primary)' : 'transparent'}`,
                     transition: 'all 0.15s',
                   }}
                 >
@@ -135,9 +135,9 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggleProyecto(p.id)}
-                    style={{ accentColor: '#1B3B36', width: '16px', height: '16px', cursor: 'pointer' }}
+                    style={{ accentColor: 'var(--at-primary)', width: '16px', height: '16px', cursor: 'pointer' }}
                   />
-                  <span style={{ color: checked ? '#577B69' : '#C7C2B0', fontSize: '14px', fontWeight: checked ? 600 : 400 }}>
+                  <span style={{ color: checked ? 'var(--at-accent-2)' : 'var(--at-line-strong)', fontSize: '14px', fontWeight: checked ? 600 : 400 }}>
                     {p.nombre}
                   </span>
                 </label>
@@ -151,7 +151,7 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
             onClick={onClose}
             style={{
               padding: '9px 18px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
-              background: 'transparent', color: '#7E9389', cursor: 'pointer', fontSize: '14px',
+              background: 'transparent', color: 'var(--at-ink-3)', cursor: 'pointer', fontSize: '14px',
             }}
           >
             Cancelar
@@ -161,7 +161,7 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
             disabled={saving}
             style={{
               padding: '9px 20px', borderRadius: '8px', border: 'none',
-              background: saving ? '#3E5A4C' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+              background: saving ? 'var(--at-ink-2)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
               color: 'white', cursor: saving ? 'not-allowed' : 'pointer',
               fontSize: '14px', fontWeight: 600,
             }}

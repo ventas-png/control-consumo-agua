@@ -62,7 +62,7 @@ export function PasswordResetPage({ onBack }: Props) {
   }
 
   const cardStyle: CSSProperties = {
-    maxWidth: '500px', margin: '40px auto', background: 'white',
+    maxWidth: '500px', margin: '40px auto', background: 'var(--at-surface)',
     borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)',
   }
 
@@ -130,7 +130,7 @@ export function PasswordResetPage({ onBack }: Props) {
               </button>
               <button
                 onClick={onBack}
-                style={{ flex: 1, padding: '12px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '12px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
               >
                 Volver
               </button>
@@ -141,7 +141,7 @@ export function PasswordResetPage({ onBack }: Props) {
             <div style={{ padding: '20px', background: '#d1fae5', borderRadius: '8px', marginBottom: '20px', color: '#059669', fontWeight: 600 }}>
               ✅ ¡Contraseña actualizada exitosamente!
             </div>
-            <p style={{ color: '#7E9389', marginBottom: '20px' }}>
+            <p style={{ color: 'var(--at-ink-3)', marginBottom: '20px' }}>
               Tu contraseña ha sido actualizada. Ahora puedes iniciar sesión.
             </p>
             <button

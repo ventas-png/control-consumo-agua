@@ -33,8 +33,8 @@ interface Props {
 }
 
 const ESTADO_CONFIG: Record<EstadoSTR, { label: string; color: string; bg: string }> = {
-  confirmada: { label: 'Confirmada', color: '#1B3B36', bg: '#D9E2DC' },
-  en_curso:   { label: 'En curso',   color: '#B96A3F', bg: '#F4EBE3' },
+  confirmada: { label: 'Confirmada', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
+  en_curso:   { label: 'En curso',   color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
   completada: { label: 'Completada', color: '#10b981', bg: '#d1fae5' },
   cancelada:  { label: 'Cancelada',  color: '#ef4444', bg: '#fee2e2' },
 }
@@ -249,8 +249,8 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   const maxAdicionales = (form.num_adultos ?? 1) + (form.num_ninos ?? 0) - 1
 
@@ -260,28 +260,28 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Total reservas',  value: String(reservasSTR.length),    icon: '🏨', color: '#1B3B36' },
-          { label: 'En curso',        value: String(enCurso),               icon: '🔑', color: '#B96A3F' },
+          { label: 'Total reservas',  value: String(reservasSTR.length),    icon: '🏨', color: 'var(--at-primary)' },
+          { label: 'En curso',        value: String(enCurso),               icon: '🔑', color: 'var(--at-accent)' },
           { label: 'Próximas',        value: String(proximas),              icon: '📅', color: '#f59e0b' },
           { label: 'Ingreso del mes', value: ingresoMes > 0 ? `${moneda} ${ingresoMes.toFixed(0)}` : '—', icon: '💰', color: '#10b981' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Rentas de Corto Plazo (STR)</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Rentas de Corto Plazo (STR)</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Reserva</button>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Reserva</button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Reserva' : 'Nueva Reserva STR'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
             <div>
@@ -350,16 +350,16 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
 
             {/* Fotos del huésped principal */}
             <div style={{ gridColumn: '1 / -1' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389', marginBottom: '8px', paddingTop: '4px', borderTop: '1px solid var(--at-line)' }}>
-                Fotografías del huésped principal <span style={{ fontWeight: 400, color: '#7E9389' }}>(opcional — se pueden completar al ingreso)</span>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '8px', paddingTop: '4px', borderTop: '1px solid var(--at-line)' }}>
+                Fotografías del huésped principal <span style={{ fontWeight: 400, color: 'var(--at-ink-3)' }}>(opcional — se pueden completar al ingreso)</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', maxWidth: '400px' }}>
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', marginBottom: '4px' }}>Foto del huésped</div>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px' }}>Foto del huésped</div>
                   <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="str_guests" label="Foto del huésped" capture />
                 </div>
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', marginBottom: '4px' }}>Foto del documento / DPI</div>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px' }}>Foto del documento / DPI</div>
                   <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="str_guests" label="DPI / Documento" capture />
                 </div>
               </div>
@@ -368,37 +368,37 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
             {/* Personas del grupo */}
             <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--at-line)', paddingTop: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-3)' }}>
                   Personas del grupo
-                  <span style={{ fontWeight: 400, color: '#7E9389', marginLeft: 6 }}>
+                  <span style={{ fontWeight: 400, color: 'var(--at-ink-3)', marginLeft: 6 }}>
                     (principal + {huespedes.length}/{maxAdicionales} adicionales pre-registradas)
                   </span>
                 </div>
                 {!showHuespedForm && huespedes.length < maxAdicionales && (
                   <button onClick={() => setShowHuespedForm(true)}
-                    style={{ padding: '4px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1.5px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                    style={{ padding: '4px 12px', background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1.5px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                     + Agregar persona
                   </button>
                 )}
               </div>
 
               {/* Principal (always shown) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', marginBottom: '6px' }}>
-                <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#1B3B36', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'white', fontWeight: 700, flexShrink: 0 }}>1</div>
-                <div style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: '#15291F' }}>{form.huesped_nombre || 'Huésped principal'}</div>
-                <span style={{ fontSize: '10px', color: '#102622', fontWeight: 600, padding: '2px 8px', background: '#D9E2DC', borderRadius: '10px' }}>Principal</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', marginBottom: '6px' }}>
+                <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--at-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'white', fontWeight: 700, flexShrink: 0 }}>1</div>
+                <div style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: 'var(--at-ink)' }}>{form.huesped_nombre || 'Huésped principal'}</div>
+                <span style={{ fontSize: '10px', color: 'var(--at-primary-hover)', fontWeight: 600, padding: '2px 8px', background: 'var(--at-primary-soft)', borderRadius: '10px' }}>Principal</span>
               </div>
 
               {/* Additional guests */}
               {huespedes.map((h, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: h.visitante_id ? '#f0fdf4' : '#FAF7EF', border: `1px solid ${h.visitante_id ? '#86efac' : '#E1DDD0'}`, borderRadius: '8px', marginBottom: '6px' }}>
-                  <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#E1DDD0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#3E5A4C', fontWeight: 700, flexShrink: 0 }}>{i + 2}</div>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: h.visitante_id ? '#f0fdf4' : 'var(--at-surface-2)', border: `1px solid ${h.visitante_id ? '#86efac' : 'var(--at-line)'}`, borderRadius: '8px', marginBottom: '6px' }}>
+                  <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--at-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--at-ink-2)', fontWeight: 700, flexShrink: 0 }}>{i + 2}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#15291F' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--at-ink)' }}>
                       {h.es_menor ? '👶 ' : ''}{h.nombre}
                       {h.visitante_id && <span style={{ marginLeft: 6, fontSize: '10px', color: '#16a34a', fontWeight: 600 }}>✓ Ingresado</span>}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#7E9389' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
                       {h.es_menor
                         ? `Menor${h.fecha_nacimiento ? ` · Nac. ${h.fecha_nacimiento}` : ''}`
                         : h.identificacion ? `DPI: ${h.identificacion}` : 'Sin documento'}
@@ -415,13 +415,13 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
 
               {/* Add guest form */}
               {showHuespedForm && (
-                <div style={{ padding: '14px', background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C' }}>Nueva persona del grupo</div>
+                <div style={{ padding: '14px', background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)' }}>Nueva persona del grupo</div>
                   <div>
                     <label style={labelStyle}>Nombre *</label>
                     <input style={inputStyle} value={huespedForm.nombre} onChange={e => setHuespedForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre completo" />
                   </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#3E5A4C', cursor: 'pointer', fontWeight: 600 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--at-ink-2)', cursor: 'pointer', fontWeight: 600 }}>
                     <input type="checkbox" checked={huespedForm.es_menor} onChange={e => setHuespedForm(f => ({ ...f, es_menor: e.target.checked, identificacion: '' }))} />
                     Es menor de edad
                     {huespedForm.es_menor && <span style={{ padding: '2px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '10px' }}>Menor</span>}
@@ -439,12 +439,12 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: huespedForm.es_menor ? '1fr' : '1fr 1fr', gap: '10px' }}>
                     <div>
-                      <div style={{ fontSize: '11px', color: '#7E9389', marginBottom: '3px' }}>Foto de la persona</div>
+                      <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '3px' }}>Foto de la persona</div>
                       <ImageUploader value={huespedForm.foto_url} onChange={v => setHuespedForm(f => ({ ...f, foto_url: v }))} folder="str_guests" label="Foto" capture />
                     </div>
                     {!huespedForm.es_menor && (
                       <div>
-                        <div style={{ fontSize: '11px', color: '#7E9389', marginBottom: '3px' }}>Foto del documento</div>
+                        <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '3px' }}>Foto del documento</div>
                         <ImageUploader value={huespedForm.foto_documento_url} onChange={v => setHuespedForm(f => ({ ...f, foto_documento_url: v }))} folder="str_guests" label="Documento" capture />
                       </div>
                     )}
@@ -455,7 +455,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                       + Agregar
                     </button>
                     <button onClick={() => { setShowHuespedForm(false); setHuespedForm(defaultHuesped()) }}
-                      style={{ padding: '7px 14px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>
+                      style={{ padding: '7px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px' }}>
                       Cancelar
                     </button>
                   </div>
@@ -465,13 +465,13 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
           </div>
 
           {form.fecha_entrada && form.fecha_salida && form.fecha_salida > form.fecha_entrada && (
-            <div style={{ marginTop: '10px', fontSize: '12px', color: '#7E9389' }}>
+            <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
               📅 {calcNoches(form.fecha_entrada, form.fecha_salida)} noches
             </div>
           )}
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
           </div>
@@ -483,16 +483,16 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
         {(['todos', 'confirmada', 'en_curso', 'completada', 'cancelada'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0',
-              background: filtroEstado === e ? '#D9E2DC' : 'white',
-              color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
+              borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
+              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'white',
+              color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? `Todas (${reservasSTR.length})` : `${ESTADO_CONFIG[e as EstadoSTR]?.label} (${reservasSTR.filter(r => r.estado === e).length})`}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏨</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay reservas registradas</p>
         </div>
@@ -506,29 +506,29 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
             const capacidad = r.num_adultos + r.num_ninos
             const lleno = ingresados >= capacidad
             return (
-              <div key={r.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '16px' }}>
+              <div key={r.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                     {r.foto_url
                       ? <SecureImage src={r.foto_url} alt={r.huesped_nombre} style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid var(--at-line)' }} />
-                      : <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#D9E2DC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🏠</div>
+                      : <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--at-primary-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>🏠</div>
                     }
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: '15px', color: '#15291F' }}>{PLATAFORMA_ICON[r.plataforma]} {r.huesped_nombre}</div>
-                      {r.unidad_nombre && <div style={{ fontSize: '11px', color: '#7E9389' }}>🏠 {r.unidad_nombre}</div>}
+                      <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--at-ink)' }}>{PLATAFORMA_ICON[r.plataforma]} {r.huesped_nombre}</div>
+                      {r.unidad_nombre && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>🏠 {r.unidad_nombre}</div>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
                     <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
                     {r.foto_documento_url && (
-                      <a href={r.foto_documento_url} target="_blank" rel="noreferrer" style={{ fontSize: '10px', color: '#102622', textDecoration: 'none', fontWeight: 600 }}>🪪 Ver doc.</a>
+                      <a href={r.foto_documento_url} target="_blank" rel="noreferrer" style={{ fontSize: '10px', color: 'var(--at-primary-hover)', textDecoration: 'none', fontWeight: 600 }}>🪪 Ver doc.</a>
                     )}
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: '#7E9389', marginBottom: '10px' }}>
-                  <div>📅 {r.fecha_entrada} → {r.fecha_salida} <span style={{ fontWeight: 600, color: '#15291F' }}>({noches}n)</span></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '10px' }}>
+                  <div>📅 {r.fecha_entrada} → {r.fecha_salida} <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>({noches}n)</span></div>
                   <div>👥 {r.num_adultos} adultos{r.num_ninos > 0 ? ` · ${r.num_ninos} niños` : ''}</div>
-                  {r.monto_total && <div style={{ fontWeight: 700, color: '#15291F' }}>💰 {moneda} {r.monto_total.toFixed(2)}</div>}
+                  {r.monto_total && <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>💰 {moneda} {r.monto_total.toFixed(2)}</div>}
                   {r.huesped_telefono && <div>📞 {r.huesped_telefono}</div>}
                 </div>
                 {/* Group progress */}
@@ -537,7 +537,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                     {ingresados}/{capacidad} ingresados
                   </span>
                   {preregistrados > 0 && !lleno && (
-                    <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#EEF2EC', color: '#1B3B36' }}>
+                    <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-primary-tint)', color: 'var(--at-primary)' }}>
                       {preregistrados} pre-reg.
                     </span>
                   )}
@@ -545,12 +545,12 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {r.estado === 'confirmada' && (
-                      <button onClick={() => handleEstado(r.id, 'en_curso')} style={{ flex: 1, padding: '4px 8px', background: '#F4EBE3', color: '#9C5733', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Check-in</button>
+                      <button onClick={() => handleEstado(r.id, 'en_curso')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Check-in</button>
                     )}
                     {r.estado === 'en_curso' && (
                       <button onClick={() => handleEstado(r.id, 'completada')} style={{ flex: 1, padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Check-out</button>
                     )}
-                    <button onClick={() => startEdit(r)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                    <button onClick={() => startEdit(r)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
                     <button onClick={() => handleDelete(r.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                   </div>
                 )}

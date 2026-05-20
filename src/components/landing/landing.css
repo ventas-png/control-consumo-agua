@@ -1937,3 +1937,22 @@
   .nav-actions .btn-ghost { display: inline-flex; }
   .nav-actions .btn-primary { display: none; }
 }
+
+/* ─── Dark theme (landing/login) ──────────────────────────────────────────
+   Sigue al sistema, salvo override manual con [data-theme] en <html>. */
+[data-theme="dark"] .at-root,
+html:not([data-theme="light"]) .at-root {
+  color-scheme: dark;
+}
+[data-theme="dark"] .at-root {
+  --c-bg: #0A1410; --c-surface: #0F1D17; --c-ink: #EFEDDF; --c-ink_2: #B5C2BA;
+  --c-ink_3: #788A80; --c-line: #1A2A22; --c-line_strong: #2A3D33;
+  --c-primary: #7FB29F; --c-primary_hover: #9CC6B6; --c-primary_soft: #15241D; --c-chip: #15211A;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .at-root {
+    --c-bg: #0A1410; --c-surface: #0F1D17; --c-ink: #EFEDDF; --c-ink_2: #B5C2BA;
+    --c-ink_3: #788A80; --c-line: #1A2A22; --c-line_strong: #2A3D33;
+    --c-primary: #7FB29F; --c-primary_hover: #9CC6B6; --c-primary_soft: #15241D; --c-chip: #15211A;
+  }
+}

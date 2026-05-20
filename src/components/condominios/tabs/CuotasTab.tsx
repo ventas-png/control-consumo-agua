@@ -40,7 +40,7 @@ const CONCEPTOS: { value: ConceptoCuota; label: string }[] = [
 ]
 
 const ESTADO_COLORS: Record<EstadoCuota, { bg: string; color: string }> = {
-  pendiente: { bg: '#EEF2EC', color: '#1B3B36' },
+  pendiente: { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
   pagado:    { bg: '#f0fdf4', color: '#16a34a' },
   moroso:    { bg: '#fef2f2', color: '#dc2626' },
 }
@@ -143,7 +143,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       html: `<p style="font-size:13px;color:var(--at-ink-2)">${csvRows.length - validas.length > 0 ? `<strong>${csvRows.length - validas.length} fila(s) con errores serán omitidas.</strong><br>` : ''}Se insertarán ${validas.length} cuotas con estado <strong>pendiente</strong>.</p>`,
       icon: 'question', showCancelButton: true,
       confirmButtonText: '📥 Importar', cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#1B3B36',
+      confirmButtonColor: 'var(--at-primary)',
     })
     if (!isConfirmed) return
     setImportando(true)
@@ -403,8 +403,8 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#15291F' }}>Cuotas de Mantenimiento</h2>
-          <p style={{ margin: '4px 0 0', color: '#7E9389', fontSize: '13.5px' }}>{cuotas.length} cuotas registradas</p>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Cuotas de Mantenimiento</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>{cuotas.length} cuotas registradas</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {canEdit && seleccionadas.size > 0 && (
@@ -433,7 +433,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             <>
               <input ref={fileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleCSVFile} />
               <button onClick={() => fileInputRef.current?.click()}
-                style={{ padding: '10px 16px', background: '#FAF1EA', color: '#9C5733', border: '1.5px solid var(--at-accent-soft)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+                style={{ padding: '10px 16px', background: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)', border: '1.5px solid var(--at-accent-soft)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
                 📥 Importar CSV
               </button>
               <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}>
@@ -446,84 +446,84 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
 
       {/* Resumen */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-        {([['pendiente', '#1B3B36', '#EEF2EC'], ['moroso', '#dc2626', '#fef2f2'], ['pagado', '#16a34a', '#f0fdf4']] as const).map(([estado, color, bg]) => (
+        {([['pendiente', 'var(--at-primary)', 'var(--at-primary-tint)'], ['moroso', '#dc2626', '#fef2f2'], ['pagado', '#16a34a', '#f0fdf4']] as const).map(([estado, color, bg]) => (
           <button key={estado} onClick={() => { setFiltroEstado(filtroEstado === estado ? 'todos' : estado); setSeleccionadas(new Set()) }}
-            style={{ padding: '14px', background: filtroEstado === estado ? bg : 'white', border: `1.5px solid ${filtroEstado === estado ? color : '#E1DDD0'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'left' }}>
+            style={{ padding: '14px', background: filtroEstado === estado ? bg : 'white', border: `1.5px solid ${filtroEstado === estado ? color : 'var(--at-line)'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'left' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color }}>{moneda} {totales[estado].toFixed(2)}</div>
-            <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px', textTransform: 'capitalize' }}>{cuotas.filter(c => c.estado === estado).length} cuotas {estado}s</div>
+            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px', textTransform: 'capitalize' }}>{cuotas.filter(c => c.estado === estado).length} cuotas {estado}s</div>
           </button>
         ))}
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Nueva cuota</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Unidad (opcional)</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Unidad (opcional)</label>
               <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                 <option value="">Todas las unidades</option>
                 {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Concepto</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Concepto</label>
               <select value={form.concepto} onChange={e => setForm(f => ({ ...f, concepto: e.target.value as ConceptoCuota }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                 {CONCEPTOS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Monto ({moneda})</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Monto ({moneda})</label>
               <input type="number" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))}
                 placeholder="0.00" min="0" step="0.01"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Período</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Período</label>
               <input type="month" value={form.periodo} onChange={e => setForm(f => ({ ...f, periodo: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha de vencimiento</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Fecha de vencimiento</label>
               <input type="date" value={form.fecha_vencimiento} onChange={e => setForm(f => ({ ...f, fecha_vencimiento: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas</label>
               <input type="text" value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
                 placeholder="Opcional"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
-            <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* CSV Preview */}
       {csvRows && (
-        <div style={{ background: 'white', border: '1.5px solid var(--at-accent-soft)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-accent-soft)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: 8 }}>
             <div>
-              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#15291F' }}>Vista previa del CSV</h3>
-              <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: '#7E9389' }}>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--at-ink)' }}>Vista previa del CSV</h3>
+              <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: 'var(--at-ink-3)' }}>
                 {csvRows.filter(r => r.status === 'ok').length} filas válidas · {csvRows.filter(r => r.status !== 'ok').length} con errores
               </p>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={confirmarImportCSV} disabled={importando || csvRows.filter(r => r.status === 'ok').length === 0}
-                style={{ padding: '9px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+                style={{ padding: '9px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
                 {importando ? 'Importando...' : `📥 Confirmar (${csvRows.filter(r => r.status === 'ok').length})`}
               </button>
               <button onClick={() => setCsvRows(null)}
-                style={{ padding: '9px 14px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '9px', cursor: 'pointer', fontSize: '13px' }}>
+                style={{ padding: '9px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '9px', cursor: 'pointer', fontSize: '13px' }}>
                 Cancelar
               </button>
             </div>
@@ -531,9 +531,9 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
               <thead>
-                <tr style={{ background: '#FAF7EF', borderBottom: '1px solid var(--at-line)' }}>
+                <tr style={{ background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)' }}>
                   {['', 'Unidad', 'Concepto', 'Monto', 'Período', 'Vencimiento', 'Notas'].map(h => (
-                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: '#7E9389', fontSize: '11px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-3)', fontSize: '11px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -543,12 +543,12 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                     <td style={{ padding: '7px 12px', fontSize: '14px' }}>
                       {r.status === 'ok' ? '✅' : r.status === 'warn' ? '⚠️' : '❌'}
                     </td>
-                    <td style={{ padding: '7px 12px', color: r.unidadId ? '#3E5A4C' : '#dc2626' }}>{r.rawUnidad || '—'}</td>
-                    <td style={{ padding: '7px 12px', color: r.concepto ? '#3E5A4C' : '#dc2626' }}>{r.rawConcepto || '—'}</td>
-                    <td style={{ padding: '7px 12px', color: r.monto ? '#3E5A4C' : '#dc2626' }}>{r.rawMonto || '—'}</td>
-                    <td style={{ padding: '7px 12px', color: '#3E5A4C' }}>{r.rawPeriodo || '—'}</td>
-                    <td style={{ padding: '7px 12px', color: '#3E5A4C' }}>{r.rawVencimiento || '—'}</td>
-                    <td style={{ padding: '7px 12px', color: '#3E5A4C', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.rawNotas || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: r.unidadId ? 'var(--at-ink-2)' : '#dc2626' }}>{r.rawUnidad || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: r.concepto ? 'var(--at-ink-2)' : '#dc2626' }}>{r.rawConcepto || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: r.monto ? 'var(--at-ink-2)' : '#dc2626' }}>{r.rawMonto || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: 'var(--at-ink-2)' }}>{r.rawPeriodo || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: 'var(--at-ink-2)' }}>{r.rawVencimiento || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: 'var(--at-ink-2)', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.rawNotas || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -562,7 +562,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
               </ul>
             </div>
           )}
-          <div style={{ marginTop: '10px', padding: '8px 12px', background: '#EEF2EC', borderRadius: '8px', fontSize: '11.5px', color: '#102622' }}>
+          <div style={{ marginTop: '10px', padding: '8px 12px', background: 'var(--at-primary-tint)', borderRadius: '8px', fontSize: '11.5px', color: 'var(--at-primary-hover)' }}>
             Formato esperado: <code>unidad,concepto,monto,periodo,vencimiento,notas</code> — ejemplo: <code>Apto 101,mantenimiento,350.00,2026-04,2026-04-30,</code>
           </div>
         </div>
@@ -570,15 +570,15 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
 
       {/* Lista */}
       {cuotasFiltradas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>💳</div>
-          <p style={{ fontWeight: 600, color: '#7E9389' }}>No hay cuotas {filtroEstado !== 'todos' ? `con estado "${filtroEstado}"` : 'registradas'}</p>
+          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay cuotas {filtroEstado !== 'todos' ? `con estado "${filtroEstado}"` : 'registradas'}</p>
         </div>
       ) : (
-        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
             <thead>
-              <tr style={{ background: '#FAF7EF', borderBottom: '1px solid var(--at-line)' }}>
+              <tr style={{ background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)' }}>
                 {canEdit && (
                   <th style={{ padding: '10px 14px', width: 36 }}>
                     <input type="checkbox"
@@ -589,7 +589,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                   </th>
                 )}
                 {['Unidad', 'Concepto', 'Período', 'Monto', 'Vencimiento', 'Estado', 'Rubros', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 700, color: '#7E9389', textTransform: 'uppercase' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -612,18 +612,18 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                         )}
                       </td>
                     )}
-                    <td style={{ padding: '10px 14px', color: '#3E5A4C' }}>{c.unidad_nombre || <span style={{ color: '#7E9389', fontStyle: 'italic' }}>General</span>}</td>
-                    <td style={{ padding: '10px 14px', color: '#3E5A4C' }}>{CONCEPTOS.find(x => x.value === c.concepto)?.label || c.concepto}</td>
-                    <td style={{ padding: '10px 14px', color: '#3E5A4C' }}>{c.periodo}</td>
+                    <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)' }}>{c.unidad_nombre || <span style={{ color: 'var(--at-ink-3)', fontStyle: 'italic' }}>General</span>}</td>
+                    <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)' }}>{CONCEPTOS.find(x => x.value === c.concepto)?.label || c.concepto}</td>
+                    <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)' }}>{c.periodo}</td>
                     <td style={{ padding: '10px 14px' }}>
-                      <div style={{ fontWeight: 700, color: '#15291F' }}>{moneda} {c.monto.toFixed(2)}</div>
+                      <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto.toFixed(2)}</div>
                       {c.estado === 'pagado' && c.metodo_pago && (
                         <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '1px' }}>
                           {c.metodo_pago}{c.fecha_pago ? ` · ${c.fecha_pago}` : ''}
                         </div>
                       )}
                     </td>
-                    <td style={{ padding: '10px 14px', color: c.fecha_vencimiento && c.fecha_vencimiento < hoy && c.estado !== 'pagado' ? '#dc2626' : '#3E5A4C' }}>
+                    <td style={{ padding: '10px 14px', color: c.fecha_vencimiento && c.fecha_vencimiento < hoy && c.estado !== 'pagado' ? '#dc2626' : 'var(--at-ink-2)' }}>
                       {c.fecha_vencimiento || '—'}
                     </td>
                     <td style={{ padding: '10px 14px' }}>
@@ -643,10 +643,10 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                     <td style={{ padding: '10px 14px' }}>
                       {tieneRubros ? (
                         <button onClick={() => toggleRubros(c.id)}
-                          style={{ fontSize: '11px', padding: '3px 8px', border: '1px solid var(--at-accent-soft)', borderRadius: '6px', cursor: 'pointer', background: expandido ? '#EEF2EC' : '#FAF7EF', color: '#9C5733', fontWeight: 600 }}>
+                          style={{ fontSize: '11px', padding: '3px 8px', border: '1px solid var(--at-accent-soft)', borderRadius: '6px', cursor: 'pointer', background: expandido ? 'var(--at-primary-tint)' : 'var(--at-surface-2)', color: 'var(--at-accent-hover)', fontWeight: 600 }}>
                           {expandido ? '▲' : '▼'} {rubrosDetalle!.length}
                         </button>
-                      ) : <span style={{ color: '#C7C2B0', fontSize: 11 }}>—</span>}
+                      ) : <span style={{ color: 'var(--at-line-strong)', fontSize: 11 }}>—</span>}
                     </td>
                     <td style={{ padding: '10px 14px' }}>
                       <div style={{ display: 'flex', gap: '4px' }}>
@@ -658,7 +658,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                         )}
                         {c.estado === 'pagado' && canCreate && (
                           <button onClick={() => crearRecibo(c)} title="Crear recibo digital"
-                            style={{ background: '#EEF2EC', border: 'none', cursor: 'pointer', color: '#1B3B36', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
+                            style={{ background: 'var(--at-primary-tint)', border: 'none', cursor: 'pointer', color: 'var(--at-primary)', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
                             🧾
                           </button>
                         )}
@@ -673,12 +673,12 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                 const detalleRow = (
                   <tr key={`${c.id}-rubros`} style={{ borderBottom: '1px solid var(--at-chip)', background: '#f8faff' }}>
                     <td colSpan={colCount} style={{ padding: '0 14px 10px 48px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 12px', background: '#EEF2EC', borderRadius: 8, border: '1px solid var(--at-accent-soft-2)' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 12px', background: 'var(--at-primary-tint)', borderRadius: 8, border: '1px solid var(--at-accent-soft-2)' }}>
                         {rubrosDetalle!.map((rd, ri) => (
-                          <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#3E5A4C' }}>
+                          <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--at-ink-2)' }}>
                             <span>
                               {rd.nombre}
-                              <span style={{ marginLeft: 6, color: '#7E9389', fontSize: 11 }}>
+                              <span style={{ marginLeft: 6, color: 'var(--at-ink-3)', fontSize: 11 }}>
                                 ({rd.metodo === 'fijo' ? 'fijo' : rd.metodo === 'por_m2' ? `${moneda} ${rd.valor}/m²` : `alíc. ${rd.valor.toLocaleString('es')}`})
                               </span>
                             </span>

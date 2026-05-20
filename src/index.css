@@ -34,6 +34,41 @@
   --at-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+/* ─── Dark theme ──────────────────────────────────────────────────────────
+   Auto: sigue el sistema (prefers-color-scheme) salvo que el usuario fuerce
+   claro con [data-theme="light"]. Manual: [data-theme="dark"] siempre oscuro.
+   Los mismos valores se declaran en ambos selectores. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --at-bg: #0B1410; --at-surface: #11201A; --at-surface-2: #172821;
+    --at-ink: #ECEFE8; --at-ink-2: #B7C4BB; --at-ink-3: #8B9A91;
+    --at-line: #28352D; --at-line-strong: #3A4A40;
+    --at-primary: #5E9D8A; --at-primary-hover: #76B3A1; --at-primary-soft: #1C2E27;
+    --at-accent: #C8865C; --at-accent-2: #79A18E; --at-chip: #1E2A23;
+    --at-primary-2: #62927F; --at-primary-tint: #16241D; --at-primary-soft-2: #2A3D33;
+    --at-primary-mint: #76B3A1; --at-primary-mint-2: #62927F;
+    --at-ink-deep: #DDE8E1; --at-ink-deeper: #C7D2CB; --at-ink-darkest: #ECEFE8;
+    --at-accent-hover: #D49A72; --at-accent-dark: #C8865C; --at-accent-darker: #B5764A;
+    --at-accent-light: #D9A580; --at-accent-soft: #2E2018; --at-accent-soft-2: #3A2A20;
+    --at-accent-tint: #1F1610; --at-accent-tint-2: #261A12;
+    color-scheme: dark;
+  }
+}
+[data-theme="dark"] {
+  --at-bg: #0B1410; --at-surface: #11201A; --at-surface-2: #172821;
+  --at-ink: #ECEFE8; --at-ink-2: #B7C4BB; --at-ink-3: #8B9A91;
+  --at-line: #28352D; --at-line-strong: #3A4A40;
+  --at-primary: #5E9D8A; --at-primary-hover: #76B3A1; --at-primary-soft: #1C2E27;
+  --at-accent: #C8865C; --at-accent-2: #79A18E; --at-chip: #1E2A23;
+  --at-primary-2: #62927F; --at-primary-tint: #16241D; --at-primary-soft-2: #2A3D33;
+  --at-primary-mint: #76B3A1; --at-primary-mint-2: #62927F;
+  --at-ink-deep: #DDE8E1; --at-ink-deeper: #C7D2CB; --at-ink-darkest: #ECEFE8;
+  --at-accent-hover: #D49A72; --at-accent-dark: #C8865C; --at-accent-darker: #B5764A;
+  --at-accent-light: #D9A580; --at-accent-soft: #2E2018; --at-accent-soft-2: #3A2A20;
+  --at-accent-tint: #1F1610; --at-accent-tint-2: #261A12;
+  color-scheme: dark;
+}
+
 /* ─── Global Reset & Base ─────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;

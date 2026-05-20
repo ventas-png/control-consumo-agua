@@ -85,9 +85,9 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
           <div style={{ fontSize: 20, fontWeight: 700, color: '#16a34a' }}>{moneda} {totalPagos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           <div style={{ fontSize: 11, color: '#16a34a' }}>Pagos recibidos</div>
         </div>
-        <div style={{ background: '#FAF7EF', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#3E5A4C' }}>{periodos.length}</div>
-          <div style={{ fontSize: 11, color: '#7E9389' }}>Períodos con snapshot</div>
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-ink-2)' }}>{periodos.length}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Períodos con snapshot</div>
         </div>
       </div>
 
@@ -102,11 +102,11 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
             <option value="">Todos los períodos</option>
             {periodos.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
-          <span style={{ fontSize: 12, color: '#7E9389', alignSelf: 'center' }}>{lista.length} registros</span>
+          <span style={{ fontSize: 12, color: 'var(--at-ink-3)', alignSelf: 'center' }}>{lista.length} registros</span>
         </div>
         {canCreate && (
           <button onClick={generarSnapshot} disabled={saving}
-            style={{ padding: '8px 16px', background: '#577B69', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent-2)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             {saving ? '⏳ Generando…' : '📸 Generar snapshot'}
           </button>
         )}
@@ -114,7 +114,7 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
 
       {/* Tabla */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
           Sin snapshots de saldo — usa "Generar snapshot" para el período actual
         </div>
@@ -122,9 +122,9 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#FAF7EF' }}>
+              <tr style={{ background: 'var(--at-surface-2)' }}>
                 {['Unidad', 'Período', 'Saldo anterior', 'Cargos', 'Pagos', 'Saldo final', 'Cuotas vencidas'].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#7E9389', fontWeight: 600, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -135,8 +135,8 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
                 return (
                   <tr key={h.id} style={{ borderBottom: '1px solid var(--at-chip)', background: deudor ? '#fef9f9' : '#fff' }}>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? h.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', color: '#7E9389' }}>{h.periodo}</td>
-                    <td style={{ padding: '8px 12px', color: '#3E5A4C' }}>{moneda} {h.saldo_anterior.toFixed(2)}</td>
+                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{h.periodo}</td>
+                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-2)' }}>{moneda} {h.saldo_anterior.toFixed(2)}</td>
                     <td style={{ padding: '8px 12px', color: '#dc2626' }}>+ {moneda} {h.cargos_periodo.toFixed(2)}</td>
                     <td style={{ padding: '8px 12px', color: '#16a34a' }}>− {moneda} {h.pagos_periodo.toFixed(2)}</td>
                     <td style={{ padding: '8px 12px', fontWeight: 700, color: deudor ? '#ef4444' : '#16a34a' }}>
@@ -145,7 +145,7 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                       {h.num_cuotas_vencidas > 0
                         ? <span style={{ padding: '2px 7px', borderRadius: 20, background: '#fee2e2', color: '#ef4444', fontSize: 11, fontWeight: 700 }}>{h.num_cuotas_vencidas}</span>
-                        : <span style={{ color: '#7E9389', fontSize: 12 }}>—</span>
+                        : <span style={{ color: 'var(--at-ink-3)', fontSize: 12 }}>—</span>
                       }
                     </td>
                   </tr>

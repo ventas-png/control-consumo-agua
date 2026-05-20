@@ -20,7 +20,7 @@ interface Props {
 
 const ESTADO_CFG: Record<EstadoReciboDigital, { label: string; bg: string; color: string }> = {
   generado: { label: 'Generado', bg: '#fef3c7', color: '#d97706' },
-  enviado:  { label: 'Enviado',  bg: '#D9E2DC', color: '#1B3B36' },
+  enviado:  { label: 'Enviado',  bg: 'var(--at-primary-soft)', color: 'var(--at-primary)' },
   anulado:  { label: 'Anulado',  bg: '#fee2e2', color: '#ef4444' },
 }
 
@@ -97,16 +97,16 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
 
   const totalEmitido = recibos.filter(r => r.estado !== 'anulado').reduce((s, r) => s + r.monto, 0)
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Total recibos', val: recibos.length, bg: '#FAF7EF', color: '#3E5A4C' },
+          { label: 'Total recibos', val: recibos.length, bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
           { label: 'Generados', val: recibos.filter(r => r.estado === 'generado').length, bg: '#fffbeb', color: '#d97706' },
-          { label: 'Enviados', val: recibos.filter(r => r.estado === 'enviado').length, bg: '#EEF2EC', color: '#1B3B36' },
+          { label: 'Enviados', val: recibos.filter(r => r.estado === 'enviado').length, bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
           { label: 'Monto emitido', val: `${moneda} ${totalEmitido.toFixed(2)}`, bg: '#f0fdf4', color: '#16a34a' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
@@ -129,7 +129,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
             <option value="">Todas las unidades</option>
             {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
           </select>
-          <span style={{ fontSize: 12, color: '#7E9389', alignSelf: 'center' }}>{lista.length} registros</span>
+          <span style={{ fontSize: 12, color: 'var(--at-ink-3)', alignSelf: 'center' }}>{lista.length} registros</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
@@ -148,7 +148,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
           </button>
           {canCreate && (
             <button onClick={() => setMostrarForm(!mostrarForm)}
-              style={{ padding: '8px 16px', background: '#102622', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+              style={{ padding: '8px 16px', background: 'var(--at-primary-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
               {mostrarForm ? '✕ Cancelar' : '🧾 Nuevo recibo'}
             </button>
           )}
@@ -157,7 +157,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Generar recibo · {nextNumero(recibos)}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -202,7 +202,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#102622', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-primary-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '🧾 Generar recibo'}
           </button>
         </div>
@@ -210,7 +210,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
 
       {/* Tabla */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🧾</div>
           Sin recibos digitales — genera el primero con el botón superior
         </div>
@@ -218,9 +218,9 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#FAF7EF' }}>
+              <tr style={{ background: 'var(--at-surface-2)' }}>
                 {['N° Recibo', 'Unidad', 'Concepto', 'Monto', 'Fecha', 'Destinatario', 'Estado', 'Acciones'].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#7E9389', fontWeight: 600, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -230,12 +230,12 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
                 const unidad = unidades.find(u => u.id === r.unidad_id)
                 return (
                   <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', opacity: r.estado === 'anulado' ? 0.5 : 1 }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 700, color: '#102622', fontFamily: 'monospace' }}>{r.numero_recibo}</td>
+                    <td style={{ padding: '8px 12px', fontWeight: 700, color: 'var(--at-primary-hover)', fontFamily: 'monospace' }}>{r.numero_recibo}</td>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? r.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '8px 12px', color: '#3E5A4C', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.concepto}</td>
+                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-2)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.concepto}</td>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>{moneda} {r.monto.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px', color: '#7E9389' }}>{r.fecha_emision}</td>
-                    <td style={{ padding: '8px 12px', color: '#7E9389' }}>{r.destinatario_nombre ?? '—'}</td>
+                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{r.fecha_emision}</td>
+                    <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{r.destinatario_nombre ?? '—'}</td>
                     <td style={{ padding: '8px 12px' }}>
                       <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                     </td>
@@ -252,13 +252,13 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
                             destinatario_email: r.destinatario_email,
                             notas: r.notas,
                           }, moneda, proyectoNombre)}
-                          style={{ padding: '3px 8px', background: '#EEF2EC', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: '#1B3B36' }}>
+                          style={{ padding: '3px 8px', background: 'var(--at-primary-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: 'var(--at-primary)' }}>
                           📄 PDF
                         </button>
                         {canEdit && r.estado === 'generado' && (
                           <>
                             <button onClick={() => marcarEnviado(r.id)}
-                              style={{ padding: '3px 8px', background: '#D9E2DC', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: '#1B3B36' }}>
+                              style={{ padding: '3px 8px', background: 'var(--at-primary-soft)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: 'var(--at-primary)' }}>
                               ✉️ Enviado
                             </button>
                             <button onClick={() => anular(r.id)}

@@ -365,7 +365,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
     zIndex: 1000, padding: '16px',
   }
   const modalStyle: CSSProperties = {
-    background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '860px',
+    background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '860px',
     maxHeight: '90vh', display: 'flex', flexDirection: 'column',
     boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
   }
@@ -387,7 +387,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
     fontSize: '14px', cursor: 'pointer',
   }
   const btnSecondary: CSSProperties = {
-    padding: '10px 22px', background: '#EAE6D8', color: '#3E5A4C',
+    padding: '10px 22px', background: 'var(--at-chip)', color: 'var(--at-ink-2)',
     border: '1px solid var(--at-line)', borderRadius: '8px', fontWeight: 600,
     fontSize: '14px', cursor: 'pointer',
   }
@@ -404,7 +404,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
     border: 'none',
     borderBottom: active ? '2px solid var(--at-primary)' : '2px solid transparent',
     background: 'none',
-    color: active ? '#1B3B36' : '#7E9389',
+    color: active ? 'var(--at-primary)' : 'var(--at-ink-3)',
     fontWeight: active ? 700 : 500,
     fontSize: '14px',
     cursor: 'pointer',
@@ -428,16 +428,16 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
         {/* Header */}
         <div style={headerStyle}>
           <div>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#15291F' }}>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>
               Importar clientes desde Excel
             </h2>
-            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#7E9389' }}>
+            <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>
               {stepLabel()}
             </p>
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', fontSize: '22px', lineHeight: 1, padding: '4px' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '22px', lineHeight: 1, padding: '4px' }}
           >
             ✕
           </button>
@@ -450,29 +450,29 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
           {step === 'upload' && (
             <div>
               {/* Template download */}
-              <div style={{ marginBottom: '24px', padding: '16px 20px', background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ marginBottom: '24px', padding: '16px 20px', background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
                 <div>
-                  <div style={{ fontWeight: 600, color: '#102622', fontSize: '14px' }}>Paso 1 — Descarga la plantilla</div>
-                  <div style={{ fontSize: '13px', color: '#1B3B36', marginTop: '2px' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--at-primary-hover)', fontSize: '14px' }}>Paso 1 — Descarga la plantilla</div>
+                  <div style={{ fontSize: '13px', color: 'var(--at-primary)', marginTop: '2px' }}>
                     Incluye encabezados y 2 filas de ejemplo con los campos aceptados.
                   </div>
                 </div>
-                <button onClick={descargarPlantilla} style={{ ...btnPrimary, background: '#1B3B36', whiteSpace: 'nowrap' }}>
+                <button onClick={descargarPlantilla} style={{ ...btnPrimary, background: 'var(--at-primary)', whiteSpace: 'nowrap' }}>
                   ⬇ plantilla_clientes.xlsx
                 </button>
               </div>
 
               {/* Fields reference */}
-              <div style={{ marginBottom: '20px', padding: '12px 16px', background: '#FAF7EF', borderRadius: '8px', border: '1px solid var(--at-line)' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', marginBottom: '8px' }}>Columnas de la plantilla:</div>
+              <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'var(--at-surface-2)', borderRadius: '8px', border: '1px solid var(--at-line)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>Columnas de la plantilla:</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {['nombre *', 'codigo *', 'email', 'telefono', 'whatsapp', 'direccion', 'nacionalidad', 'cui_dui', 'fecha_nacimiento', 'numero_facturacion', 'telefono_alterno'].map(col => (
                     <span
                       key={col}
                       style={{
                         fontSize: '12px',
-                        background: col.endsWith('*') ? '#D9E2DC' : '#E1DDD0',
-                        color: col.endsWith('*') ? '#0E2A24' : '#3E5A4C',
+                        background: col.endsWith('*') ? 'var(--at-primary-soft)' : 'var(--at-line)',
+                        color: col.endsWith('*') ? 'var(--at-ink-deep)' : 'var(--at-ink-2)',
                         padding: '2px 8px', borderRadius: '4px', fontFamily: 'monospace',
                       }}
                     >
@@ -480,7 +480,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                     </span>
                   ))}
                 </div>
-                <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '8px' }}>
                   * Requerido — <code>fecha_nacimiento</code>: formato YYYY-MM-DD — teléfonos: 8 dígitos
                 </div>
               </div>
@@ -492,20 +492,20 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                 onDragLeave={() => setDragOver(false)}
                 onClick={() => fileInputRef.current?.click()}
                 style={{
-                  border: `2px dashed ${dragOver ? '#1B3B36' : '#C7C2B0'}`,
+                  border: `2px dashed ${dragOver ? 'var(--at-primary)' : 'var(--at-line-strong)'}`,
                   borderRadius: '12px',
                   padding: '48px 24px',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  background: dragOver ? '#EEF2EC' : '#FAF7EF',
+                  background: dragOver ? 'var(--at-primary-tint)' : 'var(--at-surface-2)',
                   transition: 'all 0.15s',
                 }}
               >
                 <div style={{ fontSize: '36px', marginBottom: '12px' }}>📂</div>
-                <div style={{ fontWeight: 600, color: '#3E5A4C', fontSize: '15px', marginBottom: '6px' }}>
+                <div style={{ fontWeight: 600, color: 'var(--at-ink-2)', fontSize: '15px', marginBottom: '6px' }}>
                   Paso 2 — Arrastra tu archivo aquí o haz clic para seleccionar
                 </div>
-                <div style={{ fontSize: '13px', color: '#7E9389' }}>Formatos aceptados: .xlsx, .xls, .csv</div>
+                <div style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>Formatos aceptados: .xlsx, .xls, .csv</div>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -525,7 +525,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                 <span style={{ padding: '6px 14px', background: '#dcfce7', color: '#166534', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
                   ✅ {nuevos.length} nuevo{nuevos.length !== 1 ? 's' : ''}
                 </span>
-                <span style={{ padding: '6px 14px', background: '#D9E2DC', color: '#102622', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
+                <span style={{ padding: '6px 14px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
                   🔁 {yaExisten.length} ya en sistema
                 </span>
                 {conErrores.length > 0 && (
@@ -552,7 +552,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
               {activeTab === 'nuevos' && (
                 <div>
                   {nuevos.length === 0 ? (
-                    <p style={{ textAlign: 'center', color: '#7E9389', padding: '32px 0', fontSize: '14px' }}>
+                    <p style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 0', fontSize: '14px' }}>
                       No hay clientes nuevos para agregar.
                     </p>
                   ) : (
@@ -563,20 +563,20 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                       <div style={{ overflowX: 'auto', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                           <thead>
-                            <tr style={{ background: '#FAF7EF' }}>
+                            <tr style={{ background: 'var(--at-surface-2)' }}>
                               {['Fila', 'Nombre', 'Código', 'Email', 'Teléfono'].map(h => (
-                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#3E5A4C', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
+                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--at-ink-2)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {nuevos.map(row => (
                               <tr key={row.index} style={{ background: '#f0fdf4', borderBottom: '1px solid var(--at-line)' }}>
-                                <td style={{ padding: '9px 14px', color: '#7E9389' }}>{row.index}</td>
-                                <td style={{ padding: '9px 14px', fontWeight: 600, color: '#15291F' }}>{row.data.nombre ?? '—'}</td>
-                                <td style={{ padding: '9px 14px', color: '#3E5A4C' }}>{row.data.codigo ?? '—'}</td>
-                                <td style={{ padding: '9px 14px', color: '#7E9389' }}>{row.data.email ?? '—'}</td>
-                                <td style={{ padding: '9px 14px', color: '#7E9389' }}>{row.data.telefono ?? '—'}</td>
+                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.index}</td>
+                                <td style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)' }}>{row.data.nombre ?? '—'}</td>
+                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-2)' }}>{row.data.codigo ?? '—'}</td>
+                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.data.email ?? '—'}</td>
+                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.data.telefono ?? '—'}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -591,30 +591,30 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
               {activeTab === 'yaExisten' && (
                 <div>
                   {yaExisten.length === 0 ? (
-                    <p style={{ textAlign: 'center', color: '#7E9389', padding: '32px 0', fontSize: '14px' }}>
+                    <p style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 0', fontSize: '14px' }}>
                       Ningún cliente del archivo ya existe en tu empresa.
                     </p>
                   ) : (
                     <>
-                      <p style={{ fontSize: '13px', color: '#102622', background: '#EEF2EC', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-primary-soft-2)' }}>
+                      <p style={{ fontSize: '13px', color: 'var(--at-primary-hover)', background: 'var(--at-primary-tint)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-primary-soft-2)' }}>
                         🔁 Estos clientes ya existen en el sistema y serán vinculados a tu empresa al confirmar.
                       </p>
                       <div style={{ overflowX: 'auto', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                           <thead>
-                            <tr style={{ background: '#FAF7EF' }}>
+                            <tr style={{ background: 'var(--at-surface-2)' }}>
                               {['Fila', 'Nombre', 'Código', 'Motivo'].map(h => (
-                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#3E5A4C', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
+                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--at-ink-2)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {yaExisten.map(row => (
-                              <tr key={row.index} style={{ background: '#EEF2EC', borderBottom: '1px solid var(--at-line)' }}>
-                                <td style={{ padding: '9px 14px', color: '#7E9389' }}>{row.index}</td>
-                                <td style={{ padding: '9px 14px', fontWeight: 600, color: '#15291F' }}>{row.data.nombre ?? '—'}</td>
-                                <td style={{ padding: '9px 14px', color: '#3E5A4C' }}>{row.data.codigo ?? '—'}</td>
-                                <td style={{ padding: '9px 14px', color: '#102622', fontSize: '12px' }}>{row.duplicateReason}</td>
+                              <tr key={row.index} style={{ background: 'var(--at-primary-tint)', borderBottom: '1px solid var(--at-line)' }}>
+                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.index}</td>
+                                <td style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)' }}>{row.data.nombre ?? '—'}</td>
+                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-2)' }}>{row.data.codigo ?? '—'}</td>
+                                <td style={{ padding: '9px 14px', color: 'var(--at-primary-hover)', fontSize: '12px' }}>{row.duplicateReason}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -629,7 +629,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
               {activeTab === 'conErrores' && (
                 <div>
                   {conErrores.length === 0 ? (
-                    <p style={{ textAlign: 'center', color: '#7E9389', padding: '32px 0', fontSize: '14px' }}>
+                    <p style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 0', fontSize: '14px' }}>
                       No se encontraron filas con errores. ¡Excelente!
                     </p>
                   ) : (
@@ -640,18 +640,18 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                       <div style={{ overflowX: 'auto', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                           <thead>
-                            <tr style={{ background: '#FAF7EF' }}>
+                            <tr style={{ background: 'var(--at-surface-2)' }}>
                               {['Fila', 'Nombre', 'Código', 'Error'].map(h => (
-                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#3E5A4C', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
+                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--at-ink-2)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {conErrores.map(row => (
                               <tr key={row.index} style={{ background: '#fff1f2', borderBottom: '1px solid var(--at-line)' }}>
-                                <td style={{ padding: '9px 14px', color: '#7E9389' }}>{row.index}</td>
-                                <td style={{ padding: '9px 14px', fontWeight: 600, color: '#15291F' }}>{row.rawData['nombre'] || '—'}</td>
-                                <td style={{ padding: '9px 14px', color: '#3E5A4C' }}>{row.rawData['codigo'] || '—'}</td>
+                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.index}</td>
+                                <td style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)' }}>{row.rawData['nombre'] || '—'}</td>
+                                <td style={{ padding: '9px 14px', color: 'var(--at-ink-2)' }}>{row.rawData['codigo'] || '—'}</td>
                                 <td style={{ padding: '9px 14px' }}>
                                   <span title={row.errors.join('\n')} style={{ color: '#dc2626', cursor: 'help' }}>
                                     ❌ {row.errors[0]}{row.errors.length > 1 ? ` (+${row.errors.length - 1})` : ''}
@@ -673,8 +673,8 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
           {step === 'importing' && (
             <div style={{ textAlign: 'center', padding: '48px 0' }}>
               <div style={{ fontSize: '40px', marginBottom: '16px' }}>⏳</div>
-              <div style={{ fontWeight: 600, color: '#3E5A4C', fontSize: '16px' }}>Importando clientes...</div>
-              <div style={{ fontSize: '13px', color: '#7E9389', marginTop: '6px' }}>Por favor espera, no cierres esta ventana.</div>
+              <div style={{ fontWeight: 600, color: 'var(--at-ink-2)', fontSize: '16px' }}>Importando clientes...</div>
+              <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginTop: '6px' }}>Por favor espera, no cierres esta ventana.</div>
             </div>
           )}
 
@@ -685,9 +685,9 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
               <div style={{ fontWeight: 700, color: '#166534', fontSize: '20px', marginBottom: '12px' }}>
                 {importados} cliente{importados !== 1 ? 's' : ''} importado{importados !== 1 ? 's' : ''} correctamente
               </div>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '16px', fontSize: '14px', color: '#7E9389' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '16px', fontSize: '14px', color: 'var(--at-ink-3)' }}>
                 {analyzed.yaExisten.length > 0 && (
-                  <span style={{ padding: '6px 14px', background: '#D9E2DC', color: '#102622', borderRadius: '20px', fontWeight: 600 }}>
+                  <span style={{ padding: '6px 14px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', borderRadius: '20px', fontWeight: 600 }}>
                     🔁 {analyzed.yaExisten.length} vinculado{analyzed.yaExisten.length !== 1 ? 's' : ''} al proyecto
                   </span>
                 )}

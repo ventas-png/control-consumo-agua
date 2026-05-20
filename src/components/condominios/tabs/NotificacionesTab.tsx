@@ -24,9 +24,9 @@ const EVENTO_LABELS: Record<EventoNotificacion, string> = {
 }
 
 const CANAL_LABELS: Record<CanalNotificacion, { label: string; icon: string; color: string }> = {
-  email:    { label: 'Email',    icon: '✉️',  color: '#1B3B36' },
+  email:    { label: 'Email',    icon: '✉️',  color: 'var(--at-primary)' },
   whatsapp: { label: 'WhatsApp', icon: '💬',  color: '#10b981' },
-  push:     { label: 'Push',     icon: '🔔',  color: '#B96A3F' },
+  push:     { label: 'Push',     icon: '🔔',  color: 'var(--at-accent)' },
   sms:      { label: 'SMS',      icon: '📱',  color: '#f59e0b' },
 }
 
@@ -97,18 +97,18 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
 
   const activas   = reglas.filter(r => r.activo).length
   const inactivas = reglas.filter(r => !r.activo).length
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Reglas de Notificación</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>Configura qué eventos disparan notificaciones y a quién</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Reglas de Notificación</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>Configura qué eventos disparan notificaciones y a quién</p>
         </div>
         {canCreate && !showForm && (
           <button onClick={startNew}
-            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nueva Regla
           </button>
         )}
@@ -120,23 +120,23 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
           <span style={{ fontSize: '18px', fontWeight: 800, color: '#16a34a' }}>{activas}</span>
           <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>reglas activas</span>
         </div>
-        <div style={{ background: '#EAE6D8', borderRadius: '8px', padding: '8px 14px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '18px', fontWeight: 800, color: '#7E9389' }}>{inactivas}</span>
-          <span style={{ fontSize: '12px', color: '#7E9389', fontWeight: 600 }}>inactivas</span>
+        <div style={{ background: 'var(--at-chip)', borderRadius: '8px', padding: '8px 14px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--at-ink-3)' }}>{inactivas}</span>
+          <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 600 }}>inactivas</span>
         </div>
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar regla' : 'Nueva regla'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', gap: '10px' }}>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Nombre de la regla *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Nombre de la regla *</label>
               <input style={inputStyle} value={form.nombre} onChange={e => setF('nombre', e.target.value)} placeholder="Ej: Aviso cuota morosa admin" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Evento disparador</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Evento disparador</label>
               <select style={inputStyle} value={form.evento} onChange={e => setF('evento', e.target.value as EventoNotificacion)}>
                 {(Object.keys(EVENTO_LABELS) as EventoNotificacion[]).map(e => (
                   <option key={e} value={e}>{EVENTO_LABELS[e]}</option>
@@ -144,7 +144,7 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Canal</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Canal</label>
               <select style={inputStyle} value={form.canal} onChange={e => setF('canal', e.target.value as CanalNotificacion)}>
                 {(Object.keys(CANAL_LABELS) as CanalNotificacion[]).map(c => (
                   <option key={c} value={c}>{CANAL_LABELS[c].icon} {CANAL_LABELS[c].label}</option>
@@ -152,7 +152,7 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Destinatario</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Destinatario</label>
               <select style={inputStyle} value={form.destinatario} onChange={e => setF('destinatario', e.target.value as DestinatarioNotificacion)}>
                 {(Object.keys(DEST_LABELS) as DestinatarioNotificacion[]).map(d => (
                   <option key={d} value={d}>{DEST_LABELS[d]}</option>
@@ -160,28 +160,28 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Días de anticipación</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Días de anticipación</label>
               <input style={inputStyle} type="number" min="0" max="90" value={form.dias_anticipacion} onChange={e => setF('dias_anticipacion', parseInt(e.target.value) || 0)} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '18px' }}>
               <input type="checkbox" checked={form.activo} onChange={e => setF('activo', e.target.checked)} id="activo_regla" />
-              <label htmlFor="activo_regla" style={{ fontSize: '12px', color: '#7E9389', cursor: 'pointer' }}>Regla activa</label>
+              <label htmlFor="activo_regla" style={{ fontSize: '12px', color: 'var(--at-ink-3)', cursor: 'pointer' }}>Regla activa</label>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Plantilla del mensaje</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Plantilla del mensaje</label>
               <textarea style={{ ...inputStyle, minHeight: '70px', resize: 'vertical', fontFamily: 'inherit' }}
                 value={form.mensaje_template} onChange={e => setF('mensaje_template', e.target.value)}
                 placeholder="Ej: Estimado residente, su cuota del período {{periodo}} está pendiente de pago por un monto de {{monto}}." />
-              <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '3px' }}>Variables: {'{{'} periodo {'}}'}, {'{{'} monto {'}}'}, {'{{'} unidad {'}}'}, {'{{'} nombre {'}}'}</div>
+              <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '3px' }}>Variables: {'{{'} periodo {'}}'}, {'{{'} monto {'}}'}, {'{{'} unidad {'}}'}, {'{{'} nombre {'}}'}</div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
               Cancelar
             </button>
           </div>
@@ -190,28 +190,28 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
 
       {/* Rules list */}
       {reglas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay reglas configuradas. Crea una para comenzar.</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay reglas configuradas. Crea una para comenzar.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {reglas.map(r => {
             const canal = CANAL_LABELS[r.canal]
             return (
-              <div key={r.id} style={{ background: r.activo ? 'white' : '#FAF7EF', border: `1.5px solid ${r.activo ? '#E1DDD0' : '#EAE6D8'}`, borderRadius: '10px', padding: '12px 14px' }}>
+              <div key={r.id} style={{ background: r.activo ? 'white' : 'var(--at-surface-2)', border: `1.5px solid ${r.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '10px', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                   <div style={{ fontSize: '20px' }}>{canal.icon}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, fontSize: '13px', color: r.activo ? '#15291F' : '#7E9389' }}>{r.nombre}</span>
-                      {!r.activo && <span style={{ fontSize: '10px', color: '#7E9389', fontWeight: 600 }}>(inactiva)</span>}
+                      <span style={{ fontWeight: 700, fontSize: '13px', color: r.activo ? 'var(--at-ink)' : 'var(--at-ink-3)' }}>{r.nombre}</span>
+                      {!r.activo && <span style={{ fontSize: '10px', color: 'var(--at-ink-3)', fontWeight: 600 }}>(inactiva)</span>}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '3px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '3px' }}>
                       {EVENTO_LABELS[r.evento]} →
                       <span style={{ color: canal.color, fontWeight: 600, marginLeft: '4px' }}>{canal.label}</span>
                       <span style={{ marginLeft: '6px' }}>→ {DEST_LABELS[r.destinatario]}</span>
-                      {r.dias_anticipacion > 0 && <span style={{ marginLeft: '6px', color: '#7E9389' }}>({r.dias_anticipacion}d anticipación)</span>}
+                      {r.dias_anticipacion > 0 && <span style={{ marginLeft: '6px', color: 'var(--at-ink-3)' }}>({r.dias_anticipacion}d anticipación)</span>}
                     </div>
                     {r.mensaje_template && (
-                      <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '3px', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '3px', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         "{r.mensaje_template}"
                       </div>
                     )}
@@ -222,7 +222,7 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
                         style={{ padding: '3px 8px', background: r.activo ? '#fef3c7' : '#dcfce7', color: r.activo ? '#92400e' : '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                         {r.activo ? 'Desactivar' : 'Activar'}
                       </button>
-                      <button onClick={() => startEdit(r)} style={{ padding: '3px 7px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                      <button onClick={() => startEdit(r)} style={{ padding: '3px 7px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(r.id)} style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                     </div>
                   )}

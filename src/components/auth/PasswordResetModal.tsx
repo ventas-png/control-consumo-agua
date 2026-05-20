@@ -51,7 +51,7 @@ export function PasswordResetModal({ onClose }: Props) {
 
   return (
     <div style={overlayStyle} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'white', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '480px' }}>
+      <div style={{ background: 'var(--at-surface)', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '480px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 700 }}>Recuperar Contraseña</h3>
           <button onClick={onClose} aria-label="Cerrar modal" style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
@@ -59,7 +59,7 @@ export function PasswordResetModal({ onClose }: Props) {
 
         {!sent ? (
           <>
-            <p style={{ color: '#7E9389', marginBottom: '16px' }}>
+            <p style={{ color: 'var(--at-ink-3)', marginBottom: '16px' }}>
               Ingresa tu correo electrónico para recibir instrucciones de recuperación.
             </p>
             <div style={{ marginBottom: '16px' }}>
@@ -88,7 +88,7 @@ export function PasswordResetModal({ onClose }: Props) {
               </button>
               <button
                 onClick={onClose}
-                style={{ flex: 1, padding: '12px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '12px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
               >
                 Cancelar
               </button>
@@ -99,7 +99,7 @@ export function PasswordResetModal({ onClose }: Props) {
             <div style={{ padding: '20px', background: '#d1fae5', borderRadius: '8px', marginBottom: '16px', color: '#059669', fontWeight: 600 }}>
               ✅ ¡Correo enviado! Revisa tu bandeja de entrada.
             </div>
-            <p style={{ color: '#7E9389', marginBottom: '20px' }}>
+            <p style={{ color: 'var(--at-ink-3)', marginBottom: '20px' }}>
               Hemos enviado instrucciones de recuperación a tu correo.
             </p>
             <button

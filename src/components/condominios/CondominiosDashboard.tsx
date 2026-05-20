@@ -121,12 +121,12 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
   useEffect(() => { void cargarStats() }, [cargarStats])
 
   const kpis = [
-    { label: 'Unidades ocupadas', value: `${stats.ocupadas}/${stats.totalUnidades}`, sub: 'habitadas vs total', icon: '🏠', from: '#B96A3F', to: '#9C5733' },
+    { label: 'Unidades ocupadas', value: `${stats.ocupadas}/${stats.totalUnidades}`, sub: 'habitadas vs total', icon: '🏠', from: 'var(--at-accent)', to: 'var(--at-accent-hover)' },
     { label: 'Cuotas pendientes', value: stats.cuotasPendientes, sub: 'por cobrar', icon: '💰', from: '#f59e0b', to: '#d97706' },
     { label: 'Cuotas en mora', value: stats.cuotasMora, sub: 'vencidas', icon: '⚠️', from: '#ef4444', to: '#dc2626' },
-    { label: 'Visitantes hoy', value: stats.visitantesHoy, sub: 'entradas del día', icon: '👥', from: '#577B69', to: '#102622' },
+    { label: 'Visitantes hoy', value: stats.visitantesHoy, sub: 'entradas del día', icon: '👥', from: 'var(--at-accent-2)', to: 'var(--at-primary-hover)' },
     { label: 'Tickets abiertos', value: stats.ticketsAbiertos, sub: 'mantenimiento', icon: '🔧', from: '#f97316', to: '#ea580c' },
-    { label: 'Comun. sin asignar', value: stats.comunSinAsignar, sub: 'sin agente', icon: '💬', from: '#1B3B36', to: '#102622' },
+    { label: 'Comun. sin asignar', value: stats.comunSinAsignar, sub: 'sin agente', icon: '💬', from: 'var(--at-primary)', to: 'var(--at-primary-hover)' },
   ] as const
 
   const accesos = [
@@ -146,18 +146,18 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
   return (
     <div>
       <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#15291F', marginBottom: '16px' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '16px' }}>
           Panel — Condominios
         </h1>
 
         {/* Selector de proyecto */}
         {proyectosActivos.length > 0 && (
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '24px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 600, color: '#3E5A4C' }}>Proyecto:</label>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--at-ink-2)' }}>Proyecto:</label>
             <select
               value={selectedProjectId}
               onChange={e => setSelectedProjectId(e.target.value)}
-              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '14px', fontWeight: 500, background: 'white', cursor: 'pointer', minWidth: '200px' }}
+              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '14px', fontWeight: 500, background: 'var(--at-surface)', cursor: 'pointer', minWidth: '200px' }}
             >
               <option value="">-- Todos los proyectos --</option>
               {proyectosActivos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
@@ -182,18 +182,18 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
 
       {/* Accesos rápidos */}
       <div style={{ marginBottom: '32px' }}>
-        <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#7E9389', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Acceso Rápido</h3>
+        <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Acceso Rápido</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
           {accesos.map(a => (
             <button
               key={a.label}
               onClick={() => onNavigateSection(a.section)}
-              style={{ padding: '16px', background: 'white', border: '1px solid var(--at-line)', borderRadius: '12px', cursor: 'pointer', textAlign: 'center', transition: 'box-shadow 0.15s, transform 0.15s', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+              style={{ padding: '16px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '12px', cursor: 'pointer', textAlign: 'center', transition: 'box-shadow 0.15s, transform 0.15s', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 20px rgba(0,0,0,0.1)'; (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)' }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; (e.currentTarget as HTMLButtonElement).style.transform = '' }}
             >
               <div style={{ fontSize: '28px', marginBottom: '8px' }}>{a.icon}</div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#3E5A4C' }}>{a.label}</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)' }}>{a.label}</div>
             </button>
           ))}
         </div>
@@ -202,18 +202,18 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
       {/* Tabla por proyecto */}
       {!selectedProjectId && proyectosActivos.length > 1 && Object.keys(perProject).length > 0 && (
         <div style={{ marginBottom: '32px' }}>
-          <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#7E9389', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Comparativa por Proyecto</h3>
+          <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Comparativa por Proyecto</h3>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
-                <tr style={{ background: '#FAF7EF' }}>
-                  <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C', borderBottom: '2px solid var(--at-line)' }}>Proyecto</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#9C5733', borderBottom: '2px solid var(--at-line)' }}>🏠 Ocupación</th>
+                <tr style={{ background: 'var(--at-surface-2)' }}>
+                  <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)', borderBottom: '2px solid var(--at-line)' }}>Proyecto</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-accent-hover)', borderBottom: '2px solid var(--at-line)' }}>🏠 Ocupación</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#d97706', borderBottom: '2px solid var(--at-line)' }}>💰 Pendientes</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#dc2626', borderBottom: '2px solid var(--at-line)' }}>⚠️ Mora</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#102622', borderBottom: '2px solid var(--at-line)' }}>👥 Visitantes hoy</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-primary-hover)', borderBottom: '2px solid var(--at-line)' }}>👥 Visitantes hoy</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#ea580c', borderBottom: '2px solid var(--at-line)' }}>🔧 Tickets</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#102622', borderBottom: '2px solid var(--at-line)' }}>💬 Sin asignar</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-primary-hover)', borderBottom: '2px solid var(--at-line)' }}>💬 Sin asignar</th>
                 </tr>
               </thead>
               <tbody>
@@ -223,27 +223,27 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
                   return (
                     <tr
                       key={p.id}
-                      style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF', cursor: 'pointer', transition: 'background 0.15s' }}
+                      style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', cursor: 'pointer', transition: 'background 0.15s' }}
                       onClick={() => setSelectedProjectId(p.id)}
-                      onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#EEF2EC'}
-                      onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'white' : '#FAF7EF'}
+                      onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-primary-tint)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'white' : 'var(--at-surface-2)'}
                     >
-                      <td style={{ padding: '10px 14px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid var(--at-chip)' }}>
+                      <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--at-ink)', borderBottom: '1px solid var(--at-chip)' }}>
                         {hasMora && <span style={{ color: '#ef4444', marginRight: 6 }}>●</span>}
                         {p.nombre}
                       </td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', color: '#9C5733', fontWeight: 600 }}>{s.ocupadas}/{s.totalUnidades}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cuotasPendientes > 0 ? 700 : 400, color: s.cuotasPendientes > 0 ? '#d97706' : '#7E9389' }}>{s.cuotasPendientes}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cuotasMora > 0 ? 700 : 400, color: s.cuotasMora > 0 ? '#dc2626' : '#7E9389' }}>{s.cuotasMora}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.visitantesHoy > 0 ? 700 : 400, color: s.visitantesHoy > 0 ? '#102622' : '#7E9389' }}>{s.visitantesHoy}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.ticketsAbiertos > 0 ? 700 : 400, color: s.ticketsAbiertos > 0 ? '#ea580c' : '#7E9389' }}>{s.ticketsAbiertos}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.comunSinAsignar > 0 ? 700 : 400, color: s.comunSinAsignar > 0 ? '#102622' : '#7E9389' }}>{s.comunSinAsignar}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', color: 'var(--at-accent-hover)', fontWeight: 600 }}>{s.ocupadas}/{s.totalUnidades}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cuotasPendientes > 0 ? 700 : 400, color: s.cuotasPendientes > 0 ? '#d97706' : 'var(--at-ink-3)' }}>{s.cuotasPendientes}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cuotasMora > 0 ? 700 : 400, color: s.cuotasMora > 0 ? '#dc2626' : 'var(--at-ink-3)' }}>{s.cuotasMora}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.visitantesHoy > 0 ? 700 : 400, color: s.visitantesHoy > 0 ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>{s.visitantesHoy}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.ticketsAbiertos > 0 ? 700 : 400, color: s.ticketsAbiertos > 0 ? '#ea580c' : 'var(--at-ink-3)' }}>{s.ticketsAbiertos}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.comunSinAsignar > 0 ? 700 : 400, color: s.comunSinAsignar > 0 ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>{s.comunSinAsignar}</td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
-            <p style={{ fontSize: '11px', color: '#7E9389', marginTop: 8 }}>Haz clic en un proyecto para filtrar el panel</p>
+            <p style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: 8 }}>Haz clic en un proyecto para filtrar el panel</p>
           </div>
         </div>
       )}

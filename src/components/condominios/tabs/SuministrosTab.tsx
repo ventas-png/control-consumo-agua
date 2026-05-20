@@ -114,7 +114,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
@@ -125,7 +125,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
             <span style={{ fontWeight: 600, fontSize: 14 }}>Suministros</span>
             {canCreate && (
               <button onClick={() => { setVista('nuevo'); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nuevo
               </button>
             )}
@@ -146,14 +146,14 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
           </div>
         )}
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 16px', fontSize: 13 }}>Sin suministros</div>}
+        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin suministros</div>}
 
         {lista.map(s => {
           const cat = CATEGORIAS.find(c => c.value === s.categoria)
           const alerta = s.stock_actual <= s.stock_minimo
           return (
             <div key={s.id} onClick={() => { setSelected(s); setVista('lista') }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? '#F4EBE3' : '#fff', opacity: s.activo ? 1 : 0.5, borderLeft: alerta ? '3px solid #f59e0b' : '3px solid transparent' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? 'var(--at-accent-tint)' : '#fff', opacity: s.activo ? 1 : 0.5, borderLeft: alerta ? '3px solid #f59e0b' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {s.nombre}</span>
                 <span style={{ fontWeight: 700, fontSize: 14, color: alerta ? '#ef4444' : '#10b981' }}>
@@ -161,7 +161,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
                 </span>
               </div>
               {alerta && <div style={{ fontSize: 11, color: '#f59e0b' }}>⚠️ Mínimo: {s.stock_minimo}</div>}
-              {s.ubicacion && <div style={{ fontSize: 11, color: '#7E9389' }}>{s.ubicacion}</div>}
+              {s.ubicacion && <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{s.ubicacion}</div>}
             </div>
           )
         })}
@@ -221,7 +221,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
                 {saving ? 'Guardando…' : '✅ Guardar'}
               </button>
               <button onClick={() => setVista('lista')}
-                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -232,7 +232,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
         {vista === 'movimiento' && selected && (
           <div>
             <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Registrar movimiento</div>
-            <div style={{ fontSize: 13, color: '#7E9389', marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginBottom: 16 }}>
               {selected.nombre} — Stock actual: <strong>{selected.stock_actual} {selected.unidad_medida}</strong>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
@@ -265,11 +265,11 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={registrarMovimiento} disabled={saving}
-                style={{ padding: '8px 20px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Registrar'}
               </button>
               <button onClick={() => setVista('lista')}
-                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -284,7 +284,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
                 <div style={{ fontWeight: 700, fontSize: 20 }}>
                   {CATEGORIAS.find(c => c.value === selected.categoria)?.icon} {selected.nombre}
                 </div>
-                <div style={{ fontSize: 13, color: '#7E9389', marginTop: 4 }}>
+                <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>
                   {selected.ubicacion && <span>{selected.ubicacion} · </span>}
                   {selected.proveedor && <span>Proveedor: {selected.proveedor}</span>}
                 </div>
@@ -292,11 +292,11 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
               {canEdit && (
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setVista('movimiento')}
-                    style={{ padding: '7px 14px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                    style={{ padding: '7px 14px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                     + Movimiento
                   </button>
                   <button onClick={() => toggleActivo(selected)}
-                    style={{ padding: '7px 14px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ padding: '7px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     {selected.activo ? 'Desactivar' : 'Activar'}
                   </button>
                 </div>
@@ -307,12 +307,12 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
               {[
                 { label: `Stock actual (${selected.unidad_medida})`, value: selected.stock_actual, color: selected.stock_actual <= selected.stock_minimo ? '#ef4444' : '#10b981' },
-                { label: `Stock mínimo (${selected.unidad_medida})`, value: selected.stock_minimo, color: '#7E9389' },
-                { label: `Costo unitario (${moneda})`, value: selected.costo_unitario?.toFixed(2) ?? '—', color: '#B96A3F' },
+                { label: `Stock mínimo (${selected.unidad_medida})`, value: selected.stock_minimo, color: 'var(--at-ink-3)' },
+                { label: `Costo unitario (${moneda})`, value: selected.costo_unitario?.toFixed(2) ?? '—', color: 'var(--at-accent)' },
               ].map(k => (
-                <div key={k.label} style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                <div key={k.label} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
                   <div style={{ fontSize: 22, fontWeight: 700, color: k.color }}>{k.value}</div>
-                  <div style={{ fontSize: 11, color: '#7E9389' }}>{k.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{k.label}</div>
                 </div>
               ))}
             </div>
@@ -326,13 +326,13 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
             {/* Historial movimientos */}
             <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Últimos movimientos</div>
             {movsDelSelected.length === 0
-              ? <div style={{ color: '#7E9389', fontSize: 13 }}>Sin movimientos registrados</div>
+              ? <div style={{ color: 'var(--at-ink-3)', fontSize: 13 }}>Sin movimientos registrados</div>
               : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: '#FAF7EF' }}>
+                    <tr style={{ background: 'var(--at-surface-2)' }}>
                       {['Fecha', 'Tipo', 'Cantidad', 'Motivo', 'Área', 'Por'].map(h => (
-                        <th key={h} style={{ padding: '7px 10px', textAlign: 'left', color: '#7E9389', fontWeight: 600, borderBottom: '1px solid var(--at-line)', fontSize: 12 }}>{h}</th>
+                        <th key={h} style={{ padding: '7px 10px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600, borderBottom: '1px solid var(--at-line)', fontSize: 12 }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -359,7 +359,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
         )}
 
         {vista === 'lista' && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#7E9389', fontSize: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
             Selecciona un suministro o crea uno nuevo
           </div>
         )}

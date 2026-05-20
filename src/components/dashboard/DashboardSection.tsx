@@ -70,7 +70,7 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
         datasets: [{
           label: 'Consumo (m³)',
           data: dataConsumo,
-          borderColor: '#1B3B36',
+          borderColor: 'var(--at-primary)',
           backgroundColor: 'rgba(27, 59, 54, 0.1)',
           borderWidth: 3,
           fill: true,
@@ -112,7 +112,7 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
         ))}
       </div>
 
-      <div style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
+      <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
         <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>Tendencias de Consumo</div>
         <div style={{ height: '300px', position: 'relative' }}>
           {isLoading && (
@@ -127,7 +127,7 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
                 borderRadius: '50%', animation: 'spin 0.8s linear infinite',
               }} />
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-              <span style={{ fontSize: '13px', color: '#7E9389', fontWeight: 500 }}>Cargando datos…</span>
+              <span style={{ fontSize: '13px', color: 'var(--at-ink-3)', fontWeight: 500 }}>Cargando datos…</span>
             </div>
           )}
           <canvas ref={chartRef} />

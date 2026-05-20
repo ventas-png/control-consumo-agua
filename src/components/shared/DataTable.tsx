@@ -182,7 +182,7 @@ export function DataTable<T>({
   // ── Render: estados especiales ──────────────────────────────────────────
   if (isLoading) {
     return (
-      <div style={{ background: 'white', borderRadius: '12px', padding: '16px' }}>
+      <div style={{ background: 'var(--at-surface)', borderRadius: '12px', padding: '16px' }}>
         {[0, 1, 2, 3, 4].map(i => (
           <div key={i} style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
             {columns.map(col => (
@@ -236,7 +236,7 @@ export function DataTable<T>({
                 borderRadius: '8px',
                 border: '1px solid var(--at-line)',
                 fontSize: '13px',
-                background: 'white',
+                background: 'var(--at-surface)',
                 cursor: 'pointer',
               }}
             >
@@ -251,7 +251,7 @@ export function DataTable<T>({
 
       <div
         style={{
-          background: 'white',
+          background: 'var(--at-surface)',
           borderRadius: '12px',
           boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
           overflow: 'hidden',
@@ -267,7 +267,7 @@ export function DataTable<T>({
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
               <thead>
-                <tr style={{ background: '#FAF7EF' }}>
+                <tr style={{ background: 'var(--at-surface-2)' }}>
                   {columns.map(col => {
                     const isSorted = sortConfig?.key === col.key
                     const arrow = !isSorted ? '' : sortConfig.direction === 'asc' ? ' ↑' : ' ↓'
@@ -281,7 +281,7 @@ export function DataTable<T>({
                           padding: '12px 14px',
                           textAlign: col.align ?? 'left',
                           fontWeight: 600,
-                          color: '#3E5A4C',
+                          color: 'var(--at-ink-2)',
                           fontSize: '12px',
                           textTransform: 'uppercase',
                           letterSpacing: '0.04em',
@@ -309,7 +309,7 @@ export function DataTable<T>({
                       transition: 'background 0.12s',
                       ...(rowStyle ? rowStyle(row) : {}),
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#FAF7EF' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--at-surface-2)' }}
                     onMouseLeave={e => { e.currentTarget.style.background = '' }}
                   >
                     {columns.map(col => (
@@ -318,7 +318,7 @@ export function DataTable<T>({
                         style={{
                           padding: '10px 14px',
                           textAlign: col.align ?? 'left',
-                          color: '#15291F',
+                          color: 'var(--at-ink)',
                         }}
                       >
                         {col.render ? col.render(row) : String(getAccessorValue(col, row) ?? '')}
@@ -341,7 +341,7 @@ export function DataTable<T>({
               padding: '12px 16px',
               borderTop: '1px solid var(--at-chip)',
               fontSize: '12px',
-              color: '#7E9389',
+              color: 'var(--at-ink-3)',
               flexWrap: 'wrap',
               gap: '8px',
             }}
@@ -382,8 +382,8 @@ function paginationBtnStyle(disabled: boolean): CSSProperties {
     fontSize: '12px',
     borderRadius: '6px',
     border: '1px solid var(--at-line)',
-    background: disabled ? '#EAE6D8' : 'white',
-    color: disabled ? '#C7C2B0' : '#3E5A4C',
+    background: disabled ? 'var(--at-chip)' : 'white',
+    color: disabled ? 'var(--at-line-strong)' : 'var(--at-ink-2)',
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontWeight: 600,
   }

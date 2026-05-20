@@ -15,8 +15,8 @@ interface Props {
 const FRECUENCIA_DIAS: Record<string, number> = { diaria: 1, semanal: 7, quincenal: 15, mensual: 30 }
 
 const FRECUENCIA_LABEL: Record<string, { label: string; bg: string; color: string }> = {
-  diaria:    { label: 'Diaria',    bg: '#D9E2DC', color: '#102622' },
-  semanal:   { label: 'Semanal',   bg: '#F4EBE3', color: '#9C5733' },
+  diaria:    { label: 'Diaria',    bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
+  semanal:   { label: 'Semanal',   bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)' },
   quincenal: { label: 'Quincenal', bg: '#fef3c7', color: '#92400e' },
   mensual:   { label: 'Mensual',   bg: '#dcfce7', color: '#16a34a' },
 }
@@ -47,7 +47,7 @@ const ALERTA_STYLE = {
   vencida:   { bg: '#fee2e2', border: '#fca5a5', badge: '#ef4444', badgeBg: '#fee2e2', label: 'Vencida' },
   proxima:   { bg: '#fefce8', border: '#fde68a', badge: '#92400e', badgeBg: '#fef3c7', label: 'Próxima' },
   ok:        { bg: '#f0fdf4', border: '#bbf7d0', badge: '#16a34a', badgeBg: '#dcfce7', label: 'Al día' },
-  sin_fecha: { bg: '#FAF7EF', border: '#E1DDD0', badge: '#7E9389', badgeBg: '#EAE6D8', label: 'Sin fecha' },
+  sin_fecha: { bg: 'var(--at-surface-2)', border: 'var(--at-line)', badge: 'var(--at-ink-3)', badgeBg: 'var(--at-chip)', label: 'Sin fecha' },
 }
 
 export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
@@ -131,7 +131,7 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
           <div key={k.label} style={{ background: k.bg, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
             <div style={{ fontSize: '24px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '24px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '12px', color: '#7E9389', fontWeight: 600 }}>{k.label}</div>
+            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 600 }}>{k.label}</div>
           </div>
         ))}
       </div>
@@ -139,7 +139,7 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         {canCreate && (
-          <button onClick={openNew} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+          <button onClick={openNew} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             + Nueva área
           </button>
         )}
@@ -156,57 +156,57 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar área' : 'Nueva área de limpieza'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Área *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Área *</label>
               <input style={inputStyle} value={form.area} onChange={e => setF('area', e.target.value)} placeholder="Ej. Piscina, Lobby, Gimnasio" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Frecuencia</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Frecuencia</label>
               <select style={inputStyle} value={form.frecuencia} onChange={e => setF('frecuencia', e.target.value)}>
                 {Object.entries(FRECUENCIA_LABEL).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Responsable</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Responsable</label>
               <input style={inputStyle} value={form.responsable} onChange={e => setF('responsable', e.target.value)} placeholder="Nombre o empresa" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Última ejecución</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Última ejecución</label>
               <input style={inputStyle} type="date" value={form.ultima_ejecucion} onChange={e => setF('ultima_ejecucion', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Próxima ejecución</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Próxima ejecución</label>
               <input style={inputStyle} type="date" value={form.proxima_ejecucion} onChange={e => setF('proxima_ejecucion', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Estado</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Estado</label>
               <select style={inputStyle} value={form.activo} onChange={e => setF('activo', e.target.value)}>
                 <option value="true">Activa</option>
                 <option value="false">Inactiva</option>
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Notas</label>
               <input style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Instrucciones especiales, productos, etc." />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
-            <button onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>
+            <button onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* Cards */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '36px', marginBottom: '8px' }}>🧹</div>
-          <p style={{ fontWeight: 600, color: '#7E9389' }}>Sin áreas de limpieza programadas</p>
+          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>Sin áreas de limpieza programadas</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
@@ -215,14 +215,14 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
             const al = ALERTA_STYLE[alerta]
             const fr = FRECUENCIA_LABEL[p.frecuencia]
             return (
-              <div key={p.id} style={{ background: p.activo ? al.bg : '#FAF7EF', border: `1.5px solid ${p.activo ? al.border : '#E1DDD0'}`, borderRadius: '12px', padding: '16px', opacity: p.activo ? 1 : 0.6 }}>
+              <div key={p.id} style={{ background: p.activo ? al.bg : 'var(--at-surface-2)', border: `1.5px solid ${p.activo ? al.border : 'var(--at-line)'}`, borderRadius: '12px', padding: '16px', opacity: p.activo ? 1 : 0.6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#15291F' }}>🧹 {p.area}</div>
-                    {p.responsable && <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px' }}>👤 {p.responsable}</div>}
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>🧹 {p.area}</div>
+                    {p.responsable && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>👤 {p.responsable}</div>}
                   </div>
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
-                    {canEdit && <button onClick={() => openEdit(p)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>}
+                    {canEdit && <button onClick={() => openEdit(p)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>}
                     <button onClick={() => handleDelete(p)} style={{ padding: '4px 8px', background: '#fef2f2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#ef4444' }}>🗑</button>
                   </div>
                 </div>
@@ -230,12 +230,12 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
                   <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, background: fr.bg, color: fr.color }}>{fr.label}</span>
                   {p.activo && <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, background: al.badgeBg, color: al.badge }}>{al.label}</span>}
-                  {!p.activo && <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, background: '#EAE6D8', color: '#7E9389' }}>Inactiva</span>}
+                  {!p.activo && <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}>Inactiva</span>}
                 </div>
 
-                <div style={{ fontSize: '12px', color: '#7E9389', marginBottom: '10px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '10px' }}>
                   <div>Última: {p.ultima_ejecucion ?? '—'}</div>
-                  <div style={{ fontWeight: p.proxima_ejecucion && getAlerta(p) === 'vencida' ? 700 : 400, color: getAlerta(p) === 'vencida' ? '#ef4444' : '#7E9389' }}>
+                  <div style={{ fontWeight: p.proxima_ejecucion && getAlerta(p) === 'vencida' ? 700 : 400, color: getAlerta(p) === 'vencida' ? '#ef4444' : 'var(--at-ink-3)' }}>
                     Próxima: {p.proxima_ejecucion ?? '—'}
                   </div>
                 </div>
@@ -251,7 +251,7 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
                 {canEdit && !p.activo && (
                   <button onClick={() => toggleActivo(p)} style={{ width: '100%', padding: '6px', background: '#f0fdf4', color: '#16a34a', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>▶ Activar</button>
                 )}
-                {p.notas && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '8px' }}>{p.notas}</div>}
+                {p.notas && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '8px' }}>{p.notas}</div>}
               </div>
             )
           })}
