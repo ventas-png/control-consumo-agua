@@ -19,7 +19,7 @@ const TIPOLOGIA_META: Partial<Record<TipoAgua, { label: string; icon: string; co
   riego:               { label: 'Riego',               icon: '🌿', color: '#10b981' },
   jacuzzi:             { label: 'Jacuzzi',             icon: '🛁', color: '#B96A3F' },
   consumo_humano:      { label: 'Consumo Humano',      icon: '🚰', color: '#577B69' },
-  desmineralizada:     { label: 'Desmineralizada',     icon: '🧪', color: '#a855f7' },
+  desmineralizada:     { label: 'Desmineralizada',     icon: '🧪', color: '#B96A3F' },
   residuales_tratadas: { label: 'Residuales Tratadas', icon: '🔄', color: '#f97316' },
 }
 

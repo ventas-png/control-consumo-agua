@@ -22,7 +22,7 @@ interface UnidadInfo {
 const ESTADO_CFG: Record<EstadoUnidad, { label: string; color: string; bg: string; border: string; icon: string }> = {
   al_dia:    { label: 'Al día',     color: '#16a34a', bg: '#dcfce7', border: '#86efac', icon: '🟢' },
   mora:      { label: 'En mora',    color: '#ef4444', bg: '#fef2f2', border: '#fca5a5', icon: '🔴' },
-  arrendada: { label: 'Arrendada',  color: '#1B3B36', bg: '#EEF2EC', border: '#93c5fd', icon: '🔵' },
+  arrendada: { label: 'Arrendada',  color: '#1B3B36', bg: '#EEF2EC', border: '#577B69', icon: '🔑' },
   vacia:     { label: 'Sin cuotas', color: '#7E9389', bg: '#FAF7EF', border: '#E1DDD0', icon: '⬜' },
 }
 

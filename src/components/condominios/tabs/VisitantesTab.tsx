@@ -538,7 +538,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
       : '#E1DDD0'
     const borderLeft = isSTRMember
       ? '4px solid #B96A3F'
-      : esAcompanante ? '4px solid #93c5fd' : undefined
+      : esAcompanante ? '4px solid #577B69' : undefined
 
     return (
       <div key={v.id}

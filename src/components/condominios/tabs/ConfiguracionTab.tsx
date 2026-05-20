@@ -154,7 +154,7 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
                       placeholder={schema.placeholder}
                       readOnly={!canEdit}
                       min={schema.tipo === 'numero' ? 0 : undefined}
-                      style={{ ...inputStyle, border: `1.5px solid ${isDirty ? '#93c5fd' : '#E1DDD0'}` }}
+                      style={{ ...inputStyle, border: `1.5px solid ${isDirty ? '#577B69' : '#E1DDD0'}` }}
                     />
                   )}
                 </div>

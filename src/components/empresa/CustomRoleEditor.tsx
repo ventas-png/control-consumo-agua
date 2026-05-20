@@ -12,7 +12,7 @@ interface Props {
   onSaved: () => void
 }
 
-const PALETTE = ['#1B3B36', '#B96A3F', '#10b981', '#f59e0b', '#ef4444', '#577B69', '#ec4899', '#7E9389', '#a855f7', '#84cc16']
+const PALETTE = ['#1B3B36', '#B96A3F', '#10b981', '#f59e0b', '#ef4444', '#577B69', '#ec4899', '#7E9389', '#B96A3F', '#84cc16']
 
 export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, onSaved }: Props) {
   const [name, setName] = useState('')
@@ -231,7 +231,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
                     </div>
                     <button onClick={() => toggleCategory(perms)} style={{
                       fontSize: '11px', color: '#2F5D4F', background: 'transparent',
-                      border: '1px solid #93c5fd', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer',
+                      border: '1px solid #577B69', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer',
                     }}>{allSelected ? 'Deseleccionar' : 'Seleccionar todo'}</button>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
@@ -263,7 +263,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={onClose} style={btnSecondary}>Cancelar</button>
             <button onClick={() => void handleSave()} disabled={saving || loading} style={{
-              ...btnPrimary, background: saving ? '#93c5fd' : '#2F5D4F',
+              ...btnPrimary, background: saving ? '#577B69' : '#2F5D4F',
               cursor: saving ? 'default' : 'pointer',
             }}>{saving ? 'Guardando…' : 'Guardar rol'}</button>
           </div>

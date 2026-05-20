@@ -282,7 +282,7 @@ export function RolPermisosModal({
                     onClick={() => onOpenCustomEditor(null)}
                     style={{
                       fontSize: '11px', fontWeight: 600, color: '#2F5D4F',
-                      background: 'transparent', border: '1px solid #93c5fd', borderRadius: '6px',
+                      background: 'transparent', border: '1px solid #577B69', borderRadius: '6px',
                       padding: '3px 10px', cursor: 'pointer',
                     }}
                   >+ Crear</button>
@@ -351,7 +351,7 @@ export function RolPermisosModal({
             }}>Cancelar</button>
             <button onClick={() => void handleSave()} disabled={saving || loading} style={{
               padding: '8px 20px', borderRadius: '8px', border: 'none',
-              background: saving ? '#93c5fd' : '#2F5D4F', color: '#fff',
+              background: saving ? '#577B69' : '#2F5D4F', color: '#fff',
               fontWeight: 600, fontSize: '13px', cursor: saving ? 'default' : 'pointer',
             }}>{saving ? 'Guardando…' : 'Guardar roles'}</button>
           </div>

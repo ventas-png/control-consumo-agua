@@ -176,17 +176,17 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
               <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Tarifa por m³ ({moneda}) *</label>
               <input type="number" step="0.0001" min="0" value={tarifa}
                 onChange={e => setTarifa(e.target.value)} placeholder="0.0000"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #93c5fd', borderRadius: 6, fontSize: 13 }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #577B69', borderRadius: 6, fontSize: 13 }} />
             </div>
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Período (YYYY-MM) *</label>
               <input type="month" value={periodo} onChange={e => setPeriodo(e.target.value)}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #93c5fd', borderRadius: 6, fontSize: 13 }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #577B69', borderRadius: 6, fontSize: 13 }} />
             </div>
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Fecha vencimiento</label>
               <input type="date" value={fechaVenc} onChange={e => setFechaVenc(e.target.value)}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #93c5fd', borderRadius: 6, fontSize: 13 }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #577B69', borderRadius: 6, fontSize: 13 }} />
             </div>
           </div>
 
