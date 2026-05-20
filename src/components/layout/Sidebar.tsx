@@ -417,11 +417,11 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
           marginBottom: '1px',
           transition: 'all 0.14s ease',
           background: isActive
-            ? 'rgba(14,165,233,0.14)'
+            ? 'rgba(255,255,255,0.12)'
             : isHovered
             ? 'rgba(255,255,255,0.05)'
             : 'transparent',
-          color: isActive ? '#7dd3fc' : isHovered ? '#cbd5e1' : '#9ca3af',
+          color: isActive ? '#ffffff' : isHovered ? '#cbd5e1' : '#9ca3af',
           fontWeight: isActive ? 600 : 400,
           fontSize: '13.5px',
           letterSpacing: isActive ? '-0.1px' : '0',
@@ -438,11 +438,11 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
             justifyContent: 'center',
             borderRadius: '7px',
             background: isActive
-              ? 'rgba(14,165,233,0.2)'
+              ? 'rgba(185,106,63,0.30)'
               : isHovered
               ? 'rgba(255,255,255,0.07)'
               : 'transparent',
-            color: isActive ? '#38bdf8' : isHovered ? '#94a3b8' : '#4b5563',
+            color: isActive ? '#ffffff' : isHovered ? '#94a3b8' : '#4b5563',
             transition: 'all 0.14s ease',
           }}
         >
@@ -455,8 +455,8 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
             width: '5px',
             height: '5px',
             borderRadius: '50%',
-            background: '#0ea5e9',
-            boxShadow: '0 0 6px rgba(14,165,233,0.7)',
+            background: 'var(--at-accent)',
+            boxShadow: '0 0 6px rgba(185,106,63,0.7)',
             flexShrink: 0,
           }} />
         )}
@@ -472,7 +472,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
       style={{
         width: '256px',
         minWidth: '256px',
-        background: '#111827',
+        background: '#102622',
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
@@ -601,10 +601,10 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
             gap: '10px',
             padding: '9px 10px',
             borderRadius: '10px',
-            background: hoveredProfile ? 'rgba(14,165,233,0.1)' : 'rgba(255,255,255,0.04)',
+            background: hoveredProfile ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)',
             marginBottom: '6px',
             border: '1px solid',
-            borderColor: hoveredProfile ? 'rgba(14,165,233,0.2)' : 'rgba(255,255,255,0.05)',
+            borderColor: hoveredProfile ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.05)',
             cursor: 'pointer',
             textAlign: 'left',
             transition: 'all 0.15s ease',
@@ -616,7 +616,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
               width: '34px',
               height: '34px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #0ea5e9 0%, #0d9488 100%)',
+              background: 'linear-gradient(135deg, #577B69 0%, #B96A3F 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -624,7 +624,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
               fontWeight: 700,
               fontSize: '12px',
               flexShrink: 0,
-              boxShadow: '0 2px 8px rgba(14,165,233,0.35)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
             }}
           >
             {getInitials(currentUser.name)}

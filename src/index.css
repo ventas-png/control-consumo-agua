@@ -1,3 +1,23 @@
+/* ─── AdministraTodo design tokens ──────────────────────────────────────── */
+:root {
+  --at-bg: #F2EFE7;
+  --at-surface: #FFFFFF;
+  --at-surface-2: #FAF7EF;
+  --at-ink: #15291F;
+  --at-ink-2: #3E5A4C;
+  --at-ink-3: #7E9389;
+  --at-line: #E1DDD0;
+  --at-line-strong: #C7C2B0;
+  --at-primary: #1B3B36;
+  --at-primary-hover: #102622;
+  --at-primary-soft: #D9E2DC;
+  --at-accent: #B96A3F;
+  --at-accent-2: #577B69;
+  --at-chip: #EAE6D8;
+  --at-font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --at-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
 /* ─── Global Reset & Base ─────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -11,9 +31,9 @@ html {
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-  background: #f0f4f8;
-  color: #0f172a;
+  font-family: var(--at-font-sans);
+  background: var(--at-bg);
+  color: var(--at-ink);
   line-height: 1.5;
 }
 
@@ -35,9 +55,13 @@ body {
 
 /* ─── Focus Styles ───────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid #0ea5e9;
+  outline: 2px solid var(--at-primary);
   outline-offset: 2px;
   border-radius: 4px;
+}
+::selection {
+  background: var(--at-primary);
+  color: #fff;
 }
 button:focus:not(:focus-visible) {
   outline: none;

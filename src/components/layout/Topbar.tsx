@@ -101,11 +101,11 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             justifyContent: 'center',
             width: '38px',
             height: '38px',
-            border: '1px solid #e2e8f0',
-            background: '#f8fafc',
+            border: '1px solid #E1DDD0',
+            background: '#FAF7EF',
             borderRadius: '9px',
             cursor: 'pointer',
-            color: '#374151',
+            color: '#3E5A4C',
             flexShrink: 0,
             transition: 'background 0.13s',
           }}
@@ -121,11 +121,11 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             width: '30px',
             height: '30px',
             borderRadius: '8px',
-            background: 'linear-gradient(135deg, #e0f2fe, #dbeafe)',
+            background: 'linear-gradient(135deg, #D9E2DC, #D9E2DC)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#0ea5e9',
+            color: '#1B3B36',
             flexShrink: 0,
           }}>
             {PAGE_ICONS[activeSection]}
@@ -133,7 +133,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
           <h1 style={{
             fontSize: '16px',
             fontWeight: 650,
-            color: '#111827',
+            color: '#15291F',
             margin: 0,
             letterSpacing: '-0.2px',
           }}>
@@ -176,7 +176,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
         </span>
 
         {/* Divider */}
-        <div style={{ width: '1px', height: '24px', background: '#e5e7eb' }} />
+        <div style={{ width: '1px', height: '24px', background: '#E1DDD0' }} />
 
         {/* User chip */}
         <div
@@ -186,8 +186,8 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             gap: '9px',
             padding: '5px 12px 5px 5px',
             borderRadius: '50px',
-            background: '#f9fafb',
-            border: '1px solid #e5e7eb',
+            background: '#FAF7EF',
+            border: '1px solid #E1DDD0',
           }}
         >
           <div
@@ -195,7 +195,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
               width: '30px',
               height: '30px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #0ea5e9 0%, #0d9488 100%)',
+              background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -209,10 +209,10 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             {getInitials(currentUser.name)}
           </div>
           <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: '#111827', lineHeight: '1.25' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#15291F', lineHeight: '1.25' }}>
               {currentUser.name.split(' ')[0]}
             </div>
-            <div style={{ fontSize: '10.5px', color: '#9ca3af', lineHeight: '1' }}>
+            <div style={{ fontSize: '10.5px', color: '#7E9389', lineHeight: '1' }}>
               {getDisplayRoleLabel(currentUser)}
             </div>
           </div>

@@ -28,7 +28,7 @@ interface Props {
  *     value={consumoTotal.toFixed(2)}
  *     unit="m³"
  *     icon="💧"
- *     gradient="linear-gradient(135deg, #0ea5e9, #0284c7)"
+ *     gradient="linear-gradient(135deg, #1B3B36, #102622)"
  *     loading={isLoading}
  *   />
  */
@@ -40,7 +40,7 @@ export function KpiCard({ label, value, unit, icon, gradient, loading = false, o
       role={isInteractive ? 'button' : undefined}
       tabIndex={isInteractive ? 0 : undefined}
       style={{
-        background: gradient ?? '#0ea5e9',
+        background: gradient ?? '#1B3B36',
         color: 'white',
         padding: '20px 22px',
         borderRadius: '16px',

@@ -72,11 +72,11 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '16px 20px 14px',
-            borderBottom: '1px solid #e2e8f0',
+            borderBottom: '1px solid #E1DDD0',
             flexShrink: 0,
           }}
         >
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#1e293b' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#15291F' }}>
             {title}
           </h2>
           <button
@@ -86,7 +86,7 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: '#64748b',
+              color: '#7E9389',
               fontSize: '22px',
               lineHeight: 1,
               padding: '8px',
