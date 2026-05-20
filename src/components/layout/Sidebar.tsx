@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactNode} from 'react'
 import type { AppSection, UserRole, UserSession } from '../../types'
 import { WATER_MODULE_KEYS, CONDOMINIOS_MODULE_KEYS } from '../../lib/moduleConfig'
 import { getDisplayRoleLabel } from '../../lib/permissions'
+import { BrandLogo } from '../shared/BrandLogo'
 
 interface Tab {
   id: AppSection
@@ -485,29 +486,15 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
       {/* ── Brand ───────────────────────────────────────────── */}
       <div style={{ padding: '22px 20px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            style={{
-              width: '38px',
-              height: '38px',
-              background: 'linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%)',
-              borderRadius: '11px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              boxShadow: '0 0 0 1px rgba(6,182,212,0.35), 0 4px 14px rgba(6,182,212,0.3)',
-            }}
-          >
-            <svg width="19" height="19" fill="none" stroke="white" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-            </svg>
+          <div style={{ flexShrink: 0, lineHeight: 0, boxShadow: '0 4px 14px rgba(0,0,0,0.25)', borderRadius: '11px' }}>
+            <BrandLogo size={38} />
           </div>
           <div>
             <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '15px', letterSpacing: '-0.3px', lineHeight: '1.2' }}>
-              AquaControl
+              AdministraTodo
             </div>
             <div style={{ color: '#4b5563', fontSize: '11px', marginTop: '2px', letterSpacing: '0.02em' }}>
-              Control de Agua
+              Agua + Condominios
             </div>
           </div>
         </div>

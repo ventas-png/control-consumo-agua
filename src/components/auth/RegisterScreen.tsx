@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent} from 'react'
 import { supabase } from '../../lib/supabase'
 import { validatePasswordStrength } from '../../lib/validation'
+import { BrandLogo } from '../shared/BrandLogo'
 
 interface Props {
   onBack: () => void
@@ -133,13 +134,10 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div style={{
-            width: '56px', height: '56px', borderRadius: '16px',
-            background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '26px', margin: '0 auto 14px',
-            boxShadow: '0 8px 20px rgba(14,165,233,0.3)',
+            width: '56px', height: '56px', margin: '0 auto 14px', lineHeight: 0,
+            filter: 'drop-shadow(0 8px 20px rgba(27,59,54,0.3))',
           }}>
-            💧
+            <BrandLogo size={56} />
           </div>
           <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#0f172a' }}>
             Crear cuenta de cliente
