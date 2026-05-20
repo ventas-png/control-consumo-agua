@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/supabase'
 import type { Visitante, Unidad, ReservaSTR, HuespedSTR, SolicitudMudanzaUnidad, TipoSolicitudMudanza } from '../../../types'
 import { ImageUploader, MultiImageUploader } from '../ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
+import { SecureFileLink } from '../../shared/SecureFileLink'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 const PLATAFORMA_LABEL: Record<string, string> = {
@@ -1373,10 +1374,14 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                       { url: visitanteDetalle.foto_documento_url, label: 'DPI' },
                       { url: visitanteDetalle.foto_vehiculo_url, label: 'Vehículo' },
                     ].filter(f => f.url).map(f => (
-                      <a key={f.label} href={f.url!} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
-                        <img src={f.url!} alt={f.label} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)', display: 'block' }} />
-                        <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', textAlign: 'center', marginTop: '3px' }}>{f.label}</div>
-                      </a>
+                      <SecureFileLink key={f.label} src={f.url} style={{ textDecoration: 'none' }}>
+                        {signed => (
+                          <>
+                            <img src={signed} alt={f.label} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)', display: 'block' }} />
+                            <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', textAlign: 'center', marginTop: '3px' }}>{f.label}</div>
+                          </>
+                        )}
+                      </SecureFileLink>
                     ))}
                   </div>
                 </div>

@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase'
 import type { Amenidad, ReservaAmenidad, BloqueoAmenidad, MotivoBloqueoAmenidad, EstadoDepositoReserva, Unidad } from '../../../types'
 import { ImageUploader } from '../ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
+import { useSignedUrls } from '../../../lib/storageUrls'
 import { formatPhoneForWa } from '../../../lib/validation'
 
 interface Props {
@@ -223,6 +224,9 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   const hoy = new Date().toISOString().slice(0, 10)
   const amenidadesActivas = amenidades.filter(a => a.activo)
   const dias = diasDeSemana(semana)
+  // Firma las fotos (paths bare en condominios-media tras la migración S6) en
+  // UNA petición batch; se indexa por la misma posición que `amenidades`.
+  const amenidadFotoUrls = useSignedUrls(amenidades.map(a => a.foto_url), 'condominios-media')
 
   function abrirReservaDesdeCalendario(amenidadId: string, fecha: string) {
     setReservaForm(f => ({ ...f, amenidad_id: amenidadId, fecha }))
@@ -1068,7 +1072,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                   onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 14px 32px -14px rgba(15,23,42,0.25)' }}
                   onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px -4px rgba(15,23,42,0.08)' }}>
                   {/* Hero foto */}
-                  <div style={{ position: 'relative', height: 140, background: a.foto_url ? `center/cover no-repeat url(${a.foto_url})` : `linear-gradient(135deg, ${paleta.bg}, ${paleta.border})` }}>
+                  <div style={{ position: 'relative', height: 140, background: amenidadFotoUrls[idx] ? `center/cover no-repeat url(${amenidadFotoUrls[idx]})` : `linear-gradient(135deg, ${paleta.bg}, ${paleta.border})` }}>
                     {!a.foto_url && (
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48, opacity: 0.7 }}>🏊</div>
                     )}

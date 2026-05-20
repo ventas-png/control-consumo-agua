@@ -4,6 +4,7 @@ import type { ReservaSTR, EstadoSTR, PlataformaSTR, Unidad, HuespedSTR } from '.
 import Swal from 'sweetalert2'
 import { ImageUploader } from '../ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
+import { SecureFileLink } from '../../shared/SecureFileLink'
 
 interface HuespedSTRForm {
   id?: string
@@ -521,7 +522,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
                     <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
                     {r.foto_documento_url && (
-                      <a href={r.foto_documento_url} target="_blank" rel="noreferrer" style={{ fontSize: '10px', color: 'var(--at-primary-hover)', textDecoration: 'none', fontWeight: 600 }}>🪪 Ver doc.</a>
+                      <SecureFileLink src={r.foto_documento_url} style={{ fontSize: '10px', color: 'var(--at-primary-hover)', textDecoration: 'none', fontWeight: 600 }}>🪪 Ver doc.</SecureFileLink>
                     )}
                   </div>
                 </div>
