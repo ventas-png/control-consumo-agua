@@ -12,7 +12,63 @@
       en entornos donde el header pudiera perderse (preview locales, etc.).
     -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <title>Control de Consumo de Agua</title>
+
+    <!-- ── SEO ── -->
+    <title>AdministraTodo · Software de administración de condominios y control de agua</title>
+    <meta name="description" content="Plataforma SaaS todo-en-uno para administradoras de condominios, juntas de vecinos y operadoras de agua. Cuotas, lecturas, áreas comunes, tickets y comunicación con residentes en un solo panel." />
+    <meta name="keywords" content="software administración de condominios, control de agua, gestión de vecinos, panel informativo de clientes, HOA software, lecturas medidores, cuotas mantenimiento, reservas áreas comunes, property management Latam" />
+    <meta name="author" content="AdministraTodo" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="AdministraTodo · Administra agua, edificios y vecinos." />
+    <meta property="og:description" content="SaaS para administradoras profesionales y juntas de vecinos. Cuotas, lecturas, áreas comunes, tickets y app móvil — todo en un panel." />
+    <meta property="og:locale" content="es_LA" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AdministraTodo · Administra agua, edificios y vecinos." />
+    <meta name="twitter:description" content="Plataforma todo-en-uno para administradoras y juntas de vecinos." />
+
+    <!-- Theme color -->
+    <meta name="theme-color" content="#1B3B36" />
+
+    <!-- Fonts: Schibsted Grotesk (display/body) + JetBrains Mono (mono) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..900&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet" />
+
+    <!-- JSON-LD: SoftwareApplication + FAQ -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "name": "AdministraTodo",
+          "applicationCategory": "BusinessApplication",
+          "applicationSubCategory": "Property Management Software",
+          "operatingSystem": "Web, iOS, Android",
+          "description": "SaaS de administración de condominios y control de agua: cuotas, lecturas, reservas, tickets y comunicación con residentes.",
+          "offers": [
+            { "@type": "Offer", "name": "Solo Agua", "price": "10.00", "priceCurrency": "USD" },
+            { "@type": "Offer", "name": "Solo Condominios", "price": "10.00", "priceCurrency": "USD" },
+            { "@type": "Offer", "name": "Bundle Completo", "price": "15.00", "priceCurrency": "USD" }
+          ],
+          "aggregateRating": { "@type": "AggregateRating", "ratingValue": "4.9", "ratingCount": "142" }
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {"@type": "Question", "name": "¿Necesito instalar medidores IoT?", "acceptedAnswer": {"@type": "Answer", "text": "No es obligatorio. Puedes registrar lecturas manuales desde la app móvil; si más adelante instalas medidores compatibles, se conectan automáticamente."}},
+            {"@type": "Question", "name": "¿Cómo funciona el cobro por unidad?", "acceptedAnswer": {"@type": "Answer", "text": "Cada proyecto tiene una activación mensual fija más $1 por unidad en el proyecto principal y $0.80 por unidad en proyectos adicionales."}},
+            {"@type": "Question", "name": "¿Puedo empezar solo con un módulo?", "acceptedAnswer": {"@type": "Answer", "text": "Sí. Activa Agua o Condominios por separado a $10/mes y agrega el otro cuando lo necesites para pasar a Bundle por $15."}}
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

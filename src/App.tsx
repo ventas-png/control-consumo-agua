@@ -6,7 +6,7 @@ import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { initEmailJS } from './lib/email'
-import { LoginScreen } from './components/auth/LoginScreen'
+import { LandingPage } from './components/landing/LandingPage'
 import { PasswordResetModal } from './components/auth/PasswordResetModal'
 import { PasswordResetPage } from './components/auth/PasswordResetPage'
 import { RegisterScreen } from './components/auth/RegisterScreen'
@@ -297,7 +297,7 @@ export default function App() {
     }
     return (
       <>
-        <LoginScreen
+        <LandingPage
           onLogin={login}
           onLoginWithGoogle={loginWithGoogle}
           onForgotPassword={() => setShowPasswordReset(true)}
