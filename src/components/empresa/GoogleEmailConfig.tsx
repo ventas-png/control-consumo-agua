@@ -252,7 +252,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
 
   if (loading) {
     return (
-      <div style={{ padding: '32px', textAlign: 'center', color: '#7E9389' }}>Cargando configuración…</div>
+      <div style={{ padding: '32px', textAlign: 'center', color: 'var(--at-ink-3)' }}>Cargando configuración…</div>
     )
   }
 
@@ -262,10 +262,10 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
         <span style={{ fontSize: '22px' }}>📧</span>
         <div>
-          <h3 style={{ margin: 0, color: '#15291F', fontSize: '16px', fontWeight: 700 }}>
+          <h3 style={{ margin: 0, color: 'var(--at-ink)', fontSize: '16px', fontWeight: 700 }}>
             Correo Electrónico con Google
           </h3>
-          <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#7E9389' }}>
+          <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--at-ink-3)' }}>
             Conecta una cuenta de Gmail o Google Workspace para enviar correos automáticos a tus clientes.
           </p>
         </div>
@@ -296,14 +296,14 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
             {config ? (
               <>
                 <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#166534' }}>Conectado</p>
-                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#7E9389' }}>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--at-ink-3)' }}>
                   Enviando desde: <strong>{config.email}</strong>
                 </p>
               </>
             ) : (
               <>
-                <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#3E5A4C' }}>Sin cuenta conectada</p>
-                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#7E9389' }}>
+                <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--at-ink-2)' }}>Sin cuenta conectada</p>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--at-ink-3)' }}>
                   Conecta una cuenta de Google para habilitar el envío de correos.
                 </p>
               </>
@@ -330,7 +330,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
                 padding: '10px 20px', borderRadius: '8px', border: 'none',
-                background: connecting ? '#C7C2B0' : '#4285F4',
+                background: connecting ? 'var(--at-line-strong)' : '#4285F4',
                 color: 'white', cursor: connecting ? 'not-allowed' : 'pointer',
                 fontSize: '13px', fontWeight: 700, boxShadow: '0 2px 8px rgba(66,133,244,.35)',
               }}
@@ -354,7 +354,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
               disabled={connecting}
               style={{
                 padding: '8px 14px', borderRadius: '8px', border: '1.5px solid rgba(27, 59, 54,.3)',
-                background: 'rgba(27, 59, 54,.08)', color: '#102622',
+                background: 'rgba(27, 59, 54,.08)', color: 'var(--at-primary-hover)',
                 cursor: 'pointer', fontSize: '12px', fontWeight: 600,
               }}
             >
@@ -370,7 +370,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
           background: 'rgba(27, 59, 54,.06)', border: '1px solid rgba(27, 59, 54,.2)',
           borderRadius: '12px', padding: '16px 20px', marginBottom: '24px',
         }}>
-          <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700, color: '#15291F' }}>
+          <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)' }}>
             Enviar correo de prueba
           </p>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -390,7 +390,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
               disabled={sendingTest}
               style={{
                 padding: '9px 18px', borderRadius: '8px', border: 'none',
-                background: sendingTest ? '#C7C2B0' : 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))',
+                background: sendingTest ? 'var(--at-line-strong)' : 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))',
                 color: 'white', cursor: sendingTest ? 'not-allowed' : 'pointer',
                 fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap',
               }}
@@ -403,10 +403,10 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
 
       {/* Email templates */}
       <div>
-        <h4 style={{ margin: '0 0 12px', color: '#15291F', fontSize: '14px', fontWeight: 700 }}>
+        <h4 style={{ margin: '0 0 12px', color: 'var(--at-ink)', fontSize: '14px', fontWeight: 700 }}>
           Templates de correo
         </h4>
-        <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#7E9389' }}>
+        <p style={{ margin: '0 0 16px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
           Personaliza el diseño de cada correo. Si no defines un template, se usa el diseño predeterminado del sistema.
         </p>
 
@@ -423,23 +423,23 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
                 <div key={def.key} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   gap: '12px', flexWrap: 'wrap',
-                  background: '#FAF7EF', borderRadius: '10px', padding: '12px 16px',
-                  border: `1px solid ${custom ? 'rgba(27, 59, 54,.3)' : '#E1DDD0'}`,
+                  background: 'var(--at-surface-2)', borderRadius: '10px', padding: '12px 16px',
+                  border: `1px solid ${custom ? 'rgba(27, 59, 54,.3)' : 'var(--at-line)'}`,
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
                     <span style={{ fontSize: '20px', flexShrink: 0 }}>{def.icon}</span>
                     <div>
-                      <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#15291F' }}>
+                      <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)' }}>
                         {def.label}
                         {custom && (
                           <span style={{
                             marginLeft: '8px', fontSize: '10px', fontWeight: 700,
                             padding: '2px 7px', borderRadius: '20px',
-                            background: 'rgba(27, 59, 54,.12)', color: '#102622',
+                            background: 'rgba(27, 59, 54,.12)', color: 'var(--at-primary-hover)',
                           }}>Personalizado</span>
                         )}
                       </p>
-                      <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#7E9389' }}>{def.desc}</p>
+                      <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--at-ink-3)' }}>{def.desc}</p>
                     </div>
                   </div>
                   <button
@@ -447,7 +447,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
                     style={{
                       padding: '6px 14px', borderRadius: '7px',
                       border: '1.5px solid rgba(27, 59, 54,.3)',
-                      background: 'rgba(27, 59, 54,.08)', color: '#102622',
+                      background: 'rgba(27, 59, 54,.08)', color: 'var(--at-primary-hover)',
                       cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                     }}
                   >

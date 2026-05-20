@@ -18,10 +18,10 @@ interface TipologiaStat {
 }
 
 const TIPOLOGIA_META: Record<TipoAgua, { label: string; icon: string; from: string; to: string }> = {
-  potable:             { label: 'Potable',             icon: '💧', from: '#1B3B36', to: '#102622' },
-  rehuso:              { label: 'Rehúso',              icon: '♻️', from: '#577B69', to: '#3E5A4C' },
+  potable:             { label: 'Potable',             icon: '💧', from: 'var(--at-primary)', to: 'var(--at-primary-hover)' },
+  rehuso:              { label: 'Rehúso',              icon: '♻️', from: 'var(--at-accent-2)', to: 'var(--at-ink-2)' },
   piscina:             { label: 'Piscina',             icon: '🏊', from: '#1F6F73', to: '#134E51' },
-  desalinada:          { label: 'Desalinada',          icon: '🌊', from: '#B96A3F', to: '#9C5733' },
+  desalinada:          { label: 'Desalinada',          icon: '🌊', from: 'var(--at-accent)', to: 'var(--at-accent-hover)' },
   riego:               { label: 'Riego',               icon: '🌿', from: '#0E9E6E', to: '#067352' },
   jacuzzi:             { label: 'Jacuzzi',             icon: '🛁', from: '#A87E1E', to: '#7E5E12' },
   consumo_humano:      { label: 'Consumo Humano',      icon: '🚰', from: '#5E6B2E', to: '#44501F' },
@@ -87,7 +87,7 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
       <h3 style={{
         fontSize: '13px',
         fontWeight: 700,
-        color: '#7E9389',
+        color: 'var(--at-ink-3)',
         marginBottom: '12px',
         textTransform: 'uppercase',
         letterSpacing: '0.08em',
@@ -97,7 +97,7 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
 
       {/* Cards por tipología */}
       {activeTipos.length === 0 ? (
-        <div style={{ color: '#7E9389', fontSize: '13px', padding: '12px 0' }}>
+        <div style={{ color: 'var(--at-ink-3)', fontSize: '13px', padding: '12px 0' }}>
           Sin consumo registrado este mes.
         </div>
       ) : (
@@ -108,7 +108,7 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
         marginBottom: showProjectTable ? '24px' : 0,
       }}>
         {activeTipos.map(([tipo, stat]) => {
-          const meta = TIPOLOGIA_META[tipo] ?? { label: tipo, icon: '💧', from: '#7E9389', to: '#3E5A4C' }
+          const meta = TIPOLOGIA_META[tipo] ?? { label: tipo, icon: '💧', from: 'var(--at-ink-3)', to: 'var(--at-ink-2)' }
           return (
             <div
               key={tipo}
@@ -149,8 +149,8 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
-              <tr style={{ background: '#FAF7EF' }}>
-                <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>
+              <tr style={{ background: 'var(--at-surface-2)' }}>
+                <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>
                   Proyecto
                 </th>
                 {allTipos.map(tipo => {
@@ -159,18 +159,18 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
                     <th
                       key={tipo}
                       colSpan={2}
-                      style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 700, color: meta?.from ?? '#7E9389', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}
+                      style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 700, color: meta?.from ?? 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}
                     >
                       {meta?.icon} {meta?.label ?? tipo}
                     </th>
                   )
                 })}
               </tr>
-              <tr style={{ background: '#FAF7EF' }}>
+              <tr style={{ background: 'var(--at-surface-2)' }}>
                 <th style={{ padding: '4px 14px', borderBottom: '2px solid var(--at-line)' }} />
                 {allTipos.flatMap(tipo => [
-                  <th key={`${tipo}-m3`} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 600, color: '#7E9389', borderBottom: '2px solid var(--at-line)', fontSize: '10px' }}>m³</th>,
-                  <th key={`${tipo}-q`} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 600, color: '#7E9389', borderBottom: '2px solid var(--at-line)', fontSize: '10px' }}>{moneda}</th>,
+                  <th key={`${tipo}-m3`} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 600, color: 'var(--at-ink-3)', borderBottom: '2px solid var(--at-line)', fontSize: '10px' }}>m³</th>,
+                  <th key={`${tipo}-q`} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 600, color: 'var(--at-ink-3)', borderBottom: '2px solid var(--at-line)', fontSize: '10px' }}>{moneda}</th>,
                 ])}
               </tr>
             </thead>
@@ -180,18 +180,18 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
                 return (
                   <tr
                     key={p.id}
-                    style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF' }}
+                    style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)' }}
                   >
-                    <td style={{ padding: '9px 14px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid var(--at-chip)', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)', borderBottom: '1px solid var(--at-chip)', whiteSpace: 'nowrap' }}>
                       {p.nombre}
                     </td>
                     {allTipos.flatMap(tipo => {
                       const s = pMap?.get(tipo)
                       return [
-                        <td key={`${tipo}-m3`} style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', color: s?.consumo ? '#15291F' : '#C7C2B0', fontWeight: s?.consumo ? 600 : 400 }}>
+                        <td key={`${tipo}-m3`} style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', color: s?.consumo ? 'var(--at-ink)' : 'var(--at-line-strong)', fontWeight: s?.consumo ? 600 : 400 }}>
                           {s?.consumo ? s.consumo.toFixed(1) : '—'}
                         </td>,
-                        <td key={`${tipo}-q`} style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', color: s?.monto ? '#15291F' : '#C7C2B0', fontWeight: s?.monto ? 600 : 400 }}>
+                        <td key={`${tipo}-q`} style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', color: s?.monto ? 'var(--at-ink)' : 'var(--at-line-strong)', fontWeight: s?.monto ? 600 : 400 }}>
                           {s?.monto ? s.monto.toFixed(0) : '—'}
                         </td>,
                       ]

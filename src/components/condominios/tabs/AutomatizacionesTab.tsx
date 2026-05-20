@@ -22,7 +22,7 @@ const TRIGGER_CFG: Record<TriggerTipoAuto, { label: string; desc: (v: number) =>
 }
 
 const ACCION_CFG: Record<AccionTipoAuto, { label: string; icon: string; color: string }> = {
-  notificacion_interna: { label: 'Notificación interna', icon: '🔔', color: '#1B3B36' },
+  notificacion_interna: { label: 'Notificación interna', icon: '🔔', color: 'var(--at-primary)' },
   crear_alerta:         { label: 'Crear alerta',         icon: '🚨', color: '#d97706' },
   marcar_moroso:        { label: 'Marcar como moroso',   icon: '⚠️', color: '#ef4444' },
 }
@@ -136,7 +136,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
   }
 
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   const activas = automatizaciones.filter(a => a.activa).length
 
@@ -144,9 +144,9 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
     <div style={{ padding: 16 }}>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
-        <div style={{ background: '#EEF2EC', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#1B3B36' }}>{automatizaciones.length}</div>
-          <div style={{ fontSize: 11, color: '#1B3B36', fontWeight: 600 }}>Reglas configuradas</div>
+        <div style={{ background: 'var(--at-primary-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--at-primary)' }}>{automatizaciones.length}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-primary)', fontWeight: 600 }}>Reglas configuradas</div>
         </div>
         <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 16px' }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>{activas}</div>
@@ -162,7 +162,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nueva automatización'}
           </button>
         )}
@@ -170,7 +170,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Configurar nueva automatización</div>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 1' }}>
@@ -198,11 +198,11 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
               <input style={inp} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} placeholder="Descripción opcional" />
             </div>
           </div>
-          <div style={{ padding: '8px 12px', background: '#D9E2DC', borderRadius: 8, fontSize: 11, color: '#102622', marginBottom: 12 }}>
+          <div style={{ padding: '8px 12px', background: 'var(--at-primary-soft)', borderRadius: 8, fontSize: 11, color: 'var(--at-primary-hover)', marginBottom: 12 }}>
             Vista previa: <strong>{TRIGGER_CFG[form.trigger_tipo].desc(form.trigger_valor)}</strong> → {ACCION_CFG[form.accion_tipo].icon} {ACCION_CFG[form.accion_tipo].label}
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear regla'}
           </button>
         </div>
@@ -210,7 +210,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
 
       {/* Lista */}
       {automatizaciones.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '48px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '48px 0', fontSize: 13 }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>⚙️</div>
           Sin automatizaciones configuradas
         </div>
@@ -221,20 +221,20 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
             const ac = ACCION_CFG[a.accion_tipo]
             const afectados = evaluar(a)
             return (
-              <div key={a.id} style={{ background: '#fff', border: `1px solid ${a.activa ? '#E1DDD0' : '#EAE6D8'}`, borderRadius: 10, padding: '12px 16px', opacity: a.activa ? 1 : 0.7 }}>
+              <div key={a.id} style={{ background: 'var(--at-surface)', border: `1px solid ${a.activa ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: 10, padding: '12px 16px', opacity: a.activa ? 1 : 0.7 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 20 }}>{tc.icon}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: 13 }}>{a.nombre}</span>
-                      {!a.activa && <span style={{ fontSize: 10, background: '#EAE6D8', color: '#7E9389', padding: '1px 6px', borderRadius: 10 }}>Inactiva</span>}
+                      {!a.activa && <span style={{ fontSize: 10, background: 'var(--at-chip)', color: 'var(--at-ink-3)', padding: '1px 6px', borderRadius: 10 }}>Inactiva</span>}
                       {afectados > 0 && a.activa && (
                         <span style={{ fontSize: 10, background: '#fef2f2', color: '#ef4444', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>
                           {afectados} elemento{afectados !== 1 ? 's' : ''}
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>
                       {tc.desc(a.trigger_valor)} → {ac.icon} {ac.label}
                       {a.ultima_ejecucion && ` · Última eval.: ${a.ultima_ejecucion.slice(0, 10)}`}
                     </div>
@@ -242,11 +242,11 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
                   {canEdit && (
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button onClick={() => ejecutarAhora(a)}
-                        style={{ padding: '5px 10px', background: '#EEF2EC', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#1B3B36', fontWeight: 600 }}>
+                        style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-primary)', fontWeight: 600 }}>
                         ▶ Evaluar
                       </button>
                       <button onClick={() => toggleActiva(a.id, a.activa)}
-                        style={{ padding: '5px 10px', background: '#EAE6D8', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#7E9389' }}>
+                        style={{ padding: '5px 10px', background: 'var(--at-chip)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-ink-3)' }}>
                         {a.activa ? 'Pausar' : 'Activar'}
                       </button>
                       <button onClick={() => eliminar(a.id)}
@@ -259,7 +259,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
           })}
         </div>
       )}
-      <div style={{ marginTop: 16, padding: '10px 14px', background: '#FAF7EF', borderRadius: 8, fontSize: 11, color: '#7E9389' }}>
+      <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--at-surface-2)', borderRadius: 8, fontSize: 11, color: 'var(--at-ink-3)' }}>
         💡 Las automatizaciones evalúan los datos actuales del proyecto. La ejecución automática programada (cron) estará disponible en la próxima versión con integración de mensajería.
       </div>
       <div style={{ display: 'none' }}>{hoy}</div>

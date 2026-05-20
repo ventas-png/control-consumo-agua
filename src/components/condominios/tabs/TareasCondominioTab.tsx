@@ -15,13 +15,13 @@ interface Props {
 
 const ESTADOS: { value: EstadoTarea; label: string; color: string; bg: string }[] = [
   { value: 'pendiente',   label: 'Pendiente',   color: '#f59e0b', bg: '#fef3c7' },
-  { value: 'en_proceso',  label: 'En proceso',  color: '#B96A3F', bg: '#F4EBE3' },
+  { value: 'en_proceso',  label: 'En proceso',  color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
   { value: 'completada',  label: 'Completada',  color: '#10b981', bg: '#d1fae5' },
-  { value: 'cancelada',   label: 'Cancelada',   color: '#7E9389', bg: '#EAE6D8' },
+  { value: 'cancelada',   label: 'Cancelada',   color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 ]
 
 const PRIORIDADES: { value: PrioridadTarea; label: string; color: string }[] = [
-  { value: 'baja',    label: '🔵 Baja',    color: '#2F5D4F' },
+  { value: 'baja',    label: '🔵 Baja',    color: 'var(--at-primary-2)' },
   { value: 'media',   label: '🟡 Media',   color: '#f59e0b' },
   { value: 'alta',    label: '🔴 Alta',    color: '#ef4444' },
   { value: 'urgente', label: '🚨 Urgente', color: '#dc2626' },
@@ -125,7 +125,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
@@ -136,7 +136,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
             <span style={{ fontWeight: 600, fontSize: 14 }}>Tareas ({lista.length})</span>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nueva
               </button>
             )}
@@ -145,7 +145,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 8 }}>
             {kpis.map(k => (
               <div key={k.value} onClick={() => setFiltroEstado(filtroEstado === k.value ? '' : k.value)}
-                style={{ textAlign: 'center', padding: '4px', borderRadius: 6, cursor: 'pointer', background: filtroEstado === k.value ? k.bg : '#FAF7EF', border: `1px solid ${filtroEstado === k.value ? k.color : '#E1DDD0'}` }}>
+                style={{ textAlign: 'center', padding: '4px', borderRadius: 6, cursor: 'pointer', background: filtroEstado === k.value ? k.bg : 'var(--at-surface-2)', border: `1px solid ${filtroEstado === k.value ? k.color : 'var(--at-line)'}` }}>
                 <div style={{ fontWeight: 700, color: k.color, fontSize: 14 }}>{k.count}</div>
                 <div style={{ fontSize: 9, color: k.color }}>{k.label}</div>
               </div>
@@ -163,7 +163,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
           </div>
         )}
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 16px', fontSize: 13 }}>Sin tareas</div>}
+        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin tareas</div>}
 
         {lista.map(t => {
           const est = ESTADOS.find(s => s.value === t.estado)
@@ -172,17 +172,17 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
           const vencida = dias !== null && dias < 0 && t.estado !== 'completada' && t.estado !== 'cancelada'
           return (
             <div key={t.id} onClick={() => { setSelected(t); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === t.id ? '#F4EBE3' : '#fff', borderLeft: vencida ? '3px solid #ef4444' : '3px solid transparent' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === t.id ? 'var(--at-accent-tint)' : '#fff', borderLeft: vencida ? '3px solid #ef4444' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 13, flex: 1, marginRight: 8 }}>{t.titulo}</span>
                 <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: est?.bg, color: est?.color, flexShrink: 0 }}>{est?.label}</span>
               </div>
-              <div style={{ fontSize: 12, color: '#7E9389', marginTop: 3, display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 3, display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span style={{ color: prio?.color }}>{prio?.label}</span>
                 {t.asignado_a && <span>→ {t.asignado_a}</span>}
               </div>
               {t.fecha_limite && (
-                <div style={{ fontSize: 11, color: vencida ? '#ef4444' : dias !== null && dias <= 3 ? '#f59e0b' : '#7E9389', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: vencida ? '#ef4444' : dias !== null && dias <= 3 ? '#f59e0b' : 'var(--at-ink-3)', marginTop: 2 }}>
                   {vencida ? `⚠️ Vencida hace ${Math.abs(dias!)} días` : dias === 0 ? '⏰ Vence hoy' : `Vence: ${t.fecha_limite}`}
                 </div>
               )}
@@ -248,7 +248,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
                 {saving ? 'Guardando…' : '✅ Crear tarea'}
               </button>
               <button onClick={() => setMostrarForm(false)}
-                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -270,20 +270,20 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
                   <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                     <span style={{ padding: '3px 10px', borderRadius: 10, background: est?.bg, color: est?.color, fontSize: 12, fontWeight: 600 }}>{est?.label}</span>
                     <span style={{ fontSize: 12, color: prio?.color, fontWeight: 600 }}>{prio?.label}</span>
-                    {selected.area && <span style={{ fontSize: 12, color: '#7E9389' }}>📍 {selected.area}</span>}
+                    {selected.area && <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>📍 {selected.area}</span>}
                   </div>
                 </div>
                 {canEdit && (
                   <div style={{ display: 'flex', gap: 6 }}>
                     {siguiente && (
                       <button onClick={() => avanzarEstado(selected)}
-                        style={{ padding: '7px 14px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                        style={{ padding: '7px 14px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                         → {siguienteLabel}
                       </button>
                     )}
                     {selected.estado !== 'completada' && selected.estado !== 'cancelada' && (
                       <button onClick={() => cancelar(selected)}
-                        style={{ padding: '7px 12px', background: '#EAE6D8', color: '#7E9389', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                        style={{ padding: '7px 12px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                         Cancelar
                       </button>
                     )}
@@ -306,15 +306,15 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
                   { label: `Costo est. (${moneda})`, value: selected.costo_estimado?.toLocaleString() ?? '—' },
                   { label: `Costo real (${moneda})`, value: selected.costo_real?.toLocaleString() ?? '—' },
                 ].map(d => (
-                  <div key={d.label} style={{ background: '#FAF7EF', borderRadius: 6, padding: '7px 12px' }}>
-                    <div style={{ fontSize: 11, color: '#7E9389' }}>{d.label}</div>
+                  <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 6, padding: '7px 12px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{d.label}</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{d.value}</div>
                   </div>
                 ))}
               </div>
 
               {selected.descripcion && (
-                <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 13 }}>
+                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 13 }}>
                   {selected.descripcion}
                 </div>
               )}
@@ -322,8 +322,8 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
               {/* Comentarios */}
               <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Comentarios ({selected.comentarios.length})</div>
               {selected.comentarios.map((c, i) => (
-                <div key={i} style={{ background: '#FAF7EF', borderRadius: 8, padding: '8px 12px', marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, color: '#7E9389', marginBottom: 2 }}>{c.autor} · {c.fecha}</div>
+                <div key={i} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 12px', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 2 }}>{c.autor} · {c.fecha}</div>
                   <div style={{ fontSize: 13 }}>{c.texto}</div>
                 </div>
               ))}
@@ -332,7 +332,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
                   <input style={inp} placeholder="Nombre" value={comentario.autor} onChange={e => setComentario(p => ({ ...p, autor: e.target.value }))} />
                   <input style={inp} placeholder="Agregar comentario…" value={comentario.texto} onChange={e => setComentario(p => ({ ...p, texto: e.target.value }))} />
                   <button onClick={() => agregarComentario(selected)}
-                    style={{ padding: '7px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ padding: '7px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                     + Agregar
                   </button>
                 </div>
@@ -342,7 +342,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
         })()}
 
         {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#7E9389', fontSize: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
             Selecciona una tarea o crea una nueva
           </div>
         )}

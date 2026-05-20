@@ -74,35 +74,35 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
 
   const INPUT_STYLE = {
     width: '100%', padding: '6px 10px', borderRadius: 8,
-    border: '1px solid var(--at-line-strong)', fontSize: 13, background: '#fff',
+    border: '1px solid var(--at-line-strong)', fontSize: 13, background: 'var(--at-surface)',
   }
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F', marginBottom: 2 }}>Simulador de Cuotas</div>
-      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 16 }}>
+      <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)', marginBottom: 2 }}>Simulador de Cuotas</div>
+      <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 16 }}>
         Ajusta los parámetros y visualiza el impacto financiero en tiempo real
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 16 }}>
         {/* Panel de controles */}
-        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 14 }}>Parámetros</div>
+        <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 14 }}>Parámetros</div>
 
           <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 12, color: '#3E5A4C', fontWeight: 600, display: 'block', marginBottom: 6 }}>
-              Cuota mensual por unidad — <span style={{ color: '#1B3B36' }}>{moneda} {cuotaMensual.toLocaleString('es')}</span>
+            <label style={{ fontSize: 12, color: 'var(--at-ink-2)', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+              Cuota mensual por unidad — <span style={{ color: 'var(--at-primary)' }}>{moneda} {cuotaMensual.toLocaleString('es')}</span>
             </label>
             <input type="range" min={0} max={Math.max(cuotaMensual * 3, 5000)} step={50}
               value={cuotaMensual}
               onChange={e => setCuotaMensual(Number(e.target.value))}
-              style={{ width: '100%', accentColor: '#1B3B36' }} />
+              style={{ width: '100%', accentColor: 'var(--at-primary)' }} />
             <input type="number" value={cuotaMensual} onChange={e => setCuotaMensual(Number(e.target.value))}
               style={{ ...INPUT_STYLE, marginTop: 6 }} />
           </div>
 
           <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 12, color: '#3E5A4C', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+            <label style={{ fontSize: 12, color: 'var(--at-ink-2)', fontWeight: 600, display: 'block', marginBottom: 6 }}>
               Tasa de cobro — <span style={{ color: '#16a34a' }}>{pctCobro}%</span>
             </label>
             <input type="range" min={0} max={100} step={1}
@@ -112,7 +112,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
           </div>
 
           <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 12, color: '#3E5A4C', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+            <label style={{ fontSize: 12, color: 'var(--at-ink-2)', fontWeight: 600, display: 'block', marginBottom: 6 }}>
               Crecimiento egresos/año — <span style={{ color: '#ef4444' }}>{crecimientoEgresos}%</span>
             </label>
             <input type="range" min={-10} max={30} step={0.5}
@@ -122,21 +122,21 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
           </div>
 
           <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 12, color: '#3E5A4C', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+            <label style={{ fontSize: 12, color: 'var(--at-ink-2)', fontWeight: 600, display: 'block', marginBottom: 6 }}>
               Meses a proyectar
             </label>
             {[6, 12, 24].map(n => (
               <button key={n} onClick={() => setMesesProyeccion(n)}
                 style={{ marginRight: 6, padding: '4px 12px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: 'pointer',
-                  background: mesesProyeccion === n ? '#1B3B36' : '#fff',
-                  color: mesesProyeccion === n ? '#fff' : '#3E5A4C', fontWeight: mesesProyeccion === n ? 700 : 400 }}>
+                  background: mesesProyeccion === n ? 'var(--at-primary)' : '#fff',
+                  color: mesesProyeccion === n ? '#fff' : 'var(--at-ink-2)', fontWeight: mesesProyeccion === n ? 700 : 400 }}>
                 {n}m
               </button>
             ))}
           </div>
 
           {/* Baseline info */}
-          <div style={{ marginTop: 16, padding: '10px 12px', background: '#EEF2EC', borderRadius: 8, fontSize: 11, color: '#102622' }}>
+          <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--at-primary-tint)', borderRadius: 8, fontSize: 11, color: 'var(--at-primary-hover)' }}>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>Datos históricos (últ. 6 meses)</div>
             <div>Ingreso prom.: {moneda} {Math.round(baseline.ingProm).toLocaleString('es')}/mes</div>
             <div>Egreso prom.: {moneda} {Math.round(baseline.egProm).toLocaleString('es')}/mes</div>
@@ -153,31 +153,31 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
               { label: 'Ingreso proyectado/mes', val: `${moneda} ${Math.round(cuotaMensual * totalUnidades * (pctCobro / 100)).toLocaleString('es')}`, color: '#16a34a', bg: '#dcfce7' },
               { label: 'Saldo acumulado', val: `${saldoAcumulado >= 0 ? '+' : ''}${moneda} ${Math.round(saldoAcumulado).toLocaleString('es')}`, color: saldoAcumulado >= 0 ? '#16a34a' : '#ef4444', bg: saldoAcumulado >= 0 ? '#dcfce7' : '#fef2f2' },
               { label: 'Meses en déficit', val: String(mesesNeg), color: mesesNeg === 0 ? '#16a34a' : '#ef4444', bg: mesesNeg === 0 ? '#dcfce7' : '#fef2f2' },
-              { label: 'Punto de equilibrio', val: `${moneda} ${puntoEquilibrio.toLocaleString('es')}/unidad`, color: '#1B3B36', bg: '#EEF2EC' },
-              { label: 'Potencial máximo/mes', val: `${moneda} ${Math.round(cuotaMensual * totalUnidades).toLocaleString('es')}`, color: '#9C5733', bg: '#FAF1EA' },
+              { label: 'Punto de equilibrio', val: `${moneda} ${puntoEquilibrio.toLocaleString('es')}/unidad`, color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
+              { label: 'Potencial máximo/mes', val: `${moneda} ${Math.round(cuotaMensual * totalUnidades).toLocaleString('es')}`, color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
             ].map(k => (
               <div key={k.label} style={{ flex: '1 1 130px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
-                <div style={{ fontSize: 10, color: '#7E9389' }}>{k.label}</div>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
               </div>
             ))}
           </div>
 
           {/* Gráfica */}
-          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 12, color: '#15291F', marginBottom: 12 }}>
+          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--at-ink)', marginBottom: 12 }}>
               Proyección {mesesProyeccion} meses
             </div>
             <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 140 }}>
               {proyeccion.map((p, i) => (
                 <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                   <div style={{ width: '100%', display: 'flex', gap: 1, alignItems: 'flex-end', height: 120 }}>
-                    <div style={{ flex: 1, background: '#1B3B36', opacity: 0.8, borderRadius: '3px 3px 0 0',
+                    <div style={{ flex: 1, background: 'var(--at-primary)', opacity: 0.8, borderRadius: '3px 3px 0 0',
                       height: `${(p.ingresos / maxBar) * 100}%`, minHeight: 2 }} />
                     <div style={{ flex: 1, background: p.egresos > p.ingresos ? '#ef4444' : '#f97316', opacity: 0.8, borderRadius: '3px 3px 0 0',
                       height: `${(p.egresos / maxBar) * 100}%`, minHeight: 2 }} />
                   </div>
-                  <div style={{ fontSize: 9, color: '#7E9389', transform: 'rotate(-30deg)', marginTop: 4, whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 9, color: 'var(--at-ink-3)', transform: 'rotate(-30deg)', marginTop: 4, whiteSpace: 'nowrap' }}>
                     {labelMes(p.mes)}
                   </div>
                 </div>
@@ -185,7 +185,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
             </div>
             <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 11 }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 10, height: 10, background: '#1B3B36', borderRadius: 2, display: 'inline-block' }} />
+                <span style={{ width: 10, height: 10, background: 'var(--at-primary)', borderRadius: 2, display: 'inline-block' }} />
                 Ingresos
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -196,12 +196,12 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
           </div>
 
           {/* Tabla resumen */}
-          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
               <thead>
-                <tr style={{ background: '#FAF7EF' }}>
+                <tr style={{ background: 'var(--at-surface-2)' }}>
                   {['Mes', 'Ingresos', 'Egresos', 'Superávit/Déficit', 'Acumulado'].map(h => (
-                    <th key={h} style={{ padding: '7px 10px', textAlign: h === 'Mes' ? 'left' : 'right', color: '#7E9389', fontWeight: 600 }}>{h}</th>
+                    <th key={h} style={{ padding: '7px 10px', textAlign: h === 'Mes' ? 'left' : 'right', color: 'var(--at-ink-3)', fontWeight: 600 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -210,7 +210,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
                   acc.acum += p.superavit
                   acc.rows.push(
                     <tr key={i} style={{ borderTop: '1px solid var(--at-chip)', background: p.superavit < 0 ? '#fef2f2' : undefined }}>
-                      <td style={{ padding: '6px 10px', color: '#7E9389' }}>{labelMes(p.mes)} {p.mes.slice(0, 4)}</td>
+                      <td style={{ padding: '6px 10px', color: 'var(--at-ink-3)' }}>{labelMes(p.mes)} {p.mes.slice(0, 4)}</td>
                       <td style={{ padding: '6px 10px', textAlign: 'right', color: '#16a34a' }}>{moneda} {Math.round(p.ingresos).toLocaleString('es')}</td>
                       <td style={{ padding: '6px 10px', textAlign: 'right', color: '#ef4444' }}>{moneda} {Math.round(p.egresos).toLocaleString('es')}</td>
                       <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, color: p.superavit >= 0 ? '#16a34a' : '#ef4444' }}>
@@ -229,7 +229,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
         </div>
       </div>
 
-      <div style={{ marginTop: 14, padding: '8px 14px', background: '#FAF7EF', borderRadius: 8, fontSize: 11, color: '#7E9389' }}>
+      <div style={{ marginTop: 14, padding: '8px 14px', background: 'var(--at-surface-2)', borderRadius: 8, fontSize: 11, color: 'var(--at-ink-3)' }}>
         ⚠️ Simulación estimativa. Los ingresos proyectados = cuota × unidades × tasa cobro. Los egresos aplican el crecimiento compuesto mensual.
       </div>
     </div>

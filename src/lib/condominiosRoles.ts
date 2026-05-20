@@ -12,13 +12,13 @@ export const CONDOMINIOS_ROLES: CondominiosRoleDef[] = [
     id: 'administrador_general',
     label: 'Administrador General',
     description: 'Acceso completo a todas las secciones y tabs',
-    color: '#0ea5e9',
+    color: '#1B3B36',
   },
   {
     id: 'junta_directiva',
     label: 'Junta Directiva',
     description: 'Panel estratégico, finanzas (lectura), gobernanza y documentos',
-    color: '#8b5cf6',
+    color: '#B96A3F',
   },
   {
     id: 'finanzas',
@@ -42,7 +42,7 @@ export const CONDOMINIOS_ROLES: CondominiosRoleDef[] = [
     id: 'comunidad',
     label: 'Comunidad / Relaciones',
     description: 'Residentes y comunidad completos, comunicaciones y documentos',
-    color: '#06b6d4',
+    color: '#577B69',
   },
   {
     id: 'recepcion',
@@ -54,7 +54,7 @@ export const CONDOMINIOS_ROLES: CondominiosRoleDef[] = [
     id: 'visualizador',
     label: 'Solo Visualizador',
     description: 'Dashboards y reportes del panel únicamente, sin edición',
-    color: '#64748b',
+    color: '#7E9389',
   },
 ]
 

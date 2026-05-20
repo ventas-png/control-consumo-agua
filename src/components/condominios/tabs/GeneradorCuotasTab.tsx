@@ -180,7 +180,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
       html: `<b>${conceptoFinal}</b> · ${rubros.length} rubro(s)<br>Período: ${periodo} · Vence: ${fechaVenc}<br>Total: <b>${moneda} ${totalSeleccionado.toLocaleString('es', { minimumFractionDigits: 2 })}</b>`,
       icon: 'question',
       showCancelButton: true,
-      confirmButtonColor: '#1B3B36',
+      confirmButtonColor: 'var(--at-primary)',
       confirmButtonText: 'Generar',
       cancelButtonText: 'Cancelar',
     })
@@ -260,7 +260,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
         {(['generar', 'historial'] as const).map(t => (
           <button key={t} onClick={() => cambiarTab(t)}
             style={{ padding: '7px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: tab === t ? 700 : 500,
-              background: tab === t ? '#FAF7EF' : 'transparent', color: tab === t ? '#1B3B36' : '#7E9389',
+              background: tab === t ? 'var(--at-surface-2)' : 'transparent', color: tab === t ? 'var(--at-primary)' : 'var(--at-ink-3)',
               borderBottom: tab === t ? '2px solid var(--at-primary)' : '2px solid transparent', borderRadius: '6px 6px 0 0' }}>
             {t === 'generar' ? '🏭 Generar cuotas' : '📋 Historial de generaciones'}
           </button>
@@ -279,15 +279,15 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                 <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
-                      background: completado ? '#16a34a' : activo ? '#1B3B36' : '#E1DDD0',
-                      color: completado || activo ? '#fff' : '#7E9389' }}>
+                      background: completado ? '#16a34a' : activo ? 'var(--at-primary)' : 'var(--at-line)',
+                      color: completado || activo ? '#fff' : 'var(--at-ink-3)' }}>
                       {completado ? '✓' : i + 1}
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: activo ? 700 : 500, color: activo ? '#1B3B36' : completado ? '#16a34a' : '#7E9389' }}>
+                    <span style={{ fontSize: 12, fontWeight: activo ? 700 : 500, color: activo ? 'var(--at-primary)' : completado ? '#16a34a' : 'var(--at-ink-3)' }}>
                       {labels[i]}
                     </span>
                   </div>
-                  {i < 2 && <div style={{ width: 24, height: 1, background: '#E1DDD0' }} />}
+                  {i < 2 && <div style={{ width: 24, height: 1, background: 'var(--at-line)' }} />}
                 </div>
               )
             })}
@@ -297,8 +297,8 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
           {paso === 'config' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
               {/* Panel izquierdo: parámetros base */}
-              <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 20 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 16, color: '#15291F' }}>⚙️ Parámetros del período</div>
+              <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 20 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 16, color: 'var(--at-ink)' }}>⚙️ Parámetros del período</div>
 
                 <div style={{ marginBottom: 12 }}>
                   <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Período *</label>
@@ -325,10 +325,10 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                     style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
                 </div>
 
-                <div style={{ background: '#EEF2EC', borderRadius: 8, padding: '10px 12px', fontSize: 12 }}>
+                <div style={{ background: 'var(--at-primary-tint)', borderRadius: 8, padding: '10px 12px', fontSize: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                    <span style={{ color: '#102622' }}>Unidades disponibles</span>
-                    <span style={{ fontWeight: 700, color: '#102622' }}>{unidadesDisponibles.length}</span>
+                    <span style={{ color: 'var(--at-primary-hover)' }}>Unidades disponibles</span>
+                    <span style={{ fontWeight: 700, color: 'var(--at-primary-hover)' }}>{unidadesDisponibles.length}</span>
                   </div>
                   {unidadesYaTienen.length > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -340,14 +340,14 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
               </div>
 
               {/* Panel derecho: rubros */}
-              <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 20 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 16, color: '#15291F' }}>💰 Rubros y métodos de cálculo</div>
+              <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 20 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 16, color: 'var(--at-ink)' }}>💰 Rubros y métodos de cálculo</div>
                 <RubrosBuilder rubros={rubros} onChange={setRubros} moneda={moneda} />
 
                 {canCreate && (
                   <button onClick={irAPreview}
                     disabled={rubros.length === 0 || unidadesDisponibles.length === 0}
-                    style={{ marginTop: 20, width: '100%', padding: '10px 0', background: rubros.length === 0 || unidadesDisponibles.length === 0 ? '#7E9389' : '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
+                    style={{ marginTop: 20, width: '100%', padding: '10px 0', background: rubros.length === 0 || unidadesDisponibles.length === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
                     Previsualizar por unidad →
                   </button>
                 )}
@@ -357,18 +357,18 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
 
           {/* ─── PASO B: Preview ─── */}
           {paso === 'preview' && (
-            <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 20 }}>
+            <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: '#15291F' }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)' }}>
                     📋 Vista previa — {conceptoFinal} · {periodo}
                   </div>
-                  <div style={{ fontSize: 12, color: '#7E9389', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
                     {rubros.length} rubro(s) · vence {fechaVenc}
                   </div>
                 </div>
                 <button onClick={() => setPaso('config')}
-                  style={{ padding: '6px 14px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 12, cursor: 'pointer', background: '#FAF7EF' }}>
+                  style={{ padding: '6px 14px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 12, cursor: 'pointer', background: 'var(--at-surface-2)' }}>
                   ← Volver a configurar
                 </button>
               </div>
@@ -381,7 +381,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
               )}
 
               {/* Header de tabla */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 11, fontWeight: 600, color: '#7E9389', padding: '0 8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 11, fontWeight: 600, color: 'var(--at-ink-3)', padding: '0 8px' }}>
                 <div style={{ width: 20 }}>
                   <input type="checkbox"
                     checked={seleccionadas.size === unidadesDisponibles.length && unidadesDisponibles.length > 0}
@@ -402,14 +402,14 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                   return (
                     <div key={unidad.id} style={{ borderBottom: idx < calculos.length - 1 ? '1px solid var(--at-chip)' : 'none' }}>
                       <div onClick={() => toggleUnidad(unidad.id)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 8px', cursor: 'pointer', background: sel ? '#EEF2EC' : idx % 2 === 0 ? '#fff' : '#FAF7EF' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 8px', cursor: 'pointer', background: sel ? 'var(--at-primary-tint)' : idx % 2 === 0 ? '#fff' : 'var(--at-surface-2)' }}>
                         <div style={{ width: 20 }} onClick={e => { e.stopPropagation(); toggleUnidad(unidad.id) }}>
                           <input type="checkbox" checked={sel} onChange={() => toggleUnidad(unidad.id)} onClick={e => e.stopPropagation()} />
                         </div>
-                        <div style={{ flex: 2, fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? '#102622' : '#3E5A4C' }}>{unidad.nombre}</div>
-                        <div style={{ flex: 1, fontSize: 11, color: '#7E9389' }}>{unidad.tipo}</div>
-                        <div style={{ flex: 1, fontSize: 12, textAlign: 'right', color: '#3E5A4C' }}>{unidad.area_m2 ? `${unidad.area_m2} m²` : '—'}</div>
-                        <div style={{ flex: 1, fontSize: 12, textAlign: 'right', color: '#3E5A4C' }}>
+                        <div style={{ flex: 2, fontSize: 13, fontWeight: sel ? 600 : 400, color: sel ? 'var(--at-primary-hover)' : 'var(--at-ink-2)' }}>{unidad.nombre}</div>
+                        <div style={{ flex: 1, fontSize: 11, color: 'var(--at-ink-3)' }}>{unidad.tipo}</div>
+                        <div style={{ flex: 1, fontSize: 12, textAlign: 'right', color: 'var(--at-ink-2)' }}>{unidad.area_m2 ? `${unidad.area_m2} m²` : '—'}</div>
+                        <div style={{ flex: 1, fontSize: 12, textAlign: 'right', color: 'var(--at-ink-2)' }}>
                           {unidad.alicuota_pct != null
                             ? `${unidad.alicuota_pct.toFixed(2)}%`
                             : unidad.area_m2 && totalM2 > 0
@@ -418,11 +418,11 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                         </div>
                         <div style={{ flex: 1, textAlign: 'center' }}>
                           <button onClick={e => { e.stopPropagation(); toggleExpandir(unidad.id) }}
-                            style={{ fontSize: 10, padding: '2px 8px', border: '1px solid var(--at-line-strong)', borderRadius: 5, cursor: 'pointer', background: '#FAF7EF', color: '#7E9389' }}>
+                            style={{ fontSize: 10, padding: '2px 8px', border: '1px solid var(--at-line-strong)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-surface-2)', color: 'var(--at-ink-3)' }}>
                             {exp ? '▲ ocultar' : '▼ detalle'}
                           </button>
                         </div>
-                        <div style={{ flex: 1, fontSize: 13, fontWeight: 700, textAlign: 'right', color: '#15291F' }}>
+                        <div style={{ flex: 1, fontSize: 13, fontWeight: 700, textAlign: 'right', color: 'var(--at-ink)' }}>
                           {moneda} {total.toLocaleString('es', { minimumFractionDigits: 2 })}
                         </div>
                       </div>
@@ -431,17 +431,17 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                       {exp && (
                         <div style={{ background: '#f8faff', borderTop: '1px solid var(--at-accent-soft-2)', padding: '8px 12px 8px 48px' }}>
                           {rubrosDetalle.map((rd, ri) => (
-                            <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#3E5A4C', marginBottom: 3 }}>
-                              <span style={{ color: '#3E5A4C' }}>
+                            <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--at-ink-2)', marginBottom: 3 }}>
+                              <span style={{ color: 'var(--at-ink-2)' }}>
                                 {rd.nombre}
-                                <span style={{ marginLeft: 6, color: '#7E9389' }}>
+                                <span style={{ marginLeft: 6, color: 'var(--at-ink-3)' }}>
                                   ({rd.metodo === 'fijo' ? 'fijo' : rd.metodo === 'por_m2' ? `${rd.valor}/m²` : `${rd.valor.toLocaleString('es')} × alíc.`})
                                 </span>
                               </span>
                               <span style={{ fontWeight: 600 }}>{moneda} {rd.monto_calculado.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
                             </div>
                           ))}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: '#102622', borderTop: '1px solid var(--at-accent-soft)', marginTop: 4, paddingTop: 4 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: 'var(--at-primary-hover)', borderTop: '1px solid var(--at-accent-soft)', marginTop: 4, paddingTop: 4 }}>
                             <span>Total</span>
                             <span>{moneda} {total.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
                           </div>
@@ -460,16 +460,16 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
               )}
 
               {/* Footer */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, padding: '12px 16px', background: '#FAF7EF', borderRadius: 8, border: '1px solid var(--at-line)' }}>
-                <div style={{ fontSize: 13, color: '#3E5A4C' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, padding: '12px 16px', background: 'var(--at-surface-2)', borderRadius: 8, border: '1px solid var(--at-line)' }}>
+                <div style={{ fontSize: 13, color: 'var(--at-ink-2)' }}>
                   <span style={{ fontWeight: 700 }}>{seleccionadas.size}</span> unidades seleccionadas
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#102622' }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--at-primary-hover)' }}>
                   Total: {moneda} {totalSeleccionado.toLocaleString('es', { minimumFractionDigits: 2 })}
                 </div>
                 {canCreate && (
                   <button onClick={generar} disabled={generando || seleccionadas.size === 0}
-                    style={{ padding: '10px 24px', background: seleccionadas.size === 0 ? '#7E9389' : '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: seleccionadas.size === 0 ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, opacity: generando ? 0.7 : 1 }}>
+                    style={{ padding: '10px 24px', background: seleccionadas.size === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: seleccionadas.size === 0 ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, opacity: generando ? 0.7 : 1 }}>
                     {generando ? 'Generando…' : `🏭 Confirmar y generar ${seleccionadas.size} cuotas`}
                   </button>
                 )}
@@ -481,19 +481,19 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
           {paso === 'resultado' && resultado && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', gap: 16 }}>
               <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>✅</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#15291F' }}>¡Cuotas generadas!</div>
-              <div style={{ fontSize: 14, color: '#7E9389', textAlign: 'center' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--at-ink)' }}>¡Cuotas generadas!</div>
+              <div style={{ fontSize: 14, color: 'var(--at-ink-3)', textAlign: 'center' }}>
                 Se crearon <strong>{resultado.generadas} cuotas</strong> de <strong>{conceptoFinal}</strong><br />
                 para el período <strong>{periodo}</strong> — Total: <strong>{moneda} {resultado.total.toLocaleString('es', { minimumFractionDigits: 2 })}</strong>
               </div>
               <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
                 <button onClick={reiniciar}
-                  style={{ padding: '10px 20px', border: '1px solid var(--at-line-strong)', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: '#FAF7EF' }}>
+                  style={{ padding: '10px 20px', border: '1px solid var(--at-line-strong)', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'var(--at-surface-2)' }}>
                   Generar otro período
                 </button>
                 {onVerCuotas && (
                   <button onClick={onVerCuotas}
-                    style={{ padding: '10px 20px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+                    style={{ padding: '10px 20px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
                     Ver cuotas generadas →
                   </button>
                 )}
@@ -505,12 +505,12 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
 
       {/* ─── Historial ─── */}
       {tab === 'historial' && (
-        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Historial de generaciones masivas</div>
           {loadingLogs ? (
-            <div style={{ textAlign: 'center', color: '#7E9389', padding: 30 }}>Cargando…</div>
+            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: 30 }}>Cargando…</div>
           ) : logs.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#7E9389', padding: 40 }}>
+            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: 40 }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>📋</div>
               No hay generaciones registradas
             </div>
@@ -520,31 +520,31 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                 const expLog = logExpandidas.has(l.id)
                 const rubrosLog = (l.rubros as RubroConfig[] | null) ?? null
                 return (
-                  <div key={l.id} style={{ background: '#FAF7EF', borderRadius: 8, border: '1px solid var(--at-chip)', overflow: 'hidden' }}>
+                  <div key={l.id} style={{ background: 'var(--at-surface-2)', borderRadius: 8, border: '1px solid var(--at-chip)', overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', fontSize: 12 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 10, background: '#EEF2EC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏭</div>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--at-primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏭</div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, color: '#15291F' }}>{l.concepto} — {l.periodo}</div>
-                        <div style={{ color: '#7E9389' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{l.concepto} — {l.periodo}</div>
+                        <div style={{ color: 'var(--at-ink-3)' }}>
                           {l.unidades_generadas} unidades · {l.metodo_calculo ? `método: ${l.metodo_calculo} · ` : ''}{moneda} {l.monto_unitario.toFixed(2)} promedio · vence {l.fecha_vencimiento}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontWeight: 700, color: '#1B3B36' }}>{moneda} {(l.monto_unitario * l.unidades_generadas).toLocaleString('es', { minimumFractionDigits: 2 })}</div>
-                        <div style={{ fontSize: 10, color: '#7E9389' }}>{l.created_at?.slice(0, 16)}</div>
+                        <div style={{ fontWeight: 700, color: 'var(--at-primary)' }}>{moneda} {(l.monto_unitario * l.unidades_generadas).toLocaleString('es', { minimumFractionDigits: 2 })}</div>
+                        <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{l.created_at?.slice(0, 16)}</div>
                       </div>
                       {rubrosLog && rubrosLog.length > 0 && (
                         <button onClick={() => toggleLogExpandir(l.id)}
-                          style={{ fontSize: 10, padding: '2px 8px', border: '1px solid var(--at-line-strong)', borderRadius: 5, cursor: 'pointer', background: '#fff', color: '#7E9389', flexShrink: 0 }}>
+                          style={{ fontSize: 10, padding: '2px 8px', border: '1px solid var(--at-line-strong)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-surface)', color: 'var(--at-ink-3)', flexShrink: 0 }}>
                           {expLog ? '▲' : '▼'} rubros
                         </button>
                       )}
                     </div>
                     {expLog && rubrosLog && (
-                      <div style={{ background: '#EEF2EC', borderTop: '1px solid var(--at-accent-soft-2)', padding: '8px 14px 10px 66px' }}>
+                      <div style={{ background: 'var(--at-primary-tint)', borderTop: '1px solid var(--at-accent-soft-2)', padding: '8px 14px 10px 66px' }}>
                         {rubrosLog.map((rb, ri) => (
-                          <div key={ri} style={{ fontSize: 11, color: '#3E5A4C', display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                            <span>{rb.nombre} <span style={{ color: '#7E9389' }}>({rb.metodo})</span></span>
+                          <div key={ri} style={{ fontSize: 11, color: 'var(--at-ink-2)', display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                            <span>{rb.nombre} <span style={{ color: 'var(--at-ink-3)' }}>({rb.metodo})</span></span>
                             <span style={{ fontWeight: 600 }}>{moneda} {rb.valor.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
                           </div>
                         ))}

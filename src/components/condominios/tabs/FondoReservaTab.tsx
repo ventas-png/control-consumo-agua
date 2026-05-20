@@ -149,7 +149,7 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
           <div key={k.label} style={{ background: k.bg, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
             <div style={{ fontSize: '24px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '12px', color: '#7E9389', fontWeight: 600 }}>{k.label}</div>
+            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 600 }}>{k.label}</div>
           </div>
         ))}
       </div>
@@ -157,7 +157,7 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         {canCreate && (
-          <button onClick={openNew} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+          <button onClick={openNew} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             + Nuevo movimiento
           </button>
         )}
@@ -175,11 +175,11 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
         </select>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
           <button onClick={exportarPDF} disabled={filtered.length === 0}
-            style={{ padding: '7px 14px', background: filtered.length === 0 ? '#EAE6D8' : '#EEF2EC', color: filtered.length === 0 ? '#7E9389' : '#1B3B36', border: '1px solid var(--at-primary-soft-2)', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: filtered.length === 0 ? 'not-allowed' : 'pointer' }}>
+            style={{ padding: '7px 14px', background: filtered.length === 0 ? 'var(--at-chip)' : 'var(--at-primary-tint)', color: filtered.length === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: filtered.length === 0 ? 'not-allowed' : 'pointer' }}>
             📄 PDF
           </button>
           <button onClick={exportarXlsx} disabled={filtered.length === 0}
-            style={{ padding: '7px 14px', background: filtered.length === 0 ? '#EAE6D8' : '#f0fdf4', color: filtered.length === 0 ? '#7E9389' : '#16a34a', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: filtered.length === 0 ? 'not-allowed' : 'pointer' }}>
+            style={{ padding: '7px 14px', background: filtered.length === 0 ? 'var(--at-chip)' : '#f0fdf4', color: filtered.length === 0 ? 'var(--at-ink-3)' : '#16a34a', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: filtered.length === 0 ? 'not-allowed' : 'pointer' }}>
             📊 Excel
           </button>
         </div>
@@ -187,11 +187,11 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar movimiento' : 'Nuevo movimiento'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Tipo *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Tipo *</label>
               <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
                 <option value="aporte">Aporte</option>
                 <option value="retiro">Retiro</option>
@@ -199,19 +199,19 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Concepto *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Concepto *</label>
               <input style={inputStyle} value={form.concepto} onChange={e => setF('concepto', e.target.value)} placeholder="Descripción del movimiento" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Monto *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Monto *</label>
               <input style={inputStyle} type="number" min="0" step="0.01" value={form.monto} onChange={e => setF('monto', e.target.value)} placeholder="0.00" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha</label>
               <input style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Estado</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Estado</label>
               <select style={inputStyle} value={form.estado} onChange={e => setF('estado', e.target.value)}>
                 <option value="aprobado">Aprobado</option>
                 <option value="pendiente">Pendiente</option>
@@ -219,23 +219,23 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Aprobado por</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Aprobado por</label>
               <input style={inputStyle} value={form.aprobado_por} onChange={e => setF('aprobado_por', e.target.value)} placeholder="Nombre o cargo" />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Justificación</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Justificación</label>
               <input style={inputStyle} value={form.justificacion} onChange={e => setF('justificacion', e.target.value)} placeholder="Motivo del movimiento" />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Notas</label>
               <input style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Observaciones adicionales" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
-            <button onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
+            <button onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
               Cancelar
             </button>
           </div>
@@ -244,9 +244,9 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
 
       {/* Timeline */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '36px', marginBottom: '8px' }}>🏦</div>
-          <p style={{ fontWeight: 600, color: '#7E9389' }}>Sin movimientos registrados</p>
+          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>Sin movimientos registrados</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -254,17 +254,17 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
             const ts = TIPO_STYLE[m.tipo]
             const es = ESTADO_STYLE[m.estado]
             return (
-              <div key={m.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div key={m.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: ts.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <span style={{ fontSize: '20px', fontWeight: 800, color: ts.color }}>{ts.sign}</span>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 700, fontSize: '14px', color: '#15291F' }}>{m.concepto}</span>
+                    <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{m.concepto}</span>
                     <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, background: ts.bg, color: ts.color }}>{ts.label}</span>
                     <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, background: es.bg, color: es.color }}>{es.label}</span>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                     {m.fecha}{m.aprobado_por ? ` · Aprobado por: ${m.aprobado_por}` : ''}{m.justificacion ? ` · ${m.justificacion}` : ''}
                   </div>
                 </div>
@@ -272,14 +272,14 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
                   <div style={{ fontSize: '16px', fontWeight: 800, color: ts.color }}>
                     {ts.sign} {fmt(m.monto, moneda)}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                     Saldo: {fmt(m.saldo, moneda)}
                   </div>
                 </div>
                 {(canEdit || canCreate) && (
                   <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                     {canEdit && (
-                      <button onClick={() => openEdit(m)} style={{ padding: '5px 10px', background: '#EAE6D8', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
+                      <button onClick={() => openEdit(m)} style={{ padding: '5px 10px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
                     )}
                     <button onClick={() => handleDelete(m)} style={{ padding: '5px 10px', background: '#fef2f2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#ef4444' }}>🗑</button>
                   </div>

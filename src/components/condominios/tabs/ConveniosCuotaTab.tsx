@@ -16,10 +16,10 @@ interface Props {
 }
 
 const ESTADO_CFG: Record<EstadoConvenioCuota, { label: string; bg: string; color: string }> = {
-  activo:      { label: 'Activo',      bg: '#D9E2DC', color: '#102622' },
+  activo:      { label: 'Activo',      bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
   cumplido:    { label: 'Cumplido',    bg: '#d1fae5', color: '#065f46' },
   incumplido:  { label: 'Incumplido', bg: '#fee2e2', color: '#ef4444' },
-  anulado:     { label: 'Anulado',    bg: '#EAE6D8', color: '#7E9389' },
+  anulado:     { label: 'Anulado',    bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
 
 export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, companyId, moneda, autorNombre, canCreate, canEdit, onRefresh }: Props) {
@@ -82,17 +82,17 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
   }
 
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Activos', val: activos, bg: '#EEF2EC', color: '#1B3B36' },
+          { label: 'Activos', val: activos, bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
           { label: 'Incumplidos', val: incumplidos, bg: '#fef2f2', color: '#ef4444' },
           { label: 'Cumplidos', val: convenios.filter(c => c.estado === 'cumplido').length, bg: '#f0fdf4', color: '#16a34a' },
-          { label: 'Total', val: convenios.length, bg: '#FAF7EF', color: '#3E5A4C' },
+          { label: 'Total', val: convenios.length, bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: k.color }}>{k.val}</div>
@@ -106,14 +106,14 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {(['', 'activo', 'cumplido', 'incumplido', 'anulado'] as (EstadoConvenioCuota | '')[]).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
-              style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#9C5733' : '#E1DDD0', background: filtroEstado === e ? '#F4EBE3' : 'white', color: filtroEstado === e ? '#9C5733' : '#7E9389' }}>
+              style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-accent-hover)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-accent-tint)' : 'white', color: filtroEstado === e ? 'var(--at-accent-hover)' : 'var(--at-ink-3)' }}>
               {e === '' ? 'Todos' : ESTADO_CFG[e].label}
             </button>
           ))}
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#9C5733', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nuevo convenio'}
           </button>
         )}
@@ -121,7 +121,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nuevo convenio de pago</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -145,7 +145,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
             </div>
             <div>
               <label style={lbl}>Cuota mensual</label>
-              <div style={{ ...inp, background: '#EAE6D8', color: montoC ? '#3E5A4C' : '#7E9389' }}>
+              <div style={{ ...inp, background: 'var(--at-chip)', color: montoC ? 'var(--at-ink-2)' : 'var(--at-ink-3)' }}>
                 {montoC ? `${moneda} ${montoC.toFixed(2)}` : 'Auto-calculado'}
               </div>
             </div>
@@ -163,7 +163,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#9C5733', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear convenio'}
           </button>
         </div>
@@ -171,7 +171,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
 
       {/* Lista */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>Sin convenios de pago registrados</div>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>Sin convenios de pago registrados</div>
       ) : (
         <div style={{ display: 'flex', gap: 12 }}>
           {/* Lista */}
@@ -182,19 +182,19 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
               const unidad = unidades.find(u => u.id === c.unidad_id)
               return (
                 <div key={c.id} onClick={() => setSelected(c === selected ? null : c)}
-                  style={{ background: selected?.id === c.id ? '#F4EBE3' : '#fff', border: `1.5px solid ${selected?.id === c.id ? '#B96A3F' : '#E1DDD0'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === c.id ? 'var(--at-accent-tint)' : '#fff', border: `1.5px solid ${selected?.id === c.id ? 'var(--at-accent)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{unidad?.nombre ?? c.unidad_nombre ?? '—'}</div>
-                      <div style={{ fontSize: 12, color: '#7E9389' }}>{c.descripcion}</div>
+                      <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>{c.descripcion}</div>
                     </div>
                     <span style={{ padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ flex: 1, background: '#E1DDD0', borderRadius: 20, height: 8, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', background: c.estado === 'cumplido' ? '#16a34a' : c.estado === 'incumplido' ? '#ef4444' : '#9C5733', width: `${pct}%`, borderRadius: 20, transition: 'width 0.3s' }} />
+                    <div style={{ flex: 1, background: 'var(--at-line)', borderRadius: 20, height: 8, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', background: c.estado === 'cumplido' ? '#16a34a' : c.estado === 'incumplido' ? '#ef4444' : 'var(--at-accent-hover)', width: `${pct}%`, borderRadius: 20, transition: 'width 0.3s' }} />
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink-2)', whiteSpace: 'nowrap' }}>
                       {c.cuotas_pagadas}/{c.num_cuotas} · {moneda} {c.monto_cuota.toFixed(2)}/mes
                     </span>
                   </div>
@@ -204,7 +204,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
           </div>
           {/* Detalle */}
           {selected && (
-            <div style={{ width: 260, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 260, flexShrink: 0, background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 14 }}>Detalle del convenio</div>
               {[
                 ['Monto total', `${moneda} ${selected.monto_total.toFixed(2)}`],
@@ -215,11 +215,11 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
                 ['Aprobado por', selected.aprobado_por ?? '—'],
               ].map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--at-chip)' }}>
-                  <span style={{ color: '#7E9389' }}>{k}</span>
-                  <span style={{ fontWeight: 600, color: '#3E5A4C' }}>{v}</span>
+                  <span style={{ color: 'var(--at-ink-3)' }}>{k}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--at-ink-2)' }}>{v}</span>
                 </div>
               ))}
-              {selected.notas && <div style={{ fontSize: 11, color: '#7E9389', marginTop: 8 }}>{selected.notas}</div>}
+              {selected.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 8 }}>{selected.notas}</div>}
               {canEdit && selected.estado === 'activo' && (
                 <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
                   <button onClick={() => registrarPago(selected)}

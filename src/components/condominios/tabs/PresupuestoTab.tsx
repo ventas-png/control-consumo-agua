@@ -128,20 +128,20 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
     }])
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Presupuesto Anual</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Presupuesto Anual</h2>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '12px', color: '#7E9389', fontWeight: 600 }}>Año:</span>
+          <span style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Año:</span>
           <select value={anio} onChange={e => setAnio(Number(e.target.value))}
-            style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontWeight: 700, color: '#15291F', background: 'white', cursor: 'pointer' }}>
+            style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)', background: 'var(--at-surface)', cursor: 'pointer' }}>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-          <button onClick={exportarPDF} style={{ padding: '6px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
+          <button onClick={exportarPDF} style={{ padding: '6px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
           <button onClick={exportarXlsx} style={{ padding: '6px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
         </div>
       </div>
@@ -149,15 +149,15 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
       {/* Resumen */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         {[
-          { label: 'Total presupuestado', value: `${moneda} ${totalPresupuestado.toFixed(0)}`,   icon: '📋', color: '#1B3B36' },
+          { label: 'Total presupuestado', value: `${moneda} ${totalPresupuestado.toFixed(0)}`,   icon: '📋', color: 'var(--at-primary)' },
           { label: 'Total ejecutado',     value: `${moneda} ${totalEjecutado.toFixed(0)}`,       icon: '💰', color: pct(totalEjecutado, totalPresupuestado) >= 100 ? '#ef4444' : '#10b981' },
-          { label: 'Disponible',          value: `${moneda} ${Math.max(0, totalPresupuestado - totalEjecutado).toFixed(0)}`, icon: '✅', color: '#B96A3F' },
+          { label: 'Disponible',          value: `${moneda} ${Math.max(0, totalPresupuestado - totalEjecutado).toFixed(0)}`, icon: '✅', color: 'var(--at-accent)' },
           { label: '% Ejecución',         value: `${pct(totalEjecutado, totalPresupuestado)}%`,  icon: '📈', color: barColor(pct(totalEjecutado, totalPresupuestado)) },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '16px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
@@ -166,9 +166,9 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
       <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
-            <tr style={{ background: '#FAF7EF' }}>
+            <tr style={{ background: 'var(--at-surface-2)' }}>
               {['Categoría', 'Presupuestado', 'Ejecutado', 'Varianza', '% Ejec.', ''].map(h => (
-                <th key={h} style={{ padding: '12px 14px', textAlign: h === 'Categoría' ? 'left' : 'right', fontSize: '11px', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
+                <th key={h} style={{ padding: '12px 14px', textAlign: h === 'Categoría' ? 'left' : 'right', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -183,7 +183,7 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
 
               if (editCat === cat) {
                 return (
-                  <tr key={cat} style={{ background: '#EEF2EC', borderBottom: '1px solid var(--at-primary-soft-2)' }}>
+                  <tr key={cat} style={{ background: 'var(--at-primary-tint)', borderBottom: '1px solid var(--at-primary-soft-2)' }}>
                     <td colSpan={6} style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <span style={{ fontWeight: 700 }}>{cl.icon} {cl.label}</span>
@@ -191,10 +191,10 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
                           onChange={e => setEditMonto(e.target.value)} placeholder={`Monto (${moneda})`} autoFocus />
                         <input style={{ ...inputStyle, flex: 1, minWidth: '150px' }} value={editNotas}
                           onChange={e => setEditNotas(e.target.value)} placeholder="Notas opcionales" />
-                        <button onClick={handleSave} disabled={saving} style={{ padding: '7px 14px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                        <button onClick={handleSave} disabled={saving} style={{ padding: '7px 14px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                           {saving ? '…' : 'Guardar'}
                         </button>
-                        <button onClick={() => setEditCat(null)} style={{ padding: '7px 12px', background: 'white', border: '1px solid var(--at-line)', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: '#7E9389' }}>✕</button>
+                        <button onClick={() => setEditCat(null)} style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>✕</button>
                       </div>
                     </td>
                   </tr>
@@ -202,31 +202,31 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
               }
 
               return (
-                <tr key={cat} style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF', borderBottom: '1px solid var(--at-chip)' }}>
+                <tr key={cat} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
                   <td style={{ padding: '12px 14px', fontWeight: 600 }}>{cl.icon} {cl.label}</td>
-                  <td style={{ padding: '12px 14px', textAlign: 'right', color: '#7E9389' }}>
-                    {presupuestado > 0 ? `${moneda} ${presupuestado.toFixed(0)}` : <span style={{ color: '#C7C2B0', fontSize: '12px' }}>—</span>}
+                  <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--at-ink-3)' }}>
+                    {presupuestado > 0 ? `${moneda} ${presupuestado.toFixed(0)}` : <span style={{ color: 'var(--at-line-strong)', fontSize: '12px' }}>—</span>}
                   </td>
-                  <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: ejecutado > 0 ? 700 : 400, color: ejecutado > 0 ? '#15291F' : '#C7C2B0' }}>
+                  <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: ejecutado > 0 ? 700 : 400, color: ejecutado > 0 ? 'var(--at-ink)' : 'var(--at-line-strong)' }}>
                     {ejecutado > 0 ? `${moneda} ${ejecutado.toFixed(0)}` : '—'}
                   </td>
-                  <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: presupuestado > 0 ? (varianza < 0 ? '#ef4444' : '#10b981') : '#C7C2B0' }}>
+                  <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: presupuestado > 0 ? (varianza < 0 ? '#ef4444' : '#10b981') : 'var(--at-line-strong)' }}>
                     {presupuestado > 0 ? `${varianza >= 0 ? '+' : ''}${moneda} ${varianza.toFixed(0)}` : '—'}
                   </td>
                   <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                     {presupuestado > 0 ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                        <div style={{ width: '60px', background: '#EAE6D8', borderRadius: '4px', height: '6px' }}>
+                        <div style={{ width: '60px', background: 'var(--at-chip)', borderRadius: '4px', height: '6px' }}>
                           <div style={{ width: `${Math.min(100, pcEjec)}%`, background: barColor(pcEjec), height: '6px', borderRadius: '4px' }} />
                         </div>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: barColor(pcEjec) }}>{pcEjec}%</span>
                       </div>
-                    ) : <span style={{ color: '#C7C2B0', fontSize: '12px' }}>—</span>}
+                    ) : <span style={{ color: 'var(--at-line-strong)', fontSize: '12px' }}>—</span>}
                   </td>
                   <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                     {canEdit && (
                       <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                        <button onClick={() => startEdit(cat)} style={{ padding: '3px 8px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                        <button onClick={() => startEdit(cat)} style={{ padding: '3px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                           {presupuestado > 0 ? '✏️' : '+ Asignar'}
                         </button>
                         {p && <button onClick={() => handleDelete(p.id)} style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
@@ -237,10 +237,10 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
               )
             })}
             {/* Total row */}
-            <tr style={{ background: '#FAF7EF', borderTop: '2px solid var(--at-line)' }}>
-              <td style={{ padding: '12px 14px', fontWeight: 800, color: '#15291F' }}>TOTAL</td>
-              <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: '#15291F' }}>{moneda} {totalPresupuestado.toFixed(0)}</td>
-              <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: '#15291F' }}>{moneda} {totalEjecutado.toFixed(0)}</td>
+            <tr style={{ background: 'var(--at-surface-2)', borderTop: '2px solid var(--at-line)' }}>
+              <td style={{ padding: '12px 14px', fontWeight: 800, color: 'var(--at-ink)' }}>TOTAL</td>
+              <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: 'var(--at-ink)' }}>{moneda} {totalPresupuestado.toFixed(0)}</td>
+              <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: 'var(--at-ink)' }}>{moneda} {totalEjecutado.toFixed(0)}</td>
               <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: totalPresupuestado - totalEjecutado < 0 ? '#ef4444' : '#10b981' }}>
                 {totalPresupuestado > 0 ? `${totalPresupuestado - totalEjecutado >= 0 ? '+' : ''}${moneda} ${(totalPresupuestado - totalEjecutado).toFixed(0)}` : '—'}
               </td>

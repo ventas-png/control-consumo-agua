@@ -103,8 +103,8 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Reporte de Deudores — Antigüedad de Saldos</div>
-          <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>{deudores.length} unidades con saldo pendiente</div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)' }}>Reporte de Deudores — Antigüedad de Saldos</div>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{deudores.length} unidades con saldo pendiente</div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={exportarExcelDeudores}
@@ -112,7 +112,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
             📊 Excel
           </button>
           <button onClick={exportarCSV}
-            style={{ padding: '6px 14px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+            style={{ padding: '6px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
             CSV
           </button>
         </div>
@@ -126,10 +126,10 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
           { label: '31–60 días', val: `${moneda} ${totales.t31_60.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#ea580c', bg: '#fff7ed' },
           { label: '61–90 días', val: `${moneda} ${totales.t61_90.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#dc2626', bg: '#fef2f2' },
           { label: '+90 días', val: `${moneda} ${totales.t90plus.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#991b1b', bg: '#fef2f2' },
-          { label: 'Unidades deudoras', val: String(deudores.length), color: '#3E5A4C', bg: '#FAF7EF' },
+          { label: 'Unidades deudoras', val: String(deudores.length), color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
-            <div style={{ fontSize: 10, color: '#7E9389' }}>{k.label}</div>
+            <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>
         ))}
@@ -137,8 +137,8 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
 
       {/* Barra proporcional por tramo */}
       {totales.total > 0 && (
-        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
-          <div style={{ fontSize: 11, color: '#7E9389', marginBottom: 6, fontWeight: 600 }}>Distribución de deuda por antigüedad</div>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 6, fontWeight: 600 }}>Distribución de deuda por antigüedad</div>
           <div style={{ display: 'flex', height: 16, borderRadius: 8, overflow: 'hidden', gap: 1 }}>
             {columnas.map(col => {
               const val = totales[col.key] as number
@@ -165,47 +165,47 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
 
       {/* Tabla */}
       {deudores.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: '#7E9389', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--at-ink-3)', fontSize: 13 }}>
           No hay unidades con saldo pendiente. ¡Excelente nivel de cobro!
         </div>
       ) : (
-        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ background: '#FAF7EF' }}>
-                <th style={{ padding: '9px 12px', textAlign: 'left', color: '#7E9389', fontWeight: 600 }}>Unidad</th>
+              <tr style={{ background: 'var(--at-surface-2)' }}>
+                <th style={{ padding: '9px 12px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600 }}>Unidad</th>
                 <th style={{ padding: '9px 12px', textAlign: 'right', color: '#d97706', fontWeight: 600 }}>0–30 días</th>
                 <th style={{ padding: '9px 12px', textAlign: 'right', color: '#ea580c', fontWeight: 600 }}>31–60 días</th>
                 <th style={{ padding: '9px 12px', textAlign: 'right', color: '#dc2626', fontWeight: 600 }}>61–90 días</th>
                 <th style={{ padding: '9px 12px', textAlign: 'right', color: '#991b1b', fontWeight: 600 }}>+90 días</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: '#3E5A4C', fontWeight: 700 }}>Total</th>
-                <th style={{ padding: '9px 12px', textAlign: 'center', color: '#7E9389', fontWeight: 600 }}>Cuotas</th>
+                <th style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--at-ink-2)', fontWeight: 700 }}>Total</th>
+                <th style={{ padding: '9px 12px', textAlign: 'center', color: 'var(--at-ink-3)', fontWeight: 600 }}>Cuotas</th>
                 <th style={{ padding: '9px 12px' }} />
               </tr>
             </thead>
             <tbody>
               {deudores.map((d, i) => (
                 <tr key={d.unidadId} style={{ borderTop: i > 0 ? '1px solid var(--at-chip)' : undefined, background: d.t90plus > 0 ? '#fef2f200' : undefined }}>
-                  <td style={{ padding: '9px 12px', fontWeight: 600, color: '#15291F' }}>{d.unidadNombre}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t0_30 > 0 ? '#d97706' : '#7E9389' }}>
+                  <td style={{ padding: '9px 12px', fontWeight: 600, color: 'var(--at-ink)' }}>{d.unidadNombre}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t0_30 > 0 ? '#d97706' : 'var(--at-ink-3)' }}>
                     {d.t0_30 > 0 ? `${moneda} ${d.t0_30.toFixed(2)}` : '—'}
                   </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t31_60 > 0 ? '#ea580c' : '#7E9389' }}>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t31_60 > 0 ? '#ea580c' : 'var(--at-ink-3)' }}>
                     {d.t31_60 > 0 ? `${moneda} ${d.t31_60.toFixed(2)}` : '—'}
                   </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t61_90 > 0 ? '#dc2626' : '#7E9389' }}>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t61_90 > 0 ? '#dc2626' : 'var(--at-ink-3)' }}>
                     {d.t61_90 > 0 ? `${moneda} ${d.t61_90.toFixed(2)}` : '—'}
                   </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: d.t90plus > 0 ? 700 : 400, color: d.t90plus > 0 ? '#991b1b' : '#7E9389' }}>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: d.t90plus > 0 ? 700 : 400, color: d.t90plus > 0 ? '#991b1b' : 'var(--at-ink-3)' }}>
                     {d.t90plus > 0 ? `${moneda} ${d.t90plus.toFixed(2)}` : '—'}
                   </td>
                   <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>
                     {moneda} {d.total.toFixed(2)}
                   </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'center', color: '#7E9389' }}>{d.cuotasCount}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'center', color: 'var(--at-ink-3)' }}>{d.cuotasCount}</td>
                   <td style={{ padding: '9px 12px', textAlign: 'right' }}>
                     <button onClick={() => cartaCobro(d)}
-                      style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid var(--at-primary)', background: '#EEF2EC', color: '#1B3B36', cursor: 'pointer', fontWeight: 600 }}>
+                      style={{ padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid var(--at-primary)', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', cursor: 'pointer', fontWeight: 600 }}>
                       🖨️ Carta
                     </button>
                   </td>
@@ -213,14 +213,14 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
               ))}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: '2px solid var(--at-line)', background: '#FAF7EF' }}>
+              <tr style={{ borderTop: '2px solid var(--at-line)', background: 'var(--at-surface-2)' }}>
                 <td style={{ padding: '9px 12px', fontWeight: 700 }}>TOTAL</td>
                 <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#d97706' }}>{moneda} {totales.t0_30.toFixed(2)}</td>
                 <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#ea580c' }}>{moneda} {totales.t31_60.toFixed(2)}</td>
                 <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>{moneda} {totales.t61_90.toFixed(2)}</td>
                 <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#991b1b' }}>{moneda} {totales.t90plus.toFixed(2)}</td>
                 <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>{moneda} {totales.total.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: '#7E9389' }}>
+                <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-ink-3)' }}>
                   {deudores.reduce((s, d) => s + d.cuotasCount, 0)}
                 </td>
                 <td />

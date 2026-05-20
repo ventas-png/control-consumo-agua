@@ -33,7 +33,7 @@ function diasHasta(fecha: string): number {
 function Kpi({ label, val, sub, color, bg }: { label: string; val: string; sub?: string; color: string; bg: string }) {
   return (
     <div style={{ flex: '1 1 120px', background: bg, border: `1px solid ${color}33`, borderRadius: 10, padding: '10px 14px' }}>
-      <div style={{ fontSize: 10, color: '#7E9389' }}>{label}</div>
+      <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{label}</div>
       <div style={{ fontSize: 16, fontWeight: 800, color, marginTop: 2 }}>{val}</div>
       {sub && <div style={{ fontSize: 10, color, opacity: 0.8, marginTop: 1 }}>{sub}</div>}
     </div>
@@ -131,7 +131,7 @@ export default function PanelDirectivoTab({
   const saludColor = puntajeSalud >= 80 ? '#16a34a' : puntajeSalud >= 60 ? '#d97706' : '#ef4444'
   const saludLabel = puntajeSalud >= 80 ? 'Óptimo' : puntajeSalud >= 60 ? 'Regular' : 'Crítico'
 
-  const SECTION = { background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, marginBottom: 14 }
+  const SECTION = { background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, marginBottom: 14 }
 
   const maxFinanciero = Math.max(cobradoMes, pendienteMes, gastosMes, 1)
 
@@ -199,13 +199,13 @@ export default function PanelDirectivoTab({
   return (
     <div style={{ padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Panel Directivo</div>
+        <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)' }}>Panel Directivo</div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={exportarInformePDF} style={{ padding: '5px 10px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📄 PDF</button>
+          <button onClick={exportarInformePDF} style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📄 PDF</button>
           <button onClick={exportarResumenXlsx} style={{ padding: '5px 10px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📊 Excel</button>
         </div>
       </div>
-      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 14 }}>Indicadores clave para la junta directiva · {hoy}</div>
+      <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 14 }}>Indicadores clave para la junta directiva · {hoy}</div>
 
       {/* Puntaje de salud */}
       <div style={{ background: `${saludColor}0f`, border: `1px solid ${saludColor}44`, borderRadius: 12, padding: 14, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -215,10 +215,10 @@ export default function PanelDirectivoTab({
         </div>
         <div>
           <div style={{ fontWeight: 700, fontSize: 15, color: saludColor }}>Índice de Salud del Condominio: {saludLabel}</div>
-          <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>
             Basado en cobranza, morosidad, ejecución presupuestal, tickets urgentes, normativa y convivencia
           </div>
-          <div style={{ height: 8, background: '#E1DDD0', borderRadius: 4, marginTop: 8, width: 240 }}>
+          <div style={{ height: 8, background: 'var(--at-line)', borderRadius: 4, marginTop: 8, width: 240 }}>
             <div style={{ height: 8, borderRadius: 4, background: saludColor, width: `${puntajeSalud}%`, transition: 'width 0.5s' }} />
           </div>
         </div>
@@ -236,7 +236,7 @@ export default function PanelDirectivoTab({
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         {/* Financiero */}
         <div style={SECTION}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>💰 Gestión Financiera</div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 10 }}>💰 Gestión Financiera</div>
           {[
             { label: 'Cobrado este mes', val: `${moneda} ${cobradoMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, semaforo: { valor: tasaCobranza, umbralBueno: 90, umbralMalo: 70 } },
             { label: 'Pendiente de cobro', val: `${moneda} ${pendienteMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, semaforo: { valor: pendienteMes, umbralBueno: 0, umbralMalo: 500, invertir: true } },
@@ -244,18 +244,18 @@ export default function PanelDirectivoTab({
             { label: 'Ejecución presupuestal', val: `${ejecucionPresupuesto.toFixed(1)}%`, semaforo: { valor: ejecucionPresupuesto, umbralBueno: 100, umbralMalo: 110, invertir: true } },
           ].map(row => (
             <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 12 }}>
-              <span style={{ color: '#7E9389', display: 'flex', alignItems: 'center' }}>
+              <span style={{ color: 'var(--at-ink-3)', display: 'flex', alignItems: 'center' }}>
                 <Semaforo valor={row.semaforo.valor} umbralBueno={row.semaforo.umbralBueno} umbralMalo={row.semaforo.umbralMalo} invertir={row.semaforo.invertir} />
                 {row.label}
               </span>
-              <span style={{ fontWeight: 700, color: '#15291F' }}>{row.val}</span>
+              <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{row.val}</span>
             </div>
           ))}
         </div>
 
         {/* Mantenimiento */}
         <div style={SECTION}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>🔧 Mantenimiento</div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 10 }}>🔧 Mantenimiento</div>
           {[
             { label: 'Tickets abiertos', val: String(ticketsAbiertos), semaforoVal: ticketsAbiertos, b: 5, m: 10, inv: true },
             { label: 'Tickets urgentes', val: String(ticketsUrgentes), semaforoVal: ticketsUrgentes, b: 0, m: 2, inv: true },
@@ -263,18 +263,18 @@ export default function PanelDirectivoTab({
             { label: 'Tiempo prom. resolución', val: avgResolucion > 0 ? `${avgResolucion} días` : '—', semaforoVal: avgResolucion, b: 3, m: 7, inv: true },
           ].map(row => (
             <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 12 }}>
-              <span style={{ color: '#7E9389', display: 'flex', alignItems: 'center' }}>
+              <span style={{ color: 'var(--at-ink-3)', display: 'flex', alignItems: 'center' }}>
                 <Semaforo valor={row.semaforoVal} umbralBueno={row.b} umbralMalo={row.m} invertir={row.inv} />
                 {row.label}
               </span>
-              <span style={{ fontWeight: 700, color: '#15291F' }}>{row.val}</span>
+              <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{row.val}</span>
             </div>
           ))}
         </div>
 
         {/* Ocupación y arrendamientos */}
         <div style={SECTION}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>🏠 Ocupación y Arrendamientos</div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 10 }}>🏠 Ocupación y Arrendamientos</div>
           {[
             { label: 'Unidades activas', val: String(totalUnidades) },
             { label: 'Contratos activos', val: String(contratosActivos) },
@@ -282,18 +282,18 @@ export default function PanelDirectivoTab({
             { label: 'Tasa de ocupación', val: `${totalUnidades > 0 ? Math.round((contratosActivos / totalUnidades) * 100) : 0}%` },
           ].map(row => (
             <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 12 }}>
-              <span style={{ color: '#7E9389', display: 'flex', alignItems: 'center' }}>
+              <span style={{ color: 'var(--at-ink-3)', display: 'flex', alignItems: 'center' }}>
                 {row.alert !== undefined && <Semaforo valor={row.alert ? 1 : 0} umbralBueno={0} umbralMalo={0.5} invertir />}
                 {row.label}
               </span>
-              <span style={{ fontWeight: 700, color: row.alert ? '#d97706' : '#15291F' }}>{row.val}</span>
+              <span style={{ fontWeight: 700, color: row.alert ? '#d97706' : 'var(--at-ink)' }}>{row.val}</span>
             </div>
           ))}
         </div>
 
         {/* Cumplimiento y convivencia */}
         <div style={SECTION}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>📋 Cumplimiento y Convivencia</div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 10 }}>📋 Cumplimiento y Convivencia</div>
           {[
             { label: 'Pólizas vigentes', val: String(polizasVigentes), semaforoVal: polizas.length > 0 ? polizasVigentes / polizas.length * 100 : 100, b: 100, m: 80 },
             { label: 'Pólizas vencen en 60d', val: String(polizasVencenProx60), semaforoVal: polizasVencenProx60, b: 0, m: 1, inv: true },
@@ -303,11 +303,11 @@ export default function PanelDirectivoTab({
             { label: 'Sugerencias pendientes', val: String(sugerenciasPendientes), semaforoVal: sugerenciasPendientes, b: 0, m: 5, inv: true },
           ].map(row => (
             <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 12 }}>
-              <span style={{ color: '#7E9389', display: 'flex', alignItems: 'center' }}>
+              <span style={{ color: 'var(--at-ink-3)', display: 'flex', alignItems: 'center' }}>
                 <Semaforo valor={row.semaforoVal} umbralBueno={row.b} umbralMalo={row.m} invertir={row.inv} />
                 {row.label}
               </span>
-              <span style={{ fontWeight: 700, color: '#15291F' }}>{row.val}</span>
+              <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{row.val}</span>
             </div>
           ))}
         </div>
@@ -315,32 +315,32 @@ export default function PanelDirectivoTab({
 
       {/* Gráfica: Financiero del mes */}
       <div style={{ ...SECTION, marginBottom: 14 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>📊 Financiero del mes — {mesActual}</div>
+        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 10 }}>📊 Financiero del mes — {mesActual}</div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', height: 80 }}>
           {[
             { label: 'Cobrado', val: cobradoMes, color: '#16a34a' },
             { label: 'Pendiente', val: pendienteMes, color: '#d97706' },
-            { label: 'Gasto', val: gastosMes, color: '#1B3B36' },
+            { label: 'Gasto', val: gastosMes, color: 'var(--at-primary)' },
           ].map(b => {
             const pct = maxFinanciero > 0 ? (b.val / maxFinanciero) * 64 : 0
             return (
               <div key={b.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flex: 1 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: b.color }}>{moneda} {b.val.toFixed(0)}</span>
-                <div style={{ width: '100%', background: '#EAE6D8', borderRadius: '4px 4px 0 0', display: 'flex', alignItems: 'flex-end', height: 64 }}>
+                <div style={{ width: '100%', background: 'var(--at-chip)', borderRadius: '4px 4px 0 0', display: 'flex', alignItems: 'flex-end', height: 64 }}>
                   <div style={{ width: '100%', background: b.color, height: `${pct}px`, borderRadius: '4px 4px 0 0', transition: 'height 0.4s', minHeight: b.val > 0 ? 4 : 0 }} />
                 </div>
-                <span style={{ fontSize: 10, color: '#7E9389', fontWeight: 600 }}>{b.label}</span>
+                <span style={{ fontSize: 10, color: 'var(--at-ink-3)', fontWeight: 600 }}>{b.label}</span>
               </div>
             )
           })}
           <div style={{ flex: 2, paddingLeft: 8, borderLeft: '1px solid var(--at-line)' }}>
-            <div style={{ fontSize: 11, color: '#7E9389', marginBottom: 4 }}>Ejecución presupuestal</div>
-            <div style={{ height: 8, background: '#E1DDD0', borderRadius: 4, marginBottom: 4 }}>
-              <div style={{ height: 8, borderRadius: 4, background: ejecucionPresupuesto > 100 ? '#ef4444' : '#1B3B36', width: `${Math.min(ejecucionPresupuesto, 100)}%`, transition: 'width 0.4s' }} />
+            <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 4 }}>Ejecución presupuestal</div>
+            <div style={{ height: 8, background: 'var(--at-line)', borderRadius: 4, marginBottom: 4 }}>
+              <div style={{ height: 8, borderRadius: 4, background: ejecucionPresupuesto > 100 ? '#ef4444' : 'var(--at-primary)', width: `${Math.min(ejecucionPresupuesto, 100)}%`, transition: 'width 0.4s' }} />
             </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ejecucionPresupuesto > 100 ? '#ef4444' : '#1B3B36' }}>{ejecucionPresupuesto.toFixed(1)}%</div>
-            <div style={{ fontSize: 10, color: '#7E9389', marginTop: 6 }}>Fondo reserva: {moneda} {saldoFondo.toFixed(0)}</div>
-            <div style={{ fontSize: 10, color: recargosPendientes > 0 ? '#ef4444' : '#7E9389' }}>Recargos mora: {moneda} {recargosPendientes.toFixed(0)}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ejecucionPresupuesto > 100 ? '#ef4444' : 'var(--at-primary)' }}>{ejecucionPresupuesto.toFixed(1)}%</div>
+            <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 6 }}>Fondo reserva: {moneda} {saldoFondo.toFixed(0)}</div>
+            <div style={{ fontSize: 10, color: recargosPendientes > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>Recargos mora: {moneda} {recargosPendientes.toFixed(0)}</div>
           </div>
         </div>
       </div>

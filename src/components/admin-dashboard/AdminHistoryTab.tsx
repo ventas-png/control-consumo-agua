@@ -70,8 +70,8 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
       accessor: r => r.cliente?.nombre ?? '',
       render: r => (
         <div>
-          <div style={{ fontWeight: 600, color: '#15291F' }}>{r.cliente?.nombre ?? '—'}</div>
-          <div style={{ fontSize: '12px', color: '#7E9389' }}>{r.cliente?.codigo ?? ''}</div>
+          <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{r.cliente?.nombre ?? '—'}</div>
+          <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{r.cliente?.codigo ?? ''}</div>
         </div>
       ),
     },
@@ -82,7 +82,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
       align: 'right',
       accessor: r => r.registro.consumo,
       render: r => (
-        <span style={{ color: '#1B3B36', fontWeight: 600 }}>
+        <span style={{ color: 'var(--at-primary)', fontWeight: 600 }}>
           {formatNumber(r.registro.consumo)} m³
         </span>
       ),
@@ -106,7 +106,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
       align: 'center',
       accessor: r => r.registro.estado,
       render: r => {
-        const style = ESTADO_STYLES[r.registro.estado] ?? { bg: '#EAE6D8', color: '#3E5A4C', label: r.registro.estado }
+        const style = ESTADO_STYLES[r.registro.estado] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-2)', label: r.registro.estado }
         return (
           <span style={{
             display: 'inline-block',
@@ -156,7 +156,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
             border: '2px solid var(--at-line)',
             fontSize: '14px',
             fontFamily: 'inherit',
-            background: 'white',
+            background: 'var(--at-surface)',
           }}
         >
           <option value="todos">Todos los estados</option>

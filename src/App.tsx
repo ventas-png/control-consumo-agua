@@ -51,8 +51,8 @@ function DualServicePortal({ currentUser, onLogout }: { currentUser: UserSession
     <div>
       <div style={{
         position: 'sticky', top: 0, zIndex: 200,
-        background: 'white',
-        borderBottom: '2px solid #e2e8f0',
+        background: 'var(--at-surface)',
+        borderBottom: '2px solid var(--at-line)',
         display: 'flex', justifyContent: 'center', gap: '6px',
         padding: '8px 16px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
@@ -61,8 +61,8 @@ function DualServicePortal({ currentUser, onLogout }: { currentUser: UserSession
           onClick={() => setActiveService('condominios')}
           style={{
             padding: '7px 22px', borderRadius: '20px', border: 'none',
-            background: activeService === 'condominios' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#f1f5f9',
-            color: activeService === 'condominios' ? 'white' : '#64748b',
+            background: activeService === 'condominios' ? 'linear-gradient(135deg, var(--at-accent), var(--at-accent))' : 'var(--at-chip)',
+            color: activeService === 'condominios' ? 'white' : 'var(--at-ink-3)',
             fontWeight: 600, fontSize: '13px', cursor: 'pointer',
             transition: 'all 0.18s',
           }}
@@ -71,8 +71,8 @@ function DualServicePortal({ currentUser, onLogout }: { currentUser: UserSession
           onClick={() => setActiveService('agua')}
           style={{
             padding: '7px 22px', borderRadius: '20px', border: 'none',
-            background: activeService === 'agua' ? 'linear-gradient(135deg, #0ea5e9, #0d9488)' : '#f1f5f9',
-            color: activeService === 'agua' ? 'white' : '#64748b',
+            background: activeService === 'agua' ? 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))' : 'var(--at-chip)',
+            color: activeService === 'agua' ? 'white' : 'var(--at-ink-3)',
             fontWeight: 600, fontSize: '13px', cursor: 'pointer',
             transition: 'all 0.18s',
           }}

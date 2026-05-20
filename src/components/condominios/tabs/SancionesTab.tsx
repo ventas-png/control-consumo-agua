@@ -24,8 +24,8 @@ const BLANK = {
 const ESTADO: Record<string, { bg: string; color: string; label: string }> = {
   pendiente: { bg: '#fef3c7', color: '#92400e', label: 'Pendiente' },
   pagado:    { bg: '#dcfce7', color: '#16a34a', label: 'Pagado' },
-  anulado:   { bg: '#EAE6D8', color: '#7E9389', label: 'Anulado' },
-  apelado:   { bg: '#D9E2DC', color: '#102622', label: 'En apelación' },
+  anulado:   { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Anulado' },
+  apelado:   { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'En apelación' },
 }
 
 export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
@@ -67,15 +67,15 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
   const vencidas = pendientes.filter(s => s.fecha_vencimiento && s.fecha_vencimiento < today)
   const totalPendiente = pendientes.reduce((s, x) => s + x.monto, 0)
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Sanciones</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Sanciones</h2>
         {canCreate && !showForm && (
           <button onClick={() => setShowForm(true)}
-            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nueva Sanción
           </button>
         )}
@@ -84,32 +84,32 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Total',            value: String(sanciones.length),              color: '#15291F' },
+          { label: 'Total',            value: String(sanciones.length),              color: 'var(--at-ink)' },
           { label: 'Pendientes',       value: String(pendientes.length),             color: '#f59e0b' },
           { label: 'Monto pendiente',  value: `${moneda} ${totalPendiente.toFixed(2)}`, color: '#ef4444' },
           { label: 'Vencidas',         value: String(vencidas.length),              color: '#ef4444' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nueva Sanción</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Unidad *</label>
               <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">— Seleccionar —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Infracción relacionada</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Infracción relacionada</label>
               <select style={inputStyle} value={form.infraccion_id} onChange={e => setF('infraccion_id', e.target.value)}>
                 <option value="">— Ninguna —</option>
                 {infracciones.filter(i => !form.unidad_id || i.unidad_id === form.unidad_id).map(i => (
@@ -118,33 +118,33 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Concepto *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Concepto *</label>
               <input style={inputStyle} value={form.concepto} onChange={e => setF('concepto', e.target.value)} placeholder="Ej: Multa por ruido nocturno" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Monto ({moneda}) *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Monto ({moneda}) *</label>
               <input style={inputStyle} type="number" min="0" step="0.01" value={form.monto} onChange={e => setF('monto', parseFloat(e.target.value) || 0)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha emisión</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha emisión</label>
               <input style={inputStyle} type="date" value={form.fecha_emision} onChange={e => setF('fecha_emision', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha vencimiento</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha vencimiento</label>
               <input style={inputStyle} type="date" value={form.fecha_vencimiento} onChange={e => setF('fecha_vencimiento', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Observaciones</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Observaciones</label>
               <input style={inputStyle} value={form.observaciones} onChange={e => setF('observaciones', e.target.value)} placeholder="Opcional" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
               Cancelar
             </button>
           </div>
@@ -156,23 +156,23 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
         {(['todos', 'pendiente', 'pagado', 'apelado', 'anulado'] as const).map(f => (
           <button key={f} onClick={() => setFiltro(f)}
             style={{ padding: '5px 12px', border: '1.5px solid', borderRadius: '20px', fontSize: '12px', fontWeight: filtro === f ? 700 : 500, cursor: 'pointer',
-              borderColor: filtro === f ? '#1B3B36' : '#E1DDD0',
-              background: filtro === f ? '#D9E2DC' : 'white',
-              color: filtro === f ? '#102622' : '#7E9389' }}>
+              borderColor: filtro === f ? 'var(--at-primary)' : 'var(--at-line)',
+              background: filtro === f ? 'var(--at-primary-soft)' : 'white',
+              color: filtro === f ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>
             {f === 'todos' ? 'Todos' : ESTADO[f]?.label ?? f}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay sanciones.</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay sanciones.</div>
       ) : (
         <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: '#FAF7EF' }}>
+              <tr style={{ background: 'var(--at-surface-2)' }}>
                 {['Unidad', 'Concepto', 'Monto', 'Emisión', 'Vencimiento', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -181,12 +181,12 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
                 const est = ESTADO[s.estado]
                 const vencida = s.estado === 'pendiente' && s.fecha_vencimiento && s.fecha_vencimiento < today
                 return (
-                  <tr key={s.id} style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF', borderBottom: '1px solid var(--at-chip)' }}>
+                  <tr key={s.id} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>{s.unidad_nombre ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#3E5A4C' }}>{s.concepto}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-2)' }}>{s.concepto}</td>
                     <td style={{ padding: '10px 12px', fontWeight: 700, color: '#ef4444' }}>{moneda} {s.monto.toFixed(2)}</td>
-                    <td style={{ padding: '10px 12px', color: '#7E9389', fontSize: '12px' }}>{s.fecha_emision}</td>
-                    <td style={{ padding: '10px 12px', fontSize: '12px', fontWeight: vencida ? 700 : 400, color: vencida ? '#ef4444' : '#7E9389' }}>
+                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', fontSize: '12px' }}>{s.fecha_emision}</td>
+                    <td style={{ padding: '10px 12px', fontSize: '12px', fontWeight: vencida ? 700 : 400, color: vencida ? '#ef4444' : 'var(--at-ink-3)' }}>
                       {s.fecha_vencimiento ?? '—'}{vencida ? ' ⚠️' : ''}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
@@ -202,11 +202,11 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
                             Pagado
                           </button>
                           <button onClick={() => cambiarEstado(s.id, 'apelado')}
-                            style={{ padding: '3px 7px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+                            style={{ padding: '3px 7px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
                             Apelar
                           </button>
                           <button onClick={() => cambiarEstado(s.id, 'anulado', '¿Anular sanción?')}
-                            style={{ padding: '3px 7px', background: '#EAE6D8', color: '#7E9389', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+                            style={{ padding: '3px 7px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
                             Anular
                           </button>
                         </div>

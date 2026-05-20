@@ -17,7 +17,7 @@ function fmt(n: number) { return n.toLocaleString('es-CR', { minimumFractionDigi
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: '28px', pageBreakInside: 'avoid' }}>
-      <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 800, color: '#15291F', borderBottom: '2px solid var(--at-line)', paddingBottom: '6px' }}>{title}</h3>
+      <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 800, color: 'var(--at-ink)', borderBottom: '2px solid var(--at-line)', paddingBottom: '6px' }}>{title}</h3>
       {children}
     </div>
   )
@@ -27,9 +27,9 @@ function KpiGrid({ items }: { items: { label: string; value: string; color?: str
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
       {items.map(k => (
-        <div key={k.label} style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: k.color ?? '#15291F' }}>{k.value}</div>
-          <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
+        <div key={k.label} style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
+          <div style={{ fontSize: '18px', fontWeight: 800, color: k.color ?? 'var(--at-ink)' }}>{k.value}</div>
+          <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
         </div>
       ))}
     </div>
@@ -86,11 +86,11 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
       {/* Header — print trigger */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Reportes Ejecutivos</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>Generado: {printDate}</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Reportes Ejecutivos</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>Generado: {printDate}</p>
         </div>
         <button onClick={() => window.print()}
-          style={{ padding: '8px 20px', background: '#15291F', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+          style={{ padding: '8px 20px', background: 'var(--at-ink)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
           🖨️ Imprimir / PDF
         </button>
       </div>
@@ -98,16 +98,16 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
       {/* Print header (hidden on screen) */}
       <div className="print-only" style={{ display: 'none', marginBottom: '20px' }}>
         <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800 }}>{proyectoNombre ?? 'Condominio'} — Reporte Ejecutivo</h1>
-        <p style={{ margin: '4px 0 0', color: '#7E9389', fontSize: '13px' }}>{printDate}</p>
+        <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13px' }}>{printDate}</p>
       </div>
 
       {/* 1. Resumen General */}
       <Section title="1. Resumen General">
         <KpiGrid items={[
-          { label: 'Período',          value: periodoActual,                              color: '#1B3B36' },
+          { label: 'Período',          value: periodoActual,                              color: 'var(--at-primary)' },
           { label: 'Cuotas pendientes',value: String(cuotasPendientes),                  color: '#f59e0b' },
           { label: 'Cuotas morosas',   value: String(cuotasMorosas),                     color: '#ef4444' },
-          { label: 'Tickets abiertos', value: String(ticketsAbiertos + ticketsEnProceso), color: ticketsUrgentes > 0 ? '#ef4444' : '#15291F' },
+          { label: 'Tickets abiertos', value: String(ticketsAbiertos + ticketsEnProceso), color: ticketsUrgentes > 0 ? '#ef4444' : 'var(--at-ink)' },
           { label: 'Contratos activos',value: String(contratosActivos),                  color: '#10b981' },
         ]} />
       </Section>
@@ -119,7 +119,7 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
           { label: 'Por cobrar',         value: `${moneda} ${fmt(montoPendiente)}`,   color: '#f59e0b' },
           { label: 'Cuotas pagadas',     value: String(cuotasPagadas),                color: '#10b981' },
           { label: `Gastos ${currentYear}`, value: `${moneda} ${fmt(totalGastosAnio)}`, color: '#ef4444' },
-          { label: 'Presupuesto anual',  value: `${moneda} ${fmt(totalPresupuesto)}`, color: '#1B3B36' },
+          { label: 'Presupuesto anual',  value: `${moneda} ${fmt(totalPresupuesto)}`, color: 'var(--at-primary)' },
           { label: '% Ejecución ppto.',  value: `${pctEjec}%`,                        color: pctEjec >= 100 ? '#ef4444' : pctEjec >= 80 ? '#f59e0b' : '#10b981' },
         ]} />
 
@@ -127,18 +127,18 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
           <div style={{ marginTop: '14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
-                <tr style={{ background: '#FAF7EF' }}>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>Categoría</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>Gasto {currentYear}</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>% del Total</th>
+                <tr style={{ background: 'var(--at-surface-2)' }}>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>Categoría</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>Gasto {currentYear}</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-ink-3)', borderBottom: '1px solid var(--at-line)' }}>% del Total</th>
                 </tr>
               </thead>
               <tbody>
                 {topCategorias.map(([cat, monto], i) => (
-                  <tr key={cat} style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF' }}>
-                    <td style={{ padding: '8px 12px', color: '#15291F', textTransform: 'capitalize' }}>{cat}</td>
+                  <tr key={cat} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--at-ink)', textTransform: 'capitalize' }}>{cat}</td>
                     <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>{moneda} {fmt(monto)}</td>
-                    <td style={{ padding: '8px 12px', textAlign: 'right', color: '#7E9389' }}>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--at-ink-3)' }}>
                       {totalGastosAnio > 0 ? `${Math.round((monto / totalGastosAnio) * 100)}%` : '—'}
                     </td>
                   </tr>
@@ -153,18 +153,18 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
       <Section title="3. Mantenimiento">
         <KpiGrid items={[
           { label: 'Abiertos',       value: String(ticketsAbiertos),   color: '#f59e0b' },
-          { label: 'En proceso',     value: String(ticketsEnProceso),  color: '#1B3B36' },
+          { label: 'En proceso',     value: String(ticketsEnProceso),  color: 'var(--at-primary)' },
           { label: 'Resueltos/Cerrados', value: String(ticketsResueltos), color: '#10b981' },
           { label: 'Urgentes activos',   value: String(ticketsUrgentes),  color: ticketsUrgentes > 0 ? '#ef4444' : '#10b981' },
-          { label: 'Costo acumulado',    value: `${moneda} ${fmt(costoTickets)}`, color: '#B96A3F' },
+          { label: 'Costo acumulado',    value: `${moneda} ${fmt(costoTickets)}`, color: 'var(--at-accent)' },
         ]} />
       </Section>
 
       {/* 4. Ocupación y Visitas */}
       <Section title="4. Ocupación y Visitas">
         <KpiGrid items={[
-          { label: 'Visitantes este mes',  value: String(visitantesMes.length),  color: '#1B3B36' },
-          { label: 'Visitantes histórico', value: String(visitantesTotal),        color: '#7E9389' },
+          { label: 'Visitantes este mes',  value: String(visitantesMes.length),  color: 'var(--at-primary)' },
+          { label: 'Visitantes histórico', value: String(visitantesTotal),        color: 'var(--at-ink-3)' },
         ]} />
       </Section>
 
@@ -173,7 +173,7 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
         <KpiGrid items={[
           { label: 'Contratos activos',     value: String(contratosActivos),   color: '#10b981' },
           { label: 'Vencen en 30 días',     value: String(contratosPorVencer), color: contratosPorVencer > 0 ? '#ef4444' : '#10b981' },
-          { label: 'Contratos vencidos/term.', value: String(contratos.filter(c => c.estado !== 'activo').length), color: '#7E9389' },
+          { label: 'Contratos vencidos/term.', value: String(contratos.filter(c => c.estado !== 'activo').length), color: 'var(--at-ink-3)' },
         ]} />
       </Section>
 

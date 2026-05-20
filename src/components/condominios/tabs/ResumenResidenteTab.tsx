@@ -22,9 +22,9 @@ const ESTADO_CUOTA_CFG: Record<string, { color: string; bg: string; label: strin
 }
 
 const ESTADO_TICKET_CFG: Record<string, { color: string; bg: string }> = {
-  abierto:    { color: '#7E9389', bg: '#FAF7EF' },
+  abierto:    { color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)' },
   en_proceso: { color: '#d97706', bg: '#fef3c7' },
-  resuelto:   { color: '#1B3B36', bg: '#EEF2EC' },
+  resuelto:   { color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
   cerrado:    { color: '#16a34a', bg: '#dcfce7' },
 }
 
@@ -115,16 +115,16 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Resumen del Residente</div>
-          <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>{proyectoNombre ?? 'Condominio'} — vista consolidada</div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)' }}>Resumen del Residente</div>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{proyectoNombre ?? 'Condominio'} — vista consolidada</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <select value={unidadId} onChange={e => setUnidadId(e.target.value)}
-            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, background: '#fff', fontWeight: 600 }}>
+            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, background: 'var(--at-surface)', fontWeight: 600 }}>
             {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
           </select>
           <button onClick={imprimir}
-            style={{ padding: '6px 14px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            style={{ padding: '6px 14px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             🖨️ Imprimir
           </button>
         </div>
@@ -138,7 +138,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
             <div style={{ fontSize: 11, color: '#dc2626', marginTop: 2 }}>{pendientes.length} cuota{pendientes.length > 1 ? 's' : ''} por regularizar</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 11, color: '#7E9389' }}>Saldo pendiente</div>
+            <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Saldo pendiente</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#ef4444' }}>{moneda} {saldoPendiente.toFixed(2)}</div>
           </div>
         </div>
@@ -155,14 +155,14 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
       {/* Resumen cards */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
-          { label: 'Unidad', val: unidad?.nombre ?? '—', color: '#15291F', bg: '#FAF7EF' },
-          { label: 'Cuota este mes', val: cuotaMes ? ESTADO_CUOTA_CFG[cuotaMes.estado]?.label ?? cuotaMes.estado : 'Sin cuota', color: cuotaMes ? (ESTADO_CUOTA_CFG[cuotaMes.estado]?.color ?? '#7E9389') : '#7E9389', bg: cuotaMes ? (ESTADO_CUOTA_CFG[cuotaMes.estado]?.bg ?? '#FAF7EF') : '#FAF7EF' },
+          { label: 'Unidad', val: unidad?.nombre ?? '—', color: 'var(--at-ink)', bg: 'var(--at-surface-2)' },
+          { label: 'Cuota este mes', val: cuotaMes ? ESTADO_CUOTA_CFG[cuotaMes.estado]?.label ?? cuotaMes.estado : 'Sin cuota', color: cuotaMes ? (ESTADO_CUOTA_CFG[cuotaMes.estado]?.color ?? 'var(--at-ink-3)') : 'var(--at-ink-3)', bg: cuotaMes ? (ESTADO_CUOTA_CFG[cuotaMes.estado]?.bg ?? 'var(--at-surface-2)') : 'var(--at-surface-2)' },
           { label: 'Recargos pend.', val: `${moneda} ${saldoRecargos.toFixed(2)}`, color: saldoRecargos > 0 ? '#d97706' : '#16a34a', bg: saldoRecargos > 0 ? '#fef3c7' : '#dcfce7' },
           { label: 'Tickets activos', val: String(ticketsUnidad.length), color: ticketsUnidad.length > 0 ? '#d97706' : '#16a34a', bg: ticketsUnidad.length > 0 ? '#fef3c7' : '#dcfce7' },
-          { label: 'Reservas próx.', val: String(reservasUnidad.length), color: '#1B3B36', bg: '#EEF2EC' },
+          { label: 'Reservas próx.', val: String(reservasUnidad.length), color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '8px 12px' }}>
-            <div style={{ fontSize: 10, color: '#7E9389' }}>{k.label}</div>
+            <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>
         ))}
@@ -170,20 +170,20 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         {/* Cuotas */}
-        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>Cuotas — Últimos 12 meses</div>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 12 }}>Cuotas — Últimos 12 meses</div>
           {cuotasUnidad.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: '#7E9389', fontSize: 12 }}>Sin cuotas registradas</div>
+            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--at-ink-3)', fontSize: 12 }}>Sin cuotas registradas</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {cuotasUnidad.map(c => {
-                const cfg = ESTADO_CUOTA_CFG[c.estado] ?? { color: '#3E5A4C', bg: '#EAE6D8', label: c.estado }
+                const cfg = ESTADO_CUOTA_CFG[c.estado] ?? { color: 'var(--at-ink-2)', bg: 'var(--at-chip)', label: c.estado }
                 return (
                   <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     padding: '7px 10px', background: cfg.bg, borderRadius: 8, border: `1px solid ${cfg.color}22` }}>
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#15291F' }}>{c.concepto}</div>
-                      <div style={{ fontSize: 10, color: '#7E9389' }}>Período {c.periodo}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink)' }}>{c.concepto}</div>
+                      <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>Período {c.periodo}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: cfg.color }}>{moneda} {c.monto.toFixed(2)}</div>
@@ -200,11 +200,11 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Recargos pendientes */}
           {recargosUnidad.length > 0 && (
-            <div style={{ background: '#fff', border: '1px solid #fde68a', borderRadius: 12, padding: 14 }}>
+            <div style={{ background: 'var(--at-surface)', border: '1px solid #fde68a', borderRadius: 12, padding: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#d97706', marginBottom: 10 }}>⚡ Recargos por mora</div>
               {recargosUnidad.map(r => (
                 <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #fef3c7' }}>
-                  <div style={{ fontSize: 12, color: '#3E5A4C' }}>{r.motivo ?? r.tipo}</div>
+                  <div style={{ fontSize: 12, color: 'var(--at-ink-2)' }}>{r.motivo ?? r.tipo}</div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#d97706' }}>{moneda} {r.monto_calculado.toFixed(2)}</div>
                 </div>
               ))}
@@ -212,18 +212,18 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
           )}
 
           {/* Tickets activos */}
-          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>🔧 Mis Solicitudes de Mantenimiento</div>
+          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 10 }}>🔧 Mis Solicitudes de Mantenimiento</div>
             {ticketsUnidad.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '16px 0', color: '#7E9389', fontSize: 12 }}>Sin solicitudes activas</div>
+              <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--at-ink-3)', fontSize: 12 }}>Sin solicitudes activas</div>
             ) : (
               ticketsUnidad.map(t => {
-                const cfg = ESTADO_TICKET_CFG[t.estado] ?? { color: '#3E5A4C', bg: '#EAE6D8' }
+                const cfg = ESTADO_TICKET_CFG[t.estado] ?? { color: 'var(--at-ink-2)', bg: 'var(--at-chip)' }
                 return (
                   <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     padding: '7px 10px', background: cfg.bg, borderRadius: 8, marginBottom: 6, border: `1px solid ${cfg.color}22` }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#15291F', flex: 1 }}>{t.titulo}</div>
-                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'white', color: cfg.color, fontWeight: 600, flexShrink: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink)', flex: 1 }}>{t.titulo}</div>
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'var(--at-surface)', color: cfg.color, fontWeight: 600, flexShrink: 0 }}>
                       {t.estado.replace('_', ' ')}
                     </span>
                   </div>
@@ -233,15 +233,15 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
           </div>
 
           {/* Reservas próximas */}
-          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>📅 Mis Reservas Próximas</div>
+          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 10 }}>📅 Mis Reservas Próximas</div>
             {reservasUnidad.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '16px 0', color: '#7E9389', fontSize: 12 }}>Sin reservas próximas</div>
+              <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--at-ink-3)', fontSize: 12 }}>Sin reservas próximas</div>
             ) : (
               reservasUnidad.map(r => (
-                <div key={r.id} style={{ padding: '7px 10px', background: '#EEF2EC', borderRadius: 8, marginBottom: 6, border: '1px solid var(--at-primary-soft-2)' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#102622' }}>{r.amenidad_nombre ?? 'Amenidad'}</div>
-                  <div style={{ fontSize: 11, color: '#2F5D4F', marginTop: 2 }}>
+                <div key={r.id} style={{ padding: '7px 10px', background: 'var(--at-primary-tint)', borderRadius: 8, marginBottom: 6, border: '1px solid var(--at-primary-soft-2)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-primary-hover)' }}>{r.amenidad_nombre ?? 'Amenidad'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--at-primary-2)', marginTop: 2 }}>
                     {r.fecha} · {r.hora_inicio}–{r.hora_fin}
                     {r.num_invitados > 0 && <span style={{ marginLeft: 6 }}>👥 {r.num_invitados}</span>}
                   </div>
@@ -253,26 +253,26 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
       </div>
 
       {/* Anuncios */}
-      <div style={{ marginTop: 14, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>📋 Tablón de Anuncios</div>
+      <div style={{ marginTop: 14, background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 12 }}>📋 Tablón de Anuncios</div>
         {anunciosActivos.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '16px 0', color: '#7E9389', fontSize: 12 }}>Sin anuncios activos</div>
+          <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--at-ink-3)', fontSize: 12 }}>Sin anuncios activos</div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
             {anunciosActivos.map(a => {
               const isUrgente = a.tipo === 'urgente'
               return (
                 <div key={a.id} style={{ padding: '10px 14px', borderRadius: 10,
-                  border: `1px solid ${isUrgente ? '#fca5a5' : '#E1DDD0'}`,
-                  background: isUrgente ? '#fef2f2' : '#FAF7EF' }}>
+                  border: `1px solid ${isUrgente ? '#fca5a5' : 'var(--at-line)'}`,
+                  background: isUrgente ? '#fef2f2' : 'var(--at-surface-2)' }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
                     <span style={{ fontSize: 16 }}>{ANUNCIO_ICON[a.tipo] ?? '📢'}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: isUrgente ? '#ef4444' : '#15291F' }}>{a.titulo}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: isUrgente ? '#ef4444' : 'var(--at-ink)' }}>{a.titulo}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: '#3E5A4C', lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-2)', lineHeight: 1.5 }}>
                     {a.contenido.length > 100 ? a.contenido.slice(0, 100) + '…' : a.contenido}
                   </div>
-                  <div style={{ fontSize: 10, color: '#7E9389', marginTop: 4 }}>
+                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 4 }}>
                     {new Date(a.created_at).toLocaleDateString('es')}
                   </div>
                 </div>

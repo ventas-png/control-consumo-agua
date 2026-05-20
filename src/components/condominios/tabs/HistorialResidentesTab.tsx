@@ -14,15 +14,15 @@ interface Props {
 }
 
 const TIPO_STYLE: Record<string, { bg: string; color: string; label: string; icon: string }> = {
-  propietario:  { bg: '#F4EBE3', color: '#9C5733', label: 'Propietario',  icon: '🏠' },
-  arrendatario: { bg: '#D9E2DC', color: '#102622', label: 'Arrendatario', icon: '🔑' },
+  propietario:  { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', label: 'Propietario',  icon: '🏠' },
+  arrendatario: { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Arrendatario', icon: '🔑' },
   familiar:     { bg: '#dcfce7', color: '#16a34a', label: 'Familiar',     icon: '👨‍👩‍👧' },
-  otro:         { bg: '#EAE6D8', color: '#7E9389', label: 'Otro',         icon: '👤' },
+  otro:         { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Otro',         icon: '👤' },
 }
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   activo:   { bg: '#dcfce7', color: '#16a34a', label: 'Activo' },
-  anterior: { bg: '#EAE6D8', color: '#7E9389', label: 'Anterior' },
+  anterior: { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Anterior' },
 }
 
 const inputStyle: CSSProperties = {
@@ -116,13 +116,13 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '14px', marginBottom: '20px' }}>
         {[
           { label: 'Residentes Activos', value: activos, icon: '🏠', bg: '#f0fdf4', color: '#16a34a' },
-          { label: 'Anteriores', value: anteriores, icon: '📋', bg: '#EAE6D8', color: '#7E9389' },
-          { label: 'Total registros', value: historial.length, icon: '👥', bg: '#D9E2DC', color: '#102622' },
+          { label: 'Anteriores', value: anteriores, icon: '📋', bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
+          { label: 'Total registros', value: historial.length, icon: '👥', bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
             <div style={{ fontSize: '24px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '24px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '12px', color: '#7E9389', fontWeight: 600 }}>{k.label}</div>
+            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontWeight: 600 }}>{k.label}</div>
           </div>
         ))}
       </div>
@@ -130,7 +130,7 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         {canCreate && (
-          <button onClick={openNew} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+          <button onClick={openNew} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             + Nuevo residente
           </button>
         )}
@@ -152,68 +152,68 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar residente' : 'Nuevo residente'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Unidad</label>
               <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">— Sin unidad —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Nombre completo *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Nombre completo *</label>
               <input style={inputStyle} value={form.nombre_completo} onChange={e => setF('nombre_completo', e.target.value)} placeholder="Nombre y apellidos" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Tipo</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Tipo</label>
               <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
                 {Object.entries(TIPO_STYLE).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha desde *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha desde *</label>
               <input style={inputStyle} type="date" value={form.fecha_desde} onChange={e => setF('fecha_desde', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha hasta</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha hasta</label>
               <input style={inputStyle} type="date" value={form.fecha_hasta} onChange={e => setF('fecha_hasta', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Estado</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Estado</label>
               <select style={inputStyle} value={form.estado} onChange={e => setF('estado', e.target.value)}>
                 <option value="activo">Activo</option>
                 <option value="anterior">Anterior</option>
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Email</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Email</label>
               <input style={inputStyle} type="email" value={form.email} onChange={e => setF('email', e.target.value)} placeholder="correo@ejemplo.com" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Teléfono</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Teléfono</label>
               <input style={inputStyle} value={form.telefono} onChange={e => setF('telefono', e.target.value)} placeholder="+502 1234-5678" />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Notas</label>
               <input style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Referencias, observaciones" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
-            <button onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>
+            <button onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* Grouped list */}
       {Object.keys(grouped).length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '36px', marginBottom: '8px' }}>👥</div>
-          <p style={{ fontWeight: 600, color: '#7E9389' }}>Sin historial de residentes registrado</p>
+          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>Sin historial de residentes registrado</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -221,9 +221,9 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
             const unidad = unidades.find(u => u.id === unidadId)
             const activo = residentes.find(r => r.estado === 'activo')
             return (
-              <div key={unidadId} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
-                <div style={{ padding: '12px 16px', background: '#FAF7EF', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#15291F' }}>
+              <div key={unidadId} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ padding: '12px 16px', background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>
                     {unidad?.nombre ?? 'Sin unidad asignada'}
                   </div>
                   {activo && (
@@ -243,21 +243,21 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={{ fontWeight: 700, fontSize: '13px', color: '#15291F' }}>{h.nombre_completo}</span>
+                            <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{h.nombre_completo}</span>
                             <span style={{ padding: '1px 7px', borderRadius: '99px', fontSize: '10px', fontWeight: 700, background: ts.bg, color: ts.color }}>{ts.label}</span>
                             <span style={{ padding: '1px 7px', borderRadius: '99px', fontSize: '10px', fontWeight: 600, background: es.bg, color: es.color }}>{es.label}</span>
                           </div>
-                          <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                             {h.fecha_desde} → {h.fecha_hasta ?? 'presente'}
                             {h.telefono ? ` · ${h.telefono}` : ''}
                             {h.email ? ` · ${h.email}` : ''}
                           </div>
-                          {h.notas && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px', fontStyle: 'italic' }}>{h.notas}</div>}
+                          {h.notas && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px', fontStyle: 'italic' }}>{h.notas}</div>}
                         </div>
                         <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                           {canEdit && (
                             <>
-                              <button onClick={() => openEdit(h)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
+                              <button onClick={() => openEdit(h)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
                               {h.estado === 'activo' && (
                                 <button onClick={() => marcarAnterior(h)} title="Marcar como anterior" style={{ padding: '4px 8px', background: '#fef3c7', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>📤</button>
                               )}

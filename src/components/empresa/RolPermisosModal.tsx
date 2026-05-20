@@ -220,7 +220,7 @@ export function RolPermisosModal({
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{
-        background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '780px',
+        background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '780px',
         boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
         display: 'flex', flexDirection: 'column', maxHeight: '90vh',
       }}>
@@ -230,12 +230,12 @@ export function RolPermisosModal({
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '16px', color: '#15291F' }}>Roles y permisos</div>
-            <div style={{ fontSize: '13px', color: '#7E9389', marginTop: '2px' }}>{usuarioNombre}</div>
+            <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--at-ink)' }}>Roles y permisos</div>
+            <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{usuarioNombre}</div>
           </div>
           <button onClick={onClose} style={{
             background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: '20px', color: '#7E9389', padding: '4px 8px', borderRadius: '6px', lineHeight: 1,
+            fontSize: '20px', color: 'var(--at-ink-3)', padding: '4px 8px', borderRadius: '6px', lineHeight: 1,
           }}>×</button>
         </div>
 
@@ -247,7 +247,7 @@ export function RolPermisosModal({
             overflowY: 'auto', padding: '16px',
           }}>
             {loading ? (
-              <div style={{ color: '#7E9389', fontSize: '13px', textAlign: 'center', marginTop: '40px' }}>Cargando…</div>
+              <div style={{ color: 'var(--at-ink-3)', fontSize: '13px', textAlign: 'center', marginTop: '40px' }}>Cargando…</div>
             ) : (
               <>
                 <SectionHeader>Condominios — roles del sistema</SectionHeader>
@@ -281,14 +281,14 @@ export function RolPermisosModal({
                   <button
                     onClick={() => onOpenCustomEditor(null)}
                     style={{
-                      fontSize: '11px', fontWeight: 600, color: '#2F5D4F',
+                      fontSize: '11px', fontWeight: 600, color: 'var(--at-primary-2)',
                       background: 'transparent', border: '1px solid var(--at-accent-2)', borderRadius: '6px',
                       padding: '3px 10px', cursor: 'pointer',
                     }}
                   >+ Crear</button>
                 </div>
                 {customRoles.length === 0 ? (
-                  <div style={{ fontSize: '12px', color: '#7E9389', textAlign: 'center', padding: '14px 0' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', textAlign: 'center', padding: '14px 0' }}>
                     Sin roles personalizados.<br />Crea uno desde "Crear".
                   </div>
                 ) : (
@@ -313,7 +313,7 @@ export function RolPermisosModal({
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
             <SectionHeader>Permisos efectivos</SectionHeader>
             {selectedRoleIds.size === 0 ? (
-              <div style={{ fontSize: '13px', color: '#7E9389', textAlign: 'center', marginTop: '32px', lineHeight: '1.6' }}>
+              <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', textAlign: 'center', marginTop: '32px', lineHeight: '1.6' }}>
                 Sin roles asignados.<br />El usuario no tendrá<br />acceso a ningún módulo.
               </div>
             ) : (
@@ -343,15 +343,15 @@ export function RolPermisosModal({
           padding: '14px 24px', borderTop: '1px solid var(--at-line)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
         }}>
-          <div style={{ fontSize: '12px', color: error ? '#ef4444' : '#7E9389' }}>{error ?? ''}</div>
+          <div style={{ fontSize: '12px', color: error ? '#ef4444' : 'var(--at-ink-3)' }}>{error ?? ''}</div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={onClose} style={{
               padding: '8px 18px', borderRadius: '8px', border: '1px solid var(--at-line)',
-              background: '#fff', color: '#3E5A4C', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+              background: 'var(--at-surface)', color: 'var(--at-ink-2)', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
             }}>Cancelar</button>
             <button onClick={() => void handleSave()} disabled={saving || loading} style={{
               padding: '8px 20px', borderRadius: '8px', border: 'none',
-              background: saving ? '#577B69' : '#2F5D4F', color: '#fff',
+              background: saving ? 'var(--at-accent-2)' : 'var(--at-primary-2)', color: '#fff',
               fontWeight: 600, fontSize: '13px', cursor: saving ? 'default' : 'pointer',
             }}>{saving ? 'Guardando…' : 'Guardar roles'}</button>
           </div>
@@ -364,7 +364,7 @@ export function RolPermisosModal({
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      fontSize: '11px', fontWeight: 700, color: '#7E9389',
+      fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)',
       letterSpacing: '0.06em', marginBottom: '8px', textTransform: 'uppercase',
     }}>{children}</div>
   )
@@ -373,7 +373,7 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 function SubsectionHeader({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      fontSize: '11px', fontWeight: 700, color: '#3E5A4C',
+      fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-2)',
       letterSpacing: '0.04em', marginBottom: '4px', textTransform: 'uppercase',
       paddingBottom: '4px', borderBottom: '1px solid var(--at-line)',
     }}>{children}</div>
@@ -386,7 +386,7 @@ function PreviewRow({ label, level, count, total }: { label: string; level: 'com
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '7px 0', borderBottom: '1px solid var(--at-chip)',
     }}>
-      <span style={{ fontSize: '13px', color: '#3E5A4C', fontWeight: 500 }}>{label}</span>
+      <span style={{ fontSize: '13px', color: 'var(--at-ink-2)', fontWeight: 500 }}>{label}</span>
       <AccessBadge level={level} count={count} total={total} />
     </div>
   )
@@ -405,7 +405,7 @@ function RoleCard({
     <div style={{
       display: 'flex', flexDirection: 'column',
       width: '100%', marginBottom: '6px', borderRadius: '8px',
-      border: `1px solid ${checked ? role.color + '55' : '#E1DDD0'}`,
+      border: `1px solid ${checked ? role.color + '55' : 'var(--at-line)'}`,
       background: checked ? role.color + '12' : 'transparent',
       transition: 'border-color 0.15s, background 0.15s',
     }}>
@@ -418,7 +418,7 @@ function RoleCard({
           <span style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: '16px', height: '16px', borderRadius: '4px',
-            border: `2px solid ${checked ? role.color : '#C7C2B0'}`,
+            border: `2px solid ${checked ? role.color : 'var(--at-line-strong)'}`,
             background: checked ? role.color : 'transparent',
           }}>
             {checked && <span style={{ color: '#fff', fontSize: '11px', lineHeight: 1 }}>✓</span>}
@@ -431,10 +431,10 @@ function RoleCard({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: role.color, flexShrink: 0 }} />
-            <span style={{ fontWeight: 600, fontSize: '13px', color: '#15291F' }}>{role.name}</span>
+            <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--at-ink)' }}>{role.name}</span>
             {!role.is_system && (
               <span style={{
-                fontSize: '9px', fontWeight: 700, color: '#9C5733',
+                fontSize: '9px', fontWeight: 700, color: 'var(--at-accent-hover)',
                 background: 'rgba(156, 87, 51,0.1)', padding: '1px 5px', borderRadius: '4px',
                 letterSpacing: '0.04em', textTransform: 'uppercase',
               }}>Custom</span>
@@ -442,7 +442,7 @@ function RoleCard({
             {expiresAt && (
               <span style={{
                 fontSize: '9px', fontWeight: 700,
-                color: expired ? '#ef4444' : expiresSoon ? '#f59e0b' : '#1B3B36',
+                color: expired ? '#ef4444' : expiresSoon ? '#f59e0b' : 'var(--at-primary)',
                 background: expired ? 'rgba(239,68,68,0.1)' : expiresSoon ? 'rgba(245,158,11,0.1)' : 'rgba(27, 59, 54,0.1)',
                 padding: '1px 5px', borderRadius: '4px',
                 letterSpacing: '0.04em', textTransform: 'uppercase',
@@ -450,12 +450,12 @@ function RoleCard({
             )}
           </div>
           {role.description && (
-            <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px', lineHeight: '1.4' }}>{role.description}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px', lineHeight: '1.4' }}>{role.description}</div>
           )}
         </button>
         {!role.is_system && (
           <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-            <button onClick={onEdit} title="Editar" style={iconBtnStyle('#2F5D4F')}>✎</button>
+            <button onClick={onEdit} title="Editar" style={iconBtnStyle('var(--at-primary-2)')}>✎</button>
             <button onClick={onDelete} title="Eliminar" style={iconBtnStyle('#ef4444')}>🗑</button>
           </div>
         )}
@@ -465,7 +465,7 @@ function RoleCard({
           display: 'flex', alignItems: 'center', gap: '8px',
           padding: '0 11px 9px', borderTop: `1px dashed ${role.color}22`, paddingTop: '8px', marginTop: '0',
         }}>
-          <label style={{ fontSize: '11px', color: '#7E9389', fontWeight: 600 }}>Expira:</label>
+          <label style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Expira:</label>
           <input
             type="date"
             value={expiresAt ?? ''}
@@ -474,7 +474,7 @@ function RoleCard({
             style={{
               fontSize: '11px', padding: '3px 6px',
               border: '1px solid var(--at-line-strong)', borderRadius: '4px',
-              color: '#3E5A4C', background: '#fff',
+              color: 'var(--at-ink-2)', background: 'var(--at-surface)',
             }}
           />
           {expiresAt && (
@@ -483,13 +483,13 @@ function RoleCard({
               title="Quitar expiración (permanente)"
               style={{
                 fontSize: '10px', padding: '3px 7px', borderRadius: '4px',
-                border: '1px solid var(--at-line-strong)', background: '#fff', color: '#7E9389',
+                border: '1px solid var(--at-line-strong)', background: 'var(--at-surface)', color: 'var(--at-ink-3)',
                 cursor: 'pointer', fontWeight: 600,
               }}
             >Permanente</button>
           )}
           {!expiresAt && (
-            <span style={{ fontSize: '11px', color: '#7E9389' }}>(sin expiración)</span>
+            <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>(sin expiración)</span>
           )}
         </div>
       )}
@@ -519,7 +519,7 @@ function AccessBadge({ level, count, total }: { level: 'completo' | 'parcial' | 
     ? { color: '#22c55e', label: 'Completo' }
     : level === 'parcial'
       ? { color: '#f59e0b', label: `Parcial ${count}/${total}` }
-      : { color: '#7E9389', label: 'Sin acceso' }
+      : { color: 'var(--at-ink-3)', label: 'Sin acceso' }
   return (
     <span style={{
       fontSize: '11px', fontWeight: 600, color: cfg.color,

@@ -16,8 +16,8 @@ const ESTADOS_PRESENCIA: { value: EstadoPresencia; label: string; color: string;
   { value: 'presente', label: 'Presente', color: '#10b981', bg: '#d1fae5' },
   { value: 'ausente', label: 'Ausente', color: '#ef4444', bg: '#fee2e2' },
   { value: 'tardanza', label: 'Tardanza', color: '#f59e0b', bg: '#fef3c7' },
-  { value: 'permiso', label: 'Permiso', color: '#B96A3F', bg: '#F4EBE3' },
-  { value: 'vacaciones', label: 'Vacaciones', color: '#2F5D4F', bg: '#D9E2DC' },
+  { value: 'permiso', label: 'Permiso', color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
+  { value: 'vacaciones', label: 'Vacaciones', color: 'var(--at-primary-2)', bg: 'var(--at-primary-soft)' },
 ]
 
 export default function PresenciaPersonalTab({ registros, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
@@ -78,20 +78,20 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 14, color: '#3E5A4C' }}>Fecha:</span>
+          <span style={{ fontSize: 14, color: 'var(--at-ink-2)' }}>Fecha:</span>
           <input type="date" value={fechaFiltro} onChange={e => setFechaFiltro(e.target.value)}
             style={{ ...inp, width: 'auto', padding: '6px 10px' }} />
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Registrar persona'}
           </button>
         )}
@@ -105,15 +105,15 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
             <div style={{ fontSize: 11, color: s.color }}>{s.label}</div>
           </div>
         ))}
-        <div style={{ background: '#EAE6D8', borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 80 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#3E5A4C' }}>{registrosDia.length}</div>
-          <div style={{ fontSize: 11, color: '#7E9389' }}>Total</div>
+        <div style={{ background: 'var(--at-chip)', borderRadius: 8, padding: '8px 14px', textAlign: 'center', minWidth: 80 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-ink-2)' }}>{registrosDia.length}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Total</div>
         </div>
       </div>
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Registrar asistencia</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -156,7 +156,7 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
 
       {/* Lista del día */}
       {registrosDia.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           Sin registros para {fechaFiltro}
         </div>
       ) : (
@@ -172,18 +172,18 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
                 })()
               : null
             return (
-              <div key={r.id} style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={r.id} style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                   <span style={{ padding: '3px 10px', borderRadius: 10, background: est?.bg, color: est?.color, fontSize: 12, fontWeight: 600 }}>{est?.label}</span>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 14 }}>{r.nombre}</div>
-                    <div style={{ fontSize: 12, color: '#7E9389' }}>
+                    <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
                       {r.cargo && <span>{r.cargo} · </span>}
                       {r.hora_entrada && <span>Entrada: {r.hora_entrada}</span>}
                       {r.hora_salida && <span> · Salida: {r.hora_salida}</span>}
-                      {horasTotal && <span style={{ color: '#B96A3F' }}> · {horasTotal}</span>}
+                      {horasTotal && <span style={{ color: 'var(--at-accent)' }}> · {horasTotal}</span>}
                     </div>
-                    {r.observaciones && <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>{r.observaciones}</div>}
+                    {r.observaciones && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{r.observaciones}</div>}
                   </div>
                 </div>
                 {canEdit && (

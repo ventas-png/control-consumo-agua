@@ -154,11 +154,11 @@ export default function ExportacionTab({ cuotas, gastos, tickets, visitantes, un
 
   const cards: ExportCard[] = [
     {
-      icon: '💳', title: 'Cuotas', accentColor: '#102622', bg: '#EEF2EC', border: '#C2D2CA',
+      icon: '💳', title: 'Cuotas', accentColor: 'var(--at-primary-hover)', bg: 'var(--at-primary-tint)', border: 'var(--at-primary-soft-2)',
       desc: `${cuotasFiltradas.length} registros del período`,
       period: { value: periodo, onChange: setPeriodo, options: periodos },
       actions: [
-        { label: '📊 Excel', color: '#102622', onClick: exportCuotas },
+        { label: '📊 Excel', color: 'var(--at-primary-hover)', onClick: exportCuotas },
       ],
     },
     {
@@ -178,39 +178,39 @@ export default function ExportacionTab({ cuotas, gastos, tickets, visitantes, un
       ],
     },
     {
-      icon: '🔧', title: 'Tickets', accentColor: '#9C5733', bg: '#FAF1EA', border: '#EFE0D5',
+      icon: '🔧', title: 'Tickets', accentColor: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)', border: 'var(--at-accent-soft-2)',
       desc: `${tickets.length} tickets — ${tickets.filter(t => t.estado !== 'cerrado').length} activos`,
       actions: [
-        { label: '📊 Excel', color: '#9C5733', onClick: exportTickets },
+        { label: '📊 Excel', color: 'var(--at-accent-hover)', onClick: exportTickets },
         { label: '📄 PDF', color: '#4c1d95', onClick: pdfTickets },
       ],
     },
     {
-      icon: '🚪', title: 'Visitantes', accentColor: '#102622', bg: '#EEF2EC', border: '#C2D2CA',
+      icon: '🚪', title: 'Visitantes', accentColor: 'var(--at-primary-hover)', bg: 'var(--at-primary-tint)', border: 'var(--at-primary-soft-2)',
       desc: `${Math.min(visitantes.length, 5000)} registros — ${visitantes.filter(v => !v.hora_salida).length} en premisas`,
       actions: [
-        { label: '📊 Excel', color: '#102622', onClick: exportVisitantes },
+        { label: '📊 Excel', color: 'var(--at-primary-hover)', onClick: exportVisitantes },
       ],
     },
     {
-      icon: '🏠', title: 'Unidades', accentColor: '#577B69', bg: '#f0fdfa', border: '#99f6e4',
+      icon: '🏠', title: 'Unidades', accentColor: 'var(--at-accent-2)', bg: '#f0fdfa', border: '#99f6e4',
       desc: `${unidades.length} unidades — ${unidades.filter(u => u.activo).length} activas`,
       actions: [
-        { label: '📊 Excel', color: '#577B69', onClick: exportUnidades },
+        { label: '📊 Excel', color: 'var(--at-accent-2)', onClick: exportUnidades },
       ],
     },
     {
-      icon: '📊', title: 'Resumen Financiero', accentColor: '#3E5A4C', bg: '#FAF7EF', border: '#E1DDD0',
+      icon: '📊', title: 'Resumen Financiero', accentColor: 'var(--at-ink-2)', bg: 'var(--at-surface-2)', border: 'var(--at-line)',
       desc: 'Cuotas + Gastos en un solo libro (3 hojas)',
       actions: [
-        { label: '📊 Excel multi-hoja', color: '#3E5A4C', onClick: exportResumenFinanciero },
+        { label: '📊 Excel multi-hoja', color: 'var(--at-ink-2)', onClick: exportResumenFinanciero },
       ],
     },
   ]
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontSize: 13, color: '#7E9389', marginBottom: 20 }}>
+      <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginBottom: 20 }}>
         Exporta datos a <strong>Excel (.xlsx)</strong> o descarga reportes en <strong>PDF</strong> directamente desde el navegador.
       </div>
 
@@ -219,12 +219,12 @@ export default function ExportacionTab({ cuotas, gastos, tickets, visitantes, un
           <div key={card.title} style={{ background: card.bg, border: `1px solid ${card.border}`, borderRadius: 12, padding: 16 }}>
             <div style={{ fontSize: 24, marginBottom: 6 }}>{card.icon}</div>
             <div style={{ fontWeight: 700, fontSize: 14, color: card.accentColor, marginBottom: 4 }}>{card.title}</div>
-            <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 10 }}>{card.desc}</div>
+            <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 10 }}>{card.desc}</div>
             {card.period && (
               <select
                 value={card.period.value}
                 onChange={e => card.period!.onChange(e.target.value)}
-                style={{ width: '100%', padding: '5px 8px', border: `1px solid ${card.border}`, borderRadius: 6, fontSize: 11, marginBottom: 10, background: 'white' }}>
+                style={{ width: '100%', padding: '5px 8px', border: `1px solid ${card.border}`, borderRadius: 6, fontSize: 11, marginBottom: 10, background: 'var(--at-surface)' }}>
                 <option value="">Todos</option>
                 {card.period.options.map(o => <option key={o} value={o}>{o}</option>)}
               </select>

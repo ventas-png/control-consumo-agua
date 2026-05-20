@@ -17,15 +17,15 @@ interface Props {
 const ETAPAS: EtapaCobranzaJudicial[] = ['carta_notarial', 'juzgado', 'sentencia', 'ejecutado', 'archivado']
 const ETAPA_CFG: Record<EtapaCobranzaJudicial, { label: string; icon: string; color: string; bg: string }> = {
   carta_notarial: { label: 'Carta notarial', icon: '📬', color: '#d97706', bg: '#fef3c7' },
-  juzgado:        { label: 'En juzgado',     icon: '⚖️',  color: '#9C5733', bg: '#FAF1EA' },
-  sentencia:      { label: 'Sentencia',       icon: '📋', color: '#1B3B36', bg: '#D9E2DC' },
+  juzgado:        { label: 'En juzgado',     icon: '⚖️',  color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
+  sentencia:      { label: 'Sentencia',       icon: '📋', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
   ejecutado:      { label: 'Ejecutado',       icon: '✅', color: '#16a34a', bg: '#dcfce7' },
-  archivado:      { label: 'Archivado',       icon: '📁', color: '#7E9389', bg: '#EAE6D8' },
+  archivado:      { label: 'Archivado',       icon: '📁', color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 const ESTADO_CFG: Record<EstadoCobranzaJudicial, { label: string; bg: string; color: string }> = {
   activo:   { label: 'Activo',   bg: '#fef2f2', color: '#ef4444' },
   resuelto: { label: 'Resuelto', bg: '#dcfce7', color: '#16a34a' },
-  archivado:{ label: 'Archivado',bg: '#EAE6D8', color: '#7E9389' },
+  archivado:{ label: 'Archivado',bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
 
 const BLANK = {
@@ -92,7 +92,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
   }
 
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
@@ -102,7 +102,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
           { label: 'Casos activos', val: activos, bg: '#fef2f2', color: '#ef4444' },
           { label: 'Monto en litigio', val: `${moneda} ${montoTotal.toFixed(2)}`, bg: '#fff7ed', color: '#ea580c' },
           { label: 'Resueltos', val: cobranzas.filter(c => c.estado === 'resuelto').length, bg: '#dcfce7', color: '#16a34a' },
-          { label: 'Total casos', val: cobranzas.length, bg: '#FAF7EF', color: '#3E5A4C' },
+          { label: 'Total casos', val: cobranzas.length, bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: k.color }}>{k.val}</div>
@@ -116,7 +116,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
         <div style={{ display: 'flex', gap: 6 }}>
           {(['', 'activo', 'resuelto', 'archivado'] as (EstadoCobranzaJudicial | '')[]).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
-              style={{ padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#ef4444' : '#E1DDD0', background: filtroEstado === e ? '#fef2f2' : '#fff', color: filtroEstado === e ? '#ef4444' : '#7E9389' }}>
+              style={{ padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#ef4444' : 'var(--at-line)', background: filtroEstado === e ? '#fef2f2' : '#fff', color: filtroEstado === e ? '#ef4444' : 'var(--at-ink-3)' }}>
               {e === '' ? 'Todos' : ESTADO_CFG[e].label}
             </button>
           ))}
@@ -177,7 +177,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
 
       {/* Lista + Detalle */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>⚖️</div>
           Sin casos de cobranza judicial registrados
         </div>
@@ -191,14 +191,14 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
               const unidad = unidades.find(u => u.id === c.unidad_id)
               return (
                 <div key={c.id} onClick={() => setSelected(c === selected ? null : c)}
-                  style={{ background: selected?.id === c.id ? '#fff5f5' : '#fff', border: `1.5px solid ${selected?.id === c.id ? '#ef4444' : '#E1DDD0'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === c.id ? '#fff5f5' : '#fff', border: `1.5px solid ${selected?.id === c.id ? '#ef4444' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                     <div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
                         <span style={{ fontWeight: 700, fontSize: 14 }}>{unidad?.nombre ?? c.unidad_nombre ?? '—'}</span>
                         <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: es.bg, color: es.color }}>{es.label}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: '#7E9389' }}>
+                      <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
                         {moneda} {c.monto_adeudado.toFixed(2)}
                         {c.abogado && ` · ${c.abogado}`}
                         {c.expediente && ` · Exp. ${c.expediente}`}
@@ -213,13 +213,13 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
                       const current = i === etapaIdx && c.etapa !== 'archivado'
                       return (
                         <Fragment key={et}>
-                          <div style={{ width: 10, height: 10, borderRadius: '50%', background: current ? '#ef4444' : done ? '#fca5a5' : '#E1DDD0', border: current ? '2px solid #ef4444' : 'none', flexShrink: 0 }} />
-                          {i < 3 && <div style={{ flex: 1, height: 2, background: i < etapaIdx && c.etapa !== 'archivado' ? '#fca5a5' : '#E1DDD0' }} />}
+                          <div style={{ width: 10, height: 10, borderRadius: '50%', background: current ? '#ef4444' : done ? '#fca5a5' : 'var(--at-line)', border: current ? '2px solid #ef4444' : 'none', flexShrink: 0 }} />
+                          {i < 3 && <div style={{ flex: 1, height: 2, background: i < etapaIdx && c.etapa !== 'archivado' ? '#fca5a5' : 'var(--at-line)' }} />}
                         </Fragment>
                       )
                     })}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#7E9389', marginTop: 2, paddingRight: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--at-ink-3)', marginTop: 2, paddingRight: 4 }}>
                     {ETAPAS.slice(0, -1).map(et => <span key={et}>{ETAPA_CFG[et].label.split(' ')[0]}</span>)}
                   </div>
                 </div>
@@ -227,7 +227,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
             })}
           </div>
           {selected && (
-            <div style={{ width: 260, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 260, flexShrink: 0, background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 14 }}>Detalle del caso</div>
               {[
                 ['Unidad', unidades.find(u => u.id === selected.unidad_id)?.nombre ?? selected.unidad_nombre ?? '—'],
@@ -240,21 +240,21 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
                 ['Expediente', selected.expediente ?? '—'],
               ].map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--at-chip)' }}>
-                  <span style={{ color: '#7E9389' }}>{k}</span>
-                  <span style={{ fontWeight: 600, color: '#3E5A4C' }}>{v}</span>
+                  <span style={{ color: 'var(--at-ink-3)' }}>{k}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--at-ink-2)' }}>{v}</span>
                 </div>
               ))}
-              {selected.notas && <div style={{ fontSize: 11, color: '#7E9389', marginTop: 8, lineHeight: 1.4 }}>{selected.notas}</div>}
+              {selected.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 8, lineHeight: 1.4 }}>{selected.notas}</div>}
               {canEdit && selected.estado === 'activo' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
                   {selected.etapa !== 'ejecutado' && selected.etapa !== 'archivado' && (
                     <button onClick={() => avanzarEtapa(selected)}
-                      style={{ padding: '7px 0', background: '#9C5733', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '7px 0', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ▶ Avanzar etapa
                     </button>
                   )}
                   <button onClick={() => editarNotas(selected)}
-                    style={{ padding: '7px 0', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ padding: '7px 0', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     📝 Editar notas
                   </button>
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -263,7 +263,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
                       ✅ Resuelto
                     </button>
                     <button onClick={() => cambiarEstado(selected.id, 'archivado')}
-                      style={{ flex: 1, padding: '6px 0', background: '#EAE6D8', color: '#7E9389', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 11 }}>
+                      style={{ flex: 1, padding: '6px 0', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 11 }}>
                       📁 Archivar
                     </button>
                   </div>

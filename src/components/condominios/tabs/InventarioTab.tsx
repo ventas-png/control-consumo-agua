@@ -24,9 +24,9 @@ const CATEGORIAS: { value: CategoriaInventario; label: string; icon: string }[] 
 
 const ESTADO_CONFIG: Record<EstadoInventario, { label: string; color: string; bg: string }> = {
   disponible:    { label: 'Disponible',    color: '#10b981', bg: '#d1fae5' },
-  en_uso:        { label: 'En Uso',        color: '#1B3B36', bg: '#D9E2DC' },
+  en_uso:        { label: 'En Uso',        color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
   en_reparacion: { label: 'En Reparación', color: '#f59e0b', bg: '#fef3c7' },
-  dado_de_baja:  { label: 'Baja',          color: '#7E9389', bg: '#EAE6D8' },
+  dado_de_baja:  { label: 'Baja',          color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 
 const blank = (): Partial<ItemInventario> => ({
@@ -116,8 +116,8 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
 
   const catInfo = (c: CategoriaInventario) => CATEGORIAS.find(x => x.value === c) ?? CATEGORIAS[CATEGORIAS.length - 1]
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -143,11 +143,11 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Inventario</h2>
-          {valorTotal > 0 && <span style={{ fontSize: '12px', color: '#7E9389' }}>Valor en inventario activo: <strong style={{ color: '#1B3B36' }}>{moneda} {valorTotal.toFixed(2)}</strong></span>}
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Inventario</h2>
+          {valorTotal > 0 && <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Valor en inventario activo: <strong style={{ color: 'var(--at-primary)' }}>{moneda} {valorTotal.toFixed(2)}</strong></span>}
         </div>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Agregar Item
           </button>
         )}
@@ -155,8 +155,8 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>{editId ? 'Editar Item' : 'Nuevo Item'}</h3>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>{editId ? 'Editar Item' : 'Nuevo Item'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '12px' }}>
             <div>
               <label style={labelStyle}>Nombre *</label>
@@ -218,8 +218,8 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
           </div>
@@ -229,23 +229,23 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por nombre o ubicación…"
-          style={{ padding: '6px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: '#FAF7EF', minWidth: '200px' }} />
+          style={{ padding: '6px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface-2)', minWidth: '200px' }} />
         <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value as CategoriaInventario | 'todos')}
-          style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
+          style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: 'var(--at-surface-2)' }}>
           <option value="todos">Todas las categorías</option>
           {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
         </select>
         <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoInventario | 'todos')}
-          style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
+          style={{ padding: '6px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: 'var(--at-surface-2)' }}>
           <option value="todos">Todos los estados</option>
           {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
-        <span style={{ fontSize: '12px', color: '#7E9389' }}>{filtered.length} items</span>
+        <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{filtered.length} items</span>
       </div>
 
       {/* Grid de items */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>📦</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay items en el inventario</p>
         </div>
@@ -258,14 +258,14 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
             const venceProx = item.fecha_vencimiento && item.fecha_vencimiento >= hoy &&
               new Date(item.fecha_vencimiento).getTime() - Date.now() < 30 * 24 * 3600 * 1000
             return (
-              <div key={item.id} style={{ background: 'white', border: `1.5px solid ${stockAlerta ? '#fca5a5' : '#E1DDD0'}`, borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div key={item.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${stockAlerta ? '#fca5a5' : 'var(--at-line)'}`, borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ fontSize: '18px' }}>{cat.icon}</span>
-                      <span style={{ fontWeight: 700, color: '#15291F', fontSize: '14px' }}>{item.nombre}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--at-ink)', fontSize: '14px' }}>{item.nombre}</span>
                     </div>
-                    {item.ubicacion && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>📍 {item.ubicacion}</div>}
+                    {item.ubicacion && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>📍 {item.ubicacion}</div>}
                   </div>
                   <span style={{ padding: '3px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color, whiteSpace: 'nowrap' }}>
                     {est.label}
@@ -274,11 +274,11 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
 
                 <div style={{ display: 'flex', gap: '12px', fontSize: '13px' }}>
                   <div>
-                    <span style={{ color: stockAlerta ? '#ef4444' : '#15291F', fontWeight: 700 }}>{item.cantidad}</span>
-                    <span style={{ color: '#7E9389', fontSize: '11px' }}> {item.unidad_medida}</span>
+                    <span style={{ color: stockAlerta ? '#ef4444' : 'var(--at-ink)', fontWeight: 700 }}>{item.cantidad}</span>
+                    <span style={{ color: 'var(--at-ink-3)', fontSize: '11px' }}> {item.unidad_medida}</span>
                   </div>
                   {item.costo_unitario != null && (
-                    <div style={{ color: '#7E9389', fontSize: '12px' }}>{moneda} {item.costo_unitario.toFixed(2)}/u</div>
+                    <div style={{ color: 'var(--at-ink-3)', fontSize: '12px' }}>{moneda} {item.costo_unitario.toFixed(2)}/u</div>
                   )}
                 </div>
 
@@ -296,7 +296,7 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
                     {item.estado === 'disponible' && (
-                      <button onClick={() => handleEstado(item.id, 'en_uso')} style={{ flex: 1, padding: '4px 8px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                      <button onClick={() => handleEstado(item.id, 'en_uso')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                         En Uso
                       </button>
                     )}
@@ -305,7 +305,7 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
                         Disponible
                       </button>
                     )}
-                    <button onClick={() => startEdit(item)} style={{ padding: '4px 8px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                    <button onClick={() => startEdit(item)} style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
                     <button onClick={() => handleDelete(item.id)} style={{ padding: '4px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
                   </div>
                 )}

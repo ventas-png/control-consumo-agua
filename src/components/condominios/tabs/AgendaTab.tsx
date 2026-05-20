@@ -14,18 +14,18 @@ interface Props {
 }
 
 const TIPO_CONFIG: Record<TipoAgenda, { label: string; icon: string; color: string }> = {
-  tarea:         { label: 'Tarea',         icon: '✅', color: '#1B3B36' },
-  evento:        { label: 'Evento',        icon: '🎉', color: '#B96A3F' },
+  tarea:         { label: 'Tarea',         icon: '✅', color: 'var(--at-primary)' },
+  evento:        { label: 'Evento',        icon: '🎉', color: 'var(--at-accent)' },
   mantenimiento: { label: 'Mantenimiento', icon: '🔧', color: '#f59e0b' },
   reunion:       { label: 'Reunión',       icon: '👥', color: '#10b981' },
-  otro:          { label: 'Otro',          icon: '📋', color: '#7E9389' },
+  otro:          { label: 'Otro',          icon: '📋', color: 'var(--at-ink-3)' },
 }
 
 const ESTADO_CONFIG: Record<EstadoAgenda, { label: string; color: string; bg: string }> = {
   pendiente:  { label: 'Pendiente',  color: '#f59e0b', bg: '#fef3c7' },
-  en_curso:   { label: 'En Curso',   color: '#1B3B36', bg: '#D9E2DC' },
+  en_curso:   { label: 'En Curso',   color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
   completado: { label: 'Completado', color: '#10b981', bg: '#d1fae5' },
-  cancelado:  { label: 'Cancelado',  color: '#7E9389', bg: '#EAE6D8' },
+  cancelado:  { label: 'Cancelado',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 
 const blank = (): Partial<AgendaItem> => ({
@@ -133,9 +133,9 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
 
   const inputStyle: CSSProperties = {
     width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px',
-    fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box',
+    fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box',
   }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   const groupedByDate = filtered.reduce<Record<string, AgendaItem[]>>((acc, a) => {
     const key = a.fecha
@@ -166,9 +166,9 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Agenda Operativa</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Agenda Operativa</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo Elemento
           </button>
         )}
@@ -176,8 +176,8 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>
             {editId ? 'Editar Elemento' : 'Nuevo Elemento de Agenda'}
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
@@ -215,7 +215,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input type="checkbox" id="recurrente" checked={form.recurrente ?? false} onChange={e => setForm(f => ({ ...f, recurrente: e.target.checked }))} />
-              <label htmlFor="recurrente" style={{ fontSize: '13px', color: '#3E5A4C', fontWeight: 500, cursor: 'pointer' }}>Recurrente</label>
+              <label htmlFor="recurrente" style={{ fontSize: '13px', color: 'var(--at-ink-2)', fontWeight: 500, cursor: 'pointer' }}>Recurrente</label>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Descripción</label>
@@ -227,8 +227,8 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear'}
             </button>
           </div>
@@ -245,15 +245,15 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
         ]).map(v => (
           <button key={v.id} onClick={() => setVistaMode(v.id)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: vistaMode === v.id ? '#1B3B36' : '#E1DDD0',
-              background: vistaMode === v.id ? '#D9E2DC' : 'white',
-              color: vistaMode === v.id ? '#1B3B36' : '#7E9389' }}>
+              borderColor: vistaMode === v.id ? 'var(--at-primary)' : 'var(--at-line)',
+              background: vistaMode === v.id ? 'var(--at-primary-soft)' : 'white',
+              color: vistaMode === v.id ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {v.label}
           </button>
         ))}
-        <div style={{ width: '1px', height: '24px', background: '#E1DDD0', margin: '0 4px' }} />
+        <div style={{ width: '1px', height: '24px', background: 'var(--at-line)', margin: '0 4px' }} />
         <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoAgenda | 'todos')}
-          style={{ padding: '5px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
+          style={{ padding: '5px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: 'var(--at-surface-2)' }}>
           <option value="todos">Todos los tipos</option>
           {(Object.entries(TIPO_CONFIG) as [TipoAgenda, typeof TIPO_CONFIG[TipoAgenda]][]).map(([k, v]) => (
             <option key={k} value={k}>{v.icon} {v.label}</option>
@@ -263,7 +263,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
 
       {/* Calendar-style grouped list */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>📅</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay elementos en la agenda</p>
         </div>
@@ -277,8 +277,8 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px',
                   padding: '6px 10px', borderRadius: '8px',
-                  background: esHoy ? '#1B3B36' : esPasado ? '#EAE6D8' : '#FAF7EF',
-                  color: esHoy ? 'white' : esPasado ? '#7E9389' : '#3E5A4C',
+                  background: esHoy ? 'var(--at-primary)' : esPasado ? 'var(--at-chip)' : 'var(--at-surface-2)',
+                  color: esHoy ? 'white' : esPasado ? 'var(--at-ink-3)' : 'var(--at-ink-2)',
                 }}>
                   <span style={{ fontWeight: 700, fontSize: '13px' }}>
                     {esHoy ? '📍 HOY — ' : ''}{fecha}
@@ -291,7 +291,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
                     const estado = ESTADO_CONFIG[a.estado]
                     return (
                       <div key={a.id} style={{
-                        background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px',
+                        background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px',
                         padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: '12px',
                         borderLeft: `4px solid ${tipo.color}`,
                         opacity: a.estado === 'completado' || a.estado === 'cancelado' ? 0.65 : 1,
@@ -299,26 +299,26 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
                         <span style={{ fontSize: '20px', marginTop: '2px' }}>{tipo.icon}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <span style={{ fontWeight: 700, color: '#15291F', fontSize: '14px' }}>
+                            <span style={{ fontWeight: 700, color: 'var(--at-ink)', fontSize: '14px' }}>
                               {a.titulo}
-                              {a.recurrente && <span style={{ marginLeft: '4px', fontSize: '11px', color: '#B96A3F' }}>🔄 recurrente</span>}
+                              {a.recurrente && <span style={{ marginLeft: '4px', fontSize: '11px', color: 'var(--at-accent)' }}>🔄 recurrente</span>}
                             </span>
                             <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: estado.bg, color: estado.color }}>
                               {estado.label}
                             </span>
                           </div>
                           {(a.hora_inicio || a.hora_fin) && (
-                            <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                               🕐 {a.hora_inicio ?? ''}{a.hora_fin ? ` – ${a.hora_fin}` : ''}
                             </div>
                           )}
-                          {a.descripcion && <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '4px' }}>{a.descripcion}</div>}
-                          {a.notas && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px', fontStyle: 'italic' }}>{a.notas}</div>}
+                          {a.descripcion && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '4px' }}>{a.descripcion}</div>}
+                          {a.notas && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px', fontStyle: 'italic' }}>{a.notas}</div>}
                         </div>
                         {canEdit && (
                           <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                             {a.estado === 'pendiente' && (
-                              <button onClick={() => handleEstado(a.id, 'en_curso')} style={{ padding: '4px 8px', background: '#D9E2DC', color: '#1B3B36', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>
+                              <button onClick={() => handleEstado(a.id, 'en_curso')} style={{ padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>
                                 Iniciar
                               </button>
                             )}
@@ -327,7 +327,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
                                 ✓
                               </button>
                             )}
-                            <button onClick={() => startEdit(a)} style={{ padding: '4px 8px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                            <button onClick={() => startEdit(a)} style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
                             <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
                           </div>
                         )}

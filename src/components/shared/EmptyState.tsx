@@ -31,7 +31,7 @@ export function EmptyState({ icon = '📋', title, description, action, compact 
       style={{
         textAlign: 'center',
         padding: compact ? '24px 16px' : '48px 16px',
-        color: '#7E9389',
+        color: 'var(--at-ink-3)',
         ...style,
       }}
     >
@@ -49,7 +49,7 @@ export function EmptyState({ icon = '📋', title, description, action, compact 
           margin: 0,
           fontSize: compact ? '14px' : '16px',
           fontWeight: 600,
-          color: '#3E5A4C',
+          color: 'var(--at-ink-2)',
         }}
       >
         {title}
@@ -59,7 +59,7 @@ export function EmptyState({ icon = '📋', title, description, action, compact 
           style={{
             margin: '6px 0 0',
             fontSize: '13px',
-            color: '#7E9389',
+            color: 'var(--at-ink-3)',
             maxWidth: '420px',
             marginLeft: 'auto',
             marginRight: 'auto',

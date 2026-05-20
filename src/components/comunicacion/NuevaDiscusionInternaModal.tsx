@@ -31,23 +31,23 @@ export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, servic
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-      <div style={{ background: 'white', borderRadius: '14px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+      <div style={{ background: 'var(--at-surface)', borderRadius: '14px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
         <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--at-chip)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#15291F' }}>Nueva discusión de equipo</h3>
-            <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#7E9389' }}>Solo visible para el equipo interno</p>
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--at-ink)' }}>Nueva discusión de equipo</h3>
+            <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--at-ink-3)' }}>Solo visible para el equipo interno</p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', fontSize: '20px', lineHeight: 1 }}>×</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '20px', lineHeight: 1 }}>×</button>
         </div>
         <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>Asunto *</label>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Asunto *</label>
             <input type="text" value={subject} onChange={e => setSubject(e.target.value)}
               placeholder="Ej: Revisión de procedimientos, Aviso de mantenimiento…"
               style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>Categoría</label>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Categoría</label>
             <select value={category} onChange={e => setCategory(e.target.value as ConversationCategory)}
               style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
               {(serviceType === 'condominios' ? CONDOMINIOS_CATEGORIES : AGUA_CATEGORIES).map(k => (
@@ -56,7 +56,7 @@ export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, servic
             </select>
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>Mensaje inicial *</label>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>Mensaje inicial *</label>
             <textarea value={firstMessage} onChange={e => setFirstMessage(e.target.value)}
               placeholder="Escribe el mensaje de apertura…" rows={4}
               style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
@@ -64,11 +64,11 @@ export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, servic
         </div>
         <div style={{ padding: '12px 20px 16px', borderTop: '1px solid var(--at-chip)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button onClick={onClose} disabled={sending}
-            style={{ padding: '8px 16px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', background: 'white', color: '#3E5A4C', fontSize: '13px', cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', background: 'var(--at-surface)', color: 'var(--at-ink-2)', fontSize: '13px', cursor: 'pointer' }}>
             Cancelar
           </button>
           <button onClick={handleSubmit} disabled={sending || !subject.trim() || !firstMessage.trim()}
-            style={{ padding: '8px 18px', border: 'none', borderRadius: '8px', background: (!subject.trim() || !firstMessage.trim()) ? '#7E9389' : '#9C5733', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 18px', border: 'none', borderRadius: '8px', background: (!subject.trim() || !firstMessage.trim()) ? 'var(--at-ink-3)' : 'var(--at-accent-hover)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             {sending ? 'Creando…' : 'Crear discusión'}
           </button>
         </div>

@@ -15,7 +15,7 @@ import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: '#22c55e' },
-  inactivo:   { label: 'Inactivo',   bg: 'rgba(100,116,139,0.2)', color: '#7E9389' },
+  inactivo:   { label: 'Inactivo',   bg: 'rgba(100,116,139,0.2)', color: 'var(--at-ink-3)' },
   suspendido: { label: 'Suspendido', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
 }
 
@@ -478,8 +478,8 @@ export function EmpresaSection({ currentUser }: Props) {
             card.style.background = chk.checked ? color + '11' : 'transparent'
           })
         }
-        wireToggle('chk-agua', 'swal-rol-agua', 'card-agua', '#1B3B36')
-        wireToggle('chk-cond', 'swal-rol-cond', 'card-cond', '#B96A3F')
+        wireToggle('chk-agua', 'swal-rol-agua', 'card-agua', 'var(--at-primary)')
+        wireToggle('chk-cond', 'swal-rol-cond', 'card-cond', 'var(--at-accent)')
       },
       preConfirm: () => {
         const nombre = (document.getElementById('swal-nombre') as HTMLInputElement)?.value?.trim()
@@ -560,16 +560,16 @@ export function EmpresaSection({ currentUser }: Props) {
   }
 
   const roleBadgeColor: Record<string, string> = {
-    admin: '#1B3B36',
+    admin: 'var(--at-primary)',
     operator: '#10b981', operador: '#10b981',
-    viewer: '#B96A3F', visor: '#B96A3F',
+    viewer: 'var(--at-accent)', visor: 'var(--at-accent)',
     collector: '#f59e0b',
   }
 
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
-        <span style={{ color: '#7E9389', fontSize: '16px' }}>Cargando...</span>
+        <span style={{ color: 'var(--at-ink-3)', fontSize: '16px' }}>Cargando...</span>
       </div>
     )
   }
@@ -619,31 +619,31 @@ export function EmpresaSection({ currentUser }: Props) {
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                <h1 style={{ color: '#EAE6D8', fontSize: '20px', fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
+                <h1 style={{ color: 'var(--at-chip)', fontSize: '20px', fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
                   {empresa?.nombre ?? 'Mi Empresa'}
                 </h1>
               </div>
               <div className="empresa-info-row" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '6px' }}>
                 {empresa?.nit && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#7E9389', fontSize: '12px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--at-ink-3)', fontSize: '12px' }}>
                     <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                     NIT: {empresa.nit}
                   </span>
                 )}
                 {empresa?.email && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#7E9389', fontSize: '12px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--at-ink-3)', fontSize: '12px' }}>
                     <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                     {empresa.email}
                   </span>
                 )}
                 {empresa?.telefono && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#7E9389', fontSize: '12px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--at-ink-3)', fontSize: '12px' }}>
                     <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                     {empresa.telefono}
                   </span>
                 )}
                 {!empresa?.nit && !empresa?.email && !empresa?.telefono && (
-                  <span style={{ color: '#3E5A4C', fontSize: '12px', fontStyle: 'italic' }}>Sin datos de contacto</span>
+                  <span style={{ color: 'var(--at-ink-2)', fontSize: '12px', fontStyle: 'italic' }}>Sin datos de contacto</span>
                 )}
               </div>
             </div>
@@ -655,17 +655,17 @@ export function EmpresaSection({ currentUser }: Props) {
               background: 'rgba(27, 59, 54,0.12)', border: '1px solid rgba(27, 59, 54,0.25)',
               borderRadius: '10px', padding: '10px 16px', textAlign: 'center',
             }}>
-              <div style={{ color: '#577B69', fontSize: '22px', fontWeight: 700, lineHeight: 1 }}>
-                {proyectos.length}<span style={{ color: '#7E9389', fontSize: '15px' }}>/{empresa?.max_projects ?? 5}</span>
+              <div style={{ color: 'var(--at-accent-2)', fontSize: '22px', fontWeight: 700, lineHeight: 1 }}>
+                {proyectos.length}<span style={{ color: 'var(--at-ink-3)', fontSize: '15px' }}>/{empresa?.max_projects ?? 5}</span>
               </div>
-              <div style={{ color: '#7E9389', fontSize: '11px', marginTop: '3px' }}>proyectos</div>
+              <div style={{ color: 'var(--at-ink-3)', fontSize: '11px', marginTop: '3px' }}>proyectos</div>
             </div>
             <button
               onClick={() => void editarEmpresa()}
               style={{
                 padding: '7px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
                 border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)',
-                color: '#C7C2B0', cursor: 'pointer', whiteSpace: 'nowrap',
+                color: 'var(--at-line-strong)', cursor: 'pointer', whiteSpace: 'nowrap',
                 transition: 'background 0.15s',
               }}
             >
@@ -678,7 +678,7 @@ export function EmpresaSection({ currentUser }: Props) {
       {/* Proyectos */}
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h2 style={{ color: '#E1DDD0', fontSize: '16px', fontWeight: 600, margin: 0 }}>Proyectos</h2>
+          <h2 style={{ color: 'var(--at-line)', fontSize: '16px', fontWeight: 600, margin: 0 }}>Proyectos</h2>
           <button
             onClick={() => void crearProyecto()}
             disabled={empresa ? proyectos.length >= empresa.max_projects : false}
@@ -686,8 +686,8 @@ export function EmpresaSection({ currentUser }: Props) {
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '9px 16px', borderRadius: '8px', border: 'none',
               background: empresa && proyectos.length >= empresa.max_projects
-                ? '#3E5A4C' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
-              color: empresa && proyectos.length >= empresa.max_projects ? '#7E9389' : 'white',
+                ? 'var(--at-ink-2)' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
+              color: empresa && proyectos.length >= empresa.max_projects ? 'var(--at-ink-3)' : 'white',
               cursor: empresa && proyectos.length >= empresa.max_projects ? 'not-allowed' : 'pointer',
               fontSize: '13px', fontWeight: 600,
             }}
@@ -704,7 +704,7 @@ export function EmpresaSection({ currentUser }: Props) {
             background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)',
             borderRadius: '12px', padding: '32px', textAlign: 'center',
           }}>
-            <p style={{ color: '#3E5A4C', margin: 0 }}>No hay proyectos. Crea el primero.</p>
+            <p style={{ color: 'var(--at-ink-2)', margin: 0 }}>No hay proyectos. Crea el primero.</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '14px' }}>
@@ -712,7 +712,7 @@ export function EmpresaSection({ currentUser }: Props) {
               const estadoCfg = ESTADO_CONFIG[p.estado ?? 'activo']
               return (
               <div key={p.id} className="proyecto-card" style={{
-                background: '#15291F', borderRadius: '14px',
+                background: 'var(--at-ink)', borderRadius: '14px',
                 border: '1px solid rgba(255,255,255,0.06)',
                 overflow: 'hidden',
                 borderTop: `3px solid ${estadoCfg.color}`,
@@ -752,7 +752,7 @@ export function EmpresaSection({ currentUser }: Props) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '3px' }}>
-                      <span style={{ color: '#E1DDD0', fontWeight: 600, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ color: 'var(--at-line)', fontWeight: 600, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.nombre}
                       </span>
                     </div>
@@ -767,11 +767,11 @@ export function EmpresaSection({ currentUser }: Props) {
                       {/* Moneda badge */}
                       <span style={{
                         fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
-                        background: 'rgba(27, 59, 54,0.12)', color: '#577B69', whiteSpace: 'nowrap',
+                        background: 'rgba(27, 59, 54,0.12)', color: 'var(--at-accent-2)', whiteSpace: 'nowrap',
                       }}>
                         {p.moneda ?? 'Q'}
                       </span>
-                      <span style={{ color: '#3E5A4C', fontSize: '10px', fontFamily: 'monospace' }}>
+                      <span style={{ color: 'var(--at-ink-2)', fontSize: '10px', fontFamily: 'monospace' }}>
                         {p.id.slice(0, 6)}…
                       </span>
                     </div>
@@ -783,7 +783,7 @@ export function EmpresaSection({ currentUser }: Props) {
                       title="Editar proyecto"
                       style={{
                         padding: '5px 12px', borderRadius: '7px', border: '1px solid rgba(255,255,255,0.15)',
-                        background: 'rgba(255,255,255,0.06)', color: '#7E9389',
+                        background: 'rgba(255,255,255,0.06)', color: 'var(--at-ink-3)',
                         cursor: 'pointer', fontSize: '12px', fontWeight: 500,
                       }}
                     >
@@ -811,17 +811,17 @@ export function EmpresaSection({ currentUser }: Props) {
                     borderTop: '1px solid rgba(255,255,255,0.05)',
                   }}>
                     {p.descripcion && (
-                      <p style={{ color: '#7E9389', fontSize: '12px', margin: '0 0 6px', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      <p style={{ color: 'var(--at-ink-3)', fontSize: '12px', margin: '0 0 6px', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                         {p.descripcion}
                       </p>
                     )}
                     {p.direccion && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#3E5A4C', fontSize: '11px', marginBottom: '3px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--at-ink-2)', fontSize: '11px', marginBottom: '3px' }}>
                         <span>📍</span><span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.direccion}</span>
                       </div>
                     )}
                     {p.latitud && p.longitud && (
-                      <div style={{ color: '#3E5A4C', fontSize: '10px', fontFamily: 'monospace' }}>
+                      <div style={{ color: 'var(--at-ink-2)', fontSize: '10px', fontFamily: 'monospace' }}>
                         {p.latitud.toFixed(5)}, {p.longitud.toFixed(5)}
                       </div>
                     )}
@@ -838,7 +838,7 @@ export function EmpresaSection({ currentUser }: Props) {
                     style={{
                       flex: 1, padding: '9px 0', borderRadius: '8px',
                       border: '1px solid rgba(255,255,255,0.15)',
-                      background: 'rgba(255,255,255,0.07)', color: '#C7C2B0',
+                      background: 'rgba(255,255,255,0.07)', color: 'var(--at-line-strong)',
                       cursor: 'pointer', fontSize: '13px', fontWeight: 600,
                     }}
                   >
@@ -866,7 +866,7 @@ export function EmpresaSection({ currentUser }: Props) {
       {/* Usuarios */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h2 style={{ color: '#E1DDD0', fontSize: '16px', fontWeight: 600, margin: 0 }}>Usuarios de la Empresa</h2>
+          <h2 style={{ color: 'var(--at-line)', fontSize: '16px', fontWeight: 600, margin: 0 }}>Usuarios de la Empresa</h2>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={() => setShowAuditLog(true)}
@@ -875,7 +875,7 @@ export function EmpresaSection({ currentUser }: Props) {
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '9px 14px', borderRadius: '8px',
                 border: '1px solid rgba(148,163,184,0.3)',
-                background: 'rgba(148,163,184,0.08)', color: '#C7C2B0',
+                background: 'rgba(148,163,184,0.08)', color: 'var(--at-line-strong)',
                 cursor: 'pointer', fontSize: '13px', fontWeight: 600,
               }}
             >
@@ -904,15 +904,15 @@ export function EmpresaSection({ currentUser }: Props) {
             border: '1px solid rgba(185, 106, 63,0.18)',
             borderRadius: '10px', padding: '10px 14px', marginBottom: '12px',
             display: 'flex', alignItems: 'flex-start', gap: '10px',
-            color: '#C7C2B0', fontSize: '12px', lineHeight: 1.5,
+            color: 'var(--at-line-strong)', fontSize: '12px', lineHeight: 1.5,
           }}>
-            <span style={{ color: '#CE8A63', fontSize: '14px', lineHeight: 1, marginTop: '1px' }}>💡</span>
+            <span style={{ color: 'var(--at-accent-light)', fontSize: '14px', lineHeight: 1, marginTop: '1px' }}>💡</span>
             <div>
-              <strong style={{ color: '#E1DDD0' }}>Personalización fina de permisos:</strong>{' '}
+              <strong style={{ color: 'var(--at-line)' }}>Personalización fina de permisos:</strong>{' '}
               Asigna un rol del sistema desde el botón <em>Roles y permisos</em> en cada usuario.
               Si necesitas un perfil distinto, crea un <em>rol personalizado</em> desde el mismo modal y
               ajusta exactamente qué tabs/acciones permite. Los cambios se auditan en{' '}
-              <span style={{ color: '#CE8A63' }}>📜 Auditoría</span>.
+              <span style={{ color: 'var(--at-accent-light)' }}>📜 Auditoría</span>.
             </div>
           </div>
         )}
@@ -922,13 +922,13 @@ export function EmpresaSection({ currentUser }: Props) {
             background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)',
             borderRadius: '12px', padding: '32px', textAlign: 'center',
           }}>
-            <p style={{ color: '#3E5A4C', margin: 0 }}>No hay usuarios. Agrega el primero.</p>
+            <p style={{ color: 'var(--at-ink-2)', margin: 0 }}>No hay usuarios. Agrega el primero.</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {usuarios.map(u => (
               <div key={u.id} style={{
-                background: '#15291F', borderRadius: '12px', padding: '14px 18px',
+                background: 'var(--at-ink)', borderRadius: '12px', padding: '14px 18px',
                 border: '1px solid rgba(255,255,255,0.06)',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
                 flexWrap: 'wrap',
@@ -937,15 +937,15 @@ export function EmpresaSection({ currentUser }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '160px' }}>
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                    background: `${roleBadgeColor[u.role] ?? '#7E9389'}22`,
-                    border: `1px solid ${roleBadgeColor[u.role] ?? '#7E9389'}44`,
+                    background: `${roleBadgeColor[u.role] ?? 'var(--at-ink-3)'}22`,
+                    border: `1px solid ${roleBadgeColor[u.role] ?? 'var(--at-ink-3)'}44`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: roleBadgeColor[u.role] ?? '#7E9389', fontSize: '13px', fontWeight: 700,
+                    color: roleBadgeColor[u.role] ?? 'var(--at-ink-3)', fontSize: '13px', fontWeight: 700,
                   }}>
                     {u.full_name.charAt(0).toUpperCase()}
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ color: '#E1DDD0', fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ color: 'var(--at-line)', fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {u.full_name}
                     </div>
                     <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '3px' }}>
@@ -972,7 +972,7 @@ export function EmpresaSection({ currentUser }: Props) {
                     style={{
                       display: 'flex', alignItems: 'center', gap: '5px',
                       padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(27, 59, 54,0.3)',
-                      background: 'rgba(27, 59, 54,0.08)', color: '#577B69',
+                      background: 'rgba(27, 59, 54,0.08)', color: 'var(--at-accent-2)',
                       cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                     }}
                   >
@@ -988,7 +988,7 @@ export function EmpresaSection({ currentUser }: Props) {
                       style={{
                         display: 'flex', alignItems: 'center', gap: '5px',
                         padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(27, 59, 54,0.3)',
-                        background: 'rgba(27, 59, 54,0.08)', color: '#577B69',
+                        background: 'rgba(27, 59, 54,0.08)', color: 'var(--at-accent-2)',
                         cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                       }}
                     >
@@ -1002,7 +1002,7 @@ export function EmpresaSection({ currentUser }: Props) {
                       style={{
                         display: 'flex', alignItems: 'center', gap: '5px',
                         padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(185, 106, 63,0.3)',
-                        background: 'rgba(185, 106, 63,0.08)', color: '#CE8A63',
+                        background: 'rgba(185, 106, 63,0.08)', color: 'var(--at-accent-light)',
                         cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                       }}
                     >
@@ -1047,7 +1047,7 @@ export function EmpresaSection({ currentUser }: Props) {
       {/* Configuración de Correo Google */}
       {currentUser.company_id && (
         <div style={{
-          background: '#ffffff',
+          background: 'var(--at-surface)',
           borderRadius: '16px', padding: '28px',
           border: '1px solid var(--at-line)',
           marginTop: '24px',

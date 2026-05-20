@@ -20,9 +20,9 @@ const TIPO_LABELS: Record<TipoParqueo, string> = {
 }
 
 const TIPO_COLORS: Record<TipoParqueo, { bg: string; color: string }> = {
-  asignado:      { bg: '#EEF2EC', color: '#1B3B36' },
+  asignado:      { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
   visita:        { bg: '#f0fdf4', color: '#16a34a' },
-  discapacitado: { bg: '#FAF1EA', color: '#9C5733' },
+  discapacitado: { bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)' },
 }
 
 export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
@@ -101,8 +101,8 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#15291F' }}>Parqueos</h2>
-          <p style={{ margin: '4px 0 0', color: '#7E9389', fontSize: '13.5px' }}>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Parqueos</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
             {parqueos.length} espacios · <span style={{ color: '#16a34a', fontWeight: 600 }}>{libres} libres</span> · {ocupados} asignados
           </p>
         </div>
@@ -116,10 +116,10 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por número, placa, unidad..."
-          style={{ flex: 1, minWidth: '200px', padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF' }} />
+          style={{ flex: 1, minWidth: '200px', padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-surface-2)' }} />
         {(['todos', 'asignado', 'visita', 'discapacitado'] as const).map(t => (
           <button key={t} onClick={() => setFiltroTipo(t)}
-            style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroTipo === t ? '#1B3B36' : '#E1DDD0', background: filtroTipo === t ? '#EEF2EC' : 'white', color: filtroTipo === t ? '#1B3B36' : '#7E9389' }}>
+            style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroTipo === t ? 'var(--at-primary)' : 'var(--at-line)', background: filtroTipo === t ? 'var(--at-primary-tint)' : 'white', color: filtroTipo === t ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {t === 'todos' ? 'Todos' : TIPO_LABELS[t]}
           </button>
         ))}
@@ -127,7 +127,7 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>{editingId ? 'Editar parqueo' : 'Nuevo parqueo'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             {[
@@ -137,46 +137,46 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
               { label: 'Color', key: 'color_vehiculo', placeholder: 'Blanco, Negro...' },
             ].map(({ label, key, placeholder }) => (
               <div key={key}>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>{label}</label>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>{label}</label>
                 <input value={form[key as keyof typeof form]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} placeholder={placeholder}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
               </div>
             ))}
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tipo</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Tipo</label>
               <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoParqueo }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                 {(Object.entries(TIPO_LABELS) as [TipoParqueo, string][]).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Unidad asignada</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Unidad asignada</label>
               <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                 <option value="">Sin asignar</option>
                 {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas</label>
               <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
-            <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* Grid */}
       {filtrados.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>🅿️</div>
-          <p style={{ fontWeight: 600, color: '#7E9389' }}>No hay parqueos registrados</p>
+          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay parqueos registrados</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px' }}>
@@ -184,17 +184,17 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
             const tc = TIPO_COLORS[p.tipo]
             const tieneUnidad = !!p.unidad_id
             return (
-              <div key={p.id} style={{ background: 'white', border: `1.5px solid ${tieneUnidad ? '#C2D2CA' : '#E1DDD0'}`, borderRadius: '14px', padding: '16px', opacity: p.activo ? 1 : 0.55 }}>
+              <div key={p.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${tieneUnidad ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px', opacity: p.activo ? 1 : 0.55 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#15291F' }}>{p.numero}</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--at-ink)' }}>{p.numero}</div>
                   <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: tc.bg, color: tc.color }}>{TIPO_LABELS[p.tipo]}</span>
                 </div>
-                {p.unidad_nombre && <div style={{ fontSize: '12.5px', color: '#1B3B36', fontWeight: 600, marginBottom: '4px' }}>📍 {p.unidad_nombre}</div>}
-                {p.placa_vehiculo && <div style={{ fontSize: '12.5px', color: '#3E5A4C', marginBottom: '2px' }}>🚗 {p.placa_vehiculo}{p.marca_vehiculo ? ` · ${p.marca_vehiculo}` : ''}{p.color_vehiculo ? ` · ${p.color_vehiculo}` : ''}</div>}
+                {p.unidad_nombre && <div style={{ fontSize: '12.5px', color: 'var(--at-primary)', fontWeight: 600, marginBottom: '4px' }}>📍 {p.unidad_nombre}</div>}
+                {p.placa_vehiculo && <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)', marginBottom: '2px' }}>🚗 {p.placa_vehiculo}{p.marca_vehiculo ? ` · ${p.marca_vehiculo}` : ''}{p.color_vehiculo ? ` · ${p.color_vehiculo}` : ''}</div>}
                 {!tieneUnidad && <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>Disponible</div>}
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-                    <button onClick={() => startEdit(p)} style={{ flex: 1, padding: '6px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#3E5A4C' }}>✏️ Editar</button>
+                    <button onClick={() => startEdit(p)} style={{ flex: 1, padding: '6px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)' }}>✏️ Editar</button>
                     <button onClick={() => toggleActivo(p)} style={{ padding: '6px 10px', background: p.activo ? '#fef3c7' : '#f0fdf4', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px' }}>{p.activo ? '⏸' : '▶'}</button>
                     <button onClick={() => eliminar(p.id)} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px' }}>🗑</button>
                   </div>

@@ -40,7 +40,7 @@ export function KpiCard({ label, value, unit, icon, gradient, loading = false, o
       role={isInteractive ? 'button' : undefined}
       tabIndex={isInteractive ? 0 : undefined}
       style={{
-        background: gradient ?? '#1B3B36',
+        background: gradient ?? 'var(--at-primary)',
         color: 'white',
         padding: '20px 22px',
         borderRadius: '16px',

@@ -286,7 +286,7 @@ export function SuperAdminSection() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
-        <span style={{ color: '#7E9389', fontSize: '16px' }}>Cargando...</span>
+        <span style={{ color: 'var(--at-ink-3)', fontSize: '16px' }}>Cargando...</span>
       </div>
     )
   }
@@ -301,10 +301,10 @@ export function SuperAdminSection() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px',
       }}>
         <div>
-          <h1 style={{ color: '#EAE6D8', fontSize: '22px', fontWeight: 700, margin: 0 }}>
+          <h1 style={{ color: 'var(--at-chip)', fontSize: '22px', fontWeight: 700, margin: 0 }}>
             Panel Superadministrador
           </h1>
-          <p style={{ color: '#7E9389', fontSize: '14px', marginTop: '4px' }}>
+          <p style={{ color: 'var(--at-ink-3)', fontSize: '14px', marginTop: '4px' }}>
             {empresas.length} empresa(s) registrada(s)
           </p>
         </div>
@@ -330,7 +330,7 @@ export function SuperAdminSection() {
           background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)',
           borderRadius: '12px', padding: '48px', textAlign: 'center',
         }}>
-          <p style={{ color: '#3E5A4C', margin: 0 }}>No hay empresas registradas.</p>
+          <p style={{ color: 'var(--at-ink-2)', margin: 0 }}>No hay empresas registradas.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -341,36 +341,36 @@ export function SuperAdminSection() {
             const unitsAlerta = unitsUsoPct >= 80
             return (
               <div key={e.id} style={{
-                background: '#15291F', borderRadius: '14px', padding: '20px 24px',
+                background: 'var(--at-ink)', borderRadius: '14px', padding: '20px 24px',
                 border: '1px solid rgba(255,255,255,0.06)',
               }}>
                 {/* Fila superior: info + botón editar */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '14px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                      <div style={{ color: '#EAE6D8', fontWeight: 700, fontSize: '16px' }}>{e.nombre}</div>
+                      <div style={{ color: 'var(--at-chip)', fontWeight: 700, fontSize: '16px' }}>{e.nombre}</div>
                       {!e.activa && (
                         <span style={{ background: '#ef444422', color: '#f87171', fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', border: '1px solid #ef444444' }}>
                           Inactiva
                         </span>
                       )}
-                      <span style={{ background: 'rgba(255,255,255,0.06)', color: '#7E9389', fontSize: '11px', padding: '2px 8px', borderRadius: '20px' }}>
+                      <span style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--at-ink-3)', fontSize: '11px', padding: '2px 8px', borderRadius: '20px' }}>
                         {e.plan}
                       </span>
                     </div>
                     <div style={{ display: 'flex', gap: '16px', marginTop: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ color: '#7E9389', fontSize: '13px' }}>
-                        <span style={{ color: '#577B69', fontWeight: 600 }}>{e.project_count}</span>/{e.max_projects} proyectos
+                      <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>
+                        <span style={{ color: 'var(--at-accent-2)', fontWeight: 600 }}>{e.project_count}</span>/{e.max_projects} proyectos
                       </span>
-                      <span style={{ color: '#7E9389', fontSize: '13px' }}>
+                      <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>
                         <span style={{ color: unitsAlerta ? '#f59e0b' : '#34d399', fontWeight: 600 }}>{e.unit_count ?? 0}</span>/{e.max_units} unidades
                       </span>
-                      <span style={{ color: '#7E9389', fontSize: '13px' }}>
-                        <span style={{ color: '#CE8A63', fontWeight: 600 }}>{e.user_count}</span> usuarios
+                      <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>
+                        <span style={{ color: 'var(--at-accent-light)', fontWeight: 600 }}>{e.user_count}</span> usuarios
                       </span>
-                      {e.nit && <span style={{ color: '#7E9389', fontSize: '13px' }}>NIT: {e.nit}</span>}
-                      {e.email && <span style={{ color: '#7E9389', fontSize: '13px' }}>{e.email}</span>}
-                      {e.telefono && <span style={{ color: '#7E9389', fontSize: '13px' }}>{e.telefono}</span>}
+                      {e.nit && <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>NIT: {e.nit}</span>}
+                      {e.email && <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>{e.email}</span>}
+                      {e.telefono && <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>{e.telefono}</span>}
                     </div>
                   </div>
                   <button
@@ -378,7 +378,7 @@ export function SuperAdminSection() {
                     style={{
                       padding: '6px 14px', borderRadius: '6px',
                       border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)',
-                      color: '#7E9389', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                      color: 'var(--at-ink-3)', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
                     }}
                   >
                     Editar
@@ -388,7 +388,7 @@ export function SuperAdminSection() {
                 {/* Barra de progreso de unidades */}
                 <div style={{ marginBottom: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '11px', color: '#3E5A4C' }}>Uso de unidades</span>
+                    <span style={{ fontSize: '11px', color: 'var(--at-ink-2)' }}>Uso de unidades</span>
                     <span style={{ fontSize: '11px', fontWeight: 600, color: unitsAlerta ? '#f59e0b' : '#34d399' }}>
                       {unitsUsoPct}%
                     </span>
@@ -408,15 +408,15 @@ export function SuperAdminSection() {
                 <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
                   {/* Límite proyectos */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: '#7E9389', fontSize: '12px', whiteSpace: 'nowrap' }}>Proyectos:</span>
+                    <span style={{ color: 'var(--at-ink-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>Proyectos:</span>
                     <input
                       type="number" min={1}
                       value={isEditingProj ? editingMax[e.id] : e.max_projects}
                       onChange={(ev: ChangeEvent<HTMLInputElement>) => setEditingMax(prev => ({ ...prev, [e.id]: parseInt(ev.target.value) || 1 }))}
                       style={{
                         width: '60px', padding: '5px 7px', borderRadius: '6px',
-                        border: `1px solid ${isEditingProj ? '#1B3B36' : 'rgba(255,255,255,0.1)'}`,
-                        background: '#15291F', color: '#EAE6D8', fontSize: '13px', textAlign: 'center',
+                        border: `1px solid ${isEditingProj ? 'var(--at-primary)' : 'rgba(255,255,255,0.1)'}`,
+                        background: 'var(--at-ink)', color: 'var(--at-chip)', fontSize: '13px', textAlign: 'center',
                       }}
                     />
                     {isEditingProj && (
@@ -424,7 +424,7 @@ export function SuperAdminSection() {
                         <button onClick={() => void actualizarMaxProyectos(e.id)} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
                           Guardar
                         </button>
-                        <button onClick={() => setEditingMax(prev => { const n = { ...prev }; delete n[e.id]; return n })} style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#7E9389', cursor: 'pointer', fontSize: '11px' }}>
+                        <button onClick={() => setEditingMax(prev => { const n = { ...prev }; delete n[e.id]; return n })} style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--at-ink-3)', cursor: 'pointer', fontSize: '11px' }}>
                           ✕
                         </button>
                       </>
@@ -433,7 +433,7 @@ export function SuperAdminSection() {
 
                   {/* Límite unidades */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: '#7E9389', fontSize: '12px', whiteSpace: 'nowrap' }}>Unidades:</span>
+                    <span style={{ color: 'var(--at-ink-3)', fontSize: '12px', whiteSpace: 'nowrap' }}>Unidades:</span>
                     <input
                       type="number" min={1}
                       value={isEditingUnits ? editingMaxUnits[e.id] : e.max_units}
@@ -441,7 +441,7 @@ export function SuperAdminSection() {
                       style={{
                         width: '60px', padding: '5px 7px', borderRadius: '6px',
                         border: `1px solid ${isEditingUnits ? '#34d399' : 'rgba(255,255,255,0.1)'}`,
-                        background: '#15291F', color: '#EAE6D8', fontSize: '13px', textAlign: 'center',
+                        background: 'var(--at-ink)', color: 'var(--at-chip)', fontSize: '13px', textAlign: 'center',
                       }}
                     />
                     {isEditingUnits && (
@@ -449,7 +449,7 @@ export function SuperAdminSection() {
                         <button onClick={() => void actualizarMaxUnidades(e.id)} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg,#34d399,#059669)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
                           Guardar
                         </button>
-                        <button onClick={() => setEditingMaxUnits(prev => { const n = { ...prev }; delete n[e.id]; return n })} style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#7E9389', cursor: 'pointer', fontSize: '11px' }}>
+                        <button onClick={() => setEditingMaxUnits(prev => { const n = { ...prev }; delete n[e.id]; return n })} style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--at-ink-3)', cursor: 'pointer', fontSize: '11px' }}>
                           ✕
                         </button>
                       </>
@@ -459,7 +459,7 @@ export function SuperAdminSection() {
 
                 {/* Líneas de servicio */}
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span style={{ color: '#3E5A4C', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>Servicios:</span>
+                  <span style={{ color: 'var(--at-ink-2)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>Servicios:</span>
 
                   {/* Toggle Control Agua */}
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
@@ -485,13 +485,13 @@ export function SuperAdminSection() {
                         top: '3px',
                         left: e.servicio_agua ? '19px' : '3px',
                         width: '14px', height: '14px',
-                        background: 'white',
+                        background: 'var(--at-surface)',
                         borderRadius: '50%',
                         transition: 'left 0.2s',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
                       }} />
                     </span>
-                    <span style={{ fontSize: '12px', color: e.servicio_agua ? '#577B69' : '#3E5A4C', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '12px', color: e.servicio_agua ? 'var(--at-accent-2)' : 'var(--at-ink-2)', fontWeight: 500, whiteSpace: 'nowrap' }}>
                       Control Agua
                     </span>
                   </label>
@@ -520,13 +520,13 @@ export function SuperAdminSection() {
                         top: '3px',
                         left: e.servicio_condominios ? '19px' : '3px',
                         width: '14px', height: '14px',
-                        background: 'white',
+                        background: 'var(--at-surface)',
                         borderRadius: '50%',
                         transition: 'left 0.2s',
                         boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
                       }} />
                     </span>
-                    <span style={{ fontSize: '12px', color: e.servicio_condominios ? '#CE8A63' : '#3E5A4C', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '12px', color: e.servicio_condominios ? 'var(--at-accent-light)' : 'var(--at-ink-2)', fontWeight: 500, whiteSpace: 'nowrap' }}>
                       Condominios
                     </span>
                   </label>
@@ -539,7 +539,7 @@ export function SuperAdminSection() {
 
       {/* Configuración de correo del superadministrador */}
       <div style={{
-        background: '#ffffff',
+        background: 'var(--at-surface)',
         borderRadius: '16px', padding: '28px',
         border: '1px solid var(--at-line)',
         marginTop: '32px',

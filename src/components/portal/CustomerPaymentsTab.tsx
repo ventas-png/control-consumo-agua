@@ -62,17 +62,17 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
   }, 0)
 
   if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: '#7E9389' }}>Cargando...</div>
+    return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--at-ink-3)' }}>Cargando...</div>
   }
 
   if (registrosPendientes.length === 0) {
     return (
       <div style={{ padding: '48px', textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
-        <div style={{ fontSize: '16px', fontWeight: 700, color: '#15291F', marginBottom: '6px' }}>
+        <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '6px' }}>
           ¡Sin cargos pendientes!
         </div>
-        <div style={{ color: '#7E9389' }}>Todos tus pagos están al día</div>
+        <div style={{ color: 'var(--at-ink-3)' }}>Todos tus pagos están al día</div>
       </div>
     )
   }
@@ -121,7 +121,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
             <div
               key={registro.id}
               style={{
-                background: 'white',
+                background: 'var(--at-surface)',
                 borderRadius: '12px',
                 padding: '16px',
                 border: esMora ? '2px solid #dc2626' : '1px solid var(--at-line)',
@@ -131,7 +131,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '16px', alignItems: 'start' }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-                    <span style={{ fontSize: '15px', fontWeight: 700, color: '#15291F' }}>
+                    <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--at-ink)' }}>
                       Lectura: {new Date(registro.fecha).toLocaleDateString('es-GT')}
                     </span>
                     {esMora && (
@@ -150,15 +150,15 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px', fontSize: '13px', marginTop: '12px' }}>
                     <div>
-                      <div style={{ color: '#7E9389', marginBottom: '2px' }}>Consumo</div>
-                      <div style={{ fontWeight: 700, color: '#15291F' }}>{registro.consumo.toFixed(2)} m³</div>
+                      <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Consumo</div>
+                      <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{registro.consumo.toFixed(2)} m³</div>
                     </div>
                     <div>
-                      <div style={{ color: '#7E9389', marginBottom: '2px' }}>Monto Total</div>
-                      <div style={{ fontWeight: 700, color: '#15291F' }}>{moneda} {total.toFixed(2)}</div>
+                      <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Monto Total</div>
+                      <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {total.toFixed(2)}</div>
                     </div>
                     <div>
-                      <div style={{ color: '#7E9389', marginBottom: '2px' }}>Saldo</div>
+                      <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Saldo</div>
                       <div style={{ fontWeight: 700, color: saldo > 0 ? '#ef4444' : '#10b981', fontSize: '14px' }}>
                         {moneda} {saldo.toFixed(2)}
                       </div>
@@ -216,8 +216,8 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                       padding: '10px',
                       borderRadius: '8px',
                       border: '1.5px solid var(--at-line)',
-                      background: 'white',
-                      color: '#7E9389',
+                      background: 'var(--at-surface)',
+                      color: 'var(--at-ink-3)',
                       fontWeight: 700,
                       fontSize: '13px',
                       cursor: 'pointer',

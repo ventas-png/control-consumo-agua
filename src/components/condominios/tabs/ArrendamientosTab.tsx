@@ -19,7 +19,7 @@ interface Props {
 const ESTADO_CONFIG: Record<EstadoContrato, { label: string; bg: string; color: string }> = {
   activo:    { label: 'Activo',    bg: '#f0fdf4', color: '#16a34a' },
   vencido:   { label: 'Vencido',   bg: '#fef2f2', color: '#dc2626' },
-  terminado: { label: 'Terminado', bg: '#FAF7EF', color: '#7E9389' },
+  terminado: { label: 'Terminado', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
 export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canCreate, canEdit, onRefresh }: Props) {
@@ -130,14 +130,14 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#15291F' }}>Arrendamientos</h2>
-          <p style={{ margin: '4px 0 0', color: '#7E9389', fontSize: '13.5px' }}>
-            {activos.length} contratos activos · <span style={{ fontWeight: 600, color: '#1B3B36' }}>{moneda} {rentaTotal.toFixed(2)}/mes</span>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Arrendamientos</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
+            {activos.length} contratos activos · <span style={{ fontWeight: 600, color: 'var(--at-primary)' }}>{moneda} {rentaTotal.toFixed(2)}/mes</span>
             {porVencer.length > 0 && <span style={{ color: '#ea580c', fontWeight: 600 }}> · {porVencer.length} por vencer</span>}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={exportarPDF} disabled={contratos.length === 0} style={{ padding: '9px 14px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>📄 PDF</button>
+          <button onClick={exportarPDF} disabled={contratos.length === 0} style={{ padding: '9px 14px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>📄 PDF</button>
           <button onClick={exportarXlsx} disabled={contratos.length === 0} style={{ padding: '9px 14px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>📊 Excel</button>
           {canCreate && (
             <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
@@ -160,10 +160,10 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar arrendatario, unidad..."
-          style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF' }} />
+          style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-surface-2)' }} />
         {(['todos', 'activo', 'vencido', 'terminado'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
-            style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0', background: filtroEstado === e ? '#EEF2EC' : 'white', color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
+            style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-primary-tint)' : 'white', color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? 'Todos' : ESTADO_CONFIG[e].label}
           </button>
         ))}
@@ -171,90 +171,90 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>{editingId ? 'Editar contrato' : 'Nuevo contrato de arrendamiento'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Nombre del arrendatario *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Nombre del arrendatario *</label>
               <input value={form.arrendatario_nombre} onChange={e => setForm(f => ({ ...f, arrendatario_nombre: e.target.value }))} placeholder="Nombre completo"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Unidad *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Unidad *</label>
               <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
                 <option value="">Seleccionar...</option>
                 {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
               <input value={form.arrendatario_identificacion} onChange={e => setForm(f => ({ ...f, arrendatario_identificacion: e.target.value }))} placeholder="Número de documento"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Teléfono</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Teléfono</label>
               <input value={form.arrendatario_telefono} onChange={e => setForm(f => ({ ...f, arrendatario_telefono: e.target.value }))} placeholder="+502..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Email</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Email</label>
               <input type="email" value={form.arrendatario_email} onChange={e => setForm(f => ({ ...f, arrendatario_email: e.target.value }))} placeholder="correo@ejemplo.com"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Monto de renta ({moneda}) *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Monto de renta ({moneda}) *</label>
               <input type="number" value={form.monto_renta} onChange={e => setForm(f => ({ ...f, monto_renta: e.target.value }))} placeholder="0.00" min="0" step="0.01"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Depósito ({moneda})</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Depósito ({moneda})</label>
               <input type="number" value={form.deposito} onChange={e => setForm(f => ({ ...f, deposito: e.target.value }))} placeholder="0.00" min="0" step="0.01"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Día de pago</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Día de pago</label>
               <input type="number" value={form.dia_pago} onChange={e => setForm(f => ({ ...f, dia_pago: e.target.value }))} min="1" max="28"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha inicio *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Fecha inicio *</label>
               <input type="date" value={form.fecha_inicio} onChange={e => setForm(f => ({ ...f, fecha_inicio: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha fin (opcional)</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Fecha fin (opcional)</label>
               <input type="date" value={form.fecha_fin} onChange={e => setForm(f => ({ ...f, fecha_fin: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas</label>
               <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Condiciones especiales, observaciones..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
             <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
-            <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* Lista */}
       {filtrados.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>📄</div>
-          <p style={{ fontWeight: 600, color: '#7E9389' }}>No hay contratos {filtroEstado !== 'todos' ? `con estado "${filtroEstado}"` : 'registrados'}</p>
+          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>No hay contratos {filtroEstado !== 'todos' ? `con estado "${filtroEstado}"` : 'registrados'}</p>
         </div>
       ) : (
-        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
             <thead>
-              <tr style={{ background: '#FAF7EF', borderBottom: '1px solid var(--at-line)' }}>
+              <tr style={{ background: 'var(--at-surface-2)', borderBottom: '1px solid var(--at-line)' }}>
                 {['Arrendatario', 'Unidad', 'Renta/mes', 'Día pago', 'Período', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 700, color: '#7E9389', textTransform: 'uppercase' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -265,13 +265,13 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
                 return (
                   <tr key={c.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '10px 14px' }}>
-                      <div style={{ fontWeight: 700, color: '#15291F' }}>{c.arrendatario_nombre}</div>
-                      {c.arrendatario_telefono && <div style={{ fontSize: '12px', color: '#7E9389' }}>{c.arrendatario_telefono}</div>}
+                      <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{c.arrendatario_nombre}</div>
+                      {c.arrendatario_telefono && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{c.arrendatario_telefono}</div>}
                     </td>
-                    <td style={{ padding: '10px 14px', color: '#3E5A4C' }}>{c.unidad_nombre || '—'}</td>
-                    <td style={{ padding: '10px 14px', fontWeight: 700, color: '#15291F' }}>{moneda} {c.monto_renta.toFixed(2)}</td>
-                    <td style={{ padding: '10px 14px', color: '#3E5A4C' }}>Día {c.dia_pago}</td>
-                    <td style={{ padding: '10px 14px', color: vence30 ? '#ea580c' : '#3E5A4C', fontWeight: vence30 ? 700 : 400 }}>
+                    <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)' }}>{c.unidad_nombre || '—'}</td>
+                    <td style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto_renta.toFixed(2)}</td>
+                    <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)' }}>Día {c.dia_pago}</td>
+                    <td style={{ padding: '10px 14px', color: vence30 ? '#ea580c' : 'var(--at-ink-2)', fontWeight: vence30 ? 700 : 400 }}>
                       {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' →'}
                       {vence30 && <span style={{ display: 'block', fontSize: '11px', color: '#ea580c' }}>⚠️ Por vencer</span>}
                     </td>
@@ -298,7 +298,7 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
                           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: '#16a34a' }}
                         >💬</button>
                       )}
-                      {canEdit && <button onClick={() => startEdit(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: '#7E9389' }}>✏️</button>}
+                      {canEdit && <button onClick={() => startEdit(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--at-ink-3)' }}>✏️</button>}
                       <button onClick={() => eliminar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: '#ef4444' }}>🗑</button>
                     </td>
                   </tr>

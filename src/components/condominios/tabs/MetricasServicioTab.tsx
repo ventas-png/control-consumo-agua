@@ -64,14 +64,14 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
 
   const CAT_ICON: Record<string, string> = { instalaciones: '🔧', seguridad: '🛡️', servicios: '🧹', convivencia: '🤝', otro: '💬' }
   const PRIOR_COLOR: Record<string, string> = { urgente: '#ef4444', alta: '#f97316', media: '#fbbf24', baja: '#86efac' }
-  const ESTADO_COLOR: Record<string, string> = { abierto: '#ef4444', en_proceso: '#f97316', resuelto: '#4ade80', cerrado: '#7E9389' }
+  const ESTADO_COLOR: Record<string, string> = { abierto: '#ef4444', en_proceso: '#f97316', resuelto: '#4ade80', cerrado: 'var(--at-ink-3)' }
 
   function kpiCard(label: string, val: string | number, sub: string, color: string, bg: string) {
     return (
       <div style={{ background: bg, borderRadius: 10, padding: '12px 16px' }}>
         <div style={{ fontSize: 20, fontWeight: 800, color }}>{val}</div>
         <div style={{ fontSize: 11, color, fontWeight: 600 }}>{label}</div>
-        {sub && <div style={{ fontSize: 10, color: '#7E9389', marginTop: 2 }}>{sub}</div>}
+        {sub && <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 2 }}>{sub}</div>}
       </div>
     )
   }
@@ -80,7 +80,7 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
     <div style={{ padding: 16 }}>
       {/* Filtro período */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#15291F' }}>Métricas de servicio del período</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--at-ink)' }}>Métricas de servicio del período</div>
         <select value={filtroPeriodo} onChange={e => setFiltroPeriodo(e.target.value)}
           style={{ padding: '7px 12px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
           {periodos.map(p => <option key={p} value={p}>{p}</option>)}
@@ -89,7 +89,7 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
 
       {/* KPIs del período */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
-        {kpiCard('Tickets del período', ticketsMes.length, `${tasaResolucionTickets}% resueltos`, '#9C5733', '#FAF1EA')}
+        {kpiCard('Tickets del período', ticketsMes.length, `${tasaResolucionTickets}% resueltos`, 'var(--at-accent-hover)', 'var(--at-accent-tint-2)')}
         {kpiCard('Tiempo prom. resolución', diasPromedioResolucion === 0 ? '—' : `${diasPromedioResolucion}d`, 'días hábiles estimados', diasPromedioResolucion <= 3 ? '#16a34a' : diasPromedioResolucion <= 7 ? '#d97706' : '#ef4444', diasPromedioResolucion <= 3 ? '#f0fdf4' : diasPromedioResolucion <= 7 ? '#fef3c7' : '#fef2f2')}
         {kpiCard('Sugerencias respondidas', `${tasaRespuestaSugerencias}%`, `${sugerenciasMes.filter(s => s.estado === 'respondida').length} de ${sugerenciasMes.length}`, tasaRespuestaSugerencias >= 80 ? '#16a34a' : '#d97706', tasaRespuestaSugerencias >= 80 ? '#f0fdf4' : '#fef3c7')}
         {kpiCard('Tasa de recaudación', `${tasaRecaudacion}%`, `${cuotasMes.filter(c => c.estado === 'pagado').length} de ${cuotasMes.length} cuotas`, tasaRecaudacion >= 80 ? '#16a34a' : tasaRecaudacion >= 60 ? '#d97706' : '#ef4444', tasaRecaudacion >= 80 ? '#f0fdf4' : tasaRecaudacion >= 60 ? '#fef3c7' : '#fef2f2')}
@@ -97,15 +97,15 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* Tickets por prioridad */}
-        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Tickets por prioridad (total)</div>
           {porPrioridad.map(({ prioridad, count }) => (
             <div key={prioridad} style={{ marginBottom: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
-                <span style={{ textTransform: 'capitalize', color: '#3E5A4C' }}>{prioridad}</span>
+                <span style={{ textTransform: 'capitalize', color: 'var(--at-ink-2)' }}>{prioridad}</span>
                 <span style={{ fontWeight: 600, color: PRIOR_COLOR[prioridad] }}>{count}</span>
               </div>
-              <div style={{ background: '#EAE6D8', borderRadius: 4, height: 6 }}>
+              <div style={{ background: 'var(--at-chip)', borderRadius: 4, height: 6 }}>
                 <div style={{ height: '100%', background: PRIOR_COLOR[prioridad], width: `${(count / maxPrioridad) * 100}%`, borderRadius: 4 }} />
               </div>
             </div>
@@ -113,13 +113,13 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
         </div>
 
         {/* Tickets por estado */}
-        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Estado actual de tickets</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {porEstado.map(({ estado, count }) => (
-              <div key={estado} style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
+              <div key={estado} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px', textAlign: 'center' }}>
                 <div style={{ fontSize: 18, fontWeight: 700, color: ESTADO_COLOR[estado] }}>{count}</div>
-                <div style={{ fontSize: 10, color: '#7E9389', textTransform: 'capitalize' }}>{estado.replace('_', ' ')}</div>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)', textTransform: 'capitalize' }}>{estado.replace('_', ' ')}</div>
               </div>
             ))}
           </div>
@@ -129,45 +129,45 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         {/* Tendencia tickets + visitantes */}
         {tendTickets.length > 0 && (
-          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Tendencia mensual (últimos {tendTickets.length} meses)</div>
             <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 100, marginBottom: 6 }}>
               {tendTickets.map(t => (
                 <div key={t.periodo} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                   <div style={{ width: '100%', display: 'flex', gap: 1, alignItems: 'flex-end', height: 90 }}>
-                    <div style={{ flex: 1, background: '#CE8A63', borderRadius: '2px 2px 0 0', height: `${(t.total / maxTend) * 100}%`, minHeight: 2 }} title={`Tickets: ${t.total}`} />
+                    <div style={{ flex: 1, background: 'var(--at-accent-light)', borderRadius: '2px 2px 0 0', height: `${(t.total / maxTend) * 100}%`, minHeight: 2 }} title={`Tickets: ${t.total}`} />
                     <div style={{ flex: 1, background: '#6ee7b7', borderRadius: '2px 2px 0 0', height: `${(t.visitantes / maxTend) * 100}%`, minHeight: 2 }} title={`Visitantes: ${t.visitantes}`} />
                   </div>
-                  <div style={{ fontSize: 9, color: '#7E9389' }}>{t.periodo.slice(2)}</div>
+                  <div style={{ fontSize: 9, color: 'var(--at-ink-3)' }}>{t.periodo.slice(2)}</div>
                 </div>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#7E9389' }}>
-              <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#CE8A63', borderRadius: 2, marginRight: 4 }} />Tickets</span>
+            <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--at-ink-3)' }}>
+              <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--at-accent-light)', borderRadius: 2, marginRight: 4 }} />Tickets</span>
               <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#6ee7b7', borderRadius: 2, marginRight: 4 }} />Visitantes</span>
             </div>
           </div>
         )}
 
         {/* Sugerencias por categoría */}
-        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Sugerencias por categoría</div>
           {porCategoria.length === 0
-            ? <div style={{ color: '#7E9389', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>Sin sugerencias</div>
+            ? <div style={{ color: 'var(--at-ink-3)', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>Sin sugerencias</div>
             : porCategoria.map(({ cat, count }) => (
               <div key={cat} style={{ marginBottom: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
-                  <span style={{ color: '#3E5A4C' }}>{CAT_ICON[cat]} {cat}</span>
-                  <span style={{ fontWeight: 600, color: '#B96A3F' }}>{count}</span>
+                  <span style={{ color: 'var(--at-ink-2)' }}>{CAT_ICON[cat]} {cat}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--at-accent)' }}>{count}</span>
                 </div>
-                <div style={{ background: '#EAE6D8', borderRadius: 4, height: 6 }}>
-                  <div style={{ height: '100%', background: '#E6CDBB', width: `${(count / maxCat) * 100}%`, borderRadius: 4 }} />
+                <div style={{ background: 'var(--at-chip)', borderRadius: 4, height: 6 }}>
+                  <div style={{ height: '100%', background: 'var(--at-accent-soft)', width: `${(count / maxCat) * 100}%`, borderRadius: 4 }} />
                 </div>
               </div>
             ))
           }
-          <div style={{ marginTop: 12, padding: '8px 12px', background: '#FAF1EA', borderRadius: 8, fontSize: 11, color: '#7E9389' }}>
-            Respondidas: <strong style={{ color: '#B96A3F' }}>{pct(sugerencias.filter(s => s.estado === 'respondida').length, sugerencias.length)}%</strong> del total
+          <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--at-accent-tint-2)', borderRadius: 8, fontSize: 11, color: 'var(--at-ink-3)' }}>
+            Respondidas: <strong style={{ color: 'var(--at-accent)' }}>{pct(sugerencias.filter(s => s.estado === 'respondida').length, sugerencias.length)}%</strong> del total
           </div>
         </div>
       </div>

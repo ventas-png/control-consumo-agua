@@ -62,7 +62,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
   }
 
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   const totalActivos = articulos.filter(a => a.activo).length
 
@@ -73,11 +73,11 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
         {SECCIONES.map(s => {
           const n = articulos.filter(a => a.activo && a.seccion === s.id).length
           return (
-            <div key={s.id} style={{ background: '#FAF7EF', borderRadius: 8, padding: '8px 12px', textAlign: 'center', cursor: 'pointer', border: `1.5px solid ${filtroSeccion === s.id ? '#1B3B36' : '#E1DDD0'}` }}
+            <div key={s.id} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 12px', textAlign: 'center', cursor: 'pointer', border: `1.5px solid ${filtroSeccion === s.id ? 'var(--at-primary)' : 'var(--at-line)'}` }}
               onClick={() => setFiltroSeccion(filtroSeccion === s.id ? '' : s.id)}>
               <div style={{ fontSize: 18 }}>{s.icon}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#15291F' }}>{n}</div>
-              <div style={{ fontSize: 10, color: '#7E9389' }}>{s.label}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--at-ink)' }}>{n}</div>
+              <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{s.label}</div>
             </div>
           )
         })}
@@ -86,9 +86,9 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
       {/* Filtros + botón */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: '#7E9389' }}>{lista.length} artículo{lista.length !== 1 ? 's' : ''} · {totalActivos} activos</span>
+          <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>{lista.length} artículo{lista.length !== 1 ? 's' : ''} · {totalActivos} activos</span>
           {canEdit && (
-            <label style={{ fontSize: 12, color: '#7E9389', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+            <label style={{ fontSize: 12, color: 'var(--at-ink-3)', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
               <input type="checkbox" checked={mostrarInactivos} onChange={e => setMostrarInactivos(e.target.checked)} />
               Ver ocultos
             </label>
@@ -96,7 +96,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#102622', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-primary-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nuevo artículo'}
           </button>
         )}
@@ -104,7 +104,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Agregar artículo al manual</div>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -128,7 +128,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#102622', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-primary-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Publicar'}
           </button>
         </div>
@@ -136,7 +136,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
 
       {/* Lista agrupada por sección */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '48px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '48px 0', fontSize: 13 }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>📚</div>
           Sin artículos en el manual — agrega el primero con el botón de arriba
         </div>
@@ -148,32 +148,32 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
             if (items.length === 0) return null
             return (
               <div key={sec.id} style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#15291F', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--at-ink)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span>{sec.icon}</span> {sec.label}
-                  <span style={{ fontSize: 11, color: '#7E9389', fontWeight: 400 }}>({items.length})</span>
+                  <span style={{ fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 400 }}>({items.length})</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {items.map(a => (
-                    <div key={a.id} style={{ background: '#fff', border: `1px solid ${a.activo ? '#E1DDD0' : '#fde68a'}`, borderRadius: 8, overflow: 'hidden', opacity: a.activo ? 1 : 0.7 }}>
+                    <div key={a.id} style={{ background: 'var(--at-surface)', border: `1px solid ${a.activo ? 'var(--at-line)' : '#fde68a'}`, borderRadius: 8, overflow: 'hidden', opacity: a.activo ? 1 : 0.7 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', cursor: 'pointer' }}
                         onClick={() => setExpandido(expandido === a.id ? null : a.id)}>
                         {!a.activo && <span style={{ fontSize: 10, background: '#fef3c7', color: '#d97706', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>Oculto</span>}
                         <span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>{a.titulo}</span>
-                        <span style={{ fontSize: 10, color: '#7E9389' }}>#{a.orden}</span>
+                        <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>#{a.orden}</span>
                         {canEdit && (
                           <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
                             <button onClick={() => toggleActivo(a.id, a.activo)}
-                              style={{ padding: '3px 8px', background: '#EAE6D8', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: '#7E9389' }}>
+                              style={{ padding: '3px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: 'var(--at-ink-3)' }}>
                               {a.activo ? 'Ocultar' : 'Mostrar'}
                             </button>
                             <button onClick={() => eliminar(a.id)}
                               style={{ padding: '3px 8px', background: '#fef2f2', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: '#ef4444' }}>✕</button>
                           </div>
                         )}
-                        <span style={{ fontSize: 11, color: '#7E9389' }}>{expandido === a.id ? '▲' : '▼'}</span>
+                        <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{expandido === a.id ? '▲' : '▼'}</span>
                       </div>
                       {expandido === a.id && (
-                        <div style={{ padding: '0 14px 14px', fontSize: 13, color: '#3E5A4C', whiteSpace: 'pre-wrap', lineHeight: 1.6, borderTop: '1px solid var(--at-chip)', paddingTop: 10 }}>
+                        <div style={{ padding: '0 14px 14px', fontSize: 13, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap', lineHeight: 1.6, borderTop: '1px solid var(--at-chip)', paddingTop: 10 }}>
                           {a.contenido}
                         </div>
                       )}

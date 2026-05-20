@@ -98,21 +98,21 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
 
   return (
     <div style={{ padding: '20px 24px' }}>
-      <h2 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Dashboard de Sostenibilidad</h2>
+      <h2 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Dashboard de Sostenibilidad</h2>
 
       {/* KPIs globales */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         {[
-          { label: 'Agua consumida (6m)', value: `${totalM3Agua.toFixed(0)} m³`, icon: '💧', color: '#1B3B36' },
-          { label: 'CO₂ equiv. agua',     value: `${co2Agua.toFixed(0)} kg`,     icon: '🌊', color: '#9C5733' },
-          { label: 'Residuos totales',    value: `${totalKg.toFixed(0)} kg`,     icon: '🗑️', color: '#7E9389' },
+          { label: 'Agua consumida (6m)', value: `${totalM3Agua.toFixed(0)} m³`, icon: '💧', color: 'var(--at-primary)' },
+          { label: 'CO₂ equiv. agua',     value: `${co2Agua.toFixed(0)} kg`,     icon: '🌊', color: 'var(--at-accent-hover)' },
+          { label: 'Residuos totales',    value: `${totalKg.toFixed(0)} kg`,     icon: '🗑️', color: 'var(--at-ink-3)' },
           { label: '% Reciclaje',         value: `${pctReciclaje.toFixed(0)}%`,  icon: '♻️', color: '#10b981' },
           { label: 'CO₂ ahorrado',        value: `${co2Ahorrado.toFixed(0)} kg`, icon: '🌱', color: '#16a34a' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
@@ -120,22 +120,22 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
 
         {/* Consumo agua por mes */}
-        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>💧 Consumo de Agua (últimos 6 meses)</h3>
+        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>💧 Consumo de Agua (últimos 6 meses)</h3>
           {loadingAgua ? (
-            <div style={{ textAlign: 'center', color: '#7E9389', padding: '20px' }}>Cargando...</div>
+            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '20px' }}>Cargando...</div>
           ) : aguaMeses.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#7E9389', padding: '20px', fontSize: '13px' }}>Sin datos de consumo de agua</div>
+            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '20px', fontSize: '13px' }}>Sin datos de consumo de agua</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {aguaMeses.map(a => (
                 <div key={a.mes}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#7E9389', marginBottom: '3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '3px' }}>
                     <span>{mesLabel(a.mes)}</span>
-                    <span style={{ fontWeight: 700, color: '#1B3B36' }}>{a.m3.toFixed(1)} m³</span>
+                    <span style={{ fontWeight: 700, color: 'var(--at-primary)' }}>{a.m3.toFixed(1)} m³</span>
                   </div>
-                  <div style={{ background: '#EAE6D8', borderRadius: '4px', height: '8px' }}>
-                    <div style={{ background: '#1B3B36', height: '8px', borderRadius: '4px', width: barWidth(a.m3, maxAgua), transition: 'width 0.3s' }} />
+                  <div style={{ background: 'var(--at-chip)', borderRadius: '4px', height: '8px' }}>
+                    <div style={{ background: 'var(--at-primary)', height: '8px', borderRadius: '4px', width: barWidth(a.m3, maxAgua), transition: 'width 0.3s' }} />
                   </div>
                 </div>
               ))}
@@ -144,19 +144,19 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
         </div>
 
         {/* Residuos por mes */}
-        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>♻️ Residuos por Mes (últimos 6 meses)</h3>
+        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>♻️ Residuos por Mes (últimos 6 meses)</h3>
           {residuosMeses.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#7E9389', padding: '20px', fontSize: '13px' }}>Sin datos de residuos</div>
+            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '20px', fontSize: '13px' }}>Sin datos de residuos</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {residuosMeses.map(r => (
                 <div key={r.mes}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#7E9389', marginBottom: '3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '3px' }}>
                     <span>{mesLabel(r.mes)}</span>
                     <span style={{ fontWeight: 700, color: '#10b981' }}>{r.kg.toFixed(1)} kg</span>
                   </div>
-                  <div style={{ background: '#EAE6D8', borderRadius: '4px', height: '8px' }}>
+                  <div style={{ background: 'var(--at-chip)', borderRadius: '4px', height: '8px' }}>
                     <div style={{ background: '#10b981', height: '8px', borderRadius: '4px', width: barWidth(r.kg, maxResiduo), transition: 'width 0.3s' }} />
                   </div>
                 </div>
@@ -166,20 +166,20 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
         </div>
 
         {/* Residuos por tipo */}
-        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>🗑️ Residuos por Tipo</h3>
+        <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>🗑️ Residuos por Tipo</h3>
           {tipoEntries.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#7E9389', padding: '20px', fontSize: '13px' }}>Sin datos</div>
+            <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '20px', fontSize: '13px' }}>Sin datos</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {tipoEntries.map(([tipo, kg]) => (
                 <div key={tipo}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#7E9389', marginBottom: '3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '3px' }}>
                     <span>{TIPO_LABELS[tipo]}</span>
-                    <span style={{ fontWeight: 700, color: TIPO_RECICLABLE.has(tipo) ? '#10b981' : '#7E9389' }}>{kg.toFixed(1)} kg</span>
+                    <span style={{ fontWeight: 700, color: TIPO_RECICLABLE.has(tipo) ? '#10b981' : 'var(--at-ink-3)' }}>{kg.toFixed(1)} kg</span>
                   </div>
-                  <div style={{ background: '#EAE6D8', borderRadius: '4px', height: '8px' }}>
-                    <div style={{ background: TIPO_RECICLABLE.has(tipo) ? '#10b981' : '#7E9389', height: '8px', borderRadius: '4px', width: barWidth(kg, maxTipo), transition: 'width 0.3s' }} />
+                  <div style={{ background: 'var(--at-chip)', borderRadius: '4px', height: '8px' }}>
+                    <div style={{ background: TIPO_RECICLABLE.has(tipo) ? '#10b981' : 'var(--at-ink-3)', height: '8px', borderRadius: '4px', width: barWidth(kg, maxTipo), transition: 'width 0.3s' }} />
                   </div>
                 </div>
               ))}
@@ -195,22 +195,22 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
               { icon: '💧', label: 'Agua tratada', detail: `${totalM3Agua.toFixed(0)} m³`, co2: co2Agua, desc: 'CO₂ equiv. generado' },
               { icon: '♻️', label: 'Reciclaje',    detail: `${reciclableKg.toFixed(0)} kg`, co2: co2Ahorrado, desc: 'CO₂ equiv. ahorrado', saved: true },
             ].map(item => (
-              <div key={item.label} style={{ background: 'white', borderRadius: '8px', padding: '12px' }}>
+              <div key={item.label} style={{ background: 'var(--at-surface)', borderRadius: '8px', padding: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#15291F' }}>{item.icon} {item.label}</div>
-                    <div style={{ fontSize: '11px', color: '#7E9389' }}>{item.detail}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)' }}>{item.icon} {item.label}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{item.detail}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '16px', fontWeight: 800, color: item.saved ? '#16a34a' : '#7E9389' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 800, color: item.saved ? '#16a34a' : 'var(--at-ink-3)' }}>
                       {item.saved ? '+' : ''}{item.co2.toFixed(0)} kg
                     </div>
-                    <div style={{ fontSize: '11px', color: '#7E9389' }}>{item.desc}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{item.desc}</div>
                   </div>
                 </div>
               </div>
             ))}
-            <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '4px', fontStyle: 'italic' }}>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px', fontStyle: 'italic' }}>
               *Factores estimados: agua 0.298 kg CO₂/m³ · reciclaje 1.5 kg CO₂/kg ahorrado (IPCC)
             </div>
           </div>

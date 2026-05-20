@@ -13,21 +13,21 @@ interface Props {
 }
 
 const TIPOS: { value: TipoAutoridad; label: string; icon: string; color: string }[] = [
-  { value: 'policia',        label: 'Policía',        icon: '👮', color: '#2F5D4F' },
+  { value: 'policia',        label: 'Policía',        icon: '👮', color: 'var(--at-primary-2)' },
   { value: 'bomberos',       label: 'Bomberos',       icon: '🚒', color: '#ef4444' },
   { value: 'salud',          label: 'Salud',          icon: '🏥', color: '#10b981' },
-  { value: 'municipalidad',  label: 'Municipalidad',  icon: '🏛️', color: '#B96A3F' },
+  { value: 'municipalidad',  label: 'Municipalidad',  icon: '🏛️', color: 'var(--at-accent)' },
   { value: 'electricidad',   label: 'Electricidad',   icon: '⚡', color: '#f59e0b' },
-  { value: 'agua',           label: 'Agua',           icon: '💧', color: '#577B69' },
-  { value: 'otro',           label: 'Otro',           icon: '🔍', color: '#7E9389' },
+  { value: 'agua',           label: 'Agua',           icon: '💧', color: 'var(--at-accent-2)' },
+  { value: 'otro',           label: 'Otro',           icon: '🔍', color: 'var(--at-ink-3)' },
 ]
 
 const RESULTADOS: { value: ResultadoAutoridad; label: string; color: string; bg: string }[] = [
   { value: 'sin_novedad',       label: 'Sin novedad',       color: '#10b981', bg: '#d1fae5' },
   { value: 'acta_levantada',    label: 'Acta levantada',    color: '#f59e0b', bg: '#fef3c7' },
   { value: 'sancion',           label: 'Sanción',           color: '#ef4444', bg: '#fef2f2' },
-  { value: 'recomendacion',     label: 'Recomendación',     color: '#B96A3F', bg: '#F4EBE3' },
-  { value: 'otro',              label: 'Otro',              color: '#7E9389', bg: '#EAE6D8' },
+  { value: 'recomendacion',     label: 'Recomendación',     color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
+  { value: 'otro',              label: 'Otro',              color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 ]
 
 export default function RegistroAutoridadesTab({ registros, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
@@ -90,7 +90,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
@@ -106,7 +106,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
             </div>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nuevo
               </button>
             )}
@@ -121,20 +121,20 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
           </label>
         </div>
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
+        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
 
         {lista.map(r => {
           const tipo = TIPOS.find(t => t.value === r.tipo_autoridad)
           const res = RESULTADOS.find(x => x.value === r.resultado)
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? '#F4EBE3' : '#fff', borderLeft: `3px solid ${r.requiere_seguimiento ? '#f59e0b' : tipo?.color}` }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-accent-tint)' : '#fff', borderLeft: `3px solid ${r.requiere_seguimiento ? '#f59e0b' : tipo?.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
                 {r.resultado && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: res?.bg, color: res?.color }}>{res?.label}</span>}
               </div>
-              <div style={{ fontSize: 12, color: '#3E5A4C', marginTop: 2, lineHeight: 1.4 }}>{r.motivo.length > 60 ? r.motivo.slice(0, 60) + '…' : r.motivo}</div>
-              <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--at-ink-2)', marginTop: 2, lineHeight: 1.4 }}>{r.motivo.length > 60 ? r.motivo.slice(0, 60) + '…' : r.motivo}</div>
+              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>
                 {r.fecha}
                 {r.nombre_institucion && <span> · {r.nombre_institucion}</span>}
               </div>
@@ -211,7 +211,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
                 {saving ? 'Guardando…' : '✅ Registrar'}
               </button>
               <button onClick={() => setMostrarForm(false)}
-                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -227,7 +227,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
                 <div>
                   <div style={{ fontSize: 12, color: tipo?.color, fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>{tipo?.icon} {tipo?.label}</div>
                   <div style={{ fontWeight: 700, fontSize: 18 }}>{selected.motivo}</div>
-                  <div style={{ fontSize: 12, color: '#7E9389', marginTop: 4 }}>{selected.fecha}{selected.hora_llegada && <span> · Llegada: {selected.hora_llegada.slice(0, 5)}</span>}{selected.hora_salida && <span> · Salida: {selected.hora_salida.slice(0, 5)}</span>}</div>
+                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>{selected.fecha}{selected.hora_llegada && <span> · Llegada: {selected.hora_llegada.slice(0, 5)}</span>}{selected.hora_salida && <span> · Salida: {selected.hora_salida.slice(0, 5)}</span>}</div>
                 </div>
                 {selected.resultado && (
                   <span style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, background: res?.bg, color: res?.color, fontWeight: 600 }}>{res?.label}</span>
@@ -236,20 +236,20 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                 {selected.nombre_institucion && (
-                  <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#7E9389' }}>Institución</div>
+                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Institución</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.nombre_institucion}</div>
                   </div>
                 )}
                 {selected.nombre_funcionario && (
-                  <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#7E9389' }}>Funcionario</div>
+                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Funcionario</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.nombre_funcionario}</div>
                   </div>
                 )}
                 {selected.documento_referencia && (
-                  <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#7E9389' }}>Documento</div>
+                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Documento</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.documento_referencia}</div>
                   </div>
                 )}
@@ -271,8 +271,8 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
               )}
 
               {selected.observaciones && (
-                <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: '#3E5A4C', lineHeight: 1.6 }}>
-                  <strong style={{ fontSize: 11, color: '#7E9389', display: 'block', marginBottom: 4 }}>OBSERVACIONES</strong>
+                <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '12px 16px', fontSize: 13, color: 'var(--at-ink-2)', lineHeight: 1.6 }}>
+                  <strong style={{ fontSize: 11, color: 'var(--at-ink-3)', display: 'block', marginBottom: 4 }}>OBSERVACIONES</strong>
                   {selected.observaciones}
                 </div>
               )}
@@ -288,7 +288,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
                 <div style={{ fontSize: 12, color: '#92400e' }}>Filtra por "solo con seguimiento" para ver los pendientes</div>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: '#7E9389', fontSize: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: 'var(--at-ink-3)', fontSize: 14 }}>
               Selecciona un registro o crea uno nuevo
             </div>
           </div>

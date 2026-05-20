@@ -92,37 +92,37 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
   }
 
   const FILTRO_CFG: Record<FiltroDirect, { label: string; color: string; bg: string }> = {
-    todos:          { label: `Todos (${resumen.total})`,                color: '#3E5A4C', bg: '#FAF7EF' },
-    con_propietario:{ label: `Propietario (${resumen.conPropietario})`, color: '#1B3B36', bg: '#EEF2EC' },
-    en_renta:       { label: `En renta (${resumen.enRenta})`,          color: '#9C5733', bg: '#FAF1EA' },
+    todos:          { label: `Todos (${resumen.total})`,                color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
+    con_propietario:{ label: `Propietario (${resumen.conPropietario})`, color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
+    en_renta:       { label: `En renta (${resumen.enRenta})`,          color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
     libre:          { label: `Libre (${resumen.libre})`,               color: '#16a34a', bg: '#dcfce7' },
-    inactiva:       { label: `Inactiva (${resumen.inactiva})`,         color: '#7E9389', bg: '#FAF7EF' },
+    inactiva:       { label: `Inactiva (${resumen.inactiva})`,         color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)' },
   }
 
   return (
     <div style={{ padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Directorio de la Comunidad</div>
+        <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)' }}>Directorio de la Comunidad</div>
         <button onClick={exportarCSV}
-          style={{ padding: '6px 14px', background: '#15291F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+          style={{ padding: '6px 14px', background: 'var(--at-ink)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
           📥 Exportar CSV
         </button>
       </div>
-      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 14 }}>
+      <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 14 }}>
         {resumen.total} unidades · {resumen.totalMascotas} mascotas · {resumen.totalVehiculos} vehículos registrados
       </div>
 
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
         {[
-          { label: 'Propietarios',   val: String(resumen.conPropietario), color: '#1B3B36', bg: '#EEF2EC' },
-          { label: 'Arrendatarios',  val: String(resumen.enRenta),        color: '#9C5733', bg: '#FAF1EA' },
+          { label: 'Propietarios',   val: String(resumen.conPropietario), color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
+          { label: 'Arrendatarios',  val: String(resumen.enRenta),        color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
           { label: 'Libres',         val: String(resumen.libre),          color: '#16a34a', bg: '#dcfce7' },
           { label: 'Mascotas',       val: String(resumen.totalMascotas),  color: '#f59e0b', bg: '#fffbeb' },
-          { label: 'Vehículos',      val: String(resumen.totalVehiculos), color: '#3E5A4C', bg: '#FAF7EF' },
+          { label: 'Vehículos',      val: String(resumen.totalVehiculos), color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 90px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '8px 12px' }}>
-            <div style={{ fontSize: 10, color: '#7E9389' }}>{k.label}</div>
+            <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 16, fontWeight: 800, color: k.color, marginTop: 1 }}>{k.val}</div>
           </div>
         ))}
@@ -150,8 +150,8 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
       </div>
 
       {/* Tabla */}
-      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{ padding: '8px 14px', background: '#FAF7EF', fontSize: 11, color: '#7E9389', fontWeight: 600, display: 'flex', gap: 8 }}>
+      <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ padding: '8px 14px', background: 'var(--at-surface-2)', fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600, display: 'flex', gap: 8 }}>
           <span style={{ width: 90 }}>Unidad</span>
           <span style={{ width: 70 }}>Estado</span>
           <span style={{ flex: 1 }}>Propietario</span>
@@ -161,10 +161,10 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
         </div>
 
         {filtrado.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: '#7E9389', fontSize: 12 }}>Sin unidades en este filtro.</div>
+          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--at-ink-3)', fontSize: 12 }}>Sin unidades en este filtro.</div>
         ) : filtrado.map((d, i) => {
           const abierta = expandida === d.u.id
-          const estadoColor = d.estado === 'en_renta' ? '#9C5733' : d.estado === 'con_propietario' ? '#1B3B36' : d.estado === 'libre' ? '#16a34a' : '#7E9389'
+          const estadoColor = d.estado === 'en_renta' ? 'var(--at-accent-hover)' : d.estado === 'con_propietario' ? 'var(--at-primary)' : d.estado === 'libre' ? '#16a34a' : 'var(--at-ink-3)'
           return (
             <div key={d.u.id}>
               <div onClick={() => setExpandida(abierta ? null : d.u.id)}
@@ -172,10 +172,10 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
                   borderTop: i > 0 ? '1px solid var(--at-chip)' : undefined, cursor: 'pointer',
                   background: abierta ? '#fafbff' : undefined }}>
                 <div style={{ width: 90 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#15291F' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-ink)' }}>
                     {(TIPO_ICON as Record<string, string>)[d.u.tipo] ?? '📋'} {d.u.nombre}
                   </div>
-                  {d.u.piso != null && <div style={{ fontSize: 9, color: '#7E9389' }}>Piso {d.u.piso}</div>}
+                  {d.u.piso != null && <div style={{ fontSize: 9, color: 'var(--at-ink-3)' }}>Piso {d.u.piso}</div>}
                 </div>
                 <div style={{ width: 70 }}>
                   <span style={{ fontSize: 10, fontWeight: 700, color: estadoColor, background: `${estadoColor}15`,
@@ -183,61 +183,61 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
                 </div>
                 <div style={{ flex: 1 }}>
                   {d.u.propietario_nombre
-                    ? <div style={{ fontSize: 12, color: '#15291F' }}>{d.u.propietario_nombre}
-                        {d.u.propietario_telefono && <span style={{ fontSize: 10, color: '#7E9389' }}> · {d.u.propietario_telefono}</span>}
+                    ? <div style={{ fontSize: 12, color: 'var(--at-ink)' }}>{d.u.propietario_nombre}
+                        {d.u.propietario_telefono && <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}> · {d.u.propietario_telefono}</span>}
                       </div>
-                    : <span style={{ fontSize: 11, color: '#C7C2B0' }}>—</span>}
+                    : <span style={{ fontSize: 11, color: 'var(--at-line-strong)' }}>—</span>}
                 </div>
                 <div style={{ flex: 1 }}>
                   {d.contrato
-                    ? <div style={{ fontSize: 12, color: '#15291F' }}>{d.contrato.arrendatario_nombre}
-                        {d.contrato.arrendatario_telefono && <span style={{ fontSize: 10, color: '#7E9389' }}> · {d.contrato.arrendatario_telefono}</span>}
+                    ? <div style={{ fontSize: 12, color: 'var(--at-ink)' }}>{d.contrato.arrendatario_nombre}
+                        {d.contrato.arrendatario_telefono && <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}> · {d.contrato.arrendatario_telefono}</span>}
                       </div>
-                    : <span style={{ fontSize: 11, color: '#C7C2B0' }}>—</span>}
+                    : <span style={{ fontSize: 11, color: 'var(--at-line-strong)' }}>—</span>}
                 </div>
                 <div style={{ width: 80, textAlign: 'center', fontSize: 12 }}>
                   {d.mascotasU.length > 0 ? d.mascotasU.map(m => ESPECIE_ICON[m.especie] ?? '🐾').join('') : '—'}
                 </div>
-                <div style={{ width: 80, textAlign: 'center', fontSize: 11, color: '#3E5A4C', fontWeight: 600 }}>
+                <div style={{ width: 80, textAlign: 'center', fontSize: 11, color: 'var(--at-ink-2)', fontWeight: 600 }}>
                   {d.vehiculosU.length > 0 ? `🚗 ${d.vehiculosU.length}` : '—'}
                 </div>
               </div>
 
               {/* Detalle expandido */}
               {abierta && (
-                <div style={{ background: '#FAF7EF', borderTop: '1px solid var(--at-line)', padding: '10px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div style={{ background: 'var(--at-surface-2)', borderTop: '1px solid var(--at-line)', padding: '10px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                   {/* Propietario */}
                   <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#7E9389', marginBottom: 4 }}>👤 PROPIETARIO</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: 4 }}>👤 PROPIETARIO</div>
                     {d.u.propietario_nombre ? (
                       <>
-                        <div style={{ fontSize: 12, color: '#15291F', fontWeight: 600 }}>{d.u.propietario_nombre}</div>
-                        {d.u.propietario_telefono && <div style={{ fontSize: 11, color: '#7E9389' }}>📞 {d.u.propietario_telefono}</div>}
-                        {d.u.propietario_email && <div style={{ fontSize: 11, color: '#7E9389' }}>✉ {d.u.propietario_email}</div>}
+                        <div style={{ fontSize: 12, color: 'var(--at-ink)', fontWeight: 600 }}>{d.u.propietario_nombre}</div>
+                        {d.u.propietario_telefono && <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>📞 {d.u.propietario_telefono}</div>}
+                        {d.u.propietario_email && <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>✉ {d.u.propietario_email}</div>}
                       </>
-                    ) : <div style={{ fontSize: 11, color: '#7E9389', fontStyle: 'italic' }}>Sin propietario registrado</div>}
+                    ) : <div style={{ fontSize: 11, color: 'var(--at-ink-3)', fontStyle: 'italic' }}>Sin propietario registrado</div>}
                   </div>
 
                   {/* Arrendatario */}
                   <div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#7E9389', marginBottom: 4 }}>🏠 ARRENDATARIO</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: 4 }}>🏠 ARRENDATARIO</div>
                     {d.contrato ? (
                       <>
-                        <div style={{ fontSize: 12, color: '#15291F', fontWeight: 600 }}>{d.contrato.arrendatario_nombre}</div>
-                        {d.contrato.arrendatario_telefono && <div style={{ fontSize: 11, color: '#7E9389' }}>📞 {d.contrato.arrendatario_telefono}</div>}
-                        {d.contrato.arrendatario_email && <div style={{ fontSize: 11, color: '#7E9389' }}>✉ {d.contrato.arrendatario_email}</div>}
-                        <div style={{ fontSize: 10, color: '#7E9389', marginTop: 2 }}>Contrato: {d.contrato.fecha_inicio} — {d.contrato.fecha_fin ?? 'indefinido'}</div>
+                        <div style={{ fontSize: 12, color: 'var(--at-ink)', fontWeight: 600 }}>{d.contrato.arrendatario_nombre}</div>
+                        {d.contrato.arrendatario_telefono && <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>📞 {d.contrato.arrendatario_telefono}</div>}
+                        {d.contrato.arrendatario_email && <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>✉ {d.contrato.arrendatario_email}</div>}
+                        <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 2 }}>Contrato: {d.contrato.fecha_inicio} — {d.contrato.fecha_fin ?? 'indefinido'}</div>
                       </>
-                    ) : <div style={{ fontSize: 11, color: '#7E9389', fontStyle: 'italic' }}>Sin arrendatario</div>}
+                    ) : <div style={{ fontSize: 11, color: 'var(--at-ink-3)', fontStyle: 'italic' }}>Sin arrendatario</div>}
                   </div>
 
                   {/* Mascotas y vehículos */}
                   <div>
                     {d.mascotasU.length > 0 && (
                       <>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#7E9389', marginBottom: 4 }}>🐾 MASCOTAS</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: 4 }}>🐾 MASCOTAS</div>
                         {d.mascotasU.map(m => (
-                          <div key={m.id} style={{ fontSize: 11, color: '#3E5A4C', marginBottom: 1 }}>
+                          <div key={m.id} style={{ fontSize: 11, color: 'var(--at-ink-2)', marginBottom: 1 }}>
                             {ESPECIE_ICON[m.especie] ?? '🐾'} {m.nombre} ({m.especie}{m.raza ? `, ${m.raza}` : ''})
                           </div>
                         ))}
@@ -245,16 +245,16 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
                     )}
                     {d.vehiculosU.length > 0 && (
                       <>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#7E9389', marginBottom: 4, marginTop: d.mascotasU.length > 0 ? 8 : 0 }}>🚗 VEHÍCULOS</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: 4, marginTop: d.mascotasU.length > 0 ? 8 : 0 }}>🚗 VEHÍCULOS</div>
                         {d.vehiculosU.map(v => (
-                          <div key={v.id} style={{ fontSize: 11, color: '#3E5A4C', marginBottom: 1 }}>
+                          <div key={v.id} style={{ fontSize: 11, color: 'var(--at-ink-2)', marginBottom: 1 }}>
                             {v.placa} {v.marca ? `· ${v.marca}` : ''} {v.modelo ? v.modelo : ''} {v.color ? `(${v.color})` : ''}
                           </div>
                         ))}
                       </>
                     )}
                     {d.mascotasU.length === 0 && d.vehiculosU.length === 0 && (
-                      <div style={{ fontSize: 11, color: '#7E9389', fontStyle: 'italic' }}>Sin mascotas ni vehículos</div>
+                      <div style={{ fontSize: 11, color: 'var(--at-ink-3)', fontStyle: 'italic' }}>Sin mascotas ni vehículos</div>
                     )}
                   </div>
                 </div>
@@ -264,7 +264,7 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
         })}
       </div>
 
-      <div style={{ marginTop: 8, fontSize: 10, color: '#7E9389', textAlign: 'right' }}>
+      <div style={{ marginTop: 8, fontSize: 10, color: 'var(--at-ink-3)', textAlign: 'right' }}>
         Mostrando {filtrado.length} de {directorio.length} unidades · Haz clic en una fila para ver detalles
       </div>
     </div>

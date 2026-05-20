@@ -89,7 +89,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
     >
       <div
         style={{
-          background: 'white',
+          background: 'var(--at-surface)',
           borderRadius: '16px',
           padding: '32px',
           width: '100%',
@@ -98,30 +98,30 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#15291F', margin: 0 }}>💳 Pagar con Stripe</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)', margin: 0 }}>💳 Pagar con Stripe</h2>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#7E9389' }}
+            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--at-ink-3)' }}
           >
             ✕
           </button>
         </div>
 
-        <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
             <div>
-              <div style={{ color: '#7E9389', marginBottom: '2px' }}>Total Cargo</div>
-              <div style={{ fontWeight: 700, color: '#15291F' }}>{moneda} {total.toFixed(2)}</div>
+              <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Total Cargo</div>
+              <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {total.toFixed(2)}</div>
             </div>
             <div>
-              <div style={{ color: '#7E9389', marginBottom: '2px' }}>Saldo Pendiente</div>
+              <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Saldo Pendiente</div>
               <div style={{ fontWeight: 700, color: '#ef4444', fontSize: '16px' }}>{moneda} {saldo.toFixed(2)}</div>
             </div>
           </div>
         </div>
 
         <div style={{ marginBottom: '24px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#3E5A4C', marginBottom: '8px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
             Monto a Pagar ({moneda}) *
           </label>
           <input
@@ -152,8 +152,8 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
               padding: '12px',
               borderRadius: '8px',
               border: '1.5px solid var(--at-line)',
-              background: 'white',
-              color: '#7E9389',
+              background: 'var(--at-surface)',
+              color: 'var(--at-ink-3)',
               fontWeight: 700,
               fontSize: '14px',
               cursor: 'pointer',
@@ -169,7 +169,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
               padding: '12px',
               borderRadius: '8px',
               border: 'none',
-              background: loading ? '#C7C2B0' : 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
+              background: loading ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))',
               color: 'white',
               fontWeight: 700,
               fontSize: '14px',

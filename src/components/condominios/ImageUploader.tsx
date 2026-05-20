@@ -93,7 +93,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
 
   return (
     <div style={{ width: '100%' }}>
-      <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 6 }}>{label}</label>
+      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: 6 }}>{label}</label>
       {value ? (
         <div style={{ position: 'relative', width: '100%', paddingBottom: '75%' }}>
           <SecureImage src={value} alt="preview"
@@ -111,13 +111,13 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
           onDragOver={e => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
           onClick={() => inputRef.current?.click()}
-          style={{ width: '100%', paddingBottom: '75%', position: 'relative', border: `2px dashed ${dragOver ? '#1B3B36' : '#C7C2B0'}`, borderRadius: 10, cursor: 'pointer', background: dragOver ? '#EEF2EC' : '#FAF7EF', transition: 'all 0.15s' }}>
+          style={{ width: '100%', paddingBottom: '75%', position: 'relative', border: `2px dashed ${dragOver ? 'var(--at-primary)' : 'var(--at-line-strong)'}`, borderRadius: 10, cursor: 'pointer', background: dragOver ? 'var(--at-primary-tint)' : 'var(--at-surface-2)', transition: 'all 0.15s' }}>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
             {uploading
-              ? <div style={{ fontSize: 11, color: '#1B3B36' }}>Subiendo…</div>
+              ? <div style={{ fontSize: 11, color: 'var(--at-primary)' }}>Subiendo…</div>
               : <>
                   <span style={{ fontSize: 24 }}>📷</span>
-                  <span style={{ fontSize: 10, color: '#7E9389', textAlign: 'center', lineHeight: 1.3 }}>
+                  <span style={{ fontSize: 10, color: 'var(--at-ink-3)', textAlign: 'center', lineHeight: 1.3 }}>
                     {capture ? 'Tomar foto' : 'Clic o arrastra imagen'}
                   </span>
                 </>}
@@ -192,8 +192,8 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
 
   return (
     <div>
-      <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 6 }}>
-        {label} <span style={{ fontWeight: 400, color: '#7E9389' }}>({values.length}/{maxFiles})</span>
+      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: 6 }}>
+        {label} <span style={{ fontWeight: 400, color: 'var(--at-ink-3)' }}>({values.length}/{maxFiles})</span>
       </label>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 8 }}>
         {values.map(url => (
@@ -214,13 +214,13 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
             onClick={() => inputRef.current?.click()}
-            style={{ paddingBottom: '75%', position: 'relative', border: `2px dashed ${dragOver ? '#1B3B36' : '#C7C2B0'}`, borderRadius: 8, cursor: 'pointer', background: dragOver ? '#EEF2EC' : '#FAF7EF' }}>
+            style={{ paddingBottom: '75%', position: 'relative', border: `2px dashed ${dragOver ? 'var(--at-primary)' : 'var(--at-line-strong)'}`, borderRadius: 8, cursor: 'pointer', background: dragOver ? 'var(--at-primary-tint)' : 'var(--at-surface-2)' }}>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               {uploading
-                ? <span style={{ fontSize: 10, color: '#1B3B36' }}>…</span>
+                ? <span style={{ fontSize: 10, color: 'var(--at-primary)' }}>…</span>
                 : <>
                     <span style={{ fontSize: 20 }}>{capture ? '📷' : '+'}</span>
-                    {capture && <span style={{ fontSize: 9, color: '#7E9389', marginTop: 2 }}>Cámara</span>}
+                    {capture && <span style={{ fontSize: 9, color: 'var(--at-ink-3)', marginTop: 2 }}>Cámara</span>}
                   </>}
             </div>
           </div>

@@ -421,7 +421,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
             : isHovered
             ? 'rgba(255,255,255,0.05)'
             : 'transparent',
-          color: isActive ? '#ffffff' : isHovered ? '#C7C2B0' : '#7E9389',
+          color: isActive ? '#ffffff' : isHovered ? 'var(--at-line-strong)' : 'var(--at-ink-3)',
           fontWeight: isActive ? 600 : 400,
           fontSize: '13.5px',
           letterSpacing: isActive ? '-0.1px' : '0',
@@ -442,7 +442,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
               : isHovered
               ? 'rgba(255,255,255,0.07)'
               : 'transparent',
-            color: isActive ? '#ffffff' : isHovered ? '#7E9389' : '#3E5A4C',
+            color: isActive ? '#ffffff' : isHovered ? 'var(--at-ink-3)' : 'var(--at-ink-2)',
             transition: 'all 0.14s ease',
           }}
         >
@@ -472,7 +472,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
       style={{
         width: '256px',
         minWidth: '256px',
-        background: '#102622',
+        background: 'var(--at-primary-hover)',
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
@@ -490,10 +490,10 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
             <BrandLogo size={38} />
           </div>
           <div>
-            <div style={{ color: '#EAE6D8', fontWeight: 700, fontSize: '15px', letterSpacing: '-0.3px', lineHeight: '1.2' }}>
+            <div style={{ color: 'var(--at-chip)', fontWeight: 700, fontSize: '15px', letterSpacing: '-0.3px', lineHeight: '1.2' }}>
               AdministraTodo
             </div>
-            <div style={{ color: '#3E5A4C', fontSize: '11px', marginTop: '2px', letterSpacing: '0.02em' }}>
+            <div style={{ color: 'var(--at-ink-2)', fontSize: '11px', marginTop: '2px', letterSpacing: '0.02em' }}>
               Agua + Condominios
             </div>
           </div>
@@ -535,7 +535,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
                   border: 'none',
                   background: 'transparent',
                   cursor: 'pointer',
-                  color: isHG ? '#7E9389' : '#7E9389',
+                  color: isHG ? 'var(--at-ink-3)' : 'var(--at-ink-3)',
                   fontSize: '11px',
                   fontWeight: 700,
                   letterSpacing: '0.1em',
@@ -631,7 +631,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
           </div>
           <div style={{ overflow: 'hidden', flex: 1 }}>
             <div style={{
-              color: '#E1DDD0',
+              color: 'var(--at-line)',
               fontWeight: 600,
               fontSize: '13px',
               whiteSpace: 'nowrap',
@@ -641,7 +641,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
             }}>
               {currentUser.name}
             </div>
-            <div style={{ color: '#3E5A4C', fontSize: '11px', marginTop: '1px' }}>
+            <div style={{ color: 'var(--at-ink-2)', fontSize: '11px', marginTop: '1px' }}>
               {getDisplayRoleLabel(currentUser)}
             </div>
           </div>
@@ -665,7 +665,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
             borderRadius: '8px',
             cursor: 'pointer',
             background: hoveredLogout ? 'rgba(239,68,68,0.1)' : 'transparent',
-            color: hoveredLogout ? '#f87171' : '#3E5A4C',
+            color: hoveredLogout ? '#f87171' : 'var(--at-ink-2)',
             fontSize: '13px',
             fontWeight: 500,
             transition: 'all 0.14s ease',

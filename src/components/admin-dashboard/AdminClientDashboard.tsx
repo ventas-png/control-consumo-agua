@@ -196,14 +196,14 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
     <div>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '16px', color: '#15291F' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: '700', marginBottom: '16px', color: 'var(--at-ink)' }}>
           Dashboard - Administrador de Empresa
         </h1>
 
         {/* Selector de Proyecto */}
         {data.proyectos.length > 0 && (
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
-            <label style={{ fontSize: '14px', fontWeight: '600', color: '#3E5A4C' }}>Proyecto:</label>
+            <label style={{ fontSize: '14px', fontWeight: '600', color: 'var(--at-ink-2)' }}>Proyecto:</label>
             <select
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
@@ -213,7 +213,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                 border: '1px solid var(--at-line)',
                 fontSize: '14px',
                 fontWeight: '500',
-                background: 'white',
+                background: 'var(--at-surface)',
                 cursor: 'pointer',
                 minWidth: '200px',
               }}
@@ -228,19 +228,19 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
 
         {/* Selector de Rango de Fechas */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
-          <label style={{ fontSize: '14px', fontWeight: '600', color: '#3E5A4C' }}>Período:</label>
+          <label style={{ fontSize: '14px', fontWeight: '600', color: 'var(--at-ink-2)' }}>Período:</label>
           <input
             type="date"
             value={fechaDesde}
             onChange={e => setFechaDesde(e.target.value)}
-            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '13px', background: 'white' }}
+            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '13px', background: 'var(--at-surface)' }}
           />
-          <span style={{ fontSize: '13px', color: '#7E9389' }}>—</span>
+          <span style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>—</span>
           <input
             type="date"
             value={fechaHasta}
             onChange={e => setFechaHasta(e.target.value)}
-            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '13px', background: 'white' }}
+            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--at-line)', fontSize: '13px', background: 'var(--at-surface)' }}
           />
           {/* Quick presets */}
           {[
@@ -249,7 +249,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
             { label: 'Mes anterior', onClick: () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); const y = d.getFullYear(); const m = d.getMonth(); const last = new Date(y, m+1, 0); setFechaDesde(`${y}-${String(m+1).padStart(2,'0')}-01`); setFechaHasta(last.toISOString().slice(0,10)) } },
             { label: 'Últ. 3 meses', onClick: () => { const d = new Date(); const d90 = new Date(); d90.setDate(d.getDate() - 90); setFechaDesde(d90.toISOString().slice(0, 10)); setFechaHasta(d.toISOString().slice(0, 10)) } },
           ].map(p => (
-            <button key={p.label} onClick={p.onClick} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--at-line)', background: 'white', fontSize: '12px', fontWeight: 500, color: '#3E5A4C', cursor: 'pointer' }}>
+            <button key={p.label} onClick={p.onClick} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--at-line)', background: 'var(--at-surface)', fontSize: '12px', fontWeight: 500, color: 'var(--at-ink-2)', cursor: 'pointer' }}>
               {p.label}
             </button>
           ))}
@@ -271,7 +271,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                 padding: '10px 18px',
                 fontSize: '14px',
                 fontWeight: activeTab === tab.id ? '600' : '500',
-                color: activeTab === tab.id ? '#1B3B36' : '#7E9389',
+                color: activeTab === tab.id ? 'var(--at-primary)' : 'var(--at-ink-3)',
                 background: 'transparent',
                 border: 'none',
                 borderBottom: activeTab === tab.id ? '3px solid var(--at-primary)' : 'none',
@@ -332,7 +332,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
 
             {/* ── Estadísticas de Comunicaciones ─────────────────────── */}
             <div style={{ marginBottom: '32px' }}>
-              <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#7E9389', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 💬 Comunicaciones
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px' }}>
@@ -341,7 +341,7 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                   { label: 'Cerradas hoy', sub: 'últimas 24 horas', value: convStats.cerradasHoy, from: '#10b981', to: '#059669', icon: '✅' },
                   { label: 'Críticas', sub: 'abiertas > 48h', value: convStats.criticas, from: '#ef4444', to: '#dc2626', icon: '🚨' },
                   { label: 'Urgentes', sub: 'abiertas 24–48h', value: convStats.urgentes, from: '#f97316', to: '#ea580c', icon: '⚠️' },
-                  { label: 'En proceso', sub: 'abiertas < 24h', value: convStats.enProceso, from: '#1B3B36', to: '#102622', icon: '🔄' },
+                  { label: 'En proceso', sub: 'abiertas < 24h', value: convStats.enProceso, from: 'var(--at-primary)', to: 'var(--at-primary-hover)', icon: '🔄' },
                 ] as const).map(card => (
                   <button
                     key={card.label}
@@ -373,13 +373,13 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                 <div style={{ marginTop: '20px', overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
-                      <tr style={{ background: '#FAF7EF' }}>
-                        <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C', borderBottom: '2px solid var(--at-line)' }}>Proyecto</th>
+                      <tr style={{ background: 'var(--at-surface-2)' }}>
+                        <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)', borderBottom: '2px solid var(--at-line)' }}>Proyecto</th>
                         <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#d97706', borderBottom: '2px solid var(--at-line)' }}>📥 Sin asignar</th>
                         <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#059669', borderBottom: '2px solid var(--at-line)' }}>✅ Cerradas hoy</th>
                         <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#dc2626', borderBottom: '2px solid var(--at-line)' }}>🚨 Críticas</th>
                         <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#ea580c', borderBottom: '2px solid var(--at-line)' }}>⚠️ Urgentes</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#102622', borderBottom: '2px solid var(--at-line)' }}>🔄 En proceso</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-primary-hover)', borderBottom: '2px solid var(--at-line)' }}>🔄 En proceso</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -389,26 +389,26 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                         return (
                           <tr
                             key={p.id}
-                            style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF', cursor: 'pointer', transition: 'background 0.15s' }}
+                            style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', cursor: 'pointer', transition: 'background 0.15s' }}
                             onClick={() => setSelectedProjectId(p.id)}
-                            onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#EEF2EC'}
-                            onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'white' : '#FAF7EF'}
+                            onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-primary-tint)'}
+                            onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'white' : 'var(--at-surface-2)'}
                           >
-                            <td style={{ padding: '10px 14px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid var(--at-chip)' }}>
+                            <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--at-ink)', borderBottom: '1px solid var(--at-chip)' }}>
                               {hasCritica && <span style={{ marginRight: 6, color: '#ef4444' }}>●</span>}
                               {p.nombre}
                             </td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.sinAsignar > 0 ? 700 : 400, color: s.sinAsignar > 0 ? '#d97706' : '#7E9389' }}>{s.sinAsignar}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cerradasHoy > 0 ? 700 : 400, color: s.cerradasHoy > 0 ? '#059669' : '#7E9389' }}>{s.cerradasHoy}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.criticas > 0 ? 700 : 400, color: s.criticas > 0 ? '#dc2626' : '#7E9389' }}>{s.criticas}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.urgentes > 0 ? 700 : 400, color: s.urgentes > 0 ? '#ea580c' : '#7E9389' }}>{s.urgentes}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.enProceso > 0 ? 700 : 400, color: s.enProceso > 0 ? '#102622' : '#7E9389' }}>{s.enProceso}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.sinAsignar > 0 ? 700 : 400, color: s.sinAsignar > 0 ? '#d97706' : 'var(--at-ink-3)' }}>{s.sinAsignar}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cerradasHoy > 0 ? 700 : 400, color: s.cerradasHoy > 0 ? '#059669' : 'var(--at-ink-3)' }}>{s.cerradasHoy}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.criticas > 0 ? 700 : 400, color: s.criticas > 0 ? '#dc2626' : 'var(--at-ink-3)' }}>{s.criticas}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.urgentes > 0 ? 700 : 400, color: s.urgentes > 0 ? '#ea580c' : 'var(--at-ink-3)' }}>{s.urgentes}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.enProceso > 0 ? 700 : 400, color: s.enProceso > 0 ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>{s.enProceso}</td>
                           </tr>
                         )
                       })}
                     </tbody>
                   </table>
-                  <p style={{ fontSize: '11px', color: '#7E9389', marginTop: 8 }}>Haz clic en un proyecto para filtrar el dashboard</p>
+                  <p style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: 8 }}>Haz clic en un proyecto para filtrar el dashboard</p>
                 </div>
               )}
             </div>

@@ -14,17 +14,17 @@ interface Props {
 }
 
 const TIPOS: { value: TipoResiduo; label: string; icon: string; color: string }[] = [
-  { value: 'general',     label: 'General',     icon: '🗑️', color: '#7E9389' },
+  { value: 'general',     label: 'General',     icon: '🗑️', color: 'var(--at-ink-3)' },
   { value: 'reciclable',  label: 'Reciclable',  icon: '♻️', color: '#10b981' },
   { value: 'organico',    label: 'Orgánico',    icon: '🥬', color: '#84cc16' },
-  { value: 'electronico', label: 'Electrónico', icon: '💻', color: '#1B3B36' },
+  { value: 'electronico', label: 'Electrónico', icon: '💻', color: 'var(--at-primary)' },
   { value: 'peligroso',   label: 'Peligroso',   icon: '☢️', color: '#ef4444' },
   { value: 'escombros',   label: 'Escombros',   icon: '🧱', color: '#d97706' },
 ]
 
 const ESTADO_CONFIG: Record<EstadoResiduo, { label: string; color: string; bg: string }> = {
   pendiente:   { label: 'Pendiente',   color: '#f59e0b', bg: '#fef3c7' },
-  recolectado: { label: 'Recolectado', color: '#1B3B36', bg: '#D9E2DC' },
+  recolectado: { label: 'Recolectado', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
   procesado:   { label: 'Procesado',   color: '#10b981', bg: '#d1fae5' },
 }
 
@@ -103,8 +103,8 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
 
   const tipoInfo = (t: TipoResiduo) => TIPOS.find(x => x.value === t) ?? TIPOS[0]
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -121,33 +121,33 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Total registros', value: String(residuos.length), icon: '📊', color: '#1B3B36' },
+          { label: 'Total registros', value: String(residuos.length), icon: '📊', color: 'var(--at-primary)' },
           { label: 'Pendientes', value: String(pendientes.length), icon: '⏳', color: '#f59e0b' },
           { label: 'Total Kg registrado', value: totalKgAll > 0 ? `${totalKgAll.toFixed(1)} kg` : '—', icon: '⚖️', color: '#10b981' },
           { label: '% Reciclaje', value: totalKgAll > 0 ? `${pctReciclaje}%` : '—', icon: '♻️', color: '#84cc16' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '16px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>
           Registros
-          {totalKg > 0 && filtroTipo !== 'todos' && <span style={{ fontWeight: 400, fontSize: '13px', color: '#7E9389', marginLeft: '8px' }}>{totalKg.toFixed(1)} kg filtrados</span>}
+          {totalKg > 0 && filtroTipo !== 'todos' && <span style={{ fontWeight: 400, fontSize: '13px', color: 'var(--at-ink-3)', marginLeft: '8px' }}>{totalKg.toFixed(1)} kg filtrados</span>}
         </h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Registrar
           </button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Registro' : 'Nuevo Registro'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '12px' }}>
             <div>
@@ -179,7 +179,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
               <input style={inputStyle} value={form.empresa_recolectora ?? ''} onChange={e => setForm(f => ({ ...f, empresa_recolectora: e.target.value }))} />
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#3E5A4C', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--at-ink-2)', cursor: 'pointer' }}>
                 <input type="checkbox" checked={form.incidencia ?? false} onChange={e => setForm(f => ({ ...f, incidencia: e.target.checked }))} />
                 Hay incidencia
               </label>
@@ -196,8 +196,8 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Registrar'}
             </button>
           </div>
@@ -209,22 +209,22 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
         {TIPOS.map(t => (
           <button key={t.value} onClick={() => setFiltroTipo(filtroTipo === t.value ? 'todos' : t.value)}
             style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: filtroTipo === t.value ? t.color : '#E1DDD0',
+              borderColor: filtroTipo === t.value ? t.color : 'var(--at-line)',
               background: filtroTipo === t.value ? `${t.color}18` : 'white',
-              color: filtroTipo === t.value ? t.color : '#7E9389' }}>
+              color: filtroTipo === t.value ? t.color : 'var(--at-ink-3)' }}>
             {t.icon} {t.label} ({residuos.filter(r => r.tipo_residuo === t.value).length})
           </button>
         ))}
-        <div style={{ width: '1px', height: '24px', background: '#E1DDD0', margin: '0 4px' }} />
+        <div style={{ width: '1px', height: '24px', background: 'var(--at-line)', margin: '0 4px' }} />
         <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoResiduo | 'todos')}
-          style={{ padding: '5px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
+          style={{ padding: '5px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: 'var(--at-surface-2)' }}>
           <option value="todos">Todos los estados</option>
           {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>♻️</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay registros de residuos</p>
         </div>
@@ -232,9 +232,9 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: '#FAF7EF', borderBottom: '2px solid var(--at-line)' }}>
+              <tr style={{ background: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
                 {['Fecha', 'Tipo', 'Cantidad', 'Punto Acopio', 'Empresa', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#7E9389', fontSize: '12px' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-3)', fontSize: '12px' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -253,12 +253,12 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
                       <div style={{ fontSize: '11px', color: ti.color, fontWeight: 600 }}>{ti.label}</div>
                     </td>
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>{r.cantidad_kg != null ? `${r.cantidad_kg} kg` : '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#7E9389' }}>{r.punto_acopio ?? '—'}</td>
-                    <td style={{ padding: '10px 12px', color: '#7E9389' }}>{r.empresa_recolectora ?? '—'}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)' }}>{r.punto_acopio ?? '—'}</td>
+                    <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)' }}>{r.empresa_recolectora ?? '—'}</td>
                     <td style={{ padding: '10px 12px' }}>
                       {canEdit ? (
                         <select value={r.estado} onChange={e => handleEstado(r.id, e.target.value as EstadoResiduo)}
-                          style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'white', cursor: 'pointer' }}>
+                          style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'var(--at-surface)', cursor: 'pointer' }}>
                           {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                         </select>
                       ) : (
@@ -267,7 +267,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
                     </td>
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ display: 'flex', gap: '4px' }}>
-                        {canEdit && <button onClick={() => startEdit(r)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+                        {canEdit && <button onClick={() => startEdit(r)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
                         {canEdit && <button onClick={() => handleDelete(r.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
                       </div>
                     </td>

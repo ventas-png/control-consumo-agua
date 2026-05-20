@@ -19,12 +19,12 @@ interface Props {
 
 const CANAL_CFG: Record<CanalCampana, { label: string; icon: string; bg: string; color: string }> = {
   whatsapp: { label: 'WhatsApp', icon: '💬', bg: '#dcfce7', color: '#16a34a' },
-  email:    { label: 'Email',    icon: '✉️',  bg: '#EEF2EC', color: '#1B3B36' },
-  sms:      { label: 'SMS',      icon: '📱', bg: '#FAF1EA', color: '#9C5733' },
+  email:    { label: 'Email',    icon: '✉️',  bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
+  sms:      { label: 'SMS',      icon: '📱', bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)' },
 }
 const ESTADO_CFG: Record<EstadoCampana, { label: string; bg: string; color: string }> = {
-  borrador:   { label: 'Borrador',   bg: '#EAE6D8', color: '#7E9389' },
-  enviada:    { label: 'Enviada',    bg: '#D9E2DC', color: '#102622' },
+  borrador:   { label: 'Borrador',   bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
+  enviada:    { label: 'Enviada',    bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
   completada: { label: 'Completada', bg: '#dcfce7', color: '#16a34a' },
 }
 
@@ -98,7 +98,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
   }
 
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   const totalEnviadas = campanas.reduce((s, c) => s + c.enviadas, 0)
   const completadas = campanas.filter(c => c.estado === 'completada').length
@@ -108,10 +108,10 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Total campañas', val: campanas.length, bg: '#FAF7EF', color: '#3E5A4C' },
-          { label: 'Enviadas', val: campanas.filter(c => c.estado === 'enviada').length, bg: '#EEF2EC', color: '#1B3B36' },
+          { label: 'Total campañas', val: campanas.length, bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
+          { label: 'Enviadas', val: campanas.filter(c => c.estado === 'enviada').length, bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
           { label: 'Completadas', val: completadas, bg: '#dcfce7', color: '#16a34a' },
-          { label: 'Mensajes enviados', val: totalEnviadas, bg: '#FAF1EA', color: '#9C5733' },
+          { label: 'Mensajes enviados', val: totalEnviadas, bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: k.color }}>{k.val}</div>
@@ -122,12 +122,12 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <span style={{ fontSize: 13, color: '#7E9389' }}>
+        <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>
           <strong>{morosas.length}</strong> unidades morosas en el proyecto
         </span>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#9C5733', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nueva campaña'}
           </button>
         )}
@@ -135,7 +135,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF1EA', border: '1px solid var(--at-accent-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: 'var(--at-accent-tint-2)', border: '1px solid var(--at-accent-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nueva campaña de cobro</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -161,13 +161,13 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
               <input type="number" step="0.01" min={0} style={inp} value={form.criterio_monto_min} onChange={e => setForm(p => ({ ...p, criterio_monto_min: e.target.value }))} placeholder="Ej. 100.00" />
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <div style={{ padding: '8px 14px', background: '#EFE0D5', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#5E3417' }}>
+              <div style={{ padding: '8px 14px', background: 'var(--at-accent-soft-2)', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--at-accent-darker)' }}>
                 👥 {filteredPreview.length} destinatarios
               </div>
             </div>
           </div>
           <button onClick={crear} disabled={saving}
-            style={{ padding: '8px 20px', background: '#9C5733', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear campaña'}
           </button>
         </div>
@@ -175,7 +175,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
 
       {/* Lista + Detalle */}
       {campanas.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📣</div>
           Sin campañas de cobro — crea una para notificar a morosos en masa
         </div>
@@ -188,7 +188,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
               const pct = c.total_destinatarios > 0 ? Math.round((c.enviadas / c.total_destinatarios) * 100) : 0
               return (
                 <div key={c.id} onClick={() => setSelected(c === selected ? null : c)}
-                  style={{ background: selected?.id === c.id ? '#FAF1EA' : '#fff', border: `1.5px solid ${selected?.id === c.id ? '#CE8A63' : '#E1DDD0'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === c.id ? 'var(--at-accent-tint-2)' : '#fff', border: `1.5px solid ${selected?.id === c.id ? 'var(--at-accent-light)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                     <div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
@@ -197,7 +197,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
                         <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                         <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: cc.bg, color: cc.color }}>{cc.label}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: '#7E9389' }}>
+                      <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
                         {c.total_destinatarios} destinatarios
                         {c.criterio_dias_mora && ` · mora ≥ ${c.criterio_dias_mora}d`}
                         {c.criterio_monto_min && ` · deuda ≥ ${moneda} ${c.criterio_monto_min}`}
@@ -205,17 +205,17 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
                     </div>
                     {c.estado === 'borrador' && canEdit && (
                       <button onClick={e => { e.stopPropagation(); enviar(c) }}
-                        style={{ padding: '6px 12px', background: '#9C5733', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                        style={{ padding: '6px 12px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                         🚀 Enviar
                       </button>
                     )}
                   </div>
                   {c.estado !== 'borrador' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ flex: 1, background: '#E1DDD0', borderRadius: 20, height: 6, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', background: '#9C5733', width: `${pct}%`, borderRadius: 20 }} />
+                      <div style={{ flex: 1, background: 'var(--at-line)', borderRadius: 20, height: 6, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: 'var(--at-accent-hover)', width: `${pct}%`, borderRadius: 20 }} />
                       </div>
-                      <span style={{ fontSize: 11, color: '#7E9389', whiteSpace: 'nowrap' }}>{c.enviadas}/{c.total_destinatarios} enviadas</span>
+                      <span style={{ fontSize: 11, color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>{c.enviadas}/{c.total_destinatarios} enviadas</span>
                     </div>
                   )}
                 </div>
@@ -223,9 +223,9 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
             })}
           </div>
           {selected && (
-            <div style={{ width: 260, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 260, flexShrink: 0, background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 14 }}>Detalle</div>
-              <div style={{ fontSize: 12, color: '#3E5A4C', lineHeight: 1.6, background: '#FAF7EF', borderRadius: 8, padding: '10px 12px', marginBottom: 10, whiteSpace: 'pre-wrap' }}>
+              <div style={{ fontSize: 12, color: 'var(--at-ink-2)', lineHeight: 1.6, background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 10, whiteSpace: 'pre-wrap' }}>
                 {selected.mensaje}
               </div>
               {[
@@ -237,7 +237,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
                 ['Fecha envío', selected.fecha_envio ? new Date(selected.fecha_envio).toLocaleString('es') : '—'],
               ].map(([k, v]) => (
                 <div key={String(k)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--at-chip)' }}>
-                  <span style={{ color: '#7E9389' }}>{k}</span>
+                  <span style={{ color: 'var(--at-ink-3)' }}>{k}</span>
                   <span style={{ fontWeight: 600 }}>{v}</span>
                 </div>
               ))}

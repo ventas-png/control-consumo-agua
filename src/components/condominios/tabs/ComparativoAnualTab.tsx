@@ -37,7 +37,7 @@ function variacion(a: number, b: number): { pct: number; dir: 'up' | 'down' | 'e
 }
 
 function Badge({ v, invertido = false }: { v: ReturnType<typeof variacion>; invertido?: boolean }) {
-  if (v.dir === 'eq') return <span style={{ fontSize: 10, color: '#7E9389' }}>—</span>
+  if (v.dir === 'eq') return <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>—</span>
   const isGood = invertido ? v.dir === 'down' : v.dir === 'up'
   return (
     <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 20,
@@ -77,19 +77,19 @@ export default function ComparativoAnualTab({ cuotas, gastos, moneda }: Props) {
     1
   )
 
-  const SEL = { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, background: '#fff', fontWeight: 600 }
+  const SEL = { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, background: 'var(--at-surface)', fontWeight: 600 }
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F', marginBottom: 2 }}>Comparativo Anual</div>
+      <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)', marginBottom: 2 }}>Comparativo Anual</div>
 
       {/* Selectores */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-        <select value={anioA} onChange={e => setAnioA(Number(e.target.value))} style={{ ...SEL, color: '#1B3B36' }}>
+        <select value={anioA} onChange={e => setAnioA(Number(e.target.value))} style={{ ...SEL, color: 'var(--at-primary)' }}>
           {aniosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
-        <span style={{ fontWeight: 700, color: '#7E9389' }}>vs</span>
-        <select value={anioB} onChange={e => setAnioB(Number(e.target.value))} style={{ ...SEL, color: '#9C5733' }}>
+        <span style={{ fontWeight: 700, color: 'var(--at-ink-3)' }}>vs</span>
+        <select value={anioB} onChange={e => setAnioB(Number(e.target.value))} style={{ ...SEL, color: 'var(--at-accent-hover)' }}>
           {aniosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
       </div>
@@ -103,24 +103,24 @@ export default function ComparativoAnualTab({ cuotas, gastos, moneda }: Props) {
         ].map(k => {
           const v = variacion(k.a, k.b)
           return (
-            <div key={k.label} style={{ flex: '1 1 150px', background: '#fff', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px' }}>
-              <div style={{ fontSize: 10, color: '#7E9389', marginBottom: 6 }}>{k.label}</div>
+            <div key={k.label} style={{ flex: '1 1 150px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '10px 14px' }}>
+              <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginBottom: 6 }}>{k.label}</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
                 <div>
-                  <div style={{ fontSize: 9, color: '#1B3B36', fontWeight: 600 }}>{anioA}</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#15291F' }}>{moneda} {Math.round(k.a).toLocaleString('es')}</div>
+                  <div style={{ fontSize: 9, color: 'var(--at-primary)', fontWeight: 600 }}>{anioA}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--at-ink)' }}>{moneda} {Math.round(k.a).toLocaleString('es')}</div>
                 </div>
                 <Badge v={v} invertido={k.inv} />
               </div>
-              <div style={{ fontSize: 10, color: '#9C5733' }}>{anioB}: {moneda} {Math.round(k.b).toLocaleString('es')}</div>
+              <div style={{ fontSize: 10, color: 'var(--at-accent-hover)' }}>{anioB}: {moneda} {Math.round(k.b).toLocaleString('es')}</div>
             </div>
           )
         })}
       </div>
 
       {/* Gráfica lado a lado */}
-      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, marginBottom: 14 }}>
-        <div style={{ fontWeight: 700, fontSize: 12, color: '#15291F', marginBottom: 10 }}>Ingresos vs Egresos por mes</div>
+      <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--at-ink)', marginBottom: 10 }}>Ingresos vs Egresos por mes</div>
         <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 130 }}>
           {MESES.map((mes, i) => {
             const mA = datosA[i], mB = datosB[i]
@@ -128,28 +128,28 @@ export default function ComparativoAnualTab({ cuotas, gastos, moneda }: Props) {
               <div key={mes} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                 <div style={{ width: '100%', display: 'flex', gap: 1, alignItems: 'flex-end', height: 110 }}>
                   {/* Año A — ingresos */}
-                  <div style={{ flex: 1, background: '#1B3B36', opacity: 0.85, borderRadius: '2px 2px 0 0',
+                  <div style={{ flex: 1, background: 'var(--at-primary)', opacity: 0.85, borderRadius: '2px 2px 0 0',
                     height: `${(mA.ingresos / maxVal) * 100}%`, minHeight: mA.ingresos > 0 ? 2 : 0 }} />
                   {/* Año A — egresos */}
                   <div style={{ flex: 1, background: '#f97316', opacity: 0.85, borderRadius: '2px 2px 0 0',
                     height: `${(mA.egresos / maxVal) * 100}%`, minHeight: mA.egresos > 0 ? 2 : 0 }} />
                   {/* Año B — ingresos */}
-                  <div style={{ flex: 1, background: '#9C5733', opacity: 0.6, borderRadius: '2px 2px 0 0',
+                  <div style={{ flex: 1, background: 'var(--at-accent-hover)', opacity: 0.6, borderRadius: '2px 2px 0 0',
                     height: `${(mB.ingresos / maxVal) * 100}%`, minHeight: mB.ingresos > 0 ? 2 : 0 }} />
                   {/* Año B — egresos */}
                   <div style={{ flex: 1, background: '#f97316', opacity: 0.4, borderRadius: '2px 2px 0 0',
                     height: `${(mB.egresos / maxVal) * 100}%`, minHeight: mB.egresos > 0 ? 2 : 0 }} />
                 </div>
-                <div style={{ fontSize: 8, color: '#7E9389' }}>{mes}</div>
+                <div style={{ fontSize: 8, color: 'var(--at-ink-3)' }}>{mes}</div>
               </div>
             )
           })}
         </div>
         <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 10, flexWrap: 'wrap' }}>
           {[
-            { color: '#1B3B36', opacity: '0.85', label: `${anioA} Ingresos` },
+            { color: 'var(--at-primary)', opacity: '0.85', label: `${anioA} Ingresos` },
             { color: '#f97316', opacity: '0.85', label: `${anioA} Egresos` },
-            { color: '#9C5733', opacity: '0.6', label: `${anioB} Ingresos` },
+            { color: 'var(--at-accent-hover)', opacity: '0.6', label: `${anioB} Ingresos` },
             { color: '#f97316', opacity: '0.4', label: `${anioB} Egresos` },
           ].map(l => (
             <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -161,23 +161,23 @@ export default function ComparativoAnualTab({ cuotas, gastos, moneda }: Props) {
       </div>
 
       {/* Tabla mes a mes */}
-      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead>
-            <tr style={{ background: '#FAF7EF' }}>
-              <th style={{ padding: '8px 10px', textAlign: 'left', color: '#7E9389', fontWeight: 600 }}>Mes</th>
-              <th colSpan={3} style={{ padding: '8px 10px', textAlign: 'center', color: '#1B3B36', fontWeight: 700, borderRight: '2px solid var(--at-line)' }}>{anioA}</th>
-              <th colSpan={3} style={{ padding: '8px 10px', textAlign: 'center', color: '#9C5733', fontWeight: 700, borderRight: '2px solid var(--at-line)' }}>{anioB}</th>
-              <th style={{ padding: '8px 10px', textAlign: 'center', color: '#7E9389', fontWeight: 600 }}>Δ Ingresos</th>
+            <tr style={{ background: 'var(--at-surface-2)' }}>
+              <th style={{ padding: '8px 10px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600 }}>Mes</th>
+              <th colSpan={3} style={{ padding: '8px 10px', textAlign: 'center', color: 'var(--at-primary)', fontWeight: 700, borderRight: '2px solid var(--at-line)' }}>{anioA}</th>
+              <th colSpan={3} style={{ padding: '8px 10px', textAlign: 'center', color: 'var(--at-accent-hover)', fontWeight: 700, borderRight: '2px solid var(--at-line)' }}>{anioB}</th>
+              <th style={{ padding: '8px 10px', textAlign: 'center', color: 'var(--at-ink-3)', fontWeight: 600 }}>Δ Ingresos</th>
             </tr>
-            <tr style={{ background: '#FAF7EF', borderTop: '1px solid var(--at-chip)' }}>
+            <tr style={{ background: 'var(--at-surface-2)', borderTop: '1px solid var(--at-chip)' }}>
               <th style={{ padding: '4px 10px' }} />
-              <th style={{ padding: '4px 10px', textAlign: 'right', color: '#7E9389', fontWeight: 500, fontSize: 10 }}>Ingresos</th>
-              <th style={{ padding: '4px 10px', textAlign: 'right', color: '#7E9389', fontWeight: 500, fontSize: 10 }}>Egresos</th>
-              <th style={{ padding: '4px 10px', textAlign: 'right', color: '#7E9389', fontWeight: 500, fontSize: 10, borderRight: '2px solid var(--at-line)' }}>Saldo</th>
-              <th style={{ padding: '4px 10px', textAlign: 'right', color: '#7E9389', fontWeight: 500, fontSize: 10 }}>Ingresos</th>
-              <th style={{ padding: '4px 10px', textAlign: 'right', color: '#7E9389', fontWeight: 500, fontSize: 10 }}>Egresos</th>
-              <th style={{ padding: '4px 10px', textAlign: 'right', color: '#7E9389', fontWeight: 500, fontSize: 10, borderRight: '2px solid var(--at-line)' }}>Saldo</th>
+              <th style={{ padding: '4px 10px', textAlign: 'right', color: 'var(--at-ink-3)', fontWeight: 500, fontSize: 10 }}>Ingresos</th>
+              <th style={{ padding: '4px 10px', textAlign: 'right', color: 'var(--at-ink-3)', fontWeight: 500, fontSize: 10 }}>Egresos</th>
+              <th style={{ padding: '4px 10px', textAlign: 'right', color: 'var(--at-ink-3)', fontWeight: 500, fontSize: 10, borderRight: '2px solid var(--at-line)' }}>Saldo</th>
+              <th style={{ padding: '4px 10px', textAlign: 'right', color: 'var(--at-ink-3)', fontWeight: 500, fontSize: 10 }}>Ingresos</th>
+              <th style={{ padding: '4px 10px', textAlign: 'right', color: 'var(--at-ink-3)', fontWeight: 500, fontSize: 10 }}>Egresos</th>
+              <th style={{ padding: '4px 10px', textAlign: 'right', color: 'var(--at-ink-3)', fontWeight: 500, fontSize: 10, borderRight: '2px solid var(--at-line)' }}>Saldo</th>
               <th style={{ padding: '4px 10px' }} />
             </tr>
           </thead>
@@ -188,15 +188,15 @@ export default function ComparativoAnualTab({ cuotas, gastos, moneda }: Props) {
               const noData = mA.ingresos === 0 && mA.egresos === 0 && mB.ingresos === 0 && mB.egresos === 0
               return (
                 <tr key={mes} style={{ borderTop: '1px solid var(--at-chip)', opacity: noData ? 0.4 : 1 }}>
-                  <td style={{ padding: '7px 10px', fontWeight: 600, color: '#3E5A4C' }}>{mes}</td>
+                  <td style={{ padding: '7px 10px', fontWeight: 600, color: 'var(--at-ink-2)' }}>{mes}</td>
                   <td style={{ padding: '7px 10px', textAlign: 'right', color: '#16a34a' }}>{mA.ingresos > 0 ? `${moneda} ${Math.round(mA.ingresos).toLocaleString('es')}` : '—'}</td>
                   <td style={{ padding: '7px 10px', textAlign: 'right', color: '#ef4444' }}>{mA.egresos > 0 ? `${moneda} ${Math.round(mA.egresos).toLocaleString('es')}` : '—'}</td>
                   <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: mA.superavit >= 0 ? '#16a34a' : '#ef4444', borderRight: '2px solid var(--at-line)' }}>
                     {(mA.ingresos > 0 || mA.egresos > 0) ? `${mA.superavit >= 0 ? '+' : ''}${moneda} ${Math.round(mA.superavit).toLocaleString('es')}` : '—'}
                   </td>
-                  <td style={{ padding: '7px 10px', textAlign: 'right', color: '#9C5733' }}>{mB.ingresos > 0 ? `${moneda} ${Math.round(mB.ingresos).toLocaleString('es')}` : '—'}</td>
-                  <td style={{ padding: '7px 10px', textAlign: 'right', color: '#9C5733' }}>{mB.egresos > 0 ? `${moneda} ${Math.round(mB.egresos).toLocaleString('es')}` : '—'}</td>
-                  <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: mB.superavit >= 0 ? '#9C5733' : '#ef4444', borderRight: '2px solid var(--at-line)' }}>
+                  <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--at-accent-hover)' }}>{mB.ingresos > 0 ? `${moneda} ${Math.round(mB.ingresos).toLocaleString('es')}` : '—'}</td>
+                  <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--at-accent-hover)' }}>{mB.egresos > 0 ? `${moneda} ${Math.round(mB.egresos).toLocaleString('es')}` : '—'}</td>
+                  <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: mB.superavit >= 0 ? 'var(--at-accent-hover)' : '#ef4444', borderRight: '2px solid var(--at-line)' }}>
                     {(mB.ingresos > 0 || mB.egresos > 0) ? `${mB.superavit >= 0 ? '+' : ''}${moneda} ${Math.round(mB.superavit).toLocaleString('es')}` : '—'}
                   </td>
                   <td style={{ padding: '7px 10px', textAlign: 'center' }}>
@@ -207,16 +207,16 @@ export default function ComparativoAnualTab({ cuotas, gastos, moneda }: Props) {
             })}
           </tbody>
           <tfoot>
-            <tr style={{ borderTop: '2px solid var(--at-line)', background: '#FAF7EF' }}>
+            <tr style={{ borderTop: '2px solid var(--at-line)', background: 'var(--at-surface-2)' }}>
               <td style={{ padding: '8px 10px', fontWeight: 700 }}>TOTAL</td>
               <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{moneda} {Math.round(totalesA.ingresos).toLocaleString('es')}</td>
               <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#ef4444' }}>{moneda} {Math.round(totalesA.egresos).toLocaleString('es')}</td>
               <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: totalesA.superavit >= 0 ? '#16a34a' : '#ef4444', borderRight: '2px solid var(--at-line)' }}>
                 {totalesA.superavit >= 0 ? '+' : ''}{moneda} {Math.round(totalesA.superavit).toLocaleString('es')}
               </td>
-              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#9C5733' }}>{moneda} {Math.round(totalesB.ingresos).toLocaleString('es')}</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#9C5733' }}>{moneda} {Math.round(totalesB.egresos).toLocaleString('es')}</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: totalesB.superavit >= 0 ? '#9C5733' : '#ef4444', borderRight: '2px solid var(--at-line)' }}>
+              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: 'var(--at-accent-hover)' }}>{moneda} {Math.round(totalesB.ingresos).toLocaleString('es')}</td>
+              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: 'var(--at-accent-hover)' }}>{moneda} {Math.round(totalesB.egresos).toLocaleString('es')}</td>
+              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: totalesB.superavit >= 0 ? 'var(--at-accent-hover)' : '#ef4444', borderRight: '2px solid var(--at-line)' }}>
                 {totalesB.superavit >= 0 ? '+' : ''}{moneda} {Math.round(totalesB.superavit).toLocaleString('es')}
               </td>
               <td style={{ padding: '8px 10px', textAlign: 'center' }}>

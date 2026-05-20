@@ -30,7 +30,7 @@ const CELDA_CFG: Record<EstadoCelda, { bg: string; color: string; label: string;
   pagado:    { bg: '#16a34a', color: '#fff',   label: '✓', order: 0 },
   pendiente: { bg: '#fde68a', color: '#92400e', label: '!', order: 2 },
   moroso:    { bg: '#ef4444', color: '#fff',    label: '✗', order: 3 },
-  sin_cuota: { bg: '#EAE6D8', color: '#C7C2B0', label: '·', order: 1 },
+  sin_cuota: { bg: 'var(--at-chip)', color: 'var(--at-line-strong)', label: '·', order: 1 },
 }
 
 export default function MapaCalorCuotasTab({ cuotas, unidades, moneda }: Props) {
@@ -72,8 +72,8 @@ export default function MapaCalorCuotasTab({ cuotas, unidades, moneda }: Props) 
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F', marginBottom: 2 }}>Mapa de Calor — Cumplimiento de Cuotas</div>
-      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 14 }}>
+      <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)', marginBottom: 2 }}>Mapa de Calor — Cumplimiento de Cuotas</div>
+      <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 14 }}>
         Últimos 12 meses · {unidades.length} unidades · peores pagadores arriba
       </div>
 
@@ -86,7 +86,7 @@ export default function MapaCalorCuotasTab({ cuotas, unidades, moneda }: Props) 
           { label: 'Morosos crónicos (≥3m)', val: String(cronicas), color: cronicas > 0 ? '#ef4444' : '#16a34a', bg: cronicas > 0 ? '#fef2f2' : '#dcfce7' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 130px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
-            <div style={{ fontSize: 10, color: '#7E9389' }}>{k.label}</div>
+            <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
             <div style={{ fontSize: 15, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>
         ))}
@@ -103,25 +103,25 @@ export default function MapaCalorCuotasTab({ cuotas, unidades, moneda }: Props) 
       </div>
 
       {/* Matriz */}
-      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'auto' }}>
+      <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', fontSize: 11, minWidth: 700 }}>
           <thead>
-            <tr style={{ background: '#FAF7EF' }}>
-              <th style={{ padding: '8px 12px', textAlign: 'left', color: '#7E9389', fontWeight: 600, minWidth: 100, position: 'sticky', left: 0, background: '#FAF7EF', zIndex: 1 }}>Unidad</th>
+            <tr style={{ background: 'var(--at-surface-2)' }}>
+              <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600, minWidth: 100, position: 'sticky', left: 0, background: 'var(--at-surface-2)', zIndex: 1 }}>Unidad</th>
               {meses.map(m => (
-                <th key={m} style={{ padding: '8px 6px', textAlign: 'center', color: '#7E9389', fontWeight: 600, minWidth: 44 }}>
+                <th key={m} style={{ padding: '8px 6px', textAlign: 'center', color: 'var(--at-ink-3)', fontWeight: 600, minWidth: 44 }}>
                   {labelMes(m)}
                   <div style={{ height: 3, borderRadius: 2, marginTop: 3, background: `hsl(${Math.round(totalesMes.find(t => t.mes === m)!.pct * 120)}, 70%, 50%)`, opacity: 0.7 }} />
                 </th>
               ))}
-              <th style={{ padding: '8px 10px', textAlign: 'right', color: '#7E9389', fontWeight: 600, minWidth: 60 }}>Tasa</th>
-              <th style={{ padding: '8px 10px', textAlign: 'right', color: '#7E9389', fontWeight: 600, minWidth: 80 }}>Deuda</th>
+              <th style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--at-ink-3)', fontWeight: 600, minWidth: 60 }}>Tasa</th>
+              <th style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--at-ink-3)', fontWeight: 600, minWidth: 80 }}>Deuda</th>
             </tr>
           </thead>
           <tbody>
             {matriz.map(row => (
               <tr key={row.unidad.id} style={{ borderTop: '1px solid var(--at-chip)' }}>
-                <td style={{ padding: '6px 12px', fontWeight: 600, color: '#3E5A4C', position: 'sticky', left: 0, background: '#fff', zIndex: 1, borderRight: '1px solid var(--at-chip)' }}>
+                <td style={{ padding: '6px 12px', fontWeight: 600, color: 'var(--at-ink-2)', position: 'sticky', left: 0, background: 'var(--at-surface)', zIndex: 1, borderRight: '1px solid var(--at-chip)' }}>
                   {row.unidad.nombre}
                 </td>
                 {row.celdas.map(c => {
@@ -142,19 +142,19 @@ export default function MapaCalorCuotasTab({ cuotas, unidades, moneda }: Props) 
                   {Math.round(row.tasaCobro * 100)}%
                 </td>
                 <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: row.deudaTotal > 0 ? 700 : 400,
-                  color: row.deudaTotal > 0 ? '#ef4444' : '#7E9389' }}>
+                  color: row.deudaTotal > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>
                   {row.deudaTotal > 0 ? `${moneda} ${row.deudaTotal.toFixed(2)}` : '✓'}
                 </td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr style={{ borderTop: '2px solid var(--at-line)', background: '#FAF7EF' }}>
-              <td style={{ padding: '7px 12px', fontWeight: 700, position: 'sticky', left: 0, background: '#FAF7EF' }}>Tasa mes</td>
+            <tr style={{ borderTop: '2px solid var(--at-line)', background: 'var(--at-surface-2)' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 700, position: 'sticky', left: 0, background: 'var(--at-surface-2)' }}>Tasa mes</td>
               {totalesMes.map(t => (
                 <td key={t.mes} style={{ padding: '7px 3px', textAlign: 'center' }}>
                   <div style={{ fontSize: 10, fontWeight: 700,
-                    color: t.pct >= 0.9 ? '#16a34a' : t.pct >= 0.7 ? '#d97706' : t.total === 0 ? '#C7C2B0' : '#ef4444' }}>
+                    color: t.pct >= 0.9 ? '#16a34a' : t.pct >= 0.7 ? '#d97706' : t.total === 0 ? 'var(--at-line-strong)' : '#ef4444' }}>
                     {t.total > 0 ? `${Math.round(t.pct * 100)}%` : '—'}
                   </div>
                 </td>

@@ -9,7 +9,7 @@ export function AdminQuickActions({ onNavigate }: Props) {
       label: 'Ver Mapa',
       description: 'Ubicaciones de lecturas',
       icon: '🗺️',
-      color: '#1B3B36',
+      color: 'var(--at-primary)',
     },
     {
       id: 'rutas',
@@ -30,13 +30,13 @@ export function AdminQuickActions({ onNavigate }: Props) {
       label: 'Calidad de Agua',
       description: 'Parámetros de calidad',
       icon: '💧',
-      color: '#B96A3F',
+      color: 'var(--at-accent)',
     },
   ]
 
   return (
     <div style={{ marginTop: '32px', marginBottom: '32px' }}>
-      <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', color: '#15291F' }}>
+      <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', color: 'var(--at-ink)' }}>
         Acceso Rápido
       </h3>
       <div style={{
@@ -50,7 +50,7 @@ export function AdminQuickActions({ onNavigate }: Props) {
             onClick={() => onNavigate(action.id as 'mapa' | 'rutas' | 'contadores' | 'calidad')}
             style={{
               padding: '16px',
-              background: 'white',
+              background: 'var(--at-surface)',
               border: `2px solid ${action.color}20`,
               borderRadius: '12px',
               cursor: 'pointer',
@@ -84,7 +84,7 @@ export function AdminQuickActions({ onNavigate }: Props) {
             </div>
             <div style={{
               fontSize: '11px',
-              color: '#7E9389',
+              color: 'var(--at-ink-3)',
               fontWeight: '500',
             }}>
               {action.description}

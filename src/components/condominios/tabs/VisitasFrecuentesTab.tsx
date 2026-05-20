@@ -98,7 +98,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
@@ -113,11 +113,11 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
             <input type="checkbox" checked={soloActivos} onChange={e => setSoloActivos(e.target.checked)} />
             Solo activos
           </label>
-          <span style={{ fontSize: 13, color: '#7E9389' }}>{lista.length} visitas frecuentes</span>
+          <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>{lista.length} visitas frecuentes</span>
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Agregar visita frecuente'}
           </button>
         )}
@@ -125,7 +125,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 20 }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 20 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nueva visita frecuente</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -176,7 +176,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
             <div style={{ display: 'flex', gap: 6 }}>
               {DIAS.map(d => (
                 <button key={d} type="button" onClick={() => toggleDia(d)}
-                  style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: form.dias_permitidos.includes(d) ? '#B96A3F' : '#fff', color: form.dias_permitidos.includes(d) ? '#fff' : '#3E5A4C', borderColor: form.dias_permitidos.includes(d) ? '#B96A3F' : '#C7C2B0' }}>
+                  style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: form.dias_permitidos.includes(d) ? 'var(--at-accent)' : '#fff', color: form.dias_permitidos.includes(d) ? '#fff' : 'var(--at-ink-2)', borderColor: form.dias_permitidos.includes(d) ? 'var(--at-accent)' : 'var(--at-line-strong)' }}>
                   {DIAS_LABEL[d]}
                 </button>
               ))}
@@ -191,46 +191,46 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
 
       {/* Lista agrupada por unidad */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>Sin visitas frecuentes registradas</div>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>Sin visitas frecuentes registradas</div>
       ) : (
         Object.entries(porUnidad).map(([unidadId, items]) => {
           const unidad = unidades.find(u => u.id === unidadId)
           return (
             <div key={unidadId} style={{ marginBottom: 20 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#3E5A4C', marginBottom: 8, paddingBottom: 4, borderBottom: '2px solid var(--at-line)' }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink-2)', marginBottom: 8, paddingBottom: 4, borderBottom: '2px solid var(--at-line)' }}>
                 🏠 {unidad?.nombre || 'Unidad desconocida'} — {items.length} autorizado(s)
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
                 {items.map(v => {
                   const rel = RELACIONES.find(r => r.value === v.relacion)
                   return (
-                    <div key={v.id} style={{ background: v.activo ? '#fff' : '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: '12px 14px', opacity: v.activo ? 1 : 0.6 }}>
+                    <div key={v.id} style={{ background: v.activo ? '#fff' : 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '12px 14px', opacity: v.activo ? 1 : 0.6 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{rel?.icon} {v.nombre}</div>
-                          <div style={{ fontSize: 12, color: '#7E9389', marginTop: 2 }}>
+                          <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
                             {rel?.label}
                             {v.identificacion && <span> · {v.identificacion}</span>}
                           </div>
-                          {v.telefono && <div style={{ fontSize: 12, color: '#7E9389' }}>📞 {v.telefono}</div>}
-                          {v.placa_vehiculo && <div style={{ fontSize: 12, color: '#7E9389' }}>🚗 {v.placa_vehiculo}</div>}
+                          {v.telefono && <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>📞 {v.telefono}</div>}
+                          {v.placa_vehiculo && <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>🚗 {v.placa_vehiculo}</div>}
                           {v.dias_permitidos && v.dias_permitidos.length > 0 && (
                             <div style={{ display: 'flex', gap: 3, marginTop: 4, flexWrap: 'wrap' }}>
                               {DIAS.map(d => (
-                                <span key={d} style={{ padding: '2px 5px', borderRadius: 4, fontSize: 10, background: v.dias_permitidos!.includes(d) ? '#F4EBE3' : '#EAE6D8', color: v.dias_permitidos!.includes(d) ? '#B96A3F' : '#C7C2B0', fontWeight: v.dias_permitidos!.includes(d) ? 700 : 400 }}>
+                                <span key={d} style={{ padding: '2px 5px', borderRadius: 4, fontSize: 10, background: v.dias_permitidos!.includes(d) ? 'var(--at-accent-tint)' : 'var(--at-chip)', color: v.dias_permitidos!.includes(d) ? 'var(--at-accent)' : 'var(--at-line-strong)', fontWeight: v.dias_permitidos!.includes(d) ? 700 : 400 }}>
                                   {DIAS_LABEL[d]}
                                 </span>
                               ))}
                             </div>
                           )}
                           {(v.hora_desde || v.hora_hasta) && (
-                            <div style={{ fontSize: 11, color: '#7E9389', marginTop: 3 }}>⏰ {v.hora_desde || '00:00'} – {v.hora_hasta || '23:59'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 3 }}>⏰ {v.hora_desde || '00:00'} – {v.hora_hasta || '23:59'}</div>
                           )}
                         </div>
                         {canEdit && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                             <button onClick={() => toggleActivo(v)} title={v.activo ? 'Desactivar' : 'Activar'}
-                              style={{ padding: '4px 8px', background: v.activo ? '#EAE6D8' : '#d1fae5', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                              style={{ padding: '4px 8px', background: v.activo ? 'var(--at-chip)' : '#d1fae5', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                               {v.activo ? '⏸' : '▶'}
                             </button>
                             <button onClick={() => eliminar(v)} title="Eliminar"
@@ -240,7 +240,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
                           </div>
                         )}
                       </div>
-                      {v.notas && <div style={{ fontSize: 11, color: '#7E9389', marginTop: 6, fontStyle: 'italic' }}>{v.notas}</div>}
+                      {v.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 6, fontStyle: 'italic' }}>{v.notas}</div>}
                     </div>
                   )
                 })}

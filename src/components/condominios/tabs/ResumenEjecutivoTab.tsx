@@ -111,7 +111,7 @@ ${top5Morosos.length > 0 ? `
 <table>
   <thead><tr><th>Unidad</th><th>Cuotas vencidas</th><th>Monto en mora</th></tr></thead>
   <tbody>
-    ${top5Morosos.map((m, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#FAF7EF'}">
+    ${top5Morosos.map((m, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : 'var(--at-surface-2)'}">
       <td><strong>${m.unidad.nombre}</strong></td>
       <td style="color:#ef4444;font-weight:700">${m.count}</td>
       <td style="color:#ef4444;font-weight:700">${moneda} ${m.monto.toFixed(2)}</td>
@@ -163,17 +163,17 @@ ${venc30.length > 0 ? `
     <div style={{ padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#15291F' }}>Resumen ejecutivo — {proyectoNombre}</div>
-          <div style={{ fontSize: 12, color: '#7E9389' }}>Generado el {fechaLarga}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--at-ink)' }}>Resumen ejecutivo — {proyectoNombre}</div>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Generado el {fechaLarga}</div>
         </div>
         <button onClick={imprimir}
-          style={{ padding: '8px 18px', background: '#15291F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+          style={{ padding: '8px 18px', background: 'var(--at-ink)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
           🖨️ Imprimir / PDF
         </button>
       </div>
 
       {/* KPIs Financieros */}
-      <div style={{ fontWeight: 700, fontSize: 11, color: '#7E9389', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Finanzas y cobro</div>
+      <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Finanzas y cobro</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
         {[
           { label: 'Tasa de cobro', val: `${financiero.tasaCobro}%`, sub: `${financiero.pagadas}/${cuotas.length} cuotas`, color: financiero.tasaCobro >= 90 ? '#16a34a' : financiero.tasaCobro >= 70 ? '#d97706' : '#ef4444' },
@@ -181,17 +181,17 @@ ${venc30.length > 0 ? `
           { label: 'Cartera vencida', val: `${moneda} ${financiero.montoMora.toLocaleString('es', { maximumFractionDigits: 0 })}`, sub: 'Saldo en mora', color: '#ef4444' },
           { label: 'Ejecución presup.', val: `${ejecPct}%`, sub: `${moneda} ${financiero.gastosMes.toLocaleString('es', { maximumFractionDigits: 0 })} gastado`, color: ejecPct > 100 ? '#ef4444' : ejecPct > 80 ? '#d97706' : '#16a34a' },
         ].map(k => (
-          <div key={k.label} style={{ background: '#fff', border: `1px solid ${k.color}33`, borderRadius: 10, padding: '12px 14px', borderTop: `3px solid ${k.color}` }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: `1px solid ${k.color}33`, borderRadius: 10, padding: '12px 14px', borderTop: `3px solid ${k.color}` }}>
             <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.val}</div>
-            <div style={{ fontSize: 10, color: '#7E9389', fontWeight: 600 }}>{k.label}</div>
-            <div style={{ fontSize: 9, color: '#7E9389' }}>{k.sub}</div>
+            <div style={{ fontSize: 10, color: 'var(--at-ink-3)', fontWeight: 600 }}>{k.label}</div>
+            <div style={{ fontSize: 9, color: 'var(--at-ink-3)' }}>{k.sub}</div>
           </div>
         ))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
         {/* Top morosos */}
-        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>⚠️ Top morosos</div>
           {top5Morosos.length === 0 ? (
             <div style={{ fontSize: 12, color: '#16a34a', textAlign: 'center', padding: '20px 0' }}>✓ Sin unidades morosas</div>
@@ -199,7 +199,7 @@ ${venc30.length > 0 ? `
             <div key={m.unidad.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < top5Morosos.length - 1 ? '1px solid var(--at-chip)' : 'none' }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>{m.unidad.nombre}</div>
-                <div style={{ fontSize: 10, color: '#7E9389' }}>{m.count} cuotas vencidas</div>
+                <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{m.count} cuotas vencidas</div>
               </div>
               <div style={{ fontWeight: 700, color: '#ef4444', fontSize: 13 }}>{moneda} {m.monto.toFixed(2)}</div>
             </div>
@@ -207,7 +207,7 @@ ${venc30.length > 0 ? `
         </div>
 
         {/* Tickets críticos */}
-        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>🔧 Tickets críticos ({ticketsCriticos.length})</div>
           {ticketsCriticos.length === 0 ? (
             <div style={{ fontSize: 12, color: '#16a34a', textAlign: 'center', padding: '20px 0' }}>✓ Sin tickets urgentes abiertos</div>
@@ -232,7 +232,7 @@ ${venc30.length > 0 ? `
             {venc30.map((v, i) => {
               const dias = Math.ceil((new Date(v.fecha).getTime() - Date.now()) / 86400000)
               return (
-                <div key={i} style={{ padding: '4px 10px', background: '#fff', border: `1px solid ${dias <= 7 ? '#fca5a5' : '#fde68a'}`, borderRadius: 8, fontSize: 11 }}>
+                <div key={i} style={{ padding: '4px 10px', background: 'var(--at-surface)', border: `1px solid ${dias <= 7 ? '#fca5a5' : '#fde68a'}`, borderRadius: 8, fontSize: 11 }}>
                   <strong>{v.titulo}</strong>
                   <span style={{ color: dias <= 7 ? '#ef4444' : '#d97706', marginLeft: 6 }}>{dias}d · {v.fecha}</span>
                 </div>
@@ -244,19 +244,19 @@ ${venc30.length > 0 ? `
 
       {/* Incidentes y sugerencias */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>🚨 Incidentes del mes</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: semColorText(incidentes.filter(i => i.fecha?.startsWith(mes)).length, 0, 3) }}>
             {incidentes.filter(i => i.fecha?.startsWith(mes)).length}
           </div>
-          <div style={{ fontSize: 11, color: '#7E9389' }}>registrados en {mes}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>registrados en {mes}</div>
         </div>
-        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>💡 Sugerencias pendientes</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: semColorText(sugerencias.filter(s => s.estado === 'pendiente').length, 3, 8) }}>
             {sugerencias.filter(s => s.estado === 'pendiente').length}
           </div>
-          <div style={{ fontSize: 11, color: '#7E9389' }}>de {sugerencias.length} totales</div>
+          <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>de {sugerencias.length} totales</div>
         </div>
       </div>
     </div>

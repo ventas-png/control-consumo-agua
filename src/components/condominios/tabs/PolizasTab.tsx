@@ -29,7 +29,7 @@ const TIPOS: { value: TipoPoliza; label: string; icon: string }[] = [
 const ESTADO_CONFIG: Record<EstadoPoliza, { label: string; color: string; bg: string }> = {
   vigente:   { label: 'Vigente',   color: '#10b981', bg: '#d1fae5' },
   vencida:   { label: 'Vencida',   color: '#ef4444', bg: '#fee2e2' },
-  cancelada: { label: 'Cancelada', color: '#7E9389', bg: '#EAE6D8' },
+  cancelada: { label: 'Cancelada', color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 
 const blank = (): Partial<PolizaSeguro> => ({
@@ -133,8 +133,8 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
 
   const tipoInfo = (t: TipoPoliza) => TIPOS.find(x => x.value === t) ?? TIPOS[TIPOS.length - 1]
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -150,14 +150,14 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Pólizas de Seguro</h2>
-          {primaTotal > 0 && <span style={{ fontSize: '12px', color: '#7E9389' }}>Prima anual vigente: <strong style={{ color: '#1B3B36' }}>{moneda} {primaTotal.toFixed(2)}</strong></span>}
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Pólizas de Seguro</h2>
+          {primaTotal > 0 && <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Prima anual vigente: <strong style={{ color: 'var(--at-primary)' }}>{moneda} {primaTotal.toFixed(2)}</strong></span>}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={exportarPDF} disabled={polizas.length === 0} style={{ padding: '7px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
+          <button onClick={exportarPDF} disabled={polizas.length === 0} style={{ padding: '7px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
           <button onClick={exportarXlsx} disabled={polizas.length === 0} style={{ padding: '7px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
           {canCreate && !showForm && (
-            <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               + Nueva Póliza
             </button>
           )}
@@ -165,7 +165,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Póliza' : 'Nueva Póliza'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: '12px' }}>
             <div>
@@ -230,8 +230,8 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear Póliza'}
             </button>
           </div>
@@ -243,16 +243,16 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
         {(['todos', 'vigente', 'vencida', 'cancelada'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0',
-              background: filtroEstado === e ? '#D9E2DC' : 'white',
-              color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
+              borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
+              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'white',
+              color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? `Todas (${polizas.length})` : `${ESTADO_CONFIG[e as EstadoPoliza]?.label} (${polizas.filter(p => p.estado === e).length})`}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>🛡️</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay pólizas registradas</p>
         </div>
@@ -260,9 +260,9 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: '#FAF7EF', borderBottom: '2px solid var(--at-line)' }}>
+              <tr style={{ background: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
                 {['Póliza', 'Tipo', 'Suma Asegurada', 'Prima Anual', 'Vigencia', 'Estado', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#7E9389', fontSize: '12px' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-3)', fontSize: '12px' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -276,13 +276,13 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
                 return (
                   <tr key={p.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '10px 12px' }}>
-                      <div style={{ fontWeight: 700, color: '#15291F' }}>{p.numero_poliza}</div>
-                      <div style={{ fontSize: '12px', color: '#7E9389' }}>{p.aseguradora}</div>
-                      {p.agente_nombre && <div style={{ fontSize: '11px', color: '#7E9389' }}>Agente: {p.agente_nombre}</div>}
+                      <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{p.numero_poliza}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{p.aseguradora}</div>
+                      {p.agente_nombre && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Agente: {p.agente_nombre}</div>}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{ fontSize: '18px' }}>{ti.icon}</span>
-                      <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>{ti.label}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{ti.label}</div>
                     </td>
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>
                       {p.suma_asegurada != null ? `${moneda} ${p.suma_asegurada.toLocaleString()}` : '—'}
@@ -290,7 +290,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>
                       {p.prima_anual != null ? `${moneda} ${p.prima_anual.toFixed(2)}` : '—'}
                     </td>
-                    <td style={{ padding: '10px 12px', fontSize: '12px', color: '#7E9389' }}>
+                    <td style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
                       <div>{p.fecha_inicio}</div>
                       <div>→ {p.fecha_vencimiento}</div>
                       {diasRestantes !== null && p.estado === 'vigente' && (
@@ -302,7 +302,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
                     <td style={{ padding: '10px 12px' }}>
                       {canEdit ? (
                         <select value={p.estado} onChange={e => handleEstado(p.id, e.target.value as EstadoPoliza)}
-                          style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'white', cursor: 'pointer' }}>
+                          style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: est.color, background: 'var(--at-surface)', cursor: 'pointer' }}>
                           {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                         </select>
                       ) : (
@@ -322,8 +322,8 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
                             style={{ padding: '4px 8px', background: '#dcfce7', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#16a34a' }}
                           >💬</button>
                         )}
-                        {p.documento_url && <a href={p.documento_url} target="_blank" rel="noreferrer" style={{ padding: '4px 8px', background: '#EAE6D8', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: '#3E5A4C' }}>📄</a>}
-                        {canEdit && <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
+                        {p.documento_url && <a href={p.documento_url} target="_blank" rel="noreferrer" style={{ padding: '4px 8px', background: 'var(--at-chip)', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: 'var(--at-ink-2)' }}>📄</a>}
+                        {canEdit && <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
                         {canEdit && <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
                       </div>
                     </td>

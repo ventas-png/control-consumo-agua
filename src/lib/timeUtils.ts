@@ -50,7 +50,7 @@ export function getEditedTagInfo(
   } else if (hours < 24) {
     color = '#92400e'; bg = '#fef3c7'   // amber
   } else {
-    color = '#475569'; bg = '#f1f5f9'   // slate
+    color = '#3E5A4C'; bg = '#EAE6D8'   // slate
   }
 
   return { label, tooltip, color, bg }

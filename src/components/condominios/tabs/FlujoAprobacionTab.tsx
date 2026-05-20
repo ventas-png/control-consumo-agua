@@ -114,14 +114,14 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
           {(['', 'pendiente', 'aprobado', 'rechazado'] as (EstadoFlujoAprobacion | '')[]).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
               style={{ padding: '4px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: filtroEstado === e ? 700 : 400,
-                background: filtroEstado === e ? '#15291F' : '#fff', color: filtroEstado === e ? '#fff' : '#3E5A4C' }}>
+                background: filtroEstado === e ? 'var(--at-ink)' : '#fff', color: filtroEstado === e ? '#fff' : 'var(--at-ink-2)' }}>
               {e === '' ? 'Todas' : ESTADO_CFG[e].label}
             </button>
           ))}
         </div>
         {canCreate && (
           <button onClick={() => setShowForm(s => !s)}
-            style={{ padding: '6px 14px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            style={{ padding: '6px 14px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             {showForm ? '✕ Cancelar' : '+ Nueva solicitud'}
           </button>
         )}
@@ -129,8 +129,8 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
 
       {/* Formulario nueva solicitud */}
       {showForm && (
-        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: '#102622' }}>Nueva solicitud de aprobación</div>
+        <div style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: 'var(--at-primary-hover)' }}>Nueva solicitud de aprobación</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Tipo</label>
@@ -159,7 +159,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
               style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
           </div>
           <button onClick={crear} disabled={saving}
-            style={{ padding: '8px 18px', background: '#102622', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
+            style={{ padding: '8px 18px', background: 'var(--at-primary-hover)', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
             {saving ? 'Enviando…' : 'Enviar solicitud'}
           </button>
         </div>
@@ -167,7 +167,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
 
       {/* Lista de flujos */}
       {filtrados.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
           No hay solicitudes {filtroEstado ? ESTADO_CFG[filtroEstado].label.toLowerCase() + 's' : ''}
         </div>
@@ -177,17 +177,17 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
             const tipoCfg = TIPO_CFG[f.tipo]
             const estCfg = ESTADO_CFG[f.estado]
             return (
-              <div key={f.id} style={{ background: '#fff', border: `1px solid ${estCfg.color}33`, borderRadius: 10, padding: '12px 14px', borderLeft: `4px solid ${estCfg.color}` }}>
+              <div key={f.id} style={{ background: 'var(--at-surface)', border: `1px solid ${estCfg.color}33`, borderRadius: 10, padding: '12px 14px', borderLeft: `4px solid ${estCfg.color}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                       <span style={{ fontSize: 14 }}>{tipoCfg.icon}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', background: '#EAE6D8', color: '#3E5A4C', borderRadius: 5 }}>{tipoCfg.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', borderRadius: 5 }}>{tipoCfg.label}</span>
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', background: estCfg.bg, color: estCfg.color, borderRadius: 5 }}>{estCfg.label}</span>
                     </div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: '#15291F', marginBottom: 2 }}>{f.titulo}</div>
-                    {f.descripcion && <div style={{ fontSize: 11, color: '#7E9389', marginBottom: 4 }}>{f.descripcion}</div>}
-                    <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#7E9389', flexWrap: 'wrap' }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-ink)', marginBottom: 2 }}>{f.titulo}</div>
+                    {f.descripcion && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 4 }}>{f.descripcion}</div>}
+                    <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--at-ink-3)', flexWrap: 'wrap' }}>
                       {f.monto && <span>{moneda} {f.monto.toLocaleString('es', { minimumFractionDigits: 2 })}</span>}
                       {f.solicitado_por && <span>Solicitado por: {f.solicitado_por}</span>}
                       <span>{f.fecha_solicitud}</span>

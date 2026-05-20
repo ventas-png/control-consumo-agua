@@ -16,7 +16,7 @@ interface Props {
 
 const ESTADO_CONFIG: Record<EstadoConcierge, { label: string; color: string; bg: string }> = {
   pendiente:  { label: 'Pendiente',  color: '#f59e0b', bg: '#fef3c7' },
-  en_proceso: { label: 'En proceso', color: '#1B3B36', bg: '#D9E2DC' },
+  en_proceso: { label: 'En proceso', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
   completado: { label: 'Completado', color: '#10b981', bg: '#d1fae5' },
   cancelado:  { label: 'Cancelado',  color: '#ef4444', bg: '#fee2e2' },
 }
@@ -99,8 +99,8 @@ export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, mon
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -109,27 +109,27 @@ export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, mon
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
           { label: 'Pendientes',      value: String(pendientes),                                                   icon: '⏳', color: '#f59e0b' },
-          { label: 'En proceso',      value: String(enProceso),                                                    icon: '🔄', color: '#1B3B36' },
+          { label: 'En proceso',      value: String(enProceso),                                                    icon: '🔄', color: 'var(--at-primary)' },
           { label: 'Completados/mes', value: String(completadosMes),                                              icon: '✅', color: '#10b981' },
-          { label: 'Facturado/mes',   value: costoMes > 0 ? `${moneda} ${costoMes.toFixed(0)}` : '—',             icon: '💰', color: '#B96A3F' },
+          { label: 'Facturado/mes',   value: costoMes > 0 ? `${moneda} ${costoMes.toFixed(0)}` : '—',             icon: '💰', color: 'var(--at-accent)' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Concierge Digital</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Concierge Digital</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Solicitud</button>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Solicitud</button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Solicitud' : 'Nueva Solicitud de Concierge'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
             <div>
@@ -177,8 +177,8 @@ export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, mon
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
           </div>
@@ -190,16 +190,16 @@ export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, mon
         {(['todos', 'pendiente', 'en_proceso', 'completado', 'cancelado'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0',
-              background: filtroEstado === e ? '#D9E2DC' : 'white',
-              color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
+              borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
+              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'white',
+              color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? `Todas (${solicitudes.length})` : `${ESTADO_CONFIG[e as EstadoConcierge]?.label} (${solicitudes.filter(s => s.estado === e).length})`}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>🛎️</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay solicitudes de concierge</p>
         </div>
@@ -209,27 +209,27 @@ export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, mon
             const tc = TIPO_CONFIG[tipo as TipoConcierge] ?? { label: tipo, icon: '📋' }
             return (
               <div key={tipo}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#7E9389', marginBottom: '10px' }}>{tc.icon} {tc.label} ({items.length})</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '10px' }}>{tc.icon} {tc.label} ({items.length})</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px' }}>
                   {items.map(s => {
                     const est = ESTADO_CONFIG[s.estado]
                     return (
-                      <div key={s.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '14px' }}>
+                      <div key={s.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                          <div style={{ flex: 1, marginRight: '8px', fontSize: '13px', fontWeight: 600, color: '#15291F' }}>{s.descripcion}</div>
+                          <div style={{ flex: 1, marginRight: '8px', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink)' }}>{s.descripcion}</div>
                           <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color, whiteSpace: 'nowrap' }}>{est.label}</span>
                         </div>
-                        <div style={{ fontSize: '12px', color: '#7E9389', display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '10px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '10px' }}>
                           {s.unidad_nombre && <div>🏠 {s.unidad_nombre}</div>}
                           <div>📅 {s.fecha_solicitud}{s.hora_solicitud ? ` · ${s.hora_solicitud}` : ''}</div>
                           {s.atendido_por && <div>👤 {s.atendido_por}</div>}
-                          {s.costo && <div style={{ fontWeight: 700, color: '#15291F' }}>💰 {moneda} {s.costo.toFixed(2)}</div>}
+                          {s.costo && <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>💰 {moneda} {s.costo.toFixed(2)}</div>}
                         </div>
                         {canEdit && (
                           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {s.estado === 'pendiente' && <button onClick={() => handleEstado(s.id, 'en_proceso')} style={{ flex: 1, padding: '4px 8px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Iniciar</button>}
+                            {s.estado === 'pendiente' && <button onClick={() => handleEstado(s.id, 'en_proceso')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Iniciar</button>}
                             {s.estado === 'en_proceso' && <button onClick={() => handleEstado(s.id, 'completado')} style={{ flex: 1, padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Completar</button>}
-                            <button onClick={() => startEdit(s)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                            <button onClick={() => startEdit(s)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
                             <button onClick={() => handleDelete(s.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                           </div>
                         )}

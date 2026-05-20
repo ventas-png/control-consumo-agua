@@ -16,13 +16,13 @@ interface Props {
 const CARGO_ORDER: CargoJunta[] = ['presidente','vicepresidente','tesorero','secretario','fiscal','vocal','otro']
 
 const CARGO_LABELS: Record<CargoJunta, { label: string; icon: string; color: string }> = {
-  presidente:     { label: 'Presidente',      icon: '👑', color: '#B96A3F' },
-  vicepresidente: { label: 'Vicepresidente',  icon: '🌟', color: '#1B3B36' },
+  presidente:     { label: 'Presidente',      icon: '👑', color: 'var(--at-accent)' },
+  vicepresidente: { label: 'Vicepresidente',  icon: '🌟', color: 'var(--at-primary)' },
   tesorero:       { label: 'Tesorero',        icon: '💰', color: '#10b981' },
   secretario:     { label: 'Secretario',      icon: '📝', color: '#f59e0b' },
   fiscal:         { label: 'Fiscal',          icon: '🔍', color: '#ef4444' },
-  vocal:          { label: 'Vocal',           icon: '🗣️', color: '#7E9389' },
-  otro:           { label: 'Otro',            icon: '👤', color: '#7E9389' },
+  vocal:          { label: 'Vocal',           icon: '🗣️', color: 'var(--at-ink-3)' },
+  otro:           { label: 'Otro',            icon: '👤', color: 'var(--at-ink-3)' },
 }
 
 const BLANK = {
@@ -92,17 +92,17 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
 
   const sortedActivos = [...activos].sort((a, b) => CARGO_ORDER.indexOf(a.cargo) - CARGO_ORDER.indexOf(b.cargo))
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Junta Directiva</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Junta Directiva</h2>
         {canCreate && (
           <button onClick={startNew}
-            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Agregar Miembro
           </button>
         )}
@@ -110,61 +110,61 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar miembro' : 'Nuevo miembro'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Cargo *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Cargo *</label>
               <select style={inputStyle} value={form.cargo} onChange={e => setF('cargo', e.target.value as CargoJunta)}>
                 {CARGO_ORDER.map(c => <option key={c} value={c}>{CARGO_LABELS[c].label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Nombre *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Nombre *</label>
               <input style={inputStyle} value={form.nombre} onChange={e => setF('nombre', e.target.value)} placeholder="Nombre completo" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Unidad</label>
               <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">— Sin unidad —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Teléfono</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Teléfono</label>
               <input style={inputStyle} value={form.telefono} onChange={e => setF('telefono', e.target.value)} placeholder="+502 0000-0000" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Email</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Email</label>
               <input style={inputStyle} type="email" value={form.email} onChange={e => setF('email', e.target.value)} placeholder="correo@ejemplo.com" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Inicio período *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Inicio período *</label>
               <input style={inputStyle} type="date" value={form.periodo_inicio} onChange={e => setF('periodo_inicio', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fin período</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fin período</label>
               <input style={inputStyle} type="date" value={form.periodo_fin} onChange={e => setF('periodo_fin', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Estado</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Estado</label>
               <select style={inputStyle} value={form.activo ? 'activo' : 'inactivo'} onChange={e => setF('activo', e.target.value === 'activo')}>
                 <option value="activo">Activo</option>
                 <option value="inactivo">Inactivo / Histórico</option>
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Notas</label>
               <input style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Observaciones opcionales" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
               Cancelar
             </button>
           </div>
@@ -173,13 +173,13 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
 
       {/* Active members */}
       {sortedActivos.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay miembros activos registrados.</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay miembros activos registrados.</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px', marginBottom: '20px' }}>
           {sortedActivos.map(m => {
             const cl = CARGO_LABELS[m.cargo]
             return (
-              <div key={m.id} style={{ background: 'white', border: `2px solid ${cl.color}30`, borderTop: `4px solid ${cl.color}`, borderRadius: '10px', padding: '14px' }}>
+              <div key={m.id} style={{ background: 'var(--at-surface)', border: `2px solid ${cl.color}30`, borderTop: `4px solid ${cl.color}`, borderRadius: '10px', padding: '14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                   <div>
                     <div style={{ fontSize: '20px', marginBottom: '4px' }}>{cl.icon}</div>
@@ -187,18 +187,18 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
                   </div>
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '4px' }}>
-                      <button onClick={() => startEdit(m)} style={{ padding: '3px 7px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                      <button onClick={() => startEdit(m)} style={{ padding: '3px 7px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(m.id)} style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                     </div>
                   )}
                 </div>
-                <div style={{ fontWeight: 800, fontSize: '14px', color: '#15291F' }}>{m.nombre}</div>
-                {m.unidad_nombre && <div style={{ fontSize: '12px', color: '#7E9389' }}>🏠 {m.unidad_nombre}</div>}
-                {m.telefono && <a href={`tel:${m.telefono}`} style={{ fontSize: '12px', color: '#1B3B36', display: 'block', textDecoration: 'none', marginTop: '4px' }}>📞 {m.telefono}</a>}
-                {m.email && <a href={`mailto:${m.email}`} style={{ fontSize: '11px', color: '#7E9389', display: 'block', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis' }}>✉️ {m.email}</a>}
-                <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '6px' }}>Desde {m.periodo_inicio}{m.periodo_fin ? ` hasta ${m.periodo_fin}` : ''}</div>
+                <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--at-ink)' }}>{m.nombre}</div>
+                {m.unidad_nombre && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>🏠 {m.unidad_nombre}</div>}
+                {m.telefono && <a href={`tel:${m.telefono}`} style={{ fontSize: '12px', color: 'var(--at-primary)', display: 'block', textDecoration: 'none', marginTop: '4px' }}>📞 {m.telefono}</a>}
+                {m.email && <a href={`mailto:${m.email}`} style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'block', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis' }}>✉️ {m.email}</a>}
+                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '6px' }}>Desde {m.periodo_inicio}{m.periodo_fin ? ` hasta ${m.periodo_fin}` : ''}</div>
                 {canEdit && (
-                  <button onClick={() => toggleActivo(m)} style={{ marginTop: '8px', padding: '3px 10px', background: '#EAE6D8', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#7E9389' }}>
+                  <button onClick={() => toggleActivo(m)} style={{ marginTop: '8px', padding: '3px 10px', background: 'var(--at-chip)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
                     → Marcar inactivo
                   </button>
                 )}
@@ -212,17 +212,17 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
       {historicos.length > 0 && (
         <div>
           <button onClick={() => setShowHistorico(v => !v)}
-            style={{ fontSize: '12px', color: '#7E9389', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', fontWeight: 600 }}>
+            style={{ fontSize: '12px', color: 'var(--at-ink-3)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', fontWeight: 600 }}>
             {showHistorico ? '▾' : '▸'} Miembros anteriores ({historicos.length})
           </button>
           {showHistorico && (
             <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {historicos.map(m => (
-                <div key={m.id} style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '8px', padding: '10px 12px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <div key={m.id} style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '8px', padding: '10px 12px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <span style={{ fontSize: '16px' }}>{CARGO_LABELS[m.cargo].icon}</span>
                   <div style={{ flex: 1 }}>
-                    <span style={{ fontWeight: 600, fontSize: '13px', color: '#7E9389' }}>{m.nombre}</span>
-                    <span style={{ fontSize: '11px', color: '#7E9389', marginLeft: '8px' }}>{CARGO_LABELS[m.cargo].label} — {m.periodo_inicio}{m.periodo_fin ? ` a ${m.periodo_fin}` : ''}</span>
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--at-ink-3)' }}>{m.nombre}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginLeft: '8px' }}>{CARGO_LABELS[m.cargo].label} — {m.periodo_inicio}{m.periodo_fin ? ` a ${m.periodo_fin}` : ''}</span>
                   </div>
                   {canEdit && (
                     <button onClick={() => handleDelete(m.id)} style={{ padding: '2px 6px', background: '#fee2e2', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>

@@ -93,12 +93,12 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#15291F' }}>Informes mensuales de operación</span>
-          <div style={{ fontSize: 12, color: '#7E9389' }}>Resumen automático de indicadores por período</div>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--at-ink)' }}>Informes mensuales de operación</span>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Resumen automático de indicadores por período</div>
         </div>
         {canCreate && (
           <button onClick={generar} disabled={saving}
-            style={{ padding: '8px 16px', background: '#577B69', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent-2)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             {saving ? '⏳ Generando…' : '📄 Generar informe'}
           </button>
         )}
@@ -106,7 +106,7 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
 
       {/* Lista + Detalle */}
       {informes.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
           Sin informes mensuales — genera el primero con el botón superior
         </div>
@@ -119,12 +119,12 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
               const saldo = inf.total_recaudado - inf.total_gastos
               return (
                 <div key={inf.id} onClick={() => setSelected(inf === selected ? null : inf)}
-                  style={{ background: selected?.id === inf.id ? '#f0fdfa' : '#fff', border: `1.5px solid ${selected?.id === inf.id ? '#577B69' : '#E1DDD0'}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === inf.id ? '#f0fdfa' : '#fff', border: `1.5px solid ${selected?.id === inf.id ? 'var(--at-accent-2)' : 'var(--at-line)'}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                      <span style={{ fontSize: 18, fontWeight: 800, color: '#15291F' }}>{inf.periodo}</span>
+                      <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--at-ink)' }}>{inf.periodo}</span>
                       <span style={{ padding: '2px 9px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
-                      {inf.firmado_por && <span style={{ fontSize: 11, color: '#7E9389' }}>— {inf.firmado_por}</span>}
+                      {inf.firmado_por && <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>— {inf.firmado_por}</span>}
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: saldo >= 0 ? '#16a34a' : '#ef4444' }}>
                       {saldo >= 0 ? '+' : ''}{moneda} {saldo.toFixed(2)}
@@ -134,16 +134,16 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
                     {stat('Recaudado', `${moneda} ${inf.total_recaudado.toFixed(2)}`, '#16a34a', '#f0fdf4')}
                     {stat('Gastos', `${moneda} ${inf.total_gastos.toFixed(2)}`, '#ef4444', '#fef2f2')}
                     {stat('Recaudación', `${tasa}%`, tasa >= 80 ? '#16a34a' : '#d97706', tasa >= 80 ? '#f0fdf4' : '#fffbeb')}
-                    {stat('Tickets', inf.num_tickets, '#9C5733', '#FAF1EA')}
-                    {stat('Visitantes', inf.num_visitantes, '#102622', '#EEF2EC')}
-                    {stat('Incidentes', inf.num_incidentes, inf.num_incidentes > 0 ? '#ef4444' : '#7E9389', inf.num_incidentes > 0 ? '#fef2f2' : '#FAF7EF')}
+                    {stat('Tickets', inf.num_tickets, 'var(--at-accent-hover)', 'var(--at-accent-tint-2)')}
+                    {stat('Visitantes', inf.num_visitantes, 'var(--at-primary-hover)', 'var(--at-primary-tint)')}
+                    {stat('Incidentes', inf.num_incidentes, inf.num_incidentes > 0 ? '#ef4444' : 'var(--at-ink-3)', inf.num_incidentes > 0 ? '#fef2f2' : 'var(--at-surface-2)')}
                   </div>
                 </div>
               )
             })}
           </div>
           {selected && (
-            <div style={{ width: 280, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 280, flexShrink: 0, background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 15 }}>Informe {selected.periodo}</div>
               {([
                 ['Estado', <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ESTADO_CFG[selected.estado].bg, color: ESTADO_CFG[selected.estado].color }}>{ESTADO_CFG[selected.estado].label}</span>],
@@ -160,18 +160,18 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
                 ['Firmado por', selected.firmado_por ?? '—'],
               ] as [string, ReactNode][]).map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--at-chip)' }}>
-                  <span style={{ color: '#7E9389' }}>{k}</span>
-                  <span style={{ fontWeight: 600, color: '#3E5A4C' }}>{v}</span>
+                  <span style={{ color: 'var(--at-ink-3)' }}>{k}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--at-ink-2)' }}>{v}</span>
                 </div>
               ))}
-              {selected.notas && <div style={{ fontSize: 11, color: '#7E9389', marginTop: 8, lineHeight: 1.4, background: '#FAF7EF', borderRadius: 6, padding: '8px 10px' }}>{selected.notas}</div>}
+              {selected.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 8, lineHeight: 1.4, background: 'var(--at-surface-2)', borderRadius: 6, padding: '8px 10px' }}>{selected.notas}</div>}
               <button onClick={() => exportarPDFInformeMensual(selected, moneda, autorNombre)}
-                style={{ width: '100%', marginTop: 14, padding: '8px 0', background: '#102622', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                style={{ width: '100%', marginTop: 14, padding: '8px 0', background: 'var(--at-primary-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                 📄 Descargar PDF
               </button>
               {selected.estado === 'borrador' && (
                 <button onClick={() => publicar(selected)}
-                  style={{ width: '100%', marginTop: 8, padding: '8px 0', background: '#577B69', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  style={{ width: '100%', marginTop: 8, padding: '8px 0', background: 'var(--at-accent-2)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                   📢 Publicar informe
                 </button>
               )}

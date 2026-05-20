@@ -14,10 +14,10 @@ interface Props {
 }
 
 const ESTADO_STYLE: Record<EstadoObra, { bg: string; color: string; label: string }> = {
-  planificada:    { bg: '#F4EBE3', color: '#9C5733', label: 'Planificada' },
+  planificada:    { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', label: 'Planificada' },
   en_ejecucion:  { bg: '#fef3c7', color: '#92400e', label: 'En ejecución' },
   completada:    { bg: '#dcfce7', color: '#16a34a', label: 'Completada' },
-  pausada:       { bg: '#D9E2DC', color: '#102622', label: 'Pausada' },
+  pausada:       { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Pausada' },
   cancelada:     { bg: '#fee2e2', color: '#ef4444', label: 'Cancelada' },
 }
 
@@ -84,18 +84,18 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
   const enEjecucion = obras.filter(o => o.estado === 'en_ejecucion').length
   const completadas = obras.filter(o => o.estado === 'completada').length
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Obras y Mejoras</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>{enEjecucion} en ejecución · {completadas} completadas</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Obras y Mejoras</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>{enEjecucion} en ejecución · {completadas} completadas</p>
         </div>
         {canCreate && !showForm && (
           <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setShowForm(true) }}
-            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nueva Obra
           </button>
         )}
@@ -104,74 +104,74 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px', marginBottom: '16px' }}>
         {[
-          { label: 'Total', value: String(obras.length), color: '#7E9389' },
+          { label: 'Total', value: String(obras.length), color: 'var(--at-ink-3)' },
           { label: 'En ejecución', value: String(enEjecucion), color: '#f59e0b' },
           { label: 'Completadas', value: String(completadas), color: '#10b981' },
-          { label: 'Presupuestado', value: fmt(totalPresupuestado, moneda), color: '#1B3B36' },
+          { label: 'Presupuestado', value: fmt(totalPresupuestado, moneda), color: 'var(--at-primary)' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: k.label === 'Presupuestado' ? '12px' : '22px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#7E9389' }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar obra' : 'Nueva Obra'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Título *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Título *</label>
               <input style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Ej: Remodelación salón comunal" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Área</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Área</label>
               <input style={inputStyle} value={form.area} onChange={e => setF('area', e.target.value)} placeholder="Salón, Piscina, Exteriores…" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Contratista</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Contratista</label>
               <input style={inputStyle} value={form.contratista} onChange={e => setF('contratista', e.target.value)} placeholder="Empresa / persona" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Monto contrato ({moneda})</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Monto contrato ({moneda})</label>
               <input style={inputStyle} type="number" step="0.01" value={form.monto_contrato} onChange={e => setF('monto_contrato', e.target.value)} placeholder="0.00" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha inicio</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha inicio</label>
               <input style={inputStyle} type="date" value={form.fecha_inicio} onChange={e => setF('fecha_inicio', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha fin estimada</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha fin estimada</label>
               <input style={inputStyle} type="date" value={form.fecha_fin_estimada} onChange={e => setF('fecha_fin_estimada', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha fin real</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Fecha fin real</label>
               <input style={inputStyle} type="date" value={form.fecha_fin_real} onChange={e => setF('fecha_fin_real', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Estado</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Estado</label>
               <select style={inputStyle} value={form.estado} onChange={e => setF('estado', e.target.value as EstadoObra)}>
                 {Object.entries(ESTADO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Progreso ({form.progreso}%)</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Progreso ({form.progreso}%)</label>
               <input style={inputStyle} type="range" min="0" max="100" value={form.progreso} onChange={e => setF('progreso', e.target.value)} />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Descripción / Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Descripción / Notas</label>
               <textarea style={{ ...inputStyle, minHeight: '55px', resize: 'vertical', fontFamily: 'inherit' }}
                 value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Detalles, observaciones…" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>
               Cancelar
             </button>
           </div>
@@ -183,9 +183,9 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
         {(['todos', 'planificada', 'en_ejecucion', 'completada', 'pausada', 'cancelada'] as const).map(f => (
           <button key={f} onClick={() => setFiltroEstado(f)}
             style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '11px', cursor: 'pointer',
-              borderColor: filtroEstado === f ? '#1B3B36' : '#E1DDD0',
-              background: filtroEstado === f ? '#D9E2DC' : 'white',
-              color: filtroEstado === f ? '#102622' : '#7E9389',
+              borderColor: filtroEstado === f ? 'var(--at-primary)' : 'var(--at-line)',
+              background: filtroEstado === f ? 'var(--at-primary-soft)' : 'white',
+              color: filtroEstado === f ? 'var(--at-primary-hover)' : 'var(--at-ink-3)',
               fontWeight: filtroEstado === f ? 700 : 500 }}>
             {f === 'todos' ? 'Todas' : ESTADO_STYLE[f as EstadoObra]?.label ?? f}
           </button>
@@ -196,20 +196,20 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
         {/* List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay obras registradas.</div>
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--at-ink-3)', fontSize: '13px' }}>No hay obras registradas.</div>
           ) : filtered.map(o => {
             const es = ESTADO_STYLE[o.estado]
             const progreso = o.progreso ?? 0
             return (
               <div key={o.id} onClick={() => setSelected(selected?.id === o.id ? null : o)}
-                style={{ background: 'white', border: `1.5px solid ${selected?.id === o.id ? '#1B3B36' : '#E1DDD0'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
+                style={{ background: 'var(--at-surface)', border: `1.5px solid ${selected?.id === o.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: '13px' }}>{o.titulo}</span>
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#7E9389', marginBottom: '6px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '6px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                       {o.area && <span>📍 {o.area}</span>}
                       {o.contratista && <span>👷 {o.contratista}</span>}
                       {o.monto_contrato && <span>💰 {fmt(Number(o.monto_contrato), moneda)}</span>}
@@ -217,16 +217,16 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
                     </div>
                     {/* Progress bar */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <div style={{ flex: 1, height: '6px', background: '#E1DDD0', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${progreso}%`, background: progreso === 100 ? '#10b981' : progreso > 50 ? '#1B3B36' : '#f59e0b', borderRadius: '3px', transition: 'width 0.3s' }} />
+                      <div style={{ flex: 1, height: '6px', background: 'var(--at-line)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${progreso}%`, background: progreso === 100 ? '#10b981' : progreso > 50 ? 'var(--at-primary)' : '#f59e0b', borderRadius: '3px', transition: 'width 0.3s' }} />
                       </div>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#3E5A4C', minWidth: '30px' }}>{progreso}%</span>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-2)', minWidth: '30px' }}>{progreso}%</span>
                     </div>
                   </div>
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: '8px' }} onClick={e => e.stopPropagation()}>
                       <button onClick={() => startEdit(o)}
-                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                        style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(o.id)}
                         style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                     </div>
@@ -239,7 +239,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
 
         {/* Detail panel */}
         {selected && (
-          <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px' }}>
+          <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px' }}>
             <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{selected.titulo}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
               {[
@@ -251,9 +251,9 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
                 { label: 'Fecha fin estimada', value: selected.fecha_fin_estimada ?? '—' },
                 { label: 'Fecha fin real', value: selected.fecha_fin_real ?? '—' },
               ].map(f => (
-                <div key={f.label} style={{ background: 'white', borderRadius: '7px', padding: '8px', border: '1px solid var(--at-line)' }}>
-                  <div style={{ fontSize: '10px', color: '#7E9389' }}>{f.label}</div>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C' }}>{f.value}</div>
+                <div key={f.label} style={{ background: 'var(--at-surface)', borderRadius: '7px', padding: '8px', border: '1px solid var(--at-line)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>{f.label}</div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)' }}>{f.value}</div>
                 </div>
               ))}
             </div>
@@ -261,24 +261,24 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
             {/* Progress adjuster */}
             {canEdit && selected.estado !== 'completada' && selected.estado !== 'cancelada' && (
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '4px' }}>Actualizar progreso: {selected.progreso}%</label>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '4px' }}>Actualizar progreso: {selected.progreso}%</label>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <input type="range" min="0" max="100" defaultValue={selected.progreso ?? 0}
                     style={{ flex: 1 }}
                     onMouseUp={e => actualizarProgreso(selected.id, parseInt((e.target as HTMLInputElement).value))}
                     onTouchEnd={e => actualizarProgreso(selected.id, parseInt((e.target as HTMLInputElement).value))}
                   />
-                  <div style={{ height: '8px', width: '120px', background: '#E1DDD0', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${selected.progreso ?? 0}%`, background: '#1B3B36', borderRadius: '4px' }} />
+                  <div style={{ height: '8px', width: '120px', background: 'var(--at-line)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${selected.progreso ?? 0}%`, background: 'var(--at-primary)', borderRadius: '4px' }} />
                   </div>
                 </div>
               </div>
             )}
 
             {selected.notas && (
-              <div style={{ background: 'white', borderRadius: '8px', padding: '10px', border: '1px solid var(--at-line)' }}>
-                <div style={{ fontSize: '10px', color: '#7E9389', marginBottom: '4px' }}>Notas</div>
-                <div style={{ fontSize: '12px', color: '#3E5A4C' }}>{selected.notas}</div>
+              <div style={{ background: 'var(--at-surface)', borderRadius: '8px', padding: '10px', border: '1px solid var(--at-line)' }}>
+                <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>Notas</div>
+                <div style={{ fontSize: '12px', color: 'var(--at-ink-2)' }}>{selected.notas}</div>
               </div>
             )}
           </div>

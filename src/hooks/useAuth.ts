@@ -522,7 +522,7 @@ export function useAuth() {
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#64748b',
+      cancelButtonColor: '#7E9389',
       confirmButtonText: 'Sí, salir',
       cancelButtonText: 'Cancelar',
     })

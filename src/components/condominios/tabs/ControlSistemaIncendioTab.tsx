@@ -15,12 +15,12 @@ interface Props {
 
 const TIPOS_SISTEMA: { value: TipoSistemaIncendio; label: string; icon: string; color: string }[] = [
   { value: 'extintor',      label: 'Extintor',        icon: '🧯', color: '#ef4444' },
-  { value: 'rociador',      label: 'Rociador',        icon: '🚿', color: '#577B69' },
+  { value: 'rociador',      label: 'Rociador',        icon: '🚿', color: 'var(--at-accent-2)' },
   { value: 'alarma',        label: 'Alarma',          icon: '🔔', color: '#f59e0b' },
   { value: 'hidrant',       label: 'Hidrante',        icon: '🚒', color: '#dc2626' },
-  { value: 'detector_humo', label: 'Detector humo',   icon: '💨', color: '#B96A3F' },
-  { value: 'gabinete',      label: 'Gabinete',        icon: '🗄️', color: '#B96A3F' },
-  { value: 'otro',          label: 'Otro',            icon: '📋', color: '#7E9389' },
+  { value: 'detector_humo', label: 'Detector humo',   icon: '💨', color: 'var(--at-accent)' },
+  { value: 'gabinete',      label: 'Gabinete',        icon: '🗄️', color: 'var(--at-accent)' },
+  { value: 'otro',          label: 'Otro',            icon: '📋', color: 'var(--at-ink-3)' },
 ]
 
 const TIPOS_INSPECCION: { value: TipoInspeccionIncendio; label: string }[] = [
@@ -34,7 +34,7 @@ const TIPOS_INSPECCION: { value: TipoInspeccionIncendio; label: string }[] = [
 const RESULTADOS: { value: ResultadoInspeccionIncendio; label: string; color: string; bg: string; icon: string }[] = [
   { value: 'aprobado',              label: 'Aprobado',             color: '#10b981', bg: '#d1fae5', icon: '✅' },
   { value: 'observacion',           label: 'Observación',          color: '#f59e0b', bg: '#fef3c7', icon: '⚠️' },
-  { value: 'requiere_mantenimiento',label: 'Req. mantenimiento',   color: '#B96A3F', bg: '#F4EBE3', icon: '🔧' },
+  { value: 'requiere_mantenimiento',label: 'Req. mantenimiento',   color: 'var(--at-accent)', bg: 'var(--at-accent-tint)', icon: '🔧' },
   { value: 'fuera_servicio',        label: 'Fuera de servicio',    color: '#ef4444', bg: '#fef2f2', icon: '🚫' },
 ]
 
@@ -98,7 +98,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
   }
 
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
@@ -132,14 +132,14 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
           {resumenPorTipo.map(t => (
             <div key={t.value} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
               <span>{t.icon} {t.label}</span>
-              <span style={{ color: t.problemas > 0 ? '#ef4444' : '#7E9389' }}>
+              <span style={{ color: t.problemas > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>
                 {t.total}{t.problemas > 0 ? ` (${t.problemas} ⚠)` : ''}
               </span>
             </div>
           ))}
         </div>
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
+        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
 
         {lista.map(r => {
           const tipo = TIPOS_SISTEMA.find(t => t.value === r.tipo_sistema)
@@ -152,10 +152,10 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
                 <span style={{ fontWeight: 600, fontSize: 12 }}>{tipo?.icon} {r.identificador}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: res?.bg, color: res?.color }}>{res?.icon} {res?.label}</span>
               </div>
-              <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>{r.ubicacion}</div>
-              <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{r.ubicacion}</div>
+              <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>
                 {r.fecha}
-                {r.fecha_vencimiento && <span style={{ color: vencido ? '#ef4444' : '#7E9389' }}> · Vence: {r.fecha_vencimiento}</span>}
+                {r.fecha_vencimiento && <span style={{ color: vencido ? '#ef4444' : 'var(--at-ink-3)' }}> · Vence: {r.fecha_vencimiento}</span>}
               </div>
             </div>
           )
@@ -229,7 +229,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
                 {saving ? 'Guardando…' : '✅ Registrar'}
               </button>
               <button onClick={() => setMostrarForm(false)}
-                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -247,34 +247,34 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
                 <div>
                   <div style={{ fontSize: 12, color: tipo?.color, fontWeight: 700, marginBottom: 4 }}>{tipo?.icon} {tipo?.label}</div>
                   <div style={{ fontWeight: 700, fontSize: 20 }}>{selected.identificador}</div>
-                  <div style={{ fontSize: 13, color: '#7E9389', marginTop: 4 }}>📍 {selected.ubicacion}</div>
-                  <div style={{ fontSize: 12, color: '#7E9389', marginTop: 2 }}>{selected.fecha} · {tipoInsp?.label}</div>
+                  <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginTop: 4 }}>📍 {selected.ubicacion}</div>
+                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>{selected.fecha} · {tipoInsp?.label}</div>
                 </div>
                 <span style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, background: res?.bg, color: res?.color, fontWeight: 600 }}>{res?.icon} {res?.label}</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
                 {selected.fecha_vencimiento && (
-                  <div style={{ background: vencido ? '#fef2f2' : '#FAF7EF', borderRadius: 8, padding: '10px 14px', border: vencido ? '1px solid #fecaca' : 'none' }}>
-                    <div style={{ fontSize: 11, color: vencido ? '#ef4444' : '#7E9389' }}>Fecha vencimiento</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: vencido ? '#ef4444' : '#3E5A4C' }}>{selected.fecha_vencimiento}{vencido ? ' ⚠ VENCIDO' : ''}</div>
+                  <div style={{ background: vencido ? '#fef2f2' : 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', border: vencido ? '1px solid #fecaca' : 'none' }}>
+                    <div style={{ fontSize: 11, color: vencido ? '#ef4444' : 'var(--at-ink-3)' }}>Fecha vencimiento</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: vencido ? '#ef4444' : 'var(--at-ink-2)' }}>{selected.fecha_vencimiento}{vencido ? ' ⚠ VENCIDO' : ''}</div>
                   </div>
                 )}
                 {selected.proxima_inspeccion && (
-                  <div style={{ background: '#F4EBE3', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#B96A3F' }}>Próxima inspección</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#B96A3F' }}>{selected.proxima_inspeccion}</div>
+                  <div style={{ background: 'var(--at-accent-tint)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-accent)' }}>Próxima inspección</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--at-accent)' }}>{selected.proxima_inspeccion}</div>
                   </div>
                 )}
                 {selected.empresa_servicio && (
-                  <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#7E9389' }}>Empresa</div>
+                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Empresa</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.empresa_servicio}</div>
                   </div>
                 )}
                 {selected.tecnico && (
-                  <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#7E9389' }}>Técnico</div>
+                  <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Técnico</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.tecnico}</div>
                   </div>
                 )}
@@ -300,11 +300,11 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
             {(vencidosHoy.length > 0 || proximosVencer.length > 0) && (
               <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
                 <div style={{ fontWeight: 600, fontSize: 13, color: '#ef4444', marginBottom: 6 }}>🚨 Atención requerida</div>
-                {vencidosHoy.map(r => <div key={r.id} style={{ fontSize: 12, color: '#3E5A4C', marginBottom: 2 }}>⚠ {r.identificador} — vencido ({r.fecha_vencimiento})</div>)}
-                {proximosVencer.filter(r => !vencidosHoy.find(v => v.id === r.id)).map(r => <div key={r.id} style={{ fontSize: 12, color: '#3E5A4C', marginBottom: 2 }}>⏰ {r.identificador} — vence pronto ({r.fecha_vencimiento})</div>)}
+                {vencidosHoy.map(r => <div key={r.id} style={{ fontSize: 12, color: 'var(--at-ink-2)', marginBottom: 2 }}>⚠ {r.identificador} — vencido ({r.fecha_vencimiento})</div>)}
+                {proximosVencer.filter(r => !vencidosHoy.find(v => v.id === r.id)).map(r => <div key={r.id} style={{ fontSize: 12, color: 'var(--at-ink-2)', marginBottom: 2 }}>⏰ {r.identificador} — vence pronto ({r.fecha_vencimiento})</div>)}
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: '#7E9389', fontSize: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: 'var(--at-ink-3)', fontSize: 14 }}>
               Selecciona un registro o crea uno nuevo
             </div>
           </div>

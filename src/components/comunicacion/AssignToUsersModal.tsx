@@ -44,18 +44,18 @@ export function AssignToUsersModal({ teamUsers, currentAssignments, onClose, onA
       zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
     }}>
       <div style={{
-        background: 'white', borderRadius: '14px', width: '100%', maxWidth: '420px',
+        background: 'var(--at-surface)', borderRadius: '14px', width: '100%', maxWidth: '420px',
         padding: '24px', boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
       }}>
-        <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>
           Asignar conversación
         </h3>
-        <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#7E9389' }}>
+        <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--at-ink-3)' }}>
           Selecciona los miembros del equipo que deben atender esta conversación.
         </p>
 
         {teamUsers.length === 0 ? (
-          <p style={{ fontSize: '13px', color: '#7E9389', textAlign: 'center', padding: '20px 0' }}>
+          <p style={{ fontSize: '13px', color: 'var(--at-ink-3)', textAlign: 'center', padding: '20px 0' }}>
             No hay usuarios del equipo disponibles.
           </p>
         ) : (
@@ -68,24 +68,24 @@ export function AssignToUsersModal({ teamUsers, currentAssignments, onClose, onA
                   onClick={() => toggleUser(u.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '10px',
-                    padding: '10px 12px', border: `1px solid ${isSelected ? '#CE8A63' : '#E1DDD0'}`,
-                    borderRadius: '8px', background: isSelected ? '#F4EBE3' : 'white',
+                    padding: '10px 12px', border: `1px solid ${isSelected ? 'var(--at-accent-light)' : 'var(--at-line)'}`,
+                    borderRadius: '8px', background: isSelected ? 'var(--at-accent-tint)' : 'white',
                     cursor: 'pointer', textAlign: 'left',
                   }}
                 >
                   <span style={{
                     width: '20px', height: '20px', borderRadius: '4px',
-                    border: `2px solid ${isSelected ? '#9C5733' : '#C7C2B0'}`,
-                    background: isSelected ? '#9C5733' : 'white',
+                    border: `2px solid ${isSelected ? 'var(--at-accent-hover)' : 'var(--at-line-strong)'}`,
+                    background: isSelected ? 'var(--at-accent-hover)' : 'white',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0, fontSize: '12px', color: 'white',
                   }}>
                     {isSelected ? '✓' : ''}
                   </span>
-                  <span style={{ flex: 1, fontSize: '13px', fontWeight: 500, color: '#15291F' }}>
+                  <span style={{ flex: 1, fontSize: '13px', fontWeight: 500, color: 'var(--at-ink)' }}>
                     {u.full_name}
                   </span>
-                  <span style={{ fontSize: '11px', color: '#7E9389', textTransform: 'capitalize' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', textTransform: 'capitalize' }}>
                     {u.role}
                   </span>
                 </button>
@@ -96,13 +96,13 @@ export function AssignToUsersModal({ teamUsers, currentAssignments, onClose, onA
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button onClick={onClose}
-            style={{ padding: '8px 16px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', background: 'white', fontSize: '13px', cursor: 'pointer', color: '#3E5A4C' }}>
+            style={{ padding: '8px 16px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', background: 'var(--at-surface)', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-2)' }}>
             Cancelar
           </button>
           <button onClick={handleSave} disabled={saving}
             style={{
               padding: '8px 16px', border: 'none', borderRadius: '8px',
-              background: '#9C5733', color: 'white', fontSize: '13px', fontWeight: 600,
+              background: 'var(--at-accent-hover)', color: 'white', fontSize: '13px', fontWeight: 600,
               cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
             }}>
             {saving ? 'Guardando…' : 'Guardar asignaciones'}

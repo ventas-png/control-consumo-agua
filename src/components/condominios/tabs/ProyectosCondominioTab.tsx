@@ -14,16 +14,16 @@ interface Props {
 }
 
 const CAT_CFG: Record<CategoriaProyectoCond, { label: string; icon: string; color: string }> = {
-  mejora:        { label: 'Mejora',        icon: '🏗️', color: '#102622' },
+  mejora:        { label: 'Mejora',        icon: '🏗️', color: 'var(--at-primary-hover)' },
   mantenimiento: { label: 'Mantenimiento', icon: '🔧', color: '#d97706' },
-  seguridad:     { label: 'Seguridad',     icon: '🛡️', color: '#9C5733' },
-  tecnologia:    { label: 'Tecnología',    icon: '💻', color: '#102622' },
-  otro:          { label: 'Otro',          icon: '📌', color: '#7E9389' },
+  seguridad:     { label: 'Seguridad',     icon: '🛡️', color: 'var(--at-accent-hover)' },
+  tecnologia:    { label: 'Tecnología',    icon: '💻', color: 'var(--at-primary-hover)' },
+  otro:          { label: 'Otro',          icon: '📌', color: 'var(--at-ink-3)' },
 }
 const ESTADO_CFG: Record<EstadoProyectoCond, { label: string; bg: string; color: string; barColor: string }> = {
-  planificado:  { label: 'Planificado',  bg: '#EEF2EC', color: '#1B3B36', barColor: '#577B69' },
+  planificado:  { label: 'Planificado',  bg: 'var(--at-primary-tint)', color: 'var(--at-primary)', barColor: 'var(--at-accent-2)' },
   en_progreso:  { label: 'En progreso',  bg: '#fef3c7', color: '#d97706', barColor: '#fbbf24' },
-  pausado:      { label: 'Pausado',      bg: '#EAE6D8', color: '#7E9389', barColor: '#C7C2B0' },
+  pausado:      { label: 'Pausado',      bg: 'var(--at-chip)', color: 'var(--at-ink-3)', barColor: 'var(--at-line-strong)' },
   completado:   { label: 'Completado',   bg: '#dcfce7', color: '#16a34a', barColor: '#4ade80' },
   cancelado:    { label: 'Cancelado',    bg: '#fee2e2', color: '#ef4444', barColor: '#fca5a5' },
 }
@@ -110,7 +110,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
   }
 
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
@@ -119,8 +119,8 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
         {[
           { label: 'En progreso', val: enProgreso, bg: '#fef3c7', color: '#d97706' },
           { label: 'Completados', val: proyectos.filter(p => p.estado === 'completado').length, bg: '#dcfce7', color: '#16a34a' },
-          { label: 'Presupuesto total', val: `${moneda} ${totalPresupuesto.toFixed(2)}`, bg: '#EEF2EC', color: '#1B3B36' },
-          { label: 'Costo real', val: `${moneda} ${totalCostoReal.toFixed(2)}`, bg: totalCostoReal > totalPresupuesto && totalPresupuesto > 0 ? '#fef2f2' : '#FAF7EF', color: totalCostoReal > totalPresupuesto && totalPresupuesto > 0 ? '#ef4444' : '#3E5A4C' },
+          { label: 'Presupuesto total', val: `${moneda} ${totalPresupuesto.toFixed(2)}`, bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
+          { label: 'Costo real', val: `${moneda} ${totalCostoReal.toFixed(2)}`, bg: totalCostoReal > totalPresupuesto && totalPresupuesto > 0 ? '#fef2f2' : 'var(--at-surface-2)', color: totalCostoReal > totalPresupuesto && totalPresupuesto > 0 ? '#ef4444' : 'var(--at-ink-2)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: k.color }}>{k.val}</div>
@@ -134,14 +134,14 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(['', 'planificado', 'en_progreso', 'pausado', 'completado', 'cancelado'] as (EstadoProyectoCond | '')[]).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
-              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#102622' : '#E1DDD0', background: filtroEstado === e ? '#EEF2EC' : '#fff', color: filtroEstado === e ? '#102622' : '#7E9389' }}>
+              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-primary-hover)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-primary-tint)' : '#fff', color: filtroEstado === e ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>
               {e === '' ? 'Todos' : ESTADO_CFG[e].label}
             </button>
           ))}
         </div>
         {canCreate && (
           <button onClick={mostrarForm && !editId ? cancelar : abrirNuevo}
-            style={{ padding: '8px 16px', background: '#102622', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-primary-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm && !editId ? '✕ Cancelar' : '+ Nuevo proyecto'}
           </button>
         )}
@@ -149,7 +149,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>{editId ? 'Editar proyecto' : 'Nuevo proyecto interno'}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -203,17 +203,17 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={guardar} disabled={saving}
-              style={{ padding: '8px 20px', background: '#102622', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+              style={{ padding: '8px 20px', background: 'var(--at-primary-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
               {saving ? 'Guardando…' : editId ? '💾 Actualizar' : '✅ Crear proyecto'}
             </button>
-            <button onClick={cancelar} style={{ padding: '8px 16px', background: '#EAE6D8', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
+            <button onClick={cancelar} style={{ padding: '8px 16px', background: 'var(--at-chip)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* Lista + Detalle */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🏗️</div>
           Sin proyectos internos registrados
         </div>
@@ -226,16 +226,16 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
               const sobrePresupuesto = p.presupuesto && p.costo_real && p.costo_real > p.presupuesto
               return (
                 <div key={p.id} onClick={() => setSelected(p === selected ? null : p)}
-                  style={{ background: selected?.id === p.id ? '#EEF2EC' : '#fff', border: `1.5px solid ${selected?.id === p.id ? '#102622' : '#E1DDD0'}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === p.id ? 'var(--at-primary-tint)' : '#fff', border: `1.5px solid ${selected?.id === p.id ? 'var(--at-primary-hover)' : 'var(--at-line)'}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                     <div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 3 }}>
                         <span style={{ fontSize: 16 }}>{cat.icon}</span>
-                        <span style={{ fontWeight: 700, fontSize: 14, color: '#15291F' }}>{p.nombre}</span>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)' }}>{p.nombre}</span>
                         <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
                         {sobrePresupuesto && <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, background: '#fef2f2', color: '#ef4444', fontWeight: 700 }}>⚠ Sobre presupuesto</span>}
                       </div>
-                      <div style={{ fontSize: 12, color: '#7E9389' }}>
+                      <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
                         {cat.label}
                         {p.responsable && ` · ${p.responsable}`}
                         {p.fecha_inicio && ` · Inicio: ${p.fecha_inicio}`}
@@ -247,11 +247,11 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
                     </div>
                   </div>
                   {/* Progress bar */}
-                  <div style={{ background: '#EAE6D8', borderRadius: 20, height: 8, overflow: 'hidden' }}>
+                  <div style={{ background: 'var(--at-chip)', borderRadius: 20, height: 8, overflow: 'hidden' }}>
                     <div style={{ height: '100%', background: est.barColor, width: `${p.porcentaje_avance}%`, borderRadius: 20, transition: 'width 0.3s' }} />
                   </div>
                   {(p.presupuesto || p.costo_real) && (
-                    <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 11, color: '#7E9389' }}>
+                    <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 11, color: 'var(--at-ink-3)' }}>
                       {p.presupuesto && <span>Presupuesto: <strong>{moneda} {p.presupuesto.toFixed(2)}</strong></span>}
                       {p.costo_real && <span>Real: <strong style={{ color: sobrePresupuesto ? '#ef4444' : '#16a34a' }}>{moneda} {p.costo_real.toFixed(2)}</strong></span>}
                     </div>
@@ -261,9 +261,9 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
             })}
           </div>
           {selected && (
-            <div style={{ width: 260, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 260, flexShrink: 0, background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 14 }}>{selected.nombre}</div>
-              {selected.descripcion && <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 10, lineHeight: 1.4 }}>{selected.descripcion}</div>}
+              {selected.descripcion && <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 10, lineHeight: 1.4 }}>{selected.descripcion}</div>}
               {[
                 ['Categoría', `${CAT_CFG[selected.categoria].icon} ${CAT_CFG[selected.categoria].label}`],
                 ['Estado', ESTADO_CFG[selected.estado].label],
@@ -275,15 +275,15 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
                 ['Costo real', selected.costo_real ? `${moneda} ${selected.costo_real.toFixed(2)}` : '—'],
               ].map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--at-chip)' }}>
-                  <span style={{ color: '#7E9389' }}>{k}</span>
-                  <span style={{ fontWeight: 600, color: '#3E5A4C' }}>{v}</span>
+                  <span style={{ color: 'var(--at-ink-3)' }}>{k}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--at-ink-2)' }}>{v}</span>
                 </div>
               ))}
-              {selected.notas && <div style={{ fontSize: 11, color: '#7E9389', marginTop: 8 }}>{selected.notas}</div>}
+              {selected.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 8 }}>{selected.notas}</div>}
               {canEdit && (
                 <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
                   <button onClick={() => actualizarAvance(selected)}
-                    style={{ flex: 1, padding: '7px 0', background: '#EEF2EC', color: '#1B3B36', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    style={{ flex: 1, padding: '7px 0', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                     📊 Avance
                   </button>
                   <button onClick={() => abrirEditar(selected)}

@@ -132,18 +132,18 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
   return (
     <div style={{ maxWidth: '800px' }}>
       <form onSubmit={handleSubmit} style={{
-        background: 'white',
+        background: 'var(--at-surface)',
         padding: '32px',
         borderRadius: '16px',
         boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
       }}>
-        <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '24px', color: '#15291F' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '24px', color: 'var(--at-ink)' }}>
           Registrar Nueva Lectura
         </h2>
 
         {/* Cliente */}
         <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#3E5A4C', marginBottom: '8px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--at-ink-2)', marginBottom: '8px' }}>
             Cliente *
           </label>
           <select
@@ -169,7 +169,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
         {/* Lectura Anterior y Actual */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#3E5A4C', marginBottom: '8px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--at-ink-2)', marginBottom: '8px' }}>
               Lectura Anterior (m³) *
             </label>
             <input
@@ -190,7 +190,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#3E5A4C', marginBottom: '8px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--at-ink-2)', marginBottom: '8px' }}>
               Lectura Actual (m³) *
             </label>
             <input
@@ -215,11 +215,11 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
         {consumo > 0 && (
           <div style={{
             padding: '12px',
-            background: '#EEF2EC',
+            background: 'var(--at-primary-tint)',
             border: '1px solid var(--at-primary-soft-2)',
             borderRadius: '8px',
             fontSize: '14px',
-            color: '#102622',
+            color: 'var(--at-primary-hover)',
             marginBottom: '20px',
             fontWeight: '600',
           }}>
@@ -230,7 +230,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
         {/* Tarifa y Canon */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#3E5A4C', marginBottom: '8px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--at-ink-2)', marginBottom: '8px' }}>
               Tarifa (Q/m³)
             </label>
             <input
@@ -245,13 +245,13 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
                 border: '2px solid var(--at-line)',
                 fontSize: '14px',
                 fontFamily: 'inherit',
-                background: '#FAF7EF',
+                background: 'var(--at-surface-2)',
               }}
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#3E5A4C', marginBottom: '8px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--at-ink-2)', marginBottom: '8px' }}>
               Canon Fijo (Q)
             </label>
             <input
@@ -289,7 +289,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
 
         {/* Notas */}
         <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#3E5A4C', marginBottom: '8px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--at-ink-2)', marginBottom: '8px' }}>
             Notas
           </label>
           <textarea
@@ -311,7 +311,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
 
         {/* Subir foto */}
         <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#3E5A4C', marginBottom: '8px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: 'var(--at-ink-2)', marginBottom: '8px' }}>
             Foto del Medidor (opcional)
           </label>
           <input
@@ -350,7 +350,7 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
           style={{
             width: '100%',
             padding: '14px',
-            background: loading ? '#C7C2B0' : 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-primary-hover) 100%)',
+            background: loading ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-primary-hover) 100%)',
             color: 'white',
             border: 'none',
             borderRadius: '8px',

@@ -173,7 +173,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
   }
 
   const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
+  const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
@@ -181,7 +181,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: 16 }}>Plantillas de cuota</div>
-          <div style={{ fontSize: 12, color: '#7E9389' }}>{plantillas.filter(p => p.activa).length} activas · {unidades.filter(u => u.activo !== false).length} unidades</div>
+          <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>{plantillas.filter(p => p.activa).length} activas · {unidades.filter(u => u.activo !== false).length} unidades</div>
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
@@ -193,7 +193,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
 
       {/* Form */}
       {mostrarForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>{editingId ? 'Editar plantilla' : 'Nueva plantilla de cuota'}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -235,12 +235,12 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
             <div style={{ display: 'flex', gap: 8, marginBottom: usarRubros ? 0 : 12 }}>
               <button type="button" onClick={() => setUsarRubros(false)}
                 style={{ padding: '6px 14px', fontSize: 12, border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer',
-                  background: !usarRubros ? '#1B3B36' : '#FAF7EF', color: !usarRubros ? '#fff' : '#3E5A4C', fontWeight: !usarRubros ? 700 : 400 }}>
+                  background: !usarRubros ? 'var(--at-primary)' : 'var(--at-surface-2)', color: !usarRubros ? '#fff' : 'var(--at-ink-2)', fontWeight: !usarRubros ? 700 : 400 }}>
                 Monto fijo simple
               </button>
               <button type="button" onClick={() => setUsarRubros(true)}
                 style={{ padding: '6px 14px', fontSize: 12, border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer',
-                  background: usarRubros ? '#1B3B36' : '#FAF7EF', color: usarRubros ? '#fff' : '#3E5A4C', fontWeight: usarRubros ? 700 : 400 }}>
+                  background: usarRubros ? 'var(--at-primary)' : 'var(--at-surface-2)', color: usarRubros ? '#fff' : 'var(--at-ink-2)', fontWeight: usarRubros ? 700 : 400 }}>
                 Rubros desglozados
               </button>
             </div>
@@ -253,7 +253,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
             )}
 
             {usarRubros && (
-              <div style={{ marginTop: 12, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 8, padding: 14 }}>
+              <div style={{ marginTop: 12, background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 8, padding: 14 }}>
                 <RubrosBuilder rubros={rubros} onChange={setRubros} moneda={moneda} />
               </div>
             )}
@@ -268,7 +268,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
 
       {/* Lista */}
       {plantillas.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
           No hay plantillas de cuota — crea una para generar cuotas masivas
         </div>
@@ -277,21 +277,21 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
           {plantillas.map(p => {
             const tieneRubros = p.rubros && p.rubros.length > 0
             return (
-              <div key={p.id} style={{ background: p.activa ? '#fff' : '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 14, opacity: p.activa ? 1 : 0.65 }}>
+              <div key={p.id} style={{ background: p.activa ? '#fff' : 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 14, opacity: p.activa ? 1 : 0.65 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: '#15291F' }}>{p.nombre}</span>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)' }}>{p.nombre}</span>
                     <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#16a34a' }}>{PERIODO_LABELS[p.periodicidad]}</span>
-                    <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, background: '#EAE6D8', color: '#3E5A4C' }}>{p.concepto}</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, background: 'var(--at-chip)', color: 'var(--at-ink-2)' }}>{p.concepto}</span>
                     {tieneRubros && (
-                      <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, background: '#EEF2EC', color: '#1B3B36' }}>
+                      <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, background: 'var(--at-primary-tint)', color: 'var(--at-primary)' }}>
                         {p.rubros!.length} rubro{p.rubros!.length !== 1 ? 's' : ''}
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 13, color: '#3E5A4C' }}>
+                  <div style={{ fontSize: 13, color: 'var(--at-ink-2)' }}>
                     {tieneRubros
-                      ? <span style={{ color: '#7E9389' }}>{p.rubros!.map(r => `${r.nombre} (${r.metodo === 'fijo' ? `${moneda} ${r.valor}` : r.metodo === 'por_m2' ? `${moneda} ${r.valor}/m²` : `${r.valor.toLocaleString()} total alíc.`})`).join(' + ')}</span>
+                      ? <span style={{ color: 'var(--at-ink-3)' }}>{p.rubros!.map(r => `${r.nombre} (${r.metodo === 'fijo' ? `${moneda} ${r.valor}` : r.metodo === 'por_m2' ? `${moneda} ${r.valor}/m²` : `${r.valor.toLocaleString()} total alíc.`})`).join(' + ')}</span>
                       : <><strong>{moneda} {p.monto.toLocaleString()}</strong> por unidad</>
                     }
                     {' '}· vence día {p.dia_vencimiento} · {p.aplica_a === 'todas' ? 'Todas las unidades' : p.aplica_a}
@@ -300,13 +300,13 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                   {canCreate && p.activa && (
                     <button onClick={() => generarCuotas(p)} disabled={generando === p.id}
-                      style={{ padding: '7px 14px', background: '#9C5733', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      style={{ padding: '7px 14px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                       {generando === p.id ? '⏳' : '⚡ Generar'}
                     </button>
                   )}
                   {canEdit && (
                     <>
-                      <button onClick={() => startEdit(p)} style={{ padding: '7px 12px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>✏️</button>
+                      <button onClick={() => startEdit(p)} style={{ padding: '7px 12px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>✏️</button>
                       <button onClick={() => toggleActiva(p)} style={{ padding: '7px 12px', background: p.activa ? '#fef3c7' : '#f0fdf4', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{p.activa ? '⏸' : '▶'}</button>
                       <button onClick={() => eliminar(p.id)} style={{ padding: '7px 10px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>🗑</button>
                     </>
