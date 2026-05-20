@@ -1213,7 +1213,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
                   <div style={{
                     width: '32px', height: '32px', borderRadius: '8px',
-                    background: isActivo ? 'linear-gradient(135deg, #B96A3F, #B96A3F)' : '#E1DDD0',
+                    background: isActivo ? 'linear-gradient(135deg, #B96A3F, #9C5733)' : '#E1DDD0',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '15px', color: 'white',
                   }}>🏢</div>
@@ -1257,7 +1257,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                   }}>
                     <div style={{
                       width: '32px', height: '32px', borderRadius: '8px',
-                      background: 'linear-gradient(135deg, #B96A3F, #B96A3F)',
+                      background: 'linear-gradient(135deg, #B96A3F, #9C5733)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '15px', color: 'white',
                     }}>🏢</div>

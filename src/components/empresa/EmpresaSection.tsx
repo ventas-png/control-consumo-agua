@@ -886,7 +886,7 @@ export function EmpresaSection({ currentUser }: Props) {
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
                 padding: '9px 16px', borderRadius: '8px', border: 'none',
-                background: 'linear-gradient(135deg, #B96A3F, #B96A3F)',
+                background: 'linear-gradient(135deg, #B96A3F, #9C5733)',
                 color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
               }}
             >

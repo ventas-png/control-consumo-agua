@@ -174,13 +174,13 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
         <div style={{ display: 'flex', gap: '8px' }}>
           {vista === 'areas' && canCreate && (
             <button onClick={() => { resetAreaForm(); setShowAreaForm(true) }}
-              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#B96A3F,#B96A3F)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#B96A3F,#9C5733)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
               + Nueva área
             </button>
           )}
           {vista === 'rutas' && canCreate && (
             <button onClick={() => { resetRutaForm(); setShowRutaForm(true) }}
-              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#B96A3F,#B96A3F)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#B96A3F,#9C5733)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
               + Nueva ruta
             </button>
           )}
@@ -232,7 +232,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={saveArea} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#B96A3F,#B96A3F)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={saveArea} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#B96A3F,#9C5733)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
                   {saving ? 'Guardando...' : editAreaId ? 'Actualizar' : 'Guardar'}
                 </button>
                 <button onClick={resetAreaForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -295,7 +295,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={saveRuta} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#B96A3F,#B96A3F)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={saveRuta} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#B96A3F,#9C5733)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
                   {saving ? 'Guardando...' : editRutaId ? 'Actualizar' : 'Guardar'}
                 </button>
                 <button onClick={resetRutaForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -399,7 +399,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                               </div>
                             </div>
                             <div style={{ display: 'flex', gap: '8px' }}>
-                              <button onClick={addPunto} disabled={saving || !newPuntoAreaId} style={{ padding: '8px 18px', background: 'linear-gradient(135deg,#B96A3F,#B96A3F)', color: 'white', border: 'none', borderRadius: '7px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+                              <button onClick={addPunto} disabled={saving || !newPuntoAreaId} style={{ padding: '8px 18px', background: 'linear-gradient(135deg,#B96A3F,#9C5733)', color: 'white', border: 'none', borderRadius: '7px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
                                 {saving ? '...' : 'Agregar'}
                               </button>
                               <button onClick={() => { setAddingPunto(false); setNewPuntoAreaId(''); setNewPuntoInstrucciones(''); setNewPuntoTiempo('') }}
