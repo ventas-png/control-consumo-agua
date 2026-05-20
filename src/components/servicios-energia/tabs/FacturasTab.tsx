@@ -95,7 +95,7 @@ export default function FacturasTab({
       text: '¿Está seguro de que desea eliminar esta factura?',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
       confirmButtonText: 'Eliminar',
     })
 
@@ -112,9 +112,9 @@ export default function FacturasTab({
   }
 
   const getEstadoColor = (estado: string) => {
-    if (estado === 'pagada') return '#28a745'
-    if (estado === 'vencida') return '#dc3545'
-    return '#ffc107'
+    if (estado === 'pagada') return 'var(--at-primary)'
+    if (estado === 'vencida') return '#dc2626'
+    return '#f59e0b'
   }
 
   return (
@@ -124,7 +124,7 @@ export default function FacturasTab({
         {canCreate && (
           <button
             onClick={handleCreateNew}
-            style={{ padding: '0.5rem 1rem', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
           >
             + Nueva Factura
           </button>
@@ -178,11 +178,11 @@ export default function FacturasTab({
       {/* Tabla */}
       <div style={{ marginTop: '1.5rem' }}>
         {filteredFacturas.length === 0 ? (
-          <p style={{ color: '#888', fontStyle: 'italic' }}>No hay facturas con los filtros aplicados</p>
+          <p style={{ color: 'var(--at-ink-3)', fontStyle: 'italic' }}>No hay facturas con los filtros aplicados</p>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
-              <tr style={{ backgroundColor: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
+              <tr style={{ backgroundColor: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
                 <th style={{ padding: '0.5rem', textAlign: 'left' }}>Fuente</th>
                 <th style={{ padding: '0.5rem', textAlign: 'left' }}>Período</th>
                 <th style={{ padding: '0.5rem', textAlign: 'right' }}>kWh Consumidos</th>
@@ -196,7 +196,7 @@ export default function FacturasTab({
               {filteredFacturas.map(f => {
                 const fuente = fuentesEnergia.find(fu => fu.id === f.fuente_energia_id)
                 return (
-                  <tr key={f.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <tr key={f.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '0.5rem' }}>{fuente?.nombre || '?'}</td>
                     <td style={{ padding: '0.5rem' }}>
                       {new Date(f.periodo_inicio).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })} -
@@ -226,7 +226,7 @@ export default function FacturasTab({
                             style={{
                               marginRight: '0.5rem',
                               padding: '0.25rem 0.75rem',
-                              backgroundColor: '#0066cc',
+                              backgroundColor: 'var(--at-primary)',
                               color: 'white',
                               border: 'none',
                               borderRadius: '3px',
@@ -240,7 +240,7 @@ export default function FacturasTab({
                             onClick={() => handleDelete(f.id)}
                             style={{
                               padding: '0.25rem 0.75rem',
-                              backgroundColor: '#dc3545',
+                              backgroundColor: '#dc2626',
                               color: 'white',
                               border: 'none',
                               borderRadius: '3px',

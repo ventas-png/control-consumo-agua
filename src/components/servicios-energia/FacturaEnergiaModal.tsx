@@ -194,7 +194,7 @@ export default function FacturaEnergiaModal({
           </div>
 
           {/* kWh */}
-          <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+          <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--at-surface-2)', borderRadius: '4px' }}>
             <h4 style={{ margin: '0 0 0.75rem 0' }}>Consumo/Generación (kWh)</h4>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div>
@@ -253,7 +253,7 @@ export default function FacturaEnergiaModal({
                 style={{
                   width: '100%',
                   padding: '0.75rem',
-                  backgroundColor: '#17a2b8',
+                  backgroundColor: 'var(--at-accent-2)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '4px',
@@ -267,7 +267,7 @@ export default function FacturaEnergiaModal({
           )}
 
           {/* Desglose de montos */}
-          <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+          <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--at-surface-2)', borderRadius: '4px' }}>
             <h4 style={{ margin: '0 0 0.75rem 0' }}>Desglose ({moneda})</h4>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem' }}>
               <div>
@@ -300,7 +300,7 @@ export default function FacturaEnergiaModal({
               </div>
               <div style={{ fontWeight: 'bold', paddingTop: '0.5rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.25rem' }}>Total</label>
-                <div style={{ padding: '0.5rem', backgroundColor: '#e3f2fd', borderRadius: '3px' }}>{moneda} {(formData.monto_total || 0).toFixed(2)}</div>
+                <div style={{ padding: '0.5rem', backgroundColor: 'var(--at-primary-tint)', borderRadius: '3px' }}>{moneda} {(formData.monto_total || 0).toFixed(2)}</div>
               </div>
             </div>
           </div>
@@ -348,7 +348,7 @@ export default function FacturaEnergiaModal({
               onClick={onClose}
               style={{
                 padding: '0.75rem 1.5rem',
-                backgroundColor: '#6c757d',
+                backgroundColor: 'var(--at-ink-3)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
@@ -362,7 +362,7 @@ export default function FacturaEnergiaModal({
               disabled={loading}
               style={{
                 padding: '0.75rem 1.5rem',
-                backgroundColor: '#28a745',
+                backgroundColor: 'var(--at-primary)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',

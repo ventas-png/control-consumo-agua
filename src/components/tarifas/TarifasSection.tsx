@@ -517,7 +517,7 @@ export function TarifasSection({
                 {filtered.map((t, idx) => (
                   <tr
                     key={t.id}
-                    style={{ borderBottom: '1px solid var(--at-chip)', background: idx % 2 === 0 ? 'var(--at-surface)' : '#fafbfc' }}
+                    style={{ borderBottom: '1px solid var(--at-chip)', background: idx % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)' }}
                   >
                     <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--at-ink)' }}>
                       {t.nombre}

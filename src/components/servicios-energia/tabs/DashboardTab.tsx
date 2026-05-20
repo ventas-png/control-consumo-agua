@@ -61,63 +61,63 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
       >
         <div
           style={{
-            backgroundColor: '#e3f2fd',
+            backgroundColor: 'var(--at-primary-tint)',
             padding: '1.5rem',
             borderRadius: '8px',
-            borderLeft: '4px solid #1976d2',
+            borderLeft: '4px solid var(--at-primary)',
           }}
         >
-          <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>kWh Consumidos</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#1976d2' }}>
+          <div style={{ fontSize: '0.9rem', color: 'var(--at-ink-2)', marginBottom: '0.5rem' }}>kWh Consumidos</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--at-primary)' }}>
             {totalesGlobales.kwh_consumidos.toFixed(2)}
           </div>
         </div>
 
         <div
           style={{
-            backgroundColor: '#fff3e0',
+            backgroundColor: '#fffbeb',
             padding: '1.5rem',
             borderRadius: '8px',
-            borderLeft: '4px solid #f57c00',
+            borderLeft: '4px solid #ea580c',
           }}
         >
-          <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>kWh Generados</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#f57c00' }}>
+          <div style={{ fontSize: '0.9rem', color: 'var(--at-ink-2)', marginBottom: '0.5rem' }}>kWh Generados</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#ea580c' }}>
             {totalesGlobales.kwh_generados.toFixed(2)}
           </div>
         </div>
 
         <div
           style={{
-            backgroundColor: '#f3e5f5',
+            backgroundColor: '#F4EBE3',
             padding: '1.5rem',
             borderRadius: '8px',
-            borderLeft: '4px solid #7b1fa2',
+            borderLeft: '4px solid #B96A3F',
           }}
         >
-          <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>kWh Netos</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#7b1fa2' }}>
+          <div style={{ fontSize: '0.9rem', color: 'var(--at-ink-2)', marginBottom: '0.5rem' }}>kWh Netos</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#B96A3F' }}>
             {(totalesGlobales.kwh_consumidos - totalesGlobales.kwh_exportados).toFixed(2)}
           </div>
         </div>
 
         <div
           style={{
-            backgroundColor: '#e8f5e9',
+            backgroundColor: '#dcfce7',
             padding: '1.5rem',
             borderRadius: '8px',
-            borderLeft: '4px solid #388e3c',
+            borderLeft: '4px solid #16a34a',
           }}
         >
-          <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem' }}>Costo Total</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#388e3c' }}>
+          <div style={{ fontSize: '0.9rem', color: 'var(--at-ink-2)', marginBottom: '0.5rem' }}>Costo Total</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#16a34a' }}>
             {moneda} {totalesGlobales.monto_total.toFixed(2)}
           </div>
         </div>
       </div>
 
       {/* Desglose de costos */}
-      <div style={{ marginBottom: '2rem', padding: '1rem', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+      <div style={{ marginBottom: '2rem', padding: '1rem', backgroundColor: 'var(--at-surface-2)', borderRadius: '8px' }}>
         <h3 style={{ marginTop: 0 }}>Desglose de Costos Totales</h3>
         <div
           style={{
@@ -127,28 +127,28 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
           }}
         >
           <div>
-            <div style={{ fontSize: '0.85rem', color: '#666' }}>Energía</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>Energía</div>
             <div style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>{moneda} {totalesGlobales.monto_energia.toFixed(2)}</div>
           </div>
           <div>
-            <div style={{ fontSize: '0.85rem', color: '#666' }}>Potencia</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>Potencia</div>
             <div style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>{moneda} {totalesGlobales.monto_potencia.toFixed(2)}</div>
           </div>
           <div>
-            <div style={{ fontSize: '0.85rem', color: '#666' }}>Cargo Fijo</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>Cargo Fijo</div>
             <div style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>{moneda} {totalesGlobales.monto_cargo_fijo.toFixed(2)}</div>
           </div>
           <div>
-            <div style={{ fontSize: '0.85rem', color: '#666' }}>Alumbrado</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>Alumbrado</div>
             <div style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>{moneda} {totalesGlobales.monto_alumbrado.toFixed(2)}</div>
           </div>
           <div>
-            <div style={{ fontSize: '0.85rem', color: '#666' }}>IVA</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>IVA</div>
             <div style={{ fontSize: '1.3rem', fontWeight: 'bold' }}>{moneda} {totalesGlobales.monto_iva.toFixed(2)}</div>
           </div>
           <div>
-            <div style={{ fontSize: '0.85rem', color: '#666' }}>Crédito Exportación</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#d32f2f' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>Crédito Exportación</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#dc2626' }}>
               {moneda} {totalesGlobales.monto_credito_exportacion.toFixed(2)}
             </div>
           </div>
@@ -159,11 +159,11 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
       <div>
         <h3>Consumo por Fuente</h3>
         {totalsPorFuente.length === 0 ? (
-          <p style={{ color: '#888', fontStyle: 'italic' }}>No hay datos de facturas</p>
+          <p style={{ color: 'var(--at-ink-3)', fontStyle: 'italic' }}>No hay datos de facturas</p>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ backgroundColor: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
+              <tr style={{ backgroundColor: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
                 <th style={{ padding: '0.75rem', textAlign: 'left' }}>Fuente</th>
                 <th style={{ padding: '0.75rem', textAlign: 'right' }}>kWh Consumidos</th>
                 <th style={{ padding: '0.75rem', textAlign: 'right' }}>kWh Generados</th>
@@ -175,7 +175,7 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
             </thead>
             <tbody>
               {totalsPorFuente.map(t => (
-                <tr key={t.fuente_id} style={{ borderBottom: '1px solid #eee' }}>
+                <tr key={t.fuente_id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                   <td style={{ padding: '0.75rem' }}>{t.fuente_nombre}</td>
                   <td style={{ padding: '0.75rem', textAlign: 'right' }}>{t.kwh_consumidos.toFixed(2)}</td>
                   <td style={{ padding: '0.75rem', textAlign: 'right' }}>{t.kwh_generados.toFixed(2)}</td>
@@ -185,7 +185,7 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
                   <td style={{ padding: '0.75rem', textAlign: 'center' }}>{t.cantidad_facturas}</td>
                 </tr>
               ))}
-              <tr style={{ backgroundColor: '#f0f0f0', fontWeight: 'bold', borderTop: '2px solid #ddd' }}>
+              <tr style={{ backgroundColor: 'var(--at-chip)', fontWeight: 'bold', borderTop: '2px solid var(--at-line)' }}>
                 <td style={{ padding: '0.75rem' }}>TOTAL</td>
                 <td style={{ padding: '0.75rem', textAlign: 'right' }}>{totalesGlobales.kwh_consumidos.toFixed(2)}</td>
                 <td style={{ padding: '0.75rem', textAlign: 'right' }}>{totalesGlobales.kwh_generados.toFixed(2)}</td>
