@@ -131,10 +131,10 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
   function imprimirActa(a: AsambleaDigital) {
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acta — ${a.titulo}</title>
     <style>body{font-family:Arial,sans-serif;padding:40px;max-width:800px;margin:auto}
-    h1{font-size:22px;color:var(--at-ink)}h2{font-size:14px;color:var(--at-ink-3);font-weight:normal}
-    .meta{background:var(--at-surface-2);padding:12px;border-radius:8px;margin:16px 0;font-size:12px}
+    h1{font-size:22px;color:#15291F}h2{font-size:14px;color:#7E9389;font-weight:normal}
+    .meta{background:#FAF7EF;padding:12px;border-radius:8px;margin:16px 0;font-size:12px}
     pre{white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6}
-    .footer{margin-top:40px;border-top:1px solid var(--at-line);padding-top:12px;font-size:11px;color:var(--at-ink-3)}
+    .footer{margin-top:40px;border-top:1px solid #E1DDD0;padding-top:12px;font-size:11px;color:#7E9389}
     </style></head><body>
     <h1>ACTA DE ASAMBLEA</h1>
     <h2>${a.titulo}</h2>

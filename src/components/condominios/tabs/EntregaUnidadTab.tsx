@@ -104,10 +104,10 @@ export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, ca
     const inv = (e.inventario_items ?? []) as ItemInventario[]
     const cond = CONDICION_STYLE[e.condicion_general]
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acta de ${e.tipo === 'entrega' ? 'Entrega' : 'Devolución'}</title>
-<style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;margin:16px 0 6px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:var(--at-surface-2)}
+<style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;margin:16px 0 6px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#FAF7EF}
 .sig{margin-top:40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}.sig-box{border-top:1px solid #000;padding-top:6px;font-size:11px}</style></head><body>
 <h1>Acta de ${e.tipo === 'entrega' ? 'Entrega' : 'Devolución'} de Unidad</h1>
-<p style="color:var(--at-ink-3)">Fecha: ${e.fecha}</p>
+<p style="color:#7E9389">Fecha: ${e.fecha}</p>
 <h2>Datos Generales</h2>
 <table><tr><th>Unidad</th><td>${unidad?.nombre ?? '—'}</td><th>Condición general</th><td>${cond?.label ?? e.condicion_general}</td></tr>
 <tr><th>Inquilino</th><td>${e.inquilino ?? '—'}</td><th>Propietario</th><td>${e.propietario ?? '—'}</td></tr>
