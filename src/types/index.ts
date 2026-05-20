@@ -1450,6 +1450,25 @@ export interface InspeccionNormativa {
   created_at: string
 }
 
+export interface ContactoEmergenciaPersonal {
+  nombre: string
+  parentesco?: string
+  telefono?: string
+}
+
+export interface CodigoAccesoPersonal {
+  tipo?: string        // 'tarjeta' | 'llavero' | 'pin' | 'control' | 'app' | 'otro'
+  codigo: string
+  descripcion?: string
+}
+
+export interface EquipoAsignadoPersonal {
+  item: string
+  cantidad?: number
+  fecha_entrega?: string
+  notas?: string
+}
+
 export interface PersonalCondominio {
   id: string
   company_id: string
@@ -1466,6 +1485,31 @@ export interface PersonalCondominio {
   dpi?: string | null
   foto_url?: string | null
   notas?: string | null
+  // Contactos de emergencia (parientes / personas a avisar)
+  contactos_emergencia?: ContactoEmergenciaPersonal[] | null
+  // Afiliaciones / identificadores patronales
+  numero_igss?: string | null
+  numero_irtra?: string | null
+  nit?: string | null
+  // Etiquetas, accesos y equipo
+  tags?: string[] | null
+  codigos_acceso?: CodigoAccesoPersonal[] | null
+  equipo_asignado?: EquipoAsignadoPersonal[] | null
+  // Datos médicos / seguridad
+  tipo_sangre?: string | null
+  alergias?: string | null
+  // Datos de contrato
+  tipo_contrato?: string | null
+  fecha_fin_contrato?: string | null
+  supervisor?: string | null
+  // Datos personales
+  direccion?: string | null
+  genero?: string | null
+  estado_civil?: string | null
+  // Datos bancarios (planilla)
+  banco?: string | null
+  numero_cuenta?: string | null
+  tipo_cuenta?: string | null
   created_at: string
 }
 
