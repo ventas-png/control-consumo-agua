@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import { SecureImage } from '../../shared/SecureImage'
+import { SecureFileLink } from '../../shared/SecureFileLink'
 import type {
   RondaSeguridad, NovedadSeguridad, TipoNovedad, PrioridadNovedad, EstadoRonda,
   RutaRonda, PuntoControlRuta, VisitaControl, EstadoVisitaControl,
@@ -715,10 +716,12 @@ export function SeguridadTab({
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: todas.length === 1 ? '1fr' : 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
                         {todas.map((url, i) => (
-                          <a key={i} href={url} target="_blank" rel="noreferrer">
-                            <img src={url} alt={`Evidencia ${i + 1}`}
-                              style={{ width: '100%', height: todas.length === 1 ? '200px' : '100px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)', display: 'block' }} />
-                          </a>
+                          <SecureFileLink key={i} src={url}>
+                            {signed => (
+                              <img src={signed} alt={`Evidencia ${i + 1}`}
+                                style={{ width: '100%', height: todas.length === 1 ? '200px' : '100px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)', display: 'block' }} />
+                            )}
+                          </SecureFileLink>
                         ))}
                       </div>
                     </div>

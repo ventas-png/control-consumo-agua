@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import type { InspeccionNormativa, TipoInspeccion, ResultadoInspeccion } from '../../../types'
 import Swal from 'sweetalert2'
 import { FileUploader } from '../FileUploader'
+import { SecureFileLink } from '../../shared/SecureFileLink'
 
 interface Props {
   inspecciones: InspeccionNormativa[]
@@ -233,7 +234,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
                       {res.label}
                     </span>
                     {ins.certificado_url && (
-                      <a href={ins.certificado_url} target="_blank" rel="noreferrer" style={{ padding: '4px 8px', background: 'var(--at-chip)', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: 'var(--at-ink-2)' }}>📄</a>
+                      <SecureFileLink src={ins.certificado_url} style={{ padding: '4px 8px', background: 'var(--at-chip)', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: 'var(--at-ink-2)' }}>📄</SecureFileLink>
                     )}
                     {canEdit && <button onClick={() => startEdit(ins)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
                     {canEdit && <button onClick={() => handleDelete(ins.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}

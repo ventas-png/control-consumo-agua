@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import type { ContratoProveedor, ServicioProveedor, EstadoContrato } from '../../../types'
 import Swal from 'sweetalert2'
 import { FileUploader } from '../FileUploader'
+import { SecureFileLink } from '../../shared/SecureFileLink'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {
@@ -367,10 +368,10 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         {c.documento_url && (
-                          <a href={c.documento_url} target="_blank" rel="noreferrer"
+                          <SecureFileLink src={c.documento_url}
                             style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', textDecoration: 'none', color: 'var(--at-ink-2)' }}>
                             📄
-                          </a>
+                          </SecureFileLink>
                         )}
                         {canEdit && (
                           <button onClick={() => startEdit(c)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-ink-2)' }}>✏️</button>
