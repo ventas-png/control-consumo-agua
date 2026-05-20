@@ -19,14 +19,14 @@ interface TipologiaStat {
 
 const TIPOLOGIA_META: Record<TipoAgua, { label: string; icon: string; from: string; to: string }> = {
   potable:             { label: 'Potable',             icon: '💧', from: '#1B3B36', to: '#102622' },
-  rehuso:              { label: 'Rehúso',              icon: '♻️', from: '#577B69', to: '#102622' },
-  piscina:             { label: 'Piscina',             icon: '🏊', from: '#577B69', to: '#1B3B36' },
+  rehuso:              { label: 'Rehúso',              icon: '♻️', from: '#577B69', to: '#3E5A4C' },
+  piscina:             { label: 'Piscina',             icon: '🏊', from: '#1F6F73', to: '#134E51' },
   desalinada:          { label: 'Desalinada',          icon: '🌊', from: '#B96A3F', to: '#9C5733' },
-  riego:               { label: 'Riego',               icon: '🌿', from: '#10b981', to: '#059669' },
-  jacuzzi:             { label: 'Jacuzzi',             icon: '🛁', from: '#B96A3F', to: '#9C5733' },
-  consumo_humano:      { label: 'Consumo Humano',      icon: '🚰', from: '#577B69', to: '#577B69' },
-  desmineralizada:     { label: 'Desmineralizada',     icon: '🧪', from: '#a855f7', to: '#9C5733' },
-  residuales_tratadas: { label: 'Residuales Tratadas', icon: '🔄', from: '#f97316', to: '#ea580c' },
+  riego:               { label: 'Riego',               icon: '🌿', from: '#0E9E6E', to: '#067352' },
+  jacuzzi:             { label: 'Jacuzzi',             icon: '🛁', from: '#A87E1E', to: '#7E5E12' },
+  consumo_humano:      { label: 'Consumo Humano',      icon: '🚰', from: '#5E6B2E', to: '#44501F' },
+  desmineralizada:     { label: 'Desmineralizada',     icon: '🧪', from: '#45607A', to: '#2E4257' },
+  residuales_tratadas: { label: 'Residuales Tratadas', icon: '🔄', from: '#E2620E', to: '#B84E08' },
 }
 
 function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, selectedProjectId, unidades, fechaDesde, fechaHasta }: Props) {

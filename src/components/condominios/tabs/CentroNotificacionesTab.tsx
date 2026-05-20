@@ -34,7 +34,7 @@ interface Notificacion {
 const URG: Record<Urgencia, { color: string; bg: string; border: string; label: string; order: number }> = {
   critico: { color: '#ef4444', bg: '#fef2f2', border: '#fca5a5', label: 'Crítico', order: 0 },
   alto:    { color: '#d97706', bg: '#fef3c7', border: '#fcd34d', label: 'Alto',    order: 1 },
-  medio:   { color: '#1B3B36', bg: '#EEF2EC', border: '#93c5fd', label: 'Medio',   order: 2 },
+  medio:   { color: '#1B3B36', bg: '#EEF2EC', border: '#577B69', label: 'Medio',   order: 2 },
   info:    { color: '#16a34a', bg: '#dcfce7', border: '#86efac', label: 'Info',    order: 3 },
 }
 

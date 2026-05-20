@@ -82,7 +82,7 @@ export default function UtilizacionAmenidadesTab({ amenidades, reservas, moneda 
                 </div>
                 <div style={{ height: 8, background: '#EAE6D8', borderRadius: 4 }}>
                   <div style={{ height: 8, borderRadius: 4, width: `${(s.total / maxTotal) * 100}%`,
-                    background: s.total === maxTotal ? '#1B3B36' : '#93c5fd' }} />
+                    background: s.total === maxTotal ? '#1B3B36' : '#577B69' }} />
                 </div>
               </div>
             ))}

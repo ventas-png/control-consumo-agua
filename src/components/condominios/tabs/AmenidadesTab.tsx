@@ -191,7 +191,7 @@ const btnHero: CSSProperties = {
 }
 
 const RESERVA_CAL_COLORS = [
-  { bg: '#D9E2DC', border: '#93c5fd', color: '#0E2A24' },
+  { bg: '#D9E2DC', border: '#577B69', color: '#0E2A24' },
   { bg: '#d1fae5', border: '#6ee7b7', color: '#065f46' },
   { bg: '#F4EBE3', border: '#E6CDBB', color: '#4c1d95' },
   { bg: '#fce7f3', border: '#f9a8d4', color: '#9d174d' },
@@ -1471,10 +1471,10 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 {/* Leyenda */}
                 <div style={{ display: 'flex', gap: 14, marginTop: 14, flexWrap: 'wrap', fontSize: 11, color: '#7E9389' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 14, height: 10, borderRadius: 4, background: '#D9E2DC', border: '1px solid #93c5fd' }} /> Confirmada
+                    <span style={{ width: 14, height: 10, borderRadius: 4, background: '#D9E2DC', border: '1px solid #577B69' }} /> Confirmada
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 14, height: 10, borderRadius: 4, background: 'white', border: '1.5px dashed #93c5fd' }} /> Pendiente
+                    <span style={{ width: 14, height: 10, borderRadius: 4, background: 'white', border: '1.5px dashed #577B69' }} /> Pendiente
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 14, height: 10, borderRadius: 4, background: 'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 3px,#fde68a 3px,#fde68a 6px)', border: '1px solid #fcd34d' }} /> Bloqueado
@@ -1722,7 +1722,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
             render: canEdit ? (
               <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {r.deposito_estado === 'pendiente' && (
-                  <button onClick={() => actualizarEstadoDeposito(r, 'cobrado')} style={btnAction('#D9E2DC', '#93c5fd', '#102622')}>💵 Marcar cobrado</button>
+                  <button onClick={() => actualizarEstadoDeposito(r, 'cobrado')} style={btnAction('#D9E2DC', '#577B69', '#102622')}>💵 Marcar cobrado</button>
                 )}
                 {r.deposito_estado === 'cobrado' && (
                   <>

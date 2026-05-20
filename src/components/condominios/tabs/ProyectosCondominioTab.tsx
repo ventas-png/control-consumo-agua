@@ -21,7 +21,7 @@ const CAT_CFG: Record<CategoriaProyectoCond, { label: string; icon: string; colo
   otro:          { label: 'Otro',          icon: '📌', color: '#7E9389' },
 }
 const ESTADO_CFG: Record<EstadoProyectoCond, { label: string; bg: string; color: string; barColor: string }> = {
-  planificado:  { label: 'Planificado',  bg: '#EEF2EC', color: '#1B3B36', barColor: '#93c5fd' },
+  planificado:  { label: 'Planificado',  bg: '#EEF2EC', color: '#1B3B36', barColor: '#577B69' },
   en_progreso:  { label: 'En progreso',  bg: '#fef3c7', color: '#d97706', barColor: '#fbbf24' },
   pausado:      { label: 'Pausado',      bg: '#EAE6D8', color: '#7E9389', barColor: '#C7C2B0' },
   completado:   { label: 'Completado',   bg: '#dcfce7', color: '#16a34a', barColor: '#4ade80' },

@@ -200,7 +200,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
               const numResp = respuestas.filter(r => r.encuesta_id === enc.id).length
               return (
                 <div key={enc.id} onClick={() => setSelectedId(enc.id === selectedId ? null : enc.id)}
-                  style={{ background: enc.id === selectedId ? '#EEF2EC' : 'white', border: `1.5px solid ${enc.id === selectedId ? '#93c5fd' : '#E1DDD0'}`, borderRadius: '10px', padding: '14px', cursor: 'pointer' }}>
+                  style={{ background: enc.id === selectedId ? '#EEF2EC' : 'white', border: `1.5px solid ${enc.id === selectedId ? '#577B69' : '#E1DDD0'}`, borderRadius: '10px', padding: '14px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
                     <div style={{ fontWeight: 700, fontSize: '13px', color: '#15291F', flex: 1, marginRight: '8px' }}>{enc.titulo}</div>
                     <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color, whiteSpace: 'nowrap' }}>{est.label}</span>
