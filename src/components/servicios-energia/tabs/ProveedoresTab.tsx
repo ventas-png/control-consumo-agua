@@ -50,24 +50,24 @@ export default function ProveedoresTab({
       html: `
         <div style="text-align: left;">
           <label style="display:block;margin:0.5rem 0;font-weight:bold;">Nombre *</label>
-          <input id="prov_nombre" placeholder="EEGSA" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;" />
+          <input id="prov_nombre" placeholder="EEGSA" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
 
           ${proyectos.length > 1 ? `
           <label style="display:block;margin:0.75rem 0 0.25rem;font-weight:bold;">Proyecto *</label>
-          <select id="prov_project" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;">
+          <select id="prov_project" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;">
             <option value="">Seleccionar proyecto</option>
             ${proyectoOptions}
           </select>
           ` : `<input type="hidden" id="prov_project" value="${defaultProjectId ?? ''}" />`}
 
           <label style="display:block;margin:0.75rem 0 0.25rem;">NIT</label>
-          <input id="prov_nit" placeholder="9999999-9" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;" />
+          <input id="prov_nit" placeholder="9999999-9" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
 
           <label style="display:block;margin:0.75rem 0 0.25rem;">Contacto</label>
-          <input id="prov_contacto" placeholder="2290-1234" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;" />
+          <input id="prov_contacto" placeholder="2290-1234" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;" />
 
           <label style="display:block;margin:0.75rem 0 0.25rem;">Tipo *</label>
-          <select id="prov_tipo" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;">
+          <select id="prov_tipo" style="width:100%;padding:0.5rem;box-sizing:border-box;border:1px solid var(--at-line-strong);border-radius:4px;">
             <option value="distribuidora">Distribuidora</option>
             <option value="comercializadora">Comercializadora</option>
             <option value="autogeneracion">Autogeneración</option>
@@ -138,7 +138,7 @@ export default function ProveedoresTab({
       html: `<b>${nombre}</b> será eliminado permanentemente.`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar',
     })
@@ -158,7 +158,7 @@ export default function ProveedoresTab({
       <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ margin: 0 }}>Proveedores de Energía</h2>
         {canCreate && (
-          <button onClick={handleCreate} style={{ padding: '0.5rem 1rem', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+          <button onClick={handleCreate} style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
             + Nuevo Proveedor
           </button>
         )}
@@ -169,19 +169,19 @@ export default function ProveedoresTab({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <div>
               <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Nombre *</label>
-              <input type="text" value={editFormData.nombre ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nombre: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+              <input type="text" value={editFormData.nombre ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nombre: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
             </div>
             <div>
               <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>NIT</label>
-              <input type="text" value={editFormData.nit ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nit: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+              <input type="text" value={editFormData.nit ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, nit: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
             </div>
             <div>
               <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Contacto</label>
-              <input type="text" value={editFormData.contacto ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, contacto: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }} />
+              <input type="text" value={editFormData.contacto ?? ''} onChange={e => setEditFormData(prev => ({ ...prev, contacto: e.target.value }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }} />
             </div>
             <div>
               <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>Tipo</label>
-              <select value={editFormData.tipo ?? 'distribuidora'} onChange={e => setEditFormData(prev => ({ ...prev, tipo: e.target.value as ProveedorEnergia['tipo'] }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px' }}>
+              <select value={editFormData.tipo ?? 'distribuidora'} onChange={e => setEditFormData(prev => ({ ...prev, tipo: e.target.value as ProveedorEnergia['tipo'] }))} style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box', border: '1px solid var(--at-line-strong)', borderRadius: '4px' }}>
                 <option value="distribuidora">Distribuidora</option>
                 <option value="comercializadora">Comercializadora</option>
                 <option value="autogeneracion">Autogeneración</option>
@@ -192,19 +192,19 @@ export default function ProveedoresTab({
               <label htmlFor="prov-activo">Activo</label>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
-              <button onClick={() => setEditingId(null)} style={{ padding: '0.5rem 1rem', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', background: 'var(--at-surface)' }}>Cancelar</button>
-              <button onClick={handleSaveEdit} style={{ padding: '0.5rem 1rem', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Guardar</button>
+              <button onClick={() => setEditingId(null)} style={{ padding: '0.5rem 1rem', border: '1px solid var(--at-line-strong)', borderRadius: '4px', cursor: 'pointer', background: 'var(--at-surface)' }}>Cancelar</button>
+              <button onClick={handleSaveEdit} style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Guardar</button>
             </div>
           </div>
         </EditModal>
       )}
 
       {proveedoresEnergia.length === 0 ? (
-        <p style={{ color: '#888', fontStyle: 'italic', marginTop: '1.5rem' }}>No hay proveedores registrados</p>
+        <p style={{ color: 'var(--at-ink-3)', fontStyle: 'italic', marginTop: '1.5rem' }}>No hay proveedores registrados</p>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1.5rem' }}>
           <thead>
-            <tr style={{ backgroundColor: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
+            <tr style={{ backgroundColor: 'var(--at-surface-2)', borderBottom: '2px solid var(--at-line)' }}>
               <th style={{ padding: '0.75rem', textAlign: 'left' }}>Nombre</th>
               <th style={{ padding: '0.75rem', textAlign: 'left' }}>NIT</th>
               <th style={{ padding: '0.75rem', textAlign: 'left' }}>Tipo</th>
@@ -215,20 +215,20 @@ export default function ProveedoresTab({
           </thead>
           <tbody>
             {proveedoresEnergia.map(p => (
-              <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
+              <tr key={p.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                 <td style={{ padding: '0.75rem' }}>{p.nombre}</td>
                 <td style={{ padding: '0.75rem' }}>{p.nit || '-'}</td>
                 <td style={{ padding: '0.75rem', textTransform: 'capitalize' }}>{p.tipo}</td>
                 <td style={{ padding: '0.75rem' }}>{p.contacto || '-'}</td>
                 <td style={{ padding: '0.75rem' }}>
-                  <span style={{ color: p.activo ? '#28a745' : '#dc3545' }}>{p.activo ? '● Activo' : '● Inactivo'}</span>
+                  <span style={{ color: p.activo ? 'var(--at-primary)' : '#dc2626' }}>{p.activo ? '● Activo' : '● Inactivo'}</span>
                 </td>
                 {canEdit && (
                   <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                    <button onClick={() => handleStartEdit(p)} style={{ marginRight: '0.5rem', padding: '0.25rem 0.75rem', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>
+                    <button onClick={() => handleStartEdit(p)} style={{ marginRight: '0.5rem', padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>
                       Editar
                     </button>
-                    <button onClick={() => handleDelete(p.id, p.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>
+                    <button onClick={() => handleDelete(p.id, p.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>
                       Eliminar
                     </button>
                   </td>

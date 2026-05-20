@@ -87,7 +87,7 @@ export default function ServiciosEnergiaSection({
           gap: '0.5rem',
           marginBottom: '1.5rem',
           flexWrap: 'wrap',
-          borderBottom: '2px solid #e0e0e0',
+          borderBottom: '2px solid var(--at-line)',
         }}
       >
         {tabs.map(tab => (
@@ -97,8 +97,8 @@ export default function ServiciosEnergiaSection({
             style={{
               padding: '0.75rem 1rem',
               border: 'none',
-              background: activeTab === tab.id ? '#0066cc' : '#f5f5f5',
-              color: activeTab === tab.id ? 'white' : '#333',
+              background: activeTab === tab.id ? 'var(--at-primary)' : 'var(--at-surface-2)',
+              color: activeTab === tab.id ? 'white' : 'var(--at-ink)',
               cursor: 'pointer',
               borderRadius: '4px 4px 0 0',
               fontWeight: activeTab === tab.id ? 'bold' : 'normal',
