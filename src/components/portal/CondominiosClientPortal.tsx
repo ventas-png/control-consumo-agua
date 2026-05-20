@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { BrandLogo } from '../shared/BrandLogo'
 import type {
   UserSession, Unidad, CuotaCondominio, Amenidad,
   ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento,
@@ -250,11 +251,9 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
           gap: '12px', flexWrap: 'wrap',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '38px', height: '38px', borderRadius: '10px',
-              background: 'rgba(255,255,255,0.2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px',
-            }}>🏢</div>
+            <div style={{ width: '38px', height: '38px', lineHeight: 0, flexShrink: 0 }}>
+              <BrandLogo size={38} />
+            </div>
             <div>
               <div style={{ color: 'white', fontWeight: 700, fontSize: '16px' }}>{currentUser.name}</div>
               <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>Portal del Residente</div>
