@@ -142,7 +142,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
 
       {/* Formulario */}
       {showForm && (
-        <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 12, padding: 16, marginBottom: 14 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: '#102622' }}>
             {editId ? 'Editar orden' : 'Nueva orden de compra'}
           </div>
@@ -151,7 +151,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Proveedor *</label>
               <input list="proveedores-list" value={form.proveedor_nombre} onChange={e => setForm(f => ({ ...f, proveedor_nombre: e.target.value }))}
                 placeholder="Nombre del proveedor"
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
               <datalist id="proveedores-list">
                 {proveedores.map(p => <option key={p.id} value={p.proveedor_nombre} />)}
               </datalist>
@@ -160,26 +160,26 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Monto estimado ({moneda})</label>
               <input type="number" value={form.monto_estimado} onChange={e => setForm(f => ({ ...f, monto_estimado: e.target.value }))}
                 placeholder="0.00"
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
           </div>
           <div style={{ marginBottom: 10 }}>
             <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Concepto *</label>
             <input value={form.concepto} onChange={e => setForm(f => ({ ...f, concepto: e.target.value }))}
               placeholder="Descripción breve de la compra"
-              style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Fecha entrega esperada</label>
               <input type="date" value={form.fecha_entrega_esperada} onChange={e => setForm(f => ({ ...f, fecha_entrega_esperada: e.target.value }))}
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Notas</label>
               <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
                 placeholder="Observaciones adicionales"
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -188,7 +188,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
               {saving ? 'Guardando…' : 'Guardar como borrador'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '8px 14px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+              style={{ padding: '8px 14px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
               Cancelar
             </button>
           </div>
@@ -225,7 +225,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
                 </div>
 
                 {isOpen && (
-                  <div style={{ padding: '0 14px 14px', borderTop: '1px solid #EAE6D8' }}>
+                  <div style={{ padding: '0 14px 14px', borderTop: '1px solid var(--at-chip)' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, margin: '10px 0', fontSize: 11, color: '#7E9389' }}>
                       {orden.fecha_entrega_esperada && <div>Entrega esperada: <strong>{orden.fecha_entrega_esperada}</strong></div>}
                       {orden.estado === 'recibida' && <div>Recibido: <strong style={{ color: '#16a34a' }}>✓</strong></div>}
@@ -241,7 +241,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
                       )}
                       {canEdit && orden.estado === 'borrador' && (
                         <button onClick={() => { setEditId(orden.id); setForm({ proveedor_nombre: orden.proveedor_nombre, concepto: orden.concepto, descripcion: orden.descripcion ?? '', monto_estimado: String(orden.monto_estimado ?? ''), fecha_entrega_esperada: orden.fecha_entrega_esperada ?? '', notas: orden.notas ?? '' }); setShowForm(true) }}
-                          style={{ padding: '5px 12px', border: '1px solid #E1DDD0', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: '#FAF7EF' }}>
+                          style={{ padding: '5px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: '#FAF7EF' }}>
                           ✏️ Editar
                         </button>
                       )}

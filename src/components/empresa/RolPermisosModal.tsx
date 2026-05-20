@@ -226,7 +226,7 @@ export function RolPermisosModal({
       }}>
         {/* Header */}
         <div style={{
-          padding: '20px 24px 16px', borderBottom: '1px solid #E1DDD0',
+          padding: '20px 24px 16px', borderBottom: '1px solid var(--at-line)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
@@ -243,7 +243,7 @@ export function RolPermisosModal({
         <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
           {/* Left: roles */}
           <div style={{
-            flex: '0 0 58%', borderRight: '1px solid #E1DDD0',
+            flex: '0 0 58%', borderRight: '1px solid var(--at-line)',
             overflowY: 'auto', padding: '16px',
           }}>
             {loading ? (
@@ -282,7 +282,7 @@ export function RolPermisosModal({
                     onClick={() => onOpenCustomEditor(null)}
                     style={{
                       fontSize: '11px', fontWeight: 600, color: '#2F5D4F',
-                      background: 'transparent', border: '1px solid #577B69', borderRadius: '6px',
+                      background: 'transparent', border: '1px solid var(--at-accent-2)', borderRadius: '6px',
                       padding: '3px 10px', cursor: 'pointer',
                     }}
                   >+ Crear</button>
@@ -340,13 +340,13 @@ export function RolPermisosModal({
 
         {/* Footer */}
         <div style={{
-          padding: '14px 24px', borderTop: '1px solid #E1DDD0',
+          padding: '14px 24px', borderTop: '1px solid var(--at-line)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
         }}>
           <div style={{ fontSize: '12px', color: error ? '#ef4444' : '#7E9389' }}>{error ?? ''}</div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={onClose} style={{
-              padding: '8px 18px', borderRadius: '8px', border: '1px solid #E1DDD0',
+              padding: '8px 18px', borderRadius: '8px', border: '1px solid var(--at-line)',
               background: '#fff', color: '#3E5A4C', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
             }}>Cancelar</button>
             <button onClick={() => void handleSave()} disabled={saving || loading} style={{
@@ -375,7 +375,7 @@ function SubsectionHeader({ children }: { children: React.ReactNode }) {
     <div style={{
       fontSize: '11px', fontWeight: 700, color: '#3E5A4C',
       letterSpacing: '0.04em', marginBottom: '4px', textTransform: 'uppercase',
-      paddingBottom: '4px', borderBottom: '1px solid #E1DDD0',
+      paddingBottom: '4px', borderBottom: '1px solid var(--at-line)',
     }}>{children}</div>
   )
 }
@@ -384,7 +384,7 @@ function PreviewRow({ label, level, count, total }: { label: string; level: 'com
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '7px 0', borderBottom: '1px solid #EAE6D8',
+      padding: '7px 0', borderBottom: '1px solid var(--at-chip)',
     }}>
       <span style={{ fontSize: '13px', color: '#3E5A4C', fontWeight: 500 }}>{label}</span>
       <AccessBadge level={level} count={count} total={total} />
@@ -473,7 +473,7 @@ function RoleCard({
             min={new Date().toISOString().slice(0, 10)}
             style={{
               fontSize: '11px', padding: '3px 6px',
-              border: '1px solid #C7C2B0', borderRadius: '4px',
+              border: '1px solid var(--at-line-strong)', borderRadius: '4px',
               color: '#3E5A4C', background: '#fff',
             }}
           />
@@ -483,7 +483,7 @@ function RoleCard({
               title="Quitar expiración (permanente)"
               style={{
                 fontSize: '10px', padding: '3px 7px', borderRadius: '4px',
-                border: '1px solid #C7C2B0', background: '#fff', color: '#7E9389',
+                border: '1px solid var(--at-line-strong)', background: '#fff', color: '#7E9389',
                 cursor: 'pointer', fontWeight: 600,
               }}
             >Permanente</button>

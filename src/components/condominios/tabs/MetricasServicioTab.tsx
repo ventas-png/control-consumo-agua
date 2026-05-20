@@ -82,7 +82,7 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: '#15291F' }}>Métricas de servicio del período</div>
         <select value={filtroPeriodo} onChange={e => setFiltroPeriodo(e.target.value)}
-          style={{ padding: '7px 12px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+          style={{ padding: '7px 12px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
           {periodos.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
       </div>
@@ -97,7 +97,7 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* Tickets por prioridad */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Tickets por prioridad (total)</div>
           {porPrioridad.map(({ prioridad, count }) => (
             <div key={prioridad} style={{ marginBottom: 8 }}>
@@ -113,7 +113,7 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
         </div>
 
         {/* Tickets por estado */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Estado actual de tickets</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {porEstado.map(({ estado, count }) => (
@@ -129,7 +129,7 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         {/* Tendencia tickets + visitantes */}
         {tendTickets.length > 0 && (
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Tendencia mensual (últimos {tendTickets.length} meses)</div>
             <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 100, marginBottom: 6 }}>
               {tendTickets.map(t => (
@@ -150,7 +150,7 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
         )}
 
         {/* Sugerencias por categoría */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Sugerencias por categoría</div>
           {porCategoria.length === 0
             ? <div style={{ color: '#7E9389', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>Sin sugerencias</div>

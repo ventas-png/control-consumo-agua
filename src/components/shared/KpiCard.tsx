@@ -28,7 +28,7 @@ interface Props {
  *     value={consumoTotal.toFixed(2)}
  *     unit="m³"
  *     icon="💧"
- *     gradient="linear-gradient(135deg, #1B3B36, #102622)"
+ *     gradient="linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))"
  *     loading={isLoading}
  *   />
  */

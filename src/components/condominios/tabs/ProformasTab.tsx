@@ -149,14 +149,14 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>{editId ? 'Editar proforma' : 'Nueva proforma'}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontSize: 12, color: '#7E9389' }}>Proveedor *</label>
               <input list="proveedores-list" value={form.proveedor_nombre} onChange={e => setForm(f => ({ ...f, proveedor_nombre: e.target.value }))}
                 placeholder="Nombre del proveedor"
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
               <datalist id="proveedores-list">
                 {proveedores.map(p => <option key={p.id} value={p.proveedor_nombre} />)}
               </datalist>
@@ -165,27 +165,27 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
               <label style={{ fontSize: 12, color: '#7E9389' }}>Concepto *</label>
               <input value={form.concepto} onChange={e => setForm(f => ({ ...f, concepto: e.target.value }))}
                 placeholder="Ej: Pintura fachada"
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
             </div>
             <div>
               <label style={{ fontSize: 12, color: '#7E9389' }}>Monto ({moneda})</label>
               <input type="number" min="0" step="0.01" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
             </div>
             <div>
               <label style={{ fontSize: 12, color: '#7E9389' }}>Válida hasta</label>
               <input type="date" value={form.fecha_validez} onChange={e => setForm(f => ({ ...f, fecha_validez: e.target.value }))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: 12, color: '#7E9389' }}>Descripción</label>
               <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} rows={2}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3, resize: 'vertical' }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3, resize: 'vertical' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: 12, color: '#7E9389' }}>Notas</label>
               <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -193,7 +193,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
               style={{ padding: '8px 20px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear proforma'}
             </button>
-            <button onClick={resetForm} style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid #C7C2B0', borderRadius: 8, cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={resetForm} style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
@@ -225,7 +225,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
                   <span style={{ fontSize: 11, color: '#7E9389' }}>{exp ? '▲' : '▼'}</span>
                 </div>
                 {exp && (
-                  <div style={{ padding: '0 16px 14px', borderTop: '1px solid #EAE6D8' }}>
+                  <div style={{ padding: '0 16px 14px', borderTop: '1px solid var(--at-chip)' }}>
                     {p.descripcion && <div style={{ fontSize: 12, color: '#3E5A4C', marginTop: 10 }}>{p.descripcion}</div>}
                     {p.notas && <div style={{ fontSize: 11, color: '#7E9389', marginTop: 6 }}>📝 {p.notas}</div>}
                     <div style={{ fontSize: 10, color: '#7E9389', marginTop: 6 }}>Creada: {p.created_at?.slice(0, 10)}</div>
@@ -239,7 +239,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
                       {canEdit && p.estado === 'borrador' && (
                         <>
                           <button onClick={() => abrirEditar(p)}
-                            style={{ padding: '6px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid #1B3B36', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                            style={{ padding: '6px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid var(--at-primary)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                             ✏️ Editar
                           </button>
                           <button onClick={() => rechazar(p)}

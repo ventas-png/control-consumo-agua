@@ -78,7 +78,7 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
         <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Comparativo Presupuesto vs. Real</div>
         <div style={{ display: 'flex', gap: 8 }}>
           <select value={anio} onChange={e => setAnio(Number(e.target.value))}
-            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, background: '#fff' }}>
+            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, background: '#fff' }}>
             {aniosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
           <div style={{ display: 'flex', background: '#EAE6D8', borderRadius: 8, overflow: 'hidden' }}>
@@ -109,7 +109,7 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
       </div>
 
       {vista === 'categorias' ? (
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ background: '#FAF7EF' }}>
@@ -123,7 +123,7 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
                 const sem = f.presup === 0 && f.real === 0 ? { bg: '#FAF7EF', color: '#7E9389', label: '—' } : semaforo(f.pct)
                 const barPct = f.presup > 0 ? Math.min((f.real / f.presup) * 100, 150) : 0
                 return (
-                  <tr key={f.cat} style={{ borderTop: idx > 0 ? '1px solid #EAE6D8' : undefined }}>
+                  <tr key={f.cat} style={{ borderTop: idx > 0 ? '1px solid var(--at-chip)' : undefined }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600, color: '#15291F' }}>{CAT_LABEL[f.cat]}</td>
                     <td style={{ padding: '10px 12px', textAlign: 'right', color: '#7E9389' }}>{fmt(f.presup, moneda)}</td>
                     <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#15291F' }}>{fmt(f.real, moneda)}</td>
@@ -144,7 +144,7 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
               })}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: '2px solid #E1DDD0', background: '#FAF7EF' }}>
+              <tr style={{ borderTop: '2px solid var(--at-line)', background: '#FAF7EF' }}>
                 <td style={{ padding: '10px 12px', fontWeight: 700, color: '#15291F' }}>TOTAL</td>
                 <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>{fmt(totalPresup, moneda)}</td>
                 <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>{fmt(totalReal, moneda)}</td>
@@ -161,7 +161,7 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
           </table>
         </div>
       ) : (
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontSize: 11, color: '#7E9389', marginBottom: 12 }}>
             Línea base mensual: presupuesto prorrateado ({fmt(totalPresup / 12, moneda)}/mes)
           </div>
@@ -201,7 +201,7 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
               {filasMes.map((f, i) => {
                 const sem = semaforo(f.pct)
                 return (
-                  <tr key={i} style={{ borderTop: '1px solid #EAE6D8' }}>
+                  <tr key={i} style={{ borderTop: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '7px 10px', fontWeight: 500 }}>{f.label}</td>
                     <td style={{ padding: '7px 10px', textAlign: 'right', color: '#7E9389' }}>{fmt(f.presup, moneda)}</td>
                     <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 600 }}>{fmt(f.real, moneda)}</td>

@@ -96,7 +96,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
   }
 
   const totalEmitido = recibos.filter(r => r.estado !== 'anulado').reduce((s, r) => s + r.monto, 0)
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
@@ -120,12 +120,12 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoReciboDigital | '')}
-            style={{ padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+            style={{ padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
             <option value="">Todos los estados</option>
             {(Object.keys(ESTADO_CFG) as EstadoReciboDigital[]).map(e => <option key={e} value={e}>{ESTADO_CFG[e].label}</option>)}
           </select>
           <select value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}
-            style={{ padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+            style={{ padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
             <option value="">Todas las unidades</option>
             {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
           </select>
@@ -157,7 +157,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Generar recibo · {nextNumero(recibos)}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -220,7 +220,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
             <thead>
               <tr style={{ background: '#FAF7EF' }}>
                 {['N° Recibo', 'Unidad', 'Concepto', 'Monto', 'Fecha', 'Destinatario', 'Estado', 'Acciones'].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#7E9389', fontWeight: 600, borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#7E9389', fontWeight: 600, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -229,7 +229,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
                 const ec = ESTADO_CFG[r.estado]
                 const unidad = unidades.find(u => u.id === r.unidad_id)
                 return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #EAE6D8', opacity: r.estado === 'anulado' ? 0.5 : 1 }}>
+                  <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', opacity: r.estado === 'anulado' ? 0.5 : 1 }}>
                     <td style={{ padding: '8px 12px', fontWeight: 700, color: '#102622', fontFamily: 'monospace' }}>{r.numero_recibo}</td>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? r.unidad_nombre ?? '—'}</td>
                     <td style={{ padding: '8px 12px', color: '#3E5A4C', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.concepto}</td>

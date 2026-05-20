@@ -127,7 +127,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
     win.print()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -143,7 +143,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: 700 }}>Nuevo comunicado</h3>
           <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
             {(Object.keys(TIPO_LABELS) as TipoComunicado[]).map(t => (
@@ -203,7 +203,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -247,7 +247,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
                         {canCreate && (
                           <button onClick={e => { e.stopPropagation(); publicarEnPortal(c) }}
                             title="Publicar en portal del residente"
-                            style={{ padding: '3px 7px', background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#1B3B36', fontWeight: 600 }}>📢 Portal</button>
+                            style={{ padding: '3px 7px', background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#1B3B36', fontWeight: 600 }}>📢 Portal</button>
                         )}
                         {canEdit && (
                           <button onClick={e => { e.stopPropagation(); handleDelete(c.id) }}
@@ -264,8 +264,8 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
 
         {/* Preview panel */}
         {selected && (
-          <div style={{ border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden', alignSelf: 'start' }}>
-            <div style={{ padding: '10px 14px', background: '#FAF7EF', borderBottom: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden', alignSelf: 'start' }}>
+            <div style={{ padding: '10px 14px', background: '#FAF7EF', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389' }}>Vista previa</span>
               <div style={{ display: 'flex', gap: '6px' }}>
                 {canCreate && (
@@ -290,7 +290,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
               <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 800, textAlign: 'center', color: '#15291F' }}>{selected.titulo}</h3>
               <div style={{ whiteSpace: 'pre-wrap', color: '#15291F' }}>{selected.contenido}</div>
               {selected.firmado && (
-                <div style={{ marginTop: '30px', borderTop: '1px solid #E1DDD0', paddingTop: '12px', textAlign: 'center', fontSize: '11px', color: '#10b981', fontWeight: 600 }}>
+                <div style={{ marginTop: '30px', borderTop: '1px solid var(--at-line)', paddingTop: '12px', textAlign: 'center', fontSize: '11px', color: '#10b981', fontWeight: 600 }}>
                   ✓ Documento firmado
                 </div>
               )}

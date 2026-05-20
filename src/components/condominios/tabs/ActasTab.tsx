@@ -138,7 +138,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
   }
 
   const viewed = viewId ? actas.find(a => a.id === viewId) : null
-  const inputStyle: CSSProperties = { width: '100%', padding: '7px 10px', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '7px 10px', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -154,7 +154,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar acta' : 'Nueva acta'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '14px' }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -224,7 +224,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
               <button onClick={addPunto} style={{ padding: '2px 8px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>+ Punto</button>
             </div>
             {puntos.map((p, i) => (
-              <div key={i} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', padding: '10px', marginBottom: '6px' }}>
+              <div key={i} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', padding: '10px', marginBottom: '6px' }}>
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
                   <input style={{ ...inputStyle, flex: 1, fontSize: '12px' }} value={p.punto} onChange={e => updatePunto(i, 'punto', e.target.value)} placeholder={`Punto ${i+1}`} />
                   <button onClick={() => removePunto(i)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>✕</button>
@@ -250,7 +250,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -300,8 +300,8 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
 
         {/* Detail panel */}
         {viewed && (
-          <div style={{ border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden', alignSelf: 'start', maxHeight: '70vh', overflowY: 'auto' }}>
-            <div style={{ padding: '10px 14px', background: '#FAF7EF', borderBottom: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0 }}>
+          <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden', alignSelf: 'start', maxHeight: '70vh', overflowY: 'auto' }}>
+            <div style={{ padding: '10px 14px', background: '#FAF7EF', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0 }}>
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389' }}>Detalle del acta</span>
               <button onClick={() => setViewId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', fontSize: '16px' }}>×</button>
             </div>
@@ -318,7 +318,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ fontWeight: 700, color: '#15291F', marginBottom: '6px' }}>Orden del Día</div>
                   {(viewed.orden_del_dia as PuntoAgenda[]).map((p, i) => (
-                    <div key={i} style={{ marginBottom: '8px', paddingLeft: '8px', borderLeft: '3px solid #E1DDD0' }}>
+                    <div key={i} style={{ marginBottom: '8px', paddingLeft: '8px', borderLeft: '3px solid var(--at-line)' }}>
                       <div style={{ fontWeight: 600 }}>{i+1}. {p.punto}</div>
                       {p.descripcion && <div style={{ color: '#7E9389', marginTop: '2px' }}>{p.descripcion}</div>}
                       {p.acuerdo && <div style={{ background: '#f0fdf4', padding: '4px 6px', borderRadius: '4px', marginTop: '4px', color: '#16a34a', fontWeight: 600 }}>✓ {p.acuerdo}</div>}

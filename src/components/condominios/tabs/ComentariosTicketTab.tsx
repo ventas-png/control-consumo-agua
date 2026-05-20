@@ -26,7 +26,7 @@ export default function ComentariosTicketTab({ ticket, comentarios, companyId, a
   const [estadoNuevo, setEstadoNuevo] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
 
   async function guardar() {
     if (!contenido.trim()) { Swal.fire('Error', 'Escribe un comentario', 'warning'); return }
@@ -53,7 +53,7 @@ export default function ComentariosTicketTab({ ticket, comentarios, companyId, a
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560, maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F', marginBottom: 4 }}>{ticket.titulo}</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -100,13 +100,13 @@ export default function ComentariosTicketTab({ ticket, comentarios, companyId, a
 
         {/* Compose */}
         {canCreate && (
-          <div style={{ padding: '14px 20px', borderTop: '1px solid #E1DDD0', background: '#FAF7EF' }}>
+          <div style={{ padding: '14px 20px', borderTop: '1px solid var(--at-line)', background: '#FAF7EF' }}>
             <textarea value={contenido} onChange={e => setContenido(e.target.value)}
               placeholder="Escribe un comentario o actualización…"
               style={{ ...inp, minHeight: 72, resize: 'vertical', marginBottom: 10, fontFamily: 'inherit' }} />
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <select value={estadoNuevo} onChange={e => setEstadoNuevo(e.target.value)}
-                style={{ flex: 1, padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13, background: '#fff' }}>
+                style={{ flex: 1, padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13, background: '#fff' }}>
                 <option value="">Sin cambio de estado</option>
                 {ESTADO_OPTIONS.filter(s => s !== ticket.estado).map(s => (
                   <option key={s} value={s}>→ {s.replace('_', ' ')}</option>

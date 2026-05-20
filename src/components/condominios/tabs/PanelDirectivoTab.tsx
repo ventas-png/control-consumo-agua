@@ -131,7 +131,7 @@ export default function PanelDirectivoTab({
   const saludColor = puntajeSalud >= 80 ? '#16a34a' : puntajeSalud >= 60 ? '#d97706' : '#ef4444'
   const saludLabel = puntajeSalud >= 80 ? 'Óptimo' : puntajeSalud >= 60 ? 'Regular' : 'Crítico'
 
-  const SECTION = { background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14, marginBottom: 14 }
+  const SECTION = { background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, marginBottom: 14 }
 
   const maxFinanciero = Math.max(cobradoMes, pendienteMes, gastosMes, 1)
 
@@ -201,7 +201,7 @@ export default function PanelDirectivoTab({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Panel Directivo</div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={exportarInformePDF} style={{ padding: '5px 10px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid #C2D2CA', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📄 PDF</button>
+          <button onClick={exportarInformePDF} style={{ padding: '5px 10px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📄 PDF</button>
           <button onClick={exportarResumenXlsx} style={{ padding: '5px 10px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📊 Excel</button>
         </div>
       </div>
@@ -243,7 +243,7 @@ export default function PanelDirectivoTab({
             { label: 'Gasto operativo (mes)', val: `${moneda} ${gastosMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, semaforo: { valor: ejecucionPresupuesto, umbralBueno: 100, umbralMalo: 110, invertir: true } },
             { label: 'Ejecución presupuestal', val: `${ejecucionPresupuesto.toFixed(1)}%`, semaforo: { valor: ejecucionPresupuesto, umbralBueno: 100, umbralMalo: 110, invertir: true } },
           ].map(row => (
-            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #EAE6D8', fontSize: 12 }}>
+            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 12 }}>
               <span style={{ color: '#7E9389', display: 'flex', alignItems: 'center' }}>
                 <Semaforo valor={row.semaforo.valor} umbralBueno={row.semaforo.umbralBueno} umbralMalo={row.semaforo.umbralMalo} invertir={row.semaforo.invertir} />
                 {row.label}
@@ -262,7 +262,7 @@ export default function PanelDirectivoTab({
             { label: 'En proceso', val: String(ticketsEnProceso), semaforoVal: ticketsEnProceso, b: 20, m: 5 },
             { label: 'Tiempo prom. resolución', val: avgResolucion > 0 ? `${avgResolucion} días` : '—', semaforoVal: avgResolucion, b: 3, m: 7, inv: true },
           ].map(row => (
-            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #EAE6D8', fontSize: 12 }}>
+            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 12 }}>
               <span style={{ color: '#7E9389', display: 'flex', alignItems: 'center' }}>
                 <Semaforo valor={row.semaforoVal} umbralBueno={row.b} umbralMalo={row.m} invertir={row.inv} />
                 {row.label}
@@ -281,7 +281,7 @@ export default function PanelDirectivoTab({
             { label: 'Contratos vencen en 30d', val: String(contratosVencenProx30), alert: contratosVencenProx30 > 0 },
             { label: 'Tasa de ocupación', val: `${totalUnidades > 0 ? Math.round((contratosActivos / totalUnidades) * 100) : 0}%` },
           ].map(row => (
-            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #EAE6D8', fontSize: 12 }}>
+            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 12 }}>
               <span style={{ color: '#7E9389', display: 'flex', alignItems: 'center' }}>
                 {row.alert !== undefined && <Semaforo valor={row.alert ? 1 : 0} umbralBueno={0} umbralMalo={0.5} invertir />}
                 {row.label}
@@ -302,7 +302,7 @@ export default function PanelDirectivoTab({
             { label: 'Infracciones activas', val: String(infraccionesActivas), semaforoVal: infraccionesActivas, b: 0, m: 3, inv: true },
             { label: 'Sugerencias pendientes', val: String(sugerenciasPendientes), semaforoVal: sugerenciasPendientes, b: 0, m: 5, inv: true },
           ].map(row => (
-            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #EAE6D8', fontSize: 12 }}>
+            <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--at-chip)', fontSize: 12 }}>
               <span style={{ color: '#7E9389', display: 'flex', alignItems: 'center' }}>
                 <Semaforo valor={row.semaforoVal} umbralBueno={row.b} umbralMalo={row.m} invertir={row.inv} />
                 {row.label}
@@ -333,7 +333,7 @@ export default function PanelDirectivoTab({
               </div>
             )
           })}
-          <div style={{ flex: 2, paddingLeft: 8, borderLeft: '1px solid #E1DDD0' }}>
+          <div style={{ flex: 2, paddingLeft: 8, borderLeft: '1px solid var(--at-line)' }}>
             <div style={{ fontSize: 11, color: '#7E9389', marginBottom: 4 }}>Ejecución presupuestal</div>
             <div style={{ height: 8, background: '#E1DDD0', borderRadius: 4, marginBottom: 4 }}>
               <div style={{ height: 8, borderRadius: 4, background: ejecucionPresupuesto > 100 ? '#ef4444' : '#1B3B36', width: `${Math.min(ejecucionPresupuesto, 100)}%`, transition: 'width 0.4s' }} />

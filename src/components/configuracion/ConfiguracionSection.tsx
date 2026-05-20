@@ -7,7 +7,7 @@ interface Props {
 export function ConfiguracionSection({ onLogout }: Props) {
   return (
     <div style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
-      <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', borderBottom: '2px solid #E1DDD0', paddingBottom: '12px' }}>
+      <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', borderBottom: '2px solid var(--at-line)', paddingBottom: '12px' }}>
         Configuración
       </div>
       <p style={{ color: '#7E9389', marginBottom: '20px' }}>
@@ -26,7 +26,7 @@ export function ConfiguracionSection({ onLogout }: Props) {
       <div style={{ display: 'flex', gap: '12px' }}>
         <button
           onClick={() => Swal.fire('Info', 'La configuración se gestiona via variables de entorno (.env)', 'info')}
-          style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+          style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
         >
           Ver Info
         </button>

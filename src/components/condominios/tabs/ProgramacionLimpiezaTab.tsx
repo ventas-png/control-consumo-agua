@@ -22,7 +22,7 @@ const FRECUENCIA_LABEL: Record<string, { label: string; bg: string; color: strin
 }
 
 const inputStyle: CSSProperties = {
-  width: '100%', padding: '7px 10px', border: '1.5px solid #E1DDD0',
+  width: '100%', padding: '7px 10px', border: '1.5px solid var(--at-line)',
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }
 
@@ -156,7 +156,7 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar área' : 'Nueva área de limpieza'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div style={{ gridColumn: 'span 2' }}>

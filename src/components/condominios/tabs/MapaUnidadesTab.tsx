@@ -84,7 +84,7 @@ export default function MapaUnidadesTab({ unidades, cuotas, contratos, moneda }:
       {filtro && (
         <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 12, color: '#7E9389' }}>Filtrando: <strong>{ESTADO_CFG[filtro].label}</strong> ({filtradas.length} unidades)</span>
-          <button onClick={() => setFiltro('')} style={{ fontSize: 11, padding: '2px 8px', border: '1px solid #E1DDD0', borderRadius: 5, cursor: 'pointer', background: '#FAF7EF' }}>✕ Limpiar</button>
+          <button onClick={() => setFiltro('')} style={{ fontSize: 11, padding: '2px 8px', border: '1px solid var(--at-line)', borderRadius: 5, cursor: 'pointer', background: '#FAF7EF' }}>✕ Limpiar</button>
         </div>
       )}
 
@@ -119,7 +119,7 @@ export default function MapaUnidadesTab({ unidades, cuotas, contratos, moneda }:
                       background: '#fff', border: `1px solid ${cfg.border}`, borderRadius: 10, padding: '12px 14px',
                       boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 200, maxWidth: 240,
                     }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: '#15291F', marginBottom: 6, borderBottom: '1px solid #EAE6D8', paddingBottom: 4 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#15291F', marginBottom: 6, borderBottom: '1px solid var(--at-chip)', paddingBottom: 4 }}>
                       {info.unidad.nombre}
                     </div>
                     <div style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -137,7 +137,7 @@ export default function MapaUnidadesTab({ unidades, cuotas, contratos, moneda }:
                           <span style={{ fontWeight: 700, color: '#ef4444' }}>{info.cuotasVencidas}</span>
                         </div>
                       )}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #EAE6D8', paddingTop: 4, marginTop: 2 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--at-chip)', paddingTop: 4, marginTop: 2 }}>
                         <span style={{ color: '#7E9389' }}>Saldo pendiente</span>
                         <span style={{ fontWeight: 700, color: info.saldoPendiente > 0 ? '#ef4444' : '#16a34a' }}>
                           {moneda} {info.saldoPendiente.toLocaleString('es', { minimumFractionDigits: 2 })}

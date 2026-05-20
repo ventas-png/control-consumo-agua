@@ -37,7 +37,7 @@ const BLANK = {
 }
 
 const inputStyle: CSSProperties = {
-  width: '100%', padding: '7px 10px', border: '1.5px solid #E1DDD0',
+  width: '100%', padding: '7px 10px', border: '1.5px solid var(--at-line)',
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }
 
@@ -131,8 +131,8 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
   return (
     <div style={{ display: 'flex', height: '100%', minHeight: 0 }}>
       {/* LEFT */}
-      <div style={{ width: '360px', flexShrink: 0, borderRight: '1.5px solid #E1DDD0', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '14px', borderBottom: '1px solid #E1DDD0', background: '#FAF7EF' }}>
+      <div style={{ width: '360px', flexShrink: 0, borderRight: '1.5px solid var(--at-line)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '14px', borderBottom: '1px solid var(--at-line)', background: '#FAF7EF' }}>
           {/* KPI strip */}
           <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '60px', background: abiertos > 0 ? '#fee2e2' : '#f0fdf4', borderRadius: '8px', padding: '6px', textAlign: 'center' }}>
@@ -151,7 +151,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
                 🚨 Registrar
               </button>
             )}
-            <button onClick={exportarPDF} disabled={incidentes.length === 0} style={{ padding: '8px 10px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid #C2D2CA', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="PDF">📄</button>
+            <button onClick={exportarPDF} disabled={incidentes.length === 0} style={{ padding: '8px 10px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="PDF">📄</button>
             <button onClick={exportarXlsx} disabled={incidentes.length === 0} style={{ padding: '8px 10px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="Excel">📊</button>
           </div>
 
@@ -179,7 +179,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
             const es = ESTADO_FLOW[i.estado]
             return (
               <div key={i.id} onClick={() => { setSelected(i); setShowForm(false) }}
-                style={{ padding: '12px 14px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === i.id ? '#fff1f2' : 'white', borderLeft: selected?.id === i.id ? '3px solid #ef4444' : '3px solid transparent' }}>
+                style={{ padding: '12px 14px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === i.id ? '#fff1f2' : 'white', borderLeft: selected?.id === i.id ? '3px solid #ef4444' : '3px solid transparent' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -205,7 +205,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
         {/* Form */}
         {showForm && (
-          <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+          <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
             <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar incidente' : 'Registrar incidente'}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
               <div>
@@ -265,7 +265,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
           const ts = TIPO_STYLE[selected.tipo]
           const es = ESTADO_FLOW[selected.estado]
           return (
-            <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '24px' }}>
+            <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>

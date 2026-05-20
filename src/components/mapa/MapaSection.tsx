@@ -84,7 +84,7 @@ export function MapaSection({ clientes, registros }: Props) {
 
   return (
     <div style={{ background: 'white', borderRadius: '24px', height: 'calc(100vh - 200px)', minHeight: '300px', maxHeight: '700px', overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '15px 20px', background: 'white', borderBottom: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ padding: '15px 20px', background: 'white', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ margin: 0, fontSize: '18px' }}>Geolocalización de Medidores</h3>
         <div style={{ display: 'flex', gap: '8px' }}>
           <span style={{ padding: '4px 12px', background: '#fee2e2', color: '#991b1b', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>🔴 Mora</span>

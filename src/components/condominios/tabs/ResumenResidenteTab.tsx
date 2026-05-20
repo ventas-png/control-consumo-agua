@@ -74,27 +74,27 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>Resumen Residente — ${unidad?.nombre}</title>
     <style>
-      body{font-family:Arial,sans-serif;padding:32px;max-width:700px;margin:auto;color:#15291F;font-size:13px}
-      h1{font-size:20px;margin:0}h2{font-size:13px;color:#7E9389;font-weight:normal;margin:4px 0 0}
-      .header{border-bottom:2px solid #15291F;padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between}
+      body{font-family:Arial,sans-serif;padding:32px;max-width:700px;margin:auto;color:var(--at-ink);font-size:13px}
+      h1{font-size:20px;margin:0}h2{font-size:13px;color:var(--at-ink-3);font-weight:normal;margin:4px 0 0}
+      .header{border-bottom:2px solid var(--at-ink);padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between}
       .kpi{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:16px 0}
-      .kpi-card{background:#FAF7EF;border-radius:8px;padding:10px 14px;border:1px solid #E1DDD0}
+      .kpi-card{background:var(--at-surface-2);border-radius:8px;padding:10px 14px;border:1px solid var(--at-line)}
       .kpi-val{font-size:18px;font-weight:800;margin:2px 0}
       table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px}
-      th{background:#EAE6D8;padding:7px 10px;text-align:left;color:#7E9389;font-weight:600}
-      td{padding:7px 10px;border-bottom:1px solid #EAE6D8}
+      th{background:var(--at-chip);padding:7px 10px;text-align:left;color:var(--at-ink-3);font-weight:600}
+      td{padding:7px 10px;border-bottom:1px solid var(--at-chip)}
       section{margin-top:20px}
-      h3{font-size:14px;font-weight:700;border-bottom:1px solid #E1DDD0;padding-bottom:6px;margin-bottom:12px}
-      .footer{margin-top:32px;font-size:10px;color:#7E9389;border-top:1px solid #E1DDD0;padding-top:8px}
+      h3{font-size:14px;font-weight:700;border-bottom:1px solid var(--at-line);padding-bottom:6px;margin-bottom:12px}
+      .footer{margin-top:32px;font-size:10px;color:var(--at-ink-3);border-top:1px solid var(--at-line);padding-top:8px}
     </style></head><body>
     <div class="header">
       <div><h1>${proyectoNombre ?? 'Condominio'}</h1><h2>Resumen de Residente — ${unidad?.nombre ?? unidadId}</h2></div>
-      <div style="font-size:11px;color:#7E9389">Generado: ${new Date().toLocaleDateString('es')}</div>
+      <div style="font-size:11px;color:var(--at-ink-3)">Generado: ${new Date().toLocaleDateString('es')}</div>
     </div>
     <div class="kpi">
-      <div class="kpi-card"><div style="font-size:10px;color:#7E9389">Saldo cuotas</div><div class="kpi-val" style="color:${saldoPendiente > 0 ? '#ef4444' : '#16a34a'}">${moneda} ${saldoPendiente.toFixed(2)}</div></div>
-      <div class="kpi-card"><div style="font-size:10px;color:#7E9389">Recargos pendientes</div><div class="kpi-val" style="color:${saldoRecargos > 0 ? '#d97706' : '#16a34a'}">${moneda} ${saldoRecargos.toFixed(2)}</div></div>
-      <div class="kpi-card"><div style="font-size:10px;color:#7E9389">Tickets activos</div><div class="kpi-val" style="color:#1B3B36">${ticketsUnidad.length}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Saldo cuotas</div><div class="kpi-val" style="color:${saldoPendiente > 0 ? '#ef4444' : '#16a34a'}">${moneda} ${saldoPendiente.toFixed(2)}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Recargos pendientes</div><div class="kpi-val" style="color:${saldoRecargos > 0 ? '#d97706' : '#16a34a'}">${moneda} ${saldoRecargos.toFixed(2)}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Tickets activos</div><div class="kpi-val" style="color:var(--at-primary)">${ticketsUnidad.length}</div></div>
     </div>
     <section><h3>Cuotas (últimos 12 meses)</h3>
     <table><tr><th>Concepto</th><th>Período</th><th>Monto</th><th>Estado</th></tr>
@@ -120,7 +120,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <select value={unidadId} onChange={e => setUnidadId(e.target.value)}
-            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, background: '#fff', fontWeight: 600 }}>
+            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, background: '#fff', fontWeight: 600 }}>
             {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
           </select>
           <button onClick={imprimir}
@@ -170,7 +170,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         {/* Cuotas */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>Cuotas — Últimos 12 meses</div>
           {cuotasUnidad.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '20px 0', color: '#7E9389', fontSize: 12 }}>Sin cuotas registradas</div>
@@ -212,7 +212,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
           )}
 
           {/* Tickets activos */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>🔧 Mis Solicitudes de Mantenimiento</div>
             {ticketsUnidad.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '16px 0', color: '#7E9389', fontSize: 12 }}>Sin solicitudes activas</div>
@@ -233,13 +233,13 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
           </div>
 
           {/* Reservas próximas */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>📅 Mis Reservas Próximas</div>
             {reservasUnidad.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '16px 0', color: '#7E9389', fontSize: 12 }}>Sin reservas próximas</div>
             ) : (
               reservasUnidad.map(r => (
-                <div key={r.id} style={{ padding: '7px 10px', background: '#EEF2EC', borderRadius: 8, marginBottom: 6, border: '1px solid #C2D2CA' }}>
+                <div key={r.id} style={{ padding: '7px 10px', background: '#EEF2EC', borderRadius: 8, marginBottom: 6, border: '1px solid var(--at-primary-soft-2)' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#102622' }}>{r.amenidad_nombre ?? 'Amenidad'}</div>
                   <div style={{ fontSize: 11, color: '#2F5D4F', marginTop: 2 }}>
                     {r.fecha} · {r.hora_inicio}–{r.hora_fin}
@@ -253,7 +253,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
       </div>
 
       {/* Anuncios */}
-      <div style={{ marginTop: 14, background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+      <div style={{ marginTop: 14, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>📋 Tablón de Anuncios</div>
         {anunciosActivos.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '16px 0', color: '#7E9389', fontSize: 12 }}>Sin anuncios activos</div>

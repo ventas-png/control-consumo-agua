@@ -107,7 +107,7 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
           </p>
         </div>
         {canCreate && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
             + Agregar parqueo
           </button>
         )}
@@ -116,7 +116,7 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por número, placa, unidad..."
-          style={{ flex: 1, minWidth: '200px', padding: '8px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF' }} />
+          style={{ flex: 1, minWidth: '200px', padding: '8px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF' }} />
         {(['todos', 'asignado', 'visita', 'discapacitado'] as const).map(t => (
           <button key={t} onClick={() => setFiltroTipo(t)}
             style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroTipo === t ? '#1B3B36' : '#E1DDD0', background: filtroTipo === t ? '#EEF2EC' : 'white', color: filtroTipo === t ? '#1B3B36' : '#7E9389' }}>
@@ -127,7 +127,7 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>{editingId ? 'Editar parqueo' : 'Nuevo parqueo'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             {[
@@ -139,20 +139,20 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
               <div key={key}>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>{label}</label>
                 <input value={form[key as keyof typeof form]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} placeholder={placeholder}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
               </div>
             ))}
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tipo</label>
               <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoParqueo }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 {(Object.entries(TIPO_LABELS) as [TipoParqueo, string][]).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Unidad asignada</label>
               <select value={form.unidad_id} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="">Sin asignar</option>
                 {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
@@ -160,11 +160,11 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas</label>
               <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
             <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -194,8 +194,8 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
                 {!tieneUnidad && <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>Disponible</div>}
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-                    <button onClick={() => startEdit(p)} style={{ flex: 1, padding: '6px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#3E5A4C' }}>✏️ Editar</button>
-                    <button onClick={() => toggleActivo(p)} style={{ padding: '6px 10px', background: p.activo ? '#fef3c7' : '#f0fdf4', border: '1px solid #E1DDD0', borderRadius: '7px', cursor: 'pointer', fontSize: '12px' }}>{p.activo ? '⏸' : '▶'}</button>
+                    <button onClick={() => startEdit(p)} style={{ flex: 1, padding: '6px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#3E5A4C' }}>✏️ Editar</button>
+                    <button onClick={() => toggleActivo(p)} style={{ padding: '6px 10px', background: p.activo ? '#fef3c7' : '#f0fdf4', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px' }}>{p.activo ? '⏸' : '▶'}</button>
                     <button onClick={() => eliminar(p.id)} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px' }}>🗑</button>
                   </div>
                 )}

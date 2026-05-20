@@ -219,7 +219,7 @@ export function DataTable<T>({
                 minWidth: '180px',
                 padding: '8px 12px',
                 borderRadius: '8px',
-                border: '1px solid #E1DDD0',
+                border: '1px solid var(--at-line)',
                 fontSize: '13px',
                 outline: 'none',
               }}
@@ -234,7 +234,7 @@ export function DataTable<T>({
               style={{
                 padding: '8px 12px',
                 borderRadius: '8px',
-                border: '1px solid #E1DDD0',
+                border: '1px solid var(--at-line)',
                 fontSize: '13px',
                 background: 'white',
                 cursor: 'pointer',
@@ -285,7 +285,7 @@ export function DataTable<T>({
                           fontSize: '12px',
                           textTransform: 'uppercase',
                           letterSpacing: '0.04em',
-                          borderBottom: '2px solid #E1DDD0',
+                          borderBottom: '2px solid var(--at-line)',
                           cursor: col.sortable ? 'pointer' : 'default',
                           userSelect: col.sortable ? 'none' : 'auto',
                           width: col.width,
@@ -304,7 +304,7 @@ export function DataTable<T>({
                     key={getRowKey(row, idx)}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
                     style={{
-                      borderBottom: '1px solid #EAE6D8',
+                      borderBottom: '1px solid var(--at-chip)',
                       cursor: onRowClick ? 'pointer' : 'default',
                       transition: 'background 0.12s',
                       ...(rowStyle ? rowStyle(row) : {}),
@@ -339,7 +339,7 @@ export function DataTable<T>({
               justifyContent: 'space-between',
               alignItems: 'center',
               padding: '12px 16px',
-              borderTop: '1px solid #EAE6D8',
+              borderTop: '1px solid var(--at-chip)',
               fontSize: '12px',
               color: '#7E9389',
               flexWrap: 'wrap',
@@ -381,7 +381,7 @@ function paginationBtnStyle(disabled: boolean): CSSProperties {
     padding: '4px 10px',
     fontSize: '12px',
     borderRadius: '6px',
-    border: '1px solid #E1DDD0',
+    border: '1px solid var(--at-line)',
     background: disabled ? '#EAE6D8' : 'white',
     color: disabled ? '#C7C2B0' : '#3E5A4C',
     cursor: disabled ? 'not-allowed' : 'pointer',

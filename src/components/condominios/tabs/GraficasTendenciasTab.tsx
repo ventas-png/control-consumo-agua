@@ -202,7 +202,7 @@ export default function GraficasTendenciasTab({ cuotas, tickets, gastos, inciden
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
         {graficas.map(g => (
-          <div key={g.titulo} style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+          <div key={g.titulo} style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 12, color: '#15291F' }}>{g.titulo}</div>

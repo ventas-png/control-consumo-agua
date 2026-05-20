@@ -124,14 +124,14 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 320, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
+      <div style={{ width: 320, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Tareas ({lista.length})</span>
             {canCreate && (
@@ -172,7 +172,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
           const vencida = dias !== null && dias < 0 && t.estado !== 'completada' && t.estado !== 'cancelada'
           return (
             <div key={t.id} onClick={() => { setSelected(t); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === t.id ? '#F4EBE3' : '#fff', borderLeft: vencida ? '3px solid #ef4444' : '3px solid transparent' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === t.id ? '#F4EBE3' : '#fff', borderLeft: vencida ? '3px solid #ef4444' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 13, flex: 1, marginRight: 8 }}>{t.titulo}</span>
                 <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: est?.bg, color: est?.color, flexShrink: 0 }}>{est?.label}</span>
@@ -283,7 +283,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
                     )}
                     {selected.estado !== 'completada' && selected.estado !== 'cancelada' && (
                       <button onClick={() => cancelar(selected)}
-                        style={{ padding: '7px 12px', background: '#EAE6D8', color: '#7E9389', border: '1px solid #E1DDD0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                        style={{ padding: '7px 12px', background: '#EAE6D8', color: '#7E9389', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                         Cancelar
                       </button>
                     )}

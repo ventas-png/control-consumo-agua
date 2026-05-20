@@ -97,7 +97,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   const totalEnviadas = campanas.reduce((s, c) => s + c.enviadas, 0)
@@ -135,7 +135,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF1EA', border: '1px solid #EFE0D5', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF1EA', border: '1px solid var(--at-accent-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nueva campaña de cobro</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -223,7 +223,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
             })}
           </div>
           {selected && (
-            <div style={{ width: 260, flexShrink: 0, background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 260, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 14 }}>Detalle</div>
               <div style={{ fontSize: 12, color: '#3E5A4C', lineHeight: 1.6, background: '#FAF7EF', borderRadius: 8, padding: '10px 12px', marginBottom: 10, whiteSpace: 'pre-wrap' }}>
                 {selected.mensaje}
@@ -236,7 +236,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
                 ['Enviada por', selected.enviada_por ?? '—'],
                 ['Fecha envío', selected.fecha_envio ? new Date(selected.fecha_envio).toLocaleString('es') : '—'],
               ].map(([k, v]) => (
-                <div key={String(k)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid #EAE6D8' }}>
+                <div key={String(k)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--at-chip)' }}>
                   <span style={{ color: '#7E9389' }}>{k}</span>
                   <span style={{ fontWeight: 600 }}>{v}</span>
                 </div>

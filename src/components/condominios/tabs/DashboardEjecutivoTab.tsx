@@ -20,7 +20,7 @@ interface Props {
 
 function KpiCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
   return (
-    <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px 16px' }}>
+    <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 16px' }}>
       <div style={{ fontSize: '22px', fontWeight: 800, color }}>{value}</div>
       <div style={{ fontSize: '12px', fontWeight: 600, color: '#15291F', marginTop: '2px' }}>{label}</div>
       {sub && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>{sub}</div>}
@@ -124,7 +124,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
         </div>
 
         {/* Trend chart */}
-        <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389', marginBottom: '12px' }}>Tendencia de cuotas (últimos 6 meses)</div>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end', height: '80px' }}>
             {trend.map(t => {
@@ -156,7 +156,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
         {/* Mantenimiento */}
-        <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '13px', fontWeight: 700, color: '#15291F', marginBottom: '12px' }}>🔧 Mantenimiento</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             <div style={{ textAlign: 'center', padding: '8px', background: '#FAF7EF', borderRadius: '8px' }}>
@@ -179,7 +179,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
         </div>
 
         {/* Convivencia */}
-        <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '13px', fontWeight: 700, color: '#15291F', marginBottom: '12px' }}>👥 Convivencia</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             <div style={{ textAlign: 'center', padding: '8px', background: '#FAF7EF', borderRadius: '8px' }}>
@@ -197,7 +197,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
         </div>
 
         {/* Resumen ejecutivo */}
-        <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '13px', fontWeight: 700, color: '#15291F', marginBottom: '12px' }}>📋 Resumen ejecutivo</div>
           {[
             { label: `Cobranza ${periodoActual}`, pct: tasaCobranza, color: tasaCobranza >= 80 ? '#10b981' : '#f59e0b' },

@@ -103,9 +103,9 @@ h1{font-size:20px;margin-bottom:2px}
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:${tipo?.bg};color:${tipo?.color};margin-bottom:16px}
 table{width:100%;border-collapse:collapse;margin:12px 0}
 th,td{border:1px solid #ccc;padding:7px 10px;text-align:left}
-th{background:#FAF7EF}
-.total{font-size:16px;font-weight:800;color:#15291F;margin-top:12px;text-align:right}
-.footer{margin-top:40px;border-top:1px solid #ccc;padding-top:16px;font-size:11px;color:#7E9389}
+th{background:var(--at-surface-2)}
+.total{font-size:16px;font-weight:800;color:var(--at-ink);margin-top:12px;text-align:right}
+.footer{margin-top:40px;border-top:1px solid #ccc;padding-top:16px;font-size:11px;color:var(--at-ink-3)}
 .sig{margin-top:60px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
 .sig-box{border-top:1px solid #000;padding-top:8px;font-size:11px}</style></head>
 <body>
@@ -133,7 +133,7 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
   if (filtroUnidad) filtered = filtered.filter(a => a.unidad_id === filtroUnidad)
 
   const pendientes = avisos.filter(a => a.estado === 'emitido' || a.estado === 'entregado').length
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -153,7 +153,7 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', marginBottom: '16px' }}>
         {Object.entries(TIPO_STYLE).map(([tipo, s]) => (
-          <div key={tipo} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+          <div key={tipo} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color: s.color }}>{avisos.filter(a => a.tipo === tipo).length}</div>
             <div style={{ fontSize: '10px', color: '#7E9389' }}>{s.label}</div>
           </div>
@@ -162,7 +162,7 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar aviso' : 'Nuevo Aviso de Cobro'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
@@ -226,7 +226,7 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -245,7 +245,7 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
             {f === 'todos' ? 'Todos' : ESTADO_STYLE[f]?.label ?? f}
           </button>
         ))}
-        <select style={{ padding: '4px 8px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF', color: '#15291F' }}
+        <select style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF', color: '#15291F' }}
           value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}>
           <option value="">Todas las unidades</option>
           {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
@@ -298,7 +298,7 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
                           </button>
                         )}
                         <button onClick={() => startEdit(a)}
-                          style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                          style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                         <button onClick={() => handleDelete(a.id)}
                           style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                       </>

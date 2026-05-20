@@ -92,7 +92,7 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   const sortedActivos = [...activos].sort((a, b) => CARGO_ORDER.indexOf(a.cargo) - CARGO_ORDER.indexOf(b.cargo))
 
@@ -110,7 +110,7 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar miembro' : 'Nuevo miembro'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '10px' }}>
             <div>
@@ -164,7 +164,7 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -218,7 +218,7 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
           {showHistorico && (
             <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {historicos.map(m => (
-                <div key={m.id} style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '8px', padding: '10px 12px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <div key={m.id} style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '8px', padding: '10px 12px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <span style={{ fontSize: '16px' }}>{CARGO_LABELS[m.cargo].icon}</span>
                   <div style={{ flex: 1 }}>
                     <span style={{ fontWeight: 600, fontSize: '13px', color: '#7E9389' }}>{m.nombre}</span>

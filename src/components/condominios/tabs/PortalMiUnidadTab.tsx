@@ -68,7 +68,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
   return (
     <div>
       {/* Info de la unidad */}
-      <div style={{ background: 'linear-gradient(135deg,#0E2A24,#102622)', borderRadius: '16px', padding: '20px', marginBottom: '22px', color: 'white' }}>
+      <div style={{ background: 'linear-gradient(135deg,var(--at-ink-deep),var(--at-primary-hover))', borderRadius: '16px', padding: '20px', marginBottom: '22px', color: 'white' }}>
         <div style={{ fontSize: '28px', marginBottom: '8px' }}>🏠</div>
         <div style={{ fontSize: '22px', fontWeight: 800, marginBottom: '4px' }}>{unidad.nombre}</div>
         <div style={{ fontSize: '13.5px', opacity: 0.85, display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
@@ -87,11 +87,11 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
 
       {/* Link del portal (solo admin) */}
       {isAdmin && (
-        <div style={{ background: '#FAF1EA', border: '1.5px solid #EFE0D5', borderRadius: '14px', padding: '16px', marginBottom: '22px' }}>
+        <div style={{ background: '#FAF1EA', border: '1.5px solid var(--at-accent-soft-2)', borderRadius: '14px', padding: '16px', marginBottom: '22px' }}>
           <div style={{ fontWeight: 700, fontSize: '13.5px', color: '#7E461F', marginBottom: '8px' }}>🔗 Enlace del portal del residente</div>
           {portalUrl ? (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <code style={{ flex: 1, background: 'white', border: '1px solid #EFE0D5', borderRadius: '7px', padding: '7px 10px', fontSize: '12px', color: '#4c1d95', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <code style={{ flex: 1, background: 'white', border: '1px solid var(--at-accent-soft-2)', borderRadius: '7px', padding: '7px 10px', fontSize: '12px', color: '#4c1d95', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {portalUrl}
               </code>
               <button onClick={() => { navigator.clipboard.writeText(portalUrl); Swal.fire({ icon: 'success', title: '¡Copiado!', timer: 1000, showConfirmButton: false }) }}
@@ -123,14 +123,14 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
         <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#15291F' }}>Mensajes a la administración</h4>
         {!isAdmin && (
           <button onClick={() => setShowMsgForm(true)}
-            style={{ padding: '7px 14px', background: 'linear-gradient(135deg,#1B3B36,#102622)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+            style={{ padding: '7px 14px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             + Enviar mensaje
           </button>
         )}
       </div>
 
       {showMsgForm && (
-        <div style={{ background: 'white', border: '1.5px solid #C2D2CA', borderRadius: '12px', padding: '16px', marginBottom: '14px' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '12px', padding: '16px', marginBottom: '14px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
               {(Object.entries(TIPO_MSG) as [TipoMensajePortal, typeof TIPO_MSG[TipoMensajePortal]][]).map(([k, v]) => (
@@ -141,12 +141,12 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
               ))}
             </div>
             <input value={msgForm.asunto} onChange={e => setMsgForm(f => ({ ...f, asunto: e.target.value }))} placeholder="Asunto *"
-              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             <textarea value={msgForm.cuerpo} onChange={e => setMsgForm(f => ({ ...f, cuerpo: e.target.value }))} placeholder="Escriba su mensaje..." rows={3}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <button onClick={enviarMensaje} disabled={saving} style={{ padding: '9px 20px', background: 'linear-gradient(135deg,#1B3B36,#102622)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={enviarMensaje} disabled={saving} style={{ padding: '9px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Enviando...' : '📤 Enviar'}
             </button>
             <button onClick={() => { setShowMsgForm(false); setMsgForm(blankMsg()) }} style={{ padding: '9px 14px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -164,7 +164,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
             const tc = TIPO_MSG[m.tipo]
             const ec = ESTADO_MSG[m.estado] ?? ESTADO_MSG.nuevo
             return (
-              <div key={m.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px 16px' }}>
+              <div key={m.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 16px' }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '18px', flexShrink: 0 }}>{tc.icon}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>

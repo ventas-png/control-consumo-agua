@@ -161,7 +161,7 @@ export function AsignacionModal({ usuario, proyectos, onClose, onSaved }: Asigna
             disabled={saving}
             style={{
               padding: '9px 20px', borderRadius: '8px', border: 'none',
-              background: saving ? '#3E5A4C' : 'linear-gradient(135deg, #1B3B36, #577B69)',
+              background: saving ? '#3E5A4C' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
               color: 'white', cursor: saving ? 'not-allowed' : 'pointer',
               fontSize: '14px', fontWeight: 600,
             }}

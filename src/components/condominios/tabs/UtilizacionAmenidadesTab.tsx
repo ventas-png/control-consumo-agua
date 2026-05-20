@@ -68,7 +68,7 @@ export default function UtilizacionAmenidadesTab({ amenidades, reservas, moneda 
       ) : (
         <>
           {/* Ranking rápido */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14, marginBottom: 16 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>Ranking de Uso</div>
             {stats.map(s => (
               <div key={s.am.id} style={{ marginBottom: 10 }}>
@@ -91,7 +91,7 @@ export default function UtilizacionAmenidadesTab({ amenidades, reservas, moneda 
           {/* Cards por amenidad */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
             {stats.map(s => (
-              <div key={s.am.id} style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+              <div key={s.am.id} style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: '#15291F', marginBottom: 2 }}>{s.am.nombre}</div>
                 {s.am.capacidad_max && (
                   <div style={{ fontSize: 10, color: '#7E9389', marginBottom: 10 }}>Capacidad máx: {s.am.capacidad_max} · Horario: {s.am.horario_inicio ?? '—'}–{s.am.horario_fin ?? '—'}</div>

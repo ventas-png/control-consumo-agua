@@ -135,7 +135,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
         <>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <select value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}
-              style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, background: '#fff' }}>
+              style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, background: '#fff' }}>
               <option value="">Todas las unidades</option>
               {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
             </select>
@@ -176,23 +176,23 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
                     </div>
 
                     {esConciliando && (
-                      <div style={{ padding: '0 14px 14px', borderTop: '1px solid #EAE6D8', background: '#FAF7EF' }}>
+                      <div style={{ padding: '0 14px 14px', borderTop: '1px solid var(--at-chip)', background: '#FAF7EF' }}>
                         <div style={{ fontWeight: 600, fontSize: 12, color: '#15291F', margin: '10px 0 8px' }}>Registrar pago</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                           <div>
                             <label style={{ fontSize: 11, color: '#7E9389' }}>Monto recibido *</label>
                             <input type="number" min="0" step="0.01" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #C7C2B0', fontSize: 12, boxSizing: 'border-box', marginTop: 2 }} />
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--at-line-strong)', fontSize: 12, boxSizing: 'border-box', marginTop: 2 }} />
                           </div>
                           <div>
                             <label style={{ fontSize: 11, color: '#7E9389' }}>Fecha</label>
                             <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #C7C2B0', fontSize: 12, boxSizing: 'border-box', marginTop: 2 }} />
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--at-line-strong)', fontSize: 12, boxSizing: 'border-box', marginTop: 2 }} />
                           </div>
                           <div>
                             <label style={{ fontSize: 11, color: '#7E9389' }}>Método</label>
                             <select value={form.metodo} onChange={e => setForm(f => ({ ...f, metodo: e.target.value }))}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #C7C2B0', fontSize: 12, boxSizing: 'border-box', marginTop: 2 }}>
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--at-line-strong)', fontSize: 12, boxSizing: 'border-box', marginTop: 2 }}>
                               {METODOS.map(m => <option key={m} value={m}>{m}</option>)}
                             </select>
                           </div>
@@ -200,12 +200,12 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
                             <label style={{ fontSize: 11, color: '#7E9389' }}>Referencia</label>
                             <input value={form.referencia} onChange={e => setForm(f => ({ ...f, referencia: e.target.value }))}
                               placeholder="No. transferencia / cheque"
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #C7C2B0', fontSize: 12, boxSizing: 'border-box', marginTop: 2 }} />
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--at-line-strong)', fontSize: 12, boxSizing: 'border-box', marginTop: 2 }} />
                           </div>
                           <div style={{ gridColumn: '2 / -1' }}>
                             <label style={{ fontSize: 11, color: '#7E9389' }}>Notas</label>
                             <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #C7C2B0', fontSize: 12, boxSizing: 'border-box', marginTop: 2 }} />
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--at-line-strong)', fontSize: 12, boxSizing: 'border-box', marginTop: 2 }} />
                           </div>
                         </div>
                         {form.monto && Math.abs(parseFloat(form.monto) - cuota.monto) > 0.01 && (
@@ -221,7 +221,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
                             {saving ? 'Aplicando…' : '✓ Aplicar'}
                           </button>
                           <button onClick={cancelarConciliacion}
-                            style={{ padding: '7px 14px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid #C7C2B0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                            style={{ padding: '7px 14px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                             Cancelar
                           </button>
                         </div>
@@ -240,7 +240,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
           {conciliaciones.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: '#7E9389', fontSize: 13 }}>Sin conciliaciones registradas.</div>
           ) : (
-            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: '#FAF7EF' }}>
@@ -255,7 +255,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
                     const unidad = unidades.find(u => u.id === c.unidad_id)
                     const diff = c.monto_recibido - c.monto_cuota
                     return (
-                      <tr key={c.id} style={{ borderTop: i > 0 ? '1px solid #EAE6D8' : undefined }}>
+                      <tr key={c.id} style={{ borderTop: i > 0 ? '1px solid var(--at-chip)' : undefined }}>
                         <td style={{ padding: '8px 10px', color: '#3E5A4C' }}>{c.fecha_pago}</td>
                         <td style={{ padding: '8px 10px' }}>{unidad?.nombre ?? '—'}</td>
                         <td style={{ padding: '8px 10px', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cuota?.concepto ?? '—'}</td>

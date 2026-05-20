@@ -74,16 +74,16 @@ export default function ResumenEjecutivoTab({
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Resumen Ejecutivo — ${proyectoNombre ?? ''}</title>
 <style>
-  *{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;color:#15291F;padding:24px;max-width:900px;margin:0 auto}
-  h1{margin:0 0 4px;font-size:20px}p{margin:0 0 16px;color:#7E9389;font-size:11px}
-  h2{font-size:13px;margin:20px 0 8px;color:#15291F;border-bottom:2px solid #E1DDD0;padding-bottom:4px}
+  *{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;color:var(--at-ink);padding:24px;max-width:900px;margin:0 auto}
+  h1{margin:0 0 4px;font-size:20px}p{margin:0 0 16px;color:var(--at-ink-3);font-size:11px}
+  h2{font-size:13px;margin:20px 0 8px;color:var(--at-ink);border-bottom:2px solid var(--at-line);padding-bottom:4px}
   .grid{display:grid;gap:10px}.g4{grid-template-columns:repeat(4,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
-  .kpi{background:#FAF7EF;border-radius:8px;padding:10px 12px;border-top:3px solid var(--c)}
-  .kpi .val{font-size:18px;font-weight:800;color:var(--c)}.kpi .lbl{font-size:10px;color:#7E9389;font-weight:600}
-  table{width:100%;border-collapse:collapse}th{background:#FAF7EF;padding:6px 8px;text-align:left;border-bottom:2px solid #E1DDD0;font-size:10px;text-transform:uppercase;color:#7E9389}
-  td{padding:6px 8px;border-bottom:1px solid #EAE6D8;font-size:11px}
+  .kpi{background:var(--at-surface-2);border-radius:8px;padding:10px 12px;border-top:3px solid var(--c)}
+  .kpi .val{font-size:18px;font-weight:800;color:var(--c)}.kpi .lbl{font-size:10px;color:var(--at-ink-3);font-weight:600}
+  table{width:100%;border-collapse:collapse}th{background:var(--at-surface-2);padding:6px 8px;text-align:left;border-bottom:2px solid var(--at-line);font-size:10px;text-transform:uppercase;color:var(--at-ink-3)}
+  td{padding:6px 8px;border-bottom:1px solid var(--at-chip);font-size:11px}
   .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700}
-  .btn{padding:8px 16px;background:#1B3B36;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;margin-bottom:16px}
+  .btn{padding:8px 16px;background:var(--at-primary);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;margin-bottom:16px}
   @media print{.btn{display:none}}
 </style></head><body>
 <button class="btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
@@ -148,7 +148,7 @@ ${venc30.length > 0 ? `
   </tbody>
 </table>` : ''}
 
-<p style="margin-top:20px;font-size:9px;color:#7E9389;border-top:1px solid #E1DDD0;padding-top:8px">
+<p style="margin-top:20px;font-size:9px;color:var(--at-ink-3);border-top:1px solid var(--at-line);padding-top:8px">
   ${proyectoNombre} · Reporte generado el ${fechaLarga} · Total de unidades: ${unidades.length}
 </p>
 </body></html>`
@@ -191,12 +191,12 @@ ${venc30.length > 0 ? `
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
         {/* Top morosos */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>⚠️ Top morosos</div>
           {top5Morosos.length === 0 ? (
             <div style={{ fontSize: 12, color: '#16a34a', textAlign: 'center', padding: '20px 0' }}>✓ Sin unidades morosas</div>
           ) : top5Morosos.map((m, i) => (
-            <div key={m.unidad.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < top5Morosos.length - 1 ? '1px solid #EAE6D8' : 'none' }}>
+            <div key={m.unidad.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < top5Morosos.length - 1 ? '1px solid var(--at-chip)' : 'none' }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>{m.unidad.nombre}</div>
                 <div style={{ fontSize: 10, color: '#7E9389' }}>{m.count} cuotas vencidas</div>
@@ -207,7 +207,7 @@ ${venc30.length > 0 ? `
         </div>
 
         {/* Tickets críticos */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>🔧 Tickets críticos ({ticketsCriticos.length})</div>
           {ticketsCriticos.length === 0 ? (
             <div style={{ fontSize: 12, color: '#16a34a', textAlign: 'center', padding: '20px 0' }}>✓ Sin tickets urgentes abiertos</div>
@@ -244,14 +244,14 @@ ${venc30.length > 0 ? `
 
       {/* Incidentes y sugerencias */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>🚨 Incidentes del mes</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: semColorText(incidentes.filter(i => i.fecha?.startsWith(mes)).length, 0, 3) }}>
             {incidentes.filter(i => i.fecha?.startsWith(mes)).length}
           </div>
           <div style={{ fontSize: 11, color: '#7E9389' }}>registrados en {mes}</div>
         </div>
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>💡 Sugerencias pendientes</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: semColorText(sugerencias.filter(s => s.estado === 'pendiente').length, 3, 8) }}>
             {sugerencias.filter(s => s.estado === 'pendiente').length}

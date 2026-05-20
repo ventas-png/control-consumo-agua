@@ -176,7 +176,7 @@ export default function BitacoraActividadTab({
       {/* Filtros de tipo */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
         <button onClick={() => { setFiltro('todos'); setPagina(0) }}
-          style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid #C7C2B0', fontSize: 11, cursor: 'pointer',
+          style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--at-line-strong)', fontSize: 11, cursor: 'pointer',
             background: filtro === 'todos' ? '#15291F' : '#FAF7EF', color: filtro === 'todos' ? '#fff' : '#3E5A4C', fontWeight: filtro === 'todos' ? 700 : 400 }}>
           Todos ({eventos.length})
         </button>
@@ -196,11 +196,11 @@ export default function BitacoraActividadTab({
       {/* Búsqueda */}
       <div style={{ marginBottom: 12 }}>
         <input value={busqueda} onChange={e => { setBusqueda(e.target.value); setPagina(0) }}
-          placeholder="Buscar en bitácora..." style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+          placeholder="Buscar en bitácora..." style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
       </div>
 
       {/* Lista de eventos */}
-      <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden', marginBottom: 10 }}>
+      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden', marginBottom: 10 }}>
         {pagActual.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '32px 0', color: '#7E9389', fontSize: 12 }}>Sin eventos.</div>
         ) : (
@@ -208,7 +208,7 @@ export default function BitacoraActividadTab({
             const cfg = TIPO_CFG[ev.tipo]
             return (
               <div key={ev.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px',
-                borderBottom: i < pagActual.length - 1 ? '1px solid #EAE6D8' : undefined }}>
+                borderBottom: i < pagActual.length - 1 ? '1px solid var(--at-chip)' : undefined }}>
                 {/* Ícono */}
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: cfg.bg, border: `1px solid ${cfg.color}33`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
@@ -244,12 +244,12 @@ export default function BitacoraActividadTab({
       {paginas > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center' }}>
           <button onClick={() => setPagina(p => Math.max(0, p - 1))} disabled={pagina === 0}
-            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #C7C2B0', fontSize: 12, cursor: pagina === 0 ? 'not-allowed' : 'pointer', background: '#fff', opacity: pagina === 0 ? 0.4 : 1 }}>
+            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: pagina === 0 ? 'not-allowed' : 'pointer', background: '#fff', opacity: pagina === 0 ? 0.4 : 1 }}>
             ‹ Ant.
           </button>
           <span style={{ fontSize: 11, color: '#7E9389' }}>Pág. {pagina + 1} / {paginas} · {filtrados.length} eventos</span>
           <button onClick={() => setPagina(p => Math.min(paginas - 1, p + 1))} disabled={pagina === paginas - 1}
-            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #C7C2B0', fontSize: 12, cursor: pagina === paginas - 1 ? 'not-allowed' : 'pointer', background: '#fff', opacity: pagina === paginas - 1 ? 0.4 : 1 }}>
+            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: pagina === paginas - 1 ? 'not-allowed' : 'pointer', background: '#fff', opacity: pagina === paginas - 1 ? 0.4 : 1 }}>
             Sig. ›
           </button>
         </div>

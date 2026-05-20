@@ -79,7 +79,7 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
   }, [tickets])
 
   const BTN = (active: boolean) => ({
-    padding: '5px 14px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, cursor: 'pointer',
+    padding: '5px 14px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: 'pointer',
     background: active ? '#15291F' : '#fff', color: active ? '#fff' : '#3E5A4C', fontWeight: active ? 700 : 400,
   })
 
@@ -117,7 +117,7 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             {/* Por prioridad */}
-            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+            <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>Tiempo promedio de resolución por prioridad</div>
               {stats.porPrioridad.map(p => (
                 <div key={p.prioridad} style={{ marginBottom: 12 }}>
@@ -136,7 +136,7 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
             </div>
 
             {/* Por tipo */}
-            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+            <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>Por tipo de mantenimiento</div>
               {stats.porTipo.map(t => (
                 <div key={t.tipo} style={{ marginBottom: 16, padding: '10px 12px', background: '#FAF7EF', borderRadius: 8 }}>
@@ -158,12 +158,12 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
           {/* Filtros */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
             <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}
-              style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, background: '#fff' }}>
+              style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, background: '#fff' }}>
               <option value="">Todos los estados</option>
               {['abierto', 'en_proceso', 'resuelto', 'cerrado'].map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
             </select>
             <select value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value)}
-              style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, background: '#fff' }}>
+              style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, background: '#fff' }}>
               <option value="">Todas las prioridades</option>
               {['urgente', 'alta', 'media', 'baja'].map(p => <option key={p} value={p}>{p}</option>)}
             </select>
@@ -175,9 +175,9 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
           {ticketsFiltrados.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: '#7E9389' }}>Sin tickets con ese filtro</div>
           ) : (
-            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
               {/* Leyenda de estados */}
-              <div style={{ padding: '8px 14px', borderBottom: '1px solid #EAE6D8', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--at-chip)', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                 {Object.entries(ESTADO_COLOR).map(([est, color]) => (
                   <span key={est} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
                     <span style={{ width: 10, height: 10, background: color, borderRadius: 2, display: 'inline-block' }} />
@@ -196,9 +196,9 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
                   const duracion = diasDiff(inicio, fin)
                   const color = ESTADO_COLOR[t.estado] ?? '#7E9389'
                   return (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #FAF7EF', minHeight: 36 }}>
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--at-surface-2)', minHeight: 36 }}>
                       {/* Label */}
-                      <div style={{ width: 200, flexShrink: 0, padding: '6px 10px', borderRight: '1px solid #EAE6D8' }}>
+                      <div style={{ width: 200, flexShrink: 0, padding: '6px 10px', borderRight: '1px solid var(--at-chip)' }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#15291F', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t.titulo}</div>
                         <div style={{ fontSize: 9, color: PRIORIDAD_COLOR[t.prioridad] }}>{t.prioridad} · {t.tipo}</div>
                       </div>
@@ -228,7 +228,7 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
               </div>
 
               {ticketsFiltrados.length > 80 && (
-                <div style={{ padding: '8px 14px', fontSize: 11, color: '#7E9389', borderTop: '1px solid #EAE6D8' }}>
+                <div style={{ padding: '8px 14px', fontSize: 11, color: '#7E9389', borderTop: '1px solid var(--at-chip)' }}>
                   Mostrando primeros 80 tickets. Usa filtros para acotar.
                 </div>
               )}

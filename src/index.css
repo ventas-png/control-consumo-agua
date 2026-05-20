@@ -14,6 +14,22 @@
   --at-accent: #B96A3F;
   --at-accent-2: #577B69;
   --at-chip: #EAE6D8;
+  --at-primary-2: #2F5D4F;
+  --at-primary-tint: #EEF2EC;
+  --at-primary-soft-2: #C2D2CA;
+  --at-primary-mint: #9CC6B6;
+  --at-primary-mint-2: #7FB29F;
+  --at-ink-deep: #0E2A24;
+  --at-ink-deeper: #22332B;
+  --at-ink-darkest: #0E1A14;
+  --at-accent-hover: #9C5733;
+  --at-accent-dark: #7E461F;
+  --at-accent-darker: #5E3417;
+  --at-accent-light: #CE8A63;
+  --at-accent-soft: #E6CDBB;
+  --at-accent-soft-2: #EFE0D5;
+  --at-accent-tint: #F4EBE3;
+  --at-accent-tint-2: #FAF1EA;
   --at-font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --at-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }

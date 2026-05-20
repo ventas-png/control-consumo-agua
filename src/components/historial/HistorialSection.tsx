@@ -226,7 +226,7 @@ export function HistorialSection({
   return (
     <div style={{ background: 'white', borderRadius: 24, padding: 32, boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 12, borderBottom: '2px solid #E1DDD0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 12, borderBottom: '2px solid var(--at-line)' }}>
         <span style={{ fontSize: 20, fontWeight: 700 }}>📊 Historial de Lecturas</span>
         <div style={{ display: 'flex', gap: 10 }}>
           <button
@@ -238,7 +238,7 @@ export function HistorialSection({
               border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14,
             }}
           >⚙️ Filtros</button>
-          <div style={{ display: 'flex', gap: 5, border: '1px solid #E1DDD0', borderRadius: 8, padding: 4 }}>
+          <div style={{ display: 'flex', gap: 5, border: '1px solid var(--at-line)', borderRadius: 8, padding: 4 }}>
             <button onClick={() => setViewMode('table')} style={viewBtnStyle(viewMode === 'table')}>📋</button>
             <button onClick={() => setViewMode('cards')} style={viewBtnStyle(viewMode === 'cards')}>🎴</button>
           </div>
@@ -264,7 +264,7 @@ export function HistorialSection({
 
       {/* Filters Panel */}
       {showFilters && (
-        <div style={{ background: '#FAF7EF', padding: 16, marginBottom: 20, borderRadius: 12, border: '1px solid #E1DDD0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+        <div style={{ background: '#FAF7EF', padding: 16, marginBottom: 20, borderRadius: 12, border: '1px solid var(--at-line)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
           <input
             type="text"
             placeholder="🔍 Buscar cliente..."
@@ -337,7 +337,7 @@ export function HistorialSection({
               <div
                 key={r.id}
                 style={{
-                  background: 'white', border: '1px solid #E1DDD0', borderRadius: 12,
+                  background: 'white', border: '1px solid var(--at-line)', borderRadius: 12,
                   padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
                   transition: 'all 0.2s', cursor: 'pointer',
                 }}
@@ -404,7 +404,7 @@ export function HistorialSection({
               <select
                 value={editModal.estado}
                 onChange={e => setEditModal(prev => prev ? { ...prev, estado: e.target.value as Registro['estado'] } : null)}
-                style={{ width: '100%', padding: 12, border: '2px solid #E1DDD0', borderRadius: 10, fontSize: 15 }}
+                style={{ width: '100%', padding: 12, border: '2px solid var(--at-line)', borderRadius: 10, fontSize: 15 }}
               >
                 <option value="pendiente">⏳ Pendiente</option>
                 <option value="pagado">✓ Pagado</option>
@@ -417,7 +417,7 @@ export function HistorialSection({
                 disabled={savingEstado}
                 style={{
                   flex: 1, padding: 12,
-                  background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)',
+                  background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)',
                   color: 'white', border: 'none', borderRadius: 10, fontWeight: 600,
                   cursor: savingEstado ? 'not-allowed' : 'pointer',
                   opacity: savingEstado ? 0.6 : 1,

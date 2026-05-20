@@ -97,14 +97,14 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 300, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
+      <div style={{ width: 300, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div>
               <span style={{ fontWeight: 600, fontSize: 14 }}>Incendio ({lista.length})</span>
@@ -128,7 +128,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
         </div>
 
         {/* Resumen */}
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid #E1DDD0' }}>
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--at-line)' }}>
           {resumenPorTipo.map(t => (
             <div key={t.value} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
               <span>{t.icon} {t.label}</span>
@@ -147,7 +147,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
           const vencido = r.fecha_vencimiento && new Date(r.fecha_vencimiento) < new Date()
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === r.id ? '#fef2f2' : '#fff', borderLeft: `3px solid ${vencido ? '#ef4444' : tipo?.color}` }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? '#fef2f2' : '#fff', borderLeft: `3px solid ${vencido ? '#ef4444' : tipo?.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 12 }}>{tipo?.icon} {r.identificador}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: res?.bg, color: res?.color }}>{res?.icon} {res?.label}</span>

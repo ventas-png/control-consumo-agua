@@ -370,25 +370,25 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
     boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
   }
   const headerStyle: CSSProperties = {
-    padding: '24px 28px 20px', borderBottom: '1px solid #E1DDD0',
+    padding: '24px 28px 20px', borderBottom: '1px solid var(--at-line)',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   }
   const bodyStyle: CSSProperties = {
     padding: '24px 28px', overflowY: 'auto', flex: 1,
   }
   const footerStyle: CSSProperties = {
-    padding: '16px 28px', borderTop: '1px solid #E1DDD0',
+    padding: '16px 28px', borderTop: '1px solid var(--at-line)',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px',
     flexWrap: 'wrap',
   }
   const btnPrimary: CSSProperties = {
-    padding: '10px 22px', background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+    padding: '10px 22px', background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
     color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600,
     fontSize: '14px', cursor: 'pointer',
   }
   const btnSecondary: CSSProperties = {
     padding: '10px 22px', background: '#EAE6D8', color: '#3E5A4C',
-    border: '1px solid #E1DDD0', borderRadius: '8px', fontWeight: 600,
+    border: '1px solid var(--at-line)', borderRadius: '8px', fontWeight: 600,
     fontSize: '14px', cursor: 'pointer',
   }
   const btnDanger: CSSProperties = {
@@ -402,7 +402,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
   const tabStyle = (active: boolean): CSSProperties => ({
     padding: '8px 16px',
     border: 'none',
-    borderBottom: active ? '2px solid #1B3B36' : '2px solid transparent',
+    borderBottom: active ? '2px solid var(--at-primary)' : '2px solid transparent',
     background: 'none',
     color: active ? '#1B3B36' : '#7E9389',
     fontWeight: active ? 700 : 500,
@@ -450,7 +450,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
           {step === 'upload' && (
             <div>
               {/* Template download */}
-              <div style={{ marginBottom: '24px', padding: '16px 20px', background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ marginBottom: '24px', padding: '16px 20px', background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontWeight: 600, color: '#102622', fontSize: '14px' }}>Paso 1 — Descarga la plantilla</div>
                   <div style={{ fontSize: '13px', color: '#1B3B36', marginTop: '2px' }}>
@@ -463,7 +463,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
               </div>
 
               {/* Fields reference */}
-              <div style={{ marginBottom: '20px', padding: '12px 16px', background: '#FAF7EF', borderRadius: '8px', border: '1px solid #E1DDD0' }}>
+              <div style={{ marginBottom: '20px', padding: '12px 16px', background: '#FAF7EF', borderRadius: '8px', border: '1px solid var(--at-line)' }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', marginBottom: '8px' }}>Columnas de la plantilla:</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {['nombre *', 'codigo *', 'email', 'telefono', 'whatsapp', 'direccion', 'nacionalidad', 'cui_dui', 'fecha_nacimiento', 'numero_facturacion', 'telefono_alterno'].map(col => (
@@ -536,7 +536,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
               </div>
 
               {/* Tabs */}
-              <div style={{ display: 'flex', borderBottom: '1px solid #E1DDD0', marginBottom: '16px', gap: '4px' }}>
+              <div style={{ display: 'flex', borderBottom: '1px solid var(--at-line)', marginBottom: '16px', gap: '4px' }}>
                 <button style={tabStyle(activeTab === 'nuevos')} onClick={() => setActiveTab('nuevos')}>
                   Nuevos ({nuevos.length})
                 </button>
@@ -560,18 +560,18 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                       <p style={{ fontSize: '13px', color: '#166534', background: '#f0fdf4', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid #bbf7d0' }}>
                         ✅ Estos {nuevos.length} cliente{nuevos.length !== 1 ? 's' : ''} serán agregados a tu empresa al confirmar.
                       </p>
-                      <div style={{ overflowX: 'auto', border: '1px solid #E1DDD0', borderRadius: '8px' }}>
+                      <div style={{ overflowX: 'auto', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                           <thead>
                             <tr style={{ background: '#FAF7EF' }}>
                               {['Fila', 'Nombre', 'Código', 'Email', 'Teléfono'].map(h => (
-                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#3E5A4C', borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}>{h}</th>
+                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#3E5A4C', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {nuevos.map(row => (
-                              <tr key={row.index} style={{ background: '#f0fdf4', borderBottom: '1px solid #E1DDD0' }}>
+                              <tr key={row.index} style={{ background: '#f0fdf4', borderBottom: '1px solid var(--at-line)' }}>
                                 <td style={{ padding: '9px 14px', color: '#7E9389' }}>{row.index}</td>
                                 <td style={{ padding: '9px 14px', fontWeight: 600, color: '#15291F' }}>{row.data.nombre ?? '—'}</td>
                                 <td style={{ padding: '9px 14px', color: '#3E5A4C' }}>{row.data.codigo ?? '—'}</td>
@@ -596,21 +596,21 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                     </p>
                   ) : (
                     <>
-                      <p style={{ fontSize: '13px', color: '#102622', background: '#EEF2EC', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid #C2D2CA' }}>
+                      <p style={{ fontSize: '13px', color: '#102622', background: '#EEF2EC', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-primary-soft-2)' }}>
                         🔁 Estos clientes ya existen en el sistema y serán vinculados a tu empresa al confirmar.
                       </p>
-                      <div style={{ overflowX: 'auto', border: '1px solid #E1DDD0', borderRadius: '8px' }}>
+                      <div style={{ overflowX: 'auto', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                           <thead>
                             <tr style={{ background: '#FAF7EF' }}>
                               {['Fila', 'Nombre', 'Código', 'Motivo'].map(h => (
-                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#3E5A4C', borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}>{h}</th>
+                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#3E5A4C', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {yaExisten.map(row => (
-                              <tr key={row.index} style={{ background: '#EEF2EC', borderBottom: '1px solid #E1DDD0' }}>
+                              <tr key={row.index} style={{ background: '#EEF2EC', borderBottom: '1px solid var(--at-line)' }}>
                                 <td style={{ padding: '9px 14px', color: '#7E9389' }}>{row.index}</td>
                                 <td style={{ padding: '9px 14px', fontWeight: 600, color: '#15291F' }}>{row.data.nombre ?? '—'}</td>
                                 <td style={{ padding: '9px 14px', color: '#3E5A4C' }}>{row.data.codigo ?? '—'}</td>
@@ -637,18 +637,18 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                       <p style={{ fontSize: '13px', color: '#92400e', background: '#fffbeb', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid #fde68a' }}>
                         ⚠️ Estas {conErrores.length} fila{conErrores.length !== 1 ? 's' : ''} contienen errores y no serán importadas. Descárgalas para revisarlas y corregirlas.
                       </p>
-                      <div style={{ overflowX: 'auto', border: '1px solid #E1DDD0', borderRadius: '8px' }}>
+                      <div style={{ overflowX: 'auto', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                           <thead>
                             <tr style={{ background: '#FAF7EF' }}>
                               {['Fila', 'Nombre', 'Código', 'Error'].map(h => (
-                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#3E5A4C', borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}>{h}</th>
+                                <th scope="col" key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#3E5A4C', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {conErrores.map(row => (
-                              <tr key={row.index} style={{ background: '#fff1f2', borderBottom: '1px solid #E1DDD0' }}>
+                              <tr key={row.index} style={{ background: '#fff1f2', borderBottom: '1px solid var(--at-line)' }}>
                                 <td style={{ padding: '9px 14px', color: '#7E9389' }}>{row.index}</td>
                                 <td style={{ padding: '9px 14px', fontWeight: 600, color: '#15291F' }}>{row.rawData['nombre'] || '—'}</td>
                                 <td style={{ padding: '9px 14px', color: '#3E5A4C' }}>{row.rawData['codigo'] || '—'}</td>

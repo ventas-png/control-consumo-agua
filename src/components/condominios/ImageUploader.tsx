@@ -97,7 +97,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
       {value ? (
         <div style={{ position: 'relative', width: '100%', paddingBottom: '75%' }}>
           <SecureImage src={value} alt="preview"
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10, border: '2px solid #E1DDD0', display: 'block' }}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10, border: '2px solid var(--at-line)', display: 'block' }}
             onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           <button
             onClick={handleRemove}
@@ -199,7 +199,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
         {values.map(url => (
           <div key={url} style={{ position: 'relative', paddingBottom: '75%' }}>
             <SecureImage src={url} alt=""
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: '1.5px solid #E1DDD0', display: 'block' }}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: '1.5px solid var(--at-line)', display: 'block' }}
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <button
               onClick={() => handleRemove(url)}

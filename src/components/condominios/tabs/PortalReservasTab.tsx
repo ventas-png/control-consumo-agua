@@ -12,7 +12,7 @@ import { bloqueoSolapaReserva, validarReglasAmenidad, tarifaAplicable, esFinDeSe
 function AmenidadHeroButton({ signedFotoUrl, onClick, children }: { signedFotoUrl: string | null; onClick: () => void; children: ReactNode }) {
   const fondo = signedFotoUrl
     ? `linear-gradient(180deg, rgba(15,23,42,0.05) 0%, rgba(15,23,42,0.85) 100%), center/cover no-repeat url(${signedFotoUrl})`
-    : 'linear-gradient(135deg,#1B3B36 0%,#577B69 100%)'
+    : 'linear-gradient(135deg,var(--at-primary) 0%,var(--at-accent-2) 100%)'
   return (
     <button
       onClick={onClick}
@@ -199,7 +199,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
     <div>
       {/* Header del portal */}
       <div style={{
-        background: 'linear-gradient(135deg,#102622 0%,#577B69 100%)',
+        background: 'linear-gradient(135deg,var(--at-primary-hover) 0%,var(--at-accent-2) 100%)',
         borderRadius: 16, padding: '18px 22px', marginBottom: 18,
         color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         flexWrap: 'wrap', gap: 12,
@@ -262,8 +262,8 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
           </AmenidadHeroButton>
         ))}
         {amenidadesActivas.length === 0 && (
-          <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,#FAF7EF)', border: '1.5px dashed #C7C2B0', textAlign: 'center' }}>
-            <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#D9E2DC,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>🏖</div>
+          <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,var(--at-surface-2))', border: '1.5px dashed var(--at-line-strong)', textAlign: 'center' }}>
+            <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,var(--at-primary-soft),#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>🏖</div>
             <p style={{ fontWeight: 700, color: '#15291F', margin: '0 0 4px' }}>No hay amenidades disponibles</p>
             <p style={{ fontSize: 12.5, color: '#7E9389', margin: 0 }}>Cuando la administración active las áreas comunes, aparecerán aquí.</p>
           </div>
@@ -272,13 +272,13 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
 
       {/* Formulario */}
       {showForm && (
-        <div style={{ background: 'white', border: '1.5px solid #C2D2CA', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
           <h4 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700 }}>Solicitar reserva</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Amenidad *</label>
               <select value={form.amenidad_id} onChange={e => setForm(f => ({ ...f, amenidad_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="">Seleccionar...</option>
                 {amenidadesActivas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
               </select>
@@ -305,7 +305,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
               if (tarifa <= 0) return null
               const finde = form.fecha && esFinDeSemana(form.fecha) && amenidadSel.tarifa_uso_finde != null
               return (
-              <div style={{ gridColumn: '1 / -1', background: '#EEF2EC', border: '1.5px solid #C2D2CA', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ gridColumn: '1 / -1', background: '#EEF2EC', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: 10, padding: '12px 14px' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#102622', marginBottom: 8 }}>
                   🎟 Tarifa por uso: {moneda} {tarifa.toFixed(2)} {finde && <span style={{ fontSize: 11, fontWeight: 600 }}>(fin de semana)</span>}
                 </div>
@@ -331,9 +331,9 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
               </div>
             )}
             {amenidadSel?.reglamento && (
-              <div style={{ gridColumn: '1 / -1', background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ gridColumn: '1 / -1', background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: 10, padding: '12px 14px' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#15291F', marginBottom: 6 }}>📜 Reglamento</div>
-                <div style={{ fontSize: 12, color: '#3E5A4C', whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto', padding: '6px 8px', background: 'white', border: '1px solid #E1DDD0', borderRadius: 8, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 12, color: '#3E5A4C', whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto', padding: '6px 8px', background: 'white', border: '1px solid var(--at-line)', borderRadius: 8, lineHeight: 1.5 }}>
                   {amenidadSel.reglamento}
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12.5, color: '#3E5A4C', cursor: 'pointer', fontWeight: 600 }}>
@@ -345,31 +345,31 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha *</label>
               <input type="date" value={form.fecha} min={hoy} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>No. invitados</label>
               <input type="number" min={0} value={form.num_invitados} onChange={e => setForm(f => ({ ...f, num_invitados: parseInt(e.target.value) || 0 }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora inicio *</label>
               <input type="time" value={form.hora_inicio} onChange={e => setForm(f => ({ ...f, hora_inicio: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora fin *</label>
               <input type="time" value={form.hora_fin} onChange={e => setForm(f => ({ ...f, hora_fin: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas</label>
               <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones adicionales..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
-            <button onClick={hacerReserva} disabled={saving} style={{ padding: '10px 22px', background: 'linear-gradient(135deg,#1B3B36,#102622)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={hacerReserva} disabled={saving} style={{ padding: '10px 22px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Reservando...' : '📅 Confirmar reserva'}
             </button>
             <button onClick={() => { setShowForm(false); setForm(blankForm()) }} style={{ padding: '10px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -388,8 +388,8 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
       </div>
 
       {(vistaFutura ? futuras : pasadas).length === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,#FAF7EF)', border: '1.5px dashed #C7C2B0', textAlign: 'center' }}>
-          <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#D9E2DC,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px', borderRadius: 14, background: 'linear-gradient(180deg,#ffffff,var(--at-surface-2))', border: '1.5px dashed var(--at-line-strong)', textAlign: 'center' }}>
+          <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,var(--at-primary-soft),#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 10 }}>
             {vistaFutura ? '📅' : '📜'}
           </div>
           <p style={{ fontWeight: 700, color: '#15291F', margin: '0 0 4px' }}>Sin reservas {vistaFutura ? 'próximas' : 'anteriores'}</p>
@@ -404,11 +404,11 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
             const amenidad = amenidades.find(a => a.id === r.amenidad_id)
             const accent = r.estado === 'confirmada' ? '#16a34a' : r.estado === 'pendiente' ? '#c2410c' : '#7E9389'
             return (
-              <div key={r.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: 14, padding: '14px 16px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease' }}
+              <div key={r.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: 14, padding: '14px 16px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease' }}
                 onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 16px -8px rgba(15,23,42,0.18)' }}
                 onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none' }}>
                 <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: accent }} />
-                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,#D9E2DC,#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📅</div>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,var(--at-primary-soft),#ccfbf1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📅</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 800, fontSize: 14, color: '#15291F' }}>{amenidad?.nombre ?? 'Amenidad'}</div>
                   <div style={{ fontSize: 12.5, color: '#7E9389', marginTop: 2, textTransform: 'capitalize' }}>

@@ -94,7 +94,7 @@ export default function EstacionamientoVisitaTab({
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 4, display: 'block' }
 
   return (
@@ -116,7 +116,7 @@ export default function EstacionamientoVisitaTab({
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nueva entrada</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -167,7 +167,7 @@ export default function EstacionamientoVisitaTab({
           { label: 'Salidas hoy', value: historial.length, color: '#B96A3F' },
           { label: 'Total del día', value: registrosFiltrados.length, color: '#f59e0b' },
         ].map(k => (
-          <div key={k.label} style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
             <div style={{ fontSize: 24, fontWeight: 700, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: 12, color: '#7E9389' }}>{k.label}</div>
           </div>
@@ -217,7 +217,7 @@ export default function EstacionamientoVisitaTab({
             <thead>
               <tr style={{ background: '#FAF7EF' }}>
                 {['Espacio', 'Placa', 'Vehículo', 'Unidad', 'Visitante', 'Entrada', 'Salida', 'Duración'].map(h => (
-                  <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: '#7E9389', fontWeight: 600, borderBottom: '1px solid #E1DDD0' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: '#7E9389', fontWeight: 600, borderBottom: '1px solid var(--at-line)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -225,7 +225,7 @@ export default function EstacionamientoVisitaTab({
               {historial.map(r => {
                 const unidad = unidades.find(u => u.id === r.unidad_visitada)
                 return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #EAE6D8' }}>
+                  <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '8px 10px' }}>{r.espacio}</td>
                     <td style={{ padding: '8px 10px', fontWeight: 600 }}>{r.placa}</td>
                     <td style={{ padding: '8px 10px' }}>{TIPOS_VEHICULO.find(t => t.value === r.tipo_vehiculo)?.label || r.tipo_vehiculo}</td>

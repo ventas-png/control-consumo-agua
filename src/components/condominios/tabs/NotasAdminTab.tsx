@@ -121,7 +121,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
     setMostrarForm(true)
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   function NotaCard({ n, highlight = false }: { n: NotaAdmin; highlight?: boolean }) {
@@ -157,8 +157,8 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 320, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
+      <div style={{ width: 320, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Notas ({notas.filter(n => !n.resuelta).length} activas)</span>
             {canCreate && (
@@ -264,7 +264,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
                 {canEdit && !selected.resuelta && (
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button onClick={() => iniciarEdicion(selected)}
-                      style={{ padding: '6px 12px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid #E1DDD0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 12px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ✏️ Editar
                     </button>
                     <button onClick={() => toggleFijada(selected)}

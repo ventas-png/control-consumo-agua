@@ -113,7 +113,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
         <div style={{ display: 'flex', gap: 6 }}>
           {(['', 'pendiente', 'aprobado', 'rechazado'] as (EstadoFlujoAprobacion | '')[]).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
-              style={{ padding: '4px 12px', border: '1px solid #E1DDD0', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: filtroEstado === e ? 700 : 400,
+              style={{ padding: '4px 12px', border: '1px solid var(--at-line)', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: filtroEstado === e ? 700 : 400,
                 background: filtroEstado === e ? '#15291F' : '#fff', color: filtroEstado === e ? '#fff' : '#3E5A4C' }}>
               {e === '' ? 'Todas' : ESTADO_CFG[e].label}
             </button>
@@ -129,13 +129,13 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
 
       {/* Formulario nueva solicitud */}
       {showForm && (
-        <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: '#102622' }}>Nueva solicitud de aprobación</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Tipo</label>
               <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoFlujoAprobacion }))}
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13 }}>
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13 }}>
                 {(Object.keys(TIPO_CFG) as TipoFlujoAprobacion[]).map(t => <option key={t} value={t}>{TIPO_CFG[t].icon} {TIPO_CFG[t].label}</option>)}
               </select>
             </div>
@@ -143,20 +143,20 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Monto ({moneda})</label>
               <input type="number" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))}
                 placeholder="Opcional"
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
           </div>
           <div style={{ marginBottom: 10 }}>
             <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Título *</label>
             <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))}
               placeholder="Descripción breve de la solicitud"
-              style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
           </div>
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Descripción adicional</label>
             <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
               rows={3} placeholder="Detalles, justificación, adjuntos…"
-              style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+              style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--at-primary-soft-2)', borderRadius: 7, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
           </div>
           <button onClick={crear} disabled={saving}
             style={{ padding: '8px 18px', background: '#102622', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>

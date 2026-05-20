@@ -590,10 +590,10 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
     const { value: form } = await Swal.fire({
       title: 'Retener depósito',
       html:
-        `<p style="font-size:13px;color:#7E9389;margin:0 0 10px;text-align:left">Indica el monto que se retiene${tope != null ? ` (máximo ${moneda} ${tope.toFixed(2)})` : ''} y el motivo. Opcionalmente puedes generar un cargo a la unidad si la retención no cubre el daño.</p>` +
+        `<p style="font-size:13px;color:var(--at-ink-3);margin:0 0 10px;text-align:left">Indica el monto que se retiene${tope != null ? ` (máximo ${moneda} ${tope.toFixed(2)})` : ''} y el motivo. Opcionalmente puedes generar un cargo a la unidad si la retención no cubre el daño.</p>` +
         `<input id="swal-monto" type="number" min="0" step="0.01" max="${tope ?? ''}" class="swal2-input" placeholder="Monto retenido (${moneda})">` +
         `<textarea id="swal-motivo" class="swal2-textarea" placeholder="Motivo de la retención"></textarea>` +
-        `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#3E5A4C;margin-top:6px;text-align:left"><input type="checkbox" id="swal-cargo"> Generar cargo a la unidad por el monto retenido</label>`,
+        `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--at-ink-2);margin-top:6px;text-align:left"><input type="checkbox" id="swal-cargo"> Generar cargo a la unidad por el monto retenido</label>`,
       showCancelButton: true,
       confirmButtonText: 'Retener',
       cancelButtonText: 'Cancelar',
@@ -739,7 +739,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       <style>{SHIMMER_KEYFRAMES}</style>
       {/* Hero header con gradiente */}
       <div style={{
-        background: 'linear-gradient(135deg,#1B3B36 0%,#577B69 100%)',
+        background: 'linear-gradient(135deg,var(--at-primary) 0%,var(--at-accent-2) 100%)',
         borderRadius: 20,
         padding: '24px 28px',
         marginBottom: 16,
@@ -786,7 +786,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginBottom: 20 }}>
             {kpis.map(k => (
               <div key={k.label}
-                style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 4, position: 'relative', overflow: 'hidden', transition: 'transform 0.15s ease, box-shadow 0.15s ease', cursor: 'default' }}
+                style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 4, position: 'relative', overflow: 'hidden', transition: 'transform 0.15s ease, box-shadow 0.15s ease', cursor: 'default' }}
                 onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px -10px rgba(15,23,42,0.18)' }}
                 onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}>
                 <div style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', background: k.accent }} />
@@ -804,7 +804,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       {/* Vista toggle */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {(['amenidades', 'reservas', 'calendario', 'bloqueos', 'recordatorios'] as const).map(v => (
-          <button key={v} onClick={() => setVista(v)} style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px', background: vista === v ? 'linear-gradient(135deg,#1B3B36,#577B69)' : '#EAE6D8', color: vista === v ? 'white' : '#3E5A4C' }}>
+          <button key={v} onClick={() => setVista(v)} style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px', background: vista === v ? 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))' : '#EAE6D8', color: vista === v ? 'white' : '#3E5A4C' }}>
             {v === 'amenidades' ? '🏊 Amenidades' : v === 'reservas' ? '📋 Lista' : v === 'calendario' ? '📆 Calendario' : v === 'bloqueos' ? '🚫 Bloqueos' : '📨 Recordatorios'}
           </button>
         ))}
@@ -814,33 +814,33 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       {vista === 'amenidades' && (
         <>
           {showAmenidadForm && (
-            <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+            <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Nueva amenidad</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Nombre *</label>
                   <input value={amenidadForm.nombre} onChange={e => setAmenidadForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Ej. Piscina, Gimnasio, Salón Social"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Capacidad máxima</label>
                   <input type="number" value={amenidadForm.capacidad_max} onChange={e => setAmenidadForm(f => ({ ...f, capacidad_max: e.target.value }))} placeholder="Personas"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Descripción</label>
                   <input value={amenidadForm.descripcion} onChange={e => setAmenidadForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Opcional"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Horario inicio</label>
                   <input type="time" value={amenidadForm.horario_inicio} onChange={e => setAmenidadForm(f => ({ ...f, horario_inicio: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Horario fin</label>
                   <input type="time" value={amenidadForm.horario_fin} onChange={e => setAmenidadForm(f => ({ ...f, horario_fin: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input type="checkbox" id="deposito" checked={amenidadForm.requiere_deposito} onChange={e => setAmenidadForm(f => ({ ...f, requiere_deposito: e.target.checked }))} />
@@ -850,7 +850,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Monto depósito ({moneda})</label>
                     <input type="number" value={amenidadForm.monto_deposito} onChange={e => setAmenidadForm(f => ({ ...f, monto_deposito: e.target.value }))} min="0" step="0.01"
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                   </div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -862,12 +862,12 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                     <div>
                       <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tarifa entre semana ({moneda})</label>
                       <input type="number" value={amenidadForm.tarifa_uso} onChange={e => setAmenidadForm(f => ({ ...f, tarifa_uso: e.target.value }))} min="0" step="0.01"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tarifa fin de semana ({moneda})</label>
                       <input type="number" value={amenidadForm.tarifa_uso_finde} onChange={e => setAmenidadForm(f => ({ ...f, tarifa_uso_finde: e.target.value }))} min="0" step="0.01" placeholder="Igual que entre semana"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                     </div>
                   </>
                 )}
@@ -879,35 +879,35 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Reglamento (opcional)</label>
                   <textarea value={amenidadForm.reglamento} onChange={e => setAmenidadForm(f => ({ ...f, reglamento: e.target.value }))}
                     placeholder="Texto del reglamento que el residente debe aceptar al reservar (horarios, limpieza, daños, invitados, etc.)"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF', minHeight: 70, resize: 'vertical' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF', minHeight: 70, resize: 'vertical' }} />
                 </div>
-                <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #E1DDD0', paddingTop: 12, marginTop: 4 }}>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed var(--at-line)', paddingTop: 12, marginTop: 4 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#3E5A4C', marginBottom: 8 }}>Reglas de reserva (opcional)</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
                     <div>
                       <label style={{ fontSize: 11.5, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Máx. reservas/mes por unidad</label>
                       <input type="number" min={1} value={amenidadForm.max_reservas_mes_unidad} onChange={e => setAmenidadForm(f => ({ ...f, max_reservas_mes_unidad: e.target.value }))} placeholder="sin límite"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: 11.5, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Antelación mínima (horas)</label>
                       <input type="number" min={0} value={amenidadForm.horas_minimas_antelacion} onChange={e => setAmenidadForm(f => ({ ...f, horas_minimas_antelacion: e.target.value }))} placeholder="sin restricción"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: 11.5, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Duración máx. (horas)</label>
                       <input type="number" min={0.5} step={0.5} value={amenidadForm.duracion_max_horas} onChange={e => setAmenidadForm(f => ({ ...f, duracion_max_horas: e.target.value }))} placeholder="sin tope"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: 11.5, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Preparación previa (min)</label>
                       <input type="number" min={0} step={5} value={amenidadForm.minutos_preparacion_previa} onChange={e => setAmenidadForm(f => ({ ...f, minutos_preparacion_previa: e.target.value }))} placeholder="0"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: 11.5, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Preparación posterior (min)</label>
                       <input type="number" min={0} step={5} value={amenidadForm.minutos_preparacion_posterior} onChange={e => setAmenidadForm(f => ({ ...f, minutos_preparacion_posterior: e.target.value }))} placeholder="0"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                     </div>
                   </div>
                 </div>
@@ -916,7 +916,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={guardarAmenidad} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={guardarAmenidad} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
                   {saving ? 'Guardando...' : 'Guardar'}
                 </button>
                 <button onClick={() => setShowAmenidadForm(false)} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -925,33 +925,33 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           )}
           {/* Formulario edición de amenidad */}
           {editingAmenidad && (
-            <div style={{ background: 'white', border: '2px solid #1B3B36', borderRadius: 16, padding: 20, marginBottom: 20 }}>
+            <div style={{ background: 'white', border: '2px solid var(--at-primary)', borderRadius: 16, padding: 20, marginBottom: 20 }}>
               <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700 }}>Editar amenidad: <span style={{ color: '#1B3B36' }}>{editingAmenidad.nombre}</span></h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Nombre *</label>
                   <input value={editAmenidadForm.nombre} onChange={e => setEditAmenidadForm(f => ({ ...f, nombre: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Capacidad máxima</label>
                   <input type="number" value={editAmenidadForm.capacidad_max} onChange={e => setEditAmenidadForm(f => ({ ...f, capacidad_max: e.target.value }))} placeholder="Personas"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Descripción</label>
                   <input value={editAmenidadForm.descripcion} onChange={e => setEditAmenidadForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Opcional"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Horario inicio</label>
                   <input type="time" value={editAmenidadForm.horario_inicio} onChange={e => setEditAmenidadForm(f => ({ ...f, horario_inicio: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Horario fin</label>
                   <input type="time" value={editAmenidadForm.horario_fin} onChange={e => setEditAmenidadForm(f => ({ ...f, horario_fin: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" id="edit-deposito" checked={editAmenidadForm.requiere_deposito} onChange={e => setEditAmenidadForm(f => ({ ...f, requiere_deposito: e.target.checked }))} />
@@ -961,7 +961,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                   <div>
                     <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Monto depósito ({moneda})</label>
                     <input type="number" value={editAmenidadForm.monto_deposito} onChange={e => setEditAmenidadForm(f => ({ ...f, monto_deposito: e.target.value }))} min="0" step="0.01"
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                   </div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -973,12 +973,12 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Tarifa entre semana ({moneda})</label>
                       <input type="number" value={editAmenidadForm.tarifa_uso} onChange={e => setEditAmenidadForm(f => ({ ...f, tarifa_uso: e.target.value }))} min="0" step="0.01"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Tarifa fin de semana ({moneda})</label>
                       <input type="number" value={editAmenidadForm.tarifa_uso_finde} onChange={e => setEditAmenidadForm(f => ({ ...f, tarifa_uso_finde: e.target.value }))} min="0" step="0.01" placeholder="Igual que entre semana"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                     </div>
                   </>
                 )}
@@ -990,35 +990,35 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Reglamento (opcional)</label>
                   <textarea value={editAmenidadForm.reglamento} onChange={e => setEditAmenidadForm(f => ({ ...f, reglamento: e.target.value }))}
                     placeholder="Texto del reglamento"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 13.5, background: '#FAF7EF', minHeight: 60, resize: 'vertical' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 13.5, background: '#FAF7EF', minHeight: 60, resize: 'vertical' }} />
                 </div>
-                <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #E1DDD0', paddingTop: 12, marginTop: 4 }}>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed var(--at-line)', paddingTop: 12, marginTop: 4 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#3E5A4C', marginBottom: 8 }}>Reglas de reserva (opcional)</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
                     <div>
                       <label style={{ fontSize: 11.5, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Máx. reservas/mes por unidad</label>
                       <input type="number" min={1} value={editAmenidadForm.max_reservas_mes_unidad} onChange={e => setEditAmenidadForm(f => ({ ...f, max_reservas_mes_unidad: e.target.value }))} placeholder="sin límite"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: 11.5, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Antelación mínima (horas)</label>
                       <input type="number" min={0} value={editAmenidadForm.horas_minimas_antelacion} onChange={e => setEditAmenidadForm(f => ({ ...f, horas_minimas_antelacion: e.target.value }))} placeholder="sin restricción"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: 11.5, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Duración máx. (horas)</label>
                       <input type="number" min={0.5} step={0.5} value={editAmenidadForm.duracion_max_horas} onChange={e => setEditAmenidadForm(f => ({ ...f, duracion_max_horas: e.target.value }))} placeholder="sin tope"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: 11.5, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Preparación previa (min)</label>
                       <input type="number" min={0} step={5} value={editAmenidadForm.minutos_preparacion_previa} onChange={e => setEditAmenidadForm(f => ({ ...f, minutos_preparacion_previa: e.target.value }))} placeholder="0"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: 11.5, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 4 }}>Preparación posterior (min)</label>
                       <input type="number" min={0} step={5} value={editAmenidadForm.minutos_preparacion_posterior} onChange={e => setEditAmenidadForm(f => ({ ...f, minutos_preparacion_posterior: e.target.value }))} placeholder="0"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 14, background: '#FAF7EF' }} />
                     </div>
                   </div>
                 </div>
@@ -1027,7 +1027,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                <button onClick={guardarEdicion} disabled={savingEdit} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={guardarEdicion} disabled={savingEdit} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>
                   {savingEdit ? 'Guardando...' : 'Guardar cambios'}
                 </button>
                 <button onClick={() => setEditingAmenidad(null)} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer' }}>Cancelar</button>
@@ -1041,7 +1041,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               title="Aún no hay amenidades registradas"
               hint="Crea piscinas, salones, gimnasios u otras áreas comunes. Cada amenidad puede tener foto, horario, capacidad, depósito, tarifa y reglas de reserva."
               action={canCreate ? (
-                <button onClick={() => setShowAmenidadForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
+                <button onClick={() => setShowAmenidadForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
                   + Crear primera amenidad
                 </button>
               ) : null}
@@ -1111,7 +1111,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                       {a.reglamento && <span style={pillStyle('#FAF1EA', '#EFE0D5', '#7E461F')}>📜 Reglamento</span>}
                     </div>
                     {/* Stats footer */}
-                    <div style={{ marginTop: 'auto', paddingTop: 10, borderTop: '1px dashed #E1DDD0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ marginTop: 'auto', paddingTop: 10, borderTop: '1px dashed var(--at-line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <div style={{ fontSize: 11, color: '#7E9389', fontWeight: 600 }}>
                           <strong style={{ color: paleta.color, fontSize: 14 }}>{reservasA.length}</strong> reservas confirmadas
@@ -1149,13 +1149,13 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       {vista === 'reservas' && (
         <>
           {showReservaForm && (
-            <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+            <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Nueva reserva</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Amenidad *</label>
                   <select value={reservaForm.amenidad_id} onChange={e => setReservaForm(f => ({ ...f, amenidad_id: e.target.value }))}
-                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                     <option value="">Seleccionar...</option>
                     {amenidadesActivas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
                   </select>
@@ -1163,7 +1163,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Unidad *</label>
                   <select value={reservaForm.unidad_id} onChange={e => setReservaForm(f => ({ ...f, unidad_id: e.target.value }))}
-                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                     <option value="">Seleccionar...</option>
                     {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
                   </select>
@@ -1171,22 +1171,22 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha *</label>
                   <input type="date" value={reservaForm.fecha} onChange={e => setReservaForm(f => ({ ...f, fecha: e.target.value }))} min={hoy}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>N° invitados</label>
                   <input type="number" value={reservaForm.num_invitados} onChange={e => setReservaForm(f => ({ ...f, num_invitados: e.target.value }))} min="0"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora inicio *</label>
                   <input type="time" value={reservaForm.hora_inicio} onChange={e => setReservaForm(f => ({ ...f, hora_inicio: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora fin *</label>
                   <input type="time" value={reservaForm.hora_fin} onChange={e => setReservaForm(f => ({ ...f, hora_fin: e.target.value }))}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 {(() => {
                   const am = amenidades.find(a => a.id === reservaForm.amenidad_id)
@@ -1223,7 +1223,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 })()}
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={guardarReserva} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={guardarReserva} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
                   {saving ? 'Guardando...' : 'Confirmar reserva'}
                 </button>
                 <button onClick={() => setShowReservaForm(false)} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -1245,7 +1245,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               title="Aún no hay reservas"
               hint="Las reservas que se hagan desde esta vista o desde el portal del residente aparecerán aquí. Puedes crear una manualmente para una unidad."
               action={canCreate ? (
-                <button onClick={() => setShowReservaForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
+                <button onClick={() => setShowReservaForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
                   + Crear reserva manual
                 </button>
               ) : null}
@@ -1258,7 +1258,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 const accent = r.estado === 'confirmada' ? '#16a34a' : r.estado === 'pendiente' ? '#f59e0b' : '#7E9389'
                 return (
                 <div key={r.id}
-                  style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: 14, padding: '14px 18px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease, border-color 0.15s ease' }}
+                  style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: 14, padding: '14px 18px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease, border-color 0.15s ease' }}
                   onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 18px -8px rgba(15,23,42,0.18)'; e.currentTarget.style.borderColor = '#C7C2B0' }}
                   onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#E1DDD0' }}>
                   {/* barra acento lateral */}
@@ -1318,14 +1318,14 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
           {/* Navegación de semana */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <button onClick={() => setSemana(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })}
-              style={{ padding: '6px 14px', border: '1.5px solid #E1DDD0', borderRadius: 8, cursor: 'pointer', fontSize: 13, background: '#FAF7EF', fontWeight: 600 }}>← Ant.</button>
+              style={{ padding: '6px 14px', border: '1.5px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 13, background: '#FAF7EF', fontWeight: 600 }}>← Ant.</button>
             <div style={{ flex: 1, textAlign: 'center', fontWeight: 700, fontSize: 14, color: '#15291F' }}>
               Semana del {dias[0].toLocaleDateString('es', { day: 'numeric', month: 'long' })} al {dias[6].toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
             <button onClick={() => setSemana(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })}
-              style={{ padding: '6px 14px', border: '1.5px solid #E1DDD0', borderRadius: 8, cursor: 'pointer', fontSize: 13, background: '#FAF7EF', fontWeight: 600 }}>Sig. →</button>
+              style={{ padding: '6px 14px', border: '1.5px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 13, background: '#FAF7EF', fontWeight: 600 }}>Sig. →</button>
             <button onClick={() => setSemana(lunesDeSemana(new Date()))}
-              style={{ padding: '6px 12px', border: '1.5px solid #C2D2CA', borderRadius: 8, cursor: 'pointer', fontSize: 12, background: '#EEF2EC', color: '#1B3B36', fontWeight: 600 }}>Hoy</button>
+              style={{ padding: '6px 12px', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: 8, cursor: 'pointer', fontSize: 12, background: '#EEF2EC', color: '#1B3B36', fontWeight: 600 }}>Hoy</button>
           </div>
 
           {amenidadesActivas.length === 0 ? (
@@ -1343,7 +1343,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               return Math.max(0, Math.min(100, ((h - minH) * 60 + m) / minutosTotal * 100))
             }
             return (
-              <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: 14, padding: 16, overflowX: 'auto' }}>
+              <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: 14, padding: 16, overflowX: 'auto' }}>
                 {/* Header de días */}
                 <div style={{ display: 'grid', gridTemplateColumns: `140px repeat(7, minmax(120px,1fr))`, gap: 4, marginBottom: 8, minWidth: 980 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.06em', alignSelf: 'end', paddingBottom: 6 }}>Amenidad / Día</div>
@@ -1351,7 +1351,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                     const fechaStr = d.toISOString().slice(0, 10)
                     const esHoy = fechaStr === hoy
                     return (
-                      <div key={i} style={{ textAlign: 'center', padding: '8px 4px', borderRadius: 10, background: esHoy ? 'linear-gradient(135deg,#1B3B36,#577B69)' : '#FAF7EF', color: esHoy ? 'white' : '#3E5A4C' }}>
+                      <div key={i} style={{ textAlign: 'center', padding: '8px 4px', borderRadius: 10, background: esHoy ? 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))' : '#FAF7EF', color: esHoy ? 'white' : '#3E5A4C' }}>
                         <div style={{ fontSize: 10.5, fontWeight: 700, opacity: esHoy ? 0.9 : 1 }}>{DIAS_ES[i]}</div>
                         <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em' }}>{d.getDate()}</div>
                         <div style={{ fontSize: 9.5, opacity: 0.8, textTransform: 'capitalize' }}>{d.toLocaleDateString('es', { month: 'short' })}</div>
@@ -1366,7 +1366,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                   return (
                     <div key={a.id} style={{ display: 'grid', gridTemplateColumns: `140px repeat(7, minmax(120px,1fr))`, gap: 4, marginBottom: 6, minWidth: 980 }}>
                       {/* Etiqueta de amenidad */}
-                      <div style={{ background: 'linear-gradient(135deg,#FAF7EF,#EAE6D8)', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderLeft: `4px solid ${paleta.color}` }}>
+                      <div style={{ background: 'linear-gradient(135deg,var(--at-surface-2),var(--at-chip))', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderLeft: `4px solid ${paleta.color}` }}>
                         <div style={{ fontSize: 12, fontWeight: 800, color: '#15291F' }}>{a.nombre}</div>
                         {a.horario_inicio && <div style={{ fontSize: 10, color: '#7E9389', fontWeight: 600 }}>⏰ {a.horario_inicio}–{a.horario_fin}</div>}
                       </div>
@@ -1471,16 +1471,16 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 {/* Leyenda */}
                 <div style={{ display: 'flex', gap: 14, marginTop: 14, flexWrap: 'wrap', fontSize: 11, color: '#7E9389' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 14, height: 10, borderRadius: 4, background: '#D9E2DC', border: '1px solid #577B69' }} /> Confirmada
+                    <span style={{ width: 14, height: 10, borderRadius: 4, background: '#D9E2DC', border: '1px solid var(--at-accent-2)' }} /> Confirmada
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 14, height: 10, borderRadius: 4, background: 'white', border: '1.5px dashed #577B69' }} /> Pendiente
+                    <span style={{ width: 14, height: 10, borderRadius: 4, background: 'white', border: '1.5px dashed var(--at-accent-2)' }} /> Pendiente
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 14, height: 10, borderRadius: 4, background: 'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 3px,#fde68a 3px,#fde68a 6px)', border: '1px solid #fcd34d' }} /> Bloqueado
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 14, height: 10, borderRadius: 4, background: '#E6CDBB44', border: '1px dashed #CE8A63' }} /> Preparación
+                    <span style={{ width: 14, height: 10, borderRadius: 4, background: '#E6CDBB44', border: '1px dashed var(--at-accent-light)' }} /> Preparación
                   </span>
                 </div>
               </div>
@@ -1489,7 +1489,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
 
           {/* Detalle de reserva seleccionada */}
           {selectedReserva && (
-            <div style={{ marginTop: 16, background: 'white', border: '1.5px solid #C2D2CA', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ marginTop: 16, background: 'white', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: '#15291F' }}>{selectedReserva.amenidad_nombre}</div>
                 <div style={{ fontSize: 12, color: '#7E9389', marginTop: 2 }}>
@@ -1528,7 +1528,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Amenidad *</label>
                   <select value={bloqueoForm.amenidad_id} onChange={e => setBloqueoForm(f => ({ ...f, amenidad_id: e.target.value }))}
-                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                     <option value="">Seleccionar...</option>
                     {amenidades.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
                   </select>
@@ -1536,12 +1536,12 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Desde *</label>
                   <input type="date" value={bloqueoForm.fecha_inicio} onChange={e => setBloqueoForm(f => ({ ...f, fecha_inicio: e.target.value, fecha_fin: f.fecha_fin || e.target.value }))} min={hoy}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hasta *</label>
                   <input type="date" value={bloqueoForm.fecha_fin} onChange={e => setBloqueoForm(f => ({ ...f, fecha_fin: e.target.value }))} min={bloqueoForm.fecha_inicio || hoy}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
                 <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input type="checkbox" id="dia_completo" checked={bloqueoForm.dia_completo} onChange={e => setBloqueoForm(f => ({ ...f, dia_completo: e.target.checked }))} />
@@ -1552,26 +1552,26 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                     <div>
                       <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora inicio *</label>
                       <input type="time" value={bloqueoForm.hora_inicio} onChange={e => setBloqueoForm(f => ({ ...f, hora_inicio: e.target.value }))}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora fin *</label>
                       <input type="time" value={bloqueoForm.hora_fin} onChange={e => setBloqueoForm(f => ({ ...f, hora_fin: e.target.value }))}
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                     </div>
                   </>
                 )}
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Motivo *</label>
                   <select value={bloqueoForm.motivo} onChange={e => setBloqueoForm(f => ({ ...f, motivo: e.target.value as MotivoBloqueoAmenidad }))}
-                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                     {(Object.keys(MOTIVO_LABEL) as MotivoBloqueoAmenidad[]).map(m => <option key={m} value={m}>{MOTIVO_LABEL[m]}</option>)}
                   </select>
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas</label>
                   <input value={bloqueoForm.notas} onChange={e => setBloqueoForm(f => ({ ...f, notas: e.target.value }))} placeholder="Detalle del bloqueo (opcional)"
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
@@ -1663,7 +1663,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               {!r.checkin_at && canEdit && r.estado === 'confirmada' && (
                 <div style={{ marginTop: 10 }}>
                   <ImageUploader value={null} onChange={(url) => registrarCheckin(r, url)} folder="amenidades-checkin" label="Foto del estado inicial" />
-                  <button onClick={() => registrarCheckin(r, null)} style={{ marginTop: 6, padding: '6px 12px', background: 'transparent', color: '#1B3B36', border: '1px dashed #9CC6B6', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                  <button onClick={() => registrarCheckin(r, null)} style={{ marginTop: 6, padding: '6px 12px', background: 'transparent', color: '#1B3B36', border: '1px dashed var(--at-primary-mint)', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
                     Registrar sin foto
                   </button>
                 </div>
@@ -1826,7 +1826,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
 
         return (
           <>
-            <div style={{ background: '#EEF2EC', border: '1.5px solid #C2D2CA', borderRadius: 12, padding: '14px 18px', marginBottom: 16, fontSize: 13, color: '#0E2A24' }}>
+            <div style={{ background: '#EEF2EC', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: 12, padding: '14px 18px', marginBottom: 16, fontSize: 13, color: '#0E2A24' }}>
               📨 Reservas para hoy y los próximos 2 días: <strong>{proximas.length}</strong> · Sin recordatorio enviado: <strong>{pendientes.length}</strong>
               <div style={{ fontSize: 11.5, color: '#7E9389', marginTop: 4 }}>Al hacer clic en <strong>Enviar WhatsApp</strong> se abrirá la app/web de WhatsApp con el mensaje listo. La reserva queda marcada como recordada.</div>
             </div>
@@ -1886,12 +1886,12 @@ function EmptyState({ icon, title, hint, action }: { icon: string; title: string
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       padding: '56px 24px', textAlign: 'center',
-      background: 'linear-gradient(180deg, #ffffff 0%, #FAF7EF 100%)',
-      border: '1.5px dashed #C7C2B0', borderRadius: 16,
+      background: 'linear-gradient(180deg, #ffffff 0%, var(--at-surface-2) 100%)',
+      border: '1.5px dashed var(--at-line-strong)', borderRadius: 16,
     }}>
       <div style={{
         width: 72, height: 72, borderRadius: '50%',
-        background: 'linear-gradient(135deg,#D9E2DC,#ccfbf1)',
+        background: 'linear-gradient(135deg,var(--at-primary-soft),#ccfbf1)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 32, marginBottom: 14,
         boxShadow: '0 8px 20px -8px rgba(27, 59, 54,0.35)',
@@ -1912,7 +1912,7 @@ function CheckoutForm({ onSave }: { onSave: (foto: string | null, obs: string) =
     <>
       <ImageUploader value={foto} onChange={setFoto} folder="amenidades-checkout" label="Foto de cierre (opcional)" />
       <textarea value={obs} onChange={e => setObs(e.target.value)} placeholder="Observaciones del estado al salir (daños, basura, mobiliario, etc.)"
-        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: 8, fontSize: 13.5, background: '#FAF7EF', marginTop: 8, minHeight: 60, resize: 'vertical' }} />
+        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: 8, fontSize: 13.5, background: '#FAF7EF', marginTop: 8, minHeight: 60, resize: 'vertical' }} />
       <button onClick={() => onSave(foto, obs)} style={{ marginTop: 10, padding: '8px 16px', background: '#577B69', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
         Registrar check-out
       </button>

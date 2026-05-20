@@ -119,7 +119,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
   const vencidos = planesActivos.filter(p => getStatus(p) === 'vencido').length
   const proximos = planesActivos.filter(p => ['urgente', 'proximo'].includes(getStatus(p))).length
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -140,7 +140,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
           { label: 'Vencidos',       value: String(vencidos),            color: '#ef4444' },
           { label: 'Próximos 7d',    value: String(proximos),            color: '#f59e0b' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
           </div>
@@ -149,7 +149,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nuevo Plan de Mantenimiento</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -185,7 +185,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -229,7 +229,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
 
         {/* Detail */}
         {plan && (
-          <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px' }}>
+          <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
               <div>
                 <h3 style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: 700 }}>{plan.equipo}</h3>
@@ -257,7 +257,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
 
             {/* Execution form */}
             {showEjecForm && (
-              <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
+              <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px' }}>
                   <div>
                     <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha *</label>
@@ -290,7 +290,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
                     {savingEjec ? '…' : 'Guardar'}
                   </button>
                   <button onClick={() => setShowEjecForm(false)}
-                    style={{ padding: '6px 10px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#7E9389' }}>
+                    style={{ padding: '6px 10px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#7E9389' }}>
                     Cancelar
                   </button>
                   <span style={{ fontSize: '11px', color: '#7E9389' }}>
@@ -312,7 +312,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
                   const bg = e.estado === 'completado' ? '#dcfce7' : e.estado === 'parcial' ? '#fef3c7' : '#EAE6D8'
                   const color = e.estado === 'completado' ? '#16a34a' : e.estado === 'parcial' ? '#92400e' : '#7E9389'
                   return (
-                    <div key={e.id} style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '8px', padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div key={e.id} style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '8px', padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: '12px' }}>{e.fecha}</div>
                         {e.realizado_por && <div style={{ fontSize: '11px', color: '#7E9389' }}>{e.realizado_por}</div>}

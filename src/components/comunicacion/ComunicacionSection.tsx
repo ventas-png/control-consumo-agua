@@ -353,7 +353,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* ── Main tabs: Conversaciones / Difusión ── */}
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid #E1DDD0', paddingBottom: '0' }}>
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid var(--at-line)', paddingBottom: '0' }}>
         {(['conversaciones', ...(showDifusion ? ['difusion'] : [])] as ('conversaciones' | 'difusion')[]).map(tab => {
           const active = mainTab === tab
           return (
@@ -364,7 +364,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                 padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer',
                 fontSize: '14px', fontWeight: active ? 700 : 500,
                 color: active ? '#1B3B36' : '#7E9389',
-                borderBottom: active ? '2px solid #1B3B36' : '2px solid transparent',
+                borderBottom: active ? '2px solid var(--at-primary)' : '2px solid transparent',
                 marginBottom: '-2px', transition: 'all 0.13s ease',
                 display: 'flex', alignItems: 'center', gap: '8px',
               }}
@@ -433,7 +433,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
               onClick={() => setView(view === 'config' ? 'list' : 'config')}
               style={{
                 padding: '8px 14px',
-                border: '1px solid #C7C2B0',
+                border: '1px solid var(--at-line-strong)',
                 borderRadius: '8px',
                 background: view === 'config' ? '#EEF2EC' : 'white',
                 color: '#3E5A4C',
@@ -460,7 +460,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
         ].map(s => (
           <div key={s.label} style={{
             background: 'white',
-            border: '1px solid #E1DDD0',
+            border: '1px solid var(--at-line)',
             borderRadius: '10px',
             padding: '12px 14px',
             borderTop: `3px solid ${s.color}`,
@@ -473,7 +473,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
 
       {/* ── Vista Configuración ── */}
       {view === 'config' && isAdmin && (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '12px', padding: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 700, color: '#15291F' }}>
             Reglas de Acceso por Rol
           </h3>
@@ -499,14 +499,14 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
           {/* Lista */}
           <div style={{
             background: 'white',
-            border: '1px solid #E1DDD0',
+            border: '1px solid var(--at-line)',
             borderRadius: '12px',
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
           }}>
             {/* Tabs: Clientes / Equipo */}
-            <div style={{ display: 'flex', borderBottom: '1px solid #EAE6D8' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--at-chip)' }}>
               {([['clientes', `👥 ${clientesTabLabel}`, clientConvs.length], ['equipo', '🏢 Equipo', teamConvs.length]] as const).map(([tab, label, count]) => (
                 <button key={tab} onClick={() => { setConvTab(tab); setView('list') }}
                   style={{
@@ -524,7 +524,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
             </div>
 
             {/* Filtros */}
-            <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #EAE6D8' }}>
+            <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-chip)' }}>
               <input
                 type="text"
                 placeholder="Buscar conversación..."
@@ -533,7 +533,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                 style={{
                   width: '100%',
                   padding: '7px 10px',
-                  border: '1px solid #E1DDD0',
+                  border: '1px solid var(--at-line)',
                   borderRadius: '8px',
                   fontSize: '12.5px',
                   outline: 'none',
@@ -545,7 +545,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                 <select
                   value={filterStatus}
                   onChange={e => setFilterStatus(e.target.value as ConversationStatus | 'todas')}
-                  style={{ flex: 1, padding: '5px 8px', border: '1px solid #E1DDD0', borderRadius: '6px', fontSize: '11.5px', outline: 'none' }}
+                  style={{ flex: 1, padding: '5px 8px', border: '1px solid var(--at-line)', borderRadius: '6px', fontSize: '11.5px', outline: 'none' }}
                 >
                   <option value="todas">Todos los estados</option>
                   {Object.entries(STATUS_LABELS).map(([k, v]) => (
@@ -555,7 +555,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                 <select
                   value={filterCategory}
                   onChange={e => setFilterCategory(e.target.value as ConversationCategory | 'todas')}
-                  style={{ flex: 1, padding: '5px 8px', border: '1px solid #E1DDD0', borderRadius: '6px', fontSize: '11.5px', outline: 'none' }}
+                  style={{ flex: 1, padding: '5px 8px', border: '1px solid var(--at-line)', borderRadius: '6px', fontSize: '11.5px', outline: 'none' }}
                 >
                   <option value="todas">Todas las categorías</option>
                   {(serviceType === 'condominios' ? CONDOMINIOS_CATEGORIES : AGUA_CATEGORIES).map(k => (
@@ -587,7 +587,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
           {view === 'detail' && activeConversation && (
             <div style={{
               background: 'white',
-              border: '1px solid #E1DDD0',
+              border: '1px solid var(--at-line)',
               borderRadius: '12px',
               display: 'flex',
               flexDirection: 'column',
@@ -597,7 +597,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
               {/* Header conversación */}
               <div style={{
                 padding: '14px 16px',
-                borderBottom: '1px solid #EAE6D8',
+                borderBottom: '1px solid var(--at-chip)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
@@ -647,7 +647,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                       onChange={e => handleChangeStatus(e.target.value as ConversationStatus)}
                       style={{
                         padding: '6px 10px',
-                        border: '1px solid #C7C2B0',
+                        border: '1px solid var(--at-line-strong)',
                         borderRadius: '8px',
                         fontSize: '12px',
                         cursor: 'pointer',
@@ -666,14 +666,14 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                         </span>
                         <button
                           onClick={handleUnassign}
-                          style={{ background: 'none', border: '1px solid #C7C2B0', borderRadius: '6px', fontSize: '11px', color: '#7E9389', cursor: 'pointer', padding: '2px 8px' }}
+                          style={{ background: 'none', border: '1px solid var(--at-line-strong)', borderRadius: '6px', fontSize: '11px', color: '#7E9389', cursor: 'pointer', padding: '2px 8px' }}
                         >
                           Desasignar
                         </button>
                         {activeConversation.assigned_to !== currentUser.user_id && (
                           <button
                             onClick={handleAssignToMe}
-                            style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '6px', fontSize: '11px', color: '#102622', cursor: 'pointer', padding: '2px 8px', fontWeight: 600 }}
+                            style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: '6px', fontSize: '11px', color: '#102622', cursor: 'pointer', padding: '2px 8px', fontWeight: 600 }}
                           >
                             Asignarme
                           </button>
@@ -682,7 +682,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                     ) : (
                       <button
                         onClick={handleAssignToMe}
-                        style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '6px', fontSize: '11.5px', color: '#102622', cursor: 'pointer', padding: '4px 10px', fontWeight: 600 }}
+                        style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: '6px', fontSize: '11.5px', color: '#102622', cursor: 'pointer', padding: '4px 10px', fontWeight: 600 }}
                       >
                         + Asignarme
                       </button>
@@ -785,7 +785,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
 
               {/* Compositor de mensaje */}
               {canCreate && activeConversation.status !== 'cerrada' && (
-                <div style={{ borderTop: '1px solid #EAE6D8', padding: '12px 14px' }}>
+                <div style={{ borderTop: '1px solid var(--at-chip)', padding: '12px 14px' }}>
                   {/* Toggle nota interna — solo para conversaciones con clientes */}
                   {!activeConversation.is_internal && (
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#7E9389', cursor: 'pointer', marginBottom: '8px', userSelect: 'none' }}>
@@ -799,7 +799,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: '8px',
                       padding: '7px 10px', marginBottom: '7px',
-                      background: '#EEF2EC', border: '1px solid #C2D2CA',
+                      background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)',
                       borderRadius: '8px',
                     }}>
                       {pendingFile.type.startsWith('image/') ? (
@@ -847,7 +847,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                       }}
                     />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label title="Adjuntar archivo" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', border: '1px solid #E1DDD0', borderRadius: '10px', background: 'white', fontSize: '18px' }}>
+                      <label title="Adjuntar archivo" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', border: '1px solid var(--at-line)', borderRadius: '10px', background: 'white', fontSize: '18px' }}>
                         📎
                         <input
                           type="file"
@@ -893,7 +893,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
 
               {activeConversation.status === 'cerrada' && (
                 <div style={{
-                  borderTop: '1px solid #EAE6D8', padding: '12px 14px',
+                  borderTop: '1px solid var(--at-chip)', padding: '12px 14px',
                   background: '#FAF7EF', textAlign: 'center',
                   fontSize: '12.5px', color: '#7E9389',
                 }}>

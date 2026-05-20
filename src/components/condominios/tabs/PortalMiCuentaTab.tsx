@@ -36,7 +36,7 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre }: Props) {
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#16a34a' }}>{moneda} {totalPagado.toFixed(2)}</div>
           <div style={{ fontSize: '11.5px', color: '#7E9389', marginTop: '3px' }}>{pagadas.length} pago{pagadas.length !== 1 ? 's' : ''}</div>
         </div>
-        <div style={{ background: '#EEF2EC', borderRadius: '14px', padding: '16px', border: '1.5px solid #C2D2CA' }}>
+        <div style={{ background: '#EEF2EC', borderRadius: '14px', padding: '16px', border: '1.5px solid var(--at-primary-soft-2)' }}>
           <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#7E9389', marginBottom: '4px' }}>CUOTAS PENDIENTES</div>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#1B3B36' }}>{pendientes.length}</div>
           <div style={{ fontSize: '11.5px', color: '#7E9389', marginTop: '3px' }}>de {cuotas.length} en total</div>
@@ -79,7 +79,7 @@ export function PortalMiCuentaTab({ cuotas, moneda, unidadNombre }: Props) {
           <h4 style={{ margin: '0 0 10px', fontSize: '14px', fontWeight: 700, color: '#3E5A4C' }}>Historial de pagos</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {pagadas.sort((a, b) => (b.fecha_pago ?? b.created_at) < (a.fecha_pago ?? a.created_at) ? -1 : 1).map(c => (
-              <div key={c.id} style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '10px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div key={c.id} style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '18px' }}>✅</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: '13.5px', color: '#3E5A4C' }}>{c.concepto.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} — {c.periodo}</div>

@@ -151,7 +151,7 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
           { label: 'Turnos evaluados',      value: String(totalBloques),            color: '#102622' },
           { label: 'Rondas realizadas',     value: String(rondasTotal),             color: '#9C5733' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px 16px' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 16px' }}>
             <div style={{ fontSize: '24px', fontWeight: 800, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: '12px', fontWeight: 600, color: '#7E9389', marginTop: '2px' }}>{k.label}</div>
           </div>

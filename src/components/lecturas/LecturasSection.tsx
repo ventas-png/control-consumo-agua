@@ -297,13 +297,13 @@ export function LecturasSection({
       if (pendientes.length > 0) {
         // Hay contadores pendientes en esta misma unidad — preguntar al operador
         const listaHtml = pendientes
-          .map(c => `<li style="text-align:left;margin:4px 0"><b>${c.numero_serie}</b>${c.descripcion ? ` — ${c.descripcion}` : ''} <span style="color:#7E9389;font-size:12px">(${c.tipo_agua})</span></li>`)
+          .map(c => `<li style="text-align:left;margin:4px 0"><b>${c.numero_serie}</b>${c.descripcion ? ` — ${c.descripcion}` : ''} <span style="color:var(--at-ink-3);font-size:12px">(${c.tipo_agua})</span></li>`)
           .join('')
 
         const pregunta = await Swal.fire({
           icon: 'question',
           title: 'Contadores pendientes',
-          html: `<div style="font-size:14px;margin-bottom:8px">Esta unidad tiene <b>${pendientes.length}</b> contador${pendientes.length > 1 ? 'es' : ''} sin leer:</div><ul style="list-style:none;padding:0">${listaHtml}</ul><div style="margin-top:10px;font-size:13px;color:#3E5A4C">¿Desea registrarlos antes de continuar?</div>`,
+          html: `<div style="font-size:14px;margin-bottom:8px">Esta unidad tiene <b>${pendientes.length}</b> contador${pendientes.length > 1 ? 'es' : ''} sin leer:</div><ul style="list-style:none;padding:0">${listaHtml}</ul><div style="margin-top:10px;font-size:13px;color:var(--at-ink-2)">¿Desea registrarlos antes de continuar?</div>`,
           showCancelButton: true,
           confirmButtonColor: '#1B3B36',
           cancelButtonColor: '#7E9389',
@@ -392,7 +392,7 @@ export function LecturasSection({
     setContadoresLeidos(new Set())
   }
 
-  const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid #E1DDD0', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid var(--at-line)', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '14px', fontWeight: 600, color: '#4a5568', marginBottom: '6px', display: 'block' }
 
   const consumoInvalido = consumo !== null && consumo < 0
@@ -440,7 +440,7 @@ export function LecturasSection({
       </div>
 
       <div style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
-        <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', borderBottom: '2px solid #E1DDD0', paddingBottom: '12px' }}>
+        <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', borderBottom: '2px solid var(--at-line)', paddingBottom: '12px' }}>
           Ingreso de Lectura
         </div>
 
@@ -468,7 +468,7 @@ export function LecturasSection({
         {unidadSeleccionada && (
           <>
             {/* Info de unidad y cliente */}
-            <div style={{ background: '#FAF7EF', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #E1DDD0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+            <div style={{ background: '#FAF7EF', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid var(--at-line)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
               <div><small style={{ color: '#7E9389' }}>Unidad</small><div style={{ fontWeight: 700 }}>{unidadSeleccionada.nombre}</div></div>
               {clienteDeUnidad && (
                 <>
@@ -513,7 +513,7 @@ export function LecturasSection({
             {contadorSeleccionado && (
               <>
                 {/* Info del contador y tarifa */}
-                <div style={{ background: '#FAF7EF', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #E1DDD0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', fontSize: '13px' }}>
+                <div style={{ background: '#FAF7EF', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid var(--at-line)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', fontSize: '13px' }}>
                   <div><small style={{ color: '#7E9389' }}>N° Serie</small><div style={{ fontWeight: 700, fontFamily: 'monospace' }}>{contadorSeleccionado.numero_serie}</div></div>
                   <div><small style={{ color: '#7E9389' }}>Tipo Agua</small><div style={{ fontWeight: 600 }}>{contadorSeleccionado.tipo_agua}</div></div>
                   <div><small style={{ color: '#7E9389' }}>Última Lectura</small><div style={{ fontWeight: 700 }}>{ultimaLectura}</div>{fechaLecturaAnterior && <div style={{ fontSize: '11px', color: '#7E9389' }}>{new Date(fechaLecturaAnterior).toLocaleDateString('es-GT')}</div>}</div>
@@ -640,7 +640,7 @@ export function LecturasSection({
 
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '12px' }}>
-                    <button onClick={handleGuardar} disabled={saving || tarifaExpirada || sinTarifa} style={{ padding: '12px 24px', background: (saving || tarifaExpirada || sinTarifa) ? '#7E9389' : 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: (saving || tarifaExpirada || sinTarifa) ? 'not-allowed' : 'pointer' }}>
+                    <button onClick={handleGuardar} disabled={saving || tarifaExpirada || sinTarifa} style={{ padding: '12px 24px', background: (saving || tarifaExpirada || sinTarifa) ? '#7E9389' : 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: (saving || tarifaExpirada || sinTarifa) ? 'not-allowed' : 'pointer' }}>
                       {saving ? 'Guardando...' : enModoRuta ? `💾 Guardar y Avanzar (${rutaIndex + 1}/${unidadesOrdenadas.length})` : '💾 Guardar Lectura'}
                     </button>
                     <button onClick={limpiarFormulario} style={{ padding: '12px 24px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>

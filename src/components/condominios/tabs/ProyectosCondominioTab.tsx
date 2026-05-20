@@ -89,7 +89,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
     const { value } = await Swal.fire({
       title: 'Actualizar avance',
       html: `<input id="pct" class="swal2-input" type="number" min="0" max="100" value="${p.porcentaje_avance}" style="font-size:14px">
-             <p style="font-size:11px;color:#7E9389">0–100%</p>`,
+             <p style="font-size:11px;color:var(--at-ink-3)">0–100%</p>`,
       showCancelButton: true, confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar',
       preConfirm: () => {
         const v = parseInt((document.getElementById('pct') as HTMLInputElement)?.value ?? '0')
@@ -109,7 +109,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
@@ -149,7 +149,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>{editId ? 'Editar proyecto' : 'Nuevo proyecto interno'}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -261,7 +261,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
             })}
           </div>
           {selected && (
-            <div style={{ width: 260, flexShrink: 0, background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
+            <div style={{ width: 260, flexShrink: 0, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, alignSelf: 'flex-start' }}>
               <div style={{ fontWeight: 700, marginBottom: 10, fontSize: 14 }}>{selected.nombre}</div>
               {selected.descripcion && <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 10, lineHeight: 1.4 }}>{selected.descripcion}</div>}
               {[
@@ -274,7 +274,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
                 ['Presupuesto', selected.presupuesto ? `${moneda} ${selected.presupuesto.toFixed(2)}` : '—'],
                 ['Costo real', selected.costo_real ? `${moneda} ${selected.costo_real.toFixed(2)}` : '—'],
               ].map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid #EAE6D8' }}>
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0', borderBottom: '1px solid var(--at-chip)' }}>
                   <span style={{ color: '#7E9389' }}>{k}</span>
                   <span style={{ fontWeight: 600, color: '#3E5A4C' }}>{v}</span>
                 </div>

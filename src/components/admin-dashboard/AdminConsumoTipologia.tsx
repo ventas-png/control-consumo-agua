@@ -150,7 +150,7 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
               <tr style={{ background: '#FAF7EF' }}>
-                <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C', borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}>
+                <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>
                   Proyecto
                 </th>
                 {allTipos.map(tipo => {
@@ -159,7 +159,7 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
                     <th
                       key={tipo}
                       colSpan={2}
-                      style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 700, color: meta?.from ?? '#7E9389', borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}
+                      style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 700, color: meta?.from ?? '#7E9389', borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}
                     >
                       {meta?.icon} {meta?.label ?? tipo}
                     </th>
@@ -167,10 +167,10 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
                 })}
               </tr>
               <tr style={{ background: '#FAF7EF' }}>
-                <th style={{ padding: '4px 14px', borderBottom: '2px solid #E1DDD0' }} />
+                <th style={{ padding: '4px 14px', borderBottom: '2px solid var(--at-line)' }} />
                 {allTipos.flatMap(tipo => [
-                  <th key={`${tipo}-m3`} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 600, color: '#7E9389', borderBottom: '2px solid #E1DDD0', fontSize: '10px' }}>m³</th>,
-                  <th key={`${tipo}-q`} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 600, color: '#7E9389', borderBottom: '2px solid #E1DDD0', fontSize: '10px' }}>{moneda}</th>,
+                  <th key={`${tipo}-m3`} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 600, color: '#7E9389', borderBottom: '2px solid var(--at-line)', fontSize: '10px' }}>m³</th>,
+                  <th key={`${tipo}-q`} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 600, color: '#7E9389', borderBottom: '2px solid var(--at-line)', fontSize: '10px' }}>{moneda}</th>,
                 ])}
               </tr>
             </thead>
@@ -182,16 +182,16 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
                     key={p.id}
                     style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF' }}
                   >
-                    <td style={{ padding: '9px 14px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid #EAE6D8', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '9px 14px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid var(--at-chip)', whiteSpace: 'nowrap' }}>
                       {p.nombre}
                     </td>
                     {allTipos.flatMap(tipo => {
                       const s = pMap?.get(tipo)
                       return [
-                        <td key={`${tipo}-m3`} style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', color: s?.consumo ? '#15291F' : '#C7C2B0', fontWeight: s?.consumo ? 600 : 400 }}>
+                        <td key={`${tipo}-m3`} style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', color: s?.consumo ? '#15291F' : '#C7C2B0', fontWeight: s?.consumo ? 600 : 400 }}>
                           {s?.consumo ? s.consumo.toFixed(1) : '—'}
                         </td>,
-                        <td key={`${tipo}-q`} style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', color: s?.monto ? '#15291F' : '#C7C2B0', fontWeight: s?.monto ? 600 : 400 }}>
+                        <td key={`${tipo}-q`} style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', color: s?.monto ? '#15291F' : '#C7C2B0', fontWeight: s?.monto ? 600 : 400 }}>
                           {s?.monto ? s.monto.toFixed(0) : '—'}
                         </td>,
                       ]

@@ -340,16 +340,16 @@ export function SeguridadTab({
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button onClick={() => setShowAccesosModal(true)} style={{ padding: '9px 16px', background: '#FAF1EA', color: '#9C5733', border: '1.5px solid #EFE0D5', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+          <button onClick={() => setShowAccesosModal(true)} style={{ padding: '9px 16px', background: '#FAF1EA', color: '#9C5733', border: '1.5px solid var(--at-accent-soft-2)', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
             🚪 Verificar acceso
           </button>
           {canCreate && (
             <>
-              <button onClick={() => setShowNovedadForm(true)} style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+              <button onClick={() => setShowNovedadForm(true)} style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
                 + Novedad
               </button>
               {!rondaEnCurso && (
-                <button onClick={() => setShowRondaForm(true)} style={{ padding: '9px 16px', background: '#EAE6D8', color: '#3E5A4C', border: '1.5px solid #E1DDD0', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+                <button onClick={() => setShowRondaForm(true)} style={{ padding: '9px 16px', background: '#EAE6D8', color: '#3E5A4C', border: '1.5px solid var(--at-line)', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
                   🛡 Iniciar ronda
                 </button>
               )}
@@ -365,7 +365,7 @@ export function SeguridadTab({
 
       {/* Ronda en curso banner */}
       {rondaEnCurso && (
-        <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px' }}>
+        <div style={{ background: '#EEF2EC', border: '1px solid var(--at-primary-soft-2)', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: puntosRondaActual.length > 0 ? '12px' : '0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '18px' }}>🛡️</span>
@@ -417,7 +417,7 @@ export function SeguridadTab({
                         <div style={{ display: 'flex', gap: '4px' }}>
                           <button onClick={() => marcarVisita(visita.id, 'ok')} title="OK" style={{ padding: '4px 9px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>✅</button>
                           <button onClick={() => marcarVisitaConNovedad(visita.id)} title="Novedad" style={{ padding: '4px 9px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>⚠️</button>
-                          <button onClick={() => marcarVisita(visita.id, 'omitido')} title="Omitir" style={{ padding: '4px 9px', background: '#FAF1EA', border: '1px solid #EFE0D5', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>⏭</button>
+                          <button onClick={() => marcarVisita(visita.id, 'omitido')} title="Omitir" style={{ padding: '4px 9px', background: '#FAF1EA', border: '1px solid var(--at-accent-soft-2)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>⏭</button>
                         </div>
                       )}
                     </div>
@@ -443,13 +443,13 @@ export function SeguridadTab({
 
       {/* Form novedad */}
       {showNovedadForm && (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Registrar novedad</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tipo</label>
               <select value={novedadForm.tipo} onChange={e => setNovedadForm(f => ({ ...f, tipo: e.target.value as TipoNovedad }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 {(Object.entries(TIPO_NOVEDAD_CONFIG) as [TipoNovedad, typeof TIPO_NOVEDAD_CONFIG[TipoNovedad]][]).map(([v, c]) => (
                   <option key={v} value={v}>{c.icon} {c.label}</option>
                 ))}
@@ -458,7 +458,7 @@ export function SeguridadTab({
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Prioridad</label>
               <select value={novedadForm.prioridad} onChange={e => setNovedadForm(f => ({ ...f, prioridad: e.target.value as PrioridadNovedad }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="normal">Normal</option>
                 <option value="alta">Alta</option>
                 <option value="critica">Crítica</option>
@@ -468,12 +468,12 @@ export function SeguridadTab({
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Descripción *</label>
               <textarea value={novedadForm.descripcion} onChange={e => setNovedadForm(f => ({ ...f, descripcion: e.target.value }))}
                 placeholder="Detalle la novedad..." rows={3}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Ubicación</label>
               <input value={novedadForm.ubicacion} onChange={e => setNovedadForm(f => ({ ...f, ubicacion: e.target.value }))} placeholder="Ej. Entrada principal, Nivel 3..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             {rondaEnCurso && (
               <div>
@@ -497,7 +497,7 @@ export function SeguridadTab({
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={registrarNovedad} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={registrarNovedad} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : 'Registrar'}
             </button>
             <button onClick={() => { setShowNovedadForm(false); setFotosNovedadForm([]) }} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -507,13 +507,13 @@ export function SeguridadTab({
 
       {/* Form ronda */}
       {showRondaForm && (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Iniciar ronda de seguridad</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Ruta de ronda</label>
               <select value={rondaForm.ruta_id} onChange={e => setRondaForm(f => ({ ...f, ruta_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="">Sin ruta específica</option>
                 {rutasActivas.map(r => {
                   const cantPuntos = puntosControl.filter(p => p.ruta_id === r.id).length
@@ -529,11 +529,11 @@ export function SeguridadTab({
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas (opcional)</label>
               <input value={rondaForm.notas} onChange={e => setRondaForm(f => ({ ...f, notas: e.target.value }))} placeholder="Observaciones iniciales..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={iniciarRonda} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={iniciarRonda} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               🛡 Iniciar ahora
             </button>
             <button onClick={() => setShowRondaForm(false)} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -567,7 +567,7 @@ export function SeguridadTab({
                 const rondaVinculada = n.ronda_id ? rondas.find(r => r.id === n.ronda_id) : null
                 const accentColor = n.prioridad === 'critica' ? '#dc2626' : n.prioridad === 'alta' ? '#ea580c' : '#16a34a'
                 return (
-                  <div key={n.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden', display: 'flex' }}>
+                  <div key={n.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden', display: 'flex' }}>
                     {/* Accent stripe */}
                     <div style={{ width: '5px', background: accentColor, flexShrink: 0 }} />
                     <div style={{ flex: 1, padding: '14px 16px' }}>
@@ -638,7 +638,7 @@ export function SeguridadTab({
             const omitCount = visitasR.filter(v => v.estado === 'omitido').length
             const rutaNombre = r.ruta_id ? rutas.find(rt => rt.id === r.ruta_id)?.nombre : null
             return (
-              <div key={r.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div key={r.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <span style={{ fontSize: '22px', flexShrink: 0 }}>🛡️</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: '14px', color: '#15291F' }}>
@@ -683,7 +683,7 @@ export function SeguridadTab({
               style={{ background: 'white', borderRadius: '16px', width: '100%', maxWidth: '520px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
               {/* Header con color de prioridad */}
               <div style={{ height: '6px', background: accentColor }} />
-              <div style={{ padding: '20px 24px', borderBottom: '1px solid #EAE6D8', display: 'flex', alignItems: 'flex-start', gap: '12px', justifyContent: 'space-between' }}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--at-chip)', display: 'flex', alignItems: 'flex-start', gap: '12px', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                   <span style={{ fontSize: '28px', lineHeight: 1 }}>{tc.icon}</span>
                   <div>
@@ -717,7 +717,7 @@ export function SeguridadTab({
                         {todas.map((url, i) => (
                           <a key={i} href={url} target="_blank" rel="noreferrer">
                             <img src={url} alt={`Evidencia ${i + 1}`}
-                              style={{ width: '100%', height: todas.length === 1 ? '200px' : '100px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #E1DDD0', display: 'block' }} />
+                              style={{ width: '100%', height: todas.length === 1 ? '200px' : '100px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--at-line)', display: 'block' }} />
                           </a>
                         ))}
                       </div>
@@ -736,7 +736,7 @@ export function SeguridadTab({
                       {datosRegistro && (
                         <div>
                           <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Datos del registro</div>
-                          <div style={{ fontSize: '12.5px', color: '#7E9389', background: '#FAF7EF', padding: '10px 14px', borderRadius: '10px', border: '1px solid #E1DDD0', lineHeight: 1.7 }}>
+                          <div style={{ fontSize: '12.5px', color: '#7E9389', background: '#FAF7EF', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--at-line)', lineHeight: 1.7 }}>
                             {datosRegistro.split(' | ').map((item, i) => (
                               <span key={i} style={{ display: 'inline-block', marginRight: '6px' }}>
                                 {i > 0 && <span style={{ color: '#C7C2B0', marginRight: '6px' }}>·</span>}
@@ -759,20 +759,20 @@ export function SeguridadTab({
                 {/* Metadatos en grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   {novedadDetalle.ubicacion && (
-                    <div style={{ background: '#FAF7EF', borderRadius: '10px', padding: '12px', border: '1px solid #E1DDD0' }}>
+                    <div style={{ background: '#FAF7EF', borderRadius: '10px', padding: '12px', border: '1px solid var(--at-line)' }}>
                       <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Ubicación</div>
                       <div style={{ fontSize: '13.5px', color: '#3E5A4C', fontWeight: 600 }}>📍 {novedadDetalle.ubicacion}</div>
                     </div>
                   )}
                   {rondaVinculada && (
-                    <div style={{ background: '#EEF2EC', borderRadius: '10px', padding: '12px', border: '1px solid #C2D2CA' }}>
+                    <div style={{ background: '#EEF2EC', borderRadius: '10px', padding: '12px', border: '1px solid var(--at-primary-soft-2)' }}>
                       <div style={{ fontSize: '11px', fontWeight: 700, color: '#1B3B36', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Ronda vinculada</div>
                       <div style={{ fontSize: '13.5px', color: '#102622', fontWeight: 600 }}>
                         🛡 {new Date(rondaVinculada.inicio).toLocaleDateString('es', { day: '2-digit', month: 'short' })} · {new Date(rondaVinculada.inicio).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
                   )}
-                  <div style={{ background: '#FAF7EF', borderRadius: '10px', padding: '12px', border: '1px solid #E1DDD0' }}>
+                  <div style={{ background: '#FAF7EF', borderRadius: '10px', padding: '12px', border: '1px solid var(--at-line)' }}>
                     <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Tipo</div>
                     <div style={{ fontSize: '13.5px', color: '#3E5A4C', fontWeight: 600 }}>{tc.icon} {tc.label}</div>
                   </div>
@@ -783,7 +783,7 @@ export function SeguridadTab({
                 </div>
 
                 {/* Acciones */}
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '4px', borderTop: '1px solid #EAE6D8' }}>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '4px', borderTop: '1px solid var(--at-chip)' }}>
                   {canEdit && (
                     <button onClick={async () => { setNovedadDetalle(null); await eliminarNovedad(novedadDetalle.id) }}
                       style={{ padding: '9px 16px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
@@ -809,7 +809,7 @@ export function SeguridadTab({
             style={{ background: 'white', borderRadius: '18px', width: '100%', maxWidth: '680px', boxShadow: '0 30px 60px -20px rgba(0,0,0,0.4)', marginBottom: '24px' }}>
 
             {/* Header del modal */}
-            <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg,#9C5733,#7E461F)', color: 'white', borderRadius: '18px 18px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg,var(--at-accent-hover),var(--at-accent-dark))', color: 'white', borderRadius: '18px 18px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.8, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Control de Seguridad</div>
                 <div style={{ fontSize: 19, fontWeight: 800, marginTop: 2 }}>🚪 Registro de acceso</div>
@@ -827,7 +827,7 @@ export function SeguridadTab({
             <div style={{ padding: '20px 24px' }}>
 
               {/* Tabs de modo */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1.5px solid #EAE6D8', paddingBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1.5px solid var(--at-chip)', paddingBottom: '16px' }}>
                 <button onClick={() => cambiarModo('dpi')}
                   style={{ padding: '8px 16px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: modoModal === 'dpi' ? '#9C5733' : '#E1DDD0', background: modoModal === 'dpi' ? '#FAF1EA' : 'white', color: modoModal === 'dpi' ? '#9C5733' : '#7E9389' }}>
                   🔍 Verificar por DPI
@@ -851,17 +851,17 @@ export function SeguridadTab({
                     onKeyDown={e => e.key === 'Enter' && buscarPorDpi()}
                     placeholder="Ingrese número de DPI o identificación..."
                     autoFocus
-                    style={{ flex: 1, padding: '11px 14px', border: '1.5px solid #E1DDD0', borderRadius: '10px', fontSize: '14px', background: '#FAF7EF' }}
+                    style={{ flex: 1, padding: '11px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontSize: '14px', background: '#FAF7EF' }}
                   />
                   <button
                     onClick={buscarPorDpi}
                     disabled={searching || !dpiSearch.trim()}
-                    style={{ padding: '11px 20px', background: 'linear-gradient(135deg,#9C5733,#7E461F)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: searching || !dpiSearch.trim() ? 'not-allowed' : 'pointer', opacity: searching || !dpiSearch.trim() ? 0.65 : 1, minWidth: '110px', fontSize: '13.5px' }}>
+                    style={{ padding: '11px 20px', background: 'linear-gradient(135deg,var(--at-accent-hover),var(--at-accent-dark))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: searching || !dpiSearch.trim() ? 'not-allowed' : 'pointer', opacity: searching || !dpiSearch.trim() ? 0.65 : 1, minWidth: '110px', fontSize: '13.5px' }}>
                     {searching ? 'Buscando...' : '🔍 Buscar'}
                   </button>
                   {searchResult !== 'idle' && (
                     <button onClick={() => { setDpiSearch(''); setSearchResult('idle'); setSearchResultVisitantes([]); setShowRegForm(false); }}
-                      style={{ padding: '11px 14px', background: '#EAE6D8', color: '#7E9389', border: '1.5px solid #E1DDD0', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+                      style={{ padding: '11px 14px', background: '#EAE6D8', color: '#7E9389', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
                       Limpiar
                     </button>
                   )}
@@ -890,7 +890,7 @@ export function SeguridadTab({
                     </div>
                     {canCreate && (
                       <button onClick={() => setShowRegForm(true)}
-                        style={{ padding: '8px 16px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>
+                        style={{ padding: '8px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>
                         + Registrar nueva entrada
                       </button>
                     )}
@@ -960,7 +960,7 @@ export function SeguridadTab({
                       onChange={e => setStrSearch(e.target.value)}
                       placeholder="Buscar por nombre de huésped o unidad..."
                       autoFocus
-                      style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid #E1DDD0', borderRadius: '10px', fontSize: '14px', background: '#FAF7EF' }}
+                      style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', fontSize: '14px', background: '#FAF7EF' }}
                     />
                   </div>
 
@@ -1018,7 +1018,7 @@ export function SeguridadTab({
                                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
                                     <button onClick={() => ingresoHabilitado && precargarDesdeSTR(r)}
                                       title={!ingresoHabilitado ? `Ingreso habilitado desde: ${r.fecha_entrada}` : undefined}
-                                      style={{ padding: '7px 14px', background: ingresoHabilitado ? 'linear-gradient(135deg,#9C5733,#7E461F)' : '#EAE6D8', color: ingresoHabilitado ? 'white' : '#7E9389', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: ingresoHabilitado ? 'pointer' : 'not-allowed', fontSize: '12.5px', whiteSpace: 'nowrap' }}>
+                                      style={{ padding: '7px 14px', background: ingresoHabilitado ? 'linear-gradient(135deg,var(--at-accent-hover),var(--at-accent-dark))' : '#EAE6D8', color: ingresoHabilitado ? 'white' : '#7E9389', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: ingresoHabilitado ? 'pointer' : 'not-allowed', fontSize: '12.5px', whiteSpace: 'nowrap' }}>
                                       Registrar ingreso
                                     </button>
                                     {!ingresoHabilitado && <span style={{ fontSize: '10.5px', color: '#7E9389' }}>Desde {r.fecha_entrada}</span>}
@@ -1036,7 +1036,7 @@ export function SeguridadTab({
 
               {/* Formulario de registro (compartido entre modos DPI y STR) */}
               {showRegForm && canCreate && (
-                <div style={{ borderTop: '1.5px solid #E1DDD0', paddingTop: '18px', marginTop: '16px' }}>
+                <div style={{ borderTop: '1.5px solid var(--at-line)', paddingTop: '18px', marginTop: '16px' }}>
                   <h3 style={{ margin: '0 0 14px', fontSize: '15px', fontWeight: 700, color: '#15291F' }}>
                     {modoModal === 'str' ? 'Registrar ingreso del huésped' : searchResult === 'found' ? 'Registrar nueva entrada' : 'Registrar nuevo visitante'}
                   </h3>
@@ -1044,12 +1044,12 @@ export function SeguridadTab({
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Nombre completo *</label>
                       <input value={regForm.nombre} onChange={e => setRegForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre del visitante"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Unidad a visitar *</label>
                       <select value={regForm.unidad_id} onChange={e => setRegForm(f => ({ ...f, unidad_id: e.target.value }))}
-                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                         <option value="">Seleccionar...</option>
                         {unidades.filter(u => u.activo).map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
                       </select>
@@ -1057,22 +1057,22 @@ export function SeguridadTab({
                     <div>
                       <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>DPI / Identificación</label>
                       <input value={regForm.identificacion} onChange={e => setRegForm(f => ({ ...f, identificacion: e.target.value }))} placeholder="Número de documento"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Placa de vehículo</label>
                       <input value={regForm.placa_vehiculo} onChange={e => setRegForm(f => ({ ...f, placa_vehiculo: e.target.value }))} placeholder="Ej. ABC-123"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Motivo de visita</label>
                       <input value={regForm.motivo} onChange={e => setRegForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Ej. Entrega, Social..."
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas</label>
                       <input value={regForm.notas} onChange={e => setRegForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional"
-                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                        style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
                       {(fotosExpiradas.foto || fotosExpiradas.documento || fotosExpiradas.vehiculo) && (
@@ -1098,7 +1098,7 @@ export function SeguridadTab({
                   </div>
                   <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
                     <button onClick={handleRegistrarAcceso} disabled={regSaving}
-                      style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: regSaving ? 'not-allowed' : 'pointer', opacity: regSaving ? 0.7 : 1 }}>
+                      style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: regSaving ? 'not-allowed' : 'pointer', opacity: regSaving ? 0.7 : 1 }}>
                       {regSaving ? 'Registrando...' : '✓ Registrar entrada'}
                     </button>
                     <button onClick={() => setShowRegForm(false)}

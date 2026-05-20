@@ -94,7 +94,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
           </p>
         </div>
         {canCreate && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
             + Publicar anuncio
           </button>
         )}
@@ -120,18 +120,18 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Nuevo anuncio</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Título *</label>
               <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Título del anuncio"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tipo</label>
               <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoAnuncio }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 {(Object.entries(TIPO_CONFIG) as [TipoAnuncio, typeof TIPO_CONFIG[TipoAnuncio]][]).map(([v, cfg]) => (
                   <option key={v} value={v}>{cfg.icon} {cfg.label}</option>
                 ))}
@@ -141,21 +141,21 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha del evento</label>
                 <input type="date" value={form.fecha_evento} onChange={e => setForm(f => ({ ...f, fecha_evento: e.target.value }))}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
               </div>
             )}
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Contenido *</label>
               <textarea value={form.contenido} onChange={e => setForm(f => ({ ...f, contenido: e.target.value }))}
                 placeholder="Escribe el mensaje para los residentes..." rows={4}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
             </div>
             <div>
               <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="anuncios" label="Imagen del anuncio" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handlePublicar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={handlePublicar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Publicando...' : '📢 Publicar'}
             </button>
             <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -188,7 +188,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
                     <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '6px' }}>{a.titulo}</div>
                     <div style={{ fontSize: '13.5px', color: '#3E5A4C', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{a.contenido}</div>
                     {a.foto_url && (
-                      <SecureImage src={a.foto_url} alt="anuncio" style={{ marginTop: 10, maxWidth: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid #E1DDD0', cursor: 'zoom-in' }}
+                      <SecureImage src={a.foto_url} alt="anuncio" style={{ marginTop: 10, maxWidth: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--at-line)', cursor: 'zoom-in' }}
                         onClick={() => window.open(a.foto_url!, '_blank')} />
                     )}
                     <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '8px' }}>
@@ -199,7 +199,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
                     {canCreate && (
                       <button onClick={() => toggleActivo(a)} title={a.activo ? 'Desactivar' : 'Activar'}
-                        style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid #E1DDD0', background: a.activo ? '#f0fdf4' : '#FAF7EF', color: a.activo ? '#16a34a' : '#7E9389' }}>
+                        style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid var(--at-line)', background: a.activo ? '#f0fdf4' : '#FAF7EF', color: a.activo ? '#16a34a' : '#7E9389' }}>
                         {a.activo ? '✓ Activo' : '○ Inactivo'}
                       </button>
                     )}

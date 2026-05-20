@@ -197,13 +197,13 @@ export function TareasPersonalTab({
 
       {/* Form nuevo bloque */}
       {showBloqueForm && (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Asignar bloque de turno</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Empleado *</label>
               <select value={bloqueForm.personal_id} onChange={e => setBloqueForm(f => ({ ...f, personal_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="">Seleccionar empleado...</option>
                 {personalActivo.map(p => <option key={p.id} value={p.id}>{p.nombre} — {p.cargo}</option>)}
               </select>
@@ -211,12 +211,12 @@ export function TareasPersonalTab({
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha</label>
               <input type="date" value={bloqueForm.fecha} onChange={e => setBloqueForm(f => ({ ...f, fecha: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Turno</label>
               <select value={bloqueForm.turno} onChange={e => setBloqueForm(f => ({ ...f, turno: e.target.value as TurnoTipo }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="manana">🌅 Mañana</option>
                 <option value="tarde">☀️ Tarde</option>
                 <option value="noche">🌙 Noche</option>
@@ -225,7 +225,7 @@ export function TareasPersonalTab({
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Notas</label>
               <input value={bloqueForm.notas} onChange={e => setBloqueForm(f => ({ ...f, notas: e.target.value }))} placeholder="Indicaciones especiales..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
@@ -240,14 +240,14 @@ export function TareasPersonalTab({
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={selectedPersonalId} onChange={e => setSelectedPersonalId(e.target.value)}
-          style={{ padding: '7px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
+          style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
           <option value="todos">Todos los empleados</option>
           {personalActivo.map(p => <option key={p.id} value={p.id}>{p.nombre} — {p.cargo}</option>)}
         </select>
         <input type="date" value={selectedFecha} onChange={e => setSelectedFecha(e.target.value)}
-          style={{ padding: '7px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+          style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
         {selectedFecha !== hoy && (
-          <button onClick={() => setSelectedFecha(hoy)} style={{ padding: '7px 12px', background: '#EAE6D8', border: '1px solid #E1DDD0', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: '#3E5A4C' }}>
+          <button onClick={() => setSelectedFecha(hoy)} style={{ padding: '7px 12px', background: '#EAE6D8', border: '1px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: '#3E5A4C' }}>
             Hoy
           </button>
         )}
@@ -302,7 +302,7 @@ export function TareasPersonalTab({
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '5px' }} onClick={e => e.stopPropagation()}>
                       {bloque.estado === 'pendiente' && (
-                        <button onClick={() => iniciarBloque(bloque.id)} style={{ padding: '6px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid #C2D2CA', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        <button onClick={() => iniciarBloque(bloque.id)} style={{ padding: '6px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid var(--at-primary-soft-2)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                           ▶ Iniciar
                         </button>
                       )}
@@ -360,7 +360,7 @@ export function TareasPersonalTab({
                                 <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                                   <button onClick={() => marcarTarea(t.id, 'completada')} title="Completada" style={{ padding: '5px 9px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>✅</button>
                                   <button onClick={() => marcarTarea(t.id, 'con_observacion')} title="Con observación" style={{ padding: '5px 9px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>⚠️</button>
-                                  <button onClick={() => marcarTarea(t.id, 'omitida')} title="Omitir" style={{ padding: '5px 9px', background: '#FAF1EA', border: '1px solid #EFE0D5', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>⏭</button>
+                                  <button onClick={() => marcarTarea(t.id, 'omitida')} title="Omitir" style={{ padding: '5px 9px', background: '#FAF1EA', border: '1px solid var(--at-accent-soft-2)', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>⏭</button>
                                 </div>
                               )}
                               {canEdit && bloque.estado !== 'completado' && bloque.estado !== 'incompleto' && (
@@ -422,7 +422,7 @@ export function TareasPersonalTab({
                                 {saving ? '...' : 'Agregar'}
                               </button>
                               <button onClick={() => { setAddingTarea(false); setNuevaTarea({ titulo: '', descripcion: '', area_id: '', plantilla_id: '', requiere_foto: false }) }}
-                                style={{ padding: '8px 14px', background: 'white', color: '#3E5A4C', border: '1px solid #E1DDD0', borderRadius: '7px', cursor: 'pointer', fontSize: '13px' }}>
+                                style={{ padding: '8px 14px', background: 'white', color: '#3E5A4C', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px' }}>
                                 Cancelar
                               </button>
                             </div>

@@ -425,22 +425,22 @@ const modalStyle: CSSProperties = {
   boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
 }
 const headerStyle: CSSProperties = {
-  padding: '24px 28px 20px', borderBottom: '1px solid #E1DDD0',
+  padding: '24px 28px 20px', borderBottom: '1px solid var(--at-line)',
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
 }
 const bodyStyle: CSSProperties = { padding: '24px 28px', overflowY: 'auto', flex: 1 }
 const footerStyle: CSSProperties = {
-  padding: '16px 28px', borderTop: '1px solid #E1DDD0',
+  padding: '16px 28px', borderTop: '1px solid var(--at-line)',
   display: 'flex', justifyContent: 'flex-end', gap: '10px',
 }
 const btnPrimary: CSSProperties = {
-  padding: '10px 22px', background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+  padding: '10px 22px', background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
   color: '#fff', border: 'none', borderRadius: '8px',
   fontWeight: 600, fontSize: '14px', cursor: 'pointer',
 }
 const btnSecondary: CSSProperties = {
   padding: '10px 22px', background: '#EAE6D8', color: '#3E5A4C',
-  border: '1px solid #E1DDD0', borderRadius: '8px',
+  border: '1px solid var(--at-line)', borderRadius: '8px',
   fontWeight: 600, fontSize: '14px', cursor: 'pointer',
 }
 const closeBtnStyle: CSSProperties = {
@@ -449,7 +449,7 @@ const closeBtnStyle: CSSProperties = {
 }
 const uploadBannerStyle: CSSProperties = {
   marginBottom: '24px', padding: '16px 20px',
-  background: '#FAF7EF', border: '1px solid #C2D2CA', borderRadius: '10px',
+  background: '#FAF7EF', border: '1px solid var(--at-primary-soft-2)', borderRadius: '10px',
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   gap: '12px', flexWrap: 'wrap',
 }

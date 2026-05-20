@@ -143,7 +143,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
 
   const inputBase: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box', padding: '9px 12px',
-    border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF',
+    border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF',
   }
   const labelBase: React.CSSProperties = {
     fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px',
@@ -157,7 +157,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
           {recientes.length > 0 && <p style={{ margin: '3px 0 0', fontSize: '13px', color: '#1B3B36' }}>{recientes.length} visita{recientes.length > 1 ? 's' : ''} hoy</p>}
         </div>
         <button onClick={() => setShowForm(true)}
-          style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#1B3B36,#102622)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+          style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
           + Pre-autorizar visita
         </button>
       </div>
@@ -252,7 +252,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
               </div>
             </div>
 
-            <div style={{ marginTop: '20px', borderTop: '1.5px solid #EAE6D8', paddingTop: '16px' }}>
+            <div style={{ marginTop: '20px', borderTop: '1.5px solid var(--at-chip)', paddingTop: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: '#3E5A4C', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   👥 Acompañantes
@@ -264,7 +264,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
                 </div>
                 {!showAcompForm && (
                   <button type="button" onClick={() => setShowAcompForm(true)}
-                    style={{ padding: '5px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1.5px solid #E1DDD0', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                    style={{ padding: '5px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1.5px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                     + Agregar acompañante
                   </button>
                 )}
@@ -273,7 +273,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
               {acompanantes.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
                   {acompanantes.map(a => (
-                    <div key={a.tempId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '8px' }}>
+                    <div key={a.tempId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
                       <div style={{ width: 28, height: 28, borderRadius: '50%', background: a.es_menor ? '#fef9c3' : '#EEF2EC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', flexShrink: 0 }}>
                         {a.es_menor ? '👶' : '👤'}
                       </div>
@@ -295,7 +295,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
               )}
 
               {showAcompForm && (
-                <div style={{ padding: '14px', background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ padding: '14px', background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C' }}>Datos del acompañante</div>
                   <div>
                     <label style={{ fontSize: '11.5px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '3px' }}>Nombre *</label>
@@ -346,7 +346,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="button" onClick={agregarAcompanante}
-                      style={{ padding: '7px 16px', background: 'linear-gradient(135deg,#1B3B36,#102622)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
+                      style={{ padding: '7px 16px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
                       + Agregar
                     </button>
                     <button type="button" onClick={() => { setShowAcompForm(false); setAcompForm(defaultAcompForm()) }}
@@ -360,7 +360,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button onClick={preAutorizar} disabled={saving}
-                style={{ padding: '10px 22px', background: 'linear-gradient(135deg,#1B3B36,#102622)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                style={{ padding: '10px 22px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-primary-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Autorizando...' : `✅ Pre-autorizar visita${acompanantes.length > 0 ? ` (+${acompanantes.length})` : ''}`}
               </button>
               <button onClick={resetForm}

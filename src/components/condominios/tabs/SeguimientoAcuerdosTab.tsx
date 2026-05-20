@@ -87,7 +87,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
   const total      = enriched.length
   const tasaCumplimiento = total > 0 ? Math.round(cumplidos / total * 100) : 0
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -112,7 +112,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
           { label: 'Vencidos',    value: String(vencidos),   color: '#ef4444' },
           { label: 'Cumplimiento', value: `${tasaCumplimiento}%`, color: tasaCumplimiento >= 70 ? '#10b981' : '#f59e0b' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: '11px', color: '#7E9389' }}>{k.label}</div>
           </div>
@@ -121,7 +121,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar acuerdo' : 'Nuevo Acuerdo'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -162,7 +162,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -193,7 +193,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
             const diasRestantes = a.fecha_limite ? Math.ceil((new Date(a.fecha_limite).getTime() - new Date(today).getTime()) / 86400000) : null
 
             return (
-              <div key={a.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px 14px' }}>
+              <div key={a.id} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '3px' }}>
@@ -228,7 +228,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
                         </button>
                       )}
                       <button onClick={() => startEdit(a as SeguimientoAcuerdo)}
-                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(a.id)}
                         style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                     </div>

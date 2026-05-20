@@ -128,14 +128,14 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
     setForm({ nombre: '', categoria: 'otro', marca: '', modelo: '', serial: '', ubicacion: '', fecha_compra: '', valor_compra: '', vida_util_anios: '', estado: 'operativo', ultimo_mantenimiento: '', proximo_mantenimiento: '', notas: '' })
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 320, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
+      <div style={{ width: 320, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Equipos ({lista.length})</span>
             {canCreate && (
@@ -171,7 +171,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
           const dias = diasParaManto(e.proximo_mantenimiento)
           return (
             <div key={e.id} onClick={() => { setSelected(e); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === e.id ? '#F4EBE3' : '#fff', borderLeft: alerta === 'vencido' ? '3px solid #ef4444' : alerta === 'proximo' ? '3px solid #f59e0b' : '3px solid transparent' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === e.id ? '#F4EBE3' : '#fff', borderLeft: alerta === 'vencido' ? '3px solid #ef4444' : alerta === 'proximo' ? '3px solid #f59e0b' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {e.nombre}</span>
                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: est?.color + '20', color: est?.color }}>{est?.label}</span>
@@ -326,7 +326,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
                   </button>
                   {ESTADOS.filter(s => s.value !== selected.estado).map(s => (
                     <button key={s.value} onClick={() => actualizarEstado(selected, s.value)}
-                      style={{ padding: '7px 14px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid #E1DDD0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '7px 14px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       → {s.label}
                     </button>
                   ))}

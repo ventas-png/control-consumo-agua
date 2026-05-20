@@ -66,14 +66,14 @@ export default function NotificacionesEnviadasTab({ notificaciones, unidades }: 
       {/* Filtros */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por destinatario, asunto…"
-          style={{ flex: 1, minWidth: 180, padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }} />
+          style={{ flex: 1, minWidth: 180, padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }} />
         <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoNotificacion | '')}
-          style={{ padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+          style={{ padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
           <option value="">Todos los estados</option>
           {(Object.keys(ESTADO_CFG) as EstadoNotificacion[]).map(e => <option key={e} value={e}>{ESTADO_CFG[e].label}</option>)}
         </select>
         <select value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}
-          style={{ padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+          style={{ padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
           <option value="">Todas las unidades</option>
           {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
         </select>
@@ -112,7 +112,7 @@ export default function NotificacionesEnviadasTab({ notificaciones, unidades }: 
                   <span style={{ color: '#7E9389', fontSize: 12 }}>{isOpen ? '▲' : '▼'}</span>
                 </div>
                 {isOpen && (
-                  <div style={{ padding: '10px 14px', borderTop: '1px solid #EAE6D8', background: '#FAF7EF' }}>
+                  <div style={{ padding: '10px 14px', borderTop: '1px solid var(--at-chip)', background: '#FAF7EF' }}>
                     <div style={{ fontSize: 13, color: '#3E5A4C', whiteSpace: 'pre-wrap', lineHeight: 1.5, maxHeight: 200, overflowY: 'auto' }}>{n.contenido}</div>
                     {n.error_detalle && (
                       <div style={{ marginTop: 8, padding: '8px 12px', background: '#fee2e2', borderRadius: 8, fontSize: 12, color: '#ef4444' }}>

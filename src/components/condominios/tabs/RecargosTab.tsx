@@ -108,7 +108,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
       motivo = `Recargo automático — ${reglaActiva.nombre}`
       const conf = await Swal.fire({
         title: 'Aplicar mora automática',
-        html: `<p style="font-size:13px;color:#3E5A4C">Usando regla: <b>${reglaActiva.nombre}</b><br>
+        html: `<p style="font-size:13px;color:var(--at-ink-2)">Usando regla: <b>${reglaActiva.nombre}</b><br>
                Tipo: <b>${tipoRecargo === 'porcentaje' ? pct + '%' : moneda + ' ' + pct + ' fijo'}</b><br>
                ${unidadesMorosas.length} unidades afectadas</p>`,
         icon: 'question', showCancelButton: true,
@@ -118,9 +118,9 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     } else {
       const { value } = await Swal.fire({
         title: 'Recargo masivo por mora',
-        html: `<p style="font-size:13px;color:#3E5A4C;margin-bottom:8px">${unidadesMorosas.length} unidades con cuotas vencidas · Porcentaje de recargo:</p>
+        html: `<p style="font-size:13px;color:var(--at-ink-2);margin-bottom:8px">${unidadesMorosas.length} unidades con cuotas vencidas · Porcentaje de recargo:</p>
                <input id="pct-input" class="swal2-input" type="number" min="0.1" max="100" step="0.1" value="5" style="font-size:14px">
-               <p style="font-size:11px;color:#7E9389;margin-top:4px">Configura reglas automáticas en la pestaña "Reglas mora"</p>`,
+               <p style="font-size:11px;color:var(--at-ink-3);margin-top:4px">Configura reglas automáticas en la pestaña "Reglas mora"</p>`,
         showCancelButton: true, confirmButtonText: 'Aplicar', cancelButtonText: 'Cancelar',
         preConfirm: () => parseFloat((document.getElementById('pct-input') as HTMLInputElement)?.value ?? '0'),
       })
@@ -149,7 +149,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
@@ -174,7 +174,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}
-            style={{ padding: '6px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
+            style={{ padding: '6px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }}>
             <option value="">Todas las unidades</option>
             {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
           </select>
@@ -203,7 +203,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nuevo recargo de mora</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -261,7 +261,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
             <thead>
               <tr style={{ background: '#FAF7EF' }}>
                 {['Unidad', 'Fecha', 'Tipo', 'Valor', 'Monto', 'Estado', 'Motivo', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#7E9389', fontWeight: 600, borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#7E9389', fontWeight: 600, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -270,7 +270,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
                 const ec = ESTADO_CFG[r.estado]
                 const unidad = unidades.find(u => u.id === r.unidad_id)
                 return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #EAE6D8' }}>
+                  <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? r.unidad_nombre ?? '—'}</td>
                     <td style={{ padding: '8px 12px', color: '#7E9389' }}>{r.fecha_aplicacion}</td>
                     <td style={{ padding: '8px 12px', color: '#3E5A4C' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : 'Fijo'}</td>

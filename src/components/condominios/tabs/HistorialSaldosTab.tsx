@@ -38,7 +38,7 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
   async function generarSnapshot() {
     const { value: periodo } = await Swal.fire({
       title: 'Generar snapshot de saldos',
-      html: `<p style="font-size:13px;color:#3E5A4C;margin-bottom:8px">Período (YYYY-MM):</p>
+      html: `<p style="font-size:13px;color:var(--at-ink-2);margin-bottom:8px">Período (YYYY-MM):</p>
              <input id="periodo-snap" class="swal2-input" type="month" value="${new Date().toISOString().slice(0,7)}" style="font-size:14px">`,
       showCancelButton: true, confirmButtonText: 'Generar', cancelButtonText: 'Cancelar',
       preConfirm: () => (document.getElementById('periodo-snap') as HTMLInputElement)?.value,
@@ -71,7 +71,7 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
     onRefresh()
   }
 
-  const inp: CSSProperties = { padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }
+  const inp: CSSProperties = { padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 7, fontSize: 13 }
 
   return (
     <div style={{ padding: 16 }}>
@@ -124,7 +124,7 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
             <thead>
               <tr style={{ background: '#FAF7EF' }}>
                 {['Unidad', 'Período', 'Saldo anterior', 'Cargos', 'Pagos', 'Saldo final', 'Cuotas vencidas'].map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#7E9389', fontWeight: 600, borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#7E9389', fontWeight: 600, borderBottom: '1px solid var(--at-line)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -133,7 +133,7 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
                 const unidad = unidades.find(u => u.id === h.unidad_id)
                 const deudor = h.saldo_final > 0
                 return (
-                  <tr key={h.id} style={{ borderBottom: '1px solid #EAE6D8', background: deudor ? '#fef9f9' : '#fff' }}>
+                  <tr key={h.id} style={{ borderBottom: '1px solid var(--at-chip)', background: deudor ? '#fef9f9' : '#fff' }}>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? h.unidad_nombre ?? '—'}</td>
                     <td style={{ padding: '8px 12px', color: '#7E9389' }}>{h.periodo}</td>
                     <td style={{ padding: '8px 12px', color: '#3E5A4C' }}>{moneda} {h.saldo_anterior.toFixed(2)}</td>

@@ -201,20 +201,20 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 290px', gap: '20px', alignItems: 'start' }}>
 
         {/* Calendario mensual */}
-        <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '14px', overflow: 'hidden' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '14px', overflow: 'hidden' }}>
           {/* Navegación */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: '#FAF7EF', borderBottom: '1px solid #E1DDD0' }}>
-            <button onClick={prevMes} style={{ padding: '6px 14px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '16px', color: '#3E5A4C' }}>‹</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: '#FAF7EF', borderBottom: '1px solid var(--at-line)' }}>
+            <button onClick={prevMes} style={{ padding: '6px 14px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '16px', color: '#3E5A4C' }}>‹</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontWeight: 700, fontSize: '15px', color: '#15291F' }}>{MESES[mes]} {anio}</span>
               {(mes !== hoy.getMonth() || anio !== hoy.getFullYear()) && (
-                <button onClick={irHoy} style={{ padding: '3px 10px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid #C2D2CA', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Hoy</button>
+                <button onClick={irHoy} style={{ padding: '3px 10px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid var(--at-primary-soft-2)', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Hoy</button>
               )}
             </div>
-            <button onClick={nextMes} style={{ padding: '6px 14px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '16px', color: '#3E5A4C' }}>›</button>
+            <button onClick={nextMes} style={{ padding: '6px 14px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '16px', color: '#3E5A4C' }}>›</button>
           </div>
           {/* Encabezados días */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #E1DDD0' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--at-line)' }}>
             {DIAS.map(d => (
               <div key={d} style={{ textAlign: 'center', padding: '8px 2px', fontSize: '11px', fontWeight: 700, color: '#7E9389' }}>{d}</div>
             ))}
@@ -227,7 +227,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
               return (
                 <div key={i} style={{
                   minHeight: '76px', padding: '5px 4px',
-                  borderRight: '1px solid #EAE6D8', borderBottom: '1px solid #EAE6D8',
+                  borderRight: '1px solid var(--at-chip)', borderBottom: '1px solid var(--at-chip)',
                   background: hoyFlag ? '#EEF2EC' : lista.length > 0 ? '#FAF7EF' : 'white',
                 }}>
                   {d && (
@@ -265,7 +265,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
           {/* Leyenda */}
-          <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
             <div style={{ fontWeight: 700, fontSize: '12px', color: '#15291F', marginBottom: '8px' }}>Leyenda</div>
             {[
               { tipo: 'residente' as const, label: 'Residente / Propietario' },
@@ -279,7 +279,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
           </div>
 
           {/* Próximos 30 días */}
-          <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
             <div style={{ fontWeight: 700, fontSize: '12px', color: '#15291F', marginBottom: '10px' }}>
               📅 Próximos 30 días
               {proximos30.length > 0 && <span style={{ marginLeft: 6, background: '#D9E2DC', color: '#1B3B36', borderRadius: '12px', padding: '1px 8px', fontSize: '11px' }}>{proximos30.length}</span>}

@@ -72,7 +72,7 @@ export function PasswordResetModal({ onClose }: Props) {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="tu@correo.com"
-                style={{ width: '100%', padding: '12px', border: '2px solid #E1DDD0', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '12px', border: '2px solid var(--at-line)', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
               />
               {emailError && (
                 <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>{emailError}</p>
@@ -82,7 +82,7 @@ export function PasswordResetModal({ onClose }: Props) {
               <button
                 onClick={handleRequest}
                 disabled={loading}
-                style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '12px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
               >
                 {loading ? 'Enviando...' : 'Enviar Enlace'}
               </button>
@@ -104,7 +104,7 @@ export function PasswordResetModal({ onClose }: Props) {
             </p>
             <button
               onClick={onClose}
-              style={{ padding: '12px 32px', background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+              style={{ padding: '12px 32px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
             >
               Entendido
             </button>

@@ -616,7 +616,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
               width: '34px',
               height: '34px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #577B69 0%, #B96A3F 100%)',
+              background: 'linear-gradient(135deg, var(--at-accent-2) 0%, var(--at-accent) 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

@@ -131,10 +131,10 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
   function imprimirActa(a: AsambleaDigital) {
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acta — ${a.titulo}</title>
     <style>body{font-family:Arial,sans-serif;padding:40px;max-width:800px;margin:auto}
-    h1{font-size:22px;color:#15291F}h2{font-size:14px;color:#7E9389;font-weight:normal}
-    .meta{background:#FAF7EF;padding:12px;border-radius:8px;margin:16px 0;font-size:12px}
+    h1{font-size:22px;color:var(--at-ink)}h2{font-size:14px;color:var(--at-ink-3);font-weight:normal}
+    .meta{background:var(--at-surface-2);padding:12px;border-radius:8px;margin:16px 0;font-size:12px}
     pre{white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6}
-    .footer{margin-top:40px;border-top:1px solid #E1DDD0;padding-top:12px;font-size:11px;color:#7E9389}
+    .footer{margin-top:40px;border-top:1px solid var(--at-line);padding-top:12px;font-size:11px;color:var(--at-ink-3)}
     </style></head><body>
     <h1>ACTA DE ASAMBLEA</h1>
     <h2>${a.titulo}</h2>
@@ -165,7 +165,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
 
       {subTab === 'acta' && actaAsamblea ? (
         <div>
-          <button onClick={() => setSubTab('lista')} style={{ marginBottom: 12, padding: '4px 12px', border: '1px solid #C7C2B0', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 12 }}>← Volver</button>
+          <button onClick={() => setSubTab('lista')} style={{ marginBottom: 12, padding: '4px 12px', border: '1px solid var(--at-line-strong)', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 12 }}>← Volver</button>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{actaAsamblea.titulo}</div>
           <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 12 }}>{new Date(actaAsamblea.fecha_hora).toLocaleString('es')}</div>
           <textarea
@@ -173,7 +173,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
             onChange={e => setActaTexto(e.target.value)}
             rows={16}
             placeholder="Escriba el acta completa de la asamblea: quórum, puntos tratados, acuerdos alcanzados, votaciones y cierre..."
-            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }}
           />
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={guardarActa} disabled={savingActa}
@@ -181,7 +181,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
               {savingActa ? 'Guardando…' : '💾 Guardar acta'}
             </button>
             <button onClick={() => imprimirActa({ ...actaAsamblea, acta_url: actaTexto })}
-              style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid #C7C2B0', borderRadius: 8, cursor: 'pointer' }}>
+              style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer' }}>
               🖨️ Imprimir
             </button>
           </div>
@@ -208,7 +208,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                 <div style={{ fontSize: 10, color: '#7E9389' }}>{cfg.label}</div>
               </div>
             ))}
-            <div style={{ padding: '8px 14px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, minWidth: 90, textAlign: 'center' }}>
+            <div style={{ padding: '8px 14px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, minWidth: 90, textAlign: 'center' }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: '#15291F' }}>{unidades.length}</div>
               <div style={{ fontSize: 10, color: '#7E9389' }}>Unidades</div>
             </div>
@@ -216,24 +216,24 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
 
           {/* Form */}
           {showForm && (
-            <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: '#15291F' }}>{editId ? 'Editar asamblea' : 'Nueva asamblea'}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: 12, color: '#7E9389' }}>Título *</label>
                   <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))}
                     placeholder="Ej: Asamblea Ordinaria Q1 2026"
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                    style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, color: '#7E9389' }}>Fecha y hora *</label>
                   <input type="datetime-local" value={form.fecha_hora} onChange={e => setForm(f => ({ ...f, fecha_hora: e.target.value }))}
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                    style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, color: '#7E9389' }}>Modalidad</label>
                   <select value={form.modalidad} onChange={e => setForm(f => ({ ...f, modalidad: e.target.value as Modalidad }))}
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }}>
+                    style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }}>
                     <option value="presencial">🏛️ Presencial</option>
                     <option value="virtual">💻 Virtual</option>
                     <option value="hibrida">🔀 Híbrida</option>
@@ -242,21 +242,21 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                 <div>
                   <label style={{ fontSize: 12, color: '#7E9389' }}>Quórum requerido (%)</label>
                   <input type="number" min="0" max="100" value={form.quorum_requerido} onChange={e => setForm(f => ({ ...f, quorum_requerido: e.target.value }))}
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                    style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
                 </div>
                 {(form.modalidad === 'virtual' || form.modalidad === 'hibrida') && (
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={{ fontSize: 12, color: '#7E9389' }}>Link de reunión</label>
                     <input value={form.link_reunion} onChange={e => setForm(f => ({ ...f, link_reunion: e.target.value }))}
                       placeholder="https://meet.google.com/..."
-                      style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
                   </div>
                 )}
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ fontSize: 12, color: '#7E9389' }}>Descripción / Agenda</label>
                   <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
                     rows={3} placeholder="Puntos a tratar en la asamblea..."
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3, resize: 'vertical' }} />
+                    style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 13, boxSizing: 'border-box', marginTop: 3, resize: 'vertical' }} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -264,7 +264,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                   style={{ padding: '8px 20px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
                   {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear asamblea'}
                 </button>
-                <button onClick={resetForm} style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid #C7C2B0', borderRadius: 8, cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={resetForm} style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer' }}>Cancelar</button>
               </div>
             </div>
           )}
@@ -281,7 +281,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                 const mod = MODALIDAD_CFG[a.modalidad]
                 const exp = expandida === a.id
                 return (
-                  <div key={a.id} style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+                  <div key={a.id} style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
                     <div onClick={() => setExpandida(exp ? null : a.id)}
                       style={{ padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{ flex: 1 }}>
@@ -296,7 +296,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                     </div>
 
                     {exp && (
-                      <div style={{ padding: '0 16px 16px', borderTop: '1px solid #EAE6D8' }}>
+                      <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--at-chip)' }}>
                         {a.descripcion && (
                           <div style={{ fontSize: 12, color: '#3E5A4C', marginTop: 10, whiteSpace: 'pre-wrap' }}>{a.descripcion}</div>
                         )}
@@ -313,7 +313,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                                 ▶ Iniciar
                               </button>
                               <button onClick={() => abrirEditar(a)}
-                                style={{ padding: '6px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid #1B3B36', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                                style={{ padding: '6px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid var(--at-primary)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                                 ✏️ Editar
                               </button>
                               <button onClick={() => cambiarEstado(a, 'cancelada')}
@@ -324,19 +324,19 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                           )}
                           {canEdit && a.estado === 'en_curso' && (
                             <button onClick={() => cambiarEstado(a, 'finalizada')}
-                              style={{ padding: '6px 14px', background: '#EAE6D8', color: '#7E9389', border: '1px solid #7E9389', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                              style={{ padding: '6px 14px', background: '#EAE6D8', color: '#7E9389', border: '1px solid var(--at-ink-3)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                               ✅ Finalizar
                             </button>
                           )}
                           {(a.estado === 'en_curso' || a.estado === 'finalizada') && (
                             <button onClick={() => abrirActa(a)}
-                              style={{ padding: '6px 14px', background: '#FAF1EA', color: '#9C5733', border: '1px solid #9C5733', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                              style={{ padding: '6px 14px', background: '#FAF1EA', color: '#9C5733', border: '1px solid var(--at-accent-hover)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                               📝 {a.acta_url ? 'Ver/editar acta' : 'Registrar acta'}
                             </button>
                           )}
                           {a.acta_url && (
                             <button onClick={() => imprimirActa(a)}
-                              style={{ padding: '6px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1px solid #C7C2B0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                              style={{ padding: '6px 12px', background: '#FAF7EF', color: '#3E5A4C', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                               🖨️ Imprimir
                             </button>
                           )}

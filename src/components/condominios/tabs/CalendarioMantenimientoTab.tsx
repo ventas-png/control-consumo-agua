@@ -121,11 +121,11 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
           <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>{totalMes} evento{totalMes !== 1 ? 's' : ''} este mes</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={() => navMes(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #C7C2B0', background: '#fff', cursor: 'pointer', fontSize: 14 }}>‹</button>
+          <button onClick={() => navMes(-1)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--at-line-strong)', background: '#fff', cursor: 'pointer', fontSize: 14 }}>‹</button>
           <span style={{ fontWeight: 700, fontSize: 14, color: '#15291F', minWidth: 140, textAlign: 'center' }}>{MESES[mes]} {anio}</span>
-          <button onClick={() => navMes(1)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid #C7C2B0', background: '#fff', cursor: 'pointer', fontSize: 14 }}>›</button>
+          <button onClick={() => navMes(1)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--at-line-strong)', background: '#fff', cursor: 'pointer', fontSize: 14 }}>›</button>
           <button onClick={() => { setAnio(hoy.getFullYear()); setMes(hoy.getMonth()); setDiaDetalle(null) }}
-            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #C7C2B0', background: '#fff', cursor: 'pointer', fontSize: 12 }}>
+            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--at-line-strong)', background: '#fff', cursor: 'pointer', fontSize: 12 }}>
             Hoy
           </button>
         </div>
@@ -148,7 +148,7 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
 
       <div style={{ display: 'grid', gridTemplateColumns: diaDetalle ? '1fr 280px' : '1fr', gap: 14 }}>
         {/* Calendario */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
           {/* Días semana header */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#FAF7EF' }}>
             {DIAS_SEMANA.map(d => (
@@ -167,8 +167,8 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
                 <div key={i}
                   onClick={() => dia && setDiaDetalle(seleccionado ? null : fecha)}
                   style={{
-                    minHeight: 72, padding: '4px 6px', borderTop: '1px solid #EAE6D8',
-                    borderRight: (i + 1) % 7 !== 0 ? '1px solid #EAE6D8' : undefined,
+                    minHeight: 72, padding: '4px 6px', borderTop: '1px solid var(--at-chip)',
+                    borderRight: (i + 1) % 7 !== 0 ? '1px solid var(--at-chip)' : undefined,
                     background: seleccionado ? '#EEF2EC' : esHoy ? '#fefce8' : dia ? '#fff' : '#FAF7EF',
                     cursor: dia ? 'pointer' : 'default',
                   }}>
@@ -200,7 +200,7 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
 
         {/* Panel de detalle */}
         {diaDetalle && (
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F' }}>
                 {new Date(diaDetalle + 'T12:00:00').toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })}

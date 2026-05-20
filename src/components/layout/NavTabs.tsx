@@ -35,7 +35,7 @@ export function NavTabs({ activeSection, userRole, onSelect }: Props) {
             padding: '10px 20px', border: 'none', borderRadius: '8px', cursor: 'pointer',
             fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.2s',
             background: activeSection === tab.id
-              ? 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)'
+              ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)'
               : 'transparent',
             color: activeSection === tab.id ? 'white' : '#4a5568',
             boxShadow: activeSection === tab.id ? '0 4px 16px rgba(27, 59, 54,0.4)' : 'none',

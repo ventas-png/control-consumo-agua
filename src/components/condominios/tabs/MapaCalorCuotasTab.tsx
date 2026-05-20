@@ -103,7 +103,7 @@ export default function MapaCalorCuotasTab({ cuotas, unidades, moneda }: Props) 
       </div>
 
       {/* Matriz */}
-      <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'auto' }}>
+      <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', fontSize: 11, minWidth: 700 }}>
           <thead>
             <tr style={{ background: '#FAF7EF' }}>
@@ -120,8 +120,8 @@ export default function MapaCalorCuotasTab({ cuotas, unidades, moneda }: Props) 
           </thead>
           <tbody>
             {matriz.map(row => (
-              <tr key={row.unidad.id} style={{ borderTop: '1px solid #EAE6D8' }}>
-                <td style={{ padding: '6px 12px', fontWeight: 600, color: '#3E5A4C', position: 'sticky', left: 0, background: '#fff', zIndex: 1, borderRight: '1px solid #EAE6D8' }}>
+              <tr key={row.unidad.id} style={{ borderTop: '1px solid var(--at-chip)' }}>
+                <td style={{ padding: '6px 12px', fontWeight: 600, color: '#3E5A4C', position: 'sticky', left: 0, background: '#fff', zIndex: 1, borderRight: '1px solid var(--at-chip)' }}>
                   {row.unidad.nombre}
                 </td>
                 {row.celdas.map(c => {
@@ -149,7 +149,7 @@ export default function MapaCalorCuotasTab({ cuotas, unidades, moneda }: Props) 
             ))}
           </tbody>
           <tfoot>
-            <tr style={{ borderTop: '2px solid #E1DDD0', background: '#FAF7EF' }}>
+            <tr style={{ borderTop: '2px solid var(--at-line)', background: '#FAF7EF' }}>
               <td style={{ padding: '7px 12px', fontWeight: 700, position: 'sticky', left: 0, background: '#FAF7EF' }}>Tasa mes</td>
               {totalesMes.map(t => (
                 <td key={t.mes} style={{ padding: '7px 3px', textAlign: 'center' }}>

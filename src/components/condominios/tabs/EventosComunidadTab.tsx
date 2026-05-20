@@ -108,7 +108,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
   const filtered = filtroEstado === 'todos' ? eventos : eventos.filter(e => e.estado === filtroEstado)
   const selectedAsistentes = selected ? asistentes.filter(a => a.evento_id === selected.id) : []
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -127,7 +127,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar evento' : 'Nuevo Evento'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -186,7 +186,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -248,7 +248,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
                         </button>
                       )}
                       <button onClick={() => startEdit(ev)}
-                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(ev.id)}
                         style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                     </div>
@@ -261,7 +261,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
 
         {/* Asistentes panel */}
         {selected && (
-          <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>Asistentes — {selected.titulo}</h3>
               {canCreate && !showAsistenteForm && (
@@ -272,7 +272,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
               )}
             </div>
             {showAsistenteForm && (
-              <div style={{ background: 'white', borderRadius: '8px', padding: '10px', marginBottom: '10px', border: '1px solid #E1DDD0' }}>
+              <div style={{ background: 'white', borderRadius: '8px', padding: '10px', marginBottom: '10px', border: '1px solid var(--at-line)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
                   <div>
                     <label style={{ fontSize: '10px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '2px' }}>Unidad</label>
@@ -292,7 +292,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button onClick={handleSaveAsistente} style={{ padding: '5px 12px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>Guardar</button>
-                  <button onClick={() => { setShowAsistenteForm(false); setFormAsistente({ ...BLANK_ASISTENTE }) }} style={{ padding: '5px 10px', background: 'white', border: '1px solid #E1DDD0', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+                  <button onClick={() => { setShowAsistenteForm(false); setFormAsistente({ ...BLANK_ASISTENTE }) }} style={{ padding: '5px 10px', background: 'white', border: '1px solid var(--at-line)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
                 </div>
               </div>
             )}
@@ -303,7 +303,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
                 {selectedAsistentes.map(a => {
                   const unidad = unidades.find(u => u.id === a.unidad_id)
                   return (
-                    <div key={a.id} style={{ background: 'white', borderRadius: '8px', padding: '8px 10px', border: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={a.id} style={{ background: 'white', borderRadius: '8px', padding: '8px 10px', border: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: '12px' }}>{a.nombre} <span style={{ color: '#7E9389', fontWeight: 400 }}>({a.num_personas} persona{a.num_personas !== 1 ? 's' : ''})</span></div>
                         {unidad && <div style={{ fontSize: '11px', color: '#1B3B36' }}>🏠 {unidad.nombre}</div>}

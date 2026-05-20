@@ -32,7 +32,7 @@ export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, servic
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
       <div style={{ background: 'white', borderRadius: '14px', width: '100%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid #EAE6D8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--at-chip)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#15291F' }}>Nueva discusión de equipo</h3>
             <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#7E9389' }}>Solo visible para el equipo interno</p>
@@ -44,12 +44,12 @@ export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, servic
             <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>Asunto *</label>
             <input type="text" value={subject} onChange={e => setSubject(e.target.value)}
               placeholder="Ej: Revisión de procedimientos, Aviso de mantenimiento…"
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>Categoría</label>
             <select value={category} onChange={e => setCategory(e.target.value as ConversationCategory)}
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none' }}>
               {(serviceType === 'condominios' ? CONDOMINIOS_CATEGORIES : AGUA_CATEGORIES).map(k => (
                 <option key={k} value={k}>{CATEGORY_LABELS[k]}</option>
               ))}
@@ -59,12 +59,12 @@ export function NuevaDiscusionInternaModal({ onClose, onConfirm, sending, servic
             <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C', marginBottom: '5px' }}>Mensaje inicial *</label>
             <textarea value={firstMessage} onChange={e => setFirstMessage(e.target.value)}
               placeholder="Escribe el mensaje de apertura…" rows={4}
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: '8px', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
           </div>
         </div>
-        <div style={{ padding: '12px 20px 16px', borderTop: '1px solid #EAE6D8', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+        <div style={{ padding: '12px 20px 16px', borderTop: '1px solid var(--at-chip)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button onClick={onClose} disabled={sending}
-            style={{ padding: '8px 16px', border: '1px solid #C7C2B0', borderRadius: '8px', background: 'white', color: '#3E5A4C', fontSize: '13px', cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', background: 'white', color: '#3E5A4C', fontSize: '13px', cursor: 'pointer' }}>
             Cancelar
           </button>
           <button onClick={handleSubmit} disabled={sending || !subject.trim() || !firstMessage.trim()}

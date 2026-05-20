@@ -491,7 +491,7 @@ export function UnidadesSection({
 
   const inputStyle: CSSProperties = {
     padding: '10px 14px',
-    border: '2px solid #E1DDD0',
+    border: '2px solid var(--at-line)',
     borderRadius: '8px',
     fontSize: '14px',
     width: '100%',
@@ -554,7 +554,7 @@ export function UnidadesSection({
                   padding: '10px 20px',
                   background: '#EEF2EC',
                   color: '#102622',
-                  border: '1px solid #C2D2CA',
+                  border: '1px solid var(--at-primary-soft-2)',
                   borderRadius: '8px',
                   fontWeight: 600,
                   fontSize: '14px',
@@ -568,7 +568,7 @@ export function UnidadesSection({
                 onClick={startCreate}
                 style={{
                   padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+                  background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
@@ -899,7 +899,7 @@ export function UnidadesSection({
                   Contadores Asignados
                 </div>
                 {disponibles.length === 0 ? (
-                  <div style={{ fontSize: '13px', color: '#7E9389', padding: '12px', background: '#FAF7EF', borderRadius: '8px', border: '1px solid #E1DDD0' }}>
+                  <div style={{ fontSize: '13px', color: '#7E9389', padding: '12px', background: '#FAF7EF', borderRadius: '8px', border: '1px solid var(--at-line)' }}>
                     No hay contadores disponibles para asignar.
                   </div>
                 ) : (
@@ -980,7 +980,7 @@ export function UnidadesSection({
               disabled={loading}
               style={{
                 padding: '10px 24px',
-                background: loading ? '#7E9389' : 'linear-gradient(135deg, #1B3B36, #577B69)',
+                background: loading ? '#7E9389' : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -1123,7 +1123,7 @@ function UnidadCard({
         borderRadius: 14,
         boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
-        border: u.activo ? '1px solid #E1DDD0' : '1px solid #fca5a5',
+        border: u.activo ? '1px solid var(--at-line)' : '1px solid #fca5a5',
         opacity: u.activo ? 1 : 0.75,
       }}
     >
@@ -1277,7 +1277,7 @@ function UnidadCard({
 function pageBtnStyle(disabled: boolean): CSSProperties {
   return {
     padding: '6px 14px', borderRadius: 8,
-    border: '1px solid #E1DDD0',
+    border: '1px solid var(--at-line)',
     background: disabled ? '#EAE6D8' : 'white',
     color: disabled ? '#C7C2B0' : '#3E5A4C',
     cursor: disabled ? 'not-allowed' : 'pointer',

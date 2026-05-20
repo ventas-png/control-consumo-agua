@@ -103,7 +103,7 @@ export function AuditLogModal({ onClose }: Props) {
       }}>
         {/* Header */}
         <div style={{
-          padding: '20px 24px 14px', borderBottom: '1px solid #E1DDD0',
+          padding: '20px 24px 14px', borderBottom: '1px solid var(--at-line)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
@@ -119,13 +119,13 @@ export function AuditLogModal({ onClose }: Props) {
         </div>
 
         {/* Filters */}
-        <div style={{ padding: '12px 24px', borderBottom: '1px solid #E1DDD0', display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--at-line)', display: 'flex', gap: '10px', alignItems: 'center' }}>
           <span style={{ fontSize: '12px', color: '#7E9389', fontWeight: 600 }}>Filtrar acción:</span>
           <select
             value={filterAction}
             onChange={e => { setFilterAction(e.target.value); setPage(0) }}
             style={{
-              padding: '5px 8px', borderRadius: '6px', border: '1px solid #C7C2B0',
+              padding: '5px 8px', borderRadius: '6px', border: '1px solid var(--at-line-strong)',
               fontSize: '12px', color: '#15291F', background: '#fff',
             }}
           >
@@ -164,7 +164,7 @@ export function AuditLogModal({ onClose }: Props) {
                   const targetUser = r.target_user_id ? users[r.target_user_id] : null
                   const targetRole = r.target_role_id ? roles[r.target_role_id] : null
                   return (
-                    <tr key={r.id} style={{ borderTop: '1px solid #EAE6D8' }}>
+                    <tr key={r.id} style={{ borderTop: '1px solid var(--at-chip)' }}>
                       <td style={td}>{formatDate(r.occurred_at)}</td>
                       <td style={td}>{actor}</td>
                       <td style={td}>
@@ -196,7 +196,7 @@ export function AuditLogModal({ onClose }: Props) {
 
         {/* Pagination */}
         <div style={{
-          padding: '12px 24px', borderTop: '1px solid #E1DDD0',
+          padding: '12px 24px', borderTop: '1px solid var(--at-line)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ fontSize: '12px', color: '#7E9389' }}>
@@ -253,6 +253,6 @@ function formatDate(iso: string): string {
 const th: React.CSSProperties = { padding: '8px 6px', fontSize: '10px', fontWeight: 700 }
 const td: React.CSSProperties = { padding: '8px 6px', verticalAlign: 'top', color: '#3E5A4C' }
 const pageBtn: React.CSSProperties = {
-  padding: '5px 12px', borderRadius: '6px', border: '1px solid #C7C2B0',
+  padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--at-line-strong)',
   background: '#fff', color: '#3E5A4C', fontSize: '12px', fontWeight: 600,
 }

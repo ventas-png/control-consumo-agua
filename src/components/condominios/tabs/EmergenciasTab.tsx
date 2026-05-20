@@ -90,7 +90,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
 
   const tipoInfo = (t: TipoContactoEmergencia) => TIPOS.find(x => x.value === t) ?? TIPOS[TIPOS.length - 1]
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   return (
@@ -123,7 +123,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
         <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Gestión de Contactos</h2>
         {canCreate && !showForm && (
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => setShowImportModal(true)} style={{ padding: '8px 14px', background: '#EEF2EC', color: '#102622', border: '1.5px solid #C2D2CA', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => setShowImportModal(true)} style={{ padding: '8px 14px', background: '#EEF2EC', color: '#102622', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               ⬆ Carga masiva
             </button>
             <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
@@ -134,7 +134,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
       </div>
 
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Contacto' : 'Nuevo Contacto'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: '12px' }}>
             <div>
@@ -175,7 +175,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
@@ -231,7 +231,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
                     </div>
                   )}
                 </div>
-                {c.descripcion && <div style={{ marginTop: '8px', fontSize: '11px', color: '#7E9389', borderTop: '1px solid #EAE6D8', paddingTop: '6px' }}>{c.descripcion}</div>}
+                {c.descripcion && <div style={{ marginTop: '8px', fontSize: '11px', color: '#7E9389', borderTop: '1px solid var(--at-chip)', paddingTop: '6px' }}>{c.descripcion}</div>}
               </div>
             )
           })}

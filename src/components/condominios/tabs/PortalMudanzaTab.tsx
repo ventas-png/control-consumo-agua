@@ -148,7 +148,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
 
   const fieldStyle: React.CSSProperties = {
     width: '100%', padding: '9px 12px', fontSize: '13.5px',
-    border: '1.5px solid #E1DDD0', borderRadius: '8px', outline: 'none', boxSizing: 'border-box',
+    border: '1.5px solid var(--at-line)', borderRadius: '8px', outline: 'none', boxSizing: 'border-box',
   }
   const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#3E5A4C', marginBottom: '4px', display: 'block' }
 
@@ -231,7 +231,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
               <label style={labelStyle}>Fotos / documentos (opcional, máx. 5)</label>
               <div
                 style={{
-                  border: '1.5px dashed #E6CDBB', borderRadius: '8px', padding: '10px 12px',
+                  border: '1.5px dashed var(--at-accent-soft)', borderRadius: '8px', padding: '10px 12px',
                   background: '#f8f9ff', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
                 }}
               >
@@ -240,7 +240,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     style={{
-                      padding: '6px 14px', background: '#F4EBE3', border: '1.5px solid #E6CDBB',
+                      padding: '6px 14px', background: '#F4EBE3', border: '1.5px solid var(--at-accent-soft)',
                       borderRadius: '7px', color: '#9C5733', fontWeight: 600, fontSize: '12px', cursor: 'pointer',
                     }}
                   >
@@ -262,7 +262,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
                       <img
                         src={url}
                         alt={file.name}
-                        style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1.5px solid #E1DDD0' }}
+                        style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1.5px solid var(--at-line)' }}
                         onLoad={() => URL.revokeObjectURL(url)}
                       />
                       <button
@@ -293,7 +293,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
                   background: '#EAE6D8', borderRadius: '8px', padding: '12px',
                   maxHeight: '130px', overflowY: 'auto', fontSize: '12.5px',
                   color: '#3E5A4C', lineHeight: 1.6, marginBottom: '10px',
-                  border: '1px solid #E1DDD0', whiteSpace: 'pre-wrap',
+                  border: '1px solid var(--at-line)', whiteSpace: 'pre-wrap',
                 }}>
                   {terminosMudanza}
                 </div>
@@ -342,7 +342,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
         const est   = ESTADO_CFG[s.estado]
         const fecha = s.created_at ? new Date(s.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' }) : ''
         return (
-          <div key={s.id} style={{ border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
+          <div key={s.id} style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '10px', background: 'white' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '14px', color: '#15291F', marginBottom: '4px' }}>

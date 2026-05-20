@@ -97,7 +97,7 @@ export function BitacoraManto({ registros, proyectoId, companyId, canCreate, can
     const completadas = tareasList.filter(t => t.completado).length
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bitácora Mantenimiento</title>
 <style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px}
-table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #ccc;padding:6px 8px}th{background:#FAF7EF}
+table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #ccc;padding:6px 8px}th{background:var(--at-surface-2)}
 .check{color:${ts.color};font-weight:700}.footer{margin-top:40px;border-top:1px solid #ccc;padding-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
 .sig{border-top:1px solid #000;margin-top:50px;padding-top:6px;font-size:11px}</style></head><body>
 <h1>Bitácora de Mantenimiento — ${ts.icon} ${ts.label}</h1>
@@ -118,7 +118,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
   if (filtroTurno !== 'todos') filtered = filtered.filter(r => r.turno === filtroTurno)
   if (filtroFecha) filtered = filtered.filter(r => r.fecha === filtroFecha)
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -137,7 +137,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar registro' : 'Nuevo Registro de Mantenimiento'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
@@ -170,7 +170,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389' }}>Lista de tareas</label>
               <div style={{ display: 'flex', gap: '6px' }}>
-                <select style={{ padding: '3px 6px', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', background: '#FAF7EF' }}
+                <select style={{ padding: '3px 6px', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', background: '#FAF7EF' }}
                   onChange={e => { if (e.target.value) { addTarea(e.target.value); e.target.value = '' } }}>
                   <option value="">+ Tarea predefinida</option>
                   {TAREAS_PREDEFINIDAS.map(t => <option key={t} value={t}>{t}</option>)}
@@ -200,7 +200,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null); setTareas([]) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -220,7 +220,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
           </button>
         ))}
         <input type="date" value={filtroFecha} onChange={e => setFiltroFecha(e.target.value)}
-          style={{ padding: '4px 8px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF', color: '#15291F' }} />
+          style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF', color: '#15291F' }} />
         {filtroFecha && <button onClick={() => setFiltroFecha('')} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>✕ Limpiar fecha</button>}
       </div>
 
@@ -264,7 +264,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
                       style={{ padding: '3px 7px', background: '#F4EBE3', color: '#9C5733', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
                     {canEdit && <>
                       <button onClick={() => startEdit(r)}
-                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(r.id)}
                         style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                     </>}
@@ -280,7 +280,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
           const ts = TURNO_STYLE[selected.turno] ?? TURNO_STYLE['mañana']
           const tareasList = (selected.tareas ?? []) as TareaItem[]
           return (
-            <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px' }}>
+            <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>{ts.icon} {selected.fecha} — {ts.label}</h3>
                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -301,7 +301,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
                 {selected.area && <><span style={{ margin: '0 8px', color: '#E1DDD0' }}>|</span><span style={{ fontWeight: 600 }}>Área:</span> {selected.area}</>}
               </div>
               {selected.observaciones && (
-                <div style={{ background: 'white', borderRadius: '8px', padding: '8px', border: '1px solid #E1DDD0', marginBottom: '10px', fontSize: '12px', color: '#3E5A4C', fontStyle: 'italic' }}>
+                <div style={{ background: 'white', borderRadius: '8px', padding: '8px', border: '1px solid var(--at-line)', marginBottom: '10px', fontSize: '12px', color: '#3E5A4C', fontStyle: 'italic' }}>
                   {selected.observaciones}
                 </div>
               )}
@@ -310,7 +310,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {tareasList.map((t, i) => (
-                    <div key={i} style={{ background: 'white', borderRadius: '7px', padding: '7px 10px', border: '1px solid #E1DDD0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div key={i} style={{ background: 'white', borderRadius: '7px', padding: '7px 10px', border: '1px solid var(--at-line)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {canEdit ? (
                         <input type="checkbox" checked={t.completado} onChange={() => toggleTareaCompletada(selected, i)} style={{ width: '15px', height: '15px', cursor: 'pointer', flexShrink: 0 }} />
                       ) : (

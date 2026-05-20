@@ -101,7 +101,7 @@ export default function AnalisisVisitantesTab({ visitantes, unidades }: Props) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
             {/* Horas pico */}
-            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+            <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>Horas de mayor afluencia</div>
               <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 80 }}>
                 {stats.porHora.map((cnt, h) => (
@@ -121,7 +121,7 @@ export default function AnalisisVisitantesTab({ visitantes, unidades }: Props) {
             </div>
 
             {/* Días de semana */}
-            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+            <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>Visitas por día de semana</div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80 }}>
                 {DIAS.map((d, i) => (
@@ -142,7 +142,7 @@ export default function AnalisisVisitantesTab({ visitantes, unidades }: Props) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
             {/* Tendencia mensual */}
-            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+            <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>Tendencia últimos 6 meses</div>
               {stats.tendenciaMes.length === 0 ? (
                 <div style={{ fontSize: 12, color: '#7E9389' }}>Sin datos suficientes</div>
@@ -168,7 +168,7 @@ export default function AnalisisVisitantesTab({ visitantes, unidades }: Props) {
             </div>
 
             {/* Top unidades */}
-            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+            <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>Unidades más visitadas</div>
               {stats.topUnidades.slice(0, 6).map((u, i) => (
                 <div key={u.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -183,7 +183,7 @@ export default function AnalisisVisitantesTab({ visitantes, unidades }: Props) {
             </div>
 
             {/* Visitantes frecuentes */}
-            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+            <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>Visitantes frecuentes</div>
               {stats.visitantesFrecuentes.length === 0 ? (
                 <div style={{ fontSize: 12, color: '#7E9389' }}>Sin visitantes recurrentes</div>

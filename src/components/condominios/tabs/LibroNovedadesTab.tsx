@@ -76,13 +76,13 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
   function handlePrint(n: LibroNovedad) {
     const tc = TURNO_COLORS[n.turno] ?? { icon: '📋' }
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Novedad ${n.fecha}</title>
-    <style>body{font-family:sans-serif;padding:32px;color:#15291F}h1{font-size:18px}p{font-size:13px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid #E1DDD0}th{background:#FAF7EF}</style>
+    <style>body{font-family:sans-serif;padding:32px;color:var(--at-ink)}h1{font-size:18px}p{font-size:13px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid var(--at-line)}th{background:var(--at-surface-2)}</style>
     </head><body>
     <h1>${tc.icon} Libro de Novedades — ${n.fecha} (${n.turno})</h1>
     <p><b>Responsable:</b> ${n.responsable} &nbsp; <b>Horario:</b> ${n.hora_inicio ?? '—'} – ${n.hora_fin ?? '—'}</p>
     <h2 style="font-size:14px">Novedades del turno</h2><p>${n.novedades.replace(/\n/g, '<br>')}</p>
     ${(n.incidentes as Incidente[]).length > 0 ? `<h2 style="font-size:14px">Incidentes</h2><table><tr><th>Hora</th><th>Tipo</th><th>Descripción</th></tr>${(n.incidentes as Incidente[]).map(i => `<tr><td>${i.hora}</td><td>${i.tipo}</td><td>${i.descripcion}</td></tr>`).join('')}</table>` : ''}
-    <p style="margin-top:40px;font-size:12px;color:#7E9389">Firmado: ${n.firmado ? 'Sí' : 'No'}</p>
+    <p style="margin-top:40px;font-size:12px;color:var(--at-ink-3)">Firmado: ${n.firmado ? 'Sí' : 'No'}</p>
     </body></html>`
     const w = window.open('', '_blank')
     if (w) { w.document.write(html); w.document.close(); w.print() }
@@ -91,7 +91,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
   const filtered = filtroTurno === 'todos' ? novedades : novedades.filter(n => n.turno === filtroTurno)
   const detail = selected ? novedades.find(n => n.id === selected) : null
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -110,7 +110,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nueva entrada</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
             <div>
@@ -176,7 +176,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -229,7 +229,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
                     </div>
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                       <button onClick={e => { e.stopPropagation(); handlePrint(n) }}
-                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
+                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
                       {canEdit && !n.firmado && (
                         <button onClick={e => { e.stopPropagation(); toggleFirmado(n.id, n.firmado) }}
                           style={{ padding: '3px 7px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Firmar</button>
@@ -248,7 +248,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
 
         {/* Detail */}
         {detail && (
-          <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', alignSelf: 'flex-start' }}>
+          <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', alignSelf: 'flex-start' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>
                 {TURNO_COLORS[detail.turno]?.icon} {detail.fecha} — {detail.turno}

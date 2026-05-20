@@ -109,7 +109,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: 'white', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: 'white', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -119,7 +119,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
 
       {/* Generate new close */}
       {canCreate && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Generar nuevo cierre</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
@@ -150,7 +150,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
           )}
 
           {previewing && preview && (
-            <div style={{ marginTop: '12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px' }}>
+            <div style={{ marginTop: '12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
                 {[
                   { label: 'Cuotas emitidas', value: preview.totalEmitidas,    color: '#1B3B36' },
@@ -174,18 +174,18 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
       {sorted.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay cierres mensuales registrados.</div>
       ) : (
-        <div style={{ border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#FAF7EF' }}>
                 {['Período','Cuotas emitidas','Cuotas cobradas','Gastos','Saldo','Morosas','Estado',''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Período' || h === 'Estado' || h === '' ? 'left' : 'right', fontSize: '11px', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid #E1DDD0' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Período' || h === 'Estado' || h === '' ? 'left' : 'right', fontSize: '11px', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {sorted.map((c, i) => (
-                <tr key={c.id} style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF', borderBottom: '1px solid #EAE6D8' }}>
+                <tr key={c.id} style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF', borderBottom: '1px solid var(--at-chip)' }}>
                   <td style={{ padding: '10px 12px', fontWeight: 700 }}>{c.periodo}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', color: '#7E9389' }}>{moneda} {c.total_cuotas_emitidas.toFixed(2)}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>{moneda} {c.total_cuotas_cobradas.toFixed(2)}</td>

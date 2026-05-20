@@ -117,7 +117,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
     ? (parseFloat(form.monto_total) / parseInt(form.num_cuotas)).toFixed(2)
     : ''
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -137,7 +137,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px', marginBottom: '16px' }}>
         {Object.entries(ESTADO_STYLE).map(([estado, s]) => (
-          <div key={estado} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+          <div key={estado} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, color: s.color }}>{planes.filter(p => p.estado === estado).length}</div>
             <div style={{ fontSize: '11px', color: '#7E9389' }}>{s.label}</div>
           </div>
@@ -146,7 +146,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nuevo Plan de Pago</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
             <div>
@@ -194,7 +194,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
               {saving ? 'Creando…' : 'Crear plan'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -260,7 +260,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
 
         {/* Cuotas panel */}
         {selected && (
-          <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
             <h3 style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700 }}>
               Cuotas — {selected.concepto}
             </h3>

@@ -150,7 +150,7 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontWeight: 700, fontSize: 14, color: '#15291F' }}>Cuadro de Mando · {hoy}</div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={exportarResumenPDF} style={{ padding: '5px 10px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid #C2D2CA', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📄 PDF</button>
+          <button onClick={exportarResumenPDF} style={{ padding: '5px 10px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📄 PDF</button>
           <button onClick={exportarResumenXlsx} style={{ padding: '5px 10px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📊 Excel</button>
         </div>
       </div>
@@ -168,7 +168,7 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         {/* Tickets por prioridad */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>🔧 Tickets abiertos por prioridad</div>
           {[
             { label: 'Urgente', val: ticketsPorPrioridad.urgente, color: '#ef4444', bg: '#fef2f2' },
@@ -190,7 +190,7 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
         </div>
 
         {/* Vencimientos próximos 30 días */}
-        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>⏳ Vencimientos próximos 30 días ({vencimientos30.length})</div>
           {vencimientos30.length === 0 ? (
             <div style={{ fontSize: 12, color: '#7E9389', textAlign: 'center', padding: '16px 0' }}>Sin vencimientos en los próximos 30 días ✓</div>
@@ -232,7 +232,7 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
       )}
 
       {/* Semáforo resumen */}
-      <div style={{ marginTop: 16, background: '#FAF7EF', borderRadius: 10, padding: '12px 16px', border: '1px solid #E1DDD0' }}>
+      <div style={{ marginTop: 16, background: '#FAF7EF', borderRadius: 10, padding: '12px 16px', border: '1px solid var(--at-line)' }}>
         <div style={{ fontWeight: 700, fontSize: 12, color: '#3E5A4C', marginBottom: 8 }}>Estado general del condominio</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
           {[

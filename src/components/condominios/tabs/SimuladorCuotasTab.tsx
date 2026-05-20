@@ -74,7 +74,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
 
   const INPUT_STYLE = {
     width: '100%', padding: '6px 10px', borderRadius: 8,
-    border: '1px solid #C7C2B0', fontSize: 13, background: '#fff',
+    border: '1px solid var(--at-line-strong)', fontSize: 13, background: '#fff',
   }
 
   return (
@@ -86,7 +86,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
 
       <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 16 }}>
         {/* Panel de controles */}
-        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 14 }}>Parámetros</div>
 
           <div style={{ marginBottom: 14 }}>
@@ -127,7 +127,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
             </label>
             {[6, 12, 24].map(n => (
               <button key={n} onClick={() => setMesesProyeccion(n)}
-                style={{ marginRight: 6, padding: '4px 12px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, cursor: 'pointer',
+                style={{ marginRight: 6, padding: '4px 12px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: 'pointer',
                   background: mesesProyeccion === n ? '#1B3B36' : '#fff',
                   color: mesesProyeccion === n ? '#fff' : '#3E5A4C', fontWeight: mesesProyeccion === n ? 700 : 400 }}>
                 {n}m
@@ -164,7 +164,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
           </div>
 
           {/* Gráfica */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14, flex: 1 }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 12, color: '#15291F', marginBottom: 12 }}>
               Proyección {mesesProyeccion} meses
             </div>
@@ -196,7 +196,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
           </div>
 
           {/* Tabla resumen */}
-          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ background: '#fff', border: '1px solid var(--at-line)', borderRadius: 12, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
               <thead>
                 <tr style={{ background: '#FAF7EF' }}>
@@ -209,7 +209,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
                 {proyeccion.reduce<{ rows: ReactElement[]; acum: number }>((acc, p, i) => {
                   acc.acum += p.superavit
                   acc.rows.push(
-                    <tr key={i} style={{ borderTop: '1px solid #EAE6D8', background: p.superavit < 0 ? '#fef2f2' : undefined }}>
+                    <tr key={i} style={{ borderTop: '1px solid var(--at-chip)', background: p.superavit < 0 ? '#fef2f2' : undefined }}>
                       <td style={{ padding: '6px 10px', color: '#7E9389' }}>{labelMes(p.mes)} {p.mes.slice(0, 4)}</td>
                       <td style={{ padding: '6px 10px', textAlign: 'right', color: '#16a34a' }}>{moneda} {Math.round(p.ingresos).toLocaleString('es')}</td>
                       <td style={{ padding: '6px 10px', textAlign: 'right', color: '#ef4444' }}>{moneda} {Math.round(p.egresos).toLocaleString('es')}</td>

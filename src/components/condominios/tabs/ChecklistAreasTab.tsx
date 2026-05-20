@@ -29,7 +29,7 @@ const ITEMS_PREDEFINIDOS = [
 const BLANK_ITEM: ChecklistItem = { item: '', ok: false, observacion: '' }
 
 const inputStyle: CSSProperties = {
-  width: '100%', padding: '7px 10px', border: '1.5px solid #E1DDD0',
+  width: '100%', padding: '7px 10px', border: '1.5px solid var(--at-line)',
   borderRadius: '7px', fontSize: '13px', boxSizing: 'border-box',
 }
 
@@ -121,8 +121,8 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
   return (
     <div style={{ display: 'flex', height: '100%', minHeight: 0 }}>
       {/* LEFT */}
-      <div style={{ width: '340px', flexShrink: 0, borderRight: '1.5px solid #E1DDD0', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '14px', borderBottom: '1px solid #E1DDD0', background: '#FAF7EF' }}>
+      <div style={{ width: '340px', flexShrink: 0, borderRight: '1.5px solid var(--at-line)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '14px', borderBottom: '1px solid var(--at-line)', background: '#FAF7EF' }}>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
             {kpiCounts.map(({ key, count }) => {
               const s = ESTADO_STYLE[key]
@@ -154,7 +154,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
             const pct = c.items.length > 0 ? Math.round(c.items.filter(i => i.ok).length / c.items.length * 100) : 0
             return (
               <div key={c.id} onClick={() => { setSelected(c); setShowForm(false) }}
-                style={{ padding: '12px 14px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === c.id ? '#EEF2EC' : 'white', borderLeft: selected?.id === c.id ? '3px solid #1B3B36' : '3px solid transparent' }}>
+                style={{ padding: '12px 14px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === c.id ? '#EEF2EC' : 'white', borderLeft: selected?.id === c.id ? '3px solid var(--at-primary)' : '3px solid transparent' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: '13px', color: '#15291F' }}>{c.area}</div>
@@ -179,7 +179,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
       {/* RIGHT */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
         {showForm && (
-          <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+          <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
             <h3 style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar checklist' : 'Nuevo checklist de área'}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '14px' }}>
               <div style={{ gridColumn: 'span 2' }}>
@@ -213,7 +213,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
               </div>
               {formItems.length === 0 && <div style={{ fontSize: '12px', color: '#7E9389', fontStyle: 'italic' }}>Sin ítems añadidos</div>}
               {formItems.map((it, i) => (
-                <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px', background: 'white', borderRadius: '8px', padding: '8px', border: '1px solid #E1DDD0' }}>
+                <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px', background: 'white', borderRadius: '8px', padding: '8px', border: '1px solid var(--at-line)' }}>
                   <input type="checkbox" checked={it.ok} onChange={e => setItem(i, 'ok', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#16a34a' }} />
                   <input value={it.item} onChange={e => setItem(i, 'item', e.target.value)} placeholder="Ítem de inspección" style={{ ...inputStyle, flex: 1, background: it.ok ? '#f0fdf4' : 'white' }} />
                   <input value={it.observacion} onChange={e => setItem(i, 'observacion', e.target.value)} placeholder="Observación" style={{ ...inputStyle, flex: 1 }} />
@@ -236,7 +236,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
           const done = selected.items.filter(i => i.ok).length
           const pct = selected.items.length > 0 ? Math.round(done / selected.items.length * 100) : 0
           return (
-            <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '24px' }}>
+            <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>

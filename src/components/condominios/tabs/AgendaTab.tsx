@@ -132,7 +132,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
   }
 
   const inputStyle: CSSProperties = {
-    width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px',
+    width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px',
     fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box',
   }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
@@ -176,7 +176,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#15291F' }}>
             {editId ? 'Editar Elemento' : 'Nuevo Elemento de Agenda'}
           </h3>
@@ -227,7 +227,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear'}
             </button>
@@ -253,7 +253,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
         ))}
         <div style={{ width: '1px', height: '24px', background: '#E1DDD0', margin: '0 4px' }} />
         <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as TipoAgenda | 'todos')}
-          style={{ padding: '5px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
+          style={{ padding: '5px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: '#FAF7EF' }}>
           <option value="todos">Todos los tipos</option>
           {(Object.entries(TIPO_CONFIG) as [TipoAgenda, typeof TIPO_CONFIG[TipoAgenda]][]).map(([k, v]) => (
             <option key={k} value={k}>{v.icon} {v.label}</option>
@@ -291,7 +291,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
                     const estado = ESTADO_CONFIG[a.estado]
                     return (
                       <div key={a.id} style={{
-                        background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                        background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px',
                         padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: '12px',
                         borderLeft: `4px solid ${tipo.color}`,
                         opacity: a.estado === 'completado' || a.estado === 'cancelado' ? 0.65 : 1,

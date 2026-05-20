@@ -96,7 +96,7 @@ export function AssignToUsersModal({ teamUsers, currentAssignments, onClose, onA
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button onClick={onClose}
-            style={{ padding: '8px 16px', border: '1px solid #C7C2B0', borderRadius: '8px', background: 'white', fontSize: '13px', cursor: 'pointer', color: '#3E5A4C' }}>
+            style={{ padding: '8px 16px', border: '1px solid var(--at-line-strong)', borderRadius: '8px', background: 'white', fontSize: '13px', cursor: 'pointer', color: '#3E5A4C' }}>
             Cancelar
           </button>
           <button onClick={handleSave} disabled={saving}

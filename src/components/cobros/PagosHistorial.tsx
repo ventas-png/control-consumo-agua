@@ -62,17 +62,17 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
         <input
           type="text" placeholder="Buscar por cliente, N° doc, referencia..."
           value={busqueda} onChange={e => setBusqueda(e.target.value)}
-          style={{ flex: 1, minWidth: '220px', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit' }}
+          style={{ flex: 1, minWidth: '220px', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit' }}
         />
         <select value={filtroMetodo} onChange={e => setFiltroMetodo(e.target.value)}
-          style={{ padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit', background: 'white' }}>
+          style={{ padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', background: 'white' }}>
           <option value="todos">Todas las formas</option>
           {(Object.entries(formasPagoLabels) as [FormaPago, string][]).map(([val, lbl]) => (
             <option key={val} value={val}>{lbl}</option>
           ))}
         </select>
         <select value={filtroFecha} onChange={e => setFiltroFecha(e.target.value as any)}
-          style={{ padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit', background: 'white' }}>
+          style={{ padding: '10px 14px', borderRadius: '8px', border: '1.5px solid var(--at-line)', fontSize: '14px', fontFamily: 'inherit', background: 'white' }}>
           <option value="todos">Todas las fechas</option>
           <option value="hoy">Hoy</option>
           <option value="semana">Últimos 7 días</option>
@@ -98,7 +98,7 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
         <div style={{ background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.07)' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-              <thead style={{ background: '#FAF7EF', borderBottom: '2px solid #E1DDD0' }}>
+              <thead style={{ background: '#FAF7EF', borderBottom: '2px solid var(--at-line)' }}>
                 <tr>
                   {['Fecha','Cliente','Monto','Forma de Pago','N° Documento','Referencia / Banco','Notas'].map(h => (
                     <th scope="col" key={h} style={{ padding: '14px 16px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C', whiteSpace: 'nowrap' }}>{h}</th>
@@ -110,7 +110,7 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
                   const cliente = clientes.find(c => c.id === p.cliente_id)
                   const mc = METODO_COLOR[p.metodo] ?? METODO_COLOR.otro
                   return (
-                    <tr key={p.id} style={{ borderBottom: '1px solid #EAE6D8' }}
+                    <tr key={p.id} style={{ borderBottom: '1px solid var(--at-chip)' }}
                       onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = '#FAF7EF'}
                       onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'}>
                       <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', color: '#3E5A4C' }}>

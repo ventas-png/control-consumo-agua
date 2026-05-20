@@ -168,7 +168,7 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
 
             {/* Expanded detail */}
             {expanded && (
-              <div style={{ padding: '0 16px 16px', borderTop: '1px solid #E1DDD0' }}>
+              <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--at-line)' }}>
                 {s.motivo && (
                   <div style={{ marginTop: '12px', background: '#FAF7EF', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: '#3E5A4C' }}>
                     <strong>Motivo del cliente:</strong><br />{s.motivo}
@@ -201,7 +201,7 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
                         onClick={e => e.stopPropagation()}
                         style={{
                           padding: '7px 12px', fontSize: '13px', borderRadius: '8px',
-                          border: '1.5px solid #E1DDD0', background: 'white', cursor: 'pointer',
+                          border: '1.5px solid var(--at-line)', background: 'white', cursor: 'pointer',
                         }}
                       >
                         <option value="arrendamiento">Arrendamiento</option>

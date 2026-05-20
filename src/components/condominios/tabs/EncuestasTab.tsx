@@ -111,7 +111,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
     setSavingResp(false); setShowRespForm(false); onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   return (
@@ -126,7 +126,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
 
       {/* Formulario encuesta */}
       {showEncuestaForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editEncuestaId ? 'Editar Encuesta' : 'Nueva Encuesta'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
@@ -160,11 +160,11 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
               <button onClick={addPregunta} style={{ padding: '4px 12px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>+ Agregar</button>
             </div>
             {preguntas.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '16px', color: '#7E9389', fontSize: '12px', background: 'white', borderRadius: '8px', border: '1px dashed #E1DDD0' }}>Agrega al menos una pregunta</div>
+              <div style={{ textAlign: 'center', padding: '16px', color: '#7E9389', fontSize: '12px', background: 'white', borderRadius: '8px', border: '1px dashed var(--at-line)' }}>Agrega al menos una pregunta</div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {preguntas.map((p, i) => (
-                <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 160px auto', gap: '8px', alignItems: 'center', background: 'white', padding: '10px', borderRadius: '8px', border: '1px solid #E1DDD0' }}>
+                <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 160px auto', gap: '8px', alignItems: 'center', background: 'white', padding: '10px', borderRadius: '8px', border: '1px solid var(--at-line)' }}>
                   <input style={{ ...inputStyle, background: 'white' }} value={p.texto} onChange={e => updatePregunta(i, { texto: e.target.value })} placeholder={`Pregunta ${i + 1}`} />
                   <select style={{ ...inputStyle, background: 'white' }} value={p.tipo} onChange={e => updatePregunta(i, { tipo: e.target.value as PreguntaItem['tipo'] })}>
                     <option value="texto">Respuesta libre</option>
@@ -178,7 +178,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
           </div>
 
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelEncuestaForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={cancelEncuestaForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
             <button onClick={handleSaveEncuesta} disabled={savingEnc} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: savingEnc ? 0.7 : 1 }}>
               {savingEnc ? 'Guardando…' : editEncuestaId ? 'Actualizar' : 'Crear Encuesta'}
             </button>
@@ -225,7 +225,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
 
         {/* Detalle encuesta + respuestas */}
         {selectedEncuesta && (
-          <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px' }}>
+          <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
               <div>
                 <h3 style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: 800, color: '#15291F' }}>{selectedEncuesta.titulo}</h3>
@@ -241,7 +241,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
 
             {/* Formulario de respuesta */}
             {showRespForm && (
-              <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '10px', padding: '16px', marginBottom: '16px' }}>
+              <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '10px', padding: '16px', marginBottom: '16px' }}>
                 <h4 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700 }}>Registrar Respuesta</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                   <div>
@@ -293,7 +293,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
                   ))}
                 </div>
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                  <button onClick={() => setShowRespForm(false)} style={{ padding: '7px 14px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+                  <button onClick={() => setShowRespForm(false)} style={{ padding: '7px 14px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
                   <button onClick={handleSaveRespuesta} disabled={savingResp} style={{ padding: '7px 14px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: savingResp ? 0.7 : 1 }}>
                     {savingResp ? 'Guardando…' : 'Guardar Respuesta'}
                   </button>
@@ -308,7 +308,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389', marginBottom: '4px' }}>Respuestas recibidas ({encuestaRespuestas.length})</div>
                 {encuestaRespuestas.map((r, idx) => (
-                  <div key={r.id} style={{ background: '#FAF7EF', borderRadius: '8px', padding: '12px', border: '1px solid #E1DDD0' }}>
+                  <div key={r.id} style={{ background: '#FAF7EF', borderRadius: '8px', padding: '12px', border: '1px solid var(--at-line)' }}>
                     <div style={{ fontSize: '12px', fontWeight: 700, color: '#15291F', marginBottom: '8px' }}>
                       #{idx + 1} {r.unidad_nombre ? `🏠 ${r.unidad_nombre}` : ''} {r.nombre_respondente ? `· ${r.nombre_respondente}` : ''}
                       <span style={{ fontWeight: 400, color: '#7E9389', marginLeft: '8px' }}>{new Date(r.created_at).toLocaleDateString()}</span>

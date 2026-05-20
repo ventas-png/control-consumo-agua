@@ -87,7 +87,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 50%, #577B69 100%)',
+      background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 50%, var(--at-accent-2) 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -100,11 +100,11 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
         }
         .reg-input:focus {
           outline: none;
-          border-color: #1B3B36 !important;
+          border-color: var(--at-primary) !important;
           box-shadow: 0 0 0 3px rgba(27, 59, 54,0.15);
         }
         .reg-btn-primary:hover:not(:disabled) {
-          background: linear-gradient(135deg, #102622, #102622) !important;
+          background: linear-gradient(135deg, var(--at-primary-hover), var(--at-primary-hover)) !important;
           transform: translateY(-1px);
           box-shadow: 0 6px 20px rgba(27, 59, 54,0.4) !important;
         }
@@ -167,8 +167,8 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
           <>
             {/* Info banner */}
             <div style={{
-              background: 'linear-gradient(135deg, #EEF2EC, #D9E2DC)',
-              border: '1px solid #C2D2CA',
+              background: 'linear-gradient(135deg, var(--at-primary-tint), var(--at-primary-soft))',
+              border: '1px solid var(--at-primary-soft-2)',
               borderRadius: '12px',
               padding: '12px 16px',
               marginBottom: '24px',
@@ -199,7 +199,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                   style={{
                     width: '100%', boxSizing: 'border-box',
                     padding: '10px 14px', fontSize: '14px',
-                    border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                    border: '1.5px solid var(--at-line)', borderRadius: '10px',
                     background: '#FAF7EF', color: '#15291F',
                     transition: 'border-color 0.2s, box-shadow 0.2s',
                   }}
@@ -221,7 +221,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                   style={{
                     width: '100%', boxSizing: 'border-box',
                     padding: '10px 14px', fontSize: '14px',
-                    border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                    border: '1.5px solid var(--at-line)', borderRadius: '10px',
                     background: '#FAF7EF', color: '#15291F',
                     transition: 'border-color 0.2s, box-shadow 0.2s',
                   }}
@@ -244,7 +244,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                     style={{
                       width: '100%', boxSizing: 'border-box',
                       padding: '10px 14px', fontSize: '14px',
-                      border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                      border: '1.5px solid var(--at-line)', borderRadius: '10px',
                       background: '#FAF7EF', color: '#15291F',
                       transition: 'border-color 0.2s, box-shadow 0.2s',
                     }}
@@ -264,7 +264,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                     style={{
                       width: '100%', boxSizing: 'border-box',
                       padding: '10px 14px', fontSize: '14px',
-                      border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                      border: '1.5px solid var(--at-line)', borderRadius: '10px',
                       background: '#FAF7EF', color: '#15291F',
                       transition: 'border-color 0.2s, box-shadow 0.2s',
                     }}
@@ -288,7 +288,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                     style={{
                       width: '100%', boxSizing: 'border-box',
                       padding: '10px 44px 10px 14px', fontSize: '14px',
-                      border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                      border: '1.5px solid var(--at-line)', borderRadius: '10px',
                       background: '#FAF7EF', color: '#15291F',
                       transition: 'border-color 0.2s, box-shadow 0.2s',
                     }}
@@ -366,7 +366,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                 padding: '13px',
                 background: loading
                   ? '#7E9389'
-                  : 'linear-gradient(135deg, #1B3B36, #577B69)',
+                  : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                 color: 'white',
                 border: 'none',
                 borderRadius: '12px',
@@ -408,7 +408,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                 padding: '10px',
                 background: 'transparent',
                 color: '#7E9389',
-                border: '1.5px solid #E1DDD0',
+                border: '1.5px solid var(--at-line)',
                 borderRadius: '10px',
                 fontSize: '13.5px',
                 fontWeight: 500,

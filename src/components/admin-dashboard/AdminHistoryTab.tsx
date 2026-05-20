@@ -141,7 +141,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
           style={{
             padding: '12px 16px',
             borderRadius: '8px',
-            border: '2px solid #E1DDD0',
+            border: '2px solid var(--at-line)',
             fontSize: '14px',
             fontFamily: 'inherit',
           }}
@@ -153,7 +153,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
           style={{
             padding: '12px 16px',
             borderRadius: '8px',
-            border: '2px solid #E1DDD0',
+            border: '2px solid var(--at-line)',
             fontSize: '14px',
             fontFamily: 'inherit',
             background: 'white',

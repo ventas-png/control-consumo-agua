@@ -84,7 +84,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
   const enEjecucion = obras.filter(o => o.estado === 'en_ejecucion').length
   const completadas = obras.filter(o => o.estado === 'completada').length
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -109,7 +109,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
           { label: 'Completadas', value: String(completadas), color: '#10b981' },
           { label: 'Presupuestado', value: fmt(totalPresupuestado, moneda), color: '#1B3B36' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: k.label === 'Presupuestado' ? '12px' : '22px', fontWeight: 800, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: '11px', color: '#7E9389' }}>{k.label}</div>
           </div>
@@ -118,7 +118,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar obra' : 'Nueva Obra'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -171,7 +171,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -226,7 +226,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: '8px' }} onClick={e => e.stopPropagation()}>
                       <button onClick={() => startEdit(o)}
-                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(o.id)}
                         style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                     </div>
@@ -239,7 +239,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
 
         {/* Detail panel */}
         {selected && (
-          <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px' }}>
+          <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px' }}>
             <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{selected.titulo}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
               {[
@@ -251,7 +251,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
                 { label: 'Fecha fin estimada', value: selected.fecha_fin_estimada ?? '—' },
                 { label: 'Fecha fin real', value: selected.fecha_fin_real ?? '—' },
               ].map(f => (
-                <div key={f.label} style={{ background: 'white', borderRadius: '7px', padding: '8px', border: '1px solid #E1DDD0' }}>
+                <div key={f.label} style={{ background: 'white', borderRadius: '7px', padding: '8px', border: '1px solid var(--at-line)' }}>
                   <div style={{ fontSize: '10px', color: '#7E9389' }}>{f.label}</div>
                   <div style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C' }}>{f.value}</div>
                 </div>
@@ -276,7 +276,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
             )}
 
             {selected.notas && (
-              <div style={{ background: 'white', borderRadius: '8px', padding: '10px', border: '1px solid #E1DDD0' }}>
+              <div style={{ background: 'white', borderRadius: '8px', padding: '10px', border: '1px solid var(--at-line)' }}>
                 <div style={{ fontSize: '10px', color: '#7E9389', marginBottom: '4px' }}>Notas</div>
                 <div style={{ fontSize: '12px', color: '#3E5A4C' }}>{selected.notas}</div>
               </div>

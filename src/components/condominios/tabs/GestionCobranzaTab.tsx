@@ -165,18 +165,18 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
     }])
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 320, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
+      <div style={{ width: 320, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 4 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Cobranza ({lista.length})</span>
             <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={exportarPDF} disabled={cobranzas.length === 0} style={{ padding: '4px 8px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid #C2D2CA', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>📄</button>
+              <button onClick={exportarPDF} disabled={cobranzas.length === 0} style={{ padding: '4px 8px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid var(--at-primary-soft-2)', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>📄</button>
               <button onClick={exportarXlsx} disabled={cobranzas.length === 0} style={{ padding: '4px 8px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>📊</button>
               {canCreate && (
                 <button onClick={() => { setMostrarForm(true); setSelected(null) }}
@@ -213,7 +213,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
           const pendiente = c.monto_adeudado - c.monto_pagado
           return (
             <div key={c.id} onClick={() => { setSelected(c); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === c.id ? '#F4EBE3' : '#fff' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === c.id ? '#F4EBE3' : '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{c.responsable}</span>
                 <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: etapa?.bg, color: etapa?.color }}>{etapa?.label}</span>

@@ -72,7 +72,7 @@ export function EditModal({ title, onClose, children, maxWidth = '760px' }: Edit
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '16px 20px 14px',
-            borderBottom: '1px solid #E1DDD0',
+            borderBottom: '1px solid var(--at-line)',
             flexShrink: 0,
           }}
         >

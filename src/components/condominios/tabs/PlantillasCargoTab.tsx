@@ -97,14 +97,14 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>{editId ? 'Editar plantilla' : 'Nueva plantilla de tarea'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Cargo *</label>
               <input value={form.cargo} onChange={e => setForm(f => ({ ...f, cargo: e.target.value }))} placeholder="Ej. Limpieza, Mantenimiento, Jardinería..."
                 list="cargos-list"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
               <datalist id="cargos-list">
                 {cargos.map(c => <option key={c} value={c} />)}
               </datalist>
@@ -112,11 +112,11 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Título de la tarea *</label>
               <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej. Limpiar lobby, Revisar bomba..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Ícono</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', padding: '8px', background: '#FAF7EF', borderRadius: '8px', border: '1.5px solid #E1DDD0' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', padding: '8px', background: '#FAF7EF', borderRadius: '8px', border: '1.5px solid var(--at-line)' }}>
                 {ICONOS.map(ic => (
                   <button key={ic} onClick={() => setForm(f => ({ ...f, icono: ic }))}
                     style={{ width: '34px', height: '34px', fontSize: '18px', borderRadius: '7px', border: '2px solid', borderColor: form.icono === ic ? '#f59e0b' : 'transparent', background: form.icono === ic ? '#fef3c7' : 'transparent', cursor: 'pointer' }}>
@@ -129,7 +129,7 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Área (opcional)</label>
                 <select value={form.area_id} onChange={e => setForm(f => ({ ...f, area_id: e.target.value }))}
-                  style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
+                  style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                   <option value="">Sin área específica</option>
                   {areas.filter(a => a.activo).sort((a, b) => a.orden - b.orden).map(a => <option key={a.id} value={a.id}>{a.icono} {a.nombre}</option>)}
                 </select>
@@ -137,7 +137,7 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Orden</label>
                 <input type="number" value={form.orden} onChange={e => setForm(f => ({ ...f, orden: parseInt(e.target.value) || 0 }))} min={0}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', color: '#3E5A4C', cursor: 'pointer' }}>
                 <input type="checkbox" checked={form.requiere_foto} onChange={e => setForm(f => ({ ...f, requiere_foto: e.target.checked }))} />
@@ -147,7 +147,7 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Descripción / instrucciones</label>
               <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Detalle de cómo realizar la tarea..." rows={2}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF', resize: 'vertical' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
@@ -205,7 +205,7 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
                       </div>
                       {canEdit && (
                         <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-                          <button onClick={() => startEdit(p)} style={{ flex: 1, padding: '5px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#3E5A4C', fontWeight: 600 }}>✏️ Editar</button>
+                          <button onClick={() => startEdit(p)} style={{ flex: 1, padding: '5px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#3E5A4C', fontWeight: 600 }}>✏️ Editar</button>
                           <button onClick={() => toggleActivo(p)} style={{ padding: '5px 10px', background: p.activo ? '#fef9c3' : '#f0fdf4', border: `1px solid ${p.activo ? '#fde047' : '#86efac'}`, borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: p.activo ? '#92400e' : '#16a34a' }}>
                             {p.activo ? 'Desactivar' : 'Activar'}
                           </button>

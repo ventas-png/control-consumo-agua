@@ -116,7 +116,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
   async function generarCuotas(p: PlantillaCuota) {
     const { value: periodo } = await Swal.fire({
       title: `Generar cuotas — ${p.nombre}`,
-      html: `<p style="font-size:13px;color:#3E5A4C;margin-bottom:8px">Período (YYYY-MM):</p>
+      html: `<p style="font-size:13px;color:var(--at-ink-2);margin-bottom:8px">Período (YYYY-MM):</p>
              <input id="periodo-input" class="swal2-input" type="month" value="${new Date().toISOString().slice(0,7)}" style="font-size:14px">`,
       showCancelButton: true,
       confirmButtonText: 'Generar',
@@ -172,7 +172,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
@@ -193,7 +193,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
 
       {/* Form */}
       {mostrarForm && (
-        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>{editingId ? 'Editar plantilla' : 'Nueva plantilla de cuota'}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -234,12 +234,12 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: usarRubros ? 0 : 12 }}>
               <button type="button" onClick={() => setUsarRubros(false)}
-                style={{ padding: '6px 14px', fontSize: 12, border: '1px solid #C7C2B0', borderRadius: 6, cursor: 'pointer',
+                style={{ padding: '6px 14px', fontSize: 12, border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer',
                   background: !usarRubros ? '#1B3B36' : '#FAF7EF', color: !usarRubros ? '#fff' : '#3E5A4C', fontWeight: !usarRubros ? 700 : 400 }}>
                 Monto fijo simple
               </button>
               <button type="button" onClick={() => setUsarRubros(true)}
-                style={{ padding: '6px 14px', fontSize: 12, border: '1px solid #C7C2B0', borderRadius: 6, cursor: 'pointer',
+                style={{ padding: '6px 14px', fontSize: 12, border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer',
                   background: usarRubros ? '#1B3B36' : '#FAF7EF', color: usarRubros ? '#fff' : '#3E5A4C', fontWeight: usarRubros ? 700 : 400 }}>
                 Rubros desglozados
               </button>
@@ -253,7 +253,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
             )}
 
             {usarRubros && (
-              <div style={{ marginTop: 12, background: '#fff', border: '1px solid #E1DDD0', borderRadius: 8, padding: 14 }}>
+              <div style={{ marginTop: 12, background: '#fff', border: '1px solid var(--at-line)', borderRadius: 8, padding: 14 }}>
                 <RubrosBuilder rubros={rubros} onChange={setRubros} moneda={moneda} />
               </div>
             )}
@@ -277,7 +277,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
           {plantillas.map(p => {
             const tieneRubros = p.rubros && p.rubros.length > 0
             return (
-              <div key={p.id} style={{ background: p.activa ? '#fff' : '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 14, opacity: p.activa ? 1 : 0.65 }}>
+              <div key={p.id} style={{ background: p.activa ? '#fff' : '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 10, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 14, opacity: p.activa ? 1 : 0.65 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <span style={{ fontWeight: 700, fontSize: 14, color: '#15291F' }}>{p.nombre}</span>
@@ -306,8 +306,8 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
                   )}
                   {canEdit && (
                     <>
-                      <button onClick={() => startEdit(p)} style={{ padding: '7px 12px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>✏️</button>
-                      <button onClick={() => toggleActiva(p)} style={{ padding: '7px 12px', background: p.activa ? '#fef3c7' : '#f0fdf4', border: '1px solid #E1DDD0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{p.activa ? '⏸' : '▶'}</button>
+                      <button onClick={() => startEdit(p)} style={{ padding: '7px 12px', background: '#FAF7EF', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>✏️</button>
+                      <button onClick={() => toggleActiva(p)} style={{ padding: '7px 12px', background: p.activa ? '#fef3c7' : '#f0fdf4', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{p.activa ? '⏸' : '▶'}</button>
                       <button onClick={() => eliminar(p.id)} style={{ padding: '7px 10px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>🗑</button>
                     </>
                   )}

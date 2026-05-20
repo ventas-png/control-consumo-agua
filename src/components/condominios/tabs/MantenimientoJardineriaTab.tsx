@@ -101,14 +101,14 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 300, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
+      <div style={{ width: 300, borderRight: '1px solid var(--at-line)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--at-line)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Jardinería ({lista.length})</span>
             {canCreate && (
@@ -129,7 +129,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
         </div>
 
         {proximos.length > 0 && (
-          <div style={{ padding: '8px 12px', background: '#f0fdf4', borderBottom: '1px solid #E1DDD0' }}>
+          <div style={{ padding: '8px 12px', background: '#f0fdf4', borderBottom: '1px solid var(--at-line)' }}>
             <div style={{ fontSize: 10, color: '#16a34a', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>📅 Próximas visitas</div>
             {proximos.slice(0, 3).map(r => {
               const tipo = TIPOS.find(t => t.value === r.tipo)
@@ -150,7 +150,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
           const est = ESTADOS.find(e => e.value === r.estado)
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === r.id ? '#f0fdf4' : '#fff', borderLeft: `3px solid ${tipo?.color}` }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? '#f0fdf4' : '#fff', borderLeft: `3px solid ${tipo?.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.label}</span>
@@ -238,7 +238,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input style={{ ...inp, flex: 1 }} placeholder="Agregar área personalizada" value={areaCustom} onChange={e => setAreaCustom(e.target.value)} onKeyDown={e => e.key === 'Enter' && agregarAreaCustom()} />
-                  <button type="button" onClick={agregarAreaCustom} style={{ padding: '7px 12px', background: '#EAE6D8', border: '1px solid #C7C2B0', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>+</button>
+                  <button type="button" onClick={agregarAreaCustom} style={{ padding: '7px 12px', background: '#EAE6D8', border: '1px solid var(--at-line-strong)', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>+</button>
                 </div>
               </div>
               <div style={{ gridColumn: 'span 3' }}>
@@ -310,7 +310,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
               )}
 
               {selected.proxima_visita && (
-                <div style={{ background: '#F4EBE3', border: '1px solid #E6CDBB', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#B96A3F' }}>
+                <div style={{ background: '#F4EBE3', border: '1px solid var(--at-accent-soft)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#B96A3F' }}>
                   📅 Próxima visita: <strong>{selected.proxima_visita}</strong>
                 </div>
               )}

@@ -39,9 +39,9 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
       borderRadius: '16px',
       padding: '24px',
       boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-      border: '1px solid #E1DDD0',
+      border: '1px solid var(--at-line)',
     }}>
-      <div style={{ fontSize: '15px', fontWeight: 700, color: '#15291F', marginBottom: '18px', paddingBottom: '12px', borderBottom: '1px solid #EAE6D8' }}>
+      <div style={{ fontSize: '15px', fontWeight: 700, color: '#15291F', marginBottom: '18px', paddingBottom: '12px', borderBottom: '1px solid var(--at-chip)' }}>
         {title}
       </div>
       {children}
@@ -77,7 +77,7 @@ function InputField({
           style={{
             width: '100%',
             padding: rightEl ? '10px 44px 10px 12px' : '10px 12px',
-            border: '1.5px solid #E1DDD0',
+            border: '1.5px solid var(--at-line)',
             borderRadius: '8px',
             fontSize: '14px',
             background: disabled ? '#FAF7EF' : 'white',
@@ -220,7 +220,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     <div style={{ maxWidth: '640px' }}>
       {/* Header card — Avatar + info */}
       <div style={{
-        background: 'linear-gradient(135deg, #15291F 0%, #15291F 100%)',
+        background: 'linear-gradient(135deg, var(--at-ink) 0%, var(--at-ink) 100%)',
         borderRadius: '16px',
         padding: '28px 24px',
         marginBottom: '20px',
@@ -231,7 +231,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
       }}>
         <div style={{
           width: '64px', height: '64px', borderRadius: '50%',
-          background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+          background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'white', fontWeight: 800, fontSize: '22px', flexShrink: 0,
         }}>

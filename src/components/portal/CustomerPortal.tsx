@@ -650,7 +650,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             <select
               value={selectedProjectId ?? ''}
               onChange={e => { setSelectedProjectId(e.target.value || null); setSelectedUnidadId(null); setSelectedTipoAgua(null) }}
-              style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid #E1DDD0', borderRadius: '8px', background: '#FAF7EF', color: '#15291F', cursor: 'pointer' }}
+              style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid var(--at-line)', borderRadius: '8px', background: '#FAF7EF', color: '#15291F', cursor: 'pointer' }}
             >
               <option value="">Todos los proyectos</option>
               {clienteProjects.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
@@ -671,7 +671,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               <select
                 value={selectedUnidadId ?? ''}
                 onChange={e => { setSelectedUnidadId(e.target.value || null); setSelectedTipoAgua(null) }}
-                style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid #E1DDD0', borderRadius: '8px', background: '#FAF7EF', color: '#15291F', cursor: 'pointer' }}
+                style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid var(--at-line)', borderRadius: '8px', background: '#FAF7EF', color: '#15291F', cursor: 'pointer' }}
               >
                 <option value="">Todas las unidades</option>
                 {visibleUnidades4Filter.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
@@ -683,10 +683,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         {/* KPI Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '14px', marginBottom: '18px' }}>
           {[
-            { label: 'Consumo Mes Actual', value: `${consumoMesActual.toFixed(2)} m³`, icon: '💧', bg: 'linear-gradient(135deg, #1B3B36, #102622)' },
-            { label: 'Promedio Mensual', value: `${consumoPromedio.toFixed(2)} m³`, icon: '📊', bg: 'linear-gradient(135deg, #577B69, #0f766e)' },
+            { label: 'Consumo Mes Actual', value: `${consumoMesActual.toFixed(2)} m³`, icon: '💧', bg: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))' },
+            { label: 'Promedio Mensual', value: `${consumoPromedio.toFixed(2)} m³`, icon: '📊', bg: 'linear-gradient(135deg, var(--at-accent-2), #0f766e)' },
             { label: 'Monto Pendiente', value: `${moneda} ${montoPendiente.toFixed(2)}`, icon: '💳', bg: montoPendiente > 0 ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)' },
-            { label: 'Contadores Activos', value: String(contadoresActivos), icon: '🔢', bg: 'linear-gradient(135deg, #B96A3F, #9C5733)' },
+            { label: 'Contadores Activos', value: String(contadoresActivos), icon: '🔢', bg: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' },
           ].map(card => (
             <div key={card.label} style={{ background: card.bg, borderRadius: '16px', padding: '20px', color: 'white', boxShadow: '0 6px 20px rgba(0,0,0,0.12)' }}>
               <div style={{ fontSize: '22px', marginBottom: '10px', opacity: loading ? 0.4 : 1 }}>{card.icon}</div>
@@ -754,14 +754,14 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           {/* Controles: Período y Métrica */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '12px', color: '#7E9389', fontWeight: 500, whiteSpace: 'nowrap' }}>Período:</span>
-            <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid #E1DDD0', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid var(--at-line)', overflow: 'hidden' }}>
               {([6, 12, 24] as const).map(n => (
                 <button
                   key={n}
                   onClick={() => { setChartMonthsBack(n); setChartRangeMode('preset') }}
                   style={{
                     padding: '6px 14px', fontSize: '12.5px', fontWeight: 600,
-                    border: 'none', borderRight: '1px solid #E1DDD0', cursor: 'pointer', transition: 'all 0.15s',
+                    border: 'none', borderRight: '1px solid var(--at-line)', cursor: 'pointer', transition: 'all 0.15s',
                     background: chartRangeMode === 'preset' && chartMonthsBack === n ? '#1B3B36' : '#FAF7EF',
                     color: chartRangeMode === 'preset' && chartMonthsBack === n ? 'white' : '#3E5A4C',
                   }}
@@ -790,12 +790,12 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               >📅 Rango</button>
             </div>
             <span style={{ fontSize: '12px', color: '#7E9389', fontWeight: 500, whiteSpace: 'nowrap', marginLeft: '6px' }}>Métrica:</span>
-            <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid #E1DDD0', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid var(--at-line)', overflow: 'hidden' }}>
               <button
                 onClick={() => setChartMetric('m3')}
                 style={{
                   padding: '6px 14px', fontSize: '12.5px', fontWeight: 600,
-                  border: 'none', borderRight: '1px solid #E1DDD0', cursor: 'pointer', transition: 'all 0.15s',
+                  border: 'none', borderRight: '1px solid var(--at-line)', cursor: 'pointer', transition: 'all 0.15s',
                   background: chartMetric === 'm3' ? '#1B3B36' : '#FAF7EF',
                   color: chartMetric === 'm3' ? 'white' : '#3E5A4C',
                 }}
@@ -824,7 +824,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             const curYear = now.getFullYear()
             const years = Array.from({ length: curYear - 2018 + 2 }, (_, i) => 2018 + i)
             const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-            const selStyle: CSSProperties = { padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #9CC6B6', fontSize: '12.5px', color: '#15291F', background: 'white', cursor: 'pointer' }
+            const selStyle: CSSProperties = { padding: '5px 8px', borderRadius: '8px', border: '1.5px solid var(--at-primary-mint)', fontSize: '12.5px', color: '#15291F', background: 'white', cursor: 'pointer' }
 
             function parseParts(val: string) {
               const [y, m] = (val || '').split('-')
@@ -836,7 +836,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             const endParts = parseParts(chartCustomEnd)
 
             return (
-              <div style={{ display: 'flex', gap: '20px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap', background: '#EEF2EC', borderRadius: '10px', padding: '10px 14px', border: '1px solid #C2D2CA' }}>
+              <div style={{ display: 'flex', gap: '20px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap', background: '#EEF2EC', borderRadius: '10px', padding: '10px 14px', border: '1px solid var(--at-primary-soft-2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#3E5A4C' }}>
                   <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Desde:</span>
                   <select value={startParts.m} onChange={e => setChartCustomStart(buildVal(startParts.y, e.target.value))} style={selStyle}>
@@ -891,13 +891,13 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 <thead>
                   <tr style={{ background: '#FAF7EF' }}>
                     {['Tipo de Agua', 'Contadores', 'Consumo Mes (m³)', 'Consumo 12 meses (m³)'].map(h => (
-                      <th scope="col" key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 600, color: '#7E9389', borderBottom: '1px solid #E1DDD0' }}>{h}</th>
+                      <th scope="col" key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 600, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {(Object.entries(tipoAguaMap) as [string, { label: string; count: number; consumoMes: number; consumo12m: number }][]).map(([tipo, info]) => (
-                    <tr key={tipo} style={{ borderBottom: '1px solid #EAE6D8' }}>
+                    <tr key={tipo} style={{ borderBottom: '1px solid var(--at-chip)' }}>
                       <td style={{ padding: '10px 14px' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '3px 10px', borderRadius: '20px', background: '#D9E2DC', color: '#102622', fontSize: '12px', fontWeight: 600 }}>
                           💧 {info.label}
@@ -924,7 +924,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 return (
                   <div key={unidad.id} style={{ background: 'white', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                     {/* Header unidad */}
-                    <div style={{ background: 'linear-gradient(135deg, #577B69, #1B3B36)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ background: 'linear-gradient(135deg, var(--at-accent-2), var(--at-primary))', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px' }}>🏠</div>
                       <div>
                         <div style={{ color: 'white', fontWeight: 700, fontSize: '14px' }}>{unidad.nombre}</div>
@@ -936,10 +936,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                       {meters.length === 0 ? (
                         <div style={{ color: '#7E9389', fontSize: '12.5px', textAlign: 'center', padding: '8px 0' }}>Sin contadores asignados</div>
                       ) : meters.map(({ contador, consumo12m, consumoMesDisplay, consumoMesLabel, ultimaLectura, fotoActual, fotoAnterior }) => (
-                        <div key={contador.id} style={{ borderRadius: '10px', background: '#FAF7EF', padding: '11px', border: '1px solid #E1DDD0', marginBottom: '10px' }}>
+                        <div key={contador.id} style={{ borderRadius: '10px', background: '#FAF7EF', padding: '11px', border: '1px solid var(--at-line)', marginBottom: '10px' }}>
                           {/* Info medidor */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                            <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: 'linear-gradient(135deg, #1B3B36, #577B69)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', flexShrink: 0 }}>💧</div>
+                            <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', flexShrink: 0 }}>💧</div>
                             <div>
                               <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#15291F' }}>#{contador.numero_serie}</div>
                               <div style={{ fontSize: '11px', color: '#7E9389' }}>{TIPO_AGUA_LABELS[contador.tipo_agua] ?? contador.tipo_agua}</div>
@@ -956,7 +956,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                               { lbl: consumoMesLabel, val: consumoMesDisplay.toFixed(2), color: '#1B3B36' },
                               { lbl: 'Últimos 12m', val: consumo12m.toFixed(2), color: '#577B69' },
                             ].map(s => (
-                              <div key={s.lbl} style={{ background: 'white', borderRadius: '7px', padding: '7px 9px', border: '1px solid #E1DDD0' }}>
+                              <div key={s.lbl} style={{ background: 'white', borderRadius: '7px', padding: '7px 9px', border: '1px solid var(--at-line)' }}>
                                 <div style={{ fontSize: '10px', color: '#7E9389', marginBottom: '2px' }}>{s.lbl}</div>
                                 <div style={{ fontSize: '15px', fontWeight: 700, color: s.color }}>{s.val}</div>
                                 <div style={{ fontSize: '9.5px', color: '#7E9389' }}>m³</div>
@@ -979,10 +979,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                       src={lectura.foto}
                                       alt={label}
                                       onClick={() => setPhotoModal({ url: lectura.foto!, label: `${label} — #${contador.numero_serie} — ${parseFecha(lectura.fecha).toLocaleDateString('es-GT')}` })}
-                                      style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '7px', border: '1.5px solid #E1DDD0', cursor: 'zoom-in' }}
+                                      style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '7px', border: '1.5px solid var(--at-line)', cursor: 'zoom-in' }}
                                     />
                                   ) : (
-                                    <div style={{ width: '100%', aspectRatio: '1', background: '#EAE6D8', borderRadius: '7px', border: '1.5px dashed #C7C2B0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '3px', color: '#7E9389', fontSize: '10px' }}>
+                                    <div style={{ width: '100%', aspectRatio: '1', background: '#EAE6D8', borderRadius: '7px', border: '1.5px dashed var(--at-line-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '3px', color: '#7E9389', fontSize: '10px' }}>
                                       <span style={{ fontSize: '18px' }}>📷</span>
                                       <span>Sin foto</span>
                                     </div>
@@ -1014,7 +1014,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 50%, #577B69 100%)',
+        background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 50%, var(--at-accent-2) 100%)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '24px',
       }}>
@@ -1043,7 +1043,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           <button
             onClick={onLogout}
             style={{
-              padding: '12px 32px', background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+              padding: '12px 32px', background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
               color: 'white', border: 'none', borderRadius: '12px',
               fontSize: '14px', fontWeight: 600, cursor: 'pointer',
               boxShadow: '0 4px 14px rgba(27, 59, 54,0.35)',
@@ -1076,16 +1076,16 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           border-radius: 6px;
         }
         .portal-tab:hover { background: rgba(27, 59, 54,0.08) !important; }
-        .portal-tab.active { background: white !important; color: #1B3B36 !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .portal-tab.active { background: white !important; color: var(--at-primary) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .portal-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.1) !important; transform: translateY(-1px); }
-        .contador-row:hover { background: #EEF2EC !important; cursor: pointer; }
-        .lectura-row:nth-child(even) { background: #FAF7EF; }
-        .portal-input:focus { outline: none; border-color: #1B3B36 !important; box-shadow: 0 0 0 3px rgba(27, 59, 54,0.12); }
+        .contador-row:hover { background: var(--at-primary-tint) !important; cursor: pointer; }
+        .lectura-row:nth-child(even) { background: var(--at-surface-2); }
+        .portal-input:focus { outline: none; border-color: var(--at-primary) !important; box-shadow: 0 0 0 3px rgba(27, 59, 54,0.12); }
       `}</style>
 
       {/* Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+        background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
         padding: '0',
         boxShadow: '0 2px 12px rgba(27, 59, 54,0.3)',
       }}>
@@ -1213,7 +1213,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
                   <div style={{
                     width: '32px', height: '32px', borderRadius: '8px',
-                    background: isActivo ? 'linear-gradient(135deg, #B96A3F, #9C5733)' : '#E1DDD0',
+                    background: isActivo ? 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' : '#E1DDD0',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '15px', color: 'white',
                   }}>🏢</div>
@@ -1230,7 +1230,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                     <div style={{
                       padding: '20px 24px',
                       background: '#FAF7EF',
-                      border: '1.5px dashed #C7C2B0',
+                      border: '1.5px dashed var(--at-line-strong)',
                       borderRadius: '12px',
                       color: '#7E9389',
                       fontSize: '14px',
@@ -1257,7 +1257,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                   }}>
                     <div style={{
                       width: '32px', height: '32px', borderRadius: '8px',
-                      background: 'linear-gradient(135deg, #B96A3F, #9C5733)',
+                      background: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '15px', color: 'white',
                     }}>🏢</div>
@@ -1302,7 +1302,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                             <div style={{
                               width: '36px', height: '36px', borderRadius: '9px', flexShrink: 0,
-                              background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+                              background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               fontSize: '16px', color: 'white',
                             }}>💧</div>
@@ -1329,7 +1329,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
                         {/* Reading history */}
                         {isExpanded && (
-                          <div style={{ borderTop: '1px solid #EAE6D8' }}>
+                          <div style={{ borderTop: '1px solid var(--at-chip)' }}>
                             {contLecturas.length === 0 ? (
                               <div style={{ padding: '20px', textAlign: 'center', color: '#7E9389', fontSize: '13.5px' }}>
                                 No hay lecturas registradas para este contador.
@@ -1344,7 +1344,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                           padding: '10px 14px', textAlign: 'left',
                                           fontSize: '11.5px', fontWeight: 600,
                                           color: '#7E9389', whiteSpace: 'nowrap',
-                                          borderBottom: '1px solid #E1DDD0',
+                                          borderBottom: '1px solid var(--at-line)',
                                         }}>{h}</th>
                                       ))}
                                     </tr>
@@ -1408,7 +1408,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                       >
                         <div style={{
                           width: '36px', height: '36px', borderRadius: '9px', flexShrink: 0,
-                          background: 'linear-gradient(135deg, #1B3B36, #B96A3F)',
+                          background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent))',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: '16px', color: 'white',
                         }}>🏠</div>
@@ -1465,7 +1465,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
                 <div style={{
                   width: '44px', height: '44px', borderRadius: '12px',
-                  background: 'linear-gradient(135deg, #1B3B36, #577B69)',
+                  background: 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '20px', color: 'white',
                 }}>👤</div>
@@ -1500,7 +1500,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                       style={{
                         width: '100%', boxSizing: 'border-box',
                         padding: '10px 14px', fontSize: '14px',
-                        border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                        border: '1.5px solid var(--at-line)', borderRadius: '10px',
                         background: '#FAF7EF', color: '#15291F',
                         transition: 'border-color 0.2s, box-shadow 0.2s',
                       }}
@@ -1528,7 +1528,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                     padding: '12px', marginTop: '4px',
                     background: savingContacto
                       ? '#7E9389'
-                      : 'linear-gradient(135deg, #1B3B36, #577B69)',
+                      : 'linear-gradient(135deg, var(--at-primary), var(--at-accent-2))',
                     color: 'white', border: 'none', borderRadius: '12px',
                     fontSize: '14.5px', fontWeight: 600,
                     cursor: savingContacto ? 'not-allowed' : 'pointer',

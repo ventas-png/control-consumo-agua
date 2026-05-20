@@ -132,7 +132,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   return (
@@ -145,7 +145,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
           { label: 'Pendientes pago',   value: `${moneda} ${pendientes.reduce((s,g) => s+g.monto,0).toFixed(0)}`, icon: '⏳', color: '#f59e0b' },
           { label: 'Registros',         value: String(gastos.length),                    icon: '🗂️', color: '#10b981' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '17px', fontWeight: 800, color: k.color }}>{k.value}</div>
             <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
@@ -158,7 +158,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
             <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Gastos del Condominio</h2>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={exportarPDF} disabled={filtered.length === 0} style={{ padding: '6px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid #C2D2CA', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
+              <button onClick={exportarPDF} disabled={filtered.length === 0} style={{ padding: '6px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
               <button onClick={exportarXlsx} disabled={gastos.length === 0} style={{ padding: '6px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
               {canCreate && !showForm && (
                 <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Gasto</button>
@@ -167,7 +167,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
           </div>
 
           {showForm && (
-            <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+            <div style={{ background: '#FAF7EF', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Gasto' : 'Registrar Gasto'}</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '12px' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
@@ -218,7 +218,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-                <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+                <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
                 <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
                   {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Registrar'}
                 </button>
@@ -257,12 +257,12 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
               <p style={{ margin: 0, fontWeight: 600 }}>No hay gastos registrados</p>
             </div>
           ) : (
-            <div style={{ border: '1.5px solid #E1DDD0', borderRadius: '10px', overflow: 'hidden' }}>
+            <div style={{ border: '1.5px solid var(--at-line)', borderRadius: '10px', overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ background: '#FAF7EF' }}>
                     {['Fecha', 'Concepto', 'Categoría', 'Monto', 'Estado', ''].map(h => (
-                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid #E1DDD0' }}>{h}</th>
+                      <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid var(--at-line)' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -271,7 +271,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
                     const cat = CAT_CONFIG[g.categoria]
                     const est = ESTADO_CONFIG[g.estado]
                     return (
-                      <tr key={g.id} style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF', borderBottom: '1px solid #EAE6D8' }}>
+                      <tr key={g.id} style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF', borderBottom: '1px solid var(--at-chip)' }}>
                         <td style={{ padding: '10px 12px', color: '#7E9389', whiteSpace: 'nowrap' }}>{g.fecha}</td>
                         <td style={{ padding: '10px 12px', fontWeight: 600, color: '#15291F' }}>
                           {g.concepto}
@@ -302,7 +302,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
         </div>
 
         {/* Panel de categorías */}
-        <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', position: 'sticky', top: '20px' }}>
+        <div style={{ background: 'white', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '16px', position: 'sticky', top: '20px' }}>
           <h3 style={{ margin: '0 0 14px', fontSize: '13px', fontWeight: 700, color: '#15291F' }}>📊 Gastos por categoría ({thisYear})</h3>
           {catEntries.length === 0 ? (
             <p style={{ fontSize: '12px', color: '#7E9389', textAlign: 'center', margin: '20px 0' }}>Sin datos</p>
@@ -322,7 +322,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
                   </div>
                 )
               })}
-              <div style={{ borderTop: '1px solid #E1DDD0', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, color: '#15291F' }}>
+              <div style={{ borderTop: '1px solid var(--at-line)', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, color: '#15291F' }}>
                 <span>Total pagado</span>
                 <span>{moneda} {totalAnio.toFixed(0)}</span>
               </div>
