@@ -7,6 +7,7 @@ import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { initEmailJS } from './lib/email'
 import { LandingPage } from './components/landing/LandingPage'
+import { BrandLogo } from './components/shared/BrandLogo'
 import { PasswordResetModal } from './components/auth/PasswordResetModal'
 import { PasswordResetPage } from './components/auth/PasswordResetPage'
 import { RegisterScreen } from './components/auth/RegisterScreen'
@@ -265,17 +266,20 @@ export default function App() {
   // Not authenticated
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #0d9488 100%)' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #102622 0%, #1B3B36 55%, #2f5d4f 100%)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '18px' }}>
+          <div style={{ filter: 'drop-shadow(0 10px 24px rgba(0,0,0,0.35))' }}>
+            <BrandLogo size={64} />
+          </div>
           <div style={{
-            width: '48px', height: '48px',
+            width: '40px', height: '40px',
             border: '3px solid rgba(255,255,255,0.25)',
             borderTop: '3px solid white',
             borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
           }} />
           <div style={{ color: 'white', fontSize: '15px', fontWeight: 500, letterSpacing: '0.02em', opacity: 0.9 }}>
-            Cargando AquaControl…
+            Cargando AdministraTodo…
           </div>
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
