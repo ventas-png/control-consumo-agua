@@ -126,7 +126,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
   return (
     <div style={{ padding: 16 }}>
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid #e5e7eb', paddingBottom: 1 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid #E1DDD0', paddingBottom: 1 }}>
         {[
           { id: 'generar', label: '📱 Generar QR', badge: 0 },
           { id: 'validar', label: '📷 Validar token', badge: 0 },
@@ -134,8 +134,8 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id as typeof tab)}
             style={{ padding: '7px 16px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.id ? 700 : 500,
-              background: tab === t.id ? '#f8fafc' : 'transparent', color: tab === t.id ? '#2563eb' : '#6b7280',
-              borderBottom: tab === t.id ? '2px solid #2563eb' : '2px solid transparent', borderRadius: '6px 6px 0 0' }}>
+              background: tab === t.id ? '#FAF7EF' : 'transparent', color: tab === t.id ? '#1B3B36' : '#7E9389',
+              borderBottom: tab === t.id ? '2px solid #1B3B36' : '2px solid transparent', borderRadius: '6px 6px 0 0' }}>
             {t.label}
           </button>
         ))}
@@ -144,25 +144,25 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
       {tab === 'generar' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
           {/* Formulario */}
-          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
+          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14 }}>Pre-autorizar visitante</div>
 
             <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Nombre del visitante *</label>
               <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
                 placeholder="Nombre completo"
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
             <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Identificación</label>
               <input value={form.identificacion} onChange={e => setForm(f => ({ ...f, identificacion: e.target.value }))}
                 placeholder="DPI / Pasaporte"
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
             <div style={{ marginBottom: 10 }}>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Unidad a visitar *</label>
               <select value={form.unidadId} onChange={e => setForm(f => ({ ...f, unidadId: e.target.value }))}
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 }}>
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
                 <option value="">Selecciona unidad…</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
@@ -172,36 +172,36 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                 <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Motivo</label>
                 <input value={form.motivo} onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}
                   placeholder="Visita, entrega…"
-                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Válido hasta *</label>
                 <input type="date" value={form.validoHasta} min={hoy} onChange={e => setForm(f => ({ ...f, validoHasta: e.target.value }))}
-                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
               </div>
             </div>
             <button onClick={generarQR}
-              style={{ width: '100%', padding: '9px 0', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+              style={{ width: '100%', padding: '9px 0', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
               📱 Generar código QR
             </button>
           </div>
 
           {/* QR generado */}
-          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, textAlign: 'center' }}>
+          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, textAlign: 'center' }}>
             {!qrGenerado ? (
-              <div style={{ color: '#9ca3af', padding: '50px 0' }}>
+              <div style={{ color: '#7E9389', padding: '50px 0' }}>
                 <div style={{ fontSize: 48, marginBottom: 8 }}>📱</div>
                 <div style={{ fontSize: 13 }}>Completa el formulario y<br />genera el QR de acceso</div>
               </div>
             ) : (
               <>
                 <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>QR de pre-autorización</div>
-                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: '#7E9389', marginBottom: 12 }}>
                   {qrGenerado.nombre} → {qrGenerado.unidadNombre} · válido hasta {qrGenerado.validoHasta}
                 </div>
                 <img src={qrGenerado.qrUrl} alt="QR" width={180} height={180}
-                  style={{ border: '2px solid #e5e7eb', borderRadius: 8, marginBottom: 12 }} />
-                <div style={{ padding: '6px 12px', background: '#f1f5f9', borderRadius: 6, fontSize: 12, fontWeight: 700, letterSpacing: 2, marginBottom: 12, color: '#0f172a' }}>
+                  style={{ border: '2px solid #E1DDD0', borderRadius: 8, marginBottom: 12 }} />
+                <div style={{ padding: '6px 12px', background: '#EAE6D8', borderRadius: 6, fontSize: 12, fontWeight: 700, letterSpacing: 2, marginBottom: 12, color: '#15291F' }}>
                   Token: {qrGenerado.token}
                 </div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
@@ -210,11 +210,11 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                     {registrando ? 'Guardando…' : '✓ Guardar pre-autorización'}
                   </button>
                   <button onClick={() => setQrGenerado(null)}
-                    style={{ padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: '#f9fafb' }}>
+                    style={{ padding: '8px 12px', border: '1px solid #E1DDD0', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: '#FAF7EF' }}>
                     Descartar
                   </button>
                 </div>
-                <div style={{ marginTop: 10, fontSize: 10, color: '#9ca3af' }}>
+                <div style={{ marginTop: 10, fontSize: 10, color: '#7E9389' }}>
                   Comparte el QR o el token con el visitante.<br />El guardia lo escaneará al llegar.
                 </div>
               </>
@@ -225,15 +225,15 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
 
       {tab === 'validar' && (
         <div style={{ maxWidth: 480, margin: '0 auto' }}>
-          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 24 }}>
+          <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 24 }}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16, textAlign: 'center' }}>📷 Validar token de acceso</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
               <input value={tokenValidar} onChange={e => setTokenValidar(e.target.value.toUpperCase())}
                 onKeyDown={e => e.key === 'Enter' && validarToken()}
                 placeholder="Escribe o escanea el token (ej: AB3X7Y9Z)"
-                style={{ flex: 1, padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, letterSpacing: 2, fontFamily: 'monospace', boxSizing: 'border-box' }} />
+                style={{ flex: 1, padding: '10px 12px', border: '1.5px solid #C7C2B0', borderRadius: 8, fontSize: 14, letterSpacing: 2, fontFamily: 'monospace', boxSizing: 'border-box' }} />
               <button onClick={validarToken}
-                style={{ padding: '10px 16px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                style={{ padding: '10px 16px', background: '#15291F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
                 Validar
               </button>
             </div>
@@ -245,7 +245,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                   {resultadoValidacion.msg}
                 </div>
                 {resultadoValidacion.visitante && (
-                  <div style={{ fontSize: 12, color: '#374151', marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, color: '#3E5A4C', marginBottom: 10 }}>
                     <div><strong>{resultadoValidacion.visitante.nombre}</strong></div>
                     <div>Unidad: {resultadoValidacion.visitante.unidad_nombre}</div>
                     {resultadoValidacion.visitante.motivo && <div>Motivo: {resultadoValidacion.visitante.motivo}</div>}
@@ -259,7 +259,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                   </button>
                 )}
                 <button onClick={() => { setResultadoValidacion(null); setTokenValidar('') }}
-                  style={{ width: '100%', padding: '6px 0', marginTop: 6, border: '1px solid #e5e7eb', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: '#f9fafb' }}>
+                  style={{ width: '100%', padding: '6px 0', marginTop: 6, border: '1px solid #E1DDD0', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: '#FAF7EF' }}>
                   Limpiar
                 </button>
               </div>
@@ -271,23 +271,23 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
       {tab === 'pendientes' && (
         <div>
           {preAutorizados.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0' }}>
+            <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0' }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
               No hay visitantes pre-autorizados activos
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {preAutorizados.map(v => (
-                <div key={v.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: v.hora_entrada ? '#dcfce7' : '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                <div key={v.id} style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: v.hora_entrada ? '#dcfce7' : '#EEF2EC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
                     {v.hora_entrada ? '🟢' : '📱'}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{v.nombre}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>
-                      {v.unidad_nombre} · Token: <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 4 }}>{v.qr_token}</code>
+                    <div style={{ fontSize: 11, color: '#7E9389' }}>
+                      {v.unidad_nombre} · Token: <code style={{ background: '#EAE6D8', padding: '1px 5px', borderRadius: 4 }}>{v.qr_token}</code>
                     </div>
-                    <div style={{ fontSize: 10, color: '#9ca3af' }}>
+                    <div style={{ fontSize: 10, color: '#7E9389' }}>
                       Válido hasta {v.valido_hasta}
                       {v.hora_entrada && ` · Entró ${v.hora_entrada.slice(11, 16)}`}
                     </div>
@@ -304,7 +304,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
           )}
 
           {vencidos.length > 0 && (
-            <div style={{ marginTop: 16, padding: '10px 14px', background: '#fef2f2', borderRadius: 8, fontSize: 11, color: '#9ca3af' }}>
+            <div style={{ marginTop: 16, padding: '10px 14px', background: '#fef2f2', borderRadius: 8, fontSize: 11, color: '#7E9389' }}>
               {vencidos.length} pre-autorización(es) vencida(s) sin usar — ya no son válidas.
             </div>
           )}

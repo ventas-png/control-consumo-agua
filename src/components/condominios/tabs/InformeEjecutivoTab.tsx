@@ -72,25 +72,25 @@ export default function InformeEjecutivoTab({
 <title>Informe Ejecutivo — ${proyectoNombre ?? 'Condominio'}</title>
 <style>
   *{box-sizing:border-box}
-  body{font-family:Arial,sans-serif;padding:32px;max-width:960px;margin:auto;color:#0f172a;font-size:13px;line-height:1.5}
-  .header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #0f172a;padding-bottom:14px;margin-bottom:24px}
+  body{font-family:Arial,sans-serif;padding:32px;max-width:960px;margin:auto;color:#15291F;font-size:13px;line-height:1.5}
+  .header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #15291F;padding-bottom:14px;margin-bottom:24px}
   h1{margin:0;font-size:22px}
-  h3{font-size:14px;font-weight:700;color:#0f172a;border-bottom:1px solid #e5e7eb;padding-bottom:6px;margin:20px 0 12px}
+  h3{font-size:14px;font-weight:700;color:#15291F;border-bottom:1px solid #E1DDD0;padding-bottom:6px;margin:20px 0 12px}
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
-  .kpi{border-radius:10px;padding:12px 14px;border:1px solid #e5e7eb}
-  .kpi-label{font-size:10px;color:#6b7280;margin-bottom:4px}
+  .kpi{border-radius:10px;padding:12px 14px;border:1px solid #E1DDD0}
+  .kpi-label{font-size:10px;color:#7E9389;margin-bottom:4px}
   .kpi-val{font-size:18px;font-weight:800}
-  .section{background:#f8fafc;border-radius:10px;padding:14px 18px;margin-bottom:16px}
-  .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:12px}
+  .section{background:#FAF7EF;border-radius:10px;padding:14px 18px;margin-bottom:16px}
+  .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #EAE6D8;font-size:12px}
   .row:last-child{border-bottom:none}
-  .label{color:#6b7280}
+  .label{color:#7E9389}
   .value{font-weight:700}
   .ok{color:#16a34a}.warn{color:#d97706}.bad{color:#ef4444}
   .chart{display:flex;gap:8px;align-items:flex-end;height:${BAR_H+20}px;margin-top:8px}
   .bar-wrap{flex:1;text-align:center}
   .bar-group{display:flex;gap:2px;justify-content:center;align-items:flex-end;height:${BAR_H}px}
-  .bar-label{font-size:9px;color:#9ca3af;margin-top:4px}
-  .footer{margin-top:32px;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px;display:flex;justify-content:space-between}
+  .bar-label{font-size:9px;color:#7E9389;margin-top:4px}
+  .footer{margin-top:32px;font-size:10px;color:#7E9389;border-top:1px solid #E1DDD0;padding-top:10px;display:flex;justify-content:space-between}
   .alert-box{background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:12px}
   .alert-title{font-weight:700;color:#ef4444;margin-bottom:2px}
   @media print{body{padding:20px}}
@@ -99,9 +99,9 @@ export default function InformeEjecutivoTab({
 <div class="header">
   <div>
     <h1>${proyectoNombre ?? 'Condominio'}</h1>
-    <div style="font-size:12px;color:#64748b;margin-top:4px">Informe Ejecutivo Mensual — ${MESES[hoy.getMonth()]} ${hoy.getFullYear()}</div>
+    <div style="font-size:12px;color:#7E9389;margin-top:4px">Informe Ejecutivo Mensual — ${MESES[hoy.getMonth()]} ${hoy.getFullYear()}</div>
   </div>
-  <div style="text-align:right;font-size:11px;color:#9ca3af">
+  <div style="text-align:right;font-size:11px;color:#7E9389">
     Generado: ${hoy.toLocaleDateString('es', { day:'2-digit', month:'long', year:'numeric' })}<br>
     ${unidades.length} unidades registradas
   </div>
@@ -150,7 +150,7 @@ export default function InformeEjecutivoTab({
 
 <h3>🔧 Mantenimiento</h3>
 <div class="kpis">
-  <div class="kpi" style="background:${ticketsUrgentes>0?'#fef2f2':'#f8fafc'}">
+  <div class="kpi" style="background:${ticketsUrgentes>0?'#fef2f2':'#FAF7EF'}">
     <div class="kpi-label">Tickets urgentes abiertos</div>
     <div class="kpi-val ${ticketsUrgentes>0?'bad':'ok'}">${ticketsUrgentes}</div>
   </div>
@@ -162,9 +162,9 @@ export default function InformeEjecutivoTab({
     <div class="kpi-label">Cerrados este mes</div>
     <div class="kpi-val ok">${ticketsCerradosMes}</div>
   </div>
-  <div class="kpi" style="background:#eff6ff">
+  <div class="kpi" style="background:#EEF2EC">
     <div class="kpi-label">Costo manto. mes</div>
-    <div class="kpi-val" style="color:#2563eb">${moneda} ${costoMantoMes.toLocaleString('es',{minimumFractionDigits:2})}</div>
+    <div class="kpi-val" style="color:#1B3B36">${moneda} ${costoMantoMes.toLocaleString('es',{minimumFractionDigits:2})}</div>
   </div>
 </div>
 
@@ -208,8 +208,8 @@ ${morosos > 5 ? `<div class="alert-box"><div class="alert-title">Alto nivel de m
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 2 }}>Informe Ejecutivo</div>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16 }}>
+      <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F', marginBottom: 2 }}>Informe Ejecutivo</div>
+      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 16 }}>
         Genera un PDF consolidado con todos los KPIs del condominio — listo para presentar a la junta directiva
       </div>
 
@@ -221,18 +221,18 @@ ${morosos > 5 ? `<div class="alert-box"><div class="alert-title">Alto nivel de m
           { label: 'Tasa de cobro', val: `${Math.round(tasaCobro * 100)}%`, color: tasaCobro >= 0.9 ? '#16a34a' : tasaCobro >= 0.7 ? '#d97706' : '#ef4444', bg: tasaCobro >= 0.9 ? '#dcfce7' : tasaCobro >= 0.7 ? '#fef3c7' : '#fef2f2' },
           { label: 'Tickets activos', val: String(tickets.filter(t => t.estado !== 'cerrado').length), color: '#d97706', bg: '#fef3c7' },
           { label: 'Deuda acumulada', val: `${moneda} ${cuotas.filter(c => c.estado === 'pendiente' || c.estado === 'moroso').reduce((s, c) => s + c.monto, 0).toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#ef4444', bg: '#fef2f2' },
-          { label: 'Unidades', val: String(unidades.length), color: '#2563eb', bg: '#eff6ff' },
+          { label: 'Unidades', val: String(unidades.length), color: '#1B3B36', bg: '#EEF2EC' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
-            <div style={{ fontSize: 10, color: '#6b7280' }}>{k.label}</div>
+            <div style={{ fontSize: 10, color: '#7E9389' }}>{k.label}</div>
             <div style={{ fontSize: 15, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
           </div>
         ))}
       </div>
 
       {/* Secciones del informe */}
-      <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, marginBottom: 16 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 10 }}>El informe incluye:</div>
+      <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 10 }}>El informe incluye:</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
             '📊 Resumen financiero del mes (cobrado, egresos, tasa cobro, superávit)',
@@ -242,7 +242,7 @@ ${morosos > 5 ? `<div class="alert-box"><div class="alert-title">Alto nivel de m
             '🏘️ Comunidad y operaciones (visitas, sugerencias)',
             '⚠️ Puntos de atención prioritaria (alertas automáticas)',
           ].map(s => (
-            <div key={s} style={{ fontSize: 12, color: '#374151', padding: '5px 0', borderBottom: '1px solid #f1f5f9' }}>
+            <div key={s} style={{ fontSize: 12, color: '#3E5A4C', padding: '5px 0', borderBottom: '1px solid #EAE6D8' }}>
               {s}
             </div>
           ))}
@@ -250,11 +250,11 @@ ${morosos > 5 ? `<div class="alert-box"><div class="alert-title">Alto nivel de m
       </div>
 
       <button onClick={build}
-        style={{ width: '100%', padding: '14px 0', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 700, letterSpacing: 0.3 }}>
+        style={{ width: '100%', padding: '14px 0', background: '#15291F', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 700, letterSpacing: 0.3 }}>
         🖨️ Generar Informe Ejecutivo — {MESES[hoy.getMonth()]} {hoy.getFullYear()}
       </button>
 
-      <div style={{ marginTop: 10, fontSize: 11, color: '#9ca3af', textAlign: 'center' }}>
+      <div style={{ marginTop: 10, fontSize: 11, color: '#7E9389', textAlign: 'center' }}>
         El informe se abre en una nueva pestaña listo para imprimir o guardar como PDF
       </div>
     </div>

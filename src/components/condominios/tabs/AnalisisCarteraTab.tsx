@@ -81,10 +81,10 @@ export default function AnalisisCarteraTab({ cuotas, unidades, moneda }: Props) 
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         {/* Aging buckets */}
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14 }}>Antigüedad de la cartera vencida</div>
           {vencidas.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#9ca3af', padding: '30px 0', fontSize: 13 }}>Sin cartera vencida</div>
+            <div style={{ textAlign: 'center', color: '#7E9389', padding: '30px 0', fontSize: 13 }}>Sin cartera vencida</div>
           ) : BUCKET_CFG.map(b => {
             const monto = buckets[b.key].reduce((s, c) => s + (c.monto ?? 0), 0)
             return (
@@ -92,11 +92,11 @@ export default function AnalisisCarteraTab({ cuotas, unidades, moneda }: Props) 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ padding: '2px 8px', background: b.bg, color: b.color, borderRadius: 20, fontSize: 10, fontWeight: 700 }}>{b.label}</span>
-                    <span style={{ color: '#9ca3af' }}>{buckets[b.key].length} cuotas</span>
+                    <span style={{ color: '#7E9389' }}>{buckets[b.key].length} cuotas</span>
                   </span>
                   <span style={{ fontWeight: 700, color: b.color }}>{moneda} {monto.toLocaleString('es', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div style={{ background: '#f3f4f6', borderRadius: 4, height: 8 }}>
+                <div style={{ background: '#EAE6D8', borderRadius: 4, height: 8 }}>
                   <div style={{ height: '100%', background: b.color, width: `${(monto / maxBucket) * 100}%`, borderRadius: 4 }} />
                 </div>
               </div>
@@ -105,20 +105,20 @@ export default function AnalisisCarteraTab({ cuotas, unidades, moneda }: Props) 
         </div>
 
         {/* Top deudores */}
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
+        <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Principales unidades morosas</div>
           {porUnidad.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#9ca3af', padding: '30px 0', fontSize: 13 }}>Sin morosidad registrada</div>
+            <div style={{ textAlign: 'center', color: '#7E9389', padding: '30px 0', fontSize: 13 }}>Sin morosidad registrada</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {porUnidad.map((u, i) => (
-                <div key={u.unidad_nombre} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#f9fafb', borderRadius: 8 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: i < 3 ? '#fef2f2' : '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: i < 3 ? '#ef4444' : '#6b7280', flexShrink: 0 }}>
+                <div key={u.unidad_nombre} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#FAF7EF', borderRadius: 8 }}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: i < 3 ? '#fef2f2' : '#EAE6D8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: i < 3 ? '#ef4444' : '#7E9389', flexShrink: 0 }}>
                     {i + 1}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.unidad_nombre}</div>
-                    <div style={{ fontSize: 10, color: '#9ca3af' }}>{u.cuotas} cuotas · {u.maxDias}d máx.</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#15291F', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.unidad_nombre}</div>
+                    <div style={{ fontSize: 10, color: '#7E9389' }}>{u.cuotas} cuotas · {u.maxDias}d máx.</div>
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 12, color: '#ef4444', flexShrink: 0 }}>{moneda} {u.monto.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
                 </div>

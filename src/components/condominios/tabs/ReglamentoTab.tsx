@@ -13,13 +13,13 @@ interface Props {
 }
 
 const CATEGORIAS: { value: CategoriaReglamento; label: string; icon: string; color: string }[] = [
-  { value: 'convivencia',   label: 'Convivencia',    icon: '🤝', color: '#6366f1' },
+  { value: 'convivencia',   label: 'Convivencia',    icon: '🤝', color: '#B96A3F' },
   { value: 'pagos',         label: 'Pagos',          icon: '💳', color: '#10b981' },
   { value: 'seguridad',     label: 'Seguridad',      icon: '🛡️', color: '#ef4444' },
-  { value: 'areas_comunes', label: 'Áreas comunes',  icon: '🏊', color: '#3b82f6' },
+  { value: 'areas_comunes', label: 'Áreas comunes',  icon: '🏊', color: '#2F5D4F' },
   { value: 'mascotas',      label: 'Mascotas',       icon: '🐾', color: '#f59e0b' },
-  { value: 'mudanzas',      label: 'Mudanzas',       icon: '🚚', color: '#8b5cf6' },
-  { value: 'otro',          label: 'Otro',           icon: '📄', color: '#6b7280' },
+  { value: 'mudanzas',      label: 'Mudanzas',       icon: '🚚', color: '#B96A3F' },
+  { value: 'otro',          label: 'Otro',           icon: '📄', color: '#7E9389' },
 ]
 
 export default function ReglamentoTab({ articulos, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
@@ -101,19 +101,19 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
     setMostrarForm(true)
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 320, borderRight: '1px solid #e5e7eb', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #e5e7eb' }}>
+      <div style={{ width: 320, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Reglamento ({lista.length})</span>
             {canCreate && (
               <button onClick={() => { resetForm(); setEditando(false); setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Artículo
               </button>
             )}
@@ -129,24 +129,24 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
           </label>
         </div>
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#9ca3af', padding: '32px 16px', fontSize: 13 }}>Sin artículos</div>}
+        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 16px', fontSize: 13 }}>Sin artículos</div>}
 
         {Object.entries(porCapitulo).map(([cap, items]) => (
           <div key={cap}>
-            <div style={{ padding: '6px 12px', background: '#f9fafb', fontSize: 11, fontWeight: 700, color: '#374151', borderBottom: '1px solid #e5e7eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ padding: '6px 12px', background: '#FAF7EF', fontSize: 11, fontWeight: 700, color: '#3E5A4C', borderBottom: '1px solid #E1DDD0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {cap}
             </div>
             {items.map(a => {
               const cat = CATEGORIAS.find(c => c.value === a.categoria)
               return (
                 <div key={a.id} onClick={() => { setSelected(a); setMostrarForm(false) }}
-                  style={{ padding: '9px 12px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', background: selected?.id === a.id ? '#eef2ff' : '#fff', opacity: a.vigente ? 1 : 0.5, borderLeft: `3px solid ${cat?.color || '#e5e7eb'}` }}>
+                  style={{ padding: '9px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === a.id ? '#F4EBE3' : '#fff', opacity: a.vigente ? 1 : 0.5, borderLeft: `3px solid ${cat?.color || '#E1DDD0'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: cat?.color }}>{a.numero_articulo}</span>
-                    {!a.vigente && <span style={{ fontSize: 10, color: '#9ca3af' }}>derogado</span>}
+                    {!a.vigente && <span style={{ fontSize: 10, color: '#7E9389' }}>derogado</span>}
                   </div>
                   <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{a.titulo}</div>
-                  <div style={{ fontSize: 11, color: '#9ca3af' }}>{cat?.icon} {cat?.label} · v{a.version}</div>
+                  <div style={{ fontSize: 11, color: '#7E9389' }}>{cat?.icon} {cat?.label} · v{a.version}</div>
                 </div>
               )
             })}
@@ -201,7 +201,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
                 {saving ? 'Guardando…' : `✅ ${editando ? 'Actualizar' : 'Crear'}`}
               </button>
               <button onClick={() => { setMostrarForm(false); setEditando(false); resetForm() }}
-                style={{ padding: '8px 16px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -218,7 +218,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
                     {cat?.icon} {cat?.label} · {selected.capitulo}
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 18 }}>{selected.numero_articulo} — {selected.titulo}</div>
-                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: '#7E9389', marginTop: 4 }}>
                     Versión {selected.version}
                     {selected.fecha_vigencia && <span> · Vigente desde {selected.fecha_vigencia}</span>}
                     {!selected.vigente && <span style={{ color: '#ef4444' }}> · DEROGADO</span>}
@@ -227,7 +227,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
                 {canEdit && (
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button onClick={() => iniciarEdicion(selected)}
-                      style={{ padding: '6px 12px', background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 12px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid #E1DDD0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ✏️ Editar
                     </button>
                     <button onClick={() => toggleVigente(selected)}
@@ -238,7 +238,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
                 )}
               </div>
 
-              <div style={{ background: '#f9fafb', borderRadius: 10, padding: '16px 20px', fontSize: 14, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-wrap' }}>
+              <div style={{ background: '#FAF7EF', borderRadius: 10, padding: '16px 20px', fontSize: 14, lineHeight: 1.7, color: '#3E5A4C', whiteSpace: 'pre-wrap' }}>
                 {selected.contenido}
               </div>
 
@@ -252,7 +252,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
         })()}
 
         {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9ca3af', fontSize: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#7E9389', fontSize: 14 }}>
             Selecciona un artículo o crea uno nuevo
           </div>
         )}

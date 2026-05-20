@@ -37,15 +37,15 @@ const TIPOS_AGUA: { value: TipoAgua; label: string }[] = [
 ]
 
 const TIPO_COLORES: Record<TipoAgua, { bg: string; color: string }> = {
-  potable:             { bg: '#e0f2fe', color: '#0369a1' },
+  potable:             { bg: '#D9E2DC', color: '#102622' },
   rehuso:              { bg: '#dcfce7', color: '#166534' },
-  piscina:             { bg: '#dbeafe', color: '#1d4ed8' },
+  piscina:             { bg: '#D9E2DC', color: '#102622' },
   desalinada:          { bg: '#fef9c3', color: '#854d0e' },
   riego:               { bg: '#d1fae5', color: '#065f46' },
-  jacuzzi:             { bg: '#ede9fe', color: '#5b21b6' },
+  jacuzzi:             { bg: '#F4EBE3', color: '#5E3417' },
   consumo_humano:      { bg: '#ffedd5', color: '#c2410c' },
   desmineralizada:     { bg: '#fce7f3', color: '#9d174d' },
-  residuales_tratadas: { bg: '#f1f5f9', color: '#475569' },
+  residuales_tratadas: { bg: '#EAE6D8', color: '#3E5A4C' },
 }
 
 const MEDIDAS_CONTADOR = [
@@ -316,7 +316,7 @@ export function ContadoresSection({
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#64748b',
+      cancelButtonColor: '#7E9389',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
     })
@@ -383,12 +383,12 @@ export function ContadoresSection({
         key: 'marcaModelo', header: 'Marca / Modelo',
         accessor: c => `${c.marca ?? ''} ${c.modelo ?? ''}`.trim(),
         render: c => {
-          if (!c.marca && !c.modelo) return <span style={{ color: '#cbd5e1' }}>—</span>
+          if (!c.marca && !c.modelo) return <span style={{ color: '#C7C2B0' }}>—</span>
           return (
-            <span style={{ color: '#475569' }}>
+            <span style={{ color: '#3E5A4C' }}>
               {c.marca && <span style={{ fontWeight: 500 }}>{c.marca}</span>}
               {c.marca && c.modelo && ' / '}
-              {c.modelo && <span style={{ color: '#94a3b8' }}>{c.modelo}</span>}
+              {c.modelo && <span style={{ color: '#7E9389' }}>{c.modelo}</span>}
             </span>
           )
         },
@@ -401,7 +401,7 @@ export function ContadoresSection({
         key: 'lecturaInicial', header: 'Lect. Inicial', sortable: true, align: 'right',
         accessor: c => Number(c.lectura_inicial),
         render: c => (
-          <span style={{ fontWeight: 600, color: '#0f172a' }}>
+          <span style={{ fontWeight: 600, color: '#15291F' }}>
             {formatNumber(Number(c.lectura_inicial), 4)}
           </span>
         ),
@@ -421,7 +421,7 @@ export function ContadoresSection({
                 🏠 {nombre}
               </span>
             )
-            : <span style={{ color: '#cbd5e1', fontSize: 13 }}>Sin unidad</span>
+            : <span style={{ color: '#C7C2B0', fontSize: 13 }}>Sin unidad</span>
         },
       },
       {
@@ -433,13 +433,13 @@ export function ContadoresSection({
             ? (
               <span style={{
                 padding: '3px 10px', borderRadius: 12,
-                background: '#eff6ff', color: '#1d4ed8',
+                background: '#EEF2EC', color: '#102622',
                 fontSize: 12, fontWeight: 600,
               }}>
                 {nombre}
               </span>
             )
-            : <span style={{ color: '#cbd5e1', fontSize: 13 }}>Sin tarifa</span>
+            : <span style={{ color: '#C7C2B0', fontSize: 13 }}>Sin tarifa</span>
         },
       },
       {
@@ -474,7 +474,7 @@ export function ContadoresSection({
             <button
               onClick={() => startEdit(c)}
               style={{
-                padding: '5px 12px', background: '#eff6ff', color: '#1d4ed8',
+                padding: '5px 12px', background: '#EEF2EC', color: '#102622',
                 border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
               }}
             >Editar</button>
@@ -495,7 +495,7 @@ export function ContadoresSection({
 
   const inputStyle: CSSProperties = {
     padding: '10px 14px',
-    border: '2px solid #e2e8f0',
+    border: '2px solid #E1DDD0',
     borderRadius: '8px',
     fontSize: '14px',
     width: '100%',
@@ -523,8 +523,8 @@ export function ContadoresSection({
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>Contadores</h2>
-          <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>
+          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#15291F' }}>Contadores</h2>
+          <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#7E9389' }}>
             Gestiona los contadores de agua por tipología
           </p>
         </div>
@@ -565,8 +565,8 @@ export function ContadoresSection({
                 style={{
                   padding: '10px 18px',
                   background: '#ffffff',
-                  color: '#0ea5e9',
-                  border: '2px solid #0ea5e9',
+                  color: '#1B3B36',
+                  border: '2px solid #1B3B36',
                   borderRadius: '8px',
                   fontWeight: 600,
                   fontSize: '14px',
@@ -586,7 +586,7 @@ export function ContadoresSection({
                 onClick={startCreate}
                 style={{
                   padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                  background: 'linear-gradient(135deg, #1B3B36, #577B69)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
@@ -614,7 +614,7 @@ export function ContadoresSection({
                 onClick={() => setFilterTipo(filterTipo === r.value ? '' : r.value as TipoAgua)}
                 style={{
                   background: filterTipo === r.value ? col.bg : 'white',
-                  border: `2px solid ${filterTipo === r.value ? col.color : '#e2e8f0'}`,
+                  border: `2px solid ${filterTipo === r.value ? col.color : '#E1DDD0'}`,
                   borderRadius: '12px',
                   padding: '12px 18px',
                   cursor: 'pointer',
@@ -625,10 +625,10 @@ export function ContadoresSection({
                 <div style={{ fontSize: '11px', fontWeight: 600, color: col.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {r.label}
                 </div>
-                <div style={{ fontSize: '22px', fontWeight: 700, color: '#0f172a', margin: '4px 0 2px' }}>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: '#15291F', margin: '4px 0 2px' }}>
                   {r.total}
                 </div>
-                <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                <div style={{ fontSize: '11px', color: '#7E9389' }}>
                   {r.conTarifa} con tarifa
                 </div>
               </div>
@@ -738,8 +738,8 @@ export function ContadoresSection({
               />
             </div>
             {/* Technical fields — separator */}
-            <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '4px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#0ea5e9', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #E1DDD0', paddingTop: '16px', marginTop: '4px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#1B3B36', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Características Técnicas e Instalación
               </div>
             </div>
@@ -918,7 +918,7 @@ export function ContadoresSection({
               disabled={loading}
               style={{
                 padding: '10px 24px',
-                background: loading ? '#94a3b8' : 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                background: loading ? '#7E9389' : 'linear-gradient(135deg, #1B3B36, #577B69)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -933,8 +933,8 @@ export function ContadoresSection({
               onClick={cancelForm}
               style={{
                 padding: '10px 24px',
-                background: '#f1f5f9',
-                color: '#475569',
+                background: '#EAE6D8',
+                color: '#3E5A4C',
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: 600,
@@ -967,7 +967,7 @@ export function ContadoresSection({
       />
 
       {/* Stats compactos abajo de la tabla */}
-      <div style={{ padding: '8px 16px', color: '#94a3b8', fontSize: 12 }}>
+      <div style={{ padding: '8px 16px', color: '#7E9389', fontSize: 12 }}>
         {filtered.length} contador{filtered.length !== 1 ? 'es' : ''}{' '}
         {search || filterTipo || filterUnidad ? 'encontrados' : 'registrados'} ·{' '}
         {contadores.filter(c => c.unidad_id).length} con unidad ·{' '}
@@ -998,14 +998,14 @@ function SerieCell({ contador: c }: { contador: Contador }) {
   const tag = getEditedTagInfo(c.updated_at, c.updated_by_name)
   return (
     <div>
-      <div style={{ fontWeight: 600, color: '#1e293b' }}>{c.numero_serie}</div>
+      <div style={{ fontWeight: 600, color: '#15291F' }}>{c.numero_serie}</div>
       {c.descripcion && (
-        <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400, marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: '#7E9389', fontWeight: 400, marginTop: 2 }}>
           {c.descripcion}
         </div>
       )}
       {c.fecha_instalacion && (
-        <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 1 }}>
+        <div style={{ fontSize: 11, color: '#C7C2B0', marginTop: 1 }}>
           Inst: {formatDate(c.fecha_instalacion)}
         </div>
       )}
@@ -1031,7 +1031,7 @@ function CaracteristicasCell({ contador: c }: { contador: Contador }) {
     c.fecha_reemplazo_sugerida || c.numero_derecho_servicio ||
     c.cantidad_derecho_servicio_m3 != null || c.periodicidad_lectura_dias != null ||
     c.contratista_instalador || c.garantia_instalacion_vence
-  if (!hasAny) return <span style={{ color: '#cbd5e1' }}>—</span>
+  if (!hasAny) return <span style={{ color: '#C7C2B0' }}>—</span>
 
   const now = new Date()
   const reemplazoVencido = c.fecha_reemplazo_sugerida
@@ -1042,7 +1042,7 @@ function CaracteristicasCell({ contador: c }: { contador: Contador }) {
     : false
 
   return (
-    <div style={{ fontSize: 12, color: '#475569' }}>
+    <div style={{ fontSize: 12, color: '#3E5A4C' }}>
       {c.medida && <Field label="Medida" value={c.medida} />}
       {c.tipo_contador && <Field label="Tipo" value={c.tipo_contador} />}
       {c.material && <Field label="Material" value={c.material} />}
@@ -1051,7 +1051,7 @@ function CaracteristicasCell({ contador: c }: { contador: Contador }) {
       {c.llave_antifraude && <Field label="Antifraude" value={c.llave_antifraude} />}
       {c.valvula_aire && <Field label="V. Aire" value={c.valvula_aire} />}
       {c.fecha_reemplazo_sugerida && (
-        <div style={{ color: reemplazoVencido ? '#dc2626' : '#0369a1', fontWeight: 600 }}>
+        <div style={{ color: reemplazoVencido ? '#dc2626' : '#102622', fontWeight: 600 }}>
           Reemplazo: {formatDate(c.fecha_reemplazo_sugerida)}
         </div>
       )}
@@ -1073,5 +1073,5 @@ function CaracteristicasCell({ contador: c }: { contador: Contador }) {
 }
 
 function Field({ label, value }: { label: string; value: string }) {
-  return <div><span style={{ color: '#94a3b8' }}>{label}:</span> {value}</div>
+  return <div><span style={{ color: '#7E9389' }}>{label}:</span> {value}</div>
 }

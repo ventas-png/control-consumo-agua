@@ -20,14 +20,14 @@ interface Props {
 type TipoEvento = 'visitante' | 'ticket' | 'incidente' | 'anuncio' | 'orden_compra' | 'asamblea' | 'gasto' | 'cuota'
 
 const TIPO_CFG: Record<TipoEvento, { label: string; icon: string; color: string; bg: string }> = {
-  visitante:    { label: 'Visitante',    icon: '🚪', color: '#2563eb', bg: '#eff6ff' },
-  ticket:       { label: 'Ticket',       icon: '🔧', color: '#7c3aed', bg: '#f5f3ff' },
+  visitante:    { label: 'Visitante',    icon: '🚪', color: '#1B3B36', bg: '#EEF2EC' },
+  ticket:       { label: 'Ticket',       icon: '🔧', color: '#9C5733', bg: '#FAF1EA' },
   incidente:    { label: 'Incidente',    icon: '🚨', color: '#ef4444', bg: '#fef2f2' },
-  anuncio:      { label: 'Anuncio',      icon: '📢', color: '#0891b2', bg: '#ecfeff' },
+  anuncio:      { label: 'Anuncio',      icon: '📢', color: '#102622', bg: '#EEF2EC' },
   orden_compra: { label: 'Orden compra', icon: '🛒', color: '#d97706', bg: '#fef3c7' },
   asamblea:     { label: 'Asamblea',     icon: '🖥️', color: '#16a34a', bg: '#dcfce7' },
-  gasto:        { label: 'Gasto',        icon: '💸', color: '#64748b', bg: '#f1f5f9' },
-  cuota:        { label: 'Cuota',        icon: '💳', color: '#0f172a', bg: '#f8fafc' },
+  gasto:        { label: 'Gasto',        icon: '💸', color: '#7E9389', bg: '#EAE6D8' },
+  cuota:        { label: 'Cuota',        icon: '💳', color: '#15291F', bg: '#FAF7EF' },
 }
 
 interface Evento {
@@ -70,7 +70,7 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
       titulo: t.titulo,
       subtitulo: `${t.tipo === 'preventivo' ? 'Preventivo' : 'Correctivo'} · ${t.prioridad}`,
       badge: t.estado,
-      badgeColor: t.estado === 'resuelto' || t.estado === 'cerrado' ? '#16a34a' : t.estado === 'en_proceso' ? '#d97706' : '#64748b',
+      badgeColor: t.estado === 'resuelto' || t.estado === 'cerrado' ? '#16a34a' : t.estado === 'en_proceso' ? '#d97706' : '#7E9389',
     }))
 
     incidentes.forEach(i => list.push({
@@ -106,7 +106,7 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
       titulo: a.titulo,
       subtitulo: a.modalidad,
       badge: a.estado,
-      badgeColor: a.estado === 'finalizada' ? '#16a34a' : a.estado === 'en_curso' ? '#d97706' : '#2563eb',
+      badgeColor: a.estado === 'finalizada' ? '#16a34a' : a.estado === 'en_curso' ? '#d97706' : '#1B3B36',
     }))
 
     gastos.filter(g => g.estado !== 'anulado').forEach(g => list.push({
@@ -146,28 +146,28 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 4 }}>Bitácora de Eventos</div>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 14 }}>
+      <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F', marginBottom: 4 }}>Bitácora de Eventos</div>
+      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 14 }}>
         {filtrados.length} eventos · Feed cronológico de toda la actividad del condominio
       </div>
 
       {/* Filtros */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={filtroTipo} onChange={e => { setFiltroTipo(e.target.value as TipoEvento | ''); setPagina(1) }}
-          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, background: '#fff' }}>
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, background: '#fff' }}>
           <option value="">Todos los tipos</option>
           {(Object.keys(TIPO_CFG) as TipoEvento[]).map(t => (
             <option key={t} value={t}>{TIPO_CFG[t].icon} {TIPO_CFG[t].label} ({conteoPorTipo[t] ?? 0})</option>
           ))}
         </select>
         <input type="date" value={fechaDesde} onChange={e => { setFechaDesde(e.target.value); setPagina(1) }}
-          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12 }} />
-        <span style={{ fontSize: 12, color: '#9ca3af' }}>—</span>
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12 }} />
+        <span style={{ fontSize: 12, color: '#7E9389' }}>—</span>
         <input type="date" value={fechaHasta} onChange={e => { setFechaHasta(e.target.value); setPagina(1) }}
-          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12 }} />
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12 }} />
         {(filtroTipo || fechaDesde || fechaHasta) && (
           <button onClick={() => { setFiltroTipo(''); setFechaDesde(''); setFechaHasta(''); setPagina(1) }}
-            style={{ padding: '6px 12px', background: '#f1f5f9', border: '1px solid #d1d5db', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#374151' }}>
+            style={{ padding: '6px 12px', background: '#EAE6D8', border: '1px solid #C7C2B0', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#3E5A4C' }}>
             Limpiar filtros
           </button>
         )}
@@ -178,9 +178,9 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
         {(Object.entries(TIPO_CFG) as [TipoEvento, typeof TIPO_CFG[TipoEvento]][]).map(([tipo, cfg]) => (
           <div key={tipo} onClick={() => { setFiltroTipo(filtroTipo === tipo ? '' : tipo); setPagina(1) }}
             style={{ padding: '4px 12px', borderRadius: 20, cursor: 'pointer', fontSize: 11, fontWeight: 600,
-              background: filtroTipo === tipo ? cfg.bg : '#f8fafc',
-              color: filtroTipo === tipo ? cfg.color : '#64748b',
-              border: `1px solid ${filtroTipo === tipo ? cfg.color : '#e5e7eb'}` }}>
+              background: filtroTipo === tipo ? cfg.bg : '#FAF7EF',
+              color: filtroTipo === tipo ? cfg.color : '#7E9389',
+              border: `1px solid ${filtroTipo === tipo ? cfg.color : '#E1DDD0'}` }}>
             {cfg.icon} {cfg.label}
             {(conteoPorTipo[tipo] ?? 0) > 0 && <span style={{ marginLeft: 4, fontWeight: 800 }}>{conteoPorTipo[tipo]}</span>}
           </div>
@@ -189,10 +189,10 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
 
       {/* Timeline */}
       {pagItems.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: '#9ca3af', fontSize: 13 }}>No hay eventos con los filtros aplicados.</div>
+        <div style={{ textAlign: 'center', padding: '40px 0', color: '#7E9389', fontSize: 13 }}>No hay eventos con los filtros aplicados.</div>
       ) : (
         <div style={{ position: 'relative' }}>
-          <div style={{ position: 'absolute', left: 18, top: 0, bottom: 0, width: 2, background: '#e5e7eb' }} />
+          <div style={{ position: 'absolute', left: 18, top: 0, bottom: 0, width: 2, background: '#E1DDD0' }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {pagItems.map((e, idx) => {
               const cfg = TIPO_CFG[e.tipo]
@@ -201,7 +201,7 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
               return (
                 <div key={e.id}>
                   {showDateSep && (
-                    <div style={{ paddingLeft: 44, paddingTop: idx === 0 ? 0 : 16, paddingBottom: 6, fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>
+                    <div style={{ paddingLeft: 44, paddingTop: idx === 0 ? 0 : 16, paddingBottom: 6, fontSize: 11, color: '#7E9389', fontWeight: 600 }}>
                       {e.fecha ? new Date(e.fecha + 'T12:00:00').toLocaleDateString('es', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' }) : 'Sin fecha'}
                     </div>
                   )}
@@ -209,16 +209,16 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
                     <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fff', border: `2px solid ${cfg.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0, zIndex: 1, boxShadow: `0 0 0 2px ${cfg.color}22` }}>
                       {cfg.icon}
                     </div>
-                    <div style={{ flex: 1, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '10px 14px', marginBottom: 0 }}>
+                    <div style={{ flex: 1, background: '#fff', border: '1px solid #E1DDD0', borderRadius: 10, padding: '10px 14px', marginBottom: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                         <div>
-                          <div style={{ fontWeight: 600, fontSize: 12, color: '#0f172a' }}>{e.titulo}</div>
-                          {e.subtitulo && <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>{e.subtitulo}</div>}
-                          {e.detalle && <div style={{ fontSize: 11, color: '#374151', marginTop: 2 }}>{e.detalle}</div>}
+                          <div style={{ fontWeight: 600, fontSize: 12, color: '#15291F' }}>{e.titulo}</div>
+                          {e.subtitulo && <div style={{ fontSize: 11, color: '#7E9389', marginTop: 1 }}>{e.subtitulo}</div>}
+                          {e.detalle && <div style={{ fontSize: 11, color: '#3E5A4C', marginTop: 2 }}>{e.detalle}</div>}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           <span style={{ padding: '2px 8px', borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 10, fontWeight: 600 }}>{cfg.label}</span>
-                          {e.badge && <span style={{ fontSize: 10, color: e.badgeColor ?? '#64748b', fontWeight: 600 }}>{e.badge}</span>}
+                          {e.badge && <span style={{ fontSize: 10, color: e.badgeColor ?? '#7E9389', fontWeight: 600 }}>{e.badge}</span>}
                         </div>
                       </div>
                     </div>
@@ -234,12 +234,12 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
       {totalPaginas > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 16 }}>
           <button onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={pagina === 1}
-            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', cursor: pagina === 1 ? 'default' : 'pointer', background: '#fff', color: pagina === 1 ? '#d1d5db' : '#374151', fontSize: 12 }}>
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #C7C2B0', cursor: pagina === 1 ? 'default' : 'pointer', background: '#fff', color: pagina === 1 ? '#C7C2B0' : '#3E5A4C', fontSize: 12 }}>
             ← Ant.
           </button>
-          <span style={{ padding: '6px 14px', fontSize: 12, color: '#64748b' }}>Pág. {pagina} de {totalPaginas}</span>
+          <span style={{ padding: '6px 14px', fontSize: 12, color: '#7E9389' }}>Pág. {pagina} de {totalPaginas}</span>
           <button onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas}
-            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', cursor: pagina === totalPaginas ? 'default' : 'pointer', background: '#fff', color: pagina === totalPaginas ? '#d1d5db' : '#374151', fontSize: 12 }}>
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #C7C2B0', cursor: pagina === totalPaginas ? 'default' : 'pointer', background: '#fff', color: pagina === totalPaginas ? '#C7C2B0' : '#3E5A4C', fontSize: 12 }}>
             Sig. →
           </button>
         </div>

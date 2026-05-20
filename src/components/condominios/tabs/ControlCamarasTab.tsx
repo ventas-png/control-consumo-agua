@@ -24,8 +24,8 @@ const ESTADOS: { value: EstadoCamara; label: string; color: string; bg: string; 
   { value: 'activa',        label: 'Activa',         color: '#10b981', bg: '#d1fae5', icon: '✅' },
   { value: 'falla',         label: 'Falla',          color: '#ef4444', bg: '#fef2f2', icon: '⚠️' },
   { value: 'mantenimiento', label: 'Mantenimiento',  color: '#f59e0b', bg: '#fef3c7', icon: '🔧' },
-  { value: 'sin_señal',     label: 'Sin señal',      color: '#6366f1', bg: '#eef2ff', icon: '📵' },
-  { value: 'inactiva',      label: 'Inactiva',       color: '#6b7280', bg: '#f3f4f6', icon: '⭕' },
+  { value: 'sin_señal',     label: 'Sin señal',      color: '#B96A3F', bg: '#F4EBE3', icon: '📵' },
+  { value: 'inactiva',      label: 'Inactiva',       color: '#7E9389', bg: '#EAE6D8', icon: '⭕' },
 ]
 
 export default function ControlCamarasTab({ camaras, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
@@ -114,14 +114,14 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
       {/* Lista */}
-      <div style={{ width: 300, borderRight: '1px solid #e5e7eb', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #e5e7eb' }}>
+      <div style={{ width: 300, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div>
               <span style={{ fontWeight: 600, fontSize: 14 }}>Cámaras ({lista.length})</span>
@@ -129,7 +129,7 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
             </div>
             {canCreate && (
               <button onClick={() => { resetForm(); setEditando(false); setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nueva
               </button>
             )}
@@ -152,20 +152,20 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
           </label>
         </div>
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#9ca3af', padding: '32px 16px', fontSize: 13 }}>Sin cámaras</div>}
+        {lista.length === 0 && <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 16px', fontSize: 13 }}>Sin cámaras</div>}
 
         {lista.map(c => {
           const tipo = TIPOS.find(t => t.value === c.tipo)
           const est = ESTADOS.find(e => e.value === c.estado)
           return (
             <div key={c.id} onClick={() => { setSelected(c); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', background: selected?.id === c.id ? '#eef2ff' : '#fff', borderLeft: `3px solid ${est?.color}`, opacity: c.activo ? 1 : 0.5 }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === c.id ? '#F4EBE3' : '#fff', borderLeft: `3px solid ${est?.color}`, opacity: c.activo ? 1 : 0.5 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 12 }}>{tipo?.icon} {c.codigo} — {c.nombre}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.icon}</span>
               </div>
-              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>📍 {c.ubicacion}</div>
-              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 1 }}>
+              <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>📍 {c.ubicacion}</div>
+              <div style={{ fontSize: 11, color: '#7E9389', marginTop: 1 }}>
                 {c.resolucion && <span>{c.resolucion} · </span>}
                 {c.grabacion ? '🔴 Grab.' : '⭕ Sin grab.'}
                 {c.dias_retencion && <span> · {c.dias_retencion}d</span>}
@@ -240,7 +240,7 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
                 {saving ? 'Guardando…' : `✅ ${editando ? 'Actualizar' : 'Registrar'}`}
               </button>
               <button onClick={() => { setMostrarForm(false); setEditando(false); resetForm() }}
-                style={{ padding: '8px 16px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -254,45 +254,45 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 600, marginBottom: 4 }}>{tipo?.icon} {tipo?.label} · {selected.codigo}</div>
+                  <div style={{ fontSize: 12, color: '#7E9389', fontWeight: 600, marginBottom: 4 }}>{tipo?.icon} {tipo?.label} · {selected.codigo}</div>
                   <div style={{ fontWeight: 700, fontSize: 20 }}>📷 {selected.nombre}</div>
-                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>📍 {selected.ubicacion}</div>
+                  <div style={{ fontSize: 13, color: '#7E9389', marginTop: 4 }}>📍 {selected.ubicacion}</div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
                   <span style={{ fontSize: 12, padding: '4px 12px', borderRadius: 8, background: est?.bg, color: est?.color, fontWeight: 600 }}>{est?.icon} {est?.label}</span>
-                  {!selected.activo && <span style={{ fontSize: 11, color: '#6b7280' }}>Inactiva</span>}
+                  {!selected.activo && <span style={{ fontSize: 11, color: '#7E9389' }}>Inactiva</span>}
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
-                <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 11, color: '#9ca3af' }}>Resolución</div>
+                <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 11, color: '#7E9389' }}>Resolución</div>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{selected.resolucion ?? '—'}</div>
                 </div>
-                <div style={{ background: selected.grabacion ? '#fef2f2' : '#f3f4f6', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 11, color: '#9ca3af' }}>Grabación</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: selected.grabacion ? '#ef4444' : '#6b7280' }}>{selected.grabacion ? '🔴 Activa' : '⭕ Inactiva'}</div>
+                <div style={{ background: selected.grabacion ? '#fef2f2' : '#EAE6D8', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 11, color: '#7E9389' }}>Grabación</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: selected.grabacion ? '#ef4444' : '#7E9389' }}>{selected.grabacion ? '🔴 Activa' : '⭕ Inactiva'}</div>
                 </div>
-                <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 14px' }}>
-                  <div style={{ fontSize: 11, color: '#9ca3af' }}>Retención</div>
+                <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
+                  <div style={{ fontSize: 11, color: '#7E9389' }}>Retención</div>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{selected.dias_retencion ? `${selected.dias_retencion} días` : '—'}</div>
                 </div>
                 {selected.ip_address && (
-                  <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#9ca3af' }}>IP</div>
+                  <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: '#7E9389' }}>IP</div>
                     <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'monospace' }}>{selected.ip_address}</div>
                   </div>
                 )}
                 {selected.ultimo_mantenimiento && (
-                  <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#9ca3af' }}>Último manto.</div>
+                  <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: '#7E9389' }}>Último manto.</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{selected.ultimo_mantenimiento}</div>
                   </div>
                 )}
                 {selected.proximo_mantenimiento && (
-                  <div style={{ background: '#eef2ff', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#6366f1' }}>Próximo manto.</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#6366f1' }}>{selected.proximo_mantenimiento}</div>
+                  <div style={{ background: '#F4EBE3', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: '#B96A3F' }}>Próximo manto.</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#B96A3F' }}>{selected.proximo_mantenimiento}</div>
                   </div>
                 )}
               </div>
@@ -306,7 +306,7 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
               {canEdit && (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button onClick={() => iniciarEdicion(selected)}
-                    style={{ padding: '6px 12px', background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ padding: '6px 12px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid #E1DDD0', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     ✏️ Editar
                   </button>
                   {selected.estado !== 'activa' && (
@@ -322,7 +322,7 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
                     </button>
                   )}
                   <button onClick={() => toggleActivo(selected)}
-                    style={{ padding: '6px 12px', background: '#f3f4f6', color: '#6b7280', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ padding: '6px 12px', background: '#EAE6D8', color: '#7E9389', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     {selected.activo ? 'Desactivar' : 'Activar'}
                   </button>
                 </div>
@@ -338,16 +338,16 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
                 <div style={{ fontSize: 24, fontWeight: 700, color: '#10b981' }}>{totalActivas}</div>
                 <div style={{ fontSize: 11, color: '#10b981' }}>Activas</div>
               </div>
-              <div style={{ background: totalFallas > 0 ? '#fef2f2' : '#f3f4f6', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: totalFallas > 0 ? '#ef4444' : '#6b7280' }}>{totalFallas}</div>
-                <div style={{ fontSize: 11, color: totalFallas > 0 ? '#ef4444' : '#6b7280' }}>Con fallas</div>
+              <div style={{ background: totalFallas > 0 ? '#fef2f2' : '#EAE6D8', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: totalFallas > 0 ? '#ef4444' : '#7E9389' }}>{totalFallas}</div>
+                <div style={{ fontSize: 11, color: totalFallas > 0 ? '#ef4444' : '#7E9389' }}>Con fallas</div>
               </div>
-              <div style={{ background: '#eef2ff', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: '#6366f1' }}>{camaras.length}</div>
-                <div style={{ fontSize: 11, color: '#6366f1' }}>Total registradas</div>
+              <div style={{ background: '#F4EBE3', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: '#B96A3F' }}>{camaras.length}</div>
+                <div style={{ fontSize: 11, color: '#B96A3F' }}>Total registradas</div>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#9ca3af', fontSize: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#7E9389', fontSize: 14 }}>
               Selecciona una cámara o registra una nueva
             </div>
           </div>

@@ -86,88 +86,88 @@ export function ConvenioModal({ registros, clientes, moneda, currentUserId, onCl
         boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>🤝 Crear Convenio de Pago</h2>
-          <button onClick={onClose} aria-label="Cerrar modal" style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#15291F', margin: 0 }}>🤝 Crear Convenio de Pago</h2>
+          <button onClick={onClose} aria-label="Cerrar modal" style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#7E9389' }}>✕</button>
         </div>
 
         {/* Resumen de cargos */}
-        <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
-          <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '8px' }}>{cliente?.nombre}</div>
-          <div style={{ fontSize: '13px', color: '#475569', marginBottom: '8px' }}>
+        <div style={{ background: '#FAF7EF', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid #E1DDD0' }}>
+          <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '8px' }}>{cliente?.nombre}</div>
+          <div style={{ fontSize: '13px', color: '#3E5A4C', marginBottom: '8px' }}>
             {registros.length} cargo{registros.length !== 1 ? 's' : ''} incluido{registros.length !== 1 ? 's' : ''}
           </div>
-          <div style={{ fontSize: '20px', fontWeight: 700, color: '#8b5cf6' }}>
+          <div style={{ fontSize: '20px', fontWeight: 700, color: '#B96A3F' }}>
             Total: {moneda} {totalCargos.toFixed(2)}
           </div>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#3E5A4C', marginBottom: '6px' }}>
               Número de Convenio *
             </label>
             <input
               type="text" value={numeroConvenio} onChange={e => setNumeroConvenio(e.target.value)}
               required
-              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '14px', fontFamily: 'inherit' }}
+              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit' }}
             />
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#3E5A4C', marginBottom: '6px' }}>
               Descripción del convenio
             </label>
             <input
               type="text" value={descripcion} onChange={e => setDescripcion(e.target.value)}
               placeholder="Ej: Acuerdo de pago en 3 cuotas mensuales"
-              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '14px', fontFamily: 'inherit' }}
+              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit' }}
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#3E5A4C', marginBottom: '6px' }}>
                 Cuotas Pactadas
               </label>
               <input
                 type="number" min="1" value={cuotasPactadas} onChange={e => setCuotasPactadas(e.target.value)}
                 placeholder="Ej: 3"
-                style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '14px', fontFamily: 'inherit' }}
+                style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit' }}
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#3E5A4C', marginBottom: '6px' }}>
                 Fecha de Vencimiento
               </label>
               <input
                 type="date" value={fechaVencimiento} onChange={e => setFechaVencimiento(e.target.value)}
-                style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '14px', fontFamily: 'inherit' }}
+                style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit' }}
               />
             </div>
           </div>
 
           <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#3E5A4C', marginBottom: '6px' }}>
               Notas / Condiciones
             </label>
             <textarea
               value={notas} onChange={e => setNotas(e.target.value)}
               placeholder="Condiciones especiales, acuerdos adicionales..."
               rows={3}
-              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #e2e8f0', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }}
+              style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1.5px solid #E1DDD0', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical' }}
             />
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
             <button type="button" onClick={onClose} style={{
-              flex: 1, padding: '13px', borderRadius: '8px', border: '1.5px solid #e2e8f0',
-              background: 'white', color: '#64748b', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+              flex: 1, padding: '13px', borderRadius: '8px', border: '1.5px solid #E1DDD0',
+              background: 'white', color: '#7E9389', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
             }}>
               Cancelar
             </button>
             <button type="submit" disabled={saving} style={{
               flex: 2, padding: '13px', borderRadius: '8px', border: 'none',
-              background: saving ? '#cbd5e1' : 'linear-gradient(135deg,#8b5cf6,#7c3aed)',
+              background: saving ? '#C7C2B0' : 'linear-gradient(135deg,#B96A3F,#9C5733)',
               color: 'white', fontWeight: 700, fontSize: '14px', cursor: saving ? 'not-allowed' : 'pointer',
             }}>
               {saving ? '⏳ Creando...' : '🤝 Crear Convenio'}

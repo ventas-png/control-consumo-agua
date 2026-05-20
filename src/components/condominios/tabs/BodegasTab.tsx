@@ -16,8 +16,8 @@ interface Props {
 
 const ESTADO_CONFIG: Record<EstadoBodega, { label: string; color: string; bg: string }> = {
   disponible: { label: 'Disponible', color: '#10b981', bg: '#d1fae5' },
-  asignada:   { label: 'Asignada',   color: '#0ea5e9', bg: '#e0f2fe' },
-  bloqueada:  { label: 'Bloqueada',  color: '#64748b', bg: '#f1f5f9' },
+  asignada:   { label: 'Asignada',   color: '#1B3B36', bg: '#D9E2DC' },
+  bloqueada:  { label: 'Bloqueada',  color: '#7E9389', bg: '#EAE6D8' },
 }
 
 const blank = (): Partial<BodegaCondominio> => ({
@@ -84,8 +84,8 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -93,28 +93,28 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Total bodegas', value: String(bodegas.length), icon: '🗄️', color: '#0ea5e9' },
+          { label: 'Total bodegas', value: String(bodegas.length), icon: '🗄️', color: '#1B3B36' },
           { label: 'Disponibles', value: String(disponibles), icon: '✅', color: '#10b981' },
-          { label: 'Asignadas', value: String(bodegas.filter(b => b.estado === 'asignada').length), icon: '🔑', color: '#8b5cf6' },
+          { label: 'Asignadas', value: String(bodegas.filter(b => b.estado === 'asignada').length), icon: '🔑', color: '#B96A3F' },
           { label: 'Renta mensual', value: rentaTotal > 0 ? `${moneda} ${rentaTotal.toFixed(0)}` : '—', icon: '💰', color: '#f59e0b' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Bodegas / Almacenamiento</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Bodegas / Almacenamiento</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Agregar Bodega</button>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Agregar Bodega</button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Bodega' : 'Nueva Bodega'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
             <div>
@@ -156,8 +156,8 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
           </div>
@@ -168,16 +168,16 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
         {(['todos', 'disponible', 'asignada', 'bloqueada'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: filtroEstado === e ? '#0ea5e9' : '#e2e8f0',
-              background: filtroEstado === e ? '#e0f2fe' : 'white',
-              color: filtroEstado === e ? '#0ea5e9' : '#64748b' }}>
+              borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0',
+              background: filtroEstado === e ? '#D9E2DC' : 'white',
+              color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
             {e === 'todos' ? `Todas (${bodegas.length})` : `${ESTADO_CONFIG[e as EstadoBodega]?.label} (${bodegas.filter(b => b.estado === e).length})`}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>🗄️</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay bodegas registradas</p>
         </div>
@@ -186,24 +186,24 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
           {filtered.map(b => {
             const est = ESTADO_CONFIG[b.estado]
             return (
-              <div key={b.id} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
+              <div key={b.id} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: '18px', color: '#0f172a' }}>🗄️ {b.numero}</div>
-                    {b.piso && <div style={{ fontSize: '11px', color: '#94a3b8' }}>{b.piso}</div>}
+                    <div style={{ fontWeight: 800, fontSize: '18px', color: '#15291F' }}>🗄️ {b.numero}</div>
+                    {b.piso && <div style={{ fontSize: '11px', color: '#7E9389' }}>{b.piso}</div>}
                   </div>
                   <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: '#7E9389', marginBottom: '10px' }}>
                   {b.area_m2 && <div>📐 {b.area_m2} m²</div>}
                   {b.unidad_nombre && <div>🏠 {b.unidad_nombre}</div>}
-                  {b.monto_renta && <div style={{ fontWeight: 600, color: '#0f172a' }}>💰 {moneda} {b.monto_renta}/mes</div>}
+                  {b.monto_renta && <div style={{ fontWeight: 600, color: '#15291F' }}>💰 {moneda} {b.monto_renta}/mes</div>}
                   {b.fecha_asignacion && <div>📅 Desde {b.fecha_asignacion}</div>}
                 </div>
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {b.estado === 'disponible' && (
-                      <button onClick={() => handleEstado(b.id, 'asignada')} style={{ flex: 1, padding: '4px 8px', background: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                      <button onClick={() => handleEstado(b.id, 'asignada')} style={{ flex: 1, padding: '4px 8px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                         Asignar
                       </button>
                     )}
@@ -212,7 +212,7 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
                         Liberar
                       </button>
                     )}
-                    <button onClick={() => startEdit(b)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                    <button onClick={() => startEdit(b)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
                     <button onClick={() => handleDelete(b.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                   </div>
                 )}

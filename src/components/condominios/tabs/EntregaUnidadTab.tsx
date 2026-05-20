@@ -35,7 +35,7 @@ const BLANK: FormData = {
 
 const CONDICION_STYLE: Record<string, { label: string; color: string; bg: string }> = {
   excelente: { label: 'Excelente', color: '#16a34a', bg: '#f0fdf4' },
-  bueno:     { label: 'Bueno',     color: '#2563eb', bg: '#eff6ff' },
+  bueno:     { label: 'Bueno',     color: '#1B3B36', bg: '#EEF2EC' },
   regular:   { label: 'Regular',   color: '#f59e0b', bg: '#fef3c7' },
   malo:      { label: 'Malo',      color: '#dc2626', bg: '#fef2f2' },
 }
@@ -104,10 +104,10 @@ export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, ca
     const inv = (e.inventario_items ?? []) as ItemInventario[]
     const cond = CONDICION_STYLE[e.condicion_general]
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acta de ${e.tipo === 'entrega' ? 'Entrega' : 'Devolución'}</title>
-<style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;margin:16px 0 6px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f8fafc}
+<style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;margin:16px 0 6px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#FAF7EF}
 .sig{margin-top:40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}.sig-box{border-top:1px solid #000;padding-top:6px;font-size:11px}</style></head><body>
 <h1>Acta de ${e.tipo === 'entrega' ? 'Entrega' : 'Devolución'} de Unidad</h1>
-<p style="color:#64748b">Fecha: ${e.fecha}</p>
+<p style="color:#7E9389">Fecha: ${e.fecha}</p>
 <h2>Datos Generales</h2>
 <table><tr><th>Unidad</th><td>${unidad?.nombre ?? '—'}</td><th>Condición general</th><td>${cond?.label ?? e.condicion_general}</td></tr>
 <tr><th>Inquilino</th><td>${e.inquilino ?? '—'}</td><th>Propietario</th><td>${e.propietario ?? '—'}</td></tr>
@@ -123,18 +123,18 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
   if (filtroTipo !== 'todos') filtered = filtered.filter(e => e.tipo === filtroTipo)
   if (filtroUnidad) filtered = filtered.filter(e => e.unidad_id === filtroUnidad)
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Entrega de Unidades</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>{entregas.filter(e => e.tipo === 'entrega').length} entregas · {entregas.filter(e => e.tipo === 'devolucion').length} devoluciones</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Entrega de Unidades</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>{entregas.filter(e => e.tipo === 'entrega').length} entregas · {entregas.filter(e => e.tipo === 'devolucion').length} devoluciones</p>
         </div>
         {canCreate && !showForm && (
           <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setItems([]); setShowForm(true) }}
-            style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nueva Acta
           </button>
         )}
@@ -142,56 +142,56 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Acta' : 'Nueva Acta de Entrega/Devolución'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Unidad *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad *</label>
               <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">— Seleccionar —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Tipo *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Tipo *</label>
               <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
                 <option value="entrega">Entrega</option>
                 <option value="devolucion">Devolución</option>
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Fecha *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha *</label>
               <input type="date" style={inputStyle} value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Condición general</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Condición general</label>
               <select style={inputStyle} value={form.condicion_general} onChange={e => setF('condicion_general', e.target.value)}>
                 {Object.entries(CONDICION_STYLE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Inquilino</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Inquilino</label>
               <input style={inputStyle} value={form.inquilino} onChange={e => setF('inquilino', e.target.value)} placeholder="Nombre" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Propietario</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Propietario</label>
               <input style={inputStyle} value={form.propietario} onChange={e => setF('propietario', e.target.value)} placeholder="Nombre" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Representante Admin.</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Representante Admin.</label>
               <input style={inputStyle} value={form.representante_admin} onChange={e => setF('representante_admin', e.target.value)} placeholder="Nombre" />
             </div>
           </div>
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Observaciones</label>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Observaciones</label>
             <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '60px' }} value={form.observaciones} onChange={e => setF('observaciones', e.target.value)} />
           </div>
 
           {/* Inventory items */}
           <div style={{ marginBottom: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>Inventario</label>
-              <button onClick={addItem} style={{ padding: '4px 10px', background: '#e0f2fe', color: '#0284c7', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>+ Artículo</button>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C' }}>Inventario</label>
+              <button onClick={addItem} style={{ padding: '4px 10px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>+ Artículo</button>
             </div>
             {items.map((it, i) => (
               <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 1fr 28px', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
@@ -203,31 +203,31 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
                 <button onClick={() => removeItem(i)} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
               </div>
             ))}
-            {items.length === 0 && <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>Sin artículos de inventario</p>}
+            {items.length === 0 && <p style={{ fontSize: '12px', color: '#7E9389', margin: 0 }}>Sin artículos de inventario</p>}
           </div>
 
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '9px 20px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Guardando…' : (editId ? 'Guardar cambios' : 'Crear Acta')}</button>
-            <button onClick={() => { setShowForm(false); setEditId(null); setForm({ ...BLANK }); setItems([]) }} style={{ padding: '9px 20px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '9px 20px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? 'Guardando…' : (editId ? 'Guardar cambios' : 'Crear Acta')}</button>
+            <button onClick={() => { setShowForm(false); setEditId(null); setForm({ ...BLANK }); setItems([]) }} style={{ padding: '9px 20px', background: '#EAE6D8', color: '#7E9389', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-        <select style={{ padding: '7px 10px', borderRadius: '7px', border: '1.5px solid #e2e8f0', fontSize: '13px', background: '#f8fafc' }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as typeof filtroTipo)}>
+        <select style={{ padding: '7px 10px', borderRadius: '7px', border: '1.5px solid #E1DDD0', fontSize: '13px', background: '#FAF7EF' }} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as typeof filtroTipo)}>
           <option value="todos">Todos los tipos</option>
           <option value="entrega">Entregas</option>
           <option value="devolucion">Devoluciones</option>
         </select>
-        <select style={{ padding: '7px 10px', borderRadius: '7px', border: '1.5px solid #e2e8f0', fontSize: '13px', background: '#f8fafc' }} value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}>
+        <select style={{ padding: '7px 10px', borderRadius: '7px', border: '1.5px solid #E1DDD0', fontSize: '13px', background: '#FAF7EF' }} value={filtroUnidad} onChange={e => setFiltroUnidad(e.target.value)}>
           <option value="">Todas las unidades</option>
           {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
         </select>
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389' }}>
           <div style={{ fontSize: '32px', marginBottom: '8px' }}>📋</div>
           <p style={{ margin: 0, fontSize: '14px' }}>No hay actas de entrega registradas.</p>
         </div>
@@ -238,38 +238,38 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
             const cond = CONDICION_STYLE[e.condicion_general]
             const isSelected = selected?.id === e.id
             return (
-              <div key={e.id} style={{ border: `1.5px solid ${isSelected ? '#0ea5e9' : '#e2e8f0'}`, borderRadius: '10px', background: isSelected ? '#f0f9ff' : 'white', overflow: 'hidden' }}>
+              <div key={e.id} style={{ border: `1.5px solid ${isSelected ? '#1B3B36' : '#E1DDD0'}`, borderRadius: '10px', background: isSelected ? '#EEF2EC' : 'white', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', cursor: 'pointer' }} onClick={() => setSelected(isSelected ? null : e)}>
                   <div style={{ fontSize: '20px' }}>{e.tipo === 'entrega' ? '📦' : '🔄'}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '13.5px', color: '#0f172a' }}>{unidad?.nombre ?? 'Unidad desconocida'}</div>
-                    <div style={{ fontSize: '12px', color: '#64748b' }}>{e.tipo === 'entrega' ? 'Entrega' : 'Devolución'} · {e.fecha}</div>
+                    <div style={{ fontWeight: 700, fontSize: '13.5px', color: '#15291F' }}>{unidad?.nombre ?? 'Unidad desconocida'}</div>
+                    <div style={{ fontSize: '12px', color: '#7E9389' }}>{e.tipo === 'entrega' ? 'Entrega' : 'Devolución'} · {e.fecha}</div>
                   </div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: cond?.color ?? '#64748b', background: cond?.bg ?? '#f1f5f9', padding: '3px 9px', borderRadius: '20px' }}>{cond?.label ?? e.condicion_general}</div>
-                  <div style={{ fontSize: '11px', color: '#94a3b8' }}>{isSelected ? '▲' : '▼'}</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: cond?.color ?? '#7E9389', background: cond?.bg ?? '#EAE6D8', padding: '3px 9px', borderRadius: '20px' }}>{cond?.label ?? e.condicion_general}</div>
+                  <div style={{ fontSize: '11px', color: '#7E9389' }}>{isSelected ? '▲' : '▼'}</div>
                 </div>
 
                 {isSelected && (
-                  <div style={{ borderTop: '1px solid #e2e8f0', padding: '14px' }}>
+                  <div style={{ borderTop: '1px solid #E1DDD0', padding: '14px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px', marginBottom: '10px', fontSize: '13px' }}>
-                      {e.inquilino && <div><span style={{ color: '#64748b', fontSize: '11px', fontWeight: 600 }}>INQUILINO</span><br />{e.inquilino}</div>}
-                      {e.propietario && <div><span style={{ color: '#64748b', fontSize: '11px', fontWeight: 600 }}>PROPIETARIO</span><br />{e.propietario}</div>}
-                      {e.representante_admin && <div><span style={{ color: '#64748b', fontSize: '11px', fontWeight: 600 }}>REPR. ADMIN</span><br />{e.representante_admin}</div>}
+                      {e.inquilino && <div><span style={{ color: '#7E9389', fontSize: '11px', fontWeight: 600 }}>INQUILINO</span><br />{e.inquilino}</div>}
+                      {e.propietario && <div><span style={{ color: '#7E9389', fontSize: '11px', fontWeight: 600 }}>PROPIETARIO</span><br />{e.propietario}</div>}
+                      {e.representante_admin && <div><span style={{ color: '#7E9389', fontSize: '11px', fontWeight: 600 }}>REPR. ADMIN</span><br />{e.representante_admin}</div>}
                     </div>
-                    {e.observaciones && <p style={{ margin: '0 0 10px', fontSize: '13px', color: '#475569' }}>{e.observaciones}</p>}
+                    {e.observaciones && <p style={{ margin: '0 0 10px', fontSize: '13px', color: '#3E5A4C' }}>{e.observaciones}</p>}
 
                     {/* Inventory */}
                     {((e.inventario_items ?? []) as ItemInventario[]).length > 0 && (
                       <div style={{ marginBottom: '10px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>INVENTARIO</div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', marginBottom: '6px' }}>INVENTARIO</div>
                         <div style={{ display: 'grid', gap: '4px' }}>
                           {((e.inventario_items ?? []) as ItemInventario[]).map((it, i) => {
                             const c = CONDICION_STYLE[it.condicion]
                             return (
-                              <div key={i} style={{ display: 'flex', gap: '10px', fontSize: '12.5px', padding: '5px 8px', background: '#f8fafc', borderRadius: '6px' }}>
+                              <div key={i} style={{ display: 'flex', gap: '10px', fontSize: '12.5px', padding: '5px 8px', background: '#FAF7EF', borderRadius: '6px' }}>
                                 <span style={{ flex: 1 }}>{it.item}</span>
                                 <span style={{ color: c?.color, fontWeight: 600 }}>{c?.label ?? it.condicion}</span>
-                                {it.notas && <span style={{ color: '#94a3b8' }}>{it.notas}</span>}
+                                {it.notas && <span style={{ color: '#7E9389' }}>{it.notas}</span>}
                               </div>
                             )
                           })}
@@ -282,20 +282,20 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => toggleFirma(e, 'firmado_propietario')}
-                          style={{ padding: '5px 12px', borderRadius: '7px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: e.firmado_propietario ? '#f0fdf4' : '#f8fafc', color: e.firmado_propietario ? '#16a34a' : '#64748b' }}>
+                          style={{ padding: '5px 12px', borderRadius: '7px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: e.firmado_propietario ? '#f0fdf4' : '#FAF7EF', color: e.firmado_propietario ? '#16a34a' : '#7E9389' }}>
                           {e.firmado_propietario ? '✓' : '□'} Firma Propietario
                         </button>
                         <button
                           onClick={() => toggleFirma(e, 'firmado_inquilino')}
-                          style={{ padding: '5px 12px', borderRadius: '7px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: e.firmado_inquilino ? '#f0fdf4' : '#f8fafc', color: e.firmado_inquilino ? '#16a34a' : '#64748b' }}>
+                          style={{ padding: '5px 12px', borderRadius: '7px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: e.firmado_inquilino ? '#f0fdf4' : '#FAF7EF', color: e.firmado_inquilino ? '#16a34a' : '#7E9389' }}>
                           {e.firmado_inquilino ? '✓' : '□'} Firma Inquilino
                         </button>
                       </div>
                     )}
 
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => handlePrint(e)} style={{ padding: '6px 14px', background: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>🖨️ Imprimir</button>
-                      {canEdit && <button onClick={() => startEdit(e)} style={{ padding: '6px 14px', background: '#f1f5f9', color: '#334155', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>✏️ Editar</button>}
+                      <button onClick={() => handlePrint(e)} style={{ padding: '6px 14px', background: '#EEF2EC', color: '#1B3B36', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>🖨️ Imprimir</button>
+                      {canEdit && <button onClick={() => startEdit(e)} style={{ padding: '6px 14px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>✏️ Editar</button>}
                       {canEdit && <button onClick={() => handleDelete(e.id)} style={{ padding: '6px 14px', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>🗑️ Eliminar</button>}
                     </div>
                   </div>

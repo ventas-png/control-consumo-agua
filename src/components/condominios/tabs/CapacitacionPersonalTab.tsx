@@ -14,7 +14,7 @@ interface Props {
 }
 
 const ESTADO_CFG: Record<EstadoCapacitacion, { label: string; bg: string; color: string }> = {
-  planificado: { label: 'Planificado', bg: '#dbeafe', color: '#1d4ed8' },
+  planificado: { label: 'Planificado', bg: '#D9E2DC', color: '#102622' },
   en_progreso: { label: 'En progreso', bg: '#fef3c7', color: '#d97706' },
   completado:  { label: 'Completado',  bg: '#dcfce7', color: '#16a34a' },
   vencido:     { label: 'Vencido',     bg: '#fee2e2', color: '#ef4444' },
@@ -84,8 +84,8 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   // Group by employee
   const empleados = [...new Set(lista.map(c => c.nombre_empleado))].sort()
@@ -98,7 +98,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
           { label: 'Completadas', val: capacitaciones.filter(c => c.estado === 'completado').length, bg: '#dcfce7', color: '#16a34a' },
           { label: 'En progreso', val: capacitaciones.filter(c => c.estado === 'en_progreso').length, bg: '#fef3c7', color: '#d97706' },
           { label: 'Cert. por vencer (30d)', val: proxVencer, bg: '#fff7ed', color: '#ea580c' },
-          { label: `Inversión total`, val: `${moneda} ${totalCosto.toFixed(2)}`, bg: '#eff6ff', color: '#2563eb' },
+          { label: `Inversión total`, val: `${moneda} ${totalCosto.toFixed(2)}`, bg: '#EEF2EC', color: '#1B3B36' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: k.color }}>{k.val}</div>
@@ -111,17 +111,17 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar empleado o curso…"
-            style={{ padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, minWidth: 200 }} />
+            style={{ padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13, minWidth: 200 }} />
           <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoCapacitacion | '')}
-            style={{ padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13 }}>
+            style={{ padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 7, fontSize: 13 }}>
             <option value="">Todos los estados</option>
             {(Object.keys(ESTADO_CFG) as EstadoCapacitacion[]).map(e => <option key={e} value={e}>{ESTADO_CFG[e].label}</option>)}
           </select>
-          <span style={{ fontSize: 12, color: '#6b7280', alignSelf: 'center' }}>{lista.length} registros</span>
+          <span style={{ fontSize: 12, color: '#7E9389', alignSelf: 'center' }}>{lista.length} registros</span>
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: '#102622', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nueva capacitación'}
           </button>
         )}
@@ -129,7 +129,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Registrar capacitación</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -176,7 +176,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: '#102622', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Registrar'}
           </button>
         </div>
@@ -184,7 +184,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
 
       {/* Lista agrupada por empleado */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🎓</div>
           Sin capacitaciones registradas
         </div>
@@ -194,12 +194,12 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
             const caps = lista.filter(c => c.nombre_empleado === emp)
             return (
               <div key={emp}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#1d4ed8' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#15291F', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#D9E2DC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#102622' }}>
                     {emp.charAt(0).toUpperCase()}
                   </div>
                   {emp}
-                  {caps[0]?.cargo && <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 400 }}>— {caps[0].cargo}</span>}
+                  {caps[0]?.cargo && <span style={{ fontSize: 11, color: '#7E9389', fontWeight: 400 }}>— {caps[0].cargo}</span>}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 36 }}>
                   {caps.map(c => {
@@ -208,14 +208,14 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
                     const diasCert = certVence ? Math.floor((new Date(certVence).getTime() - Date.now()) / 86400000) : null
                     const certAlerta = diasCert !== null && diasCert >= 0 && diasCert <= 30
                     return (
-                      <div key={c.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div key={c.id} style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 8, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontWeight: 600, fontSize: 13 }}>{c.curso}</span>
                             <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                             {certAlerta && <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, background: '#fff7ed', color: '#ea580c', fontWeight: 700 }}>⚠ Cert. vence en {diasCert}d</span>}
                           </div>
-                          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                          <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>
                             {c.proveedor && `${c.proveedor} · `}
                             {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ''}
                             {c.costo && ` · ${moneda} ${c.costo.toFixed(2)}`}

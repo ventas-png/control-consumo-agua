@@ -18,20 +18,20 @@ const TIPO_STYLE: Record<string, { bg: string; color: string; label: string; ico
   queja:          { bg: '#fee2e2', color: '#ef4444', label: 'Queja',           icon: '😤' },
   sugerencia:     { bg: '#dcfce7', color: '#16a34a', label: 'Sugerencia',      icon: '💡' },
   reclamo_formal: { bg: '#fef3c7', color: '#92400e', label: 'Reclamo Formal',  icon: '📋' },
-  apelacion:      { bg: '#f3e8ff', color: '#7c3aed', label: 'Apelación',       icon: '⚖️' },
+  apelacion:      { bg: '#F4EBE3', color: '#9C5733', label: 'Apelación',       icon: '⚖️' },
 }
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  recibido:    { bg: '#e0f2fe', color: '#0369a1', label: 'Recibido' },
+  recibido:    { bg: '#D9E2DC', color: '#102622', label: 'Recibido' },
   en_revision: { bg: '#fef3c7', color: '#92400e', label: 'En revisión' },
   respondido:  { bg: '#dcfce7', color: '#16a34a', label: 'Respondido' },
-  cerrado:     { bg: '#f1f5f9', color: '#64748b', label: 'Cerrado' },
+  cerrado:     { bg: '#EAE6D8', color: '#7E9389', label: 'Cerrado' },
   escalado:    { bg: '#fee2e2', color: '#ef4444', label: 'Escalado' },
 }
 
 const PRIORIDAD_STYLE: Record<string, { color: string; label: string }> = {
-  baja:    { color: '#94a3b8', label: 'Baja' },
-  normal:  { color: '#0ea5e9', label: 'Normal' },
+  baja:    { color: '#7E9389', label: 'Baja' },
+  normal:  { color: '#1B3B36', label: 'Normal' },
   alta:    { color: '#f59e0b', label: 'Alta' },
   urgente: { color: '#ef4444', label: 'Urgente' },
 }
@@ -109,18 +109,18 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
   if (filtroTipo !== 'todos') filtered = filtered.filter(r => r.tipo === filtroTipo)
 
   const pendientes = reclamos.filter(r => r.estado === 'recibido' || r.estado === 'en_revision').length
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Reclamos y Sugerencias</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>{pendientes} pendiente(s) de respuesta</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Reclamos y Sugerencias</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>{pendientes} pendiente(s) de respuesta</p>
         </div>
         {canCreate && !showForm && (
           <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setShowForm(true) }}
-            style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo
           </button>
         )}
@@ -129,52 +129,52 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '10px', marginBottom: '16px' }}>
         {Object.entries(ESTADO_STYLE).map(([est, s]) => (
-          <div key={est} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+          <div key={est} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color: s.color }}>{reclamos.filter(r => r.estado === est).length}</div>
-            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{s.label}</div>
+            <div style={{ fontSize: '10px', color: '#7E9389' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar reclamo' : 'Nuevo Reclamo / Sugerencia'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Tipo</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Tipo</label>
               <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
                 {Object.entries(TIPO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.icon} {s.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Unidad</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad</label>
               <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">— Sin unidad / General —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Prioridad</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Prioridad</label>
               <select style={inputStyle} value={form.prioridad} onChange={e => setF('prioridad', e.target.value)}>
                 {Object.entries(PRIORIDAD_STYLE).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Plazo de respuesta</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Plazo de respuesta</label>
               <input style={inputStyle} type="date" value={form.plazo_respuesta} onChange={e => setF('plazo_respuesta', e.target.value)} />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Asunto *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Asunto *</label>
               <input style={inputStyle} value={form.asunto} onChange={e => setF('asunto', e.target.value)} placeholder="Resumen del reclamo o sugerencia" autoFocus />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Descripción</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Descripción</label>
               <textarea style={{ ...inputStyle, minHeight: '65px', resize: 'vertical', fontFamily: 'inherit' }}
                 value={form.descripcion} onChange={e => setF('descripcion', e.target.value)} placeholder="Detalle del reclamo, contexto, evidencias…" />
             </div>
             <div>
-              <label style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginTop: '8px' }}>
+              <label style={{ fontSize: '12px', color: '#7E9389', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginTop: '8px' }}>
                 <input type="checkbox" checked={form.anonimo} onChange={e => setF('anonimo', e.target.checked)} />
                 Anónimo
               </label>
@@ -182,11 +182,11 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -198,14 +198,14 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
         {(['todos', 'recibido', 'en_revision', 'respondido', 'cerrado', 'escalado'] as const).map(f => (
           <button key={f} onClick={() => setFiltroEstado(f)}
             style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '11px', cursor: 'pointer',
-              borderColor: filtroEstado === f ? '#0ea5e9' : '#e2e8f0',
-              background: filtroEstado === f ? '#e0f2fe' : 'white',
-              color: filtroEstado === f ? '#0369a1' : '#64748b',
+              borderColor: filtroEstado === f ? '#1B3B36' : '#E1DDD0',
+              background: filtroEstado === f ? '#D9E2DC' : 'white',
+              color: filtroEstado === f ? '#102622' : '#7E9389',
               fontWeight: filtroEstado === f ? 700 : 500 }}>
             {f === 'todos' ? 'Todos' : ESTADO_STYLE[f]?.label ?? f}
           </button>
         ))}
-        <select style={{ padding: '4px 8px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '11px', background: '#f8fafc', color: '#1e293b' }}
+        <select style={{ padding: '4px 8px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '11px', background: '#FAF7EF', color: '#15291F' }}
           value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}>
           <option value="todos">Todos los tipos</option>
           {Object.entries(TIPO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
@@ -216,7 +216,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
         {/* List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay reclamos registrados.</div>
+            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay reclamos registrados.</div>
           ) : filtered.map(r => {
             const ts = TIPO_STYLE[r.tipo] ?? TIPO_STYLE.queja
             const es = ESTADO_STYLE[r.estado] ?? ESTADO_STYLE.recibido
@@ -226,7 +226,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
             const vencido = (r.estado === 'recibido' || r.estado === 'en_revision') && r.plazo_respuesta && r.plazo_respuesta < today
             return (
               <div key={r.id} onClick={() => setSelected(selected?.id === r.id ? null : r)}
-                style={{ background: 'white', border: `1.5px solid ${vencido ? '#fca5a5' : selected?.id === r.id ? '#0ea5e9' : '#e2e8f0'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
+                style={{ background: 'white', border: `1.5px solid ${vencido ? '#fca5a5' : selected?.id === r.id ? '#1B3B36' : '#E1DDD0'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: '5px', alignItems: 'center', marginBottom: '3px', flexWrap: 'wrap' }}>
@@ -235,12 +235,12 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '20px', background: ts.bg, color: ts.color }}>{ts.label}</span>
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '11px', color: '#7E9389', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                       {!r.anonimo && unidad && <span>🏠 {unidad.nombre}</span>}
-                      {r.anonimo && <span style={{ color: '#94a3b8' }}>🔒 Anónimo</span>}
+                      {r.anonimo && <span style={{ color: '#7E9389' }}>🔒 Anónimo</span>}
                       <span style={{ color: pr.color, fontWeight: 600 }}>● {pr.label}</span>
                       <span>📅 {r.created_at.slice(0, 10)}</span>
-                      {r.plazo_respuesta && <span style={{ color: vencido ? '#ef4444' : '#64748b' }}>⏰ Plazo: {r.plazo_respuesta}{vencido ? ' ⚠️' : ''}</span>}
+                      {r.plazo_respuesta && <span style={{ color: vencido ? '#ef4444' : '#7E9389' }}>⏰ Plazo: {r.plazo_respuesta}{vencido ? ' ⚠️' : ''}</span>}
                     </div>
                   </div>
                   {canEdit && (
@@ -253,12 +253,12 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
                       )}
                       {r.estado === 'respondido' && (
                         <button onClick={() => cambiarEstado(r.id, 'cerrado')}
-                          style={{ padding: '3px 7px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                          style={{ padding: '3px 7px', background: '#EAE6D8', color: '#7E9389', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
                           Cerrar
                         </button>
                       )}
                       <button onClick={() => startEdit(r)}
-                        style={{ padding: '3px 7px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(r.id)}
                         style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                     </div>
@@ -271,7 +271,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
 
         {/* Detail / response panel */}
         {selected && (
-          <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '14px' }}>
             <h3 style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700 }}>{TIPO_STYLE[selected.tipo]?.icon} {selected.asunto}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '10px' }}>
               {[
@@ -282,52 +282,52 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
                 { label: 'Recibido', value: selected.created_at.slice(0, 10) },
                 { label: 'Plazo', value: selected.plazo_respuesta ?? '—' },
               ].map(f => (
-                <div key={f.label} style={{ background: 'white', borderRadius: '7px', padding: '7px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '10px', color: '#94a3b8' }}>{f.label}</div>
+                <div key={f.label} style={{ background: 'white', borderRadius: '7px', padding: '7px', border: '1px solid #E1DDD0' }}>
+                  <div style={{ fontSize: '10px', color: '#7E9389' }}>{f.label}</div>
                   <div style={{ fontSize: '12px', fontWeight: 600 }}>{f.value}</div>
                 </div>
               ))}
             </div>
 
             {selected.descripcion && (
-              <div style={{ background: 'white', borderRadius: '8px', padding: '8px', border: '1px solid #e2e8f0', marginBottom: '10px' }}>
-                <div style={{ fontSize: '10px', color: '#94a3b8', marginBottom: '3px' }}>Descripción</div>
-                <div style={{ fontSize: '12px', color: '#374151' }}>{selected.descripcion}</div>
+              <div style={{ background: 'white', borderRadius: '8px', padding: '8px', border: '1px solid #E1DDD0', marginBottom: '10px' }}>
+                <div style={{ fontSize: '10px', color: '#7E9389', marginBottom: '3px' }}>Descripción</div>
+                <div style={{ fontSize: '12px', color: '#3E5A4C' }}>{selected.descripcion}</div>
               </div>
             )}
 
             {selected.respuesta_admin && (
               <div style={{ background: '#dcfce7', borderRadius: '8px', padding: '8px', border: '1px solid #86efac', marginBottom: '10px' }}>
                 <div style={{ fontSize: '10px', color: '#16a34a', fontWeight: 700, marginBottom: '3px' }}>Respuesta{selected.respondido_por ? ` de ${selected.respondido_por}` : ''} ({selected.fecha_respuesta})</div>
-                <div style={{ fontSize: '12px', color: '#374151' }}>{selected.respuesta_admin}</div>
+                <div style={{ fontSize: '12px', color: '#3E5A4C' }}>{selected.respuesta_admin}</div>
               </div>
             )}
 
             {canEdit && !showRespForm && (selected.estado === 'recibido' || selected.estado === 'en_revision') && (
               <button onClick={() => setShowRespForm(true)}
-                style={{ width: '100%', padding: '8px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', fontWeight: 600, marginBottom: '8px' }}>
+                style={{ width: '100%', padding: '8px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', fontWeight: 600, marginBottom: '8px' }}>
                 ✍️ Responder
               </button>
             )}
 
             {showRespForm && (
-              <div style={{ background: 'white', borderRadius: '8px', padding: '10px', border: '1px solid #e2e8f0' }}>
+              <div style={{ background: 'white', borderRadius: '8px', padding: '10px', border: '1px solid #E1DDD0' }}>
                 <div style={{ marginBottom: '6px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Respondido por</label>
+                  <label style={{ fontSize: '10px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '2px' }}>Respondido por</label>
                   <input style={{ ...inputStyle, fontSize: '12px' }} value={formResp.respondido_por} onChange={e => setFR('respondido_por', e.target.value)} placeholder="Nombre del administrador" />
                 </div>
                 <div style={{ marginBottom: '8px' }}>
-                  <label style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '2px' }}>Respuesta *</label>
+                  <label style={{ fontSize: '10px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '2px' }}>Respuesta *</label>
                   <textarea style={{ ...inputStyle, minHeight: '70px', resize: 'vertical', fontFamily: 'inherit', fontSize: '12px' }}
                     value={formResp.respuesta_admin} onChange={e => setFR('respuesta_admin', e.target.value)} placeholder="Respuesta oficial de la administración…" autoFocus />
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button onClick={handleResponder}
-                    style={{ padding: '6px 14px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>
+                    style={{ padding: '6px 14px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>
                     Enviar respuesta
                   </button>
                   <button onClick={() => { setShowRespForm(false); setFormResp({ ...BLANK_RESP }) }}
-                    style={{ padding: '6px 10px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#64748b' }}>
+                    style={{ padding: '6px 10px', background: 'white', border: '1px solid #E1DDD0', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#7E9389' }}>
                     Cancelar
                   </button>
                 </div>

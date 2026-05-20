@@ -17,10 +17,10 @@ interface Props {
 type EstadoP = Proforma['estado']
 
 const ESTADO_CFG: Record<EstadoP, { label: string; color: string; bg: string; next?: EstadoP; nextLabel?: string }> = {
-  borrador:      { label: 'Borrador',     color: '#64748b', bg: '#f1f5f9', next: 'enviada',     nextLabel: 'Enviar a proveedor' },
-  enviada:       { label: 'Enviada',      color: '#2563eb', bg: '#eff6ff', next: 'aprobada',    nextLabel: 'Aprobar' },
+  borrador:      { label: 'Borrador',     color: '#7E9389', bg: '#EAE6D8', next: 'enviada',     nextLabel: 'Enviar a proveedor' },
+  enviada:       { label: 'Enviada',      color: '#1B3B36', bg: '#EEF2EC', next: 'aprobada',    nextLabel: 'Aprobar' },
   aprobada:      { label: 'Aprobada',     color: '#16a34a', bg: '#dcfce7', next: 'convertida_oc', nextLabel: 'Convertir a OC' },
-  convertida_oc: { label: 'OC generada', color: '#7c3aed', bg: '#f5f3ff' },
+  convertida_oc: { label: 'OC generada', color: '#9C5733', bg: '#FAF1EA' },
   rechazada:     { label: 'Rechazada',    color: '#ef4444', bg: '#fef2f2' },
 }
 
@@ -66,7 +66,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
 
   async function guardar() {
     if (!form.proveedor_nombre.trim() || !form.concepto.trim()) {
-      return Swal.fire({ icon: 'warning', title: 'Faltan datos', text: 'Proveedor y concepto son obligatorios.', confirmButtonColor: '#2563eb' })
+      return Swal.fire({ icon: 'warning', title: 'Faltan datos', text: 'Proveedor y concepto son obligatorios.', confirmButtonColor: '#1B3B36' })
     }
     setSaving(true)
     const payload = {
@@ -82,7 +82,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
       ? await supabase.from('proformas_condominio').update(payload).eq('id', editId)
       : await supabase.from('proformas_condominio').insert({ ...payload, estado: 'borrador' })
     setSaving(false)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: '#2563eb' })
+    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: '#1B3B36' })
     resetForm(); onRefresh()
   }
 
@@ -91,7 +91,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
     if (!cfg.next) return
     const nuevoEstado = cfg.next
     const { error } = await supabase.from('proformas_condominio').update({ estado: nuevoEstado }).eq('id', p.id)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: '#2563eb' })
+    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: '#1B3B36' })
     if (nuevoEstado === 'convertida_oc') {
       await supabase.from('ordenes_compra').insert({
         company_id: companyId, project_id: proyectoId,
@@ -102,7 +102,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
         estado: 'borrador',
         notas: `Proforma: ${p.id}`,
       })
-      Swal.fire({ icon: 'success', title: 'OC generada', text: 'Se creó una orden de compra en estado Borrador.', confirmButtonColor: '#2563eb' })
+      Swal.fire({ icon: 'success', title: 'OC generada', text: 'Se creó una orden de compra en estado Borrador.', confirmButtonColor: '#1B3B36' })
     }
     onRefresh()
   }
@@ -125,12 +125,12 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
     <div style={{ padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>Proformas / Cotizaciones</div>
-          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>Monto total activo: <strong>{moneda} {montoTotal.toLocaleString('es', { maximumFractionDigits: 0 })}</strong></div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Proformas / Cotizaciones</div>
+          <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>Monto total activo: <strong>{moneda} {montoTotal.toLocaleString('es', { maximumFractionDigits: 0 })}</strong></div>
         </div>
         {canCreate && !showForm && (
           <button onClick={() => setShowForm(true)}
-            style={{ padding: '7px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+            style={{ padding: '7px 16px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
             + Nueva proforma
           </button>
         )}
@@ -140,67 +140,67 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         {(Object.entries(ESTADO_CFG) as [EstadoP, typeof ESTADO_CFG[EstadoP]][]).map(([est, cfg]) => (
           <div key={est} onClick={() => setFiltroEstado(filtroEstado === est ? '' : est)}
-            style={{ padding: '8px 14px', background: filtroEstado === est ? cfg.bg : '#f8fafc', border: `1px solid ${filtroEstado === est ? cfg.color : '#e5e7eb'}`, borderRadius: 10, cursor: 'pointer', minWidth: 90, textAlign: 'center' }}>
+            style={{ padding: '8px 14px', background: filtroEstado === est ? cfg.bg : '#FAF7EF', border: `1px solid ${filtroEstado === est ? cfg.color : '#E1DDD0'}`, borderRadius: 10, cursor: 'pointer', minWidth: 90, textAlign: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: cfg.color }}>{conteos[est]}</div>
-            <div style={{ fontSize: 10, color: '#64748b' }}>{cfg.label}</div>
+            <div style={{ fontSize: 10, color: '#7E9389' }}>{cfg.label}</div>
           </div>
         ))}
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>{editId ? 'Editar proforma' : 'Nueva proforma'}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <label style={{ fontSize: 12, color: '#64748b' }}>Proveedor *</label>
+              <label style={{ fontSize: 12, color: '#7E9389' }}>Proveedor *</label>
               <input list="proveedores-list" value={form.proveedor_nombre} onChange={e => setForm(f => ({ ...f, proveedor_nombre: e.target.value }))}
                 placeholder="Nombre del proveedor"
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
               <datalist id="proveedores-list">
                 {proveedores.map(p => <option key={p.id} value={p.proveedor_nombre} />)}
               </datalist>
             </div>
             <div>
-              <label style={{ fontSize: 12, color: '#64748b' }}>Concepto *</label>
+              <label style={{ fontSize: 12, color: '#7E9389' }}>Concepto *</label>
               <input value={form.concepto} onChange={e => setForm(f => ({ ...f, concepto: e.target.value }))}
                 placeholder="Ej: Pintura fachada"
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: '#64748b' }}>Monto ({moneda})</label>
+              <label style={{ fontSize: 12, color: '#7E9389' }}>Monto ({moneda})</label>
               <input type="number" min="0" step="0.01" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
             </div>
             <div>
-              <label style={{ fontSize: 12, color: '#64748b' }}>Válida hasta</label>
+              <label style={{ fontSize: 12, color: '#7E9389' }}>Válida hasta</label>
               <input type="date" value={form.fecha_validez} onChange={e => setForm(f => ({ ...f, fecha_validez: e.target.value }))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: 12, color: '#64748b' }}>Descripción</label>
+              <label style={{ fontSize: 12, color: '#7E9389' }}>Descripción</label>
               <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} rows={2}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box', marginTop: 3, resize: 'vertical' }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3, resize: 'vertical' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: 12, color: '#64748b' }}>Notas</label>
+              <label style={{ fontSize: 12, color: '#7E9389' }}>Notas</label>
               <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 13, boxSizing: 'border-box', marginTop: 3 }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button onClick={guardar} disabled={saving}
-              style={{ padding: '8px 20px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+              style={{ padding: '8px 20px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear proforma'}
             </button>
-            <button onClick={resetForm} style={{ padding: '8px 16px', background: '#f1f5f9', color: '#374151', border: '1px solid #d1d5db', borderRadius: 8, cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={resetForm} style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: '1px solid #C7C2B0', borderRadius: 8, cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
 
       {/* List */}
       {filtradas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: '#9ca3af', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', padding: '40px 0', color: '#7E9389', fontSize: 13 }}>
           {filtroEstado ? `No hay proformas con estado "${ESTADO_CFG[filtroEstado].label}".` : 'No hay proformas registradas.'}
         </div>
       ) : (
@@ -210,25 +210,25 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
             const exp = expandida === p.id
             const vencida = p.fecha_validez && p.fecha_validez < new Date().toISOString().slice(0, 10) && p.estado !== 'convertida_oc' && p.estado !== 'rechazada'
             return (
-              <div key={p.id} style={{ background: '#fff', border: `1px solid ${vencida ? '#fca5a5' : '#e5e7eb'}`, borderRadius: 12, overflow: 'hidden' }}>
+              <div key={p.id} style={{ background: '#fff', border: `1px solid ${vencida ? '#fca5a5' : '#E1DDD0'}`, borderRadius: 12, overflow: 'hidden' }}>
                 <div onClick={() => setExpandida(exp ? null : p.id)}
                   style={{ padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>{p.concepto}</div>
-                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F' }}>{p.concepto}</div>
+                    <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>
                       {p.proveedor_nombre} · {p.monto != null ? `${moneda} ${p.monto.toLocaleString('es', { maximumFractionDigits: 2 })}` : 'Sin monto'}
                       {p.fecha_validez && ` · Válida hasta: ${p.fecha_validez}`}
                     </div>
                   </div>
                   {vencida && <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>VENCIDA</span>}
                   <span style={{ padding: '3px 10px', borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 600 }}>{cfg.label}</span>
-                  <span style={{ fontSize: 11, color: '#9ca3af' }}>{exp ? '▲' : '▼'}</span>
+                  <span style={{ fontSize: 11, color: '#7E9389' }}>{exp ? '▲' : '▼'}</span>
                 </div>
                 {exp && (
-                  <div style={{ padding: '0 16px 14px', borderTop: '1px solid #f1f5f9' }}>
-                    {p.descripcion && <div style={{ fontSize: 12, color: '#374151', marginTop: 10 }}>{p.descripcion}</div>}
-                    {p.notas && <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>📝 {p.notas}</div>}
-                    <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 6 }}>Creada: {p.created_at?.slice(0, 10)}</div>
+                  <div style={{ padding: '0 16px 14px', borderTop: '1px solid #EAE6D8' }}>
+                    {p.descripcion && <div style={{ fontSize: 12, color: '#3E5A4C', marginTop: 10 }}>{p.descripcion}</div>}
+                    {p.notas && <div style={{ fontSize: 11, color: '#7E9389', marginTop: 6 }}>📝 {p.notas}</div>}
+                    <div style={{ fontSize: 10, color: '#7E9389', marginTop: 6 }}>Creada: {p.created_at?.slice(0, 10)}</div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                       {canEdit && cfg.next && p.estado !== 'rechazada' && (
                         <button onClick={() => avanzarEstado(p)}
@@ -239,7 +239,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
                       {canEdit && p.estado === 'borrador' && (
                         <>
                           <button onClick={() => abrirEditar(p)}
-                            style={{ padding: '6px 12px', background: '#eff6ff', color: '#2563eb', border: '1px solid #2563eb', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                            style={{ padding: '6px 12px', background: '#EEF2EC', color: '#1B3B36', border: '1px solid #1B3B36', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                             ✏️ Editar
                           </button>
                           <button onClick={() => rechazar(p)}

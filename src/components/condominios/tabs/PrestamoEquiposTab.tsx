@@ -17,7 +17,7 @@ const ESTADO_STYLE: Record<EstadoPrestamo, { color: string; bg: string; label: s
   prestado: { color: '#f59e0b', bg: '#fef3c7', label: 'Prestado' },
   devuelto: { color: '#10b981', bg: '#dcfce7', label: 'Devuelto' },
   dañado:   { color: '#ef4444', bg: '#fee2e2', label: 'Dañado'   },
-  perdido:  { color: '#7c3aed', bg: '#ede9fe', label: 'Perdido'  },
+  perdido:  { color: '#9C5733', bg: '#F4EBE3', label: 'Perdido'  },
 }
 
 const EQUIPOS_COMUNES = ['Sillas','Mesas','Proyector','Pantalla','Micrófono','Toldo','Cañonera','Extensiones','Decoraciones','Cocina','Otro']
@@ -91,15 +91,15 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Préstamo de Equipos</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Préstamo de Equipos</h2>
         {canCreate && (
           <button onClick={() => setShowForm(v => !v)}
-            style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Registrar Préstamo
           </button>
         )}
@@ -109,71 +109,71 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', marginBottom: '16px' }}>
         {[
           { label: 'Activos (prestados)', value: activos,                   color: '#f59e0b' },
-          { label: 'Total histórico',     value: prestamos.length,          color: '#0f172a' },
-          { label: 'Con depósito',        value: conDeposito,               color: '#8b5cf6' },
+          { label: 'Total histórico',     value: prestamos.length,          color: '#15291F' },
+          { label: 'Con depósito',        value: conDeposito,               color: '#B96A3F' },
           { label: 'Dañados/Perdidos',    value: prestamos.filter(p => p.estado === 'dañado' || p.estado === 'perdido').length, color: '#ef4444' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nuevo préstamo</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Unidad *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad *</label>
               <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">— Seleccionar —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Equipo *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Equipo *</label>
               <input style={inputStyle} list="equipos-list" value={form.equipo_nombre}
                 onChange={e => setF('equipo_nombre', e.target.value)} placeholder="Ej: Sillas, Proyector…" autoFocus />
               <datalist id="equipos-list">{EQUIPOS_COMUNES.map(e => <option key={e} value={e} />)}</datalist>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Cantidad</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Cantidad</label>
               <input style={inputStyle} type="number" min="1" value={form.cantidad} onChange={e => setF('cantidad', parseInt(e.target.value) || 1)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Fecha préstamo</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha préstamo</label>
               <input style={inputStyle} type="date" value={form.fecha_prestamo} onChange={e => setF('fecha_prestamo', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Hora</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Hora</label>
               <input style={inputStyle} type="time" value={form.hora_prestamo} onChange={e => setF('hora_prestamo', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Depósito</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Depósito</label>
               <input style={inputStyle} type="number" min="0" step="0.01" value={form.deposito} onChange={e => setF('deposito', e.target.value)} placeholder="0.00" />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '18px' }}>
               <input type="checkbox" checked={form.deposito_pagado} onChange={e => setF('deposito_pagado', e.target.checked)} id="dep_pagado" />
-              <label htmlFor="dep_pagado" style={{ fontSize: '12px', color: '#64748b', cursor: 'pointer' }}>Depósito pagado</label>
+              <label htmlFor="dep_pagado" style={{ fontSize: '12px', color: '#7E9389', cursor: 'pointer' }}>Depósito pagado</label>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Entregado por</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Entregado por</label>
               <input style={inputStyle} value={form.entregado_por} onChange={e => setF('entregado_por', e.target.value)} placeholder="Nombre del encargado" />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Observaciones</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Observaciones</label>
               <input style={inputStyle} value={form.observaciones} onChange={e => setF('observaciones', e.target.value)} placeholder="Estado del equipo, condiciones, etc." />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -185,9 +185,9 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
         {(['all','prestado','devuelto','dañado','perdido'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e as EstadoPrestamo | 'all')}
             style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
-              background: filtroEstado === e ? '#0f172a' : 'white',
-              color: filtroEstado === e ? 'white' : '#64748b',
-              borderColor: filtroEstado === e ? '#0f172a' : '#e2e8f0' }}>
+              background: filtroEstado === e ? '#15291F' : 'white',
+              color: filtroEstado === e ? 'white' : '#7E9389',
+              borderColor: filtroEstado === e ? '#15291F' : '#E1DDD0' }}>
             {e === 'all' ? 'Todos' : ESTADO_STYLE[e as EstadoPrestamo]?.label ?? e}
           </button>
         ))}
@@ -195,14 +195,14 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay préstamos registrados.</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay préstamos registrados.</div>
       ) : (
-        <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: '#f8fafc' }}>
+              <tr style={{ background: '#FAF7EF' }}>
                 {['Equipo','Unidad','Qty','F. Préstamo','F. Devolución','Depósito','Estado',''].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
+                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#7E9389', borderBottom: '1px solid #E1DDD0' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -210,21 +210,21 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
               {filtered.map((p, i) => {
                 const es = ESTADO_STYLE[p.estado]
                 return (
-                  <tr key={p.id} style={{ background: i % 2 === 0 ? 'white' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}>
+                  <tr key={p.id} style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF', borderBottom: '1px solid #EAE6D8' }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>
                       {p.equipo_nombre}
-                      {p.observaciones && <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 400 }}>{p.observaciones}</div>}
+                      {p.observaciones && <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 400 }}>{p.observaciones}</div>}
                     </td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>{p.unidad_nombre ?? '—'}</td>
+                    <td style={{ padding: '10px 12px', color: '#7E9389' }}>{p.unidad_nombre ?? '—'}</td>
                     <td style={{ padding: '10px 12px', textAlign: 'center' }}>{p.cantidad}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>{p.fecha_prestamo}{p.hora_prestamo ? ` ${p.hora_prestamo}` : ''}</td>
-                    <td style={{ padding: '10px 12px', color: '#64748b' }}>{p.fecha_devolucion ?? <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                    <td style={{ padding: '10px 12px', color: '#7E9389' }}>{p.fecha_prestamo}{p.hora_prestamo ? ` ${p.hora_prestamo}` : ''}</td>
+                    <td style={{ padding: '10px 12px', color: '#7E9389' }}>{p.fecha_devolucion ?? <span style={{ color: '#C7C2B0' }}>—</span>}</td>
                     <td style={{ padding: '10px 12px' }}>
                       {p.deposito ? (
                         <span style={{ fontSize: '12px', color: p.deposito_pagado ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
                           {p.deposito_pagado ? '✓' : '!'} {p.deposito.toFixed(2)}
                         </span>
-                      ) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                      ) : <span style={{ color: '#C7C2B0' }}>—</span>}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{ background: es.bg, color: es.color, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>{es.label}</span>
@@ -245,7 +245,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
                             </>
                           )}
                           <button onClick={() => handleDelete(p.id)}
-                            style={{ padding: '3px 7px', background: '#f1f5f9', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#94a3b8' }}>🗑️</button>
+                            style={{ padding: '3px 7px', background: '#EAE6D8', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#7E9389' }}>🗑️</button>
                         </div>
                       )}
                     </td>

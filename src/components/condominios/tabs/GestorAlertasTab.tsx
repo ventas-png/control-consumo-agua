@@ -33,7 +33,7 @@ const SEV_CFG: Record<Severidad, { color: string; bg: string; border: string; ic
   critica: { color: '#dc2626', bg: '#fef2f2', border: '#fca5a5', icon: '🚨', label: 'Crítica', order: 0 },
   alta:    { color: '#ea580c', bg: '#fff7ed', border: '#fdba74', icon: '⚠️', label: 'Alta',    order: 1 },
   media:   { color: '#d97706', bg: '#fef3c7', border: '#fde68a', icon: '🔔', label: 'Media',   order: 2 },
-  baja:    { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', icon: 'ℹ️', label: 'Baja',    order: 3 },
+  baja:    { color: '#1B3B36', bg: '#EEF2EC', border: '#C2D2CA', icon: 'ℹ️', label: 'Baja',    order: 3 },
 }
 
 const CAT_CFG: Record<Categoria, { icon: string; label: string }> = {
@@ -196,8 +196,8 @@ export default function GestorAlertasTab({ cuotas, tickets, polizas, contratosPr
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a', marginBottom: 2 }}>Centro de Alertas</div>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 14 }}>
+      <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F', marginBottom: 2 }}>Centro de Alertas</div>
+      <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 14 }}>
         {alertas.length} alerta{alertas.length !== 1 ? 's' : ''} activa{alertas.length !== 1 ? 's' : ''} — actualizado al abrir esta sección
       </div>
 
@@ -205,10 +205,10 @@ export default function GestorAlertasTab({ cuotas, tickets, polizas, contratosPr
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         {(Object.entries(SEV_CFG) as [Severidad, typeof SEV_CFG[Severidad]][]).map(([sev, cfg]) => (
           <button key={sev} onClick={() => setFiltroSev(filtroSev === sev ? '' : sev)}
-            style={{ flex: '1 1 100px', background: filtroSev === sev ? cfg.bg : '#f8fafc',
-              border: `1.5px solid ${filtroSev === sev ? cfg.border : '#e5e7eb'}`,
+            style={{ flex: '1 1 100px', background: filtroSev === sev ? cfg.bg : '#FAF7EF',
+              border: `1.5px solid ${filtroSev === sev ? cfg.border : '#E1DDD0'}`,
               borderRadius: 10, padding: '10px 14px', cursor: 'pointer', textAlign: 'left' }}>
-            <div style={{ fontSize: 10, color: '#6b7280' }}>{cfg.icon} {cfg.label}</div>
+            <div style={{ fontSize: 10, color: '#7E9389' }}>{cfg.icon} {cfg.label}</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: cfg.color, marginTop: 2 }}>{conteoSev[sev]}</div>
           </button>
         ))}
@@ -217,16 +217,16 @@ export default function GestorAlertasTab({ cuotas, tickets, polizas, contratosPr
       {/* Filtros de categoría */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
         <button onClick={() => setFiltroCat('')}
-          style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid #d1d5db', fontSize: 11, cursor: 'pointer',
-            background: filtroCat === '' ? '#0f172a' : '#fff', color: filtroCat === '' ? '#fff' : '#374151', fontWeight: 600 }}>
+          style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid #C7C2B0', fontSize: 11, cursor: 'pointer',
+            background: filtroCat === '' ? '#15291F' : '#fff', color: filtroCat === '' ? '#fff' : '#3E5A4C', fontWeight: 600 }}>
           Todas
         </button>
         {(Object.entries(CAT_CFG) as [Categoria, typeof CAT_CFG[Categoria]][]).map(([cat, cfg]) => {
           const count = alertas.filter(a => a.categoria === cat).length
           return count > 0 ? (
             <button key={cat} onClick={() => setFiltroCat(filtroCat === cat ? '' : cat)}
-              style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid #d1d5db', fontSize: 11, cursor: 'pointer',
-                background: filtroCat === cat ? '#0f172a' : '#fff', color: filtroCat === cat ? '#fff' : '#374151', fontWeight: 600 }}>
+              style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid #C7C2B0', fontSize: 11, cursor: 'pointer',
+                background: filtroCat === cat ? '#15291F' : '#fff', color: filtroCat === cat ? '#fff' : '#3E5A4C', fontWeight: 600 }}>
               {cfg.icon} {cfg.label} ({count})
             </button>
           ) : null
@@ -235,7 +235,7 @@ export default function GestorAlertasTab({ cuotas, tickets, polizas, contratosPr
 
       {/* Lista de alertas */}
       {alertasFiltradas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: '#9ca3af', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', padding: '48px 0', color: '#7E9389', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
           {alertas.length === 0 ? 'No hay alertas activas. ¡Todo en orden!' : 'Ninguna alerta coincide con el filtro'}
         </div>
@@ -253,10 +253,10 @@ export default function GestorAlertasTab({ cuotas, tickets, polizas, contratosPr
                     <div style={{ fontSize: 13, fontWeight: 700, color: sev.color }}>{a.titulo}</div>
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                       <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.7)', color: sev.color, fontWeight: 700 }}>{sev.label}</span>
-                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.7)', color: '#374151' }}>{cat.icon} {cat.label}</span>
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.7)', color: '#3E5A4C' }}>{cat.icon} {cat.label}</span>
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, color: '#374151', marginTop: 3 }}>{a.detalle}</div>
+                  <div style={{ fontSize: 12, color: '#3E5A4C', marginTop: 3 }}>{a.detalle}</div>
                   {a.monto !== undefined && (
                     <div style={{ fontSize: 11, color: sev.color, fontWeight: 600, marginTop: 4 }}>
                       {moneda} {a.monto.toLocaleString('es', { minimumFractionDigits: 2 })}

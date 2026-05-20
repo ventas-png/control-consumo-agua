@@ -203,7 +203,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
               fontWeight: 700,
               fontSize: '11px',
               flexShrink: 0,
-              boxShadow: '0 1px 6px rgba(14,165,233,0.3)',
+              boxShadow: '0 1px 6px rgba(27, 59, 54,0.3)',
             }}
           >
             {getInitials(currentUser.name)}

@@ -57,23 +57,23 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
 
   const inputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box',
-    padding: '10px 14px', border: '1.5px solid #e2e8f0',
+    padding: '10px 14px', border: '1.5px solid #E1DDD0',
     borderRadius: '10px', fontSize: '14px',
-    background: '#f8fafc', color: '#0f172a',
+    background: '#FAF7EF', color: '#15291F',
     transition: 'border-color 0.15s, box-shadow 0.15s',
   }
 
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #0d9488 100%)',
+      background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 50%, #577B69 100%)',
       padding: '16px',
     }}>
       <style>{`
         .oauth-input:focus {
           outline: none;
-          border-color: #0ea5e9 !important;
-          box-shadow: 0 0 0 3px rgba(14,165,233,0.15);
+          border-color: #1B3B36 !important;
+          box-shadow: 0 0 0 3px rgba(27, 59, 54,0.15);
         }
         .reg-card { padding: 40px; }
         @media (max-width: 480px) { .reg-card { padding: 24px 20px !important; } }
@@ -92,10 +92,10 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
           }}>
             <BrandLogo size={56} />
           </div>
-          <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>
+          <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#15291F' }}>
             Completa tu registro
           </h1>
-          <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#64748b' }}>
+          <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#7E9389' }}>
             Confirma tu identidad para vincular tu cuenta de Google
           </p>
         </div>
@@ -118,7 +118,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '5px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '5px' }}>
                 DPI / CUI *
               </label>
               <input
@@ -133,7 +133,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
             </div>
 
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '5px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '5px' }}>
                 Fecha de nacimiento *
               </label>
               <input
@@ -162,7 +162,7 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
             disabled={loading}
             style={{
               width: '100%', padding: '12px',
-              background: loading ? '#94a3b8' : 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+              background: loading ? '#7E9389' : 'linear-gradient(135deg, #1B3B36, #577B69)',
               color: 'white', border: 'none', borderRadius: '12px',
               fontSize: '15px', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
               marginBottom: '10px',
@@ -177,8 +177,8 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
             disabled={loading}
             style={{
               width: '100%', padding: '10px',
-              background: 'transparent', color: '#64748b',
-              border: '1.5px solid #e2e8f0', borderRadius: '12px',
+              background: 'transparent', color: '#7E9389',
+              border: '1.5px solid #E1DDD0', borderRadius: '12px',
               fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >

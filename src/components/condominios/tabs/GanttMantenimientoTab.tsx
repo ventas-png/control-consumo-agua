@@ -10,13 +10,13 @@ const PRIORIDAD_COLOR: Record<string, string> = {
   urgente: '#ef4444',
   alta:    '#f97316',
   media:   '#d97706',
-  baja:    '#64748b',
+  baja:    '#7E9389',
 }
 
 const ESTADO_COLOR: Record<string, string> = {
-  abierto:    '#64748b',
+  abierto:    '#7E9389',
   en_proceso: '#d97706',
-  resuelto:   '#2563eb',
+  resuelto:   '#1B3B36',
   cerrado:    '#16a34a',
 }
 
@@ -79,16 +79,16 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
   }, [tickets])
 
   const BTN = (active: boolean) => ({
-    padding: '5px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, cursor: 'pointer',
-    background: active ? '#0f172a' : '#fff', color: active ? '#fff' : '#374151', fontWeight: active ? 700 : 400,
+    padding: '5px 14px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, cursor: 'pointer',
+    background: active ? '#15291F' : '#fff', color: active ? '#fff' : '#3E5A4C', fontWeight: active ? 700 : 400,
   })
 
   return (
     <div style={{ padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>Gantt de Mantenimiento</div>
-          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Gantt de Mantenimiento</div>
+          <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>
             {tickets.length} tickets · {stats.cerrados} cerrados · {stats.totalAbiertos} activos
           </div>
         </div>
@@ -103,13 +103,13 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
           {/* Stats generales */}
           <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
             {[
-              { label: 'Tickets totales', val: String(tickets.length), color: '#374151', bg: '#f8fafc' },
+              { label: 'Tickets totales', val: String(tickets.length), color: '#3E5A4C', bg: '#FAF7EF' },
               { label: 'Cerrados', val: String(stats.cerrados), color: '#16a34a', bg: '#dcfce7' },
               { label: 'Activos', val: String(stats.totalAbiertos), color: '#d97706', bg: '#fef3c7' },
-              { label: 'Costo total real', val: `${moneda} ${stats.costoTotal.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#2563eb', bg: '#eff6ff' },
+              { label: 'Costo total real', val: `${moneda} ${stats.costoTotal.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#1B3B36', bg: '#EEF2EC' },
             ].map(k => (
               <div key={k.label} style={{ flex: '1 1 110px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '10px 14px' }}>
-                <div style={{ fontSize: 10, color: '#6b7280' }}>{k.label}</div>
+                <div style={{ fontSize: 10, color: '#7E9389' }}>{k.label}</div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
               </div>
             ))}
@@ -117,17 +117,17 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             {/* Por prioridad */}
-            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 12 }}>Tiempo promedio de resolución por prioridad</div>
+            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>Tiempo promedio de resolución por prioridad</div>
               {stats.porPrioridad.map(p => (
                 <div key={p.prioridad} style={{ marginBottom: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: PRIORIDAD_COLOR[p.prioridad] }}>{p.prioridad}</span>
-                    <span style={{ fontSize: 12, color: '#374151' }}>
+                    <span style={{ fontSize: 12, color: '#3E5A4C' }}>
                       {p.count > 0 ? `${Math.round(p.avgDias)} días prom. (${p.count} tickets)` : 'Sin datos'}
                     </span>
                   </div>
-                  <div style={{ height: 8, background: '#f1f5f9', borderRadius: 4 }}>
+                  <div style={{ height: 8, background: '#EAE6D8', borderRadius: 4 }}>
                     <div style={{ height: 8, borderRadius: 4, background: PRIORIDAD_COLOR[p.prioridad],
                       width: `${Math.min((p.avgDias / 30) * 100, 100)}%` }} />
                   </div>
@@ -136,17 +136,17 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
             </div>
 
             {/* Por tipo */}
-            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 14 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 12 }}>Por tipo de mantenimiento</div>
+            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>Por tipo de mantenimiento</div>
               {stats.porTipo.map(t => (
-                <div key={t.tipo} style={{ marginBottom: 16, padding: '10px 12px', background: '#f8fafc', borderRadius: 8 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 6, textTransform: 'capitalize' }}>
+                <div key={t.tipo} style={{ marginBottom: 16, padding: '10px 12px', background: '#FAF7EF', borderRadius: 8 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 6, textTransform: 'capitalize' }}>
                     {t.tipo === 'correctivo' ? '🔧' : '🔩'} {t.tipo}
                   </div>
-                  <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#374151' }}>
+                  <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#3E5A4C' }}>
                     <span>{t.count} resueltos</span>
                     <span>{t.count > 0 ? `${Math.round(t.avgDias)} días prom.` : '—'}</span>
-                    {t.costoTotal > 0 && <span style={{ color: '#2563eb', fontWeight: 600 }}>{moneda} {t.costoTotal.toLocaleString('es', { minimumFractionDigits: 2 })}</span>}
+                    {t.costoTotal > 0 && <span style={{ color: '#1B3B36', fontWeight: 600 }}>{moneda} {t.costoTotal.toLocaleString('es', { minimumFractionDigits: 2 })}</span>}
                   </div>
                 </div>
               ))}
@@ -158,26 +158,26 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
           {/* Filtros */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
             <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}
-              style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, background: '#fff' }}>
+              style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, background: '#fff' }}>
               <option value="">Todos los estados</option>
               {['abierto', 'en_proceso', 'resuelto', 'cerrado'].map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
             </select>
             <select value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value)}
-              style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, background: '#fff' }}>
+              style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, background: '#fff' }}>
               <option value="">Todas las prioridades</option>
               {['urgente', 'alta', 'media', 'baja'].map(p => <option key={p} value={p}>{p}</option>)}
             </select>
-            <span style={{ fontSize: 11, color: '#9ca3af', alignSelf: 'center' }}>
+            <span style={{ fontSize: 11, color: '#7E9389', alignSelf: 'center' }}>
               {ticketsFiltrados.length} de {tickets.length} tickets
             </span>
           </div>
 
           {ticketsFiltrados.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#9ca3af' }}>Sin tickets con ese filtro</div>
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#7E9389' }}>Sin tickets con ese filtro</div>
           ) : (
-            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, overflow: 'hidden' }}>
               {/* Leyenda de estados */}
-              <div style={{ padding: '8px 14px', borderBottom: '1px solid #f1f5f9', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              <div style={{ padding: '8px 14px', borderBottom: '1px solid #EAE6D8', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                 {Object.entries(ESTADO_COLOR).map(([est, color]) => (
                   <span key={est} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
                     <span style={{ width: 10, height: 10, background: color, borderRadius: 2, display: 'inline-block' }} />
@@ -194,12 +194,12 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
                   const left = pctLeft(inicio)
                   const width = pctWidth(inicio, fin)
                   const duracion = diasDiff(inicio, fin)
-                  const color = ESTADO_COLOR[t.estado] ?? '#64748b'
+                  const color = ESTADO_COLOR[t.estado] ?? '#7E9389'
                   return (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f8fafc', minHeight: 36 }}>
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #FAF7EF', minHeight: 36 }}>
                       {/* Label */}
-                      <div style={{ width: 200, flexShrink: 0, padding: '6px 10px', borderRight: '1px solid #f1f5f9' }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#0f172a', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t.titulo}</div>
+                      <div style={{ width: 200, flexShrink: 0, padding: '6px 10px', borderRight: '1px solid #EAE6D8' }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#15291F', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t.titulo}</div>
                         <div style={{ fontSize: 9, color: PRIORIDAD_COLOR[t.prioridad] }}>{t.prioridad} · {t.tipo}</div>
                       </div>
                       {/* Bar area */}
@@ -228,7 +228,7 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
               </div>
 
               {ticketsFiltrados.length > 80 && (
-                <div style={{ padding: '8px 14px', fontSize: 11, color: '#9ca3af', borderTop: '1px solid #f1f5f9' }}>
+                <div style={{ padding: '8px 14px', fontSize: 11, color: '#7E9389', borderTop: '1px solid #EAE6D8' }}>
                   Mostrando primeros 80 tickets. Usa filtros para acotar.
                 </div>
               )}

@@ -15,18 +15,18 @@ interface Props {
 }
 
 const CATEGORIAS: { value: CategoriaCargoAdicional; label: string; icon: string; color: string }[] = [
-  { value: 'reparacion',     label: 'Reparación',      icon: '🔧', color: '#6366f1' },
-  { value: 'exceso_consumo', label: 'Exceso consumo',  icon: '💧', color: '#3b82f6' },
+  { value: 'reparacion',     label: 'Reparación',      icon: '🔧', color: '#B96A3F' },
+  { value: 'exceso_consumo', label: 'Exceso consumo',  icon: '💧', color: '#2F5D4F' },
   { value: 'dano',           label: 'Daño',            icon: '⚠️', color: '#ef4444' },
-  { value: 'servicio',       label: 'Servicio extra',  icon: '🛎️', color: '#8b5cf6' },
+  { value: 'servicio',       label: 'Servicio extra',  icon: '🛎️', color: '#B96A3F' },
   { value: 'multa',          label: 'Multa',           icon: '⚖️', color: '#f97316' },
-  { value: 'otro',           label: 'Otro',            icon: '📄', color: '#6b7280' },
+  { value: 'otro',           label: 'Otro',            icon: '📄', color: '#7E9389' },
 ]
 
 const ESTADOS: { value: EstadoCargoAdicional; label: string; color: string; bg: string }[] = [
   { value: 'pendiente', label: 'Pendiente', color: '#f59e0b', bg: '#fef3c7' },
   { value: 'pagado',    label: 'Pagado',    color: '#10b981', bg: '#d1fae5' },
-  { value: 'anulado',   label: 'Anulado',   color: '#6b7280', bg: '#f3f4f6' },
+  { value: 'anulado',   label: 'Anulado',   color: '#7E9389', bg: '#EAE6D8' },
 ]
 
 export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
@@ -91,8 +91,8 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ padding: 16 }}>
@@ -101,7 +101,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
         {[
           { label: 'Total pendiente', value: `${moneda} ${totalPendiente.toLocaleString()}`, color: '#f59e0b', bg: '#fef3c7' },
           { label: 'Total cobrado', value: `${moneda} ${totalCobrado.toLocaleString()}`, color: '#10b981', bg: '#d1fae5' },
-          { label: 'Registros activos', value: cargos.filter(c => c.estado === 'pendiente').length, color: '#6366f1', bg: '#eef2ff' },
+          { label: 'Registros activos', value: cargos.filter(c => c.estado === 'pendiente').length, color: '#B96A3F', bg: '#F4EBE3' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: k.color }}>{k.value}</div>
@@ -124,7 +124,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nuevo cargo'}
           </button>
         )}
@@ -132,7 +132,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nuevo cargo adicional</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -182,14 +182,14 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
 
       {/* Lista agrupada */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0', fontSize: 13 }}>Sin cargos para los filtros seleccionados</div>
+        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>Sin cargos para los filtros seleccionados</div>
       ) : (
         Object.entries(porUnidad).map(([unidadId, items]) => {
           const unidad = unidades.find(u => u.id === unidadId)
           const totalUnidad = items.reduce((s, c) => s + c.monto, 0)
           return (
             <div key={unidadId} style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingBottom: 4, borderBottom: '2px solid #e5e7eb' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingBottom: 4, borderBottom: '2px solid #E1DDD0' }}>
                 <span style={{ fontWeight: 700, fontSize: 14 }}>🏠 {unidad?.nombre || 'Unidad'}</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#f59e0b' }}>{moneda} {totalUnidad.toLocaleString()}</span>
               </div>
@@ -199,15 +199,15 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                   const est = ESTADOS.find(e => e.value === c.estado)
                   const vencido = c.fecha_vencimiento && new Date(c.fecha_vencimiento) < new Date() && c.estado === 'pendiente'
                   return (
-                    <div key={c.id} style={{ background: '#fff', border: `1px solid ${vencido ? '#fecaca' : '#e5e7eb'}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={c.id} style={{ background: '#fff', border: `1px solid ${vencido ? '#fecaca' : '#E1DDD0'}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                           <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: cat?.color + '20', color: cat?.color }}>{cat?.icon} {cat?.label}</span>
                           <span style={{ fontWeight: 600, fontSize: 14 }}>{c.concepto}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>
+                        <div style={{ fontSize: 12, color: '#7E9389', marginTop: 3 }}>
                           {c.fecha_cargo}
-                          {c.fecha_vencimiento && <span> · Vence: <span style={{ color: vencido ? '#ef4444' : '#6b7280' }}>{c.fecha_vencimiento}</span></span>}
+                          {c.fecha_vencimiento && <span> · Vence: <span style={{ color: vencido ? '#ef4444' : '#7E9389' }}>{c.fecha_vencimiento}</span></span>}
                           {c.referencia && <span> · Ref: {c.referencia}</span>}
                         </div>
                       </div>
@@ -223,7 +223,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                               ✓ Pagado
                             </button>
                             <button onClick={() => anular(c)}
-                              style={{ padding: '4px 8px', background: '#f3f4f6', color: '#6b7280', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                              style={{ padding: '4px 8px', background: '#EAE6D8', color: '#7E9389', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                               Anular
                             </button>
                           </div>

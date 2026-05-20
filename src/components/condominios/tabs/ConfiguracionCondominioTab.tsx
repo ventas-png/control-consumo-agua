@@ -75,31 +75,31 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
       ? await supabase.from('config_condominio').update(payload).eq('id', config.id)
       : await supabase.from('config_condominio').insert(payload)
     setSaving(false)
-    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: '#2563eb' })
+    if (error) return Swal.fire({ icon: 'error', title: 'Error', text: error.message, confirmButtonColor: '#1B3B36' })
     Swal.fire({ icon: 'success', title: 'Configuración guardada', timer: 1500, showConfirmButton: false })
     onRefresh()
   }
 
   const INPUT = (disabled = false) => ({
     width: '100%', padding: '7px 10px', borderRadius: 8,
-    border: '1px solid #d1d5db', fontSize: 13, background: disabled ? '#f8fafc' : '#fff',
-    outline: 'none', color: '#0f172a',
+    border: '1px solid #C7C2B0', fontSize: 13, background: disabled ? '#FAF7EF' : '#fff',
+    outline: 'none', color: '#15291F',
   })
 
-  const SECTION = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, marginBottom: 14 }
+  const SECTION = { background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16, marginBottom: 14 }
 
   return (
     <div style={{ padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>Configuración del Condominio</div>
-          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>Configuración del Condominio</div>
+          <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>
             {config ? 'Configuración guardada — última actualización: ' + config.updated_at.slice(0, 10) : 'Sin configuración guardada aún'}
           </div>
         </div>
         {canEdit && (
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 8,
+            style={{ padding: '8px 20px', background: '#15291F', color: '#fff', border: 'none', borderRadius: 8,
               cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 13, opacity: saving ? 0.7 : 1 }}>
             {saving ? 'Guardando…' : '💾 Guardar cambios'}
           </button>
@@ -109,30 +109,30 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         {/* Financiero */}
         <div style={SECTION}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 12 }}>💰 Parámetros Financieros</div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>💰 Parámetros Financieros</div>
           {[
             { label: 'Cuota base mensual', key: 'cuota_base', type: 'number', placeholder: '0.00', help: 'Monto estándar por unidad' },
             { label: 'Días de gracia para pago', key: 'dias_gracia', type: 'number', placeholder: '5', help: 'Días antes de aplicar mora' },
             { label: 'Tasa de mora mensual (%)', key: 'tasa_mora_mensual', type: 'number', placeholder: '2.0', help: '% mensual sobre saldo vencido' },
           ].map(f => (
             <div key={f.key} style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 3 }}>{f.label}</label>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 3 }}>{f.label}</label>
               <input type={f.type} value={(form as unknown as Record<string, string>)[f.key]} placeholder={f.placeholder}
                 disabled={!canEdit}
                 onChange={e => canEdit && setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                 style={INPUT(!canEdit)} />
-              <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{f.help}</div>
+              <div style={{ fontSize: 10, color: '#7E9389', marginTop: 2 }}>{f.help}</div>
             </div>
           ))}
 
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>Métodos de pago habilitados</label>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 6 }}>Métodos de pago habilitados</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {METODOS_DISPONIBLES.map(m => (
                 <button key={m} onClick={() => canEdit && toggleMetodo(m)} disabled={!canEdit}
-                  style={{ padding: '4px 10px', borderRadius: 20, border: '1px solid #d1d5db', fontSize: 11, cursor: canEdit ? 'pointer' : 'default',
-                    background: form.metodos_pago.includes(m) ? '#0f172a' : '#f8fafc',
-                    color: form.metodos_pago.includes(m) ? '#fff' : '#374151', fontWeight: form.metodos_pago.includes(m) ? 700 : 400 }}>
+                  style={{ padding: '4px 10px', borderRadius: 20, border: '1px solid #C7C2B0', fontSize: 11, cursor: canEdit ? 'pointer' : 'default',
+                    background: form.metodos_pago.includes(m) ? '#15291F' : '#FAF7EF',
+                    color: form.metodos_pago.includes(m) ? '#fff' : '#3E5A4C', fontWeight: form.metodos_pago.includes(m) ? 700 : 400 }}>
                   {m.replace('_', ' ')}
                 </button>
               ))}
@@ -142,7 +142,7 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
 
         {/* Administración */}
         <div style={SECTION}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 12 }}>👤 Datos del Administrador</div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>👤 Datos del Administrador</div>
           {[
             { label: 'Nombre del administrador', key: 'nombre_administrador', type: 'text', placeholder: 'Nombre completo' },
             { label: 'Teléfono', key: 'telefono_admin', type: 'tel', placeholder: '+502 0000-0000' },
@@ -150,7 +150,7 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
             { label: 'URL del Reglamento', key: 'reglamento_url', type: 'url', placeholder: 'https://...' },
           ].map(f => (
             <div key={f.key} style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 3 }}>{f.label}</label>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 3 }}>{f.label}</label>
               <input type={f.type} value={(form as unknown as Record<string, string>)[f.key]} placeholder={f.placeholder}
                 disabled={!canEdit}
                 onChange={e => canEdit && setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
@@ -161,10 +161,10 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
 
         {/* Notificaciones y reservas */}
         <div style={SECTION}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 12 }}>🔔 Notificaciones y Reservas</div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>🔔 Notificaciones y Reservas</div>
 
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 3 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 3 }}>
               Días antes del vencimiento para notificar
             </label>
             <input type="number" value={form.notif_dias_antes_vencimiento} disabled={!canEdit}
@@ -173,15 +173,15 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 3 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 3 }}>
               Reservas online de amenidades
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
               {[true, false].map(v => (
                 <button key={String(v)} onClick={() => canEdit && setForm(f => ({ ...f, permitir_reservas_online: v }))} disabled={!canEdit}
-                  style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 12, cursor: canEdit ? 'pointer' : 'default',
-                    background: form.permitir_reservas_online === v ? '#0f172a' : '#f8fafc',
-                    color: form.permitir_reservas_online === v ? '#fff' : '#374151', fontWeight: form.permitir_reservas_online === v ? 700 : 400 }}>
+                  style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid #C7C2B0', fontSize: 12, cursor: canEdit ? 'pointer' : 'default',
+                    background: form.permitir_reservas_online === v ? '#15291F' : '#FAF7EF',
+                    color: form.permitir_reservas_online === v ? '#fff' : '#3E5A4C', fontWeight: form.permitir_reservas_online === v ? 700 : 400 }}>
                   {v ? '✅ Habilitado' : '❌ Deshabilitado'}
                 </button>
               ))}
@@ -189,7 +189,7 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
           </div>
 
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 3 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: 3 }}>
               Máximo de reservas por unidad / mes
             </label>
             <input type="number" value={form.max_reservas_por_unidad_mes} disabled={!canEdit}
@@ -199,8 +199,8 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
         </div>
 
         {/* Resumen de config actual */}
-        <div style={{ ...SECTION, background: '#f8fafc' }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 12 }}>📋 Resumen actual</div>
+        <div style={{ ...SECTION, background: '#FAF7EF' }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#15291F', marginBottom: 12 }}>📋 Resumen actual</div>
           {[
             { label: 'Cuota base', val: form.cuota_base ? `Q ${parseFloat(form.cuota_base).toFixed(2)}` : 'No definida' },
             { label: 'Días de gracia', val: `${form.dias_gracia} días` },
@@ -210,9 +210,9 @@ export default function ConfiguracionCondominioTab({ config, proyectoId, company
             { label: 'Reservas online', val: form.permitir_reservas_online ? 'Habilitadas' : 'Deshabilitadas' },
             { label: 'Máx. reservas/mes', val: `${form.max_reservas_por_unidad_mes} por unidad` },
           ].map(r => (
-            <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #f1f5f9', fontSize: 12 }}>
-              <span style={{ color: '#6b7280' }}>{r.label}</span>
-              <span style={{ fontWeight: 600, color: '#0f172a' }}>{r.val}</span>
+            <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #EAE6D8', fontSize: 12 }}>
+              <span style={{ color: '#7E9389' }}>{r.label}</span>
+              <span style={{ fontWeight: 600, color: '#15291F' }}>{r.val}</span>
             </div>
           ))}
         </div>

@@ -17,8 +17,8 @@ interface Props {
 type EstadoOC = OrdenCompra['estado']
 
 const ESTADO_CFG: Record<EstadoOC, { label: string; color: string; bg: string; next?: EstadoOC; nextLabel?: string }> = {
-  borrador:  { label: 'Borrador',   color: '#64748b', bg: '#f1f5f9', next: 'aprobada',  nextLabel: 'Aprobar' },
-  aprobada:  { label: 'Aprobada',   color: '#2563eb', bg: '#eff6ff', next: 'emitida',   nextLabel: 'Emitir OC' },
+  borrador:  { label: 'Borrador',   color: '#7E9389', bg: '#EAE6D8', next: 'aprobada',  nextLabel: 'Aprobar' },
+  aprobada:  { label: 'Aprobada',   color: '#1B3B36', bg: '#EEF2EC', next: 'emitida',   nextLabel: 'Emitir OC' },
   emitida:   { label: 'Emitida',    color: '#d97706', bg: '#fef3c7', next: 'recibida',  nextLabel: 'Marcar recibida' },
   recibida:  { label: 'Recibida',   color: '#16a34a', bg: '#dcfce7' },
   cancelada: { label: 'Cancelada',  color: '#ef4444', bg: '#fef2f2' },
@@ -119,7 +119,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
           const cfg = ESTADO_CFG[e]
           return (
             <div key={e} onClick={() => setFiltroEstado(filtroEstado === e ? '' : e)}
-              style={{ background: filtroEstado === e ? cfg.bg : '#fff', border: `1.5px solid ${filtroEstado === e ? cfg.color : '#e5e7eb'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', textAlign: 'center' }}>
+              style={{ background: filtroEstado === e ? cfg.bg : '#fff', border: `1.5px solid ${filtroEstado === e ? cfg.color : '#E1DDD0'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: cfg.color }}>{totalesPorEstado[e]}</div>
               <div style={{ fontSize: 10, color: cfg.color, fontWeight: 600 }}>{cfg.label}</div>
             </div>
@@ -128,13 +128,13 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div style={{ fontSize: 12, color: '#6b7280' }}>
-          Total comprometido: <strong style={{ color: '#0f172a' }}>{moneda} {montoTotal.toLocaleString('es', { minimumFractionDigits: 2 })}</strong>
+        <div style={{ fontSize: 12, color: '#7E9389' }}>
+          Total comprometido: <strong style={{ color: '#15291F' }}>{moneda} {montoTotal.toLocaleString('es', { minimumFractionDigits: 2 })}</strong>
           {filtroEstado && <span> · Filtrando: {ESTADO_CFG[filtroEstado].label} ({filtradas.length})</span>}
         </div>
         {canCreate && (
           <button onClick={abrirNueva}
-            style={{ padding: '6px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            style={{ padding: '6px 14px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             + Nueva OC
           </button>
         )}
@@ -142,8 +142,8 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
 
       {/* Formulario */}
       {showForm && (
-        <div style={{ background: '#f0f9ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: 16, marginBottom: 14 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: '#1d4ed8' }}>
+        <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12, color: '#102622' }}>
             {editId ? 'Editar orden' : 'Nueva orden de compra'}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
@@ -151,7 +151,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Proveedor *</label>
               <input list="proveedores-list" value={form.proveedor_nombre} onChange={e => setForm(f => ({ ...f, proveedor_nombre: e.target.value }))}
                 placeholder="Nombre del proveedor"
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #bfdbfe', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
               <datalist id="proveedores-list">
                 {proveedores.map(p => <option key={p.id} value={p.proveedor_nombre} />)}
               </datalist>
@@ -160,35 +160,35 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Monto estimado ({moneda})</label>
               <input type="number" value={form.monto_estimado} onChange={e => setForm(f => ({ ...f, monto_estimado: e.target.value }))}
                 placeholder="0.00"
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #bfdbfe', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
           </div>
           <div style={{ marginBottom: 10 }}>
             <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Concepto *</label>
             <input value={form.concepto} onChange={e => setForm(f => ({ ...f, concepto: e.target.value }))}
               placeholder="Descripción breve de la compra"
-              style={{ width: '100%', padding: '7px 10px', border: '1px solid #bfdbfe', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Fecha entrega esperada</label>
               <input type="date" value={form.fecha_entrega_esperada} onChange={e => setForm(f => ({ ...f, fecha_entrega_esperada: e.target.value }))}
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #bfdbfe', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 4 }}>Notas</label>
               <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
                 placeholder="Observaciones adicionales"
-                style={{ width: '100%', padding: '7px 10px', border: '1px solid #bfdbfe', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', border: '1px solid #C2D2CA', borderRadius: 7, fontSize: 13, boxSizing: 'border-box' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={guardar} disabled={saving}
-              style={{ padding: '8px 18px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
+              style={{ padding: '8px 18px', background: '#102622', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : 'Guardar como borrador'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '8px 14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+              style={{ padding: '8px 14px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
               Cancelar
             </button>
           </div>
@@ -197,7 +197,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
 
       {/* Lista */}
       {filtradas.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0' }}>
+        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0' }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🛒</div>
           No hay órdenes de compra{filtroEstado ? ` en estado "${ESTADO_CFG[filtroEstado].label}"` : ''}
         </div>
@@ -210,10 +210,10 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
               <div key={orden.id} style={{ background: '#fff', border: `1px solid ${cfg.color}33`, borderRadius: 10, borderLeft: `4px solid ${cfg.color}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', cursor: 'pointer' }}
                   onClick={() => setExpandida(isOpen ? null : orden.id)}>
-                  <div style={{ width: 60, fontSize: 10, color: '#9ca3af', fontWeight: 600, flexShrink: 0 }}>{correlativo(i)}</div>
+                  <div style={{ width: 60, fontSize: 10, color: '#7E9389', fontWeight: 600, flexShrink: 0 }}>{correlativo(i)}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{orden.concepto}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>{orden.proveedor_nombre}</div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: '#15291F' }}>{orden.concepto}</div>
+                    <div style={{ fontSize: 11, color: '#7E9389' }}>{orden.proveedor_nombre}</div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     {orden.monto_estimado && (
@@ -221,17 +221,17 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
                     )}
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', background: cfg.bg, color: cfg.color, borderRadius: 6 }}>{cfg.label}</span>
                   </div>
-                  <span style={{ color: '#9ca3af', fontSize: 12 }}>{isOpen ? '▲' : '▼'}</span>
+                  <span style={{ color: '#7E9389', fontSize: 12 }}>{isOpen ? '▲' : '▼'}</span>
                 </div>
 
                 {isOpen && (
-                  <div style={{ padding: '0 14px 14px', borderTop: '1px solid #f1f5f9' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, margin: '10px 0', fontSize: 11, color: '#6b7280' }}>
+                  <div style={{ padding: '0 14px 14px', borderTop: '1px solid #EAE6D8' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, margin: '10px 0', fontSize: 11, color: '#7E9389' }}>
                       {orden.fecha_entrega_esperada && <div>Entrega esperada: <strong>{orden.fecha_entrega_esperada}</strong></div>}
                       {orden.estado === 'recibida' && <div>Recibido: <strong style={{ color: '#16a34a' }}>✓</strong></div>}
-                      {orden.monto_real && <div>Monto real: <strong style={{ color: '#0f172a' }}>{moneda} {orden.monto_real.toFixed(2)}</strong></div>}
+                      {orden.monto_real && <div>Monto real: <strong style={{ color: '#15291F' }}>{moneda} {orden.monto_real.toFixed(2)}</strong></div>}
                     </div>
-                    {orden.notas && <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 10 }}>📝 {orden.notas}</div>}
+                    {orden.notas && <div style={{ fontSize: 11, color: '#7E9389', marginBottom: 10 }}>📝 {orden.notas}</div>}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {canEdit && cfg.next && (
                         <button onClick={() => avanzarEstado(orden)}
@@ -241,7 +241,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
                       )}
                       {canEdit && orden.estado === 'borrador' && (
                         <button onClick={() => { setEditId(orden.id); setForm({ proveedor_nombre: orden.proveedor_nombre, concepto: orden.concepto, descripcion: orden.descripcion ?? '', monto_estimado: String(orden.monto_estimado ?? ''), fecha_entrega_esperada: orden.fecha_entrega_esperada ?? '', notas: orden.notas ?? '' }); setShowForm(true) }}
-                          style={{ padding: '5px 12px', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: '#f9fafb' }}>
+                          style={{ padding: '5px 12px', border: '1px solid #E1DDD0', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: '#FAF7EF' }}>
                           ✏️ Editar
                         </button>
                       )}

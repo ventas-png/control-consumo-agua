@@ -449,7 +449,7 @@ const closeBtnStyle: CSSProperties = {
 }
 const uploadBannerStyle: CSSProperties = {
   marginBottom: '24px', padding: '16px 20px',
-  background: '#FAF7EF', border: '1px solid #bae6fd', borderRadius: '10px',
+  background: '#FAF7EF', border: '1px solid #C2D2CA', borderRadius: '10px',
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   gap: '12px', flexWrap: 'wrap',
 }
@@ -457,7 +457,7 @@ function dropZoneStyle(dragOver: boolean): CSSProperties {
   return {
     border: `2.5px dashed ${dragOver ? '#1B3B36' : '#C7C2B0'}`,
     borderRadius: '12px', padding: '40px 20px', textAlign: 'center',
-    cursor: 'pointer', background: dragOver ? '#FAF7EF' : '#fafafa',
+    cursor: 'pointer', background: dragOver ? '#FAF7EF' : '#FAF7EF',
     transition: 'all 0.15s',
   }
 }

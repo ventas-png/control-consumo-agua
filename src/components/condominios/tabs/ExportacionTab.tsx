@@ -154,11 +154,11 @@ export default function ExportacionTab({ cuotas, gastos, tickets, visitantes, un
 
   const cards: ExportCard[] = [
     {
-      icon: '💳', title: 'Cuotas', accentColor: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe',
+      icon: '💳', title: 'Cuotas', accentColor: '#102622', bg: '#EEF2EC', border: '#C2D2CA',
       desc: `${cuotasFiltradas.length} registros del período`,
       period: { value: periodo, onChange: setPeriodo, options: periodos },
       actions: [
-        { label: '📊 Excel', color: '#1d4ed8', onClick: exportCuotas },
+        { label: '📊 Excel', color: '#102622', onClick: exportCuotas },
       ],
     },
     {
@@ -178,39 +178,39 @@ export default function ExportacionTab({ cuotas, gastos, tickets, visitantes, un
       ],
     },
     {
-      icon: '🔧', title: 'Tickets', accentColor: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe',
+      icon: '🔧', title: 'Tickets', accentColor: '#9C5733', bg: '#FAF1EA', border: '#EFE0D5',
       desc: `${tickets.length} tickets — ${tickets.filter(t => t.estado !== 'cerrado').length} activos`,
       actions: [
-        { label: '📊 Excel', color: '#7c3aed', onClick: exportTickets },
+        { label: '📊 Excel', color: '#9C5733', onClick: exportTickets },
         { label: '📄 PDF', color: '#4c1d95', onClick: pdfTickets },
       ],
     },
     {
-      icon: '🚪', title: 'Visitantes', accentColor: '#0369a1', bg: '#f0f9ff', border: '#bae6fd',
+      icon: '🚪', title: 'Visitantes', accentColor: '#102622', bg: '#EEF2EC', border: '#C2D2CA',
       desc: `${Math.min(visitantes.length, 5000)} registros — ${visitantes.filter(v => !v.hora_salida).length} en premisas`,
       actions: [
-        { label: '📊 Excel', color: '#0369a1', onClick: exportVisitantes },
+        { label: '📊 Excel', color: '#102622', onClick: exportVisitantes },
       ],
     },
     {
-      icon: '🏠', title: 'Unidades', accentColor: '#0d9488', bg: '#f0fdfa', border: '#99f6e4',
+      icon: '🏠', title: 'Unidades', accentColor: '#577B69', bg: '#f0fdfa', border: '#99f6e4',
       desc: `${unidades.length} unidades — ${unidades.filter(u => u.activo).length} activas`,
       actions: [
-        { label: '📊 Excel', color: '#0d9488', onClick: exportUnidades },
+        { label: '📊 Excel', color: '#577B69', onClick: exportUnidades },
       ],
     },
     {
-      icon: '📊', title: 'Resumen Financiero', accentColor: '#374151', bg: '#f9fafb', border: '#e5e7eb',
+      icon: '📊', title: 'Resumen Financiero', accentColor: '#3E5A4C', bg: '#FAF7EF', border: '#E1DDD0',
       desc: 'Cuotas + Gastos en un solo libro (3 hojas)',
       actions: [
-        { label: '📊 Excel multi-hoja', color: '#374151', onClick: exportResumenFinanciero },
+        { label: '📊 Excel multi-hoja', color: '#3E5A4C', onClick: exportResumenFinanciero },
       ],
     },
   ]
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>
+      <div style={{ fontSize: 13, color: '#7E9389', marginBottom: 20 }}>
         Exporta datos a <strong>Excel (.xlsx)</strong> o descarga reportes en <strong>PDF</strong> directamente desde el navegador.
       </div>
 
@@ -219,7 +219,7 @@ export default function ExportacionTab({ cuotas, gastos, tickets, visitantes, un
           <div key={card.title} style={{ background: card.bg, border: `1px solid ${card.border}`, borderRadius: 12, padding: 16 }}>
             <div style={{ fontSize: 24, marginBottom: 6 }}>{card.icon}</div>
             <div style={{ fontWeight: 700, fontSize: 14, color: card.accentColor, marginBottom: 4 }}>{card.title}</div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>{card.desc}</div>
+            <div style={{ fontSize: 12, color: '#7E9389', marginBottom: 10 }}>{card.desc}</div>
             {card.period && (
               <select
                 value={card.period.value}

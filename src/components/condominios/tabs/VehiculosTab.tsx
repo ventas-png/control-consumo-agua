@@ -16,10 +16,10 @@ interface Props {
 
 const TIPO_LABEL: Record<string, string> = { auto: 'Auto', moto: 'Moto', camion: 'Camión', otro: 'Otro' }
 const TIPO_COLOR: Record<string, { bg: string; color: string }> = {
-  auto:   { bg: '#e0f2fe', color: '#0369a1' },
+  auto:   { bg: '#D9E2DC', color: '#102622' },
   moto:   { bg: '#fef3c7', color: '#92400e' },
-  camion: { bg: '#f3e8ff', color: '#7c3aed' },
-  otro:   { bg: '#f1f5f9', color: '#64748b' },
+  camion: { bg: '#F4EBE3', color: '#9C5733' },
+  otro:   { bg: '#EAE6D8', color: '#7E9389' },
 }
 
 const BLANK = { unidad_id: '', placa: '', marca: '', modelo: '', color: '', anio: '', tipo: 'auto', activo: true, notas: '' }
@@ -79,7 +79,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
   if (filtroTipo !== 'todos') filtered = filtered.filter(v => v.tipo === filtroTipo)
   if (soloActivos) filtered = filtered.filter(v => v.activo)
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   const totalActivos = vehiculos.filter(v => v.activo).length
 
@@ -87,12 +87,12 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Vehículos de Residentes</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>{totalActivos} vehículos activos registrados</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Vehículos de Residentes</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>{totalActivos} vehículos activos registrados</p>
         </div>
         {canCreate && !showForm && (
           <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setShowForm(true) }}
-            style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Registrar Vehículo
           </button>
         )}
@@ -104,9 +104,9 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
           const count = vehiculos.filter(v => v.tipo === tipo && v.activo).length
           const style = TIPO_COLOR[tipo]
           return (
-            <div key={tipo} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+            <div key={tipo} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
               <div style={{ fontSize: '22px', fontWeight: 800, color: style.color }}>{count}</div>
-              <div style={{ fontSize: '11px', color: '#94a3b8' }}>{label}s</div>
+              <div style={{ fontSize: '11px', color: '#7E9389' }}>{label}s</div>
             </div>
           )
         })}
@@ -114,61 +114,61 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar vehículo' : 'Registrar Vehículo'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Unidad *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad *</label>
               <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">— Seleccionar —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Placa *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Placa *</label>
               <input style={inputStyle} value={form.placa} onChange={e => setF('placa', e.target.value)} placeholder="ABC-1234" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Tipo</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Tipo</label>
               <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
                 {Object.entries(TIPO_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Marca</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Marca</label>
               <input style={inputStyle} value={form.marca} onChange={e => setF('marca', e.target.value)} placeholder="Toyota, Honda…" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Modelo</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Modelo</label>
               <input style={inputStyle} value={form.modelo} onChange={e => setF('modelo', e.target.value)} placeholder="Corolla, Civic…" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Color</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Color</label>
               <input style={inputStyle} value={form.color} onChange={e => setF('color', e.target.value)} placeholder="Blanco, Negro…" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Año</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Año</label>
               <input style={inputStyle} type="number" value={form.anio} onChange={e => setF('anio', e.target.value)} placeholder="2023" min="1990" max="2030" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Estado</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Estado</label>
               <select style={inputStyle} value={form.activo ? 'true' : 'false'} onChange={e => setF('activo', e.target.value === 'true')}>
                 <option value="true">Activo</option>
                 <option value="false">Inactivo</option>
               </select>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Notas</label>
               <input style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Observaciones adicionales…" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -185,7 +185,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
           <option value="todos">Todos los tipos</option>
           {Object.entries(TIPO_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
-        <label style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+        <label style={{ fontSize: '12px', color: '#7E9389', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
           <input type="checkbox" checked={soloActivos} onChange={e => setSoloActivos(e.target.checked)} />
           Solo activos
         </label>
@@ -193,27 +193,27 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay vehículos registrados.</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay vehículos registrados.</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
           {filtered.map(v => {
             const unidad = unidades.find(u => u.id === v.unidad_id)
             const tc = TIPO_COLOR[v.tipo] ?? TIPO_COLOR.otro
             return (
-              <div key={v.id} style={{ background: 'white', border: `1.5px solid ${v.activo ? '#e2e8f0' : '#f1f5f9'}`, borderRadius: '10px', padding: '12px', opacity: v.activo ? 1 : 0.6 }}>
+              <div key={v.id} style={{ background: 'white', border: `1.5px solid ${v.activo ? '#E1DDD0' : '#EAE6D8'}`, borderRadius: '10px', padding: '12px', opacity: v.activo ? 1 : 0.6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '1px', color: '#0f172a' }}>{v.placa}</span>
+                      <span style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '1px', color: '#15291F' }}>{v.placa}</span>
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: tc.bg, color: tc.color }}>{TIPO_LABEL[v.tipo]}</span>
-                      {!v.activo && <span style={{ fontSize: '10px', padding: '2px 6px', background: '#f1f5f9', color: '#94a3b8', borderRadius: '20px' }}>Inactivo</span>}
+                      {!v.activo && <span style={{ fontSize: '10px', padding: '2px 6px', background: '#EAE6D8', color: '#7E9389', borderRadius: '20px' }}>Inactivo</span>}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#374151' }}>
+                    <div style={{ fontSize: '12px', color: '#3E5A4C' }}>
                       {[v.anio, v.marca, v.modelo].filter(Boolean).join(' · ')}
                     </div>
-                    {v.color && <div style={{ fontSize: '11px', color: '#94a3b8' }}>Color: {v.color}</div>}
-                    {unidad && <div style={{ fontSize: '11px', color: '#0ea5e9', marginTop: '3px' }}>🏠 {unidad.nombre}</div>}
-                    {v.notas && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px', fontStyle: 'italic' }}>{v.notas}</div>}
+                    {v.color && <div style={{ fontSize: '11px', color: '#7E9389' }}>Color: {v.color}</div>}
+                    {unidad && <div style={{ fontSize: '11px', color: '#1B3B36', marginTop: '3px' }}>🏠 {unidad.nombre}</div>}
+                    {v.notas && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px', fontStyle: 'italic' }}>{v.notas}</div>}
                   </div>
                   {canEdit && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -222,7 +222,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
                         {v.activo ? 'Desactivar' : 'Activar'}
                       </button>
                       <button onClick={() => startEdit(v)}
-                        style={{ padding: '3px 7px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(v.id)}
                         style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                     </div>

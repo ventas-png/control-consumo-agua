@@ -381,13 +381,13 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
     // Per-counter datasets — one dataset per active counter
     const CHART_COLOR_SETS = [
-      { full: '#0ea5e9', soft: 'rgba(14,165,233,0.5)' },
+      { full: '#1B3B36', soft: 'rgba(27, 59, 54,0.5)' },
       { full: '#10b981', soft: 'rgba(16,185,129,0.5)' },
       { full: '#f59e0b', soft: 'rgba(245,158,11,0.5)' },
-      { full: '#8b5cf6', soft: 'rgba(139,92,246,0.5)' },
+      { full: '#B96A3F', soft: 'rgba(185, 106, 63,0.5)' },
       { full: '#ef4444', soft: 'rgba(239,68,68,0.5)' },
       { full: '#ec4899', soft: 'rgba(236,72,153,0.5)' },
-      { full: '#14b8a6', soft: 'rgba(20,184,166,0.5)' },
+      { full: '#577B69', soft: 'rgba(87, 123, 105,0.5)' },
       { full: '#f97316', soft: 'rgba(249,115,22,0.5)' },
     ]
     const chartDatasets = filteredContadores.map((contador, idx) => {
@@ -527,12 +527,12 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             legend: {
               display: chartDatasets.length > 1 || hasTrend,
               labels: {
-                font: { size: 11 }, color: '#475569', boxWidth: 12, padding: 14,
+                font: { size: 11 }, color: '#3E5A4C', boxWidth: 12, padding: 14,
                 filter: item => item.text !== 'Tendencia' || hasTrend,
               },
             },
             tooltip: {
-              backgroundColor: '#0f172a',
+              backgroundColor: '#15291F',
               padding: 10,
               cornerRadius: 8,
               callbacks: {
@@ -543,13 +543,13 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           scales: {
             x: {
               grid: { display: false },
-              ticks: { font: { size: 10 }, maxRotation: 45, color: '#94a3b8' },
+              ticks: { font: { size: 10 }, maxRotation: 45, color: '#7E9389' },
               border: { display: false },
             },
             y: {
               beginAtZero: true,
-              grid: { color: '#f1f5f9' },
-              ticks: { font: { size: 11 }, color: '#94a3b8', callback: v => `${v} ${metricLabel}` },
+              grid: { color: '#EAE6D8' },
+              ticks: { font: { size: 11 }, color: '#7E9389', callback: v => `${v} ${metricLabel}` },
               border: { display: false },
             },
           },
@@ -628,15 +628,15 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       const positive = !isNull && pct! >= 0
       return (
         <div style={{ background: 'white', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#64748b', marginBottom: '8px' }}>{label}</div>
+          <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#7E9389', marginBottom: '8px' }}>{label}</div>
           {isNull ? (
-            <span style={{ fontSize: '14px', color: '#94a3b8' }}>Sin datos</span>
+            <span style={{ fontSize: '14px', color: '#7E9389' }}>Sin datos</span>
           ) : (
             <span style={{ fontSize: '20px', fontWeight: 700, color: positive ? '#ef4444' : '#10b981' }}>
               {positive ? '▲' : '▼'} {Math.abs(pct!).toFixed(1)}%
             </span>
           )}
-          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '5px' }}>{baseLabel}: {base.toFixed(2)} m³</div>
+          <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '5px' }}>{baseLabel}: {base.toFixed(2)} m³</div>
         </div>
       )
     }
@@ -646,11 +646,11 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         {/* Filtro de proyecto */}
         {clienteProjects.length > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '20px', background: 'white', borderRadius: '12px', padding: '12px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>🏗️ Proyecto:</span>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#3E5A4C' }}>🏗️ Proyecto:</span>
             <select
               value={selectedProjectId ?? ''}
               onChange={e => { setSelectedProjectId(e.target.value || null); setSelectedUnidadId(null); setSelectedTipoAgua(null) }}
-              style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc', color: '#0f172a', cursor: 'pointer' }}
+              style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid #E1DDD0', borderRadius: '8px', background: '#FAF7EF', color: '#15291F', cursor: 'pointer' }}
             >
               <option value="">Todos los proyectos</option>
               {clienteProjects.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
@@ -667,11 +667,11 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           if (visibleUnidades4Filter.length < 2) return null
           return (
             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '20px', background: 'white', borderRadius: '12px', padding: '12px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>🏠 Unidad:</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#3E5A4C' }}>🏠 Unidad:</span>
               <select
                 value={selectedUnidadId ?? ''}
                 onChange={e => { setSelectedUnidadId(e.target.value || null); setSelectedTipoAgua(null) }}
-                style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid #e2e8f0', borderRadius: '8px', background: '#f8fafc', color: '#0f172a', cursor: 'pointer' }}
+                style={{ flex: 1, padding: '7px 12px', fontSize: '13.5px', border: '1.5px solid #E1DDD0', borderRadius: '8px', background: '#FAF7EF', color: '#15291F', cursor: 'pointer' }}
               >
                 <option value="">Todas las unidades</option>
                 {visibleUnidades4Filter.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
@@ -683,10 +683,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         {/* KPI Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '14px', marginBottom: '18px' }}>
           {[
-            { label: 'Consumo Mes Actual', value: `${consumoMesActual.toFixed(2)} m³`, icon: '💧', bg: 'linear-gradient(135deg, #0ea5e9, #0284c7)' },
-            { label: 'Promedio Mensual', value: `${consumoPromedio.toFixed(2)} m³`, icon: '📊', bg: 'linear-gradient(135deg, #0d9488, #0f766e)' },
+            { label: 'Consumo Mes Actual', value: `${consumoMesActual.toFixed(2)} m³`, icon: '💧', bg: 'linear-gradient(135deg, #1B3B36, #102622)' },
+            { label: 'Promedio Mensual', value: `${consumoPromedio.toFixed(2)} m³`, icon: '📊', bg: 'linear-gradient(135deg, #577B69, #0f766e)' },
             { label: 'Monto Pendiente', value: `${moneda} ${montoPendiente.toFixed(2)}`, icon: '💳', bg: montoPendiente > 0 ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)' },
-            { label: 'Contadores Activos', value: String(contadoresActivos), icon: '🔢', bg: 'linear-gradient(135deg, #6366f1, #4f46e5)' },
+            { label: 'Contadores Activos', value: String(contadoresActivos), icon: '🔢', bg: 'linear-gradient(135deg, #B96A3F, #9C5733)' },
           ].map(card => (
             <div key={card.label} style={{ background: card.bg, borderRadius: '16px', padding: '20px', color: 'white', boxShadow: '0 6px 20px rgba(0,0,0,0.12)' }}>
               <div style={{ fontSize: '22px', marginBottom: '10px', opacity: loading ? 0.4 : 1 }}>{card.icon}</div>
@@ -716,8 +716,8 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           {/* Título + filtro tipo de agua */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
             <div>
-              <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Historial de Consumo</div>
-            <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px' }}>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F' }}>Historial de Consumo</div>
+            <div style={{ fontSize: '11.5px', color: '#7E9389', marginTop: '2px' }}>
               {chartRangeMode === 'custom' && chartCustomStart && chartCustomEnd
                 ? `${chartCustomStart} — ${chartCustomEnd} · ${chartMetric === 'm3' ? 'm³' : moneda}`
                 : `Últimos ${chartMonthsBack} meses · ${chartMetric === 'm3' ? 'm³' : moneda}`}
@@ -730,9 +730,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                   style={{
                     padding: '4px 12px', fontSize: '11.5px', fontWeight: 600, borderRadius: '20px', cursor: 'pointer',
                     border: '1.5px solid', transition: 'all 0.15s',
-                    background: selectedTipoAgua === null ? '#0ea5e9' : 'transparent',
-                    borderColor: selectedTipoAgua === null ? '#0ea5e9' : '#cbd5e1',
-                    color: selectedTipoAgua === null ? 'white' : '#475569',
+                    background: selectedTipoAgua === null ? '#1B3B36' : 'transparent',
+                    borderColor: selectedTipoAgua === null ? '#1B3B36' : '#C7C2B0',
+                    color: selectedTipoAgua === null ? 'white' : '#3E5A4C',
                   }}
                 >Todos</button>
                 {availableTiposAgua.map(tipo => (
@@ -742,9 +742,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                     style={{
                       padding: '4px 12px', fontSize: '11.5px', fontWeight: 600, borderRadius: '20px', cursor: 'pointer',
                       border: '1.5px solid', transition: 'all 0.15s',
-                      background: selectedTipoAgua === tipo ? '#0ea5e9' : 'transparent',
-                      borderColor: selectedTipoAgua === tipo ? '#0ea5e9' : '#cbd5e1',
-                      color: selectedTipoAgua === tipo ? 'white' : '#475569',
+                      background: selectedTipoAgua === tipo ? '#1B3B36' : 'transparent',
+                      borderColor: selectedTipoAgua === tipo ? '#1B3B36' : '#C7C2B0',
+                      color: selectedTipoAgua === tipo ? 'white' : '#3E5A4C',
                     }}
                   >{TIPO_AGUA_LABELS[tipo] ?? tipo}</button>
                 ))}
@@ -753,17 +753,17 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           </div>
           {/* Controles: Período y Métrica */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap' }}>Período:</span>
-            <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid #e2e8f0', overflow: 'hidden' }}>
+            <span style={{ fontSize: '12px', color: '#7E9389', fontWeight: 500, whiteSpace: 'nowrap' }}>Período:</span>
+            <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid #E1DDD0', overflow: 'hidden' }}>
               {([6, 12, 24] as const).map(n => (
                 <button
                   key={n}
                   onClick={() => { setChartMonthsBack(n); setChartRangeMode('preset') }}
                   style={{
                     padding: '6px 14px', fontSize: '12.5px', fontWeight: 600,
-                    border: 'none', borderRight: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.15s',
-                    background: chartRangeMode === 'preset' && chartMonthsBack === n ? '#0ea5e9' : '#f8fafc',
-                    color: chartRangeMode === 'preset' && chartMonthsBack === n ? 'white' : '#475569',
+                    border: 'none', borderRight: '1px solid #E1DDD0', cursor: 'pointer', transition: 'all 0.15s',
+                    background: chartRangeMode === 'preset' && chartMonthsBack === n ? '#1B3B36' : '#FAF7EF',
+                    color: chartRangeMode === 'preset' && chartMonthsBack === n ? 'white' : '#3E5A4C',
                   }}
                 >{n}M</button>
               ))}
@@ -784,20 +784,20 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 style={{
                   padding: '6px 14px', fontSize: '12.5px', fontWeight: 600,
                   border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                  background: chartRangeMode === 'custom' ? '#0ea5e9' : '#f8fafc',
-                  color: chartRangeMode === 'custom' ? 'white' : '#475569',
+                  background: chartRangeMode === 'custom' ? '#1B3B36' : '#FAF7EF',
+                  color: chartRangeMode === 'custom' ? 'white' : '#3E5A4C',
                 }}
               >📅 Rango</button>
             </div>
-            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap', marginLeft: '6px' }}>Métrica:</span>
-            <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid #e2e8f0', overflow: 'hidden' }}>
+            <span style={{ fontSize: '12px', color: '#7E9389', fontWeight: 500, whiteSpace: 'nowrap', marginLeft: '6px' }}>Métrica:</span>
+            <div style={{ display: 'flex', borderRadius: '8px', border: '1.5px solid #E1DDD0', overflow: 'hidden' }}>
               <button
                 onClick={() => setChartMetric('m3')}
                 style={{
                   padding: '6px 14px', fontSize: '12.5px', fontWeight: 600,
-                  border: 'none', borderRight: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.15s',
-                  background: chartMetric === 'm3' ? '#0ea5e9' : '#f8fafc',
-                  color: chartMetric === 'm3' ? 'white' : '#475569',
+                  border: 'none', borderRight: '1px solid #E1DDD0', cursor: 'pointer', transition: 'all 0.15s',
+                  background: chartMetric === 'm3' ? '#1B3B36' : '#FAF7EF',
+                  color: chartMetric === 'm3' ? 'white' : '#3E5A4C',
                 }}
               >m³</button>
               <button
@@ -805,15 +805,15 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 style={{
                   padding: '6px 14px', fontSize: '12.5px', fontWeight: 600,
                   border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                  background: chartMetric === 'moneda' ? '#0ea5e9' : '#f8fafc',
-                  color: chartMetric === 'moneda' ? 'white' : '#475569',
+                  background: chartMetric === 'moneda' ? '#1B3B36' : '#FAF7EF',
+                  color: chartMetric === 'moneda' ? 'white' : '#3E5A4C',
                 }}
               >{moneda}</button>
             </div>
             {chartDatasets.length === 1 && (
-              <div style={{ display: 'flex', gap: '10px', fontSize: '11px', color: '#64748b', alignItems: 'center', marginLeft: 'auto' }}>
-                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: '#0ea5e9', marginRight: '4px' }} />Mes actual</span>
-                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(14,165,233,0.45)', marginRight: '4px' }} />Anteriores</span>
+              <div style={{ display: 'flex', gap: '10px', fontSize: '11px', color: '#7E9389', alignItems: 'center', marginLeft: 'auto' }}>
+                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: '#1B3B36', marginRight: '4px' }} />Mes actual</span>
+                <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(27, 59, 54,0.45)', marginRight: '4px' }} />Anteriores</span>
                 <span><span style={{ display: 'inline-block', width: '18px', height: '0px', borderTop: '2px dashed #f59e0b', marginRight: '4px', verticalAlign: 'middle' }} />Tendencia</span>
               </div>
             )}
@@ -824,7 +824,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             const curYear = now.getFullYear()
             const years = Array.from({ length: curYear - 2018 + 2 }, (_, i) => 2018 + i)
             const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-            const selStyle: CSSProperties = { padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #7dd3fc', fontSize: '12.5px', color: '#0f172a', background: 'white', cursor: 'pointer' }
+            const selStyle: CSSProperties = { padding: '5px 8px', borderRadius: '8px', border: '1.5px solid #9CC6B6', fontSize: '12.5px', color: '#15291F', background: 'white', cursor: 'pointer' }
 
             function parseParts(val: string) {
               const [y, m] = (val || '').split('-')
@@ -836,8 +836,8 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
             const endParts = parseParts(chartCustomEnd)
 
             return (
-              <div style={{ display: 'flex', gap: '20px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap', background: '#f0f9ff', borderRadius: '10px', padding: '10px 14px', border: '1px solid #bae6fd' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
+              <div style={{ display: 'flex', gap: '20px', marginBottom: '14px', alignItems: 'center', flexWrap: 'wrap', background: '#EEF2EC', borderRadius: '10px', padding: '10px 14px', border: '1px solid #C2D2CA' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#3E5A4C' }}>
                   <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Desde:</span>
                   <select value={startParts.m} onChange={e => setChartCustomStart(buildVal(startParts.y, e.target.value))} style={selStyle}>
                     <option value="">Mes</option>
@@ -848,7 +848,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                     {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
                   </select>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#374151' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#3E5A4C' }}>
                   <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Hasta:</span>
                   <select value={endParts.m} onChange={e => setChartCustomEnd(buildVal(endParts.y, e.target.value))} style={selStyle}>
                     <option value="">Mes</option>
@@ -864,13 +864,13 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           })()}
           {/* Gráfico o estado vacío */}
           {lecturasTotal === 0 ? (
-            <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '8px', background: '#f8fafc', borderRadius: '10px' }}>
+            <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#7E9389', gap: '8px', background: '#FAF7EF', borderRadius: '10px' }}>
               <span style={{ fontSize: '32px' }}>📊</span>
               <span style={{ fontSize: '13px', fontWeight: 500 }}>Sin lecturas registradas aún</span>
               <span style={{ fontSize: '11.5px', textAlign: 'center', maxWidth: '280px' }}>Los datos aparecerán cuando se ingresen lecturas de consumo</span>
             </div>
           ) : filteredLecturasCount === 0 ? (
-            <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: '8px', background: '#f8fafc', borderRadius: '10px' }}>
+            <div style={{ height: '200px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#7E9389', gap: '8px', background: '#FAF7EF', borderRadius: '10px' }}>
               <span style={{ fontSize: '32px' }}>🔍</span>
               <span style={{ fontSize: '13px', fontWeight: 500 }}>Sin lecturas para los contadores activos</span>
               <span style={{ fontSize: '11.5px', textAlign: 'center', maxWidth: '320px' }}>
@@ -885,27 +885,27 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         {/* Desglose por tipo de agua */}
         {Object.keys(tipoAguaMap).length > 0 && (
           <div style={{ background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '18px' }}>
-            <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '14px' }}>Desglose por Tipo de Agua</div>
+            <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '14px' }}>Desglose por Tipo de Agua</div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ background: '#f8fafc' }}>
+                  <tr style={{ background: '#FAF7EF' }}>
                     {['Tipo de Agua', 'Contadores', 'Consumo Mes (m³)', 'Consumo 12 meses (m³)'].map(h => (
-                      <th scope="col" key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 600, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
+                      <th scope="col" key={h} style={{ padding: '9px 14px', textAlign: 'left', fontSize: '11.5px', fontWeight: 600, color: '#7E9389', borderBottom: '1px solid #E1DDD0' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {(Object.entries(tipoAguaMap) as [string, { label: string; count: number; consumoMes: number; consumo12m: number }][]).map(([tipo, info]) => (
-                    <tr key={tipo} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr key={tipo} style={{ borderBottom: '1px solid #EAE6D8' }}>
                       <td style={{ padding: '10px 14px' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '3px 10px', borderRadius: '20px', background: '#e0f2fe', color: '#0369a1', fontSize: '12px', fontWeight: 600 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '3px 10px', borderRadius: '20px', background: '#D9E2DC', color: '#102622', fontSize: '12px', fontWeight: 600 }}>
                           💧 {info.label}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 14px', color: '#374151', textAlign: 'center' }}>{info.count}</td>
-                      <td style={{ padding: '10px 14px', fontWeight: 600, color: '#0ea5e9', textAlign: 'right' }}>{info.consumoMes.toFixed(2)}</td>
-                      <td style={{ padding: '10px 14px', color: '#374151', textAlign: 'right' }}>{info.consumo12m.toFixed(2)}</td>
+                      <td style={{ padding: '10px 14px', color: '#3E5A4C', textAlign: 'center' }}>{info.count}</td>
+                      <td style={{ padding: '10px 14px', fontWeight: 600, color: '#1B3B36', textAlign: 'right' }}>{info.consumoMes.toFixed(2)}</td>
+                      <td style={{ padding: '10px 14px', color: '#3E5A4C', textAlign: 'right' }}>{info.consumo12m.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -917,14 +917,14 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         {/* Desglose por unidad */}
         {unidadBreakdown.length > 0 && (
           <div>
-            <div style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a', marginBottom: '12px' }}>Desglose por Unidad</div>
+            <div style={{ fontWeight: 700, fontSize: '15px', color: '#15291F', marginBottom: '12px' }}>Desglose por Unidad</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(290px, 100%), 1fr))', gap: '14px' }}>
               {(unidadBreakdown as { unidad: UnidadInfo; meters: { contador: ContadorInfo; consumoMes: number; consumo12m: number; consumoMesDisplay: number; consumoMesLabel: string; ultimaLectura: LecturaInfo | null; fotoActual: LecturaInfo | null; fotoAnterior: LecturaInfo | null }[] }[]).map(({ unidad, meters }) => {
                 const project = projects.find(p => p.id === unidad.project_id)
                 return (
                   <div key={unidad.id} style={{ background: 'white', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                     {/* Header unidad */}
-                    <div style={{ background: 'linear-gradient(135deg, #0d9488, #0ea5e9)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ background: 'linear-gradient(135deg, #577B69, #1B3B36)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px' }}>🏠</div>
                       <div>
                         <div style={{ color: 'white', fontWeight: 700, fontSize: '14px' }}>{unidad.nombre}</div>
@@ -934,17 +934,17 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                     {/* Contadores */}
                     <div style={{ padding: '14px 16px' }}>
                       {meters.length === 0 ? (
-                        <div style={{ color: '#94a3b8', fontSize: '12.5px', textAlign: 'center', padding: '8px 0' }}>Sin contadores asignados</div>
+                        <div style={{ color: '#7E9389', fontSize: '12.5px', textAlign: 'center', padding: '8px 0' }}>Sin contadores asignados</div>
                       ) : meters.map(({ contador, consumo12m, consumoMesDisplay, consumoMesLabel, ultimaLectura, fotoActual, fotoAnterior }) => (
-                        <div key={contador.id} style={{ borderRadius: '10px', background: '#f8fafc', padding: '11px', border: '1px solid #e2e8f0', marginBottom: '10px' }}>
+                        <div key={contador.id} style={{ borderRadius: '10px', background: '#FAF7EF', padding: '11px', border: '1px solid #E1DDD0', marginBottom: '10px' }}>
                           {/* Info medidor */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                            <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: 'linear-gradient(135deg, #0ea5e9, #0d9488)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', flexShrink: 0 }}>💧</div>
+                            <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: 'linear-gradient(135deg, #1B3B36, #577B69)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', flexShrink: 0 }}>💧</div>
                             <div>
-                              <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#0f172a' }}>#{contador.numero_serie}</div>
-                              <div style={{ fontSize: '11px', color: '#64748b' }}>{TIPO_AGUA_LABELS[contador.tipo_agua] ?? contador.tipo_agua}</div>
+                              <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#15291F' }}>#{contador.numero_serie}</div>
+                              <div style={{ fontSize: '11px', color: '#7E9389' }}>{TIPO_AGUA_LABELS[contador.tipo_agua] ?? contador.tipo_agua}</div>
                               {ultimaLectura && (
-                                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '1px' }}>
+                                <div style={{ fontSize: '10px', color: '#7E9389', marginTop: '1px' }}>
                                   Última lectura: {parseFecha(ultimaLectura.fecha).toLocaleDateString('es-GT')}
                                 </div>
                               )}
@@ -953,42 +953,42 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                           {/* Stats */}
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', marginBottom: '12px' }}>
                             {[
-                              { lbl: consumoMesLabel, val: consumoMesDisplay.toFixed(2), color: '#0ea5e9' },
-                              { lbl: 'Últimos 12m', val: consumo12m.toFixed(2), color: '#0d9488' },
+                              { lbl: consumoMesLabel, val: consumoMesDisplay.toFixed(2), color: '#1B3B36' },
+                              { lbl: 'Últimos 12m', val: consumo12m.toFixed(2), color: '#577B69' },
                             ].map(s => (
-                              <div key={s.lbl} style={{ background: 'white', borderRadius: '7px', padding: '7px 9px', border: '1px solid #e2e8f0' }}>
-                                <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '2px' }}>{s.lbl}</div>
+                              <div key={s.lbl} style={{ background: 'white', borderRadius: '7px', padding: '7px 9px', border: '1px solid #E1DDD0' }}>
+                                <div style={{ fontSize: '10px', color: '#7E9389', marginBottom: '2px' }}>{s.lbl}</div>
                                 <div style={{ fontSize: '15px', fontWeight: 700, color: s.color }}>{s.val}</div>
-                                <div style={{ fontSize: '9.5px', color: '#94a3b8' }}>m³</div>
+                                <div style={{ fontSize: '9.5px', color: '#7E9389' }}>m³</div>
                               </div>
                             ))}
                           </div>
                           {/* Fotos — always shown */}
                           <div>
-                            <div style={{ fontSize: '10.5px', fontWeight: 600, color: '#64748b', marginBottom: '7px' }}>📷 Fotografías del Medidor</div>
+                            <div style={{ fontSize: '10.5px', fontWeight: 600, color: '#7E9389', marginBottom: '7px' }}>📷 Fotografías del Medidor</div>
                             <div style={{ display: 'flex', gap: '8px' }}>
                               {[
                                 { lectura: fotoAnterior, label: 'Foto Anterior' },
                                 { lectura: fotoActual, label: 'Foto Actual' },
                               ].map(({ lectura, label }) => (
                                 <div key={label} style={{ flex: 1 }}>
-                                  <div style={{ fontSize: '9.5px', color: '#94a3b8', marginBottom: '3px', textAlign: 'center' }}>{label}</div>
+                                  <div style={{ fontSize: '9.5px', color: '#7E9389', marginBottom: '3px', textAlign: 'center' }}>{label}</div>
                                   {lectura?.foto ? (
                                     <SecureImage
                                       bucket="registro-fotos"
                                       src={lectura.foto}
                                       alt={label}
                                       onClick={() => setPhotoModal({ url: lectura.foto!, label: `${label} — #${contador.numero_serie} — ${parseFecha(lectura.fecha).toLocaleDateString('es-GT')}` })}
-                                      style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '7px', border: '1.5px solid #e2e8f0', cursor: 'zoom-in' }}
+                                      style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: '7px', border: '1.5px solid #E1DDD0', cursor: 'zoom-in' }}
                                     />
                                   ) : (
-                                    <div style={{ width: '100%', aspectRatio: '1', background: '#f1f5f9', borderRadius: '7px', border: '1.5px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '3px', color: '#94a3b8', fontSize: '10px' }}>
+                                    <div style={{ width: '100%', aspectRatio: '1', background: '#EAE6D8', borderRadius: '7px', border: '1.5px dashed #C7C2B0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '3px', color: '#7E9389', fontSize: '10px' }}>
                                       <span style={{ fontSize: '18px' }}>📷</span>
                                       <span>Sin foto</span>
                                     </div>
                                   )}
                                   {lectura && (
-                                    <div style={{ fontSize: '9px', color: '#94a3b8', textAlign: 'center', marginTop: '2px' }}>
+                                    <div style={{ fontSize: '9px', color: '#7E9389', textAlign: 'center', marginTop: '2px' }}>
                                       {parseFecha(lectura.fecha).toLocaleDateString('es-GT')}
                                     </div>
                                   )}
@@ -1014,7 +1014,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #0d9488 100%)',
+        background: 'linear-gradient(135deg, #1B3B36 0%, #577B69 50%, #577B69 100%)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '24px',
       }}>
@@ -1024,29 +1024,29 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           boxShadow: '0 24px 64px rgba(0,0,0,0.16)',
         }}>
           <div style={{ fontSize: '56px', marginBottom: '20px' }}>💧</div>
-          <h2 style={{ margin: '0 0 12px', fontSize: '22px', fontWeight: 700, color: '#0f172a' }}>
+          <h2 style={{ margin: '0 0 12px', fontSize: '22px', fontWeight: 700, color: '#15291F' }}>
             Sin servicios asociados
           </h2>
-          <p style={{ margin: '0 0 8px', fontSize: '15px', color: '#475569', lineHeight: 1.6 }}>
+          <p style={{ margin: '0 0 8px', fontSize: '15px', color: '#3E5A4C', lineHeight: 1.6 }}>
             Por el momento no cuenta con contadores ni unidades activas vinculadas a su cuenta.
           </p>
-          <p style={{ margin: '0 0 32px', fontSize: '13.5px', color: '#94a3b8' }}>
+          <p style={{ margin: '0 0 32px', fontSize: '13.5px', color: '#7E9389' }}>
             Si cree que esto es un error, comuníquese con su empresa de servicios de agua.
           </p>
           <div style={{
-            background: '#f1f5f9', borderRadius: '12px', padding: '16px',
-            fontSize: '13px', color: '#64748b', marginBottom: '28px',
+            background: '#EAE6D8', borderRadius: '12px', padding: '16px',
+            fontSize: '13px', color: '#7E9389', marginBottom: '28px',
           }}>
-            <strong style={{ color: '#334155' }}>Sesión activa:</strong> {currentUser.name}
+            <strong style={{ color: '#3E5A4C' }}>Sesión activa:</strong> {currentUser.name}
             <br />{currentUser.email}
           </div>
           <button
             onClick={onLogout}
             style={{
-              padding: '12px 32px', background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+              padding: '12px 32px', background: 'linear-gradient(135deg, #1B3B36, #577B69)',
               color: 'white', border: 'none', borderRadius: '12px',
               fontSize: '14px', fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(14,165,233,0.35)',
+              boxShadow: '0 4px 14px rgba(27, 59, 54,0.35)',
             }}
           >
             Cerrar sesión
@@ -1058,7 +1058,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
   // ── Full portal ──────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f9ff' }}>
+    <div style={{ minHeight: '100vh', background: '#EEF2EC' }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes shimmer {
@@ -1075,19 +1075,19 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           animation: shimmer 1.4s infinite linear;
           border-radius: 6px;
         }
-        .portal-tab:hover { background: rgba(14,165,233,0.08) !important; }
-        .portal-tab.active { background: white !important; color: #0ea5e9 !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .portal-tab:hover { background: rgba(27, 59, 54,0.08) !important; }
+        .portal-tab.active { background: white !important; color: #1B3B36 !important; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .portal-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.1) !important; transform: translateY(-1px); }
-        .contador-row:hover { background: #f0f9ff !important; cursor: pointer; }
-        .lectura-row:nth-child(even) { background: #f8fafc; }
-        .portal-input:focus { outline: none; border-color: #0ea5e9 !important; box-shadow: 0 0 0 3px rgba(14,165,233,0.12); }
+        .contador-row:hover { background: #EEF2EC !important; cursor: pointer; }
+        .lectura-row:nth-child(even) { background: #FAF7EF; }
+        .portal-input:focus { outline: none; border-color: #1B3B36 !important; box-shadow: 0 0 0 3px rgba(27, 59, 54,0.12); }
       `}</style>
 
       {/* Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+        background: 'linear-gradient(135deg, #1B3B36, #577B69)',
         padding: '0',
-        boxShadow: '0 2px 12px rgba(14,165,233,0.3)',
+        boxShadow: '0 2px 12px rgba(27, 59, 54,0.3)',
       }}>
         <div style={{
           maxWidth: '900px', margin: '0 auto',
@@ -1141,7 +1141,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               style={{
                 padding: '10px 18px',
                 background: tab === t.key ? 'white' : 'transparent',
-                color: tab === t.key ? '#0ea5e9' : 'rgba(255,255,255,0.85)',
+                color: tab === t.key ? '#1B3B36' : 'rgba(255,255,255,0.85)',
                 border: 'none',
                 borderRadius: '10px 10px 0 0',
                 fontSize: '13.5px', fontWeight: 600,
@@ -1172,9 +1172,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               marginBottom: '28px',
             }}>
               {[
-                { icon: '🏢', label: 'Empresas', value: companies.length, color: '#6366f1' },
-                { icon: '🏠', label: 'Unidades activas', value: unidades.length, color: '#0ea5e9' },
-                { icon: '💧', label: 'Contadores activos', value: contadores.length, color: '#0d9488' },
+                { icon: '🏢', label: 'Empresas', value: companies.length, color: '#B96A3F' },
+                { icon: '🏠', label: 'Unidades activas', value: unidades.length, color: '#1B3B36' },
+                { icon: '💧', label: 'Contadores activos', value: contadores.length, color: '#577B69' },
                 { icon: '📋', label: 'Registros de lectura', value: lecturas.length, color: '#f59e0b' },
               ].map(s => (
                 <div
@@ -1195,7 +1195,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                   }}>{s.icon}</div>
                   <div>
                     <div style={{ fontSize: '22px', fontWeight: 700, color: s.color }}>{s.value}</div>
-                    <div style={{ fontSize: '12px', color: '#64748b' }}>{s.label}</div>
+                    <div style={{ fontSize: '12px', color: '#7E9389' }}>{s.label}</div>
                   </div>
                 </div>
               ))}
@@ -1213,11 +1213,11 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
                   <div style={{
                     width: '32px', height: '32px', borderRadius: '8px',
-                    background: isActivo ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#e2e8f0',
+                    background: isActivo ? 'linear-gradient(135deg, #B96A3F, #9C5733)' : '#E1DDD0',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '15px', color: 'white',
                   }}>🏢</div>
-                  <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: isActivo ? '#1e293b' : '#94a3b8' }}>
+                  <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: isActivo ? '#15291F' : '#7E9389' }}>
                     {company.nombre}
                   </h2>
                 </div>
@@ -1229,10 +1229,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                     {companyHeader}
                     <div style={{
                       padding: '20px 24px',
-                      background: '#f8fafc',
-                      border: '1.5px dashed #cbd5e1',
+                      background: '#FAF7EF',
+                      border: '1.5px dashed #C7C2B0',
                       borderRadius: '12px',
-                      color: '#64748b',
+                      color: '#7E9389',
                       fontSize: '14px',
                       display: 'flex',
                       alignItems: 'center',
@@ -1257,11 +1257,11 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                   }}>
                     <div style={{
                       width: '32px', height: '32px', borderRadius: '8px',
-                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      background: 'linear-gradient(135deg, #B96A3F, #9C5733)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '15px', color: 'white',
                     }}>🏢</div>
-                    <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#1e293b' }}>
+                    <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#15291F' }}>
                       {company.nombre}
                     </h2>
                   </div>
@@ -1302,15 +1302,15 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                             <div style={{
                               width: '36px', height: '36px', borderRadius: '9px', flexShrink: 0,
-                              background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                              background: 'linear-gradient(135deg, #1B3B36, #577B69)',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               fontSize: '16px', color: 'white',
                             }}>💧</div>
                             <div style={{ minWidth: 0 }}>
-                              <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '14.5px' }}>
+                              <div style={{ fontWeight: 600, color: '#15291F', fontSize: '14.5px' }}>
                                 Contador #{contador.numero_serie}
                               </div>
-                              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                              <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px' }}>
                                 {TIPO_AGUA_LABELS[contador.tipo_agua] ?? contador.tipo_agua}
                                 {unidad && ` · ${unidad.nombre}`}
                                 {project && ` · ${project.nombre}`}
@@ -1323,28 +1323,28 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                               background: '#dcfce7', color: '#166534',
                               fontSize: '11px', fontWeight: 600,
                             }}>Activo</span>
-                            <span style={{ color: '#94a3b8', fontSize: '16px', transition: 'transform 0.2s', display: 'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+                            <span style={{ color: '#7E9389', fontSize: '16px', transition: 'transform 0.2s', display: 'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
                           </div>
                         </div>
 
                         {/* Reading history */}
                         {isExpanded && (
-                          <div style={{ borderTop: '1px solid #f1f5f9' }}>
+                          <div style={{ borderTop: '1px solid #EAE6D8' }}>
                             {contLecturas.length === 0 ? (
-                              <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '13.5px' }}>
+                              <div style={{ padding: '20px', textAlign: 'center', color: '#7E9389', fontSize: '13.5px' }}>
                                 No hay lecturas registradas para este contador.
                               </div>
                             ) : (
                               <div style={{ overflowX: 'auto' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                                   <thead>
-                                    <tr style={{ background: '#f8fafc' }}>
+                                    <tr style={{ background: '#FAF7EF' }}>
                                       {['Fecha', 'Período', 'Lect. anterior', 'Lect. actual', 'Consumo (m³)', `Monto (${moneda})`, 'Estado'].map(h => (
                                         <th scope="col" key={h} style={{
                                           padding: '10px 14px', textAlign: 'left',
                                           fontSize: '11.5px', fontWeight: 600,
-                                          color: '#64748b', whiteSpace: 'nowrap',
-                                          borderBottom: '1px solid #e2e8f0',
+                                          color: '#7E9389', whiteSpace: 'nowrap',
+                                          borderBottom: '1px solid #E1DDD0',
                                         }}>{h}</th>
                                       ))}
                                     </tr>
@@ -1354,22 +1354,22 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                                       const est = ESTADO_COLORS[lectura.estado] ?? ESTADO_COLORS.pendiente
                                       return (
                                         <tr key={lectura.id} className="lectura-row">
-                                          <td style={{ padding: '10px 14px', color: '#374151', whiteSpace: 'nowrap' }}>
+                                          <td style={{ padding: '10px 14px', color: '#3E5A4C', whiteSpace: 'nowrap' }}>
                                             {parseFecha(lectura.fecha).toLocaleDateString('es-GT')}
                                           </td>
-                                          <td style={{ padding: '10px 14px', color: '#64748b' }}>
+                                          <td style={{ padding: '10px 14px', color: '#7E9389' }}>
                                             {lectura.dias_servicio != null ? `${lectura.dias_servicio} días` : lectura.mes ? `Mes ${lectura.mes}` : '—'}
                                           </td>
-                                          <td style={{ padding: '10px 14px', color: '#374151', textAlign: 'right' }}>
+                                          <td style={{ padding: '10px 14px', color: '#3E5A4C', textAlign: 'right' }}>
                                             {lectura.lectura_anterior.toFixed(2)}
                                           </td>
-                                          <td style={{ padding: '10px 14px', color: '#374151', textAlign: 'right' }}>
+                                          <td style={{ padding: '10px 14px', color: '#3E5A4C', textAlign: 'right' }}>
                                             {lectura.lectura_actual.toFixed(2)}
                                           </td>
-                                          <td style={{ padding: '10px 14px', fontWeight: 600, color: '#0ea5e9', textAlign: 'right' }}>
+                                          <td style={{ padding: '10px 14px', fontWeight: 600, color: '#1B3B36', textAlign: 'right' }}>
                                             {lectura.consumo.toFixed(2)}
                                           </td>
-                                          <td style={{ padding: '10px 14px', fontWeight: 600, color: '#0f172a', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                          <td style={{ padding: '10px 14px', fontWeight: 600, color: '#15291F', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                             {moneda} {lectura.monto_calculado.toFixed(2)}
                                           </td>
                                           <td style={{ padding: '10px 14px' }}>
@@ -1408,15 +1408,15 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                       >
                         <div style={{
                           width: '36px', height: '36px', borderRadius: '9px', flexShrink: 0,
-                          background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+                          background: 'linear-gradient(135deg, #1B3B36, #B96A3F)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: '16px', color: 'white',
                         }}>🏠</div>
                         <div>
-                          <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '14.5px' }}>
+                          <div style={{ fontWeight: 600, color: '#15291F', fontSize: '14.5px' }}>
                             {unidad.nombre}
                           </div>
-                          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                          <div style={{ fontSize: '12px', color: '#7E9389', marginTop: '2px' }}>
                             {unidad.tipo.replace('_', ' ')}
                             {unidad.piso != null && ` · Piso ${unidad.piso}`}
                             {unidad.area_m2 != null && ` · ${unidad.area_m2} m²`}
@@ -1449,7 +1449,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           />
         )}
         {tab === 'comunicacion' && companies.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '48px 24px', color: '#9ca3af', fontSize: '14px' }}>
+          <div style={{ textAlign: 'center', padding: '48px 24px', color: '#7E9389', fontSize: '14px' }}>
             No estás asociado a ninguna empresa todavía.
           </div>
         )}
@@ -1465,15 +1465,15 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
                 <div style={{
                   width: '44px', height: '44px', borderRadius: '12px',
-                  background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                  background: 'linear-gradient(135deg, #1B3B36, #577B69)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '20px', color: 'white',
                 }}>👤</div>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#0f172a' }}>
+                  <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#15291F' }}>
                     {currentUser.name}
                   </h2>
-                  <div style={{ fontSize: '12.5px', color: '#64748b' }}>Actualice su información de contacto</div>
+                  <div style={{ fontSize: '12.5px', color: '#7E9389' }}>Actualice su información de contacto</div>
                 </div>
               </div>
 
@@ -1487,7 +1487,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                   <div key={field.key}>
                     <label style={{
                       display: 'block', fontSize: '12.5px',
-                      fontWeight: 600, color: '#374151', marginBottom: '5px',
+                      fontWeight: 600, color: '#3E5A4C', marginBottom: '5px',
                     }}>
                       {field.label}
                     </label>
@@ -1500,8 +1500,8 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                       style={{
                         width: '100%', boxSizing: 'border-box',
                         padding: '10px 14px', fontSize: '14px',
-                        border: '1.5px solid #e2e8f0', borderRadius: '10px',
-                        background: '#f8fafc', color: '#0f172a',
+                        border: '1.5px solid #E1DDD0', borderRadius: '10px',
+                        background: '#FAF7EF', color: '#15291F',
                         transition: 'border-color 0.2s, box-shadow 0.2s',
                       }}
                     />
@@ -1527,12 +1527,12 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                   style={{
                     padding: '12px', marginTop: '4px',
                     background: savingContacto
-                      ? '#94a3b8'
-                      : 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                      ? '#7E9389'
+                      : 'linear-gradient(135deg, #1B3B36, #577B69)',
                     color: 'white', border: 'none', borderRadius: '12px',
                     fontSize: '14.5px', fontWeight: 600,
                     cursor: savingContacto ? 'not-allowed' : 'pointer',
-                    boxShadow: savingContacto ? 'none' : '0 4px 14px rgba(14,165,233,0.3)',
+                    boxShadow: savingContacto ? 'none' : '0 4px 14px rgba(27, 59, 54,0.3)',
                     transition: 'all 0.2s',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                   }}

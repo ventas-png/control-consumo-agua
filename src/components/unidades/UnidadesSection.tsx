@@ -77,12 +77,12 @@ const TIPO_AGUA_LABELS: Record<string, string> = {
 }
 
 const TIPO_COLORES: Record<TipoUnidad, { bg: string; color: string }> = {
-  apartamento:     { bg: '#e0f2fe', color: '#0369a1' },
+  apartamento:     { bg: '#D9E2DC', color: '#102622' },
   casa:            { bg: '#dcfce7', color: '#166534' },
   bodega:          { bg: '#fef9c3', color: '#854d0e' },
   local_comercial: { bg: '#ffedd5', color: '#c2410c' },
-  oficina:         { bg: '#ede9fe', color: '#5b21b6' },
-  parqueadero:     { bg: '#f1f5f9', color: '#475569' },
+  oficina:         { bg: '#F4EBE3', color: '#5E3417' },
+  parqueadero:     { bg: '#EAE6D8', color: '#3E5A4C' },
   otro:            { bg: '#fce7f3', color: '#9d174d' },
 }
 
@@ -439,7 +439,7 @@ export function UnidadesSection({
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#64748b',
+      cancelButtonColor: '#7E9389',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
     })
@@ -491,7 +491,7 @@ export function UnidadesSection({
 
   const inputStyle: CSSProperties = {
     padding: '10px 14px',
-    border: '2px solid #e2e8f0',
+    border: '2px solid #E1DDD0',
     borderRadius: '8px',
     fontSize: '14px',
     width: '100%',
@@ -511,8 +511,8 @@ export function UnidadesSection({
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>Unidades del Proyecto</h2>
-          <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>
+          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#15291F' }}>Unidades del Proyecto</h2>
+          <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#7E9389' }}>
             Apartamentos, casas, bodegas, locales y más — luego se les asignan contadores
           </p>
         </div>
@@ -552,9 +552,9 @@ export function UnidadesSection({
                 onClick={() => setShowImportModal(true)}
                 style={{
                   padding: '10px 20px',
-                  background: '#f0f9ff',
-                  color: '#0369a1',
-                  border: '1px solid #bae6fd',
+                  background: '#EEF2EC',
+                  color: '#102622',
+                  border: '1px solid #C2D2CA',
                   borderRadius: '8px',
                   fontWeight: 600,
                   fontSize: '14px',
@@ -568,7 +568,7 @@ export function UnidadesSection({
                 onClick={startCreate}
                 style={{
                   padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                  background: 'linear-gradient(135deg, #1B3B36, #577B69)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
@@ -597,7 +597,7 @@ export function UnidadesSection({
                 onClick={() => setFilterTipo(isSelected ? '' : r.value as TipoUnidad)}
                 style={{
                   background: isSelected ? col.bg : 'white',
-                  border: `2px solid ${isSelected ? col.color : '#e2e8f0'}`,
+                  border: `2px solid ${isSelected ? col.color : '#E1DDD0'}`,
                   borderRadius: '12px',
                   padding: '12px 18px',
                   cursor: 'pointer',
@@ -609,8 +609,8 @@ export function UnidadesSection({
                 <div style={{ fontSize: '11px', fontWeight: 600, color: col.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {r.label}
                 </div>
-                <div style={{ fontSize: '22px', fontWeight: 700, color: r.max !== null && r.total >= r.max ? '#ef4444' : '#0f172a', margin: '2px 0' }}>
-                  {r.total}{r.max !== null ? <span style={{ fontSize: '13px', fontWeight: 500, color: '#94a3b8' }}>/{r.max}</span> : null}
+                <div style={{ fontSize: '22px', fontWeight: 700, color: r.max !== null && r.total >= r.max ? '#ef4444' : '#15291F', margin: '2px 0' }}>
+                  {r.total}{r.max !== null ? <span style={{ fontSize: '13px', fontWeight: 500, color: '#7E9389' }}>/{r.max}</span> : null}
                 </div>
               </div>
             )
@@ -622,7 +622,7 @@ export function UnidadesSection({
       {isModalOpen && canEdit && (
         <EditModal title={editingId ? 'Editar Unidad' : 'Nueva Unidad'} onClose={cancelForm} maxWidth="820px">
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
               Datos de la Unidad
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
@@ -686,7 +686,7 @@ export function UnidadesSection({
                 />
               </div>
               <div>
-                <label style={labelStyle} title="Porcentaje de participación en gastos comunes (0-100). Si no se define, se calcula proporcionalmente por área.">Alícuota % <span style={{ color: '#9ca3af', fontWeight: 400 }}>(opcional)</span></label>
+                <label style={labelStyle} title="Porcentaje de participación en gastos comunes (0-100). Si no se define, se calcula proporcionalmente por área.">Alícuota % <span style={{ color: '#7E9389', fontWeight: 400 }}>(opcional)</span></label>
                 <input
                   style={inputStyle}
                   type="number"
@@ -712,7 +712,7 @@ export function UnidadesSection({
           </div>
 
           <div style={{ marginBottom: '20px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
               Datos del Propietario / Ocupante
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
@@ -753,7 +753,7 @@ export function UnidadesSection({
 
           {/* Datos del Inmueble */}
           <div style={{ marginBottom: '20px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
               Datos del Inmueble
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
@@ -804,7 +804,7 @@ export function UnidadesSection({
 
           {/* Estado Ocupacional */}
           <div style={{ marginBottom: '20px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
               Estado Ocupacional
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
@@ -826,7 +826,7 @@ export function UnidadesSection({
 
           {/* Contrato de Suministro */}
           <div style={{ marginBottom: '20px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
               Contrato de Suministro
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
@@ -875,7 +875,7 @@ export function UnidadesSection({
           </div>
 
           <div style={{ marginBottom: '20px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
               Cliente Asignado
             </div>
             <select
@@ -895,11 +895,11 @@ export function UnidadesSection({
             const disponibles = contadores.filter(c => c.unidad_id === null || c.unidad_id === editingId)
             return (
               <div style={{ marginBottom: '20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
                   Contadores Asignados
                 </div>
                 {disponibles.length === 0 ? (
-                  <div style={{ fontSize: '13px', color: '#94a3b8', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '13px', color: '#7E9389', padding: '12px', background: '#FAF7EF', borderRadius: '8px', border: '1px solid #E1DDD0' }}>
                     No hay contadores disponibles para asignar.
                   </div>
                 ) : (
@@ -915,8 +915,8 @@ export function UnidadesSection({
                             gap: '10px',
                             padding: '10px 14px',
                             borderRadius: '8px',
-                            border: `2px solid ${checked ? '#0ea5e9' : '#e2e8f0'}`,
-                            background: checked ? '#f0f9ff' : '#fafafa',
+                            border: `2px solid ${checked ? '#1B3B36' : '#E1DDD0'}`,
+                            background: checked ? '#EEF2EC' : '#FAF7EF',
                             cursor: 'pointer',
                             userSelect: 'none',
                             transition: 'all 0.1s',
@@ -929,13 +929,13 @@ export function UnidadesSection({
                               if (e.target.checked) setSelectedContadorIds(prev => [...prev, c.id])
                               else setSelectedContadorIds(prev => prev.filter(id => id !== c.id))
                             }}
-                            style={{ width: '16px', height: '16px', accentColor: '#0ea5e9', flexShrink: 0 }}
+                            style={{ width: '16px', height: '16px', accentColor: '#1B3B36', flexShrink: 0 }}
                           />
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <div style={{ fontWeight: 600, fontSize: '13px', color: '#15291F', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               🔧 {c.numero_serie}
                             </div>
-                            <div style={{ fontSize: '11px', color: '#64748b' }}>
+                            <div style={{ fontSize: '11px', color: '#7E9389' }}>
                               {TIPO_AGUA_LABELS[c.tipo_agua] ?? c.tipo_agua}
                               {c.marca && ` · ${c.marca}`}
                             </div>
@@ -946,7 +946,7 @@ export function UnidadesSection({
                   </div>
                 )}
                 {selectedContadorIds.length > 0 && (
-                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#0369a1' }}>
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#102622' }}>
                     {selectedContadorIds.length} contador{selectedContadorIds.length !== 1 ? 'es' : ''} seleccionado{selectedContadorIds.length !== 1 ? 's' : ''}
                   </div>
                 )}
@@ -980,7 +980,7 @@ export function UnidadesSection({
               disabled={loading}
               style={{
                 padding: '10px 24px',
-                background: loading ? '#94a3b8' : 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+                background: loading ? '#7E9389' : 'linear-gradient(135deg, #1B3B36, #577B69)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -995,8 +995,8 @@ export function UnidadesSection({
               onClick={cancelForm}
               style={{
                 padding: '10px 24px',
-                background: '#f1f5f9',
-                color: '#475569',
+                background: '#EAE6D8',
+                color: '#3E5A4C',
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: 600,
@@ -1051,7 +1051,7 @@ export function UnidadesSection({
               >
                 ← Anterior
               </button>
-              <span style={{ color: '#475569', fontWeight: 600 }}>
+              <span style={{ color: '#3E5A4C', fontWeight: 600 }}>
                 Página {currentPage + 1} de {totalPages}
               </span>
               <button
@@ -1066,7 +1066,7 @@ export function UnidadesSection({
         </>
       )}
 
-      <div style={{ marginTop: 16, color: '#94a3b8', fontSize: 12 }}>
+      <div style={{ marginTop: 16, color: '#7E9389', fontSize: 12 }}>
         {filtered.length} unidad{filtered.length !== 1 ? 'es' : ''}{' '}
         {search || filterTipo ? 'encontradas' : 'registradas'} ·{' '}
         {unidades.filter(u => u.activo).length} activa{unidades.filter(u => u.activo).length !== 1 ? 's' : ''}
@@ -1123,7 +1123,7 @@ function UnidadCard({
         borderRadius: 14,
         boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
-        border: u.activo ? '1px solid #e2e8f0' : '1px solid #fca5a5',
+        border: u.activo ? '1px solid #E1DDD0' : '1px solid #fca5a5',
         opacity: u.activo ? 1 : 0.75,
       }}
     >
@@ -1136,7 +1136,7 @@ function UnidadCard({
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 24 }}>{tipo.icon}</span>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{u.nombre}</div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: '#15291F' }}>{u.nombre}</div>
               <span style={{
                 display: 'inline-block', padding: '2px 9px',
                 borderRadius: 10, background: col.bg, color: col.color,
@@ -1145,7 +1145,7 @@ function UnidadCard({
                 {tipo.label}
               </span>
               {proyectoNombre && (
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 3 }}>🏗️ {proyectoNombre}</div>
+                <div style={{ fontSize: 11, color: '#7E9389', marginTop: 3 }}>🏗️ {proyectoNombre}</div>
               )}
             </div>
           </div>
@@ -1159,7 +1159,7 @@ function UnidadCard({
         </div>
 
         {/* Details */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, fontSize: 13, color: '#475569' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, fontSize: 13, color: '#3E5A4C' }}>
           {(u.piso != null || u.area_m2 != null) && (
             <div style={{ display: 'flex', gap: 16 }}>
               {u.piso != null && <span>🏢 Piso {u.piso}</span>}
@@ -1173,13 +1173,13 @@ function UnidadCard({
               ✉️ {u.propietario_email}
             </div>
           )}
-          {u.descripcion && <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>{u.descripcion}</div>}
+          {u.descripcion && <div style={{ color: '#7E9389', fontStyle: 'italic' }}>{u.descripcion}</div>}
           {u.direccion && <div>📍 {u.direccion}</div>}
           {u.estado_ocupacional && (
             <div>
               <span style={{
                 display: 'inline-block', padding: '2px 9px', borderRadius: 10,
-                background: '#f0f9ff', color: '#0369a1', fontSize: 11, fontWeight: 600,
+                background: '#EEF2EC', color: '#102622', fontSize: 11, fontWeight: 600,
               }}>
                 {ESTADOS_OCUPACIONALES.find(e => e.value === u.estado_ocupacional)?.label ?? u.estado_ocupacional}
               </span>
@@ -1189,16 +1189,16 @@ function UnidadCard({
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{
                 padding: '2px 9px', borderRadius: 10, fontSize: 11, fontWeight: 600,
-                background: u.contrato_suministro === 'si' ? '#dcfce7' : u.contrato_suministro === 'no' ? '#fee2e2' : '#f1f5f9',
-                color:      u.contrato_suministro === 'si' ? '#166534' : u.contrato_suministro === 'no' ? '#991b1b' : '#475569',
+                background: u.contrato_suministro === 'si' ? '#dcfce7' : u.contrato_suministro === 'no' ? '#fee2e2' : '#EAE6D8',
+                color:      u.contrato_suministro === 'si' ? '#166534' : u.contrato_suministro === 'no' ? '#991b1b' : '#3E5A4C',
               }}>
                 📄 Contrato: {CONTRATOS_SUMINISTRO.find(c => c.value === u.contrato_suministro)?.label ?? u.contrato_suministro}
               </span>
               {u.numero_contrato_suministro && (
-                <span style={{ fontSize: 11, color: '#64748b' }}>#{u.numero_contrato_suministro}</span>
+                <span style={{ fontSize: 11, color: '#7E9389' }}>#{u.numero_contrato_suministro}</span>
               )}
               {u.fecha_vencimiento_contrato && (
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>Vence: {formatDate(u.fecha_vencimiento_contrato)}</span>
+                <span style={{ fontSize: 11, color: '#7E9389' }}>Vence: {formatDate(u.fecha_vencimiento_contrato)}</span>
               )}
             </div>
           )}
@@ -1206,8 +1206,8 @@ function UnidadCard({
 
         {/* Cliente asignado */}
         {clienteAsignado && (
-          <div style={{ marginBottom: 8, fontSize: 13, color: '#0369a1', fontWeight: 600 }}>
-            👤 {clienteAsignado.nombre} <span style={{ fontWeight: 400, color: '#64748b' }}>({clienteAsignado.codigo})</span>
+          <div style={{ marginBottom: 8, fontSize: 13, color: '#102622', fontWeight: 600 }}>
+            👤 {clienteAsignado.nombre} <span style={{ fontWeight: 400, color: '#7E9389' }}>({clienteAsignado.codigo})</span>
           </div>
         )}
 
@@ -1215,10 +1215,10 @@ function UnidadCard({
         <div style={{ marginBottom: 14, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{
             padding: '4px 12px', borderRadius: 20,
-            background: nContadores > 0 ? '#eff6ff' : '#f8fafc',
-            color: nContadores > 0 ? '#1d4ed8' : '#94a3b8',
+            background: nContadores > 0 ? '#EEF2EC' : '#FAF7EF',
+            color: nContadores > 0 ? '#102622' : '#7E9389',
             fontSize: 12, fontWeight: 600,
-            border: `1px solid ${nContadores > 0 ? '#bfdbfe' : '#e2e8f0'}`,
+            border: `1px solid ${nContadores > 0 ? '#C2D2CA' : '#E1DDD0'}`,
           }}>
             🔧 {nContadores} contador{nContadores !== 1 ? 'es' : ''} asignado{nContadores !== 1 ? 's' : ''}
           </span>
@@ -1241,7 +1241,7 @@ function UnidadCard({
             <button
               onClick={onEdit}
               style={{
-                flex: 1, padding: '7px 0', background: '#eff6ff', color: '#1d4ed8',
+                flex: 1, padding: '7px 0', background: '#EEF2EC', color: '#102622',
                 border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12,
               }}
             >
@@ -1277,9 +1277,9 @@ function UnidadCard({
 function pageBtnStyle(disabled: boolean): CSSProperties {
   return {
     padding: '6px 14px', borderRadius: 8,
-    border: '1px solid #e2e8f0',
-    background: disabled ? '#f1f5f9' : 'white',
-    color: disabled ? '#cbd5e1' : '#475569',
+    border: '1px solid #E1DDD0',
+    background: disabled ? '#EAE6D8' : 'white',
+    color: disabled ? '#C7C2B0' : '#3E5A4C',
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontWeight: 600, fontSize: 12,
   }

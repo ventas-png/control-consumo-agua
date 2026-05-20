@@ -28,12 +28,12 @@ function fmt(n: number, moneda: string) { return `${moneda} ${n.toLocaleString('
 
 function pct(a: number, b: number): string { return b === 0 ? '—' : `${Math.round(a / b * 100)}%` }
 
-function KpiBox({ label, value, sub, color = '#0f172a', bg = 'white', border = '#e2e8f0' }: { label: string; value: string; sub?: string; color?: string; bg?: string; border?: string }) {
+function KpiBox({ label, value, sub, color = '#15291F', bg = 'white', border = '#E1DDD0' }: { label: string; value: string; sub?: string; color?: string; bg?: string; border?: string }) {
   return (
     <div style={{ background: bg, border: `1.5px solid ${border}`, borderRadius: '10px', padding: '13px 15px' }}>
       <div style={{ fontSize: '20px', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginTop: '3px' }}>{label}</div>
-      {sub && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>{sub}</div>}
+      <div style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', marginTop: '3px' }}>{label}</div>
+      {sub && <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>{sub}</div>}
     </div>
   )
 }
@@ -41,9 +41,9 @@ function KpiBox({ label, value, sub, color = '#0f172a', bg = 'white', border = '
 function Section({ title, icon, children }: { title: string; icon: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: '28px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', paddingBottom: '8px', borderBottom: '2px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', paddingBottom: '8px', borderBottom: '2px solid #E1DDD0' }}>
         <span style={{ fontSize: '18px' }}>{icon}</span>
-        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>{title}</h3>
+        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#15291F' }}>{title}</h3>
       </div>
       {children}
     </div>
@@ -123,20 +123,20 @@ export function ReporteConsolidadoTab({
       {/* Controls */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px', flexWrap: 'wrap', gap: '12px' }} className="no-print">
         <div>
-          <h2 style={{ margin: '0 0 3px', fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>Reporte Ejecutivo Consolidado</h2>
-          <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Vista integrada de todos los módulos del condominio</p>
+          <h2 style={{ margin: '0 0 3px', fontSize: '17px', fontWeight: 800, color: '#15291F' }}>Reporte Ejecutivo Consolidado</h2>
+          <p style={{ margin: 0, fontSize: '13px', color: '#7E9389' }}>Vista integrada de todos los módulos del condominio</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <select value={mes} onChange={e => setMes(parseInt(e.target.value))}
-            style={{ padding: '7px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: '#f8fafc', fontWeight: 600 }}>
+            style={{ padding: '7px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: '#FAF7EF', fontWeight: 600 }}>
             {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
           </select>
           <select value={anio} onChange={e => setAnio(parseInt(e.target.value))}
-            style={{ padding: '7px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: '#f8fafc', fontWeight: 600 }}>
+            style={{ padding: '7px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: '#FAF7EF', fontWeight: 600 }}>
             {aniosDisp.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <button onClick={imprimir}
-            style={{ padding: '7px 16px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+            style={{ padding: '7px 16px', background: '#15291F', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
             🖨️ Imprimir / PDF
           </button>
         </div>
@@ -145,7 +145,7 @@ export function ReporteConsolidadoTab({
       {/* Reporte */}
       <div id="reporte-ejecutivo">
         {/* Encabezado imprimible */}
-        <div style={{ background: 'linear-gradient(135deg,#1e40af,#1d4ed8)', borderRadius: '16px', padding: '22px 26px', marginBottom: '26px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ background: 'linear-gradient(135deg,#0E2A24,#102622)', borderRadius: '16px', padding: '22px 26px', marginBottom: '26px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <div style={{ fontSize: '13px', opacity: 0.75, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Informe Ejecutivo Mensual</div>
             <div style={{ fontSize: '24px', fontWeight: 900, marginTop: '4px' }}>{proyectoNombre ?? 'Condominio'}</div>
@@ -174,18 +174,18 @@ export function ReporteConsolidadoTab({
             <KpiBox label="Cobrado período"      value={fmt(cobrado, moneda)}    color='#16a34a' bg='#f0fdf4' border='#86efac' />
             <KpiBox label="Pendiente período"    value={fmt(pendiente, moneda)}  color={pendiente > 0 ? '#dc2626' : '#16a34a'} />
             <KpiBox label="Cuotas morosas"       value={String(morosos)}          color={morosos > 0 ? '#dc2626' : '#16a34a'} />
-            <KpiBox label="Total gastos"         value={fmt(totalGastos, moneda)} color='#7c3aed' />
+            <KpiBox label="Total gastos"         value={fmt(totalGastos, moneda)} color='#9C5733' />
             <KpiBox label="Ppto. mensual est."   value={presupuestoPeriodo > 0 ? fmt(presupuestoPeriodo, moneda) : '—'} sub='Pro-rata anual' />
             <KpiBox label="% Cobrado vs ppto."   value={presupuestoPeriodo > 0 ? pct(cobrado, presupuestoPeriodo) : '—'} color={cobrado >= presupuestoPeriodo ? '#16a34a' : '#dc2626'} />
           </div>
           {Object.keys(gastosXCat).length > 0 && (
-            <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '12px 14px' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '8px' }}>Gastos por categoría</div>
+            <div style={{ background: '#FAF7EF', borderRadius: '10px', padding: '12px 14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#3E5A4C', marginBottom: '8px' }}>Gastos por categoría</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
                 {Object.entries(gastosXCat).sort((a,b) => b[1]-a[1]).map(([cat, monto]) => (
-                  <div key={cat} style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '5px 10px', fontSize: '12px' }}>
-                    <span style={{ color: '#64748b' }}>{cat.replace(/_/g, ' ')}: </span>
-                    <span style={{ fontWeight: 700, color: '#0f172a' }}>{fmt(monto, moneda)}</span>
+                  <div key={cat} style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '8px', padding: '5px 10px', fontSize: '12px' }}>
+                    <span style={{ color: '#7E9389' }}>{cat.replace(/_/g, ' ')}: </span>
+                    <span style={{ fontWeight: 700, color: '#15291F' }}>{fmt(monto, moneda)}</span>
                   </div>
                 ))}
               </div>
@@ -230,12 +230,12 @@ export function ReporteConsolidadoTab({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px,1fr))', gap: '10px' }}>
             <KpiBox label="Anuncios publicados"  value={String(anunciosPeriodo.length)} />
             <KpiBox label="Reservas realizadas"  value={String(reservasPeriodo.length)} sub={`${reservasCanceladas} canceladas`} />
-            <KpiBox label="Uso de amenidades"    value={reservasPeriodo.length > 0 ? `${reservasPeriodo.length}` : '—'} color='#7c3aed' />
+            <KpiBox label="Uso de amenidades"    value={reservasPeriodo.length > 0 ? `${reservasPeriodo.length}` : '—'} color='#9C5733' />
           </div>
         </Section>
 
         {/* Footer */}
-        <div style={{ borderTop: '1.5px solid #e2e8f0', paddingTop: '14px', marginTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#94a3b8', flexWrap: 'wrap', gap: '6px' }}>
+        <div style={{ borderTop: '1.5px solid #E1DDD0', paddingTop: '14px', marginTop: '10px', display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#7E9389', flexWrap: 'wrap', gap: '6px' }}>
           <span>Reporte: {periodo.label} — {proyectoNombre ?? 'Condominio'}</span>
           <span>Generado automáticamente · {new Date().toLocaleString('es')}</span>
         </div>

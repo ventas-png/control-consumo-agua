@@ -22,7 +22,7 @@ const TRIGGER_CFG: Record<TriggerTipoAuto, { label: string; desc: (v: number) =>
 }
 
 const ACCION_CFG: Record<AccionTipoAuto, { label: string; icon: string; color: string }> = {
-  notificacion_interna: { label: 'Notificación interna', icon: '🔔', color: '#2563eb' },
+  notificacion_interna: { label: 'Notificación interna', icon: '🔔', color: '#1B3B36' },
   crear_alerta:         { label: 'Crear alerta',         icon: '🚨', color: '#d97706' },
   marcar_moroso:        { label: 'Marcar como moroso',   icon: '⚠️', color: '#ef4444' },
 }
@@ -119,7 +119,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
         <p><strong>Disparador:</strong> ${TRIGGER_CFG[a.trigger_tipo].desc(a.trigger_valor)}</p>
         <p><strong>Acción:</strong> ${accion.icon} ${accion.label}</p>
         <p style="font-size:20px;font-weight:700;color:${afectados > 0 ? '#ef4444' : '#16a34a'};margin:12px 0">${afectados} elemento${afectados !== 1 ? 's' : ''} afectado${afectados !== 1 ? 's' : ''}</p>
-        ${afectados > 0 ? `<p style="color:#6b7280;font-size:12px">Esta acción genera notificaciones internas — revisa el Centro de Notificaciones.</p>` : `<p style="color:#16a34a;font-size:12px">✓ No hay elementos que cumplan el criterio actualmente.</p>`}
+        ${afectados > 0 ? `<p style="color:#7E9389;font-size:12px">Esta acción genera notificaciones internas — revisa el Centro de Notificaciones.</p>` : `<p style="color:#16a34a;font-size:12px">✓ No hay elementos que cumplan el criterio actualmente.</p>`}
       </div>`,
       icon: afectados > 0 ? 'warning' : 'success',
       confirmButtonText: 'Entendido',
@@ -135,8 +135,8 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   const activas = automatizaciones.filter(a => a.activa).length
 
@@ -144,9 +144,9 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
     <div style={{ padding: 16 }}>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
-        <div style={{ background: '#eff6ff', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#2563eb' }}>{automatizaciones.length}</div>
-          <div style={{ fontSize: 11, color: '#2563eb', fontWeight: 600 }}>Reglas configuradas</div>
+        <div style={{ background: '#EEF2EC', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#1B3B36' }}>{automatizaciones.length}</div>
+          <div style={{ fontSize: 11, color: '#1B3B36', fontWeight: 600 }}>Reglas configuradas</div>
         </div>
         <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 16px' }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>{activas}</div>
@@ -162,7 +162,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nueva automatización'}
           </button>
         )}
@@ -170,7 +170,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Configurar nueva automatización</div>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 1' }}>
@@ -198,11 +198,11 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
               <input style={inp} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} placeholder="Descripción opcional" />
             </div>
           </div>
-          <div style={{ padding: '8px 12px', background: '#dbeafe', borderRadius: 8, fontSize: 11, color: '#1d4ed8', marginBottom: 12 }}>
+          <div style={{ padding: '8px 12px', background: '#D9E2DC', borderRadius: 8, fontSize: 11, color: '#102622', marginBottom: 12 }}>
             Vista previa: <strong>{TRIGGER_CFG[form.trigger_tipo].desc(form.trigger_valor)}</strong> → {ACCION_CFG[form.accion_tipo].icon} {ACCION_CFG[form.accion_tipo].label}
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: '#1B3B36', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear regla'}
           </button>
         </div>
@@ -210,7 +210,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
 
       {/* Lista */}
       {automatizaciones.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '48px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: '#7E9389', padding: '48px 0', fontSize: 13 }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>⚙️</div>
           Sin automatizaciones configuradas
         </div>
@@ -221,20 +221,20 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
             const ac = ACCION_CFG[a.accion_tipo]
             const afectados = evaluar(a)
             return (
-              <div key={a.id} style={{ background: '#fff', border: `1px solid ${a.activa ? '#e5e7eb' : '#f3f4f6'}`, borderRadius: 10, padding: '12px 16px', opacity: a.activa ? 1 : 0.7 }}>
+              <div key={a.id} style={{ background: '#fff', border: `1px solid ${a.activa ? '#E1DDD0' : '#EAE6D8'}`, borderRadius: 10, padding: '12px 16px', opacity: a.activa ? 1 : 0.7 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 20 }}>{tc.icon}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: 13 }}>{a.nombre}</span>
-                      {!a.activa && <span style={{ fontSize: 10, background: '#f3f4f6', color: '#9ca3af', padding: '1px 6px', borderRadius: 10 }}>Inactiva</span>}
+                      {!a.activa && <span style={{ fontSize: 10, background: '#EAE6D8', color: '#7E9389', padding: '1px 6px', borderRadius: 10 }}>Inactiva</span>}
                       {afectados > 0 && a.activa && (
                         <span style={{ fontSize: 10, background: '#fef2f2', color: '#ef4444', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>
                           {afectados} elemento{afectados !== 1 ? 's' : ''}
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>
                       {tc.desc(a.trigger_valor)} → {ac.icon} {ac.label}
                       {a.ultima_ejecucion && ` · Última eval.: ${a.ultima_ejecucion.slice(0, 10)}`}
                     </div>
@@ -242,11 +242,11 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
                   {canEdit && (
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button onClick={() => ejecutarAhora(a)}
-                        style={{ padding: '5px 10px', background: '#eff6ff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#2563eb', fontWeight: 600 }}>
+                        style={{ padding: '5px 10px', background: '#EEF2EC', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#1B3B36', fontWeight: 600 }}>
                         ▶ Evaluar
                       </button>
                       <button onClick={() => toggleActiva(a.id, a.activa)}
-                        style={{ padding: '5px 10px', background: '#f3f4f6', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#6b7280' }}>
+                        style={{ padding: '5px 10px', background: '#EAE6D8', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#7E9389' }}>
                         {a.activa ? 'Pausar' : 'Activar'}
                       </button>
                       <button onClick={() => eliminar(a.id)}
@@ -259,7 +259,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
           })}
         </div>
       )}
-      <div style={{ marginTop: 16, padding: '10px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 11, color: '#6b7280' }}>
+      <div style={{ marginTop: 16, padding: '10px 14px', background: '#FAF7EF', borderRadius: 8, fontSize: 11, color: '#7E9389' }}>
         💡 Las automatizaciones evalúan los datos actuales del proyecto. La ejecución automática programada (cron) estará disponible en la próxima versión con integración de mensajería.
       </div>
       <div style={{ display: 'none' }}>{hoy}</div>

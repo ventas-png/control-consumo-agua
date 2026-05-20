@@ -78,12 +78,12 @@ export class ErrorBoundary extends Component<Props, State> {
           gap: '12px',
         }}>
           <div style={{ fontSize: '48px' }}>{isChunk ? '🔄' : '⚠️'}</div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#1e293b' }}>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#15291F' }}>
             {isChunk
               ? (alreadyReloaded ? 'No se pudo cargar esta sección' : 'Actualizando a la nueva versión…')
               : 'Ocurrió un error en esta sección'}
           </h2>
-          <p style={{ margin: 0, color: '#64748b', maxWidth: '420px', fontSize: '14px' }}>
+          <p style={{ margin: 0, color: '#7E9389', maxWidth: '420px', fontSize: '14px' }}>
             {isChunk
               ? (alreadyReloaded
                   ? 'Recarga la página manualmente. Si el problema persiste, limpia la caché del navegador.'
@@ -97,8 +97,8 @@ export class ErrorBoundary extends Component<Props, State> {
                 style={{
                   padding: '8px 20px',
                   borderRadius: '8px',
-                  border: '1px solid #0ea5e9',
-                  background: '#0ea5e9',
+                  border: '1px solid #1B3B36',
+                  background: '#1B3B36',
                   color: '#fff',
                   cursor: 'pointer',
                   fontSize: '14px',
@@ -113,9 +113,9 @@ export class ErrorBoundary extends Component<Props, State> {
               style={{
                 padding: '8px 20px',
                 borderRadius: '8px',
-                border: '1px solid #e2e8f0',
+                border: '1px solid #E1DDD0',
                 background: '#fff',
-                color: '#475569',
+                color: '#3E5A4C',
                 cursor: 'pointer',
                 fontSize: '14px',
                 fontWeight: 500,

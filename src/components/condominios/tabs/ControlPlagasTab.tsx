@@ -24,7 +24,7 @@ const RESULTADOS: { value: ResultadoControlPlagas; label: string; color: string 
   { value: 'satisfactorio',        label: 'Satisfactorio',        color: '#10b981' },
   { value: 'con_observaciones',    label: 'Con observaciones',    color: '#f59e0b' },
   { value: 'requiere_seguimiento', label: 'Requiere seguimiento', color: '#ef4444' },
-  { value: 'no_realizado',         label: 'No realizado',         color: '#6b7280' },
+  { value: 'no_realizado',         label: 'No realizado',         color: '#7E9389' },
 ]
 
 const AREAS_COMUNES = ['Lobby', 'Piscina', 'Gimnasio', 'Parqueo', 'Jardines', 'Azotea', 'Cuarto de basura', 'Cuarto de máquinas', 'Pasillos', 'Escaleras', 'Sótano']
@@ -88,17 +88,17 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: 0 }}>
-      <div style={{ width: 300, borderRight: '1px solid #e5e7eb', overflowY: 'auto', flexShrink: 0 }}>
-        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ width: 300, borderRight: '1px solid #E1DDD0', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontWeight: 600, fontSize: 14 }}>Registros ({registros.length})</span>
           {canCreate && (
             <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-              style={{ padding: '5px 10px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+              style={{ padding: '5px 10px', background: '#B96A3F', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
               + Nuevo
             </button>
           )}
@@ -110,7 +110,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
           </div>
         )}
 
-        {registros.length === 0 && <div style={{ textAlign: 'center', color: '#9ca3af', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
+        {registros.length === 0 && <div style={{ textAlign: 'center', color: '#7E9389', padding: '32px 16px', fontSize: 13 }}>Sin registros</div>}
 
         {registros.map(r => {
           const tipo = TIPOS.find(t => t.value === r.tipo)
@@ -118,16 +118,16 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
           const diasProx = diasParaProxima(r.proxima_visita)
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', background: selected?.id === r.id ? '#eef2ff' : '#fff' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid #EAE6D8', cursor: 'pointer', background: selected?.id === r.id ? '#F4EBE3' : '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
                 <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: res?.color + '20', color: res?.color }}>{res?.label}</span>
               </div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: '#7E9389', marginTop: 2 }}>
                 {r.fecha}
                 {r.empresa && <span> · {r.empresa}</span>}
               </div>
-              <div style={{ fontSize: 11, color: '#9ca3af' }}>{r.areas.slice(0, 3).join(', ')}{r.areas.length > 3 ? ` +${r.areas.length - 3}` : ''}</div>
+              <div style={{ fontSize: 11, color: '#7E9389' }}>{r.areas.slice(0, 3).join(', ')}{r.areas.length > 3 ? ` +${r.areas.length - 3}` : ''}</div>
               {diasProx !== null && diasProx <= 30 && (
                 <div style={{ fontSize: 11, color: diasProx <= 7 ? '#ef4444' : '#f59e0b', marginTop: 2 }}>
                   ⏰ Próx. visita en {diasProx} días
@@ -195,17 +195,17 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                 {AREAS_COMUNES.map(a => (
                   <button key={a} type="button" onClick={() => toggleArea(a)}
-                    style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: areasSeleccionadas.includes(a) ? '#6366f1' : '#fff', color: areasSeleccionadas.includes(a) ? '#fff' : '#374151', borderColor: areasSeleccionadas.includes(a) ? '#6366f1' : '#d1d5db' }}>
+                    style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: areasSeleccionadas.includes(a) ? '#B96A3F' : '#fff', color: areasSeleccionadas.includes(a) ? '#fff' : '#3E5A4C', borderColor: areasSeleccionadas.includes(a) ? '#B96A3F' : '#C7C2B0' }}>
                     {a}
                   </button>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input style={{ ...inp, flex: 1 }} placeholder="Otra área…" value={areaCustom} onChange={e => setAreaCustom(e.target.value)} onKeyDown={e => e.key === 'Enter' && addAreaCustom()} />
-                <button onClick={addAreaCustom} style={{ padding: '7px 12px', background: '#f3f4f6', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>+ Agregar</button>
+                <button onClick={addAreaCustom} style={{ padding: '7px 12px', background: '#EAE6D8', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>+ Agregar</button>
               </div>
               {areasSeleccionadas.length > 0 && (
-                <div style={{ marginTop: 6, fontSize: 12, color: '#6366f1' }}>
+                <div style={{ marginTop: 6, fontSize: 12, color: '#B96A3F' }}>
                   Seleccionadas: {areasSeleccionadas.join(', ')}
                 </div>
               )}
@@ -221,7 +221,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
                 {saving ? 'Guardando…' : '✅ Guardar'}
               </button>
               <button onClick={() => { setMostrarForm(false); setAreasSeleccionadas([]) }}
-                style={{ padding: '8px 16px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 Cancelar
               </button>
             </div>
@@ -237,8 +237,8 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
               <div style={{ fontWeight: 700, fontSize: 20, marginBottom: 4 }}>{tipo?.icon} {tipo?.label}</div>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
                 <span style={{ padding: '4px 12px', borderRadius: 10, background: res?.color + '20', color: res?.color, fontWeight: 600, fontSize: 13 }}>{res?.label}</span>
-                <span style={{ fontSize: 13, color: '#6b7280' }}>{selected.fecha}</span>
-                {selected.hora_inicio && <span style={{ fontSize: 13, color: '#6b7280' }}>{selected.hora_inicio} – {selected.hora_fin || '?'}</span>}
+                <span style={{ fontSize: 13, color: '#7E9389' }}>{selected.fecha}</span>
+                {selected.hora_inicio && <span style={{ fontSize: 13, color: '#7E9389' }}>{selected.hora_inicio} – {selected.hora_fin || '?'}</span>}
               </div>
 
               {diasProx !== null && diasProx <= 30 && (
@@ -255,8 +255,8 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
                   { label: `Costo (${moneda})`, value: selected.costo?.toLocaleString() ?? '—' },
                   { label: 'Próxima visita', value: selected.proxima_visita || '—' },
                 ].map(d => (
-                  <div key={d.label} style={{ background: '#f9fafb', borderRadius: 6, padding: '7px 12px' }}>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>{d.label}</div>
+                  <div key={d.label} style={{ background: '#FAF7EF', borderRadius: 6, padding: '7px 12px' }}>
+                    <div style={{ fontSize: 11, color: '#7E9389' }}>{d.label}</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{d.value}</div>
                   </div>
                 ))}
@@ -265,13 +265,13 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
               <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Áreas tratadas</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
                 {selected.areas.map(a => (
-                  <span key={a} style={{ padding: '4px 10px', background: '#eef2ff', color: '#6366f1', borderRadius: 8, fontSize: 12 }}>{a}</span>
+                  <span key={a} style={{ padding: '4px 10px', background: '#F4EBE3', color: '#B96A3F', borderRadius: 8, fontSize: 12 }}>{a}</span>
                 ))}
               </div>
 
               {selected.observaciones && (
-                <div style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: '#6b7280', marginBottom: 3 }}>Observaciones</div>
+                <div style={{ background: '#FAF7EF', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#7E9389', marginBottom: 3 }}>Observaciones</div>
                   {selected.observaciones}
                 </div>
               )}
@@ -280,7 +280,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
         })()}
 
         {!mostrarForm && !selected && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9ca3af', fontSize: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#7E9389', fontSize: 14 }}>
             Selecciona un registro o crea uno nuevo
           </div>
         )}

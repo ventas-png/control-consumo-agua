@@ -15,7 +15,7 @@ interface Props {
 
 const ESTADO_CONFIG: Record<EstadoLocal, { label: string; color: string; bg: string }> = {
   disponible:       { label: 'Disponible',      color: '#10b981', bg: '#d1fae5' },
-  ocupado:          { label: 'Ocupado',          color: '#0ea5e9', bg: '#e0f2fe' },
+  ocupado:          { label: 'Ocupado',          color: '#1B3B36', bg: '#D9E2DC' },
   en_remodelacion:  { label: 'Remodelación',     color: '#f59e0b', bg: '#fef3c7' },
 }
 
@@ -89,8 +89,8 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -98,28 +98,28 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Total locales',   value: String(locales.length),  icon: '🏪', color: '#0ea5e9' },
-          { label: 'Ocupados',        value: String(ocupados),        icon: '🔑', color: '#8b5cf6' },
+          { label: 'Total locales',   value: String(locales.length),  icon: '🏪', color: '#1B3B36' },
+          { label: 'Ocupados',        value: String(ocupados),        icon: '🔑', color: '#B96A3F' },
           { label: 'Disponibles',     value: String(locales.filter(l => l.estado === 'disponible').length), icon: '✅', color: '#10b981' },
           { label: 'Renta + CAM/mes', value: rentaTotal > 0 ? `${moneda} ${rentaTotal.toFixed(0)}` : '—', icon: '💰', color: '#f59e0b' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+          <div key={k.label} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>{k.label}</div>
+            <div style={{ fontSize: '11px', color: '#7E9389', fontWeight: 500 }}>{k.label}</div>
           </div>
         ))}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Locales Comerciales</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Locales Comerciales</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Agregar Local</button>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Agregar Local</button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Local' : 'Nuevo Local Comercial'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
             <div>
@@ -184,8 +184,8 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
           </div>
@@ -197,16 +197,16 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
         {(['todos', 'disponible', 'ocupado', 'en_remodelacion'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: filtroEstado === e ? '#0ea5e9' : '#e2e8f0',
-              background: filtroEstado === e ? '#e0f2fe' : 'white',
-              color: filtroEstado === e ? '#0ea5e9' : '#64748b' }}>
+              borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0',
+              background: filtroEstado === e ? '#D9E2DC' : 'white',
+              color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
             {e === 'todos' ? `Todos (${locales.length})` : `${ESTADO_CONFIG[e as EstadoLocal]?.label} (${locales.filter(l => l.estado === e).length})`}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏪</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay locales registrados</p>
         </div>
@@ -216,33 +216,33 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
             const est = ESTADO_CONFIG[l.estado]
             const vence = l.fecha_fin ? new Date(l.fecha_fin) < new Date() : false
             return (
-              <div key={l.id} style={{ background: 'white', border: `1.5px solid ${vence && l.estado === 'ocupado' ? '#fcd34d' : '#e2e8f0'}`, borderRadius: '10px', padding: '16px' }}>
+              <div key={l.id} style={{ background: 'white', border: `1.5px solid ${vence && l.estado === 'ocupado' ? '#fcd34d' : '#E1DDD0'}`, borderRadius: '10px', padding: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: '17px', color: '#0f172a' }}>{GIRO_ICON[l.giro]} {l.numero_local}</div>
-                    {l.piso && <div style={{ fontSize: '11px', color: '#94a3b8' }}>{l.piso}</div>}
+                    <div style={{ fontWeight: 800, fontSize: '17px', color: '#15291F' }}>{GIRO_ICON[l.giro]} {l.numero_local}</div>
+                    {l.piso && <div style={{ fontSize: '11px', color: '#7E9389' }}>{l.piso}</div>}
                   </div>
                   <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: '#7E9389', marginBottom: '10px' }}>
                   {l.area_m2 && <div>📐 {l.area_m2} m²</div>}
                   {l.inquilino_nombre && <div>👤 {l.inquilino_nombre}</div>}
                   {l.inquilino_telefono && <div>📞 {l.inquilino_telefono}</div>}
                   {(l.renta_base || l.cuota_cam) && (
-                    <div style={{ fontWeight: 600, color: '#0f172a' }}>
+                    <div style={{ fontWeight: 600, color: '#15291F' }}>
                       💰 Renta: {moneda} {(l.renta_base ?? 0).toFixed(0)}
                       {l.cuota_cam ? ` + CAM: ${moneda} ${l.cuota_cam.toFixed(0)}` : ''}
                     </div>
                   )}
                   {l.fecha_fin && (
-                    <div style={{ color: vence ? '#ef4444' : '#64748b' }}>
+                    <div style={{ color: vence ? '#ef4444' : '#7E9389' }}>
                       📅 Vence: {l.fecha_fin}{vence ? ' ⚠️ Vencido' : ''}
                     </div>
                   )}
                 </div>
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={() => startEdit(l)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                    <button onClick={() => startEdit(l)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
                     <button onClick={() => handleDelete(l.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                   </div>
                 )}

@@ -16,16 +16,16 @@ interface Props {
 }
 
 const ESTADO_CONFIG: Record<EstadoAsamblea, { label: string; bg: string; color: string }> = {
-  programada: { label: 'Programada', bg: '#eff6ff', color: '#2563eb' },
+  programada: { label: 'Programada', bg: '#EEF2EC', color: '#1B3B36' },
   en_curso:   { label: 'En curso',   bg: '#f0fdf4', color: '#16a34a' },
-  finalizada: { label: 'Finalizada', bg: '#f8fafc', color: '#64748b' },
+  finalizada: { label: 'Finalizada', bg: '#FAF7EF', color: '#7E9389' },
   cancelada:  { label: 'Cancelada',  bg: '#fef2f2', color: '#dc2626' },
 }
 
 const VOTO_CONFIG: Record<TipoVoto, { label: string; bg: string; color: string }> = {
   a_favor:    { label: 'A favor',    bg: '#f0fdf4', color: '#16a34a' },
   en_contra:  { label: 'En contra',  bg: '#fef2f2', color: '#dc2626' },
-  abstencion: { label: 'Abstención', bg: '#f8fafc', color: '#64748b' },
+  abstencion: { label: 'Abstención', bg: '#FAF7EF', color: '#7E9389' },
 }
 
 export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
@@ -131,13 +131,13 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
     <div style={{ padding: '24px', maxWidth: '1200px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Asambleas y Votaciones</h2>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '13.5px' }}>
-            {asambleas.length} asambleas · <span style={{ color: '#2563eb', fontWeight: 600 }}>{proximas} programadas</span>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#15291F' }}>Asambleas y Votaciones</h2>
+          <p style={{ margin: '4px 0 0', color: '#7E9389', fontSize: '13.5px' }}>
+            {asambleas.length} asambleas · <span style={{ color: '#1B3B36', fontWeight: 600 }}>{proximas} programadas</span>
           </p>
         </div>
         {canCreate && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
             + Convocar asamblea
           </button>
         )}
@@ -147,7 +147,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         {(['todos', 'programada', 'en_curso', 'finalizada', 'cancelada'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
-            style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#0ea5e9' : '#e2e8f0', background: filtroEstado === e ? '#eff6ff' : 'white', color: filtroEstado === e ? '#0ea5e9' : '#64748b' }}>
+            style={{ padding: '7px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#1B3B36' : '#E1DDD0', background: filtroEstado === e ? '#EEF2EC' : 'white', color: filtroEstado === e ? '#1B3B36' : '#7E9389' }}>
             {e === 'todos' ? 'Todas' : ESTADO_CONFIG[e as EstadoAsamblea].label}
           </button>
         ))}
@@ -155,53 +155,53 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
 
       {/* Form nueva asamblea */}
       {showForm && (
-        <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: 'white', border: '1px solid #E1DDD0', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Convocar asamblea</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Título *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Título *</label>
               <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej. Asamblea Ordinaria Abril 2026"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Tipo</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Tipo</label>
               <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoAsamblea }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }}>
+                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }}>
                 <option value="ordinaria">Ordinaria</option>
                 <option value="extraordinaria">Extraordinaria</option>
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Quórum requerido (%)</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Quórum requerido (%)</label>
               <input type="number" value={form.quorum_requerido} onChange={e => setForm(f => ({ ...f, quorum_requerido: e.target.value }))} min="1" max="100"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Fecha *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Fecha *</label>
               <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Hora inicio *</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora inicio *</label>
               <input type="time" value={form.hora_inicio} onChange={e => setForm(f => ({ ...f, hora_inicio: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Hora fin</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Hora fin</label>
               <input type="time" value={form.hora_fin} onChange={e => setForm(f => ({ ...f, hora_fin: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '4px' }}>Lugar</label>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '4px' }}>Lugar</label>
               <input value={form.lugar} onChange={e => setForm(f => ({ ...f, lugar: e.target.value }))} placeholder="Salón de reuniones, Área BBQ..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', background: '#f8fafc' }} />
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '14px', background: '#FAF7EF' }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#0ea5e9,#0d9488)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={handleGuardar} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#1B3B36,#577B69)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : '📅 Convocar'}
             </button>
-            <button onClick={resetForm} style={{ padding: '10px 20px', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={resetForm} style={{ padding: '10px 20px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
@@ -210,23 +210,23 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
         {/* Lista asambleas */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filtradas.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+            <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>🏛️</div>
-              <p style={{ fontWeight: 600, color: '#64748b' }}>No hay asambleas</p>
+              <p style={{ fontWeight: 600, color: '#7E9389' }}>No hay asambleas</p>
             </div>
           ) : filtradas.map(a => {
             const ec = ESTADO_CONFIG[a.estado]
             const isSelected = a.id === selectedId
             return (
               <div key={a.id} onClick={() => cargarPuntos(a.id)}
-                style={{ background: 'white', border: `1.5px solid ${isSelected ? '#0ea5e9' : '#e2e8f0'}`, borderRadius: '14px', padding: '14px 16px', cursor: 'pointer', transition: 'border-color 0.15s' }}>
+                style={{ background: 'white', border: `1.5px solid ${isSelected ? '#1B3B36' : '#E1DDD0'}`, borderRadius: '14px', padding: '14px 16px', cursor: 'pointer', transition: 'border-color 0.15s' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{a.titulo}</span>
-                      <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: '#f1f5f9', color: '#64748b' }}>{a.tipo}</span>
+                      <span style={{ fontWeight: 700, fontSize: '14px', color: '#15291F' }}>{a.titulo}</span>
+                      <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: '#EAE6D8', color: '#7E9389' }}>{a.tipo}</span>
                     </div>
-                    <div style={{ fontSize: '12.5px', color: '#64748b', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '12.5px', color: '#7E9389', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                       <span>📅 {a.fecha} {a.hora_inicio}</span>
                       {a.lugar && <span>📍 {a.lugar}</span>}
                       <span>Quórum: {a.quorum_requerido}%</span>
@@ -253,38 +253,38 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
 
         {/* Panel de puntos y votación */}
         {selectedId && selectedAsamblea && (
-          <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '16px', padding: '20px' }}>
+          <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '16px', padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>Agenda: {selectedAsamblea.titulo}</h3>
-                <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: '#64748b' }}>{puntos.length} puntos · {unidades.filter(u => u.activo).length} unidades</p>
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#15291F' }}>Agenda: {selectedAsamblea.titulo}</h3>
+                <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: '#7E9389' }}>{puntos.length} puntos · {unidades.filter(u => u.activo).length} unidades</p>
               </div>
-              {canEdit && <button onClick={() => setShowPuntoForm(v => !v)} style={{ padding: '7px 14px', background: '#f1f5f9', border: '1.5px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, color: '#374151' }}>+ Punto</button>}
+              {canEdit && <button onClick={() => setShowPuntoForm(v => !v)} style={{ padding: '7px 14px', background: '#EAE6D8', border: '1.5px solid #E1DDD0', borderRadius: '8px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 600, color: '#3E5A4C' }}>+ Punto</button>}
             </div>
 
             {showPuntoForm && (
-              <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '14px', marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ background: '#FAF7EF', borderRadius: '10px', padding: '14px', marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <input value={puntoForm.titulo} onChange={e => setPuntoForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Título del punto"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13.5px', background: 'white' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13.5px', background: 'white' }} />
                 <input value={puntoForm.descripcion} onChange={e => setPuntoForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Descripción (opcional)"
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13.5px', background: 'white' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13.5px', background: 'white' }} />
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <select value={puntoForm.tipo} onChange={e => setPuntoForm(f => ({ ...f, tipo: e.target.value as TipoPunto }))}
-                    style={{ flex: 1, padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13.5px', background: 'white' }}>
+                    style={{ flex: 1, padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13.5px', background: 'white' }}>
                     <option value="informativo">Informativo</option>
                     <option value="votacion">Votación</option>
                     <option value="debate">Debate</option>
                   </select>
-                  <button onClick={agregarPunto} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>Agregar</button>
-                  <button onClick={() => setShowPuntoForm(false)} style={{ padding: '8px 12px', background: '#f1f5f9', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px' }}>✕</button>
+                  <button onClick={agregarPunto} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>Agregar</button>
+                  <button onClick={() => setShowPuntoForm(false)} style={{ padding: '8px 12px', background: '#EAE6D8', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '13px' }}>✕</button>
                 </div>
               </div>
             )}
 
             {loadingPuntos ? (
-              <p style={{ color: '#94a3b8', fontSize: '13px' }}>Cargando...</p>
+              <p style={{ color: '#7E9389', fontSize: '13px' }}>Cargando...</p>
             ) : puntos.length === 0 ? (
-              <p style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', padding: '20px' }}>No hay puntos en la agenda. Agrega el primero.</p>
+              <p style={{ color: '#7E9389', fontSize: '13px', textAlign: 'center', padding: '20px' }}>No hay puntos en la agenda. Agrega el primero.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '500px', overflowY: 'auto' }}>
                 {puntos.map((p, idx) => {
@@ -294,14 +294,14 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                   const totalVotos = Object.values(conteo).reduce((a, b) => a + b, 0)
 
                   return (
-                    <div key={p.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
-                      <div style={{ background: '#f8fafc', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#0ea5e9', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>{idx + 1}</span>
+                    <div key={p.id} style={{ border: '1px solid #E1DDD0', borderRadius: '10px', overflow: 'hidden' }}>
+                      <div style={{ background: '#FAF7EF', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#1B3B36', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>{idx + 1}</span>
                         <div style={{ flex: 1 }}>
-                          <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#0f172a' }}>{p.titulo}</span>
-                          {p.descripcion && <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '8px' }}>{p.descripcion}</span>}
+                          <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#15291F' }}>{p.titulo}</span>
+                          {p.descripcion && <span style={{ fontSize: '12px', color: '#7E9389', marginLeft: '8px' }}>{p.descripcion}</span>}
                         </div>
-                        <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '20px', background: p.tipo === 'votacion' ? '#eff6ff' : '#f1f5f9', color: p.tipo === 'votacion' ? '#2563eb' : '#64748b', fontWeight: 600 }}>{p.tipo}</span>
+                        <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '20px', background: p.tipo === 'votacion' ? '#EEF2EC' : '#EAE6D8', color: p.tipo === 'votacion' ? '#1B3B36' : '#7E9389', fontWeight: 600 }}>{p.tipo}</span>
                       </div>
 
                       {p.tipo === 'votacion' && (
@@ -314,7 +314,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                                   {VOTO_CONFIG[v].label}: {conteo[v]}
                                 </span>
                               ))}
-                              <span style={{ fontSize: '12px', color: '#94a3b8', alignSelf: 'center' }}>Total: {totalVotos}/{unidades.filter(u => u.activo).length}</span>
+                              <span style={{ fontSize: '12px', color: '#7E9389', alignSelf: 'center' }}>Total: {totalVotos}/{unidades.filter(u => u.activo).length}</span>
                             </div>
                           )}
                           {/* Registro de votos por unidad */}
@@ -322,13 +322,13 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto' }}>
                               {unidades.filter(u => u.activo).map(u => (
                                 <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
-                                  <span style={{ flex: 1, color: '#374151' }}>{u.nombre}</span>
+                                  <span style={{ flex: 1, color: '#3E5A4C' }}>{u.nombre}</span>
                                   {(['a_favor', 'en_contra', 'abstencion'] as TipoVoto[]).map(v => (
                                     <button key={v} onClick={() => registrarVoto(p.id, u.id, v)}
                                       style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: '1px solid',
-                                        borderColor: votosMap[u.id] === v ? VOTO_CONFIG[v].color : '#e2e8f0',
+                                        borderColor: votosMap[u.id] === v ? VOTO_CONFIG[v].color : '#E1DDD0',
                                         background: votosMap[u.id] === v ? VOTO_CONFIG[v].bg : 'white',
-                                        color: votosMap[u.id] === v ? VOTO_CONFIG[v].color : '#94a3b8' }}>
+                                        color: votosMap[u.id] === v ? VOTO_CONFIG[v].color : '#7E9389' }}>
                                       {v === 'a_favor' ? '✓' : v === 'en_contra' ? '✗' : '—'}
                                     </button>
                                   ))}
@@ -346,16 +346,16 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
 
             {/* Acta */}
             {canEdit && selectedAsamblea.estado === 'finalizada' && (
-              <div style={{ marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: '#374151', display: 'block', marginBottom: '6px' }}>📝 Acta de la asamblea</label>
+              <div style={{ marginTop: '16px', borderTop: '1px solid #E1DDD0', paddingTop: '14px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', display: 'block', marginBottom: '6px' }}>📝 Acta de la asamblea</label>
                 <textarea defaultValue={selectedAsamblea.acta ?? ''} onBlur={e => guardarActa(selectedAsamblea.id, e.target.value)} rows={4} placeholder="Redacta el acta de la asamblea..."
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13.5px', background: '#f8fafc', resize: 'vertical' }} />
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13.5px', background: '#FAF7EF', resize: 'vertical' }} />
               </div>
             )}
             {selectedAsamblea.acta && selectedAsamblea.estado !== 'en_curso' && !canEdit && (
-              <div style={{ marginTop: '14px', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
-                <p style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>📝 Acta</p>
-                <p style={{ fontSize: '13.5px', color: '#374151', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{selectedAsamblea.acta}</p>
+              <div style={{ marginTop: '14px', borderTop: '1px solid #E1DDD0', paddingTop: '12px' }}>
+                <p style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C', marginBottom: '6px' }}>📝 Acta</p>
+                <p style={{ fontSize: '13.5px', color: '#3E5A4C', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{selectedAsamblea.acta}</p>
               </div>
             )}
           </div>

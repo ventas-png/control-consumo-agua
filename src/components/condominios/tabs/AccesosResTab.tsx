@@ -15,9 +15,9 @@ interface Props {
 }
 
 const TIPO_STYLE: Record<string, { bg: string; color: string; label: string; icon: string }> = {
-  tarjeta:       { bg: '#e0f2fe', color: '#0369a1', label: 'Tarjeta',       icon: '💳' },
+  tarjeta:       { bg: '#D9E2DC', color: '#102622', label: 'Tarjeta',       icon: '💳' },
   codigo:        { bg: '#fef3c7', color: '#92400e', label: 'Código',         icon: '🔢' },
-  llave_digital: { bg: '#f3e8ff', color: '#7c3aed', label: 'Llave digital',  icon: '📱' },
+  llave_digital: { bg: '#F4EBE3', color: '#9C5733', label: 'Llave digital',  icon: '📱' },
   biometrico:    { bg: '#dcfce7', color: '#16a34a', label: 'Biométrico',     icon: '🔏' },
 }
 
@@ -86,18 +86,18 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
     const dt = new Date(d + 'T12:00:00'); dt.setDate(dt.getDate() + days); return dt.toISOString().slice(0, 10)
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Accesos de Residentes</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>{accesos.filter(a => a.activo).length} activos · {vencidos.length > 0 ? `${vencidos.length} vencidos` : 'sin vencidos'}</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Accesos de Residentes</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>{accesos.filter(a => a.activo).length} activos · {vencidos.length > 0 ? `${vencidos.length} vencidos` : 'sin vencidos'}</p>
         </div>
         {canCreate && !showForm && (
           <button onClick={() => { setEditId(null); setForm({ ...BLANK }); setShowForm(true) }}
-            style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo Acceso
           </button>
         )}
@@ -122,67 +122,67 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
       {/* KPIs by type */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px', marginBottom: '16px' }}>
         {Object.entries(TIPO_STYLE).map(([tipo, s]) => (
-          <div key={tipo} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+          <div key={tipo} style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: '18px' }}>{s.icon}</div>
             <div style={{ fontSize: '18px', fontWeight: 800, color: s.color }}>{accesos.filter(a => a.tipo === tipo && a.activo).length}</div>
-            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{s.label}</div>
+            <div style={{ fontSize: '10px', color: '#7E9389' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar acceso' : 'Nuevo Acceso'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Unidad *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad *</label>
               <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                 <option value="">— Seleccionar —</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Tipo *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Tipo *</label>
               <select style={inputStyle} value={form.tipo} onChange={e => setF('tipo', e.target.value)}>
                 {Object.entries(TIPO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.icon} {s.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Identificador *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Identificador *</label>
               <input style={inputStyle} value={form.identificador} onChange={e => setF('identificador', e.target.value)} placeholder="Nº tarjeta / código…" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Titular *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Titular *</label>
               <input style={inputStyle} value={form.titular} onChange={e => setF('titular', e.target.value)} placeholder="Nombre del titular" />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Fecha emisión</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha emisión</label>
               <input style={inputStyle} type="date" value={form.fecha_emision} onChange={e => setF('fecha_emision', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Fecha vencimiento</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha vencimiento</label>
               <input style={inputStyle} type="date" value={form.fecha_vencimiento} onChange={e => setF('fecha_vencimiento', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Estado</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Estado</label>
               <select style={inputStyle} value={form.activo ? 'true' : 'false'} onChange={e => setF('activo', e.target.value === 'true')}>
                 <option value="true">Activo</option>
                 <option value="false">Inactivo</option>
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Notas</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Notas</label>
               <input style={inputStyle} value={form.notas} onChange={e => setF('notas', e.target.value)} placeholder="Observaciones…" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => { setShowForm(false); setEditId(null) }}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -199,7 +199,7 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
           <option value="todos">Todos los tipos</option>
           {Object.entries(TIPO_STYLE).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
         </select>
-        <label style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+        <label style={{ fontSize: '12px', color: '#7E9389', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
           <input type="checkbox" checked={soloActivos} onChange={e => setSoloActivos(e.target.checked)} />
           Solo activos
         </label>
@@ -207,7 +207,7 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay accesos registrados.</div>
+        <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay accesos registrados.</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '10px' }}>
           {filtered.map(a => {
@@ -216,20 +216,20 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
             const vencido = a.fecha_vencimiento && a.fecha_vencimiento < today
             const proxVencer = a.fecha_vencimiento && !vencido && a.fecha_vencimiento <= addDays(today, 30)
             return (
-              <div key={a.id} style={{ background: 'white', border: `1.5px solid ${vencido ? '#fca5a5' : proxVencer ? '#fde68a' : '#e2e8f0'}`, borderRadius: '10px', padding: '12px', opacity: a.activo ? 1 : 0.6 }}>
+              <div key={a.id} style={{ background: 'white', border: `1.5px solid ${vencido ? '#fca5a5' : proxVencer ? '#fde68a' : '#E1DDD0'}`, borderRadius: '10px', padding: '12px', opacity: a.activo ? 1 : 0.6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
                       <span style={{ fontSize: '16px' }}>{ts.icon}</span>
-                      <span style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>{a.identificador}</span>
+                      <span style={{ fontWeight: 700, fontSize: '13px', color: '#15291F' }}>{a.identificador}</span>
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '20px', background: ts.bg, color: ts.color }}>{ts.label}</span>
-                      {!a.activo && <span style={{ fontSize: '10px', padding: '2px 5px', background: '#f1f5f9', color: '#94a3b8', borderRadius: '20px' }}>Inactivo</span>}
+                      {!a.activo && <span style={{ fontSize: '10px', padding: '2px 5px', background: '#EAE6D8', color: '#7E9389', borderRadius: '20px' }}>Inactivo</span>}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#374151', fontWeight: 600 }}>{a.titular}</div>
-                    {unidad && <div style={{ fontSize: '11px', color: '#0ea5e9' }}>🏠 {unidad.nombre}</div>}
-                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>Emitido: {a.fecha_emision}</div>
+                    <div style={{ fontSize: '12px', color: '#3E5A4C', fontWeight: 600 }}>{a.titular}</div>
+                    {unidad && <div style={{ fontSize: '11px', color: '#1B3B36' }}>🏠 {unidad.nombre}</div>}
+                    <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>Emitido: {a.fecha_emision}</div>
                     {a.fecha_vencimiento && (
-                      <div style={{ fontSize: '11px', color: vencido ? '#ef4444' : proxVencer ? '#f59e0b' : '#94a3b8', fontWeight: (vencido || proxVencer) ? 700 : 400 }}>
+                      <div style={{ fontSize: '11px', color: vencido ? '#ef4444' : proxVencer ? '#f59e0b' : '#7E9389', fontWeight: (vencido || proxVencer) ? 700 : 400 }}>
                         Vence: {a.fecha_vencimiento}{vencido ? ' ⚠️' : proxVencer ? ' 🕐' : ''}
                       </div>
                     )}
@@ -241,7 +241,7 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
                         {a.activo ? 'Desact.' : 'Activar'}
                       </button>
                       <button onClick={() => startEdit(a)}
-                        style={{ padding: '3px 7px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
+                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(a.id)}
                         style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                     </div>

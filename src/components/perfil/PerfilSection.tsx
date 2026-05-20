@@ -39,9 +39,9 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
       borderRadius: '16px',
       padding: '24px',
       boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-      border: '1px solid #e2e8f0',
+      border: '1px solid #E1DDD0',
     }}>
-      <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', marginBottom: '18px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ fontSize: '15px', fontWeight: 700, color: '#15291F', marginBottom: '18px', paddingBottom: '12px', borderBottom: '1px solid #EAE6D8' }}>
         {title}
       </div>
       {children}
@@ -63,7 +63,7 @@ function InputField({
 }) {
   return (
     <div style={{ marginBottom: '14px' }}>
-      <label htmlFor={id} style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
+      <label htmlFor={id} style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#3E5A4C', marginBottom: '6px' }}>
         {label}
       </label>
       <div style={{ position: 'relative' }}>
@@ -77,11 +77,11 @@ function InputField({
           style={{
             width: '100%',
             padding: rightEl ? '10px 44px 10px 12px' : '10px 12px',
-            border: '1.5px solid #e2e8f0',
+            border: '1.5px solid #E1DDD0',
             borderRadius: '8px',
             fontSize: '14px',
-            background: disabled ? '#f8fafc' : 'white',
-            color: disabled ? '#94a3b8' : '#0f172a',
+            background: disabled ? '#FAF7EF' : 'white',
+            color: disabled ? '#7E9389' : '#15291F',
             boxSizing: 'border-box',
             outline: 'none',
           }}
@@ -96,14 +96,14 @@ function InputField({
   )
 }
 
-function SubmitBtn({ loading, label, color = '#0ea5e9' }: { loading: boolean; label: string; color?: string }) {
+function SubmitBtn({ loading, label, color = '#1B3B36' }: { loading: boolean; label: string; color?: string }) {
   return (
     <button
       type="submit"
       disabled={loading}
       style={{
         padding: '10px 22px',
-        background: loading ? '#94a3b8' : `linear-gradient(135deg, ${color}, ${color}cc)`,
+        background: loading ? '#7E9389' : `linear-gradient(135deg, ${color}, ${color}cc)`,
         color: 'white',
         border: 'none',
         borderRadius: '8px',
@@ -209,7 +209,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   }
 
   const eyeBtn = (show: boolean, toggle: () => void) => (
-    <button type="button" onClick={toggle} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 0, fontSize: '16px', lineHeight: 1 }}>
+    <button type="button" onClick={toggle} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', padding: 0, fontSize: '16px', lineHeight: 1 }}>
       {show ? '🙈' : '👁️'}
     </button>
   )
@@ -220,7 +220,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     <div style={{ maxWidth: '640px' }}>
       {/* Header card — Avatar + info */}
       <div style={{
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+        background: 'linear-gradient(135deg, #15291F 0%, #15291F 100%)',
         borderRadius: '16px',
         padding: '28px 24px',
         marginBottom: '20px',
@@ -231,7 +231,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
       }}>
         <div style={{
           width: '64px', height: '64px', borderRadius: '50%',
-          background: 'linear-gradient(135deg, #0ea5e9, #0d9488)',
+          background: 'linear-gradient(135deg, #1B3B36, #577B69)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'white', fontWeight: 800, fontSize: '22px', flexShrink: 0,
         }}>
@@ -239,7 +239,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
         </div>
         <div>
           <div style={{ color: 'white', fontWeight: 700, fontSize: '18px' }}>{currentUser.name}</div>
-          <div style={{ color: '#94a3b8', fontSize: '13px', marginTop: '3px' }}>{currentUser.email}</div>
+          <div style={{ color: '#7E9389', fontSize: '13px', marginTop: '3px' }}>{currentUser.email}</div>
           <span style={{
             display: 'inline-block', marginTop: '8px',
             background: roleColor + '22',
@@ -273,7 +273,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
         {/* Card 2 — Contraseña */}
         {isOAuthUser ? (
           <Card title="Cambiar contraseña">
-            <div style={{ color: '#64748b', fontSize: '14px', padding: '8px 0' }}>
+            <div style={{ color: '#7E9389', fontSize: '14px', padding: '8px 0' }}>
               ℹ️ Tu cuenta está vinculada con Google. El cambio de contraseña se gestiona desde tu cuenta de Google.
             </div>
           </Card>
@@ -307,7 +307,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
                 placeholder="Repite la nueva contraseña"
                 rightEl={eyeBtn(showPw.confirm, () => setShowPw(s => ({ ...s, confirm: !s.confirm })))}
               />
-              <SubmitBtn loading={pwLoading} label="Cambiar contraseña" color="#7c3aed" />
+              <SubmitBtn loading={pwLoading} label="Cambiar contraseña" color="#9C5733" />
               <FeedbackMsg fb={pwFb} />
             </form>
           </Card>
@@ -328,7 +328,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
               onChange={setNewEmail}
               placeholder="nuevo@ejemplo.com"
             />
-            <SubmitBtn loading={emailLoading} label="Solicitar cambio" color="#0d9488" />
+            <SubmitBtn loading={emailLoading} label="Solicitar cambio" color="#577B69" />
             <FeedbackMsg fb={emailFb} />
           </form>
         </Card>

@@ -6,11 +6,11 @@ import type { CompanyPaymentConfig } from '../../types'
 // -- Reusable style objects --------------------------------------------------
 const s = {
   card: {
-    background: '#f8fafc',
+    background: '#FAF7EF',
     borderRadius: '12px',
     padding: '24px',
     marginBottom: '24px',
-    border: '1px solid #e2e8f0',
+    border: '1px solid #E1DDD0',
   },
   cardHeader: {
     display: 'flex',
@@ -21,24 +21,24 @@ const s = {
   title: {
     fontSize: '16px',
     fontWeight: 700,
-    color: '#0f172a',
+    color: '#15291F',
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
   } as CSSProperties,
-  subtitle: { fontSize: '13px', color: '#64748b', marginTop: '4px' },
+  subtitle: { fontSize: '13px', color: '#7E9389', marginTop: '4px' },
   label: {
     display: 'block',
     fontSize: '13px',
     fontWeight: 700,
-    color: '#475569',
+    color: '#3E5A4C',
     marginBottom: '8px',
   } as CSSProperties,
   input: {
     width: '100%',
     padding: '12px',
     borderRadius: '8px',
-    border: '1.5px solid #e2e8f0',
+    border: '1.5px solid #E1DDD0',
     fontSize: '14px',
     fontFamily: 'monospace',
   },
@@ -47,13 +47,13 @@ const s = {
     padding: '12px',
     paddingRight: '40px',
     borderRadius: '8px',
-    border: '1.5px solid #e2e8f0',
+    border: '1.5px solid #E1DDD0',
     fontSize: '14px',
     fontFamily: 'monospace',
   },
-  hint: { fontSize: '11px', color: '#94a3b8', marginTop: '6px' },
+  hint: { fontSize: '11px', color: '#7E9389', marginTop: '6px' },
   warning: { fontSize: '11px', color: '#ef4444', marginTop: '6px', fontWeight: 600 } as CSSProperties,
-  link: { color: '#0ea5e9' },
+  link: { color: '#1B3B36' },
   toggleSecretBtn: {
     position: 'absolute',
     right: '12px',
@@ -63,11 +63,11 @@ const s = {
     border: 'none',
     cursor: 'pointer',
     fontSize: '16px',
-    color: '#64748b',
+    color: '#7E9389',
   } as CSSProperties,
   editBtn: {
     fontSize: '13px',
-    color: '#0ea5e9',
+    color: '#1B3B36',
     background: 'none',
     border: 'none',
     cursor: 'pointer',
@@ -95,8 +95,8 @@ function toggleBtn(active: boolean, saving: boolean) {
     padding: '10px 16px',
     borderRadius: '8px',
     border: 'none',
-    background: active ? '#10b981' : '#e2e8f0',
-    color: active ? 'white' : '#64748b',
+    background: active ? '#10b981' : '#E1DDD0',
+    color: active ? 'white' : '#7E9389',
     fontWeight: 700,
     fontSize: '13px',
     cursor: saving ? 'not-allowed' : 'pointer',
@@ -110,7 +110,7 @@ function primaryBtn(disabled: boolean) {
     padding: '12px',
     borderRadius: '8px',
     border: 'none',
-    background: disabled ? '#cbd5e1' : 'linear-gradient(135deg,#0ea5e9,#0284c7)',
+    background: disabled ? '#C7C2B0' : 'linear-gradient(135deg,#1B3B36,#102622)',
     color: 'white',
     fontWeight: 700,
     fontSize: '14px',
@@ -354,7 +354,7 @@ export function StripePayPalConfig({ companyId, onConfigUpdated }: Props) {
 
   return (
     <div>
-      <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '24px', color: '#0f172a' }}>
+      <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '24px', color: '#15291F' }}>
         Configuración de Pagos Online
       </h2>
 
@@ -548,9 +548,9 @@ function StripeConfigForm({ config, saving, testing, onSave, onTest }: StripeFor
             style={{
               padding: '12px 20px',
               borderRadius: '8px',
-              border: '1.5px solid #0ea5e9',
+              border: '1.5px solid #1B3B36',
               background: 'white',
-              color: '#0ea5e9',
+              color: '#1B3B36',
               fontWeight: 700,
               fontSize: '14px',
               cursor: testing ? 'not-allowed' : 'pointer',

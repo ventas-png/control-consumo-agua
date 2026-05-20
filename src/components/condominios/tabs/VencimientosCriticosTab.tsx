@@ -31,11 +31,11 @@ interface ItemVenc {
 }
 
 const CAT_CFG: Record<CategoriaVencimiento, { label: string; icon: string; color: string }> = {
-  contrato:      { label: 'Contrato',      icon: '📄', color: '#2563eb' },
-  permiso:       { label: 'Permiso',       icon: '🏛️', color: '#7c3aed' },
-  certificacion: { label: 'Certificación', icon: '🎖️', color: '#0369a1' },
+  contrato:      { label: 'Contrato',      icon: '📄', color: '#1B3B36' },
+  permiso:       { label: 'Permiso',       icon: '🏛️', color: '#9C5733' },
+  certificacion: { label: 'Certificación', icon: '🎖️', color: '#102622' },
   seguro:        { label: 'Seguro',        icon: '🛡️', color: '#d97706' },
-  otro:          { label: 'Otro',          icon: '📌', color: '#6b7280' },
+  otro:          { label: 'Otro',          icon: '📌', color: '#7E9389' },
 }
 
 function urgencia(dias: number): { color: string; bg: string; label: string } {
@@ -134,8 +134,8 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   const ORIGEN_LABEL = { todos: 'Todos', poliza: 'Pólizas', contrato: 'Contratos', inspeccion: 'Inspecciones', extra: 'Manuales' }
   const PLAZO_LABEL = { todos: 'Todos', vencido: 'Vencidos', '30': '≤ 30 días', '60': '≤ 60 días', '90': '≤ 90 días' }
@@ -148,7 +148,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
           { label: 'Vencidos', val: vencidos, bg: '#fef2f2', color: '#ef4444' },
           { label: 'Próximos 30d', val: proximos30, bg: '#fff7ed', color: '#ea580c' },
           { label: 'Próximos 60d', val: proximos60, bg: '#fef3c7', color: '#d97706' },
-          { label: 'Total seguidos', val: items.length, bg: '#f9fafb', color: '#374151' },
+          { label: 'Total seguidos', val: items.length, bg: '#FAF7EF', color: '#3E5A4C' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: k.color }}>{k.val}</div>
@@ -162,14 +162,14 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(Object.keys(ORIGEN_LABEL) as (keyof typeof ORIGEN_LABEL)[]).map(o => (
             <button key={o} onClick={() => setFiltroOrigen(o as typeof filtroOrigen)}
-              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroOrigen === o ? '#2563eb' : '#e2e8f0', background: filtroOrigen === o ? '#eff6ff' : '#fff', color: filtroOrigen === o ? '#2563eb' : '#64748b' }}>
+              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroOrigen === o ? '#1B3B36' : '#E1DDD0', background: filtroOrigen === o ? '#EEF2EC' : '#fff', color: filtroOrigen === o ? '#1B3B36' : '#7E9389' }}>
               {ORIGEN_LABEL[o]}
             </button>
           ))}
-          <span style={{ width: 1, background: '#e5e7eb', margin: '0 4px' }} />
+          <span style={{ width: 1, background: '#E1DDD0', margin: '0 4px' }} />
           {(Object.keys(PLAZO_LABEL) as (keyof typeof PLAZO_LABEL)[]).map(p => (
             <button key={p} onClick={() => setFiltroPlazo(p as typeof filtroPlazo)}
-              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroPlazo === p ? '#ef4444' : '#e2e8f0', background: filtroPlazo === p ? '#fef2f2' : '#fff', color: filtroPlazo === p ? '#ef4444' : '#64748b' }}>
+              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroPlazo === p ? '#ef4444' : '#E1DDD0', background: filtroPlazo === p ? '#fef2f2' : '#fff', color: filtroPlazo === p ? '#ef4444' : '#7E9389' }}>
               {PLAZO_LABEL[p]}
             </button>
           ))}
@@ -227,7 +227,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
 
       {/* Lista */}
       {filtrados.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🗓️</div>
           {items.length === 0 ? 'Sin vencimientos — agrega uno manualmente o verifica pólizas, contratos e inspecciones' : 'Sin resultados para el filtro seleccionado'}
         </div>
@@ -237,11 +237,11 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
             const u = urgencia(item.dias)
             const origenIcon = { poliza: '🛡️', contrato: '🤝', inspeccion: '🏛️', extra: '📌' }[item.origen]
             return (
-              <div key={`${item.origen}-${item.id}`} style={{ background: '#fff', border: `1px solid ${item.dias < 0 ? '#fecaca' : item.dias <= 30 ? '#fed7aa' : '#e5e7eb'}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div key={`${item.origen}-${item.id}`} style={{ background: '#fff', border: `1px solid ${item.dias < 0 ? '#fecaca' : item.dias <= 30 ? '#fed7aa' : '#E1DDD0'}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 20, flexShrink: 0 }}>{origenIcon}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{item.titulo}</div>
-                  <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: '#15291F' }}>{item.titulo}</div>
+                  <div style={{ fontSize: 11, color: '#7E9389' }}>
                     {item.tipo}{item.entidad ? ` · ${item.entidad}` : ''}
                     {' · '}{new Date(item.fecha).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </div>

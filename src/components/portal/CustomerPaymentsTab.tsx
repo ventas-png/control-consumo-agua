@@ -62,17 +62,17 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
   }, 0)
 
   if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Cargando...</div>
+    return <div style={{ padding: '40px', textAlign: 'center', color: '#7E9389' }}>Cargando...</div>
   }
 
   if (registrosPendientes.length === 0) {
     return (
       <div style={{ padding: '48px', textAlign: 'center' }}>
         <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
-        <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
+        <div style={{ fontSize: '16px', fontWeight: 700, color: '#15291F', marginBottom: '6px' }}>
           ¡Sin cargos pendientes!
         </div>
-        <div style={{ color: '#94a3b8' }}>Todos tus pagos están al día</div>
+        <div style={{ color: '#7E9389' }}>Todos tus pagos están al día</div>
       </div>
     )
   }
@@ -98,7 +98,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
         </div>
 
         <div style={{
-          background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+          background: 'linear-gradient(135deg, #2F5D4F, #102622)',
           borderRadius: '16px',
           padding: '20px',
           color: 'white',
@@ -124,14 +124,14 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                 background: 'white',
                 borderRadius: '12px',
                 padding: '16px',
-                border: esMora ? '2px solid #dc2626' : '1px solid #e2e8f0',
+                border: esMora ? '2px solid #dc2626' : '1px solid #E1DDD0',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
               }}
             >
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '16px', alignItems: 'start' }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-                    <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+                    <span style={{ fontSize: '15px', fontWeight: 700, color: '#15291F' }}>
                       Lectura: {new Date(registro.fecha).toLocaleDateString('es-GT')}
                     </span>
                     {esMora && (
@@ -150,15 +150,15 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px', fontSize: '13px', marginTop: '12px' }}>
                     <div>
-                      <div style={{ color: '#94a3b8', marginBottom: '2px' }}>Consumo</div>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{registro.consumo.toFixed(2)} m³</div>
+                      <div style={{ color: '#7E9389', marginBottom: '2px' }}>Consumo</div>
+                      <div style={{ fontWeight: 700, color: '#15291F' }}>{registro.consumo.toFixed(2)} m³</div>
                     </div>
                     <div>
-                      <div style={{ color: '#94a3b8', marginBottom: '2px' }}>Monto Total</div>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{moneda} {total.toFixed(2)}</div>
+                      <div style={{ color: '#7E9389', marginBottom: '2px' }}>Monto Total</div>
+                      <div style={{ fontWeight: 700, color: '#15291F' }}>{moneda} {total.toFixed(2)}</div>
                     </div>
                     <div>
-                      <div style={{ color: '#94a3b8', marginBottom: '2px' }}>Saldo</div>
+                      <div style={{ color: '#7E9389', marginBottom: '2px' }}>Saldo</div>
                       <div style={{ fontWeight: 700, color: saldo > 0 ? '#ef4444' : '#10b981', fontSize: '14px' }}>
                         {moneda} {saldo.toFixed(2)}
                       </div>
@@ -175,7 +175,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                         padding: '10px',
                         borderRadius: '8px',
                         border: 'none',
-                        background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                        background: 'linear-gradient(135deg, #1B3B36, #102622)',
                         color: 'white',
                         fontWeight: 700,
                         fontSize: '13px',
@@ -215,9 +215,9 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                     style={{
                       padding: '10px',
                       borderRadius: '8px',
-                      border: '1.5px solid #e2e8f0',
+                      border: '1.5px solid #E1DDD0',
                       background: 'white',
-                      color: '#64748b',
+                      color: '#7E9389',
                       fontWeight: 700,
                       fontSize: '13px',
                       cursor: 'pointer',

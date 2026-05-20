@@ -47,15 +47,15 @@ export function AssignToUsersModal({ teamUsers, currentAssignments, onClose, onA
         background: 'white', borderRadius: '14px', width: '100%', maxWidth: '420px',
         padding: '24px', boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
       }}>
-        <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 700, color: '#111827' }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>
           Asignar conversación
         </h3>
-        <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#6b7280' }}>
+        <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#7E9389' }}>
           Selecciona los miembros del equipo que deben atender esta conversación.
         </p>
 
         {teamUsers.length === 0 ? (
-          <p style={{ fontSize: '13px', color: '#9ca3af', textAlign: 'center', padding: '20px 0' }}>
+          <p style={{ fontSize: '13px', color: '#7E9389', textAlign: 'center', padding: '20px 0' }}>
             No hay usuarios del equipo disponibles.
           </p>
         ) : (
@@ -68,24 +68,24 @@ export function AssignToUsersModal({ teamUsers, currentAssignments, onClose, onA
                   onClick={() => toggleUser(u.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '10px',
-                    padding: '10px 12px', border: `1px solid ${isSelected ? '#a78bfa' : '#e5e7eb'}`,
-                    borderRadius: '8px', background: isSelected ? '#ede9fe' : 'white',
+                    padding: '10px 12px', border: `1px solid ${isSelected ? '#CE8A63' : '#E1DDD0'}`,
+                    borderRadius: '8px', background: isSelected ? '#F4EBE3' : 'white',
                     cursor: 'pointer', textAlign: 'left',
                   }}
                 >
                   <span style={{
                     width: '20px', height: '20px', borderRadius: '4px',
-                    border: `2px solid ${isSelected ? '#7c3aed' : '#d1d5db'}`,
-                    background: isSelected ? '#7c3aed' : 'white',
+                    border: `2px solid ${isSelected ? '#9C5733' : '#C7C2B0'}`,
+                    background: isSelected ? '#9C5733' : 'white',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0, fontSize: '12px', color: 'white',
                   }}>
                     {isSelected ? '✓' : ''}
                   </span>
-                  <span style={{ flex: 1, fontSize: '13px', fontWeight: 500, color: '#111827' }}>
+                  <span style={{ flex: 1, fontSize: '13px', fontWeight: 500, color: '#15291F' }}>
                     {u.full_name}
                   </span>
-                  <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'capitalize' }}>
+                  <span style={{ fontSize: '11px', color: '#7E9389', textTransform: 'capitalize' }}>
                     {u.role}
                   </span>
                 </button>
@@ -96,13 +96,13 @@ export function AssignToUsersModal({ teamUsers, currentAssignments, onClose, onA
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
           <button onClick={onClose}
-            style={{ padding: '8px 16px', border: '1px solid #d1d5db', borderRadius: '8px', background: 'white', fontSize: '13px', cursor: 'pointer', color: '#374151' }}>
+            style={{ padding: '8px 16px', border: '1px solid #C7C2B0', borderRadius: '8px', background: 'white', fontSize: '13px', cursor: 'pointer', color: '#3E5A4C' }}>
             Cancelar
           </button>
           <button onClick={handleSave} disabled={saving}
             style={{
               padding: '8px 16px', border: 'none', borderRadius: '8px',
-              background: '#7c3aed', color: 'white', fontSize: '13px', fontWeight: 600,
+              background: '#9C5733', color: 'white', fontSize: '13px', fontWeight: 600,
               cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
             }}>
             {saving ? 'Guardando…' : 'Guardar asignaciones'}

@@ -96,7 +96,7 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
 
   return (
     <div>
-      {label && <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '6px', display: 'block' }}>{label}</label>}
+      {label && <label style={{ fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '6px', display: 'block' }}>{label}</label>}
 
       {value ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '8px' }}>
@@ -123,26 +123,26 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
           onDrop={e => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files) }}
           onClick={() => !uploading && ref.current?.click()}
           style={{
-            border: `2px dashed ${dragging ? '#0ea5e9' : '#cbd5e1'}`,
+            border: `2px dashed ${dragging ? '#1B3B36' : '#C7C2B0'}`,
             borderRadius: '8px',
             padding: '16px',
             textAlign: 'center',
             cursor: uploading ? 'default' : 'pointer',
-            background: dragging ? '#f0f9ff' : '#f8fafc',
+            background: dragging ? '#EEF2EC' : '#FAF7EF',
             transition: 'all 0.15s',
           }}>
           {uploading ? (
             <div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>Subiendo…</div>
-              <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ height: '100%', background: '#0ea5e9', width: `${progress}%`, transition: 'width 0.3s' }} />
+              <div style={{ fontSize: '12px', color: '#7E9389', marginBottom: '8px' }}>Subiendo…</div>
+              <div style={{ height: '6px', background: '#E1DDD0', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: '#1B3B36', width: `${progress}%`, transition: 'width 0.3s' }} />
               </div>
             </div>
           ) : (
             <>
               <div style={{ fontSize: '24px', marginBottom: '4px' }}>📎</div>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}>Arrastra o haz clic para adjuntar</div>
-              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>PDF, Word, Excel · Máx. 20 MB</div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: '#3E5A4C' }}>Arrastra o haz clic para adjuntar</div>
+              <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>PDF, Word, Excel · Máx. 20 MB</div>
             </>
           )}
         </div>

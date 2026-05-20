@@ -15,11 +15,11 @@ interface Props {
 }
 
 const TIPO_LABELS: Record<TipoComunicado, { label: string; icon: string; color: string }> = {
-  carta:        { label: 'Carta',        icon: '✉️',  color: '#0ea5e9' },
-  circular:     { label: 'Circular',     icon: '📢',  color: '#8b5cf6' },
+  carta:        { label: 'Carta',        icon: '✉️',  color: '#1B3B36' },
+  circular:     { label: 'Circular',     icon: '📢',  color: '#B96A3F' },
   aviso:        { label: 'Aviso',        icon: '📌',  color: '#f59e0b' },
   certificado:  { label: 'Certificado',  icon: '📜',  color: '#10b981' },
-  acta:         { label: 'Acta',         icon: '📋',  color: '#64748b' },
+  acta:         { label: 'Acta',         icon: '📋',  color: '#7E9389' },
 }
 
 const DEST_LABELS: Record<DestinatarioComunicado, string> = {
@@ -89,7 +89,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
       title: '¿Publicar en el portal del residente?',
       html: `El comunicado <b>${c.titulo}</b> aparecerá como anuncio visible para todos los residentes en su portal.`,
       icon: 'question', showCancelButton: true,
-      confirmButtonText: 'Publicar', cancelButtonText: 'Cancelar', confirmButtonColor: '#2563eb',
+      confirmButtonText: 'Publicar', cancelButtonText: 'Cancelar', confirmButtonColor: '#1B3B36',
     })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('anuncios_comunidad').insert({
@@ -127,15 +127,15 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
     win.print()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Comunicados Formales</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Comunicados Formales</h2>
         {canCreate && (
           <button onClick={() => { setShowForm(v => !v); setSelectedId(null) }}
-            style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nuevo Comunicado
           </button>
         )}
@@ -143,26 +143,26 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: 700 }}>Nuevo comunicado</h3>
           <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
             {(Object.keys(TIPO_LABELS) as TipoComunicado[]).map(t => (
               <button key={t} onClick={() => applyTemplate(t)}
                 style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
-                  background: form.tipo === t ? '#0f172a' : 'white',
-                  color: form.tipo === t ? 'white' : '#64748b',
-                  borderColor: form.tipo === t ? '#0f172a' : '#e2e8f0' }}>
+                  background: form.tipo === t ? '#15291F' : 'white',
+                  color: form.tipo === t ? 'white' : '#7E9389',
+                  borderColor: form.tipo === t ? '#15291F' : '#E1DDD0' }}>
                 {TIPO_LABELS[t].icon} {TIPO_LABELS[t].label}
               </button>
             ))}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', gap: '10px', marginBottom: '10px' }}>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Título *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Título *</label>
               <input style={inputStyle} value={form.titulo} onChange={e => setF('titulo', e.target.value)} placeholder="Asunto del comunicado" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Destinatario</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Destinatario</label>
               <select style={inputStyle} value={form.destinatario} onChange={e => setF('destinatario', e.target.value as DestinatarioComunicado)}>
                 {(Object.keys(DEST_LABELS) as DestinatarioComunicado[]).map(d => (
                   <option key={d} value={d}>{DEST_LABELS[d]}</option>
@@ -171,7 +171,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
             </div>
             {form.destinatario === 'especifico' && (
               <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Unidad *</label>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Unidad *</label>
                 <select style={inputStyle} value={form.unidad_id} onChange={e => setF('unidad_id', e.target.value)}>
                   <option value="">— Seleccionar —</option>
                   {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
@@ -179,19 +179,19 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
               </div>
             )}
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Fecha emisión</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha emisión</label>
               <input style={inputStyle} type="date" value={form.fecha_envio} onChange={e => setF('fecha_envio', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Emitido por</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Emitido por</label>
               <input style={inputStyle} value={form.enviado_por} onChange={e => setF('enviado_por', e.target.value)} placeholder="Administración / nombre" />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
               <input type="checkbox" checked={form.firmado} onChange={e => setF('firmado', e.target.checked)} id="firmado_chk" />
-              <label htmlFor="firmado_chk" style={{ fontSize: '12px', color: '#64748b', cursor: 'pointer' }}>Documento firmado</label>
+              <label htmlFor="firmado_chk" style={{ fontSize: '12px', color: '#7E9389', cursor: 'pointer' }}>Documento firmado</label>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Contenido *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Contenido *</label>
               <textarea style={{ ...inputStyle, minHeight: '140px', resize: 'vertical', fontFamily: 'Georgia, serif', lineHeight: '1.6' }}
                 value={form.contenido} onChange={e => setF('contenido', e.target.value)}
                 placeholder="Redacte el contenido del comunicado…" />
@@ -199,11 +199,11 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -215,9 +215,9 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
         {(['all',...Object.keys(TIPO_LABELS)] as const).map(t => (
           <button key={t} onClick={() => setFiltroTipo(t as TipoComunicado | 'all')}
             style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
-              background: filtroTipo === t ? '#0f172a' : 'white',
-              color: filtroTipo === t ? 'white' : '#64748b',
-              borderColor: filtroTipo === t ? '#0f172a' : '#e2e8f0' }}>
+              background: filtroTipo === t ? '#15291F' : 'white',
+              color: filtroTipo === t ? 'white' : '#7E9389',
+              borderColor: filtroTipo === t ? '#15291F' : '#E1DDD0' }}>
             {t === 'all' ? 'Todos' : TIPO_LABELS[t as TipoComunicado].label}
           </button>
         ))}
@@ -227,18 +227,18 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
         {/* List */}
         <div>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay comunicados.</div>
+            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay comunicados.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filtered.map(c => {
                 const tl = TIPO_LABELS[c.tipo]
                 return (
                   <div key={c.id} onClick={() => setSelectedId(selectedId === c.id ? null : c.id)}
-                    style={{ background: selectedId === c.id ? '#eff6ff' : 'white', border: `1.5px solid ${selectedId === c.id ? '#bfdbfe' : '#e2e8f0'}`, borderLeft: `4px solid ${tl.color}`, borderRadius: '8px', padding: '12px 14px', cursor: 'pointer' }}>
+                    style={{ background: selectedId === c.id ? '#EEF2EC' : 'white', border: `1.5px solid ${selectedId === c.id ? '#C2D2CA' : '#E1DDD0'}`, borderLeft: `4px solid ${tl.color}`, borderRadius: '8px', padding: '12px 14px', cursor: 'pointer' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>{tl.icon} {c.titulo}</div>
-                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '13px', color: '#15291F' }}>{tl.icon} {c.titulo}</div>
+                        <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>
                           {tl.label} — {DEST_LABELS[c.destinatario]}{c.unidad_nombre ? ` (${c.unidad_nombre})` : ''} — {c.fecha_envio}
                           {c.firmado && <span style={{ marginLeft: '6px', color: '#10b981', fontWeight: 700 }}>✓ Firmado</span>}
                         </div>
@@ -247,7 +247,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
                         {canCreate && (
                           <button onClick={e => { e.stopPropagation(); publicarEnPortal(c) }}
                             title="Publicar en portal del residente"
-                            style={{ padding: '3px 7px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#2563eb', fontWeight: 600 }}>📢 Portal</button>
+                            style={{ padding: '3px 7px', background: '#EEF2EC', border: '1px solid #C2D2CA', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#1B3B36', fontWeight: 600 }}>📢 Portal</button>
                         )}
                         {canEdit && (
                           <button onClick={e => { e.stopPropagation(); handleDelete(c.id) }}
@@ -264,33 +264,33 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
 
         {/* Preview panel */}
         {selected && (
-          <div style={{ border: '1.5px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', alignSelf: 'start' }}>
-            <div style={{ padding: '10px 14px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>Vista previa</span>
+          <div style={{ border: '1.5px solid #E1DDD0', borderRadius: '12px', overflow: 'hidden', alignSelf: 'start' }}>
+            <div style={{ padding: '10px 14px', background: '#FAF7EF', borderBottom: '1px solid #E1DDD0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389' }}>Vista previa</span>
               <div style={{ display: 'flex', gap: '6px' }}>
                 {canCreate && (
                   <button onClick={() => publicarEnPortal(selected)}
-                    style={{ padding: '4px 10px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                    style={{ padding: '4px 10px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                     📢 Publicar en portal
                   </button>
                 )}
                 <button onClick={() => handlePrint(selected)}
-                  style={{ padding: '4px 10px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                  style={{ padding: '4px 10px', background: '#15291F', color: 'white', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                   🖨️ Imprimir
                 </button>
                 <button onClick={() => setSelectedId(null)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '16px' }}>×</button>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389', fontSize: '16px' }}>×</button>
               </div>
             </div>
             <div style={{ padding: '16px', fontFamily: 'Georgia, serif', lineHeight: '1.7', fontSize: '13px', maxHeight: '500px', overflowY: 'auto' }}>
-              <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', color: '#7E9389', marginBottom: '12px' }}>
                 {TIPO_LABELS[selected.tipo].label} — {DEST_LABELS[selected.destinatario]}{selected.unidad_nombre ? ` — ${selected.unidad_nombre}` : ''}<br />
                 Fecha: {selected.fecha_envio}{selected.enviado_por ? ` — Emitido por: ${selected.enviado_por}` : ''}
               </div>
-              <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 800, textAlign: 'center', color: '#0f172a' }}>{selected.titulo}</h3>
-              <div style={{ whiteSpace: 'pre-wrap', color: '#1e293b' }}>{selected.contenido}</div>
+              <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 800, textAlign: 'center', color: '#15291F' }}>{selected.titulo}</h3>
+              <div style={{ whiteSpace: 'pre-wrap', color: '#15291F' }}>{selected.contenido}</div>
               {selected.firmado && (
-                <div style={{ marginTop: '30px', borderTop: '1px solid #e2e8f0', paddingTop: '12px', textAlign: 'center', fontSize: '11px', color: '#10b981', fontWeight: 600 }}>
+                <div style={{ marginTop: '30px', borderTop: '1px solid #E1DDD0', paddingTop: '12px', textAlign: 'center', fontSize: '11px', color: '#10b981', fontWeight: 600 }}>
                   ✓ Documento firmado
                 </div>
               )}

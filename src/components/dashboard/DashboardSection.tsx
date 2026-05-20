@@ -70,8 +70,8 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
         datasets: [{
           label: 'Consumo (m³)',
           data: dataConsumo,
-          borderColor: '#0ea5e9',
-          backgroundColor: 'rgba(14, 165, 233, 0.1)',
+          borderColor: '#1B3B36',
+          backgroundColor: 'rgba(27, 59, 54, 0.1)',
           borderWidth: 3,
           fill: true,
           tension: 0.4,
@@ -89,7 +89,7 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
   }, [registros])
 
   const statCards = [
-    { label: 'Consumo Mes (m³)', value: consumoTotal.toFixed(2), bg: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)' },
+    { label: 'Consumo Mes (m³)', value: consumoTotal.toFixed(2), bg: 'linear-gradient(135deg, #1B3B36 0%, #102622 100%)' },
     { label: `Recaudo Estimado (${moneda})`, value: recaudoTotal.toFixed(2), bg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
     { label: 'Pendientes de Pago', value: String(pendientes), bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' },
   ]
@@ -123,11 +123,11 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
             }}>
               <div style={{
                 width: '32px', height: '32px',
-                border: '3px solid #e2e8f0', borderTop: '3px solid #0ea5e9',
+                border: '3px solid #E1DDD0', borderTop: '3px solid #1B3B36',
                 borderRadius: '50%', animation: 'spin 0.8s linear infinite',
               }} />
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-              <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500 }}>Cargando datos…</span>
+              <span style={{ fontSize: '13px', color: '#7E9389', fontWeight: 500 }}>Cargando datos…</span>
             </div>
           )}
           <canvas ref={chartRef} />

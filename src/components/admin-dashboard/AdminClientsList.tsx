@@ -35,7 +35,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
       case 'mora':
         return { bg: 'rgba(239, 68, 68, 0.15)', color: '#dc2626', label: '⚠ Mora' }
       default:
-        return { bg: 'rgba(148, 163, 184, 0.15)', color: '#64748b', label: 'Sin lectura' }
+        return { bg: 'rgba(148, 163, 184, 0.15)', color: '#7E9389', label: 'Sin lectura' }
     }
   }
 
@@ -52,7 +52,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
             width: '100%',
             padding: '12px 16px',
             borderRadius: '12px',
-            border: '2px solid #e2e8f0',
+            border: '2px solid #E1DDD0',
             fontSize: '14px',
             fontFamily: 'inherit',
           }}
@@ -67,7 +67,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
             background: 'white',
             borderRadius: '12px',
             textAlign: 'center',
-            color: '#94a3b8',
+            color: '#7E9389',
           }}>
             No se encontraron clientes
           </div>
@@ -83,7 +83,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
                   background: 'white',
                   borderRadius: '12px',
                   padding: '16px',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid #E1DDD0',
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr 1fr 1fr auto',
                   gap: '16px',
@@ -92,27 +92,27 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
               >
                 {/* Nombre y código */}
                 <div>
-                  <div style={{ fontWeight: '600', color: '#0f172a', marginBottom: '4px' }}>
+                  <div style={{ fontWeight: '600', color: '#15291F', marginBottom: '4px' }}>
                     {cliente.nombre}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                  <div style={{ fontSize: '12px', color: '#7E9389' }}>
                     Cód: {cliente.codigo}
                   </div>
                 </div>
 
                 {/* Consumo total */}
                 <div>
-                  <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '12px', color: '#7E9389', marginBottom: '4px' }}>
                     Consumo Total
                   </div>
-                  <div style={{ fontWeight: '700', fontSize: '16px', color: '#0ea5e9' }}>
+                  <div style={{ fontWeight: '700', fontSize: '16px', color: '#1B3B36' }}>
                     {stats.consumoTotal.toFixed(2)} m³
                   </div>
                 </div>
 
                 {/* Recaudo total */}
                 <div>
-                  <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '12px', color: '#7E9389', marginBottom: '4px' }}>
                     Recaudo Total
                   </div>
                   <div style={{ fontWeight: '700', fontSize: '16px', color: '#10b981' }}>
@@ -122,10 +122,10 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
 
                 {/* Última lectura */}
                 <div>
-                  <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '12px', color: '#7E9389', marginBottom: '4px' }}>
                     Última Lectura
                   </div>
-                  <div style={{ fontWeight: '500', fontSize: '13px', color: '#475569' }}>
+                  <div style={{ fontWeight: '500', fontSize: '13px', color: '#3E5A4C' }}>
                     {stats.ultimaLectura
                       ? new Date(stats.ultimaLectura.fecha).toLocaleDateString('es-GT')
                       : 'Sin lecturas'
@@ -158,11 +158,11 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
         <div style={{
           marginTop: '24px',
           padding: '16px',
-          background: '#f0f9ff',
+          background: '#EEF2EC',
           borderRadius: '12px',
-          border: '1px solid #bae6fd',
+          border: '1px solid #C2D2CA',
           fontSize: '13px',
-          color: '#0369a1',
+          color: '#102622',
         }}>
           <strong>{clientesFiltrados.length}</strong> clientes mostrados
         </div>

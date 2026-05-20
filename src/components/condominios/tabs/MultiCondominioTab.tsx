@@ -63,7 +63,7 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
 
   if (proyectosActivos.length <= 1) {
     return (
-      <div style={{ padding: 16, textAlign: 'center', color: '#9ca3af', paddingTop: 60 }}>
+      <div style={{ padding: 16, textAlign: 'center', color: '#7E9389', paddingTop: 60 }}>
         <div style={{ fontSize: 36, marginBottom: 8 }}>🏘️</div>
         Este módulo muestra el comparativo cuando hay 2 o más condominios activos.
         <div style={{ fontSize: 11, marginTop: 6 }}>Actualmente solo hay {proyectosActivos.length} proyecto activo.</div>
@@ -92,25 +92,25 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
           <div style={{ fontSize: 18, fontWeight: 800, color: '#f97316' }}>{totalTicketsAbiertos}</div>
           <div style={{ fontSize: 11, color: '#f97316', fontWeight: 600 }}>Tickets abiertos en total</div>
         </div>
-        <div style={{ background: '#eff6ff', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#2563eb' }}>{totalUnidades}</div>
-          <div style={{ fontSize: 11, color: '#2563eb', fontWeight: 600 }}>Unidades totales activas</div>
+        <div style={{ background: '#EEF2EC', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#1B3B36' }}>{totalUnidades}</div>
+          <div style={{ fontSize: 11, color: '#1B3B36', fontWeight: 600 }}>Unidades totales activas</div>
         </div>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0' }}>Cargando datos de todos los condominios…</div>
+        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0' }}>Cargando datos de todos los condominios…</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {resumenes.map(r => {
             const tasaRec = r.cuotasTotales > 0 ? Math.round((r.cuotasPagadas / r.cuotasTotales) * 100) : 0
             const tasaMora = r.cuotasTotales > 0 ? Math.round((r.cuotasMorosas / r.cuotasTotales) * 100) : 0
             return (
-              <div key={r.proyecto.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
+              <div key={r.proyecto.id} style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 12, padding: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>🏢 {r.proyecto.nombre}</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{r.unidades} unidades · {r.visitantesHoy} visitantes hoy</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#15291F' }}>🏢 {r.proyecto.nombre}</div>
+                    <div style={{ fontSize: 11, color: '#7E9389', marginTop: 2 }}>{r.unidades} unidades · {r.visitantesHoy} visitantes hoy</div>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: tasaRec >= 80 ? '#dcfce7' : tasaRec >= 60 ? '#fef3c7' : '#fef2f2', color: tasaRec >= 80 ? '#16a34a' : tasaRec >= 60 ? '#d97706' : '#ef4444' }}>
@@ -126,22 +126,22 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
                   {[
-                    { label: 'Cuotas totales', val: r.cuotasTotales, color: '#374151' },
+                    { label: 'Cuotas totales', val: r.cuotasTotales, color: '#3E5A4C' },
                     { label: 'Pagadas', val: r.cuotasPagadas, color: '#16a34a' },
                     { label: 'Morosas', val: r.cuotasMorosas, color: '#ef4444' },
                     { label: `Recaudado ${moneda}`, val: r.montoRecaudado.toLocaleString('es', { maximumFractionDigits: 0 }), color: '#16a34a' },
                     { label: `Mora ${moneda}`, val: r.montoVencido.toLocaleString('es', { maximumFractionDigits: 0 }), color: r.montoVencido > 0 ? '#ef4444' : '#16a34a' },
                   ].map(k => (
-                    <div key={k.label} style={{ background: '#f9fafb', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+                    <div key={k.label} style={{ background: '#FAF7EF', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: k.color }}>{k.val}</div>
-                      <div style={{ fontSize: 9, color: '#9ca3af' }}>{k.label}</div>
+                      <div style={{ fontSize: 9, color: '#7E9389' }}>{k.label}</div>
                     </div>
                   ))}
                 </div>
 
                 {/* Barra recaudación */}
                 <div style={{ marginTop: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#9ca3af', marginBottom: 3 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#7E9389', marginBottom: 3 }}>
                     <span>Recaudación</span>
                     <span>{tasaRec}% · Mora {tasaMora}%</span>
                   </div>

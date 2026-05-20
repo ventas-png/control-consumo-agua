@@ -21,7 +21,7 @@ export function Header({ currentUser }: Props) {
           <span style={{ width: '6px', height: '6px', background: isOnline ? '#10b981' : '#f59e0b', borderRadius: '50%', display: 'inline-block' }} />
           {isOnline ? 'Supabase Conectado' : 'Modo Offline'}
         </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', background: '#e0f2fe', color: '#0369a1', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', background: '#D9E2DC', color: '#102622', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
           Rol: {currentUser.role}
         </span>
       </div>

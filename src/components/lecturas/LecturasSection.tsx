@@ -224,7 +224,7 @@ export function LecturasSection({
         icon: 'warning',
         title: 'Tarifa No Vigente',
         text: 'La tarifa del contador no está vigente. Por favor actualice la tarifa del contador antes de registrar lecturas.',
-        confirmButtonColor: '#0ea5e9',
+        confirmButtonColor: '#1B3B36',
       })
       return
     }
@@ -279,7 +279,7 @@ export function LecturasSection({
       text: '¿Deseas enviar el recibo por WhatsApp?',
       showCancelButton: true,
       confirmButtonColor: '#25D366',
-      cancelButtonColor: '#64748b',
+      cancelButtonColor: '#7E9389',
       confirmButtonText: 'Enviar WhatsApp',
       cancelButtonText: 'No, gracias',
     })
@@ -297,16 +297,16 @@ export function LecturasSection({
       if (pendientes.length > 0) {
         // Hay contadores pendientes en esta misma unidad — preguntar al operador
         const listaHtml = pendientes
-          .map(c => `<li style="text-align:left;margin:4px 0"><b>${c.numero_serie}</b>${c.descripcion ? ` — ${c.descripcion}` : ''} <span style="color:#64748b;font-size:12px">(${c.tipo_agua})</span></li>`)
+          .map(c => `<li style="text-align:left;margin:4px 0"><b>${c.numero_serie}</b>${c.descripcion ? ` — ${c.descripcion}` : ''} <span style="color:#7E9389;font-size:12px">(${c.tipo_agua})</span></li>`)
           .join('')
 
         const pregunta = await Swal.fire({
           icon: 'question',
           title: 'Contadores pendientes',
-          html: `<div style="font-size:14px;margin-bottom:8px">Esta unidad tiene <b>${pendientes.length}</b> contador${pendientes.length > 1 ? 'es' : ''} sin leer:</div><ul style="list-style:none;padding:0">${listaHtml}</ul><div style="margin-top:10px;font-size:13px;color:#475569">¿Desea registrarlos antes de continuar?</div>`,
+          html: `<div style="font-size:14px;margin-bottom:8px">Esta unidad tiene <b>${pendientes.length}</b> contador${pendientes.length > 1 ? 'es' : ''} sin leer:</div><ul style="list-style:none;padding:0">${listaHtml}</ul><div style="margin-top:10px;font-size:13px;color:#3E5A4C">¿Desea registrarlos antes de continuar?</div>`,
           showCancelButton: true,
-          confirmButtonColor: '#0ea5e9',
-          cancelButtonColor: '#64748b',
+          confirmButtonColor: '#1B3B36',
+          cancelButtonColor: '#7E9389',
           confirmButtonText: 'Sí, registrar',
           cancelButtonText: 'No, siguiente parada',
         })
@@ -392,16 +392,16 @@ export function LecturasSection({
     setContadoresLeidos(new Set())
   }
 
-  const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid #E1DDD0', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
   const labelStyle: CSSProperties = { fontSize: '14px', fontWeight: 600, color: '#4a5568', marginBottom: '6px', display: 'block' }
 
   const consumoInvalido = consumo !== null && consumo < 0
 
   const bannerRuta = rutaActiva
     ? {
-        bg: '#eff6ff',
-        border: '#bfdbfe',
-        color: '#1e40af',
+        bg: '#EEF2EC',
+        border: '#C2D2CA',
+        color: '#0E2A24',
         texto: `🗺️ Ruta: ${rutaActiva.nombre} — Unidad ${rutaIndex + 1} de ${unidadesOrdenadas.length}${rutaActiva.fecha_programada ? ` | 📅 ${new Date(rutaActiva.fecha_programada + 'T12:00:00').toLocaleDateString('es-GT')}` : ''}`,
       }
     : rutaModoManual
@@ -431,7 +431,7 @@ export function LecturasSection({
           ) : (
             <button
               onClick={toggleModoManual}
-              style={{ padding: '8px 16px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
+              style={{ padding: '8px 16px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
             >
               🚀 Iniciar Ruta Manual
             </button>
@@ -440,7 +440,7 @@ export function LecturasSection({
       </div>
 
       <div style={{ background: 'white', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
-        <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', borderBottom: '2px solid #e2e8f0', paddingBottom: '12px' }}>
+        <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', borderBottom: '2px solid #E1DDD0', paddingBottom: '12px' }}>
           Ingreso de Lectura
         </div>
 
@@ -468,19 +468,19 @@ export function LecturasSection({
         {unidadSeleccionada && (
           <>
             {/* Info de unidad y cliente */}
-            <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
-              <div><small style={{ color: '#64748b' }}>Unidad</small><div style={{ fontWeight: 700 }}>{unidadSeleccionada.nombre}</div></div>
+            <div style={{ background: '#FAF7EF', padding: '15px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #E1DDD0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+              <div><small style={{ color: '#7E9389' }}>Unidad</small><div style={{ fontWeight: 700 }}>{unidadSeleccionada.nombre}</div></div>
               {clienteDeUnidad && (
                 <>
-                  <div><small style={{ color: '#64748b' }}>Cliente</small><div style={{ fontWeight: 700 }}>{clienteDeUnidad.nombre}</div></div>
-                  <div><small style={{ color: '#64748b' }}>Código</small><div style={{ fontWeight: 600, fontFamily: 'monospace' }}>{clienteDeUnidad.codigo}</div></div>
+                  <div><small style={{ color: '#7E9389' }}>Cliente</small><div style={{ fontWeight: 700 }}>{clienteDeUnidad.nombre}</div></div>
+                  <div><small style={{ color: '#7E9389' }}>Código</small><div style={{ fontWeight: 600, fontFamily: 'monospace' }}>{clienteDeUnidad.codigo}</div></div>
                   {clienteDeUnidad.telefono && (
-                    <div><small style={{ color: '#64748b' }}>Teléfono</small><div style={{ fontWeight: 600 }}>{clienteDeUnidad.telefono}</div></div>
+                    <div><small style={{ color: '#7E9389' }}>Teléfono</small><div style={{ fontWeight: 600 }}>{clienteDeUnidad.telefono}</div></div>
                   )}
                 </>
               )}
               {!clienteDeUnidad && (
-                <div><small style={{ color: '#64748b' }}>Cliente</small><div style={{ color: '#94a3b8', fontSize: '13px' }}>Sin cliente asignado</div></div>
+                <div><small style={{ color: '#7E9389' }}>Cliente</small><div style={{ color: '#7E9389', fontSize: '13px' }}>Sin cliente asignado</div></div>
               )}
             </div>
 
@@ -513,18 +513,18 @@ export function LecturasSection({
             {contadorSeleccionado && (
               <>
                 {/* Info del contador y tarifa */}
-                <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', fontSize: '13px' }}>
-                  <div><small style={{ color: '#64748b' }}>N° Serie</small><div style={{ fontWeight: 700, fontFamily: 'monospace' }}>{contadorSeleccionado.numero_serie}</div></div>
-                  <div><small style={{ color: '#64748b' }}>Tipo Agua</small><div style={{ fontWeight: 600 }}>{contadorSeleccionado.tipo_agua}</div></div>
-                  <div><small style={{ color: '#64748b' }}>Última Lectura</small><div style={{ fontWeight: 700 }}>{ultimaLectura}</div>{fechaLecturaAnterior && <div style={{ fontSize: '11px', color: '#94a3b8' }}>{new Date(fechaLecturaAnterior).toLocaleDateString('es-GT')}</div>}</div>
+                <div style={{ background: '#FAF7EF', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', border: '1px solid #E1DDD0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', fontSize: '13px' }}>
+                  <div><small style={{ color: '#7E9389' }}>N° Serie</small><div style={{ fontWeight: 700, fontFamily: 'monospace' }}>{contadorSeleccionado.numero_serie}</div></div>
+                  <div><small style={{ color: '#7E9389' }}>Tipo Agua</small><div style={{ fontWeight: 600 }}>{contadorSeleccionado.tipo_agua}</div></div>
+                  <div><small style={{ color: '#7E9389' }}>Última Lectura</small><div style={{ fontWeight: 700 }}>{ultimaLectura}</div>{fechaLecturaAnterior && <div style={{ fontSize: '11px', color: '#7E9389' }}>{new Date(fechaLecturaAnterior).toLocaleDateString('es-GT')}</div>}</div>
                   {tarifaDelContador && (
                     <>
-                      <div><small style={{ color: '#64748b' }}>Tarifa</small><div style={{ fontWeight: 600 }}>{tarifaDelContador.nombre}</div></div>
-                      <div><small style={{ color: '#64748b' }}>Precio/m³</small><div style={{ fontWeight: 600 }}>{moneda}{tarifaDelContador.precio_m3}</div></div>
+                      <div><small style={{ color: '#7E9389' }}>Tarifa</small><div style={{ fontWeight: 600 }}>{tarifaDelContador.nombre}</div></div>
+                      <div><small style={{ color: '#7E9389' }}>Precio/m³</small><div style={{ fontWeight: 600 }}>{moneda}{tarifaDelContador.precio_m3}</div></div>
                       {Number(tarifaDelContador.precio_m3_exceso ?? 0) > 0 && (
-                        <div><small style={{ color: '#64748b' }}>Precio Exceso/m³</small><div style={{ fontWeight: 600 }}>{moneda}{tarifaDelContador.precio_m3_exceso}</div></div>
+                        <div><small style={{ color: '#7E9389' }}>Precio Exceso/m³</small><div style={{ fontWeight: 600 }}>{moneda}{tarifaDelContador.precio_m3_exceso}</div></div>
                       )}
-                      <div><small style={{ color: '#64748b' }}>Canon Fijo</small><div style={{ fontWeight: 600 }}>{moneda}{tarifaDelContador.canon_fijo}</div></div>
+                      <div><small style={{ color: '#7E9389' }}>Canon Fijo</small><div style={{ fontWeight: 600 }}>{moneda}{tarifaDelContador.canon_fijo}</div></div>
                     </>
                   )}
                 </div>
@@ -543,11 +543,11 @@ export function LecturasSection({
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '20px' }}>
                   <div>
                     <label style={labelStyle}>Lectura Actual</label>
-                    <input type="number" step="0.01" value={lecturaActual} onChange={e => setLecturaActual(e.target.value)} placeholder="Ingrese lectura del medidor" style={{ ...inputStyle, borderColor: consumoInvalido ? '#dc2626' : '#e2e8f0' }} />
+                    <input type="number" step="0.01" value={lecturaActual} onChange={e => setLecturaActual(e.target.value)} placeholder="Ingrese lectura del medidor" style={{ ...inputStyle, borderColor: consumoInvalido ? '#dc2626' : '#E1DDD0' }} />
                   </div>
                   <div>
                     <label style={labelStyle}>Consumo Calculado (m³)</label>
-                    <input type="text" readOnly value={consumo !== null ? (consumoInvalido ? consumo.toFixed(2) + ' (ERROR)' : consumo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? '#dc2626' : '#0ea5e9', background: '#f7fafc' }} />
+                    <input type="text" readOnly value={consumo !== null ? (consumoInvalido ? consumo.toFixed(2) + ' (ERROR)' : consumo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? '#dc2626' : '#1B3B36', background: '#f7fafc' }} />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={labelStyle}>Desglose de Cobro</label>
@@ -574,7 +574,7 @@ export function LecturasSection({
                         )}
                       </div>
                     ) : (
-                      <div style={{ ...inputStyle, color: '#94a3b8', background: '#f7fafc' }}>—</div>
+                      <div style={{ ...inputStyle, color: '#7E9389', background: '#f7fafc' }}>—</div>
                     )}
                   </div>
                   <div>
@@ -585,7 +585,7 @@ export function LecturasSection({
                         <div style={{ fontSize: '11px', color: '#b45309', marginTop: '4px' }}>Primera lectura — puede establecer la fecha de inicio del servicio</div>
                       </>
                     ) : (
-                      <input type="date" readOnly value={fechaLecturaAnterior ? fechaLecturaAnterior.split('T')[0] : ''} style={{ ...inputStyle, background: '#f7fafc', color: '#1e293b' }} />
+                      <input type="date" readOnly value={fechaLecturaAnterior ? fechaLecturaAnterior.split('T')[0] : ''} style={{ ...inputStyle, background: '#f7fafc', color: '#15291F' }} />
                     )}
                   </div>
                   <div>
@@ -594,7 +594,7 @@ export function LecturasSection({
                   </div>
                   <div>
                     <label style={labelStyle}>Días de Servicio</label>
-                    <input type="text" readOnly value={diasServicio !== null ? `${diasServicio} días` : '—'} style={{ ...inputStyle, fontWeight: 'bold', color: diasServicio !== null ? '#0ea5e9' : '#94a3b8', background: '#f7fafc' }} />
+                    <input type="text" readOnly value={diasServicio !== null ? `${diasServicio} días` : '—'} style={{ ...inputStyle, fontWeight: 'bold', color: diasServicio !== null ? '#1B3B36' : '#7E9389', background: '#f7fafc' }} />
                   </div>
                   <div>
                     <label style={labelStyle}>Estado Pago</label>
@@ -640,10 +640,10 @@ export function LecturasSection({
 
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '12px' }}>
-                    <button onClick={handleGuardar} disabled={saving || tarifaExpirada || sinTarifa} style={{ padding: '12px 24px', background: (saving || tarifaExpirada || sinTarifa) ? '#94a3b8' : 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: (saving || tarifaExpirada || sinTarifa) ? 'not-allowed' : 'pointer' }}>
+                    <button onClick={handleGuardar} disabled={saving || tarifaExpirada || sinTarifa} style={{ padding: '12px 24px', background: (saving || tarifaExpirada || sinTarifa) ? '#7E9389' : 'linear-gradient(135deg, #1B3B36 0%, #577B69 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: (saving || tarifaExpirada || sinTarifa) ? 'not-allowed' : 'pointer' }}>
                       {saving ? 'Guardando...' : enModoRuta ? `💾 Guardar y Avanzar (${rutaIndex + 1}/${unidadesOrdenadas.length})` : '💾 Guardar Lectura'}
                     </button>
-                    <button onClick={limpiarFormulario} style={{ padding: '12px 24px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
+                    <button onClick={limpiarFormulario} style={{ padding: '12px 24px', background: '#EAE6D8', color: '#3E5A4C', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
                       Cancelar
                     </button>
                   </div>

@@ -103,15 +103,15 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
     toast.success('Configuración guardada')
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', color: '#1e293b', background: canEdit ? 'white' : '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', color: '#15291F', background: canEdit ? 'white' : '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Configuración del Condominio</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Configuración del Condominio</h2>
         {canEdit && dirty.size > 0 && (
           <button onClick={handleSaveAll} disabled={saving === 'all'}
-            style={{ padding: '8px 20px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 20px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             {saving === 'all' ? 'Guardando…' : `💾 Guardar todo (${dirty.size})`}
           </button>
         )}
@@ -119,7 +119,7 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
 
       {GROUPS.map(group => (
         <div key={group} style={{ marginBottom: '24px' }}>
-          <h3 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: 700, color: '#7E9389', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #EAE6D8', paddingBottom: '6px' }}>
             {group}
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
@@ -127,12 +127,12 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
               const isDirty = dirty.has(schema.clave)
               const isSaving = saving === schema.clave
               return (
-                <div key={schema.clave} style={{ background: 'white', border: `1.5px solid ${isDirty ? '#bfdbfe' : '#e2e8f0'}`, borderRadius: '10px', padding: '12px' }}>
+                <div key={schema.clave} style={{ background: 'white', border: `1.5px solid ${isDirty ? '#C2D2CA' : '#E1DDD0'}`, borderRadius: '10px', padding: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>{schema.label}</label>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#7E9389' }}>{schema.label}</label>
                     {canEdit && isDirty && (
                       <button onClick={() => handleSave(schema.clave)} disabled={!!saving}
-                        style={{ padding: '2px 8px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                        style={{ padding: '2px 8px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                         {isSaving ? '…' : '✓ Guardar'}
                       </button>
                     )}
@@ -154,7 +154,7 @@ export function ConfiguracionTab({ configuracion, proyectoId, companyId, canEdit
                       placeholder={schema.placeholder}
                       readOnly={!canEdit}
                       min={schema.tipo === 'numero' ? 0 : undefined}
-                      style={{ ...inputStyle, border: `1.5px solid ${isDirty ? '#93c5fd' : '#e2e8f0'}` }}
+                      style={{ ...inputStyle, border: `1.5px solid ${isDirty ? '#93c5fd' : '#E1DDD0'}` }}
                     />
                   )}
                 </div>

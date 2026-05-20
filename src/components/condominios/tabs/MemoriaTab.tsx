@@ -90,22 +90,22 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
     onRefresh()
   }
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px', display: 'block' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
+  const labelStyle: CSSProperties = { fontSize: '12px', fontWeight: 600, color: '#7E9389', marginBottom: '4px', display: 'block' }
   const textareaStyle: CSSProperties = { ...inputStyle, resize: 'vertical', minHeight: '80px' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Memoria de Labores</h2>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Memoria de Labores</h2>
         {canCreate && !showForm && (
-          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Memoria</button>
+          <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nueva Memoria</button>
         )}
       </div>
 
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Memoria' : 'Nueva Memoria de Labores'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '12px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
@@ -132,8 +132,8 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
           </div>
 
           {/* Métricas */}
-          <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', marginBottom: '10px' }}>MÉTRICAS DEL PERÍODO</div>
+          <div style={{ marginTop: '12px', padding: '12px', background: 'white', borderRadius: '8px', border: '1px solid #E1DDD0' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#7E9389', marginBottom: '10px' }}>MÉTRICAS DEL PERÍODO</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
               {[
                 { key: 'tickets_resueltos' as const,       label: '🔧 Tickets resueltos' },
@@ -165,8 +165,8 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
           </div>
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Crear'}
             </button>
           </div>
@@ -178,16 +178,16 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
         {(['todos', 'mensual', 'trimestral', 'anual'] as const).map(t => (
           <button key={t} onClick={() => setFiltroTipo(t)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-              borderColor: filtroTipo === t ? '#0ea5e9' : '#e2e8f0',
-              background: filtroTipo === t ? '#e0f2fe' : 'white',
-              color: filtroTipo === t ? '#0ea5e9' : '#64748b' }}>
+              borderColor: filtroTipo === t ? '#1B3B36' : '#E1DDD0',
+              background: filtroTipo === t ? '#D9E2DC' : 'white',
+              color: filtroTipo === t ? '#1B3B36' : '#7E9389' }}>
             {t === 'todos' ? `Todas (${memorias.length})` : `${TIPO_PERIODO.find(x => x.value === t)?.label} (${memorias.filter(m => m.tipo_periodo === t).length})`}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '48px', color: '#7E9389' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>📊</div>
           <p style={{ margin: 0, fontWeight: 600 }}>No hay memorias de labores</p>
         </div>
@@ -197,16 +197,16 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {filtered.map(m => (
               <div key={m.id} onClick={() => setSelected(selected?.id === m.id ? null : m)}
-                style={{ background: selected?.id === m.id ? '#e0f2fe' : 'white', border: `1.5px solid ${selected?.id === m.id ? '#0ea5e9' : '#e2e8f0'}`, borderRadius: '10px', padding: '14px', cursor: 'pointer' }}>
+                style={{ background: selected?.id === m.id ? '#D9E2DC' : 'white', border: `1.5px solid ${selected?.id === m.id ? '#1B3B36' : '#E1DDD0'}`, borderRadius: '10px', padding: '14px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>{m.titulo}</div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: '#15291F' }}>{m.titulo}</div>
+                    <div style={{ fontSize: '11px', color: '#7E9389', marginTop: '2px' }}>
                       📅 {m.periodo} · {TIPO_PERIODO.find(t => t.value === m.tipo_periodo)?.label}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: m.estado === 'publicado' ? '#d1fae5' : '#f1f5f9', color: m.estado === 'publicado' ? '#059669' : '#64748b' }}>
+                    <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: m.estado === 'publicado' ? '#d1fae5' : '#EAE6D8', color: m.estado === 'publicado' ? '#059669' : '#7E9389' }}>
                       {m.estado === 'publicado' ? '✅ Publicado' : '📝 Borrador'}
                     </span>
                   </div>
@@ -214,7 +214,7 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
                 {m.estado === 'borrador' && canEdit && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }} onClick={e => e.stopPropagation()}>
                     <button onClick={() => handlePublicar(m.id)} style={{ flex: 1, padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Publicar</button>
-                    <button onClick={() => startEdit(m)} style={{ padding: '4px 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
+                    <button onClick={() => startEdit(m)} style={{ padding: '4px 8px', background: '#EAE6D8', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
                     <button onClick={() => handleDelete(m.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
                   </div>
                 )}
@@ -229,24 +229,24 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
 
           {/* Detalle */}
           {selected && (
-            <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '20px', position: 'sticky', top: '16px' }}>
+            <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '20px', position: 'sticky', top: '16px' }}>
               <div style={{ marginBottom: '16px' }}>
-                <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>{selected.titulo}</h3>
-                <div style={{ fontSize: '12px', color: '#94a3b8' }}>{selected.periodo} · {TIPO_PERIODO.find(t => t.value === selected.tipo_periodo)?.label}</div>
+                <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>{selected.titulo}</h3>
+                <div style={{ fontSize: '12px', color: '#7E9389' }}>{selected.periodo} · {TIPO_PERIODO.find(t => t.value === selected.tipo_periodo)?.label}</div>
               </div>
 
               {/* Métricas */}
               {(selected.tickets_resueltos != null || selected.visitantes_registrados != null || selected.cuotas_cobradas != null || selected.incidencias_atendidas != null) && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }}>
                   {[
-                    { v: selected.tickets_resueltos,      label: '🔧 Tickets',      color: '#0ea5e9' },
-                    { v: selected.visitantes_registrados, label: '🚪 Visitantes',    color: '#8b5cf6' },
+                    { v: selected.tickets_resueltos,      label: '🔧 Tickets',      color: '#1B3B36' },
+                    { v: selected.visitantes_registrados, label: '🚪 Visitantes',    color: '#B96A3F' },
                     { v: selected.cuotas_cobradas,        label: '💳 Cuotas',        color: '#10b981' },
                     { v: selected.incidencias_atendidas,  label: '⚠️ Incidencias',  color: '#f59e0b' },
                   ].filter(x => x.v != null).map(k => (
-                    <div key={k.label} style={{ background: '#f8fafc', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
+                    <div key={k.label} style={{ background: '#FAF7EF', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
                       <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.v}</div>
-                      <div style={{ fontSize: '11px', color: '#94a3b8' }}>{k.label}</div>
+                      <div style={{ fontSize: '11px', color: '#7E9389' }}>{k.label}</div>
                     </div>
                   ))}
                 </div>
@@ -254,20 +254,20 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
 
               {selected.resumen && (
                 <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '4px' }}>RESUMEN</div>
-                  <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.6 }}>{selected.resumen}</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', marginBottom: '4px' }}>RESUMEN</div>
+                  <div style={{ fontSize: '13px', color: '#3E5A4C', lineHeight: 1.6 }}>{selected.resumen}</div>
                 </div>
               )}
               {selected.logros && (
                 <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '4px' }}>LOGROS</div>
-                  <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{selected.logros}</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', marginBottom: '4px' }}>LOGROS</div>
+                  <div style={{ fontSize: '13px', color: '#3E5A4C', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{selected.logros}</div>
                 </div>
               )}
               {selected.pendientes && (
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '4px' }}>PENDIENTES</div>
-                  <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{selected.pendientes}</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', marginBottom: '4px' }}>PENDIENTES</div>
+                  <div style={{ fontSize: '13px', color: '#3E5A4C', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{selected.pendientes}</div>
                 </div>
               )}
             </div>

@@ -71,8 +71,8 @@ function AdminDashboardChartsImpl({ registros }: Props) {
           {
             label: 'Consumo (m³)',
             data: chartsData.dataConsumo,
-            borderColor: '#0ea5e9',
-            backgroundColor: 'rgba(14, 165, 233, 0.1)',
+            borderColor: '#1B3B36',
+            backgroundColor: 'rgba(27, 59, 54, 0.1)',
             borderWidth: 3,
             fill: true,
             tension: 0.4,
@@ -156,7 +156,7 @@ function AdminDashboardChartsImpl({ registros }: Props) {
         padding: '24px',
         boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
       }}>
-        <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#0f172a' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#15291F' }}>
           Tendencias de Consumo y Recaudo
         </h3>
         <div style={{ height: '320px' }}>
@@ -171,7 +171,7 @@ function AdminDashboardChartsImpl({ registros }: Props) {
         padding: '24px',
         boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
       }}>
-        <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#0f172a' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#15291F' }}>
           Distribución de Estados
         </h3>
         <div style={{ height: '320px' }}>

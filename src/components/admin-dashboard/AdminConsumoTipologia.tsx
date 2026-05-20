@@ -18,14 +18,14 @@ interface TipologiaStat {
 }
 
 const TIPOLOGIA_META: Record<TipoAgua, { label: string; icon: string; from: string; to: string }> = {
-  potable:             { label: 'Potable',             icon: '💧', from: '#0ea5e9', to: '#0284c7' },
-  rehuso:              { label: 'Rehúso',              icon: '♻️', from: '#06b6d4', to: '#0891b2' },
-  piscina:             { label: 'Piscina',             icon: '🏊', from: '#38bdf8', to: '#0ea5e9' },
-  desalinada:          { label: 'Desalinada',          icon: '🌊', from: '#6366f1', to: '#4f46e5' },
+  potable:             { label: 'Potable',             icon: '💧', from: '#1B3B36', to: '#102622' },
+  rehuso:              { label: 'Rehúso',              icon: '♻️', from: '#577B69', to: '#102622' },
+  piscina:             { label: 'Piscina',             icon: '🏊', from: '#577B69', to: '#1B3B36' },
+  desalinada:          { label: 'Desalinada',          icon: '🌊', from: '#B96A3F', to: '#9C5733' },
   riego:               { label: 'Riego',               icon: '🌿', from: '#10b981', to: '#059669' },
-  jacuzzi:             { label: 'Jacuzzi',             icon: '🛁', from: '#8b5cf6', to: '#7c3aed' },
-  consumo_humano:      { label: 'Consumo Humano',      icon: '🚰', from: '#14b8a6', to: '#0d9488' },
-  desmineralizada:     { label: 'Desmineralizada',     icon: '🧪', from: '#a855f7', to: '#9333ea' },
+  jacuzzi:             { label: 'Jacuzzi',             icon: '🛁', from: '#B96A3F', to: '#9C5733' },
+  consumo_humano:      { label: 'Consumo Humano',      icon: '🚰', from: '#577B69', to: '#577B69' },
+  desmineralizada:     { label: 'Desmineralizada',     icon: '🧪', from: '#a855f7', to: '#9C5733' },
   residuales_tratadas: { label: 'Residuales Tratadas', icon: '🔄', from: '#f97316', to: '#ea580c' },
 }
 
@@ -87,7 +87,7 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
       <h3 style={{
         fontSize: '13px',
         fontWeight: 700,
-        color: '#94a3b8',
+        color: '#7E9389',
         marginBottom: '12px',
         textTransform: 'uppercase',
         letterSpacing: '0.08em',
@@ -97,7 +97,7 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
 
       {/* Cards por tipología */}
       {activeTipos.length === 0 ? (
-        <div style={{ color: '#94a3b8', fontSize: '13px', padding: '12px 0' }}>
+        <div style={{ color: '#7E9389', fontSize: '13px', padding: '12px 0' }}>
           Sin consumo registrado este mes.
         </div>
       ) : (
@@ -108,7 +108,7 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
         marginBottom: showProjectTable ? '24px' : 0,
       }}>
         {activeTipos.map(([tipo, stat]) => {
-          const meta = TIPOLOGIA_META[tipo] ?? { label: tipo, icon: '💧', from: '#64748b', to: '#475569' }
+          const meta = TIPOLOGIA_META[tipo] ?? { label: tipo, icon: '💧', from: '#7E9389', to: '#3E5A4C' }
           return (
             <div
               key={tipo}
@@ -149,8 +149,8 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#475569', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
+              <tr style={{ background: '#FAF7EF' }}>
+                <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: '#3E5A4C', borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}>
                   Proyecto
                 </th>
                 {allTipos.map(tipo => {
@@ -159,18 +159,18 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
                     <th
                       key={tipo}
                       colSpan={2}
-                      style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 700, color: meta?.from ?? '#64748b', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}
+                      style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 700, color: meta?.from ?? '#7E9389', borderBottom: '1px solid #E1DDD0', whiteSpace: 'nowrap' }}
                     >
                       {meta?.icon} {meta?.label ?? tipo}
                     </th>
                   )
                 })}
               </tr>
-              <tr style={{ background: '#f8fafc' }}>
-                <th style={{ padding: '4px 14px', borderBottom: '2px solid #e2e8f0' }} />
+              <tr style={{ background: '#FAF7EF' }}>
+                <th style={{ padding: '4px 14px', borderBottom: '2px solid #E1DDD0' }} />
                 {allTipos.flatMap(tipo => [
-                  <th key={`${tipo}-m3`} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 600, color: '#94a3b8', borderBottom: '2px solid #e2e8f0', fontSize: '10px' }}>m³</th>,
-                  <th key={`${tipo}-q`} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 600, color: '#94a3b8', borderBottom: '2px solid #e2e8f0', fontSize: '10px' }}>{moneda}</th>,
+                  <th key={`${tipo}-m3`} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 600, color: '#7E9389', borderBottom: '2px solid #E1DDD0', fontSize: '10px' }}>m³</th>,
+                  <th key={`${tipo}-q`} style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 600, color: '#7E9389', borderBottom: '2px solid #E1DDD0', fontSize: '10px' }}>{moneda}</th>,
                 ])}
               </tr>
             </thead>
@@ -180,18 +180,18 @@ function AdminConsumoTipologiaImpl({ registros, contadores, proyectos, moneda, s
                 return (
                   <tr
                     key={p.id}
-                    style={{ background: i % 2 === 0 ? 'white' : '#f8fafc' }}
+                    style={{ background: i % 2 === 0 ? 'white' : '#FAF7EF' }}
                   >
-                    <td style={{ padding: '9px 14px', fontWeight: 600, color: '#0f172a', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '9px 14px', fontWeight: 600, color: '#15291F', borderBottom: '1px solid #EAE6D8', whiteSpace: 'nowrap' }}>
                       {p.nombre}
                     </td>
                     {allTipos.flatMap(tipo => {
                       const s = pMap?.get(tipo)
                       return [
-                        <td key={`${tipo}-m3`} style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', color: s?.consumo ? '#0f172a' : '#cbd5e1', fontWeight: s?.consumo ? 600 : 400 }}>
+                        <td key={`${tipo}-m3`} style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', color: s?.consumo ? '#15291F' : '#C7C2B0', fontWeight: s?.consumo ? 600 : 400 }}>
                           {s?.consumo ? s.consumo.toFixed(1) : '—'}
                         </td>,
-                        <td key={`${tipo}-q`} style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid #f1f5f9', color: s?.monto ? '#0f172a' : '#cbd5e1', fontWeight: s?.monto ? 600 : 400 }}>
+                        <td key={`${tipo}-q`} style={{ padding: '9px 8px', textAlign: 'center', borderBottom: '1px solid #EAE6D8', color: s?.monto ? '#15291F' : '#C7C2B0', fontWeight: s?.monto ? 600 : 400 }}>
                           {s?.monto ? s.monto.toFixed(0) : '—'}
                         </td>,
                       ]

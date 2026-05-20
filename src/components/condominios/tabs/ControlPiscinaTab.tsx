@@ -15,12 +15,12 @@ interface Props {
 const ESTADOS: { value: EstadoPiscina; label: string; color: string; bg: string; icon: string }[] = [
   { value: 'abierta',               label: 'Abierta',             color: '#10b981', bg: '#d1fae5', icon: '✅' },
   { value: 'cerrada_mantenimiento', label: 'Cerrada (manto.)',    color: '#f59e0b', bg: '#fef3c7', icon: '🔧' },
-  { value: 'cerrada_quimica',       label: 'Cerrada (química)',   color: '#6366f1', bg: '#eef2ff', icon: '🧪' },
+  { value: 'cerrada_quimica',       label: 'Cerrada (química)',   color: '#B96A3F', bg: '#F4EBE3', icon: '🧪' },
   { value: 'cerrada_incidente',     label: 'Cerrada (incidente)', color: '#ef4444', bg: '#fef2f2', icon: '🚨' },
 ]
 
 const TURBIEDAD: { value: TurbiededadPiscina; label: string; color: string }[] = [
-  { value: 'cristalina',          label: 'Cristalina',           color: '#06b6d4' },
+  { value: 'cristalina',          label: 'Cristalina',           color: '#577B69' },
   { value: 'ligeramente_turbia',  label: 'Liger. turbia',        color: '#f59e0b' },
   { value: 'turbia',              label: 'Turbia',               color: '#ef4444' },
 ]
@@ -98,16 +98,16 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
     onRefresh()
   }
 
-  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
-  const lbl: CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 3, display: 'block' }
+  const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid #C7C2B0', borderRadius: 6, fontSize: 13 }
+  const lbl: CSSProperties = { fontSize: 12, color: '#7E9389', marginBottom: 3, display: 'block' }
 
   function GaugeBar({ value, min, max, status }: { value: number | null | undefined; min: number; max: number; status: 'ok' | 'warn' | 'bad' }) {
-    if (value == null) return <span style={{ fontSize: 12, color: '#9ca3af' }}>—</span>
+    if (value == null) return <span style={{ fontSize: 12, color: '#7E9389' }}>—</span>
     const pct = Math.min(Math.max(((value - (min - 1)) / ((max + 1) - (min - 1))) * 100, 0), 100)
     return (
       <div>
         <div style={{ fontSize: 13, fontWeight: 700, color: STATUS_COLOR[status] }}>{value}</div>
-        <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, overflow: 'hidden', marginTop: 2 }}>
+        <div style={{ height: 4, background: '#E1DDD0', borderRadius: 2, overflow: 'hidden', marginTop: 2 }}>
           <div style={{ height: '100%', width: `${pct}%`, background: STATUS_COLOR[status] }} />
         </div>
       </div>
@@ -124,7 +124,7 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
             const est = ESTADOS.find(e => e.value === r?.estado)
             const turb = TURBIEDAD.find(t => t.value === r?.turbiedad)
             return (
-              <div key={p} style={{ background: est?.bg ?? '#f9fafb', border: `1px solid ${est?.color ?? '#e5e7eb'}`, borderRadius: 12, padding: '12px 16px' }}>
+              <div key={p} style={{ background: est?.bg ?? '#FAF7EF', border: `1px solid ${est?.color ?? '#E1DDD0'}`, borderRadius: 12, padding: '12px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <span style={{ fontWeight: 700, fontSize: 14 }}>🏊 {p}</span>
                   <span style={{ fontSize: 11, fontWeight: 600, color: est?.color }}>{est?.icon} {est?.label}</span>
@@ -132,23 +132,23 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
                 {r ? (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                     <div>
-                      <div style={{ fontSize: 10, color: '#9ca3af' }}>pH</div>
+                      <div style={{ fontSize: 10, color: '#7E9389' }}>pH</div>
                       <GaugeBar value={r.ph} min={PH_MIN} max={PH_MAX} status={phStatus(r.ph)} />
                     </div>
                     <div>
-                      <div style={{ fontSize: 10, color: '#9ca3af' }}>Cloro</div>
+                      <div style={{ fontSize: 10, color: '#7E9389' }}>Cloro</div>
                       <GaugeBar value={r.cloro} min={CLORO_MIN} max={CLORO_MAX} status={cloroStatus(r.cloro)} />
                     </div>
                     <div>
-                      <div style={{ fontSize: 10, color: '#9ca3af' }}>°C</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>{r.temperatura ?? '—'}</div>
+                      <div style={{ fontSize: 10, color: '#7E9389' }}>°C</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#3E5A4C' }}>{r.temperatura ?? '—'}</div>
                     </div>
                     <div style={{ gridColumn: 'span 3', fontSize: 11, color: turb?.color, marginTop: 2 }}>
                       💧 {turb?.label} · {r.fecha} {r.hora?.slice(0, 5)}
                     </div>
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: '#9ca3af' }}>Sin registros</div>
+                  <div style={{ fontSize: 12, color: '#7E9389' }}>Sin registros</div>
                 )}
               </div>
             )
@@ -163,11 +163,11 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
             <option value="">Todas las piscinas</option>
             {piscinas.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
-          <span style={{ fontSize: 13, color: '#6b7280', alignSelf: 'center' }}>{lista.length} registros</span>
+          <span style={{ fontSize: 13, color: '#7E9389', alignSelf: 'center' }}>{lista.length} registros</span>
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#06b6d4', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: '#577B69', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nuevo registro'}
           </button>
         )}
@@ -175,7 +175,7 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nuevo registro de piscina</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -191,12 +191,12 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
               <input type="time" style={inp} value={form.hora} onChange={e => setForm(p => ({ ...p, hora: e.target.value }))} />
             </div>
             <div>
-              <label style={lbl}>pH <span style={{ color: '#9ca3af' }}>(ideal {PH_MIN}–{PH_MAX})</span></label>
-              <input type="number" step="0.01" style={{ ...inp, borderColor: form.ph ? STATUS_COLOR[phStatus(parseFloat(form.ph))] : '#d1d5db' }} value={form.ph} onChange={e => setForm(p => ({ ...p, ph: e.target.value }))} />
+              <label style={lbl}>pH <span style={{ color: '#7E9389' }}>(ideal {PH_MIN}–{PH_MAX})</span></label>
+              <input type="number" step="0.01" style={{ ...inp, borderColor: form.ph ? STATUS_COLOR[phStatus(parseFloat(form.ph))] : '#C7C2B0' }} value={form.ph} onChange={e => setForm(p => ({ ...p, ph: e.target.value }))} />
             </div>
             <div>
-              <label style={lbl}>Cloro ppm <span style={{ color: '#9ca3af' }}>({CLORO_MIN}–{CLORO_MAX})</span></label>
-              <input type="number" step="0.01" style={{ ...inp, borderColor: form.cloro ? STATUS_COLOR[cloroStatus(parseFloat(form.cloro))] : '#d1d5db' }} value={form.cloro} onChange={e => setForm(p => ({ ...p, cloro: e.target.value }))} />
+              <label style={lbl}>Cloro ppm <span style={{ color: '#7E9389' }}>({CLORO_MIN}–{CLORO_MAX})</span></label>
+              <input type="number" step="0.01" style={{ ...inp, borderColor: form.cloro ? STATUS_COLOR[cloroStatus(parseFloat(form.cloro))] : '#C7C2B0' }} value={form.cloro} onChange={e => setForm(p => ({ ...p, cloro: e.target.value }))} />
             </div>
             <div>
               <label style={lbl}>Temperatura (°C)</label>
@@ -236,21 +236,21 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
 
       {/* Historial */}
       {lista.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0', fontSize: 13 }}>Sin registros</div>
+        <div style={{ textAlign: 'center', color: '#7E9389', padding: '40px 0', fontSize: 13 }}>Sin registros</div>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
           {lista.map(r => {
             const est = ESTADOS.find(e => e.value === r.estado)
             const turb = TURBIEDAD.find(t => t.value === r.turbiedad)
             return (
-              <div key={r.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={r.id} style={{ background: '#fff', border: '1px solid #E1DDD0', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>🏊 {r.piscina}</span>
                     <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.icon} {est?.label}</span>
                     <span style={{ fontSize: 11, color: turb?.color }}>💧 {turb?.label}</span>
                   </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>
+                  <div style={{ fontSize: 12, color: '#7E9389', marginTop: 3 }}>
                     {r.fecha} {r.hora?.slice(0, 5)}
                     {r.registrado_por && <span> · {r.registrado_por}</span>}
                     {r.observaciones && <span> · {r.observaciones}</span>}
@@ -259,20 +259,20 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
                 <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                   {r.ph != null && (
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 10, color: '#9ca3af' }}>pH</div>
+                      <div style={{ fontSize: 10, color: '#7E9389' }}>pH</div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: STATUS_COLOR[phStatus(r.ph)] }}>{r.ph}</div>
                     </div>
                   )}
                   {r.cloro != null && (
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 10, color: '#9ca3af' }}>Cl</div>
+                      <div style={{ fontSize: 10, color: '#7E9389' }}>Cl</div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: STATUS_COLOR[cloroStatus(r.cloro)] }}>{r.cloro}</div>
                     </div>
                   )}
                   {r.temperatura != null && (
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 10, color: '#9ca3af' }}>°C</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>{r.temperatura}</div>
+                      <div style={{ fontSize: 10, color: '#7E9389' }}>°C</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#3E5A4C' }}>{r.temperatura}</div>
                     </div>
                   )}
                   {canEdit && r.estado !== 'abierta' && (

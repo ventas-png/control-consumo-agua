@@ -16,7 +16,7 @@ interface Props {
 }
 
 const ESTADO_REV: Record<EstadoRevision, { label: string; icon: string; bg: string; color: string; border: string }> = {
-  pendiente: { label: 'Pendiente revisión', icon: '⏳', bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' },
+  pendiente: { label: 'Pendiente revisión', icon: '⏳', bg: '#FAF7EF', color: '#7E9389', border: '#E1DDD0' },
   aprobado:  { label: 'Aprobado',           icon: '✅', bg: '#f0fdf4', color: '#16a34a', border: '#86efac' },
   rechazado: { label: 'Rechazado',          icon: '❌', bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
 }
@@ -81,8 +81,8 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
   return (
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
       <div style={{ marginBottom: '20px' }}>
-        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Revisión de turnos</h2>
-        <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '13.5px' }}>
+        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#15291F' }}>Revisión de turnos</h2>
+        <p style={{ margin: '4px 0 0', color: '#7E9389', fontSize: '13.5px' }}>
           Ronda del administrador · aprueba o rechaza el trabajo realizado por el personal
         </p>
       </div>
@@ -90,23 +90,23 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={selectedPersonalId} onChange={e => setSelectedPersonalId(e.target.value)}
-          style={{ padding: '7px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
+          style={{ padding: '7px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white' }}>
           <option value="todos">Todos los empleados</option>
           {personalActivo.map(p => <option key={p.id} value={p.id}>{p.nombre} — {p.cargo}</option>)}
         </select>
         <input type="date" value={selectedFecha} onChange={e => setSelectedFecha(e.target.value)}
-          style={{ padding: '7px 12px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
+          style={{ padding: '7px 12px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', background: 'white' }} />
         {selectedFecha !== hoy && (
-          <button onClick={() => setSelectedFecha(hoy)} style={{ padding: '7px 12px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: '#374151' }}>
+          <button onClick={() => setSelectedFecha(hoy)} style={{ padding: '7px 12px', background: '#EAE6D8', border: '1px solid #E1DDD0', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: '#3E5A4C' }}>
             Hoy
           </button>
         )}
       </div>
 
       {bloquesCerrados.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '56px', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center', padding: '56px', color: '#7E9389' }}>
           <div style={{ fontSize: '48px', marginBottom: '12px' }}>🔍</div>
-          <p style={{ fontWeight: 700, color: '#64748b' }}>Sin turnos cerrados para revisar</p>
+          <p style={{ fontWeight: 700, color: '#7E9389' }}>Sin turnos cerrados para revisar</p>
           <p style={{ fontSize: '13px' }}>Los turnos aparecen aquí cuando el operativo cierra su bloque de trabajo.</p>
         </div>
       ) : (
@@ -119,16 +119,16 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
             const revisionCompleta = rev.pendientes === 0 && rev.total > 0
 
             return (
-              <div key={bloque.id} style={{ background: 'white', border: `1.5px solid ${isOpen ? '#6366f1' : '#e2e8f0'}`, borderRadius: '16px', overflow: 'hidden' }}>
+              <div key={bloque.id} style={{ background: 'white', border: `1.5px solid ${isOpen ? '#B96A3F' : '#E1DDD0'}`, borderRadius: '16px', overflow: 'hidden' }}>
                 {/* Header del bloque */}
-                <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', background: isOpen ? '#eef2ff' : 'white' }}
+                <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', background: isOpen ? '#F4EBE3' : 'white' }}
                   onClick={() => setBloqueAbierto(isOpen ? null : bloque.id)}>
                   <span style={{ fontSize: '22px' }}>🔍</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '14.5px', color: '#0f172a' }}>
+                    <div style={{ fontWeight: 700, fontSize: '14.5px', color: '#15291F' }}>
                       {empleado?.nombre ?? 'Empleado'} — {empleado?.cargo ?? ''}
                     </div>
-                    <div style={{ fontSize: '12.5px', color: '#64748b', display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '2px' }}>
+                    <div style={{ fontSize: '12.5px', color: '#7E9389', display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '2px' }}>
                       <span>{new Date(bloque.fecha + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'short' })}</span>
                       {bloque.turno === 'manana' && <span>🌅 Mañana</span>}
                       {bloque.turno === 'tarde'  && <span>☀️ Tarde</span>}
@@ -142,7 +142,7 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                         <>
                           {rev.aprobadas > 0 && <span style={{ color: '#16a34a' }}>✅ {rev.aprobadas} aprobadas</span>}
                           {rev.rechazadas > 0 && <span style={{ color: '#dc2626' }}>❌ {rev.rechazadas} rechazadas</span>}
-                          {rev.pendientes > 0 && <span style={{ color: '#64748b' }}>⏳ {rev.pendientes} por revisar</span>}
+                          {rev.pendientes > 0 && <span style={{ color: '#7E9389' }}>⏳ {rev.pendientes} por revisar</span>}
                         </>
                       )}
                     </div>
@@ -151,19 +151,19 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                   {/* Badge revisión */}
                   {rev.total > 0 && (
                     <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, flexShrink: 0,
-                      background: revisionCompleta ? (rev.rechazadas > 0 ? '#fef2f2' : '#f0fdf4') : '#eff6ff',
-                      color: revisionCompleta ? (rev.rechazadas > 0 ? '#dc2626' : '#16a34a') : '#2563eb' }}>
+                      background: revisionCompleta ? (rev.rechazadas > 0 ? '#fef2f2' : '#f0fdf4') : '#EEF2EC',
+                      color: revisionCompleta ? (rev.rechazadas > 0 ? '#dc2626' : '#16a34a') : '#1B3B36' }}>
                       {revisionCompleta ? (rev.rechazadas > 0 ? '⚠ Con rechazos' : '✓ Revisado') : 'Pendiente revisión'}
                     </span>
                   )}
-                  <span style={{ color: '#94a3b8', fontSize: '16px', transition: 'transform .2s', transform: isOpen ? 'rotate(180deg)' : 'none' }}>▾</span>
+                  <span style={{ color: '#7E9389', fontSize: '16px', transition: 'transform .2s', transform: isOpen ? 'rotate(180deg)' : 'none' }}>▾</span>
                 </div>
 
                 {/* Detalle de tareas para revisar */}
                 {isOpen && (
-                  <div style={{ borderTop: '1px solid #c7d2fe', padding: '16px 18px', background: '#eef2ff' }}>
+                  <div style={{ borderTop: '1px solid #E6CDBB', padding: '16px 18px', background: '#F4EBE3' }}>
                     {ts.length === 0 ? (
-                      <p style={{ color: '#94a3b8', fontSize: '13px' }}>Este turno no tenía tareas asignadas.</p>
+                      <p style={{ color: '#7E9389', fontSize: '13px' }}>Este turno no tenía tareas asignadas.</p>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {ts.map((t, idx) => {
@@ -175,20 +175,20 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                           return (
                             <div key={t.id} style={{ padding: '12px 14px', background: rc.bg, borderRadius: '10px', border: `1px solid ${rc.border}` }}>
                               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                                <span style={{ fontSize: '12px', fontWeight: 800, color: '#6366f1', width: '18px', flexShrink: 0, marginTop: '2px', textAlign: 'center' }}>{idx + 1}</span>
+                                <span style={{ fontSize: '12px', fontWeight: 800, color: '#B96A3F', width: '18px', flexShrink: 0, marginTop: '2px', textAlign: 'center' }}>{idx + 1}</span>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '3px' }}>
-                                    <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#0f172a' }}>{t.titulo}</span>
-                                    <span style={{ fontSize: '11.5px', padding: '1px 7px', borderRadius: '20px', background: t.estado === 'completada' ? '#dcfce7' : t.estado === 'con_observacion' ? '#fef3c7' : t.estado === 'omitida' ? '#ede9fe' : '#f1f5f9', color: t.estado === 'completada' ? '#16a34a' : t.estado === 'con_observacion' ? '#92400e' : '#64748b', fontWeight: 600 }}>
+                                    <span style={{ fontWeight: 700, fontSize: '13.5px', color: '#15291F' }}>{t.titulo}</span>
+                                    <span style={{ fontSize: '11.5px', padding: '1px 7px', borderRadius: '20px', background: t.estado === 'completada' ? '#dcfce7' : t.estado === 'con_observacion' ? '#fef3c7' : t.estado === 'omitida' ? '#F4EBE3' : '#EAE6D8', color: t.estado === 'completada' ? '#16a34a' : t.estado === 'con_observacion' ? '#92400e' : '#7E9389', fontWeight: 600 }}>
                                       {t.estado === 'completada' ? '✅ Completada' : t.estado === 'con_observacion' ? '⚠️ Con observación' : t.estado === 'omitida' ? '⏭ Omitida' : '⏳ Pendiente'}
                                     </span>
                                   </div>
-                                  {t.descripcion && <div style={{ fontSize: '12px', color: '#64748b' }}>{t.descripcion}</div>}
+                                  {t.descripcion && <div style={{ fontSize: '12px', color: '#7E9389' }}>{t.descripcion}</div>}
                                   {t.notas_operativo && (
                                     <div style={{ fontSize: '12.5px', color: '#ea580c', marginTop: '3px' }}>💬 {t.notas_operativo}</div>
                                   )}
                                   {t.completada_en && (
-                                    <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '2px' }}>
+                                    <div style={{ fontSize: '11.5px', color: '#7E9389', marginTop: '2px' }}>
                                       Completada a las {new Date(t.completada_en).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
                                     </div>
                                   )}
@@ -212,7 +212,7 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                                   </div>
                                 )}
                                 {!esCompletada && (
-                                  <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', flexShrink: 0 }}>No aplica</span>
+                                  <span style={{ fontSize: '12px', color: '#7E9389', fontStyle: 'italic', flexShrink: 0 }}>No aplica</span>
                                 )}
                               </div>
                             </div>
@@ -226,22 +226,22 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                       <div style={{ marginTop: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                         <div style={{ padding: '10px 16px', background: '#f0fdf4', borderRadius: '10px', textAlign: 'center' }}>
                           <div style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a' }}>{rev.aprobadas}</div>
-                          <div style={{ fontSize: '11.5px', color: '#64748b' }}>Aprobadas</div>
+                          <div style={{ fontSize: '11.5px', color: '#7E9389' }}>Aprobadas</div>
                         </div>
                         <div style={{ padding: '10px 16px', background: '#fef2f2', borderRadius: '10px', textAlign: 'center' }}>
                           <div style={{ fontSize: '20px', fontWeight: 800, color: '#dc2626' }}>{rev.rechazadas}</div>
-                          <div style={{ fontSize: '11.5px', color: '#64748b' }}>Rechazadas</div>
+                          <div style={{ fontSize: '11.5px', color: '#7E9389' }}>Rechazadas</div>
                         </div>
-                        <div style={{ padding: '10px 16px', background: '#f8fafc', borderRadius: '10px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '20px', fontWeight: 800, color: '#64748b' }}>{rev.pendientes}</div>
-                          <div style={{ fontSize: '11.5px', color: '#64748b' }}>Por revisar</div>
+                        <div style={{ padding: '10px 16px', background: '#FAF7EF', borderRadius: '10px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '20px', fontWeight: 800, color: '#7E9389' }}>{rev.pendientes}</div>
+                          <div style={{ fontSize: '11.5px', color: '#7E9389' }}>Por revisar</div>
                         </div>
                         {rev.total > 0 && (
-                          <div style={{ padding: '10px 16px', background: '#eff6ff', borderRadius: '10px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '20px', fontWeight: 800, color: '#2563eb' }}>
+                          <div style={{ padding: '10px 16px', background: '#EEF2EC', borderRadius: '10px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '20px', fontWeight: 800, color: '#1B3B36' }}>
                               {rev.total > 0 ? Math.round((rev.aprobadas / rev.total) * 100) : 0}%
                             </div>
-                            <div style={{ fontSize: '11.5px', color: '#64748b' }}>Tasa aprobación</div>
+                            <div style={{ fontSize: '11.5px', color: '#7E9389' }}>Tasa aprobación</div>
                           </div>
                         )}
                       </div>

@@ -25,7 +25,7 @@ const BLANK = {
 const TURNO_COLORS: Record<string, { bg: string; color: string; icon: string }> = {
   'mañana': { bg: '#fef9c3', color: '#92400e', icon: '🌅' },
   tarde:    { bg: '#fff7ed', color: '#c2410c', icon: '☀️' },
-  noche:    { bg: '#ede9fe', color: '#5b21b6', icon: '🌙' },
+  noche:    { bg: '#F4EBE3', color: '#5E3417', icon: '🌙' },
 }
 const TIPO_INCIDENTE = ['observacion', 'incidente', 'emergencia', 'visita', 'reparacion', 'otro']
 
@@ -76,13 +76,13 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
   function handlePrint(n: LibroNovedad) {
     const tc = TURNO_COLORS[n.turno] ?? { icon: '📋' }
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Novedad ${n.fecha}</title>
-    <style>body{font-family:sans-serif;padding:32px;color:#0f172a}h1{font-size:18px}p{font-size:13px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid #e2e8f0}th{background:#f8fafc}</style>
+    <style>body{font-family:sans-serif;padding:32px;color:#15291F}h1{font-size:18px}p{font-size:13px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid #E1DDD0}th{background:#FAF7EF}</style>
     </head><body>
     <h1>${tc.icon} Libro de Novedades — ${n.fecha} (${n.turno})</h1>
     <p><b>Responsable:</b> ${n.responsable} &nbsp; <b>Horario:</b> ${n.hora_inicio ?? '—'} – ${n.hora_fin ?? '—'}</p>
     <h2 style="font-size:14px">Novedades del turno</h2><p>${n.novedades.replace(/\n/g, '<br>')}</p>
     ${(n.incidentes as Incidente[]).length > 0 ? `<h2 style="font-size:14px">Incidentes</h2><table><tr><th>Hora</th><th>Tipo</th><th>Descripción</th></tr>${(n.incidentes as Incidente[]).map(i => `<tr><td>${i.hora}</td><td>${i.tipo}</td><td>${i.descripcion}</td></tr>`).join('')}</table>` : ''}
-    <p style="margin-top:40px;font-size:12px;color:#64748b">Firmado: ${n.firmado ? 'Sí' : 'No'}</p>
+    <p style="margin-top:40px;font-size:12px;color:#7E9389">Firmado: ${n.firmado ? 'Sí' : 'No'}</p>
     </body></html>`
     const w = window.open('', '_blank')
     if (w) { w.document.write(html); w.document.close(); w.print() }
@@ -91,18 +91,18 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
   const filtered = filtroTurno === 'todos' ? novedades : novedades.filter(n => n.turno === filtroTurno)
   const detail = selected ? novedades.find(n => n.id === selected) : null
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', color: '#1e293b', background: '#f8fafc', boxSizing: 'border-box' }
+  const inputStyle: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid #E1DDD0', borderRadius: '8px', fontSize: '13px', color: '#15291F', background: '#FAF7EF', boxSizing: 'border-box' }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Libro de Novedades</h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>Bitácora de turnos de seguridad y administración</p>
+          <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: 700, color: '#15291F' }}>Libro de Novedades</h2>
+          <p style={{ margin: 0, fontSize: '12px', color: '#7E9389' }}>Bitácora de turnos de seguridad y administración</p>
         </div>
         {canCreate && !showForm && (
           <button onClick={() => setShowForm(true)}
-            style={{ padding: '8px 16px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ padding: '8px 16px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Nueva entrada
           </button>
         )}
@@ -110,15 +110,15 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
 
       {/* Form */}
       {showForm && (
-        <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ background: '#FAF7EF', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
           <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700 }}>Nueva entrada</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Fecha</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Fecha</label>
               <input style={inputStyle} type="date" value={form.fecha} onChange={e => setF('fecha', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Turno</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Turno</label>
               <select style={inputStyle} value={form.turno} onChange={e => setF('turno', e.target.value)}>
                 <option value="mañana">🌅 Mañana</option>
                 <option value="tarde">☀️ Tarde</option>
@@ -126,23 +126,23 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Responsable *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Responsable *</label>
               <input style={inputStyle} value={form.responsable} onChange={e => setF('responsable', e.target.value)} placeholder="Nombre del encargado" autoFocus />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Hora inicio</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Hora inicio</label>
               <input style={inputStyle} type="time" value={form.hora_inicio} onChange={e => setF('hora_inicio', e.target.value)} />
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Hora fin</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Hora fin</label>
               <input style={inputStyle} type="time" value={form.hora_fin} onChange={e => setF('hora_fin', e.target.value)} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
               <input type="checkbox" id="firmado_form" checked={form.firmado} onChange={e => setF('firmado', e.target.checked)} />
-              <label htmlFor="firmado_form" style={{ fontSize: '12px', color: '#64748b', cursor: 'pointer' }}>Turno firmado</label>
+              <label htmlFor="firmado_form" style={{ fontSize: '12px', color: '#7E9389', cursor: 'pointer' }}>Turno firmado</label>
             </div>
             <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', display: 'block', marginBottom: '3px' }}>Novedades del turno *</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389', display: 'block', marginBottom: '3px' }}>Novedades del turno *</label>
               <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical', fontFamily: 'inherit' }}
                 value={form.novedades} onChange={e => setF('novedades', e.target.value)}
                 placeholder="Describe las novedades generales del turno…" />
@@ -152,9 +152,9 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
           {/* Incidentes */}
           <div style={{ marginTop: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>Incidentes del turno</label>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: '#7E9389' }}>Incidentes del turno</label>
               <button onClick={addIncidente}
-                style={{ padding: '3px 10px', background: '#e0f2fe', color: '#0369a1', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer' }}>
+                style={{ padding: '3px 10px', background: '#D9E2DC', color: '#102622', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer' }}>
                 + Agregar
               </button>
             </div>
@@ -172,11 +172,11 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
 
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button onClick={handleSave} disabled={saving}
-              style={{ padding: '7px 18px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '7px 18px', background: '#1B3B36', color: 'white', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button onClick={() => setShowForm(false)}
-              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#64748b' }}>
+              style={{ padding: '7px 12px', background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '7px', fontSize: '13px', cursor: 'pointer', color: '#7E9389' }}>
               Cancelar
             </button>
           </div>
@@ -190,9 +190,9 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
           return (
             <button key={f} onClick={() => setFiltroTurno(f)}
               style={{ padding: '5px 12px', border: '1.5px solid', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', fontWeight: filtroTurno === f ? 700 : 500,
-                borderColor: filtroTurno === f ? '#0ea5e9' : '#e2e8f0',
-                background: filtroTurno === f ? '#e0f2fe' : 'white',
-                color: filtroTurno === f ? '#0369a1' : '#64748b' }}>
+                borderColor: filtroTurno === f ? '#1B3B36' : '#E1DDD0',
+                background: filtroTurno === f ? '#D9E2DC' : 'white',
+                color: filtroTurno === f ? '#102622' : '#7E9389' }}>
               {f === 'todos' ? 'Todos' : `${tc?.icon} ${f}`}
             </button>
           )
@@ -203,14 +203,14 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
       <div style={{ display: 'grid', gridTemplateColumns: detail ? '1fr 340px' : '1fr', gap: '16px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '13px' }}>No hay entradas.</div>
+            <div style={{ textAlign: 'center', padding: '40px', color: '#7E9389', fontSize: '13px' }}>No hay entradas.</div>
           ) : (
             filtered.map(n => {
-              const tc = TURNO_COLORS[n.turno] ?? { bg: '#f1f5f9', color: '#64748b', icon: '📋' }
+              const tc = TURNO_COLORS[n.turno] ?? { bg: '#EAE6D8', color: '#7E9389', icon: '📋' }
               const incs = n.incidentes as Incidente[]
               return (
                 <div key={n.id} onClick={() => setSelected(selected === n.id ? null : n.id)}
-                  style={{ background: selected === n.id ? '#f0f9ff' : 'white', border: `1.5px solid ${selected === n.id ? '#0ea5e9' : '#e2e8f0'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
+                  style={{ background: selected === n.id ? '#EEF2EC' : 'white', border: `1.5px solid ${selected === n.id ? '#1B3B36' : '#E1DDD0'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '3px' }}>
@@ -219,17 +219,17 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
                         <span style={{ fontSize: '11px', fontWeight: 600, padding: '1px 7px', borderRadius: '10px', background: tc.bg, color: tc.color }}>{n.turno}</span>
                         {n.firmado && <span style={{ fontSize: '10px', color: '#16a34a', fontWeight: 700 }}>✓ Firmado</span>}
                       </div>
-                      <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      <div style={{ fontSize: '12px', color: '#7E9389' }}>
                         {n.responsable}{n.hora_inicio ? ` · ${n.hora_inicio}–${n.hora_fin ?? '?'}` : ''}
                         {incs.length > 0 && <span style={{ marginLeft: '8px', color: '#ef4444', fontWeight: 600 }}>{incs.length} incidente(s)</span>}
                       </div>
-                      <div style={{ fontSize: '12px', color: '#374151', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '500px' }}>
+                      <div style={{ fontSize: '12px', color: '#3E5A4C', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '500px' }}>
                         {n.novedades}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                       <button onClick={e => { e.stopPropagation(); handlePrint(n) }}
-                        style={{ padding: '3px 7px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
+                        style={{ padding: '3px 7px', background: '#FAF7EF', border: '1px solid #E1DDD0', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
                       {canEdit && !n.firmado && (
                         <button onClick={e => { e.stopPropagation(); toggleFirmado(n.id, n.firmado) }}
                           style={{ padding: '3px 7px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Firmar</button>
@@ -248,26 +248,26 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
 
         {/* Detail */}
         {detail && (
-          <div style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '16px', alignSelf: 'flex-start' }}>
+          <div style={{ background: 'white', border: '1.5px solid #E1DDD0', borderRadius: '12px', padding: '16px', alignSelf: 'flex-start' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>
                 {TURNO_COLORS[detail.turno]?.icon} {detail.fecha} — {detail.turno}
               </h3>
-              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+              <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7E9389' }}>✕</button>
             </div>
-            <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', color: '#7E9389', marginBottom: '10px' }}>
               {detail.responsable}{detail.hora_inicio ? ` · ${detail.hora_inicio} – ${detail.hora_fin}` : ''}
               {detail.firmado && ' · ✓ Firmado'}
             </div>
-            <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5, marginBottom: '12px', whiteSpace: 'pre-wrap' }}>{detail.novedades}</div>
+            <div style={{ fontSize: '13px', color: '#3E5A4C', lineHeight: 1.5, marginBottom: '12px', whiteSpace: 'pre-wrap' }}>{detail.novedades}</div>
             {(detail.incidentes as Incidente[]).length > 0 && (
               <>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>Incidentes</div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#7E9389', marginBottom: '6px' }}>Incidentes</div>
                 {(detail.incidentes as Incidente[]).map((inc, i) => (
                   <div key={i} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '6px 8px', marginBottom: '4px', fontSize: '12px' }}>
                     <span style={{ fontWeight: 700, color: '#ef4444' }}>{inc.hora}</span>
-                    <span style={{ color: '#64748b', marginLeft: '6px', fontSize: '11px' }}>[{inc.tipo}]</span>
-                    <span style={{ marginLeft: '6px', color: '#374151' }}>{inc.descripcion}</span>
+                    <span style={{ color: '#7E9389', marginLeft: '6px', fontSize: '11px' }}>[{inc.tipo}]</span>
+                    <span style={{ marginLeft: '6px', color: '#3E5A4C' }}>{inc.descripcion}</span>
                   </div>
                 ))}
               </>
