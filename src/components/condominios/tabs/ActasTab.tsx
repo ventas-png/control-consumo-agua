@@ -267,7 +267,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
               {actas.map(a => {
                 const tl = TIPO_LABELS[a.tipo]
                 return (
-                  <div key={a.id} style={{ background: viewId === a.id ? 'var(--at-primary-tint)' : 'white', border: `1.5px solid ${viewId === a.id ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderLeft: `4px solid ${tl.color}`, borderRadius: '8px', padding: '12px 14px' }}>
+                  <div key={a.id} style={{ background: viewId === a.id ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${viewId === a.id ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderLeft: `4px solid ${tl.color}`, borderRadius: '8px', padding: '12px 14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setViewId(viewId === a.id ? null : a.id)}>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>

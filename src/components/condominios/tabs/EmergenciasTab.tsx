@@ -186,12 +186,12 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
       {/* Filtro por tipo */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => setFiltroTipo('todos')}
-          style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroTipo === 'todos' ? 'var(--at-primary)' : 'var(--at-line)', background: filtroTipo === 'todos' ? 'var(--at-primary-soft)' : 'white', color: filtroTipo === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+          style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroTipo === 'todos' ? 'var(--at-primary)' : 'var(--at-line)', background: filtroTipo === 'todos' ? 'var(--at-primary-soft)' : 'var(--at-surface)', color: filtroTipo === 'todos' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
           Todos ({contactos.length})
         </button>
         {TIPOS.filter(t => contactos.some(c => c.tipo === t.value)).map(t => (
           <button key={t.value} onClick={() => setFiltroTipo(t.value)}
-            style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroTipo === t.value ? t.color : 'var(--at-line)', background: filtroTipo === t.value ? `${t.color}20` : 'white', color: filtroTipo === t.value ? t.color : 'var(--at-ink-3)' }}>
+            style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer', borderColor: filtroTipo === t.value ? t.color : 'var(--at-line)', background: filtroTipo === t.value ? `${t.color}20` : 'var(--at-surface)', color: filtroTipo === t.value ? t.color : 'var(--at-ink-3)' }}>
             {t.icon} {t.label}
           </button>
         ))}
@@ -207,7 +207,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
           {sorted.map(c => {
             const ti = tipoInfo(c.tipo)
             return (
-              <div key={c.id} style={{ background: c.activo ? 'white' : 'var(--at-surface-2)', border: `1.5px solid ${c.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '10px', padding: '14px', opacity: c.activo ? 1 : 0.6 }}>
+              <div key={c.id} style={{ background: c.activo ? 'var(--at-surface)' : 'var(--at-surface-2)', border: `1.5px solid ${c.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '10px', padding: '14px', opacity: c.activo ? 1 : 0.6 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: `${ti.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', flexShrink: 0 }}>
                     {ti.icon}

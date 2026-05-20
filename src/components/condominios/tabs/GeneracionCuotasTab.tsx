@@ -208,7 +208,7 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
 
             {canCreate && (
               <button onClick={generar} disabled={generando || seleccionadas.size === 0}
-                style={{ width: '100%', padding: '10px 0', background: seleccionadas.size === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: seleccionadas.size === 0 ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, opacity: generando ? 0.7 : 1 }}>
+                style={{ width: '100%', padding: '10px 0', background: seleccionadas.size === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: seleccionadas.size === 0 ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, opacity: generando ? 0.7 : 1 }}>
                 {generando ? 'Generando…' : `🏭 Generar ${seleccionadas.size} cuotas`}
               </button>
             )}
@@ -238,8 +238,8 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
                 const sel = seleccionadas.has(u.id)
                 return (
                   <div key={u.id} onClick={() => toggleUnidad(u.id)} style={{ padding: '8px 10px', border: `1.5px solid ${sel ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: 8, cursor: 'pointer', background: sel ? 'var(--at-primary-tint)' : 'var(--at-surface-2)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 16, height: 16, border: `2px solid ${sel ? 'var(--at-primary)' : 'var(--at-line-strong)'}`, borderRadius: 4, background: sel ? 'var(--at-primary)' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {sel && <span style={{ color: '#fff', fontSize: 10, fontWeight: 900 }}>✓</span>}
+                    <div style={{ width: 16, height: 16, border: `2px solid ${sel ? 'var(--at-primary)' : 'var(--at-line-strong)'}`, borderRadius: 4, background: sel ? 'var(--at-primary)' : 'var(--at-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {sel && <span style={{ color: 'white', fontSize: 10, fontWeight: 900 }}>✓</span>}
                     </div>
                     <span style={{ fontSize: 12, fontWeight: sel ? 600 : 400, color: sel ? 'var(--at-primary-hover)' : 'var(--at-ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.nombre}</span>
                   </div>

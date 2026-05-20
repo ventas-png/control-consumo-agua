@@ -117,7 +117,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Agregar visita frecuente'}
           </button>
         )}
@@ -176,14 +176,14 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
             <div style={{ display: 'flex', gap: 6 }}>
               {DIAS.map(d => (
                 <button key={d} type="button" onClick={() => toggleDia(d)}
-                  style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: form.dias_permitidos.includes(d) ? 'var(--at-accent)' : '#fff', color: form.dias_permitidos.includes(d) ? '#fff' : 'var(--at-ink-2)', borderColor: form.dias_permitidos.includes(d) ? 'var(--at-accent)' : 'var(--at-line-strong)' }}>
+                  style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: form.dias_permitidos.includes(d) ? 'var(--at-accent)' : 'var(--at-surface)', color: form.dias_permitidos.includes(d) ? 'white' : 'var(--at-ink-2)', borderColor: form.dias_permitidos.includes(d) ? 'var(--at-accent)' : 'var(--at-line-strong)' }}>
                   {DIAS_LABEL[d]}
                 </button>
               ))}
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Guardar'}
           </button>
         </div>
@@ -204,7 +204,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
                 {items.map(v => {
                   const rel = RELACIONES.find(r => r.value === v.relacion)
                   return (
-                    <div key={v.id} style={{ background: v.activo ? '#fff' : 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '12px 14px', opacity: v.activo ? 1 : 0.6 }}>
+                    <div key={v.id} style={{ background: v.activo ? 'var(--at-surface)' : 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '12px 14px', opacity: v.activo ? 1 : 0.6 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{rel?.icon} {v.nombre}</div>

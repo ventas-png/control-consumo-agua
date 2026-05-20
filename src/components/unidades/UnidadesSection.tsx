@@ -596,7 +596,7 @@ export function UnidadesSection({
                 key={r.value}
                 onClick={() => setFilterTipo(isSelected ? '' : r.value as TipoUnidad)}
                 style={{
-                  background: isSelected ? col.bg : 'white',
+                  background: isSelected ? col.bg : 'var(--at-surface)',
                   border: `2px solid ${isSelected ? col.color : 'var(--at-line)'}`,
                   borderRadius: '12px',
                   padding: '12px 18px',
@@ -1278,7 +1278,7 @@ function pageBtnStyle(disabled: boolean): CSSProperties {
   return {
     padding: '6px 14px', borderRadius: 8,
     border: '1px solid var(--at-line)',
-    background: disabled ? 'var(--at-chip)' : 'white',
+    background: disabled ? 'var(--at-chip)' : 'var(--at-surface)',
     color: disabled ? 'var(--at-line-strong)' : 'var(--at-ink-2)',
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontWeight: 600, fontSize: 12,

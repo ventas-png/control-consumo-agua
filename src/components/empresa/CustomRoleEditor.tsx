@@ -294,5 +294,5 @@ const btnSecondary: React.CSSProperties = {
 
 const btnPrimary: React.CSSProperties = {
   padding: '8px 20px', borderRadius: '8px', border: 'none',
-  color: '#fff', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
+  color: 'white', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
 }

@@ -553,7 +553,7 @@ export function RutasSection({
                       onDragStart={() => handleDragStart(idx)}
                       onDragOver={e => handleDragOver(e, idx)}
                       onDrop={handleDrop}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)', background: draggingIdx === idx ? 'var(--at-primary-tint)' : 'white', cursor: 'grab', userSelect: 'none' }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)', background: draggingIdx === idx ? 'var(--at-primary-tint)' : 'var(--at-surface)', cursor: 'grab', userSelect: 'none' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ color: 'var(--at-ink-3)', fontSize: '16px' }}>⠿</span>
@@ -637,7 +637,7 @@ export function RutasSection({
                         setDraggingIdx(null)
                         dragOver.current = null
                       }}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)', background: draggingIdx === idx ? 'var(--at-primary-tint)' : 'white', cursor: 'grab', userSelect: 'none' }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)', background: draggingIdx === idx ? 'var(--at-primary-tint)' : 'var(--at-surface)', cursor: 'grab', userSelect: 'none' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ color: 'var(--at-ink-3)', fontSize: '16px' }}>⠿</span>
@@ -721,7 +721,7 @@ export function RutasSection({
                         setDraggingIdx(null)
                         dragOver.current = null
                       }}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)', background: draggingIdx === idx ? 'var(--at-primary-tint)' : 'white', cursor: 'grab', userSelect: 'none' }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--at-chip)', background: draggingIdx === idx ? 'var(--at-primary-tint)' : 'var(--at-surface)', cursor: 'grab', userSelect: 'none' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ color: 'var(--at-ink-3)', fontSize: '16px' }}>⠿</span>

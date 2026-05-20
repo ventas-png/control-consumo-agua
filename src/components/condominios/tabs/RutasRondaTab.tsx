@@ -191,7 +191,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
         {(['areas', 'rutas'] as const).map(v => (
           <button key={v} onClick={() => setVista(v)}
-            style={{ padding: '8px 18px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === v ? 'var(--at-accent)' : 'var(--at-line)', background: vista === v ? 'var(--at-accent-tint)' : 'white', color: vista === v ? 'var(--at-accent)' : 'var(--at-ink-3)' }}>
+            style={{ padding: '8px 18px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === v ? 'var(--at-accent)' : 'var(--at-line)', background: vista === v ? 'var(--at-accent-tint)' : 'var(--at-surface)', color: vista === v ? 'var(--at-accent)' : 'var(--at-ink-3)' }}>
             {v === 'areas' ? `📍 Áreas (${areas.length})` : `🗺 Rutas (${rutas.length})`}
           </button>
         ))}

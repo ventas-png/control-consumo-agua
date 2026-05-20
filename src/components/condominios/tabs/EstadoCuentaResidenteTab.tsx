@@ -162,11 +162,11 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
             {aniosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
           <button onClick={() => exportarPDFEstadoCuenta(movimientos, unidad?.nombre ?? unidadId, anio, moneda, proyectoNombre)}
-            style={{ padding: '6px 16px', background: 'var(--at-accent-2)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+            style={{ padding: '6px 16px', background: 'var(--at-accent-2)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
             📄 Descargar PDF
           </button>
           <button onClick={imprimir}
-            style={{ padding: '6px 16px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+            style={{ padding: '6px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
             🖨️ Imprimir
           </button>
         </div>

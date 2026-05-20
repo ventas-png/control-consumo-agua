@@ -179,7 +179,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
             const es = ESTADO_FLOW[i.estado]
             return (
               <div key={i.id} onClick={() => { setSelected(i); setShowForm(false) }}
-                style={{ padding: '12px 14px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === i.id ? '#fff1f2' : 'white', borderLeft: selected?.id === i.id ? '3px solid #ef4444' : '3px solid transparent' }}>
+                style={{ padding: '12px 14px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === i.id ? '#fff1f2' : 'var(--at-surface)', borderLeft: selected?.id === i.id ? '3px solid #ef4444' : '3px solid transparent' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>

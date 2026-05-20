@@ -113,7 +113,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
             <span style={{ fontWeight: 600, fontSize: 14 }}>Reglamento ({lista.length})</span>
             {canCreate && (
               <button onClick={() => { resetForm(); setEditando(false); setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Artículo
               </button>
             )}
@@ -140,7 +140,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
               const cat = CATEGORIAS.find(c => c.value === a.categoria)
               return (
                 <div key={a.id} onClick={() => { setSelected(a); setMostrarForm(false) }}
-                  style={{ padding: '9px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === a.id ? 'var(--at-accent-tint)' : '#fff', opacity: a.vigente ? 1 : 0.5, borderLeft: `3px solid ${cat?.color || 'var(--at-line)'}` }}>
+                  style={{ padding: '9px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === a.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', opacity: a.vigente ? 1 : 0.5, borderLeft: `3px solid ${cat?.color || 'var(--at-line)'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: cat?.color }}>{a.numero_articulo}</span>
                     {!a.vigente && <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>derogado</span>}
@@ -197,7 +197,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : `✅ ${editando ? 'Actualizar' : 'Crear'}`}
               </button>
               <button onClick={() => { setMostrarForm(false); setEditando(false); resetForm() }}

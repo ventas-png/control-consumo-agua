@@ -280,7 +280,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
                       background: completado ? '#16a34a' : activo ? 'var(--at-primary)' : 'var(--at-line)',
-                      color: completado || activo ? '#fff' : 'var(--at-ink-3)' }}>
+                      color: completado || activo ? 'white' : 'var(--at-ink-3)' }}>
                       {completado ? '✓' : i + 1}
                     </div>
                     <span style={{ fontSize: 12, fontWeight: activo ? 700 : 500, color: activo ? 'var(--at-primary)' : completado ? '#16a34a' : 'var(--at-ink-3)' }}>
@@ -347,7 +347,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                 {canCreate && (
                   <button onClick={irAPreview}
                     disabled={rubros.length === 0 || unidadesDisponibles.length === 0}
-                    style={{ marginTop: 20, width: '100%', padding: '10px 0', background: rubros.length === 0 || unidadesDisponibles.length === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
+                    style={{ marginTop: 20, width: '100%', padding: '10px 0', background: rubros.length === 0 || unidadesDisponibles.length === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
                     Previsualizar por unidad →
                   </button>
                 )}
@@ -402,7 +402,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                   return (
                     <div key={unidad.id} style={{ borderBottom: idx < calculos.length - 1 ? '1px solid var(--at-chip)' : 'none' }}>
                       <div onClick={() => toggleUnidad(unidad.id)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 8px', cursor: 'pointer', background: sel ? 'var(--at-primary-tint)' : idx % 2 === 0 ? '#fff' : 'var(--at-surface-2)' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 8px', cursor: 'pointer', background: sel ? 'var(--at-primary-tint)' : idx % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)' }}>
                         <div style={{ width: 20 }} onClick={e => { e.stopPropagation(); toggleUnidad(unidad.id) }}>
                           <input type="checkbox" checked={sel} onChange={() => toggleUnidad(unidad.id)} onClick={e => e.stopPropagation()} />
                         </div>
@@ -469,7 +469,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                 </div>
                 {canCreate && (
                   <button onClick={generar} disabled={generando || seleccionadas.size === 0}
-                    style={{ padding: '10px 24px', background: seleccionadas.size === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: seleccionadas.size === 0 ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, opacity: generando ? 0.7 : 1 }}>
+                    style={{ padding: '10px 24px', background: seleccionadas.size === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: seleccionadas.size === 0 ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, opacity: generando ? 0.7 : 1 }}>
                     {generando ? 'Generando…' : `🏭 Confirmar y generar ${seleccionadas.size} cuotas`}
                   </button>
                 )}
@@ -493,7 +493,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                 </button>
                 {onVerCuotas && (
                   <button onClick={onVerCuotas}
-                    style={{ padding: '10px 20px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+                    style={{ padding: '10px 20px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
                     Ver cuotas generadas →
                   </button>
                 )}

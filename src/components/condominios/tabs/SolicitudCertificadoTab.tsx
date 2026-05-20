@@ -95,7 +95,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
             <span style={{ fontWeight: 600, fontSize: 14 }}>Certificados ({lista.length})</span>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nueva
               </button>
             )}
@@ -118,7 +118,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
           const unidad = unidades.find(u => u.id === s.unidad_id)
           return (
             <div key={s.id} onClick={() => { setSelected(s); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? 'var(--at-accent-tint)' : '#fff' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? 'var(--at-accent-tint)' : 'var(--at-surface)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
                 <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: est?.bg, color: est?.color }}>{est?.label}</span>
@@ -170,7 +170,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Crear solicitud'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -202,7 +202,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
                   <div style={{ display: 'flex', gap: 6 }}>
                     {siguiente && (
                       <button onClick={() => avanzar(selected)}
-                        style={{ padding: '7px 14px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                        style={{ padding: '7px 14px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                         → {ESTADOS.find(e => e.value === siguiente)?.label}
                       </button>
                     )}
@@ -223,7 +223,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
                   return (
                     <div key={f} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                       <div style={{ textAlign: 'center', minWidth: 80 }}>
-                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: actual ? e.color : pasado ? '#d1fae5' : 'var(--at-chip)', margin: '0 auto 4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: actual ? '#fff' : pasado ? '#10b981' : 'var(--at-ink-3)', fontWeight: 700 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: actual ? e.color : pasado ? '#d1fae5' : 'var(--at-chip)', margin: '0 auto 4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: actual ? 'white' : pasado ? '#10b981' : 'var(--at-ink-3)', fontWeight: 700 }}>
                           {pasado ? '✓' : i + 1}
                         </div>
                         <div style={{ fontSize: 10, color: actual ? e.color : 'var(--at-ink-3)', fontWeight: actual ? 700 : 400 }}>{e.label}</div>

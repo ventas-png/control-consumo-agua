@@ -838,7 +838,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                             <button
                               onClick={() => ingresoHabilitado && abrirRegistroSTR(r)}
                               disabled={!ingresoHabilitado}
-                              style={{ width: '100%', padding: '8px', background: ingresoHabilitado ? 'white' : 'var(--at-surface-2)', border: `1.5px dashed ${ingresoHabilitado ? 'var(--at-line-strong)' : 'var(--at-line)'}`, borderRadius: '8px', cursor: ingresoHabilitado ? 'pointer' : 'not-allowed', color: ingresoHabilitado ? 'var(--at-ink-2)' : 'var(--at-ink-3)', fontSize: '12px', fontWeight: 600, boxSizing: 'border-box' }}>
+                              style={{ width: '100%', padding: '8px', background: ingresoHabilitado ? 'var(--at-surface)' : 'var(--at-surface-2)', border: `1.5px dashed ${ingresoHabilitado ? 'var(--at-line-strong)' : 'var(--at-line)'}`, borderRadius: '8px', cursor: ingresoHabilitado ? 'pointer' : 'not-allowed', color: ingresoHabilitado ? 'var(--at-ink-2)' : 'var(--at-ink-3)', fontSize: '12px', fontWeight: 600, boxSizing: 'border-box' }}>
                               + Nueva persona ({cuposLibres} cupo{cuposLibres !== 1 ? 's' : ''} disponible{cuposLibres !== 1 ? 's' : ''})
                             </button>
                           )}

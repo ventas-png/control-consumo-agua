@@ -113,7 +113,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
             <span style={{ fontWeight: 600, fontSize: 14 }}>Jardinería ({lista.length})</span>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#22c55e', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: '#22c55e', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nuevo
               </button>
             )}
@@ -150,7 +150,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
           const est = ESTADOS.find(e => e.value === r.estado)
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? '#f0fdf4' : '#fff', borderLeft: `3px solid ${tipo?.color}` }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? '#f0fdf4' : 'var(--at-surface)', borderLeft: `3px solid ${tipo?.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.label}</span>
@@ -231,7 +231,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
                   {AREAS_COMUNES.map(a => (
                     <button key={a} type="button" onClick={() => toggleArea(a)}
-                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid', fontSize: 11, cursor: 'pointer', background: form.areas.includes(a) ? '#22c55e' : '#fff', color: form.areas.includes(a) ? '#fff' : 'var(--at-ink-2)', borderColor: form.areas.includes(a) ? '#22c55e' : 'var(--at-line-strong)' }}>
+                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid', fontSize: 11, cursor: 'pointer', background: form.areas.includes(a) ? '#22c55e' : 'var(--at-surface)', color: form.areas.includes(a) ? 'white' : 'var(--at-ink-2)', borderColor: form.areas.includes(a) ? '#22c55e' : 'var(--at-line-strong)' }}>
                       {a}
                     </button>
                   ))}
@@ -248,7 +248,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Registrar'}
               </button>
               <button onClick={() => setMostrarForm(false)}

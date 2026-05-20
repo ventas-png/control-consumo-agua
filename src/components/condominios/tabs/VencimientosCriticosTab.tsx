@@ -162,21 +162,21 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {(Object.keys(ORIGEN_LABEL) as (keyof typeof ORIGEN_LABEL)[]).map(o => (
             <button key={o} onClick={() => setFiltroOrigen(o as typeof filtroOrigen)}
-              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroOrigen === o ? 'var(--at-primary)' : 'var(--at-line)', background: filtroOrigen === o ? 'var(--at-primary-tint)' : '#fff', color: filtroOrigen === o ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroOrigen === o ? 'var(--at-primary)' : 'var(--at-line)', background: filtroOrigen === o ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: filtroOrigen === o ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
               {ORIGEN_LABEL[o]}
             </button>
           ))}
           <span style={{ width: 1, background: 'var(--at-line)', margin: '0 4px' }} />
           {(Object.keys(PLAZO_LABEL) as (keyof typeof PLAZO_LABEL)[]).map(p => (
             <button key={p} onClick={() => setFiltroPlazo(p as typeof filtroPlazo)}
-              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroPlazo === p ? '#ef4444' : 'var(--at-line)', background: filtroPlazo === p ? '#fef2f2' : '#fff', color: filtroPlazo === p ? '#ef4444' : 'var(--at-ink-3)' }}>
+              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroPlazo === p ? '#ef4444' : 'var(--at-line)', background: filtroPlazo === p ? '#fef2f2' : 'var(--at-surface)', color: filtroPlazo === p ? '#ef4444' : 'var(--at-ink-3)' }}>
               {PLAZO_LABEL[p]}
             </button>
           ))}
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#d97706', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: '#d97706', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Agregar vencimiento'}
           </button>
         )}
@@ -219,7 +219,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#d97706', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: '#d97706', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Agregar'}
           </button>
         </div>

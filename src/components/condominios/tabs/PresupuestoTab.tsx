@@ -202,7 +202,7 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
               }
 
               return (
-                <tr key={cat} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
+                <tr key={cat} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
                   <td style={{ padding: '12px 14px', fontWeight: 600 }}>{cl.icon} {cl.label}</td>
                   <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--at-ink-3)' }}>
                     {presupuestado > 0 ? `${moneda} ${presupuestado.toFixed(0)}` : <span style={{ color: 'var(--at-line-strong)', fontSize: '12px' }}>—</span>}

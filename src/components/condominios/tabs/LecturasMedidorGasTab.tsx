@@ -124,7 +124,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nueva lectura'}
           </button>
         )}
@@ -198,7 +198,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Registrar'}
           </button>
         </div>
@@ -221,7 +221,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
               {lista.map(l => {
                 const unidad = unidades.find(u => u.id === l.unidad_id)
                 return (
-                  <tr key={l.id} style={{ borderBottom: '1px solid var(--at-chip)', background: l.alerta_fuga ? '#fef2f2' : '#fff' }}>
+                  <tr key={l.id} style={{ borderBottom: '1px solid var(--at-chip)', background: l.alerta_fuga ? '#fef2f2' : 'var(--at-surface)' }}>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>
                       {l.alerta_fuga && <span style={{ color: '#ef4444', marginRight: 4 }}>🚨</span>}
                       {unidad?.nombre ?? l.area ?? 'Área común'}

@@ -124,7 +124,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
             {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
           </select>
           <button onClick={imprimir}
-            style={{ padding: '6px 14px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            style={{ padding: '6px 14px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             🖨️ Imprimir
           </button>
         </div>

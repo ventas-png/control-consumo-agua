@@ -280,7 +280,7 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
             {(['activa', 'resuelta', 'ignorada', 'all'] as const).map(e => (
               <button key={e} onClick={() => setFiltroEstado(e)}
                 style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
-                  background: filtroEstado === e ? 'var(--at-ink)' : 'white',
+                  background: filtroEstado === e ? 'var(--at-ink)' : 'var(--at-surface)',
                   color: filtroEstado === e ? 'white' : 'var(--at-ink-3)',
                   borderColor: filtroEstado === e ? 'var(--at-ink)' : 'var(--at-line)' }}>
                 {e === 'all' ? 'Todas' : e.charAt(0).toUpperCase() + e.slice(1)}

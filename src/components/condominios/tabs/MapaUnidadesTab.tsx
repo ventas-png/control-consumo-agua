@@ -73,7 +73,7 @@ export default function MapaUnidadesTab({ unidades, cuotas, contratos, moneda }:
           const cfg = ESTADO_CFG[e]
           return (
             <div key={e} onClick={ev => { ev.stopPropagation(); setFiltro(filtro === e ? '' : e) }}
-              style={{ background: filtro === e ? cfg.bg : '#fff', border: `1.5px solid ${filtro === e ? cfg.border : 'var(--at-line)'}`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', transition: 'all 0.15s' }}>
+              style={{ background: filtro === e ? cfg.bg : 'var(--at-surface)', border: `1.5px solid ${filtro === e ? cfg.border : 'var(--at-line)'}`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', transition: 'all 0.15s' }}>
               <div style={{ fontSize: 18, fontWeight: 800, color: cfg.color }}>{conteos[e]}</div>
               <div style={{ fontSize: 11, color: cfg.color, fontWeight: 600 }}>{cfg.icon} {cfg.label}</div>
             </div>

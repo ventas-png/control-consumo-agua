@@ -127,7 +127,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nueva sugerencia'}
           </button>
         )}
@@ -165,7 +165,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Enviar sugerencia'}
           </button>
         </div>
@@ -186,7 +186,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
               const unidad = unidades.find(u => u.id === s.unidad_id)
               return (
                 <div key={s.id} onClick={() => setSelected(s === selected ? null : s)}
-                  style={{ background: selected?.id === s.id ? 'var(--at-accent-tint-2)' : '#fff', border: `1.5px solid ${selected?.id === s.id ? 'var(--at-accent-light)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === s.id ? 'var(--at-accent-tint-2)' : 'var(--at-surface)', border: `1.5px solid ${selected?.id === s.id ? 'var(--at-accent-light)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 3, flexWrap: 'wrap' }}>
@@ -246,7 +246,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
                   )}
                   {(selected.estado === 'pendiente' || selected.estado === 'en_revision') && (
                     <button onClick={() => responder(selected)}
-                      style={{ padding: '7px 0', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      style={{ padding: '7px 0', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                       💬 Responder
                     </button>
                   )}

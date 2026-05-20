@@ -123,7 +123,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
         ].map((s, i) => (
           <div key={s.n} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: paso >= s.n ? 'var(--at-primary)' : 'var(--at-line)', color: paso >= s.n ? '#fff' : 'var(--at-ink-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: paso >= s.n ? 'var(--at-primary)' : 'var(--at-line)', color: paso >= s.n ? 'white' : 'var(--at-ink-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
                 {paso > s.n ? '✓' : s.n}
               </div>
               <div style={{ fontSize: 10, color: paso >= s.n ? 'var(--at-primary)' : 'var(--at-ink-3)', fontWeight: 600, marginTop: 3 }}>{s.label}</div>
@@ -189,7 +189,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
 
             <div style={{ marginTop: 14 }}>
               <button onClick={() => setPaso(2)} disabled={!plantillaId || destinatarios.length === 0}
-                style={{ width: '100%', padding: '10px 0', background: !plantillaId || destinatarios.length === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: !plantillaId || destinatarios.length === 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>
+                style={{ width: '100%', padding: '10px 0', background: !plantillaId || destinatarios.length === 0 ? 'var(--at-ink-3)' : 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: !plantillaId || destinatarios.length === 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>
                 Ver vista previa → ({destinatarios.length} destinatarios)
               </button>
             </div>
@@ -205,7 +205,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setPaso(1)} style={{ padding: '6px 14px', border: '1px solid var(--at-line)', borderRadius: 7, cursor: 'pointer', fontSize: 12, background: 'var(--at-surface-2)' }}>← Volver</button>
                 <button onClick={enviar} disabled={enviando}
-                  style={{ padding: '6px 18px', background: canalCfg?.color, color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: enviando ? 0.7 : 1 }}>
+                  style={{ padding: '6px 18px', background: canalCfg?.color, color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700, opacity: enviando ? 0.7 : 1 }}>
                   {enviando ? 'Registrando…' : `${canalCfg?.icon} Enviar a ${destinatarios.length} unidades`}
                 </button>
               </div>
@@ -249,7 +249,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
               Se registraron <strong>{destinatarios.length}</strong> mensajes en el log de notificaciones enviadas.
             </div>
             <button onClick={() => { setPaso(1); setPlantillaId(''); }}
-              style={{ padding: '9px 22px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+              style={{ padding: '9px 22px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
               Nuevo envío
             </button>
           </div>
@@ -270,7 +270,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
                     <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'var(--at-surface)', border: '1px solid #bbf7d0', borderRadius: 8 }}>
                       <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--at-ink)' }}>{u.nombre}</span>
                       <a href={url} target="_blank" rel="noreferrer"
-                        style={{ padding: '5px 12px', background: '#16a34a', color: '#fff', borderRadius: 6, fontSize: 11, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                        style={{ padding: '5px 12px', background: '#16a34a', color: 'white', borderRadius: 6, fontSize: 11, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
                         💬 Abrir WhatsApp
                       </a>
                     </div>

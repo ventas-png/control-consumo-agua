@@ -69,14 +69,14 @@ export function AssignToUsersModal({ teamUsers, currentAssignments, onClose, onA
                   style={{
                     display: 'flex', alignItems: 'center', gap: '10px',
                     padding: '10px 12px', border: `1px solid ${isSelected ? 'var(--at-accent-light)' : 'var(--at-line)'}`,
-                    borderRadius: '8px', background: isSelected ? 'var(--at-accent-tint)' : 'white',
+                    borderRadius: '8px', background: isSelected ? 'var(--at-accent-tint)' : 'var(--at-surface)',
                     cursor: 'pointer', textAlign: 'left',
                   }}
                 >
                   <span style={{
                     width: '20px', height: '20px', borderRadius: '4px',
                     border: `2px solid ${isSelected ? 'var(--at-accent-hover)' : 'var(--at-line-strong)'}`,
-                    background: isSelected ? 'var(--at-accent-hover)' : 'white',
+                    background: isSelected ? 'var(--at-accent-hover)' : 'var(--at-surface)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0, fontSize: '12px', color: 'white',
                   }}>

@@ -130,7 +130,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
     const dias = diasHastaRecordatorio(n.fecha_recordatorio)
     return (
       <div onClick={() => { setSelected(n); setMostrarForm(false) }}
-        style={{ background: highlight ? '#fffbeb' : n.resuelta ? 'var(--at-surface-2)' : '#fff', border: `1px solid ${selected?.id === n.id ? 'var(--at-accent)' : highlight ? '#fde68a' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', opacity: n.resuelta ? 0.65 : 1, marginBottom: 8 }}>
+        style={{ background: highlight ? '#fffbeb' : n.resuelta ? 'var(--at-surface-2)' : 'var(--at-surface)', border: `1px solid ${selected?.id === n.id ? 'var(--at-accent)' : highlight ? '#fde68a' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', opacity: n.resuelta ? 0.65 : 1, marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
             {n.fijada && <span title="Fijada">📌</span>}
@@ -163,7 +163,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
             <span style={{ fontWeight: 600, fontSize: 14 }}>Notas ({notas.filter(n => !n.resuelta).length} activas)</span>
             {canCreate && (
               <button onClick={() => { resetForm(); setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nueva
               </button>
             )}
@@ -230,7 +230,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : `✅ ${editando ? 'Actualizar' : 'Crear nota'}`}
               </button>
               <button onClick={resetForm}

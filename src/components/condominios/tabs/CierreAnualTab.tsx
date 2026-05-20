@@ -109,7 +109,7 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
         <span style={{ fontSize: 13, color: 'var(--at-ink-3)' }}>{cierres.length} cierre(s) registrado(s)</span>
         {canCreate && (
           <button onClick={generarCierre} disabled={saving}
-            style={{ padding: '8px 16px', background: 'var(--at-accent-2)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent-2)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             {saving ? '⏳ Generando…' : '📊 Generar cierre anual'}
           </button>
         )}
@@ -129,7 +129,7 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
               const tasaColor = (c.tasa_recaudacion ?? 0) >= 80 ? '#16a34a' : (c.tasa_recaudacion ?? 0) >= 60 ? '#d97706' : '#ef4444'
               return (
                 <div key={c.id} onClick={() => setSelected(c === selected ? null : c)}
-                  style={{ background: selected?.id === c.id ? '#f0fdfa' : '#fff', border: `1.5px solid ${selected?.id === c.id ? 'var(--at-accent-2)' : 'var(--at-line)'}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === c.id ? '#f0fdfa' : 'var(--at-surface)', border: `1.5px solid ${selected?.id === c.id ? 'var(--at-accent-2)' : 'var(--at-line)'}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                       <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--at-ink)' }}>{c.anio}</div>
@@ -172,7 +172,7 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
               {selected.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 8 }}>{selected.notas}</div>}
               {selected.estado === 'borrador' && (
                 <button onClick={() => firmar(selected)}
-                  style={{ width: '100%', marginTop: 14, padding: '8px 0', background: 'var(--at-accent-2)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  style={{ width: '100%', marginTop: 14, padding: '8px 0', background: 'var(--at-accent-2)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                   🔒 Cerrar definitivamente
                 </button>
               )}

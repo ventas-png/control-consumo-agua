@@ -113,7 +113,7 @@ export default function ComentariosTicketTab({ ticket, comentarios, companyId, a
                 ))}
               </select>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                style={{ padding: '8px 20px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
                 {saving ? 'Enviando…' : '↩ Comentar'}
               </button>
             </div>

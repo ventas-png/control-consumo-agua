@@ -140,7 +140,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
             <span style={{ fontWeight: 600, fontSize: 14 }}>Equipos ({lista.length})</span>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nuevo
               </button>
             )}
@@ -171,7 +171,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
           const dias = diasParaManto(e.proximo_mantenimiento)
           return (
             <div key={e.id} onClick={() => { setSelected(e); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === e.id ? 'var(--at-accent-tint)' : '#fff', borderLeft: alerta === 'vencido' ? '3px solid #ef4444' : alerta === 'proximo' ? '3px solid #f59e0b' : '3px solid transparent' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === e.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: alerta === 'vencido' ? '3px solid #ef4444' : alerta === 'proximo' ? '3px solid #f59e0b' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {e.nombre}</span>
                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: est?.color + '20', color: est?.color }}>{est?.label}</span>
@@ -255,7 +255,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Guardar equipo'}
               </button>
               <button onClick={() => { setMostrarForm(false); resetForm() }}
@@ -321,7 +321,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
               {canEdit && (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button onClick={() => registrarMantenimiento(selected)}
-                    style={{ padding: '7px 14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                    style={{ padding: '7px 14px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                     🔧 Registrar mantenimiento
                   </button>
                   {ESTADOS.filter(s => s.value !== selected.estado).map(s => (

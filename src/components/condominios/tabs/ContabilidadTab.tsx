@@ -232,7 +232,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
               <button key={c} onClick={() => setFiltroCat(c as CategoriaGasto | 'todos')}
                 style={{ padding: '4px 10px', borderRadius: '16px', border: '1.5px solid', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
                   borderColor: filtroCat === c ? 'var(--at-primary)' : 'var(--at-line)',
-                  background: filtroCat === c ? 'var(--at-primary-soft)' : 'white',
+                  background: filtroCat === c ? 'var(--at-primary-soft)' : 'var(--at-surface)',
                   color: filtroCat === c ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
                 {c === 'todos' ? `Todos (${gastos.length})` : `${CAT_CONFIG[c as CategoriaGasto].icon} ${CAT_CONFIG[c as CategoriaGasto].label}`}
               </button>
@@ -243,7 +243,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
               <button key={e} onClick={() => setFiltroEstado(e)}
                 style={{ padding: '4px 10px', borderRadius: '16px', border: '1.5px solid', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
                   borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
-                  background: filtroEstado === e ? 'var(--at-primary-soft)' : 'white',
+                  background: filtroEstado === e ? 'var(--at-primary-soft)' : 'var(--at-surface)',
                   color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
                 {e === 'todos' ? 'Todos' : ESTADO_CONFIG[e as EstadoGasto].label}
               </button>
@@ -271,7 +271,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
                     const cat = CAT_CONFIG[g.categoria]
                     const est = ESTADO_CONFIG[g.estado]
                     return (
-                      <tr key={g.id} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
+                      <tr key={g.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
                         <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>{g.fecha}</td>
                         <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--at-ink)' }}>
                           {g.concepto}

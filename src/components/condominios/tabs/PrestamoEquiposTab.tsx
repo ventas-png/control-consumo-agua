@@ -185,7 +185,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
         {(['all','prestado','devuelto','dañado','perdido'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e as EstadoPrestamo | 'all')}
             style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 600, borderRadius: '20px', border: '1.5px solid', cursor: 'pointer',
-              background: filtroEstado === e ? 'var(--at-ink)' : 'white',
+              background: filtroEstado === e ? 'var(--at-ink)' : 'var(--at-surface)',
               color: filtroEstado === e ? 'white' : 'var(--at-ink-3)',
               borderColor: filtroEstado === e ? 'var(--at-ink)' : 'var(--at-line)' }}>
             {e === 'all' ? 'Todos' : ESTADO_STYLE[e as EstadoPrestamo]?.label ?? e}
@@ -210,7 +210,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
               {filtered.map((p, i) => {
                 const es = ESTADO_STYLE[p.estado]
                 return (
-                  <tr key={p.id} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
+                  <tr key={p.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>
                       {p.equipo_nombre}
                       {p.observaciones && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 400 }}>{p.observaciones}</div>}

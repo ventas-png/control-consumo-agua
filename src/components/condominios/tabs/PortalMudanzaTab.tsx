@@ -194,7 +194,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
                     style={{
                       padding: '10px 12px', borderRadius: '10px', cursor: 'pointer', textAlign: 'left',
                       border: `2px solid ${form.tipo_mudanza === key ? 'var(--at-accent-hover)' : 'var(--at-line)'}`,
-                      background: form.tipo_mudanza === key ? 'var(--at-accent-tint)' : 'white',
+                      background: form.tipo_mudanza === key ? 'var(--at-accent-tint)' : 'var(--at-surface)',
                     }}
                   >
                     <div style={{ fontSize: '18px', marginBottom: '2px' }}>{cfg.icon}</div>

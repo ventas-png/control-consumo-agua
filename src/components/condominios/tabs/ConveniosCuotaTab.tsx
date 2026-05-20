@@ -106,14 +106,14 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {(['', 'activo', 'cumplido', 'incumplido', 'anulado'] as (EstadoConvenioCuota | '')[]).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
-              style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-accent-hover)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-accent-tint)' : 'white', color: filtroEstado === e ? 'var(--at-accent-hover)' : 'var(--at-ink-3)' }}>
+              style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-accent-hover)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-accent-tint)' : 'var(--at-surface)', color: filtroEstado === e ? 'var(--at-accent-hover)' : 'var(--at-ink-3)' }}>
               {e === '' ? 'Todos' : ESTADO_CFG[e].label}
             </button>
           ))}
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nuevo convenio'}
           </button>
         )}
@@ -163,7 +163,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear convenio'}
           </button>
         </div>
@@ -182,7 +182,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
               const unidad = unidades.find(u => u.id === c.unidad_id)
               return (
                 <div key={c.id} onClick={() => setSelected(c === selected ? null : c)}
-                  style={{ background: selected?.id === c.id ? 'var(--at-accent-tint)' : '#fff', border: `1.5px solid ${selected?.id === c.id ? 'var(--at-accent)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === c.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', border: `1.5px solid ${selected?.id === c.id ? 'var(--at-accent)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{unidad?.nombre ?? c.unidad_nombre ?? '—'}</div>
@@ -223,7 +223,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
               {canEdit && selected.estado === 'activo' && (
                 <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
                   <button onClick={() => registrarPago(selected)}
-                    style={{ flex: 1, padding: '7px 0', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    style={{ flex: 1, padding: '7px 0', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                     💳 Registrar pago
                   </button>
                   <button onClick={() => cambiarEstado(selected.id, 'incumplido')}

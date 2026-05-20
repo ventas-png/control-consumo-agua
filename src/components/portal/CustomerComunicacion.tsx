@@ -370,7 +370,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     padding: '10px 12px',
                     border: `2px solid ${newCategory === cat ? 'var(--at-primary)' : 'var(--at-line)'}`,
                     borderRadius: '10px',
-                    background: newCategory === cat ? 'var(--at-primary-tint)' : 'white',
+                    background: newCategory === cat ? 'var(--at-primary-tint)' : 'var(--at-surface)',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -427,7 +427,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     padding: '6px 14px',
                     border: `2px solid ${newPriority === val ? color : 'var(--at-line)'}`,
                     borderRadius: '999px',
-                    background: newPriority === val ? color + '18' : 'white',
+                    background: newPriority === val ? color + '18' : 'var(--at-surface)',
                     color: newPriority === val ? color : 'var(--at-ink-3)',
                     fontSize: '12px',
                     fontWeight: 600,
@@ -568,7 +568,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   transition: 'background 0.12s',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--at-surface-2)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'white')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--at-surface)')}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
@@ -692,7 +692,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                         borderRadius: isMe ? '16px 16px 3px 16px' : '16px 16px 16px 3px',
                         background: isMe
                           ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)'
-                          : 'white',
+                          : 'var(--at-surface)',
                         color: isMe ? 'white' : 'var(--at-ink)',
                         boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
                       }}>

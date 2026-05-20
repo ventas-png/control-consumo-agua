@@ -162,7 +162,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nueva automatización'}
           </button>
         )}
@@ -202,7 +202,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
             Vista previa: <strong>{TRIGGER_CFG[form.trigger_tipo].desc(form.trigger_valor)}</strong> → {ACCION_CFG[form.accion_tipo].icon} {ACCION_CFG[form.accion_tipo].label}
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear regla'}
           </button>
         </div>

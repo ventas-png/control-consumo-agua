@@ -200,7 +200,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
               const numResp = respuestas.filter(r => r.encuesta_id === enc.id).length
               return (
                 <div key={enc.id} onClick={() => setSelectedId(enc.id === selectedId ? null : enc.id)}
-                  style={{ background: enc.id === selectedId ? 'var(--at-primary-tint)' : 'white', border: `1.5px solid ${enc.id === selectedId ? 'var(--at-accent-2)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '14px', cursor: 'pointer' }}>
+                  style={{ background: enc.id === selectedId ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${enc.id === selectedId ? 'var(--at-accent-2)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '14px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
                     <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)', flex: 1, marginRight: '8px' }}>{enc.titulo}</div>
                     <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: est.bg, color: est.color, whiteSpace: 'nowrap' }}>{est.label}</span>
@@ -268,7 +268,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
                           {[1,2,3,4,5].map(n => (
                             <button key={n} onClick={() => setRespForm(f => ({ ...f, answers: { ...f.answers, [p.id]: String(n) } }))}
                               style={{ width: '36px', height: '36px', borderRadius: '8px', border: '1.5px solid', fontSize: '14px', fontWeight: 700, cursor: 'pointer',
-                                background: respForm.answers[p.id] === String(n) ? 'var(--at-primary)' : 'white',
+                                background: respForm.answers[p.id] === String(n) ? 'var(--at-primary)' : 'var(--at-surface)',
                                 color: respForm.answers[p.id] === String(n) ? 'white' : 'var(--at-ink-3)',
                                 borderColor: respForm.answers[p.id] === String(n) ? 'var(--at-primary)' : 'var(--at-line)' }}>
                               {n}
@@ -281,7 +281,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
                           {['si', 'no'].map(v => (
                             <button key={v} onClick={() => setRespForm(f => ({ ...f, answers: { ...f.answers, [p.id]: v } }))}
                               style={{ padding: '6px 16px', borderRadius: '8px', border: '1.5px solid', fontSize: '13px', fontWeight: 700, cursor: 'pointer', textTransform: 'capitalize',
-                                background: respForm.answers[p.id] === v ? 'var(--at-primary)' : 'white',
+                                background: respForm.answers[p.id] === v ? 'var(--at-primary)' : 'var(--at-surface)',
                                 color: respForm.answers[p.id] === v ? 'white' : 'var(--at-ink-3)',
                                 borderColor: respForm.answers[p.id] === v ? 'var(--at-primary)' : 'var(--at-line)' }}>
                               {v === 'si' ? 'Sí' : 'No'}

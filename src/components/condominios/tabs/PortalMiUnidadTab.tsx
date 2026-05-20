@@ -135,7 +135,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
             <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
               {(Object.entries(TIPO_MSG) as [TipoMensajePortal, typeof TIPO_MSG[TipoMensajePortal]][]).map(([k, v]) => (
                 <button key={k} onClick={() => setMsgForm(f => ({ ...f, tipo: k }))}
-                  style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid', borderColor: msgForm.tipo === k ? 'var(--at-primary)' : 'var(--at-line)', background: msgForm.tipo === k ? 'var(--at-primary-tint)' : 'white', color: msgForm.tipo === k ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+                  style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid', borderColor: msgForm.tipo === k ? 'var(--at-primary)' : 'var(--at-line)', background: msgForm.tipo === k ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: msgForm.tipo === k ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
                   {v.icon} {v.label}
                 </button>
               ))}

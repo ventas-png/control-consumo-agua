@@ -171,7 +171,7 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
           {(['todos', 'entrada', 'salida'] as const).map(f => (
             <button key={f} onClick={() => setFiltroTipo(f)}
               style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-                borderColor: filtroTipo === f ? 'var(--at-primary)' : 'var(--at-line)', background: filtroTipo === f ? 'var(--at-primary-soft)' : 'white', color: filtroTipo === f ? 'var(--at-primary-hover)' : 'var(--at-ink-3)', fontWeight: filtroTipo === f ? 700 : 500 }}>
+                borderColor: filtroTipo === f ? 'var(--at-primary)' : 'var(--at-line)', background: filtroTipo === f ? 'var(--at-primary-soft)' : 'var(--at-surface)', color: filtroTipo === f ? 'var(--at-primary-hover)' : 'var(--at-ink-3)', fontWeight: filtroTipo === f ? 700 : 500 }}>
               {f === 'todos' ? 'Todos' : f === 'entrada' ? '📥 Entrada' : '📤 Salida'}
             </button>
           ))}
@@ -180,7 +180,7 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
           {(['todos', 'pendiente', 'atendido', 'archivado'] as const).map(f => (
             <button key={f} onClick={() => setFiltroEstado(f)}
               style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '12px', cursor: 'pointer',
-                borderColor: filtroEstado === f ? 'var(--at-accent)' : 'var(--at-line)', background: filtroEstado === f ? 'var(--at-accent-tint)' : 'white', color: filtroEstado === f ? 'var(--at-accent-hover)' : 'var(--at-ink-3)', fontWeight: filtroEstado === f ? 700 : 500 }}>
+                borderColor: filtroEstado === f ? 'var(--at-accent)' : 'var(--at-line)', background: filtroEstado === f ? 'var(--at-accent-tint)' : 'var(--at-surface)', color: filtroEstado === f ? 'var(--at-accent-hover)' : 'var(--at-ink-3)', fontWeight: filtroEstado === f ? 700 : 500 }}>
               {f === 'todos' ? 'Todos estados' : f}
             </button>
           ))}
@@ -208,7 +208,7 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
                     const es = ESTADO_STYLE[c.estado]
                     return (
                       <tr key={c.id} onClick={() => setSelected(selected === c.id ? null : c.id)}
-                        style={{ background: selected === c.id ? 'var(--at-primary-tint)' : i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer' }}>
+                        style={{ background: selected === c.id ? 'var(--at-primary-tint)' : i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer' }}>
                         <td style={{ padding: '9px 12px' }}>
                           <span style={{ fontSize: '13px' }}>{c.tipo === 'entrada' ? '📥' : '📤'}</span>
                           {c.prioridad === 'urgente' && <span style={{ fontSize: '10px', marginLeft: '4px', color: '#ef4444', fontWeight: 700 }}>URG</span>}

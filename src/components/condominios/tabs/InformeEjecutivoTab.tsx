@@ -250,7 +250,7 @@ ${morosos > 5 ? `<div class="alert-box"><div class="alert-title">Alto nivel de m
       </div>
 
       <button onClick={build}
-        style={{ width: '100%', padding: '14px 0', background: 'var(--at-ink)', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 700, letterSpacing: 0.3 }}>
+        style={{ width: '100%', padding: '14px 0', background: 'var(--at-ink)', color: 'white', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 700, letterSpacing: 0.3 }}>
         🖨️ Generar Informe Ejecutivo — {MESES[hoy.getMonth()]} {hoy.getFullYear()}
       </button>
 

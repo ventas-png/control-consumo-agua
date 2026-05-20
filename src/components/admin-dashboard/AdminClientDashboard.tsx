@@ -389,10 +389,10 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                         return (
                           <tr
                             key={p.id}
-                            style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', cursor: 'pointer', transition: 'background 0.15s' }}
+                            style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', cursor: 'pointer', transition: 'background 0.15s' }}
                             onClick={() => setSelectedProjectId(p.id)}
                             onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--at-primary-tint)'}
-                            onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'white' : 'var(--at-surface-2)'}
+                            onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)'}
                           >
                             <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--at-ink)', borderBottom: '1px solid var(--at-chip)' }}>
                               {hasCritica && <span style={{ marginRight: 6, color: '#ef4444' }}>●</span>}

@@ -191,7 +191,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
             <button key={f} onClick={() => setFiltroTurno(f)}
               style={{ padding: '5px 12px', border: '1.5px solid', borderRadius: '20px', fontSize: '12px', cursor: 'pointer', fontWeight: filtroTurno === f ? 700 : 500,
                 borderColor: filtroTurno === f ? 'var(--at-primary)' : 'var(--at-line)',
-                background: filtroTurno === f ? 'var(--at-primary-soft)' : 'white',
+                background: filtroTurno === f ? 'var(--at-primary-soft)' : 'var(--at-surface)',
                 color: filtroTurno === f ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>
               {f === 'todos' ? 'Todos' : `${tc?.icon} ${f}`}
             </button>
@@ -210,7 +210,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
               const incs = n.incidentes as Incidente[]
               return (
                 <div key={n.id} onClick={() => setSelected(selected === n.id ? null : n.id)}
-                  style={{ background: selected === n.id ? 'var(--at-primary-tint)' : 'white', border: `1.5px solid ${selected === n.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
+                  style={{ background: selected === n.id ? 'var(--at-primary-tint)' : 'var(--at-surface)', border: `1.5px solid ${selected === n.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '3px' }}>

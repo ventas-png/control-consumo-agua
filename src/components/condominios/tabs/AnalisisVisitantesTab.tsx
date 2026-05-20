@@ -173,7 +173,7 @@ export default function AnalisisVisitantesTab({ visitantes, unidades }: Props) {
               {stats.topUnidades.slice(0, 6).map((u, i) => (
                 <div key={u.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--at-primary)', color: '#fff',
+                    <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--at-primary)', color: 'white',
                       fontSize: 9, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
                     <span style={{ fontSize: 12, color: 'var(--at-ink-2)' }}>{u.nombre}</span>
                   </div>

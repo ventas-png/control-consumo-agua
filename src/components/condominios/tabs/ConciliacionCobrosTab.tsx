@@ -125,7 +125,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
         {(['pendientes', 'historial'] as const).map(t => (
           <button key={t} onClick={() => setSubTab(t)}
             style={{ padding: '6px 18px', border: 'none', cursor: 'pointer', fontSize: 12,
-              background: subTab === t ? 'var(--at-primary)' : 'transparent', color: subTab === t ? '#fff' : 'var(--at-ink-2)', fontWeight: subTab === t ? 700 : 400 }}>
+              background: subTab === t ? 'var(--at-primary)' : 'transparent', color: subTab === t ? 'white' : 'var(--at-ink-2)', fontWeight: subTab === t ? 700 : 400 }}>
             {t === 'pendientes' ? `Pendientes (${cuotasPendientes.length})` : `Historial (${conciliaciones.length})`}
           </button>
         ))}
@@ -169,7 +169,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
                       </div>
                       {canCreate && !esConciliando && (
                         <button onClick={() => iniciarConciliacion(cuota)}
-                          style={{ padding: '7px 16px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                          style={{ padding: '7px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
                           Conciliar
                         </button>
                       )}
@@ -217,7 +217,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
                         )}
                         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                           <button onClick={aplicarConciliacion} disabled={saving || !form.monto}
-                            style={{ padding: '7px 18px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                            style={{ padding: '7px 18px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
                             {saving ? 'Aplicando…' : '✓ Aplicar'}
                           </button>
                           <button onClick={cancelarConciliacion}

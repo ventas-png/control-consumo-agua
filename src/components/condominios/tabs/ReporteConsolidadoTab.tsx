@@ -28,7 +28,7 @@ function fmt(n: number, moneda: string) { return `${moneda} ${n.toLocaleString('
 
 function pct(a: number, b: number): string { return b === 0 ? '—' : `${Math.round(a / b * 100)}%` }
 
-function KpiBox({ label, value, sub, color = 'var(--at-ink)', bg = 'white', border = 'var(--at-line)' }: { label: string; value: string; sub?: string; color?: string; bg?: string; border?: string }) {
+function KpiBox({ label, value, sub, color = 'var(--at-ink)', bg = 'var(--at-surface)', border = 'var(--at-line)' }: { label: string; value: string; sub?: string; color?: string; bg?: string; border?: string }) {
   return (
     <div style={{ background: bg, border: `1.5px solid ${border}`, borderRadius: '10px', padding: '13px 15px' }}>
       <div style={{ fontSize: '20px', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>

@@ -27,9 +27,9 @@ function labelMes(ym: string): string {
 type EstadoCelda = 'pagado' | 'pendiente' | 'moroso' | 'sin_cuota'
 
 const CELDA_CFG: Record<EstadoCelda, { bg: string; color: string; label: string; order: number }> = {
-  pagado:    { bg: '#16a34a', color: '#fff',   label: '✓', order: 0 },
+  pagado:    { bg: '#16a34a', color: 'white',   label: '✓', order: 0 },
   pendiente: { bg: '#fde68a', color: '#92400e', label: '!', order: 2 },
-  moroso:    { bg: '#ef4444', color: '#fff',    label: '✗', order: 3 },
+  moroso:    { bg: '#ef4444', color: 'white',    label: '✗', order: 3 },
   sin_cuota: { bg: 'var(--at-chip)', color: 'var(--at-line-strong)', label: '·', order: 1 },
 }
 

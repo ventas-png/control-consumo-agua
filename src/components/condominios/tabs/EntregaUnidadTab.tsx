@@ -238,7 +238,7 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
             const cond = CONDICION_STYLE[e.condicion_general]
             const isSelected = selected?.id === e.id
             return (
-              <div key={e.id} style={{ border: `1.5px solid ${isSelected ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', background: isSelected ? 'var(--at-primary-tint)' : 'white', overflow: 'hidden' }}>
+              <div key={e.id} style={{ border: `1.5px solid ${isSelected ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', background: isSelected ? 'var(--at-primary-tint)' : 'var(--at-surface)', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', cursor: 'pointer' }} onClick={() => setSelected(isSelected ? null : e)}>
                   <div style={{ fontSize: '20px' }}>{e.tipo === 'entrega' ? '📦' : '🔄'}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>

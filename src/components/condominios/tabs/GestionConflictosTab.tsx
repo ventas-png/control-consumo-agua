@@ -155,7 +155,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
         {([['infracciones', `⚖️ Infracciones (${infracciones.length})`], ['sugerencias', `💡 Sugerencias/Quejas (${sugerencias.length})`]] as const).map(([f, lbl]) => (
           <button key={f} onClick={() => setFuente(f)}
             style={{ padding: '6px 16px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: 'pointer',
-              background: fuente === f ? 'var(--at-ink)' : 'var(--at-surface-2)', color: fuente === f ? '#fff' : 'var(--at-ink-2)', fontWeight: fuente === f ? 700 : 400 }}>
+              background: fuente === f ? 'var(--at-ink)' : 'var(--at-surface-2)', color: fuente === f ? 'white' : 'var(--at-ink-2)', fontWeight: fuente === f ? 700 : 400 }}>
             {lbl}
           </button>
         ))}
@@ -167,7 +167,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
           {(['todos', 'activos', 'resueltos'] as const).map(f => (
             <button key={f} onClick={() => setFiltroEstado(f)}
               style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--at-line-strong)', fontSize: 11, cursor: 'pointer',
-                background: filtroEstado === f ? 'var(--at-ink-2)' : 'var(--at-surface-2)', color: filtroEstado === f ? '#fff' : 'var(--at-ink-2)', fontWeight: filtroEstado === f ? 700 : 400 }}>
+                background: filtroEstado === f ? 'var(--at-ink-2)' : 'var(--at-surface-2)', color: filtroEstado === f ? 'white' : 'var(--at-ink-2)', fontWeight: filtroEstado === f ? 700 : 400 }}>
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}

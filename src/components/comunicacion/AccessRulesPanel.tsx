@@ -135,7 +135,7 @@ export function AccessRulesPanel({ companyId, accessRules, onSave, canEdit, serv
                       style={{
                         padding: '3px 10px', borderRadius: '999px',
                         border: `1px solid ${active ? 'var(--at-primary)' : 'var(--at-line-strong)'}`,
-                        background: active ? 'var(--at-primary-soft)' : 'white',
+                        background: active ? 'var(--at-primary-soft)' : 'var(--at-surface)',
                         color: active ? 'var(--at-primary-hover)' : 'var(--at-ink-3)',
                         fontSize: '11px', fontWeight: 500, cursor: 'pointer',
                       }}

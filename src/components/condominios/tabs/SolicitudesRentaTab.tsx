@@ -141,7 +141,7 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
           <div key={s.id} style={{
             border: `1.5px solid ${expanded ? 'var(--at-accent-soft)' : 'var(--at-line)'}`,
             borderRadius: '12px', marginBottom: '10px',
-            background: expanded ? '#fafafe' : 'white',
+            background: expanded ? '#fafafe' : 'var(--at-surface)',
             transition: 'all 0.15s',
           }}>
             {/* Card header */}

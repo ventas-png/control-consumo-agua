@@ -210,7 +210,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
           <button key={t.value} onClick={() => setFiltroTipo(filtroTipo === t.value ? 'todos' : t.value)}
             style={{ padding: '5px 10px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               borderColor: filtroTipo === t.value ? t.color : 'var(--at-line)',
-              background: filtroTipo === t.value ? `${t.color}18` : 'white',
+              background: filtroTipo === t.value ? `${t.color}18` : 'var(--at-surface)',
               color: filtroTipo === t.value ? t.color : 'var(--at-ink-3)' }}>
             {t.icon} {t.label} ({residuos.filter(r => r.tipo_residuo === t.value).length})
           </button>
@@ -243,7 +243,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
                 const ti = tipoInfo(r.tipo_residuo)
                 const est = ESTADO_CONFIG[r.estado]
                 return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: r.incidencia ? '#fff7ed' : 'white' }}>
+                  <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: r.incidencia ? '#fff7ed' : 'var(--at-surface)' }}>
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ fontWeight: 600 }}>{r.fecha}</div>
                       {r.incidencia && <span style={{ fontSize: '10px', fontWeight: 700, color: '#ef4444' }}>⚠ Incidencia</span>}

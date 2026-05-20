@@ -432,11 +432,11 @@ export function SeguridadTab({
       {/* Vista toggle */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button onClick={() => setVista('novedades')}
-          style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === 'novedades' ? 'var(--at-primary)' : 'var(--at-line)', background: vista === 'novedades' ? 'var(--at-primary-tint)' : 'white', color: vista === 'novedades' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+          style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === 'novedades' ? 'var(--at-primary)' : 'var(--at-line)', background: vista === 'novedades' ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: vista === 'novedades' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
           📋 Novedades ({novedades.length})
         </button>
         <button onClick={() => setVista('rondas')}
-          style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === 'rondas' ? 'var(--at-primary)' : 'var(--at-line)', background: vista === 'rondas' ? 'var(--at-primary-tint)' : 'white', color: vista === 'rondas' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+          style={{ padding: '8px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: vista === 'rondas' ? 'var(--at-primary)' : 'var(--at-line)', background: vista === 'rondas' ? 'var(--at-primary-tint)' : 'var(--at-surface)', color: vista === 'rondas' ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
           🛡 Rondas ({rondas.length})
         </button>
       </div>
@@ -829,11 +829,11 @@ export function SeguridadTab({
               {/* Tabs de modo */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1.5px solid var(--at-chip)', paddingBottom: '16px' }}>
                 <button onClick={() => cambiarModo('dpi')}
-                  style={{ padding: '8px 16px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: modoModal === 'dpi' ? 'var(--at-accent-hover)' : 'var(--at-line)', background: modoModal === 'dpi' ? 'var(--at-accent-tint-2)' : 'white', color: modoModal === 'dpi' ? 'var(--at-accent-hover)' : 'var(--at-ink-3)' }}>
+                  style={{ padding: '8px 16px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: modoModal === 'dpi' ? 'var(--at-accent-hover)' : 'var(--at-line)', background: modoModal === 'dpi' ? 'var(--at-accent-tint-2)' : 'var(--at-surface)', color: modoModal === 'dpi' ? 'var(--at-accent-hover)' : 'var(--at-ink-3)' }}>
                   🔍 Verificar por DPI
                 </button>
                 <button onClick={() => cambiarModo('str')}
-                  style={{ padding: '8px 16px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: modoModal === 'str' ? 'var(--at-accent-hover)' : 'var(--at-line)', background: modoModal === 'str' ? 'var(--at-accent-tint-2)' : 'white', color: modoModal === 'str' ? 'var(--at-accent-hover)' : 'var(--at-ink-3)' }}>
+                  style={{ padding: '8px 16px', borderRadius: '9px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', border: '1.5px solid', borderColor: modoModal === 'str' ? 'var(--at-accent-hover)' : 'var(--at-line)', background: modoModal === 'str' ? 'var(--at-accent-tint-2)' : 'var(--at-surface)', color: modoModal === 'str' ? 'var(--at-accent-hover)' : 'var(--at-ink-3)' }}>
                   🏠 Renta corta
                 </button>
               </div>

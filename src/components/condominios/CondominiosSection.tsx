@@ -1233,7 +1233,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
                   padding: '7px 13px', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
                   fontSize: 12, fontWeight: activa ? 700 : 500,
                   background: activa ? 'var(--at-ink)' : 'var(--at-chip)',
-                  color: activa ? '#fff' : 'var(--at-ink-3)',
+                  color: activa ? 'white' : 'var(--at-ink-3)',
                   borderRadius: '6px 6px 0 0',
                   borderBottom: activa ? '2px solid var(--at-ink)' : '2px solid transparent',
                   marginBottom: -2,

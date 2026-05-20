@@ -184,7 +184,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
           <button key={f} onClick={() => setFiltroEstado(f)}
             style={{ padding: '4px 10px', border: '1.5px solid', borderRadius: '20px', fontSize: '11px', cursor: 'pointer',
               borderColor: filtroEstado === f ? 'var(--at-primary)' : 'var(--at-line)',
-              background: filtroEstado === f ? 'var(--at-primary-soft)' : 'white',
+              background: filtroEstado === f ? 'var(--at-primary-soft)' : 'var(--at-surface)',
               color: filtroEstado === f ? 'var(--at-primary-hover)' : 'var(--at-ink-3)',
               fontWeight: filtroEstado === f ? 700 : 500 }}>
             {f === 'todos' ? 'Todas' : ESTADO_STYLE[f as EstadoObra]?.label ?? f}

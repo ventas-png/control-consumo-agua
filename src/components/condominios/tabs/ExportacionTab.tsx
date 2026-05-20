@@ -234,7 +234,7 @@ export default function ExportacionTab({ cuotas, gastos, tickets, visitantes, un
                 <button
                   key={act.label}
                   onClick={act.onClick}
-                  style={{ padding: '7px 12px', background: act.color, color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  style={{ padding: '7px 12px', background: act.color, color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                   {act.label}
                 </button>
               ))}

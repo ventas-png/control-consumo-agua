@@ -1140,7 +1140,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               onClick={() => setTab(t.key)}
               style={{
                 padding: '10px 18px',
-                background: tab === t.key ? 'white' : 'transparent',
+                background: tab === t.key ? 'var(--at-surface)' : 'transparent',
                 color: tab === t.key ? 'var(--at-primary)' : 'rgba(255,255,255,0.85)',
                 border: 'none',
                 borderRadius: '10px 10px 0 0',

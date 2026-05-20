@@ -165,7 +165,7 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
                 const ctr = contadorMap[m.contador_id]
                 const cons = consumoMap[m.contador_id]
                 return (
-                  <tr key={m.id} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)', opacity: m.activo ? 1 : 0.5 }}>
+                  <tr key={m.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)', opacity: m.activo ? 1 : 0.5 }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>{m.unidad_nombre ?? '—'}</td>
                     <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '12px' }}>{ctr?.numero_serie ?? m.contador_id.slice(0,8)}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', textTransform: 'capitalize' }}>{ctr?.tipo_agua ?? '—'}</td>

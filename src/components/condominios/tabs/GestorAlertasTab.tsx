@@ -218,7 +218,7 @@ export default function GestorAlertasTab({ cuotas, tickets, polizas, contratosPr
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
         <button onClick={() => setFiltroCat('')}
           style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--at-line-strong)', fontSize: 11, cursor: 'pointer',
-            background: filtroCat === '' ? 'var(--at-ink)' : '#fff', color: filtroCat === '' ? '#fff' : 'var(--at-ink-2)', fontWeight: 600 }}>
+            background: filtroCat === '' ? 'var(--at-ink)' : 'var(--at-surface)', color: filtroCat === '' ? 'white' : 'var(--at-ink-2)', fontWeight: 600 }}>
           Todas
         </button>
         {(Object.entries(CAT_CFG) as [Categoria, typeof CAT_CFG[Categoria]][]).map(([cat, cfg]) => {
@@ -226,7 +226,7 @@ export default function GestorAlertasTab({ cuotas, tickets, polizas, contratosPr
           return count > 0 ? (
             <button key={cat} onClick={() => setFiltroCat(filtroCat === cat ? '' : cat)}
               style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--at-line-strong)', fontSize: 11, cursor: 'pointer',
-                background: filtroCat === cat ? 'var(--at-ink)' : '#fff', color: filtroCat === cat ? '#fff' : 'var(--at-ink-2)', fontWeight: 600 }}>
+                background: filtroCat === cat ? 'var(--at-ink)' : 'var(--at-surface)', color: filtroCat === cat ? 'white' : 'var(--at-ink-2)', fontWeight: 600 }}>
               {cfg.icon} {cfg.label} ({count})
             </button>
           ) : null

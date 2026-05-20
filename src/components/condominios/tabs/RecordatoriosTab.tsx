@@ -122,7 +122,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {(['pendientes', 'completados', 'todos'] as const).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
-              style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-accent-hover)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-accent-tint)' : 'white', color: filtroEstado === e ? 'var(--at-accent-hover)' : 'var(--at-ink-3)' }}>
+              style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-accent-hover)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-accent-tint)' : 'var(--at-surface)', color: filtroEstado === e ? 'var(--at-accent-hover)' : 'var(--at-ink-3)' }}>
               {e.charAt(0).toUpperCase() + e.slice(1)}
             </button>
           ))}
@@ -136,7 +136,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Recordatorio'}
           </button>
         )}
@@ -174,7 +174,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: 'var(--at-accent-hover)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-accent-hover)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear recordatorio'}
           </button>
         </div>
@@ -191,7 +191,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
             const urgente = !r.completado && dias >= 0 && dias <= 3
             const pcfg = PRIORIDAD_CFG[r.prioridad]
             return (
-              <div key={r.id} style={{ background: r.completado ? 'var(--at-surface-2)' : vencido ? '#fef2f2' : urgente ? '#fffbeb' : '#fff', border: `1px solid ${vencido ? '#fecaca' : urgente ? '#fde68a' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div key={r.id} style={{ background: r.completado ? 'var(--at-surface-2)' : vencido ? '#fef2f2' : urgente ? '#fffbeb' : 'var(--at-surface)', border: `1px solid ${vencido ? '#fecaca' : urgente ? '#fde68a' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <input type="checkbox" checked={r.completado} onChange={() => marcarCompletado(r)}
                   style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>

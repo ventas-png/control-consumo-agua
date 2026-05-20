@@ -136,7 +136,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
             <span style={{ fontWeight: 600, fontSize: 14 }}>Tareas ({lista.length})</span>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nueva
               </button>
             )}
@@ -172,7 +172,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
           const vencida = dias !== null && dias < 0 && t.estado !== 'completada' && t.estado !== 'cancelada'
           return (
             <div key={t.id} onClick={() => { setSelected(t); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === t.id ? 'var(--at-accent-tint)' : '#fff', borderLeft: vencida ? '3px solid #ef4444' : '3px solid transparent' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === t.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: vencida ? '3px solid #ef4444' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 13, flex: 1, marginRight: 8 }}>{t.titulo}</span>
                 <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: est?.bg, color: est?.color, flexShrink: 0 }}>{est?.label}</span>
@@ -244,7 +244,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Crear tarea'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -277,7 +277,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
                   <div style={{ display: 'flex', gap: 6 }}>
                     {siguiente && (
                       <button onClick={() => avanzarEstado(selected)}
-                        style={{ padding: '7px 14px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                        style={{ padding: '7px 14px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                         → {siguienteLabel}
                       </button>
                     )}
@@ -332,7 +332,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
                   <input style={inp} placeholder="Nombre" value={comentario.autor} onChange={e => setComentario(p => ({ ...p, autor: e.target.value }))} />
                   <input style={inp} placeholder="Agregar comentario…" value={comentario.texto} onChange={e => setComentario(p => ({ ...p, texto: e.target.value }))} />
                   <button onClick={() => agregarComentario(selected)}
-                    style={{ padding: '7px', background: 'var(--at-accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ padding: '7px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                     + Agregar
                   </button>
                 </div>

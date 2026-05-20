@@ -20,9 +20,9 @@ const COLUMNAS: { estado: EstadoTicket; label: string; color: string; bg: string
 ]
 
 const PRIORIDAD_CFG: Record<PrioridadTicket, { label: string; color: string; bg: string; order: number }> = {
-  urgente: { label: 'Urgente', color: '#fff', bg: '#ef4444', order: 0 },
-  alta:    { label: 'Alta',    color: '#fff', bg: '#f97316', order: 1 },
-  media:   { label: 'Media',   color: '#fff', bg: '#d97706', order: 2 },
+  urgente: { label: 'Urgente', color: 'white', bg: '#ef4444', order: 0 },
+  alta:    { label: 'Alta',    color: 'white', bg: '#f97316', order: 1 },
+  media:   { label: 'Media',   color: 'white', bg: '#d97706', order: 2 },
   baja:    { label: 'Baja',    color: 'var(--at-ink-2)', bg: 'var(--at-line)', order: 3 },
 }
 
@@ -128,7 +128,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
             {/* Column header */}
             <div style={{ background: col.bgHeader, border: `1px solid ${col.color}33`, borderRadius: '10px 10px 0 0', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 700, fontSize: 12, color: col.color }}>{col.label}</span>
-              <span style={{ background: col.color, color: '#fff', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
+              <span style={{ background: col.color, color: 'white', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
                 {porColumna[col.estado].length}
               </span>
             </div>

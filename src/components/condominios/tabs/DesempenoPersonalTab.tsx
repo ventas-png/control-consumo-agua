@@ -135,7 +135,7 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
             <button key={p} onClick={() => setPeriodo(p)}
               style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid',
                 borderColor: periodo === p ? 'var(--at-primary)' : 'var(--at-line)',
-                background: periodo === p ? 'var(--at-primary-tint)' : 'white',
+                background: periodo === p ? 'var(--at-primary-tint)' : 'var(--at-surface)',
                 color: periodo === p ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
               {p === '7' ? 'Última semana' : p === '30' ? 'Último mes' : 'Últimos 3 meses'}
             </button>
@@ -164,7 +164,7 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
           <button onClick={() => setFiltroCargo('')}
             style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid',
               borderColor: !filtroCargo ? 'var(--at-primary)' : 'var(--at-line)',
-              background: !filtroCargo ? 'var(--at-primary-tint)' : 'white',
+              background: !filtroCargo ? 'var(--at-primary-tint)' : 'var(--at-surface)',
               color: !filtroCargo ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             Todos los cargos
           </button>
@@ -172,7 +172,7 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
             <button key={c} onClick={() => setFiltroCargo(c)}
               style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid',
                 borderColor: filtroCargo === c ? 'var(--at-primary)' : 'var(--at-line)',
-                background: filtroCargo === c ? 'var(--at-primary-tint)' : 'white',
+                background: filtroCargo === c ? 'var(--at-primary-tint)' : 'var(--at-surface)',
                 color: filtroCargo === c ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
               {c.replace(/_/g, ' ')}
             </button>

@@ -122,7 +122,7 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
               {filtered.map((c, i) => {
                 const es = ESTADO_STYLE[c.estado] ?? ESTADO_STYLE.pendiente
                 return (
-                  <tr key={c.id} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
+                  <tr key={c.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>{c.periodo}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)' }}>{c.unidad_nombre ?? '—'}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)' }}>{c.concepto}</td>

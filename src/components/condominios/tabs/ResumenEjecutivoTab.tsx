@@ -111,7 +111,7 @@ ${top5Morosos.length > 0 ? `
 <table>
   <thead><tr><th>Unidad</th><th>Cuotas vencidas</th><th>Monto en mora</th></tr></thead>
   <tbody>
-    ${top5Morosos.map((m, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : 'var(--at-surface-2)'}">
+    ${top5Morosos.map((m, i) => `<tr style="background:${i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)'}">
       <td><strong>${m.unidad.nombre}</strong></td>
       <td style="color:#ef4444;font-weight:700">${m.count}</td>
       <td style="color:#ef4444;font-weight:700">${moneda} ${m.monto.toFixed(2)}</td>
@@ -167,7 +167,7 @@ ${venc30.length > 0 ? `
           <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Generado el {fechaLarga}</div>
         </div>
         <button onClick={imprimir}
-          style={{ padding: '8px 18px', background: 'var(--at-ink)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+          style={{ padding: '8px 18px', background: 'var(--at-ink)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
           🖨️ Imprimir / PDF
         </button>
       </div>

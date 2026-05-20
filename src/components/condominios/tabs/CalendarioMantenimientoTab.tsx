@@ -169,7 +169,7 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
                   style={{
                     minHeight: 72, padding: '4px 6px', borderTop: '1px solid var(--at-chip)',
                     borderRight: (i + 1) % 7 !== 0 ? '1px solid var(--at-chip)' : undefined,
-                    background: seleccionado ? 'var(--at-primary-tint)' : esHoy ? '#fefce8' : dia ? '#fff' : 'var(--at-surface-2)',
+                    background: seleccionado ? 'var(--at-primary-tint)' : esHoy ? '#fefce8' : dia ? 'var(--at-surface)' : 'var(--at-surface-2)',
                     cursor: dia ? 'pointer' : 'default',
                   }}>
                   {dia && (
@@ -177,7 +177,7 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
                       <div style={{ fontSize: 12, fontWeight: esHoy ? 800 : 500,
                         width: 22, height: 22, borderRadius: '50%',
                         background: esHoy ? 'var(--at-primary)' : undefined,
-                        color: esHoy ? '#fff' : 'var(--at-ink-2)',
+                        color: esHoy ? 'white' : 'var(--at-ink-2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 2 }}>
                         {dia}
                       </div>

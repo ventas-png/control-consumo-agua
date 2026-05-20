@@ -106,7 +106,7 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
             </select>
             {canCreate && (
               <button onClick={abrirNueva}
-                style={{ padding: '5px 12px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                style={{ padding: '5px 12px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                 + Nueva
               </button>
             )}
@@ -248,7 +248,7 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 18px', background: 'var(--at-primary)', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
+                style={{ padding: '8px 18px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Guardando…' : editId ? 'Guardar cambios' : 'Crear plantilla'}
               </button>
               {editId && (

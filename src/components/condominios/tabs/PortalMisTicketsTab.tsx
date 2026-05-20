@@ -91,7 +91,7 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
                   const pc = PRIORIDAD_CONFIG[p]
                   return (
                     <button key={p} onClick={() => setForm(f => ({ ...f, prioridad: p }))}
-                      style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid', borderColor: form.prioridad === p ? pc.color : 'var(--at-line)', background: form.prioridad === p ? pc.bg : 'white', color: form.prioridad === p ? pc.color : 'var(--at-ink-3)' }}>
+                      style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid', borderColor: form.prioridad === p ? pc.color : 'var(--at-line)', background: form.prioridad === p ? pc.bg : 'var(--at-surface)', color: form.prioridad === p ? pc.color : 'var(--at-ink-3)' }}>
                       {pc.label}
                     </button>
                   )

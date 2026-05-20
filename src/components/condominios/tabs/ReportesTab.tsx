@@ -135,7 +135,7 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
               </thead>
               <tbody>
                 {topCategorias.map(([cat, monto], i) => (
-                  <tr key={cat} style={{ background: i % 2 === 0 ? 'white' : 'var(--at-surface-2)' }}>
+                  <tr key={cat} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)' }}>
                     <td style={{ padding: '8px 12px', color: 'var(--at-ink)', textTransform: 'capitalize' }}>{cat}</td>
                     <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>{moneda} {fmt(monto)}</td>
                     <td style={{ padding: '8px 12px', textAlign: 'right', color: 'var(--at-ink-3)' }}>

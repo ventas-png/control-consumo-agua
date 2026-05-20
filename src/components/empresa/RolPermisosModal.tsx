@@ -351,7 +351,7 @@ export function RolPermisosModal({
             }}>Cancelar</button>
             <button onClick={() => void handleSave()} disabled={saving || loading} style={{
               padding: '8px 20px', borderRadius: '8px', border: 'none',
-              background: saving ? 'var(--at-accent-2)' : 'var(--at-primary-2)', color: '#fff',
+              background: saving ? 'var(--at-accent-2)' : 'var(--at-primary-2)', color: 'white',
               fontWeight: 600, fontSize: '13px', cursor: saving ? 'default' : 'pointer',
             }}>{saving ? 'Guardando…' : 'Guardar roles'}</button>
           </div>
@@ -421,7 +421,7 @@ function RoleCard({
             border: `2px solid ${checked ? role.color : 'var(--at-line-strong)'}`,
             background: checked ? role.color : 'transparent',
           }}>
-            {checked && <span style={{ color: '#fff', fontSize: '11px', lineHeight: 1 }}>✓</span>}
+            {checked && <span style={{ color: 'white', fontSize: '11px', lineHeight: 1 }}>✓</span>}
           </span>
         </button>
         <button

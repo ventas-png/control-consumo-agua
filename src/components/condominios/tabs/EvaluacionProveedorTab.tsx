@@ -110,7 +110,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
             {(['lista', 'ranking'] as const).map(v => (
               <button key={v} onClick={() => setView(v)}
                 style={{ padding: '6px 12px', border: 'none', fontSize: '12px', cursor: 'pointer', fontWeight: view === v ? 700 : 500,
-                  background: view === v ? 'var(--at-primary)' : 'white', color: view === v ? 'white' : 'var(--at-ink-3)' }}>
+                  background: view === v ? 'var(--at-primary)' : 'var(--at-surface)', color: view === v ? 'white' : 'var(--at-ink-3)' }}>
                 {v === 'lista' ? '📋 Lista' : '🏆 Ranking'}
               </button>
             ))}

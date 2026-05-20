@@ -382,7 +382,7 @@ function paginationBtnStyle(disabled: boolean): CSSProperties {
     fontSize: '12px',
     borderRadius: '6px',
     border: '1px solid var(--at-line)',
-    background: disabled ? 'var(--at-chip)' : 'white',
+    background: disabled ? 'var(--at-chip)' : 'var(--at-surface)',
     color: disabled ? 'var(--at-line-strong)' : 'var(--at-ink-2)',
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontWeight: 600,

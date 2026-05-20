@@ -128,8 +128,8 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
             {[6, 12, 24].map(n => (
               <button key={n} onClick={() => setMesesProyeccion(n)}
                 style={{ marginRight: 6, padding: '4px 12px', borderRadius: 8, border: '1px solid var(--at-line-strong)', fontSize: 12, cursor: 'pointer',
-                  background: mesesProyeccion === n ? 'var(--at-primary)' : '#fff',
-                  color: mesesProyeccion === n ? '#fff' : 'var(--at-ink-2)', fontWeight: mesesProyeccion === n ? 700 : 400 }}>
+                  background: mesesProyeccion === n ? 'var(--at-primary)' : 'var(--at-surface)',
+                  color: mesesProyeccion === n ? 'white' : 'var(--at-ink-2)', fontWeight: mesesProyeccion === n ? 700 : 400 }}>
                 {n}m
               </button>
             ))}

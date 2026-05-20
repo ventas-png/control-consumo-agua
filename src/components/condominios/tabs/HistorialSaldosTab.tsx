@@ -106,7 +106,7 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
         </div>
         {canCreate && (
           <button onClick={generarSnapshot} disabled={saving}
-            style={{ padding: '8px 16px', background: 'var(--at-accent-2)', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-accent-2)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             {saving ? '⏳ Generando…' : '📸 Generar snapshot'}
           </button>
         )}
@@ -133,7 +133,7 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
                 const unidad = unidades.find(u => u.id === h.unidad_id)
                 const deudor = h.saldo_final > 0
                 return (
-                  <tr key={h.id} style={{ borderBottom: '1px solid var(--at-chip)', background: deudor ? '#fef9f9' : '#fff' }}>
+                  <tr key={h.id} style={{ borderBottom: '1px solid var(--at-chip)', background: deudor ? '#fef9f9' : 'var(--at-surface)' }}>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? h.unidad_nombre ?? '—'}</td>
                     <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{h.periodo}</td>
                     <td style={{ padding: '8px 12px', color: 'var(--at-ink-2)' }}>{moneda} {h.saldo_anterior.toFixed(2)}</td>

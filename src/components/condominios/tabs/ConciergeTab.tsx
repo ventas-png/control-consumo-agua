@@ -191,7 +191,7 @@ export function ConciergeTab({ solicitudes, unidades, proyectoId, companyId, mon
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               borderColor: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-line)',
-              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'white',
+              background: filtroEstado === e ? 'var(--at-primary-soft)' : 'var(--at-surface)',
               color: filtroEstado === e ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
             {e === 'todos' ? `Todas (${solicitudes.length})` : `${ESTADO_CONFIG[e as EstadoConcierge]?.label} (${solicitudes.filter(s => s.estado === e).length})`}
           </button>
