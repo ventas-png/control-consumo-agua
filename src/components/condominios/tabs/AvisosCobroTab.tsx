@@ -103,9 +103,9 @@ h1{font-size:20px;margin-bottom:2px}
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:${tipo?.bg};color:${tipo?.color};margin-bottom:16px}
 table{width:100%;border-collapse:collapse;margin:12px 0}
 th,td{border:1px solid #ccc;padding:7px 10px;text-align:left}
-th{background:var(--at-surface-2)}
-.total{font-size:16px;font-weight:800;color:var(--at-ink);margin-top:12px;text-align:right}
-.footer{margin-top:40px;border-top:1px solid #ccc;padding-top:16px;font-size:11px;color:var(--at-ink-3)}
+th{background:#FAF7EF}
+.total{font-size:16px;font-weight:800;color:#15291F;margin-top:12px;text-align:right}
+.footer{margin-top:40px;border-top:1px solid #ccc;padding-top:16px;font-size:11px;color:#7E9389}
 .sig{margin-top:60px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
 .sig-box{border-top:1px solid #000;padding-top:8px;font-size:11px}</style></head>
 <body>

@@ -76,7 +76,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
   function handlePrint(n: LibroNovedad) {
     const tc = TURNO_COLORS[n.turno] ?? { icon: '📋' }
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Novedad ${n.fecha}</title>
-    <style>body{font-family:sans-serif;padding:32px;color:var(--at-ink)}h1{font-size:18px}p{font-size:13px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid var(--at-line)}th{background:var(--at-surface-2)}</style>
+    <style>body{font-family:sans-serif;padding:32px;color:#15291F}h1{font-size:18px}p{font-size:13px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid #E1DDD0}th{background:#FAF7EF}</style>
     </head><body>
     <h1>${tc.icon} Libro de Novedades — ${n.fecha} (${n.turno})</h1>
     <p><b>Responsable:</b> ${n.responsable} &nbsp; <b>Horario:</b> ${n.hora_inicio ?? '—'} – ${n.hora_fin ?? '—'}</p>

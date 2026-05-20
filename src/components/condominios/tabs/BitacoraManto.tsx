@@ -97,7 +97,7 @@ export function BitacoraManto({ registros, proyectoId, companyId, canCreate, can
     const completadas = tareasList.filter(t => t.completado).length
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bitácora Mantenimiento</title>
 <style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px}
-table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #ccc;padding:6px 8px}th{background:var(--at-surface-2)}
+table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #ccc;padding:6px 8px}th{background:#FAF7EF}
 .check{color:${ts.color};font-weight:700}.footer{margin-top:40px;border-top:1px solid #ccc;padding-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
 .sig{border-top:1px solid #000;margin-top:50px;padding-top:6px;font-size:11px}</style></head><body>
 <h1>Bitácora de Mantenimiento — ${ts.icon} ${ts.label}</h1>

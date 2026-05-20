@@ -74,27 +74,27 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>Resumen Residente — ${unidad?.nombre}</title>
     <style>
-      body{font-family:Arial,sans-serif;padding:32px;max-width:700px;margin:auto;color:var(--at-ink);font-size:13px}
-      h1{font-size:20px;margin:0}h2{font-size:13px;color:var(--at-ink-3);font-weight:normal;margin:4px 0 0}
-      .header{border-bottom:2px solid var(--at-ink);padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between}
+      body{font-family:Arial,sans-serif;padding:32px;max-width:700px;margin:auto;color:#15291F;font-size:13px}
+      h1{font-size:20px;margin:0}h2{font-size:13px;color:#7E9389;font-weight:normal;margin:4px 0 0}
+      .header{border-bottom:2px solid #15291F;padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between}
       .kpi{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:16px 0}
-      .kpi-card{background:var(--at-surface-2);border-radius:8px;padding:10px 14px;border:1px solid var(--at-line)}
+      .kpi-card{background:#FAF7EF;border-radius:8px;padding:10px 14px;border:1px solid #E1DDD0}
       .kpi-val{font-size:18px;font-weight:800;margin:2px 0}
       table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px}
-      th{background:var(--at-chip);padding:7px 10px;text-align:left;color:var(--at-ink-3);font-weight:600}
-      td{padding:7px 10px;border-bottom:1px solid var(--at-chip)}
+      th{background:#EAE6D8;padding:7px 10px;text-align:left;color:#7E9389;font-weight:600}
+      td{padding:7px 10px;border-bottom:1px solid #EAE6D8}
       section{margin-top:20px}
-      h3{font-size:14px;font-weight:700;border-bottom:1px solid var(--at-line);padding-bottom:6px;margin-bottom:12px}
-      .footer{margin-top:32px;font-size:10px;color:var(--at-ink-3);border-top:1px solid var(--at-line);padding-top:8px}
+      h3{font-size:14px;font-weight:700;border-bottom:1px solid #E1DDD0;padding-bottom:6px;margin-bottom:12px}
+      .footer{margin-top:32px;font-size:10px;color:#7E9389;border-top:1px solid #E1DDD0;padding-top:8px}
     </style></head><body>
     <div class="header">
       <div><h1>${proyectoNombre ?? 'Condominio'}</h1><h2>Resumen de Residente — ${unidad?.nombre ?? unidadId}</h2></div>
-      <div style="font-size:11px;color:var(--at-ink-3)">Generado: ${new Date().toLocaleDateString('es')}</div>
+      <div style="font-size:11px;color:#7E9389">Generado: ${new Date().toLocaleDateString('es')}</div>
     </div>
     <div class="kpi">
-      <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Saldo cuotas</div><div class="kpi-val" style="color:${saldoPendiente > 0 ? '#ef4444' : '#16a34a'}">${moneda} ${saldoPendiente.toFixed(2)}</div></div>
-      <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Recargos pendientes</div><div class="kpi-val" style="color:${saldoRecargos > 0 ? '#d97706' : '#16a34a'}">${moneda} ${saldoRecargos.toFixed(2)}</div></div>
-      <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Tickets activos</div><div class="kpi-val" style="color:var(--at-primary)">${ticketsUnidad.length}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:#7E9389">Saldo cuotas</div><div class="kpi-val" style="color:${saldoPendiente > 0 ? '#ef4444' : '#16a34a'}">${moneda} ${saldoPendiente.toFixed(2)}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:#7E9389">Recargos pendientes</div><div class="kpi-val" style="color:${saldoRecargos > 0 ? '#d97706' : '#16a34a'}">${moneda} ${saldoRecargos.toFixed(2)}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:#7E9389">Tickets activos</div><div class="kpi-val" style="color:#1B3B36">${ticketsUnidad.length}</div></div>
     </div>
     <section><h3>Cuotas (últimos 12 meses)</h3>
     <table><tr><th>Concepto</th><th>Período</th><th>Monto</th><th>Estado</th></tr>
