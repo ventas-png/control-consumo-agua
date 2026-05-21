@@ -3,6 +3,7 @@ import Swal from 'sweetalert2'
 import type { Cliente, Registro, Empresa, FuenteAgua, RegistroCalidad, Ruta, Tarifa, Contador, Unidad, Proyecto, MaxUnidadesPorTipo, ProveedorEnergia, TarifaEnergia, FuenteEnergia, FacturaEnergia } from '../types'
 import { supabase } from '../lib/supabase'
 import { SYSTEM_ROLE_IDS } from '../lib/systemRoleIds'
+import { filterRutasByProjectAccess } from '../lib/rutasAccess'
 
 async function ensureSupabaseSession(): Promise<boolean> {
   const { data: { session } } = await supabase.auth.getSession()
@@ -275,7 +276,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     return next
   }
 
-  const filterProyectosByAssignment = async (appData: AppData): Promise<AppData> => {
+  const filterDataByAssignment = async (appData: AppData): Promise<AppData> => {
     const uid = userIdRef.current
     const role = userRoleRef.current
     const roleIds = assignedRoleIdsRef.current ?? []
@@ -289,22 +290,41 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     // rather than falling back to the full list. RLS on `projects` is the
     // authoritative guard; this keeps the client consistent with it.
     const allowed = new Set((assignments ?? []).map((a: { project_id: string }) => a.project_id))
-    const filtered = appData.proyectos.filter(p => allowed.has(p.id))
-    if (filtered.length === appData.proyectos.length) return appData
-    const first = filtered[0]
+    const filteredProyectos = appData.proyectos.filter(p => allowed.has(p.id))
+
+    // Routes are not project-scoped in RLS (the rutas table has no project_id),
+    // so filter them here against the projects the user can actually see.
+    const accessible = new Set(filteredProyectos.map(p => p.id))
+    const filteredRutas = filterRutasByProjectAccess({
+      rutas: appData.rutas,
+      contadores: appData.contadores,
+      unidades: appData.unidades,
+      registros: appData.registros,
+      accessibleProjectIds: accessible,
+      userId: uid,
+    })
+
+    const proyectosChanged = filteredProyectos.length !== appData.proyectos.length
+    const rutasChanged = filteredRutas.length !== appData.rutas.length
+    if (!proyectosChanged && !rutasChanged) return appData
+
+    const first = filteredProyectos[0]
     return {
       ...appData,
-      proyectos: filtered,
-      moneda: first?.moneda ?? appData.moneda,
-      maxUnidadesPorTipo: first ? {
-        apartamento:     first.max_unidades_apartamento ?? null,
-        casa:            first.max_unidades_casa ?? null,
-        bodega:          first.max_unidades_bodega ?? null,
-        local_comercial: first.max_unidades_local_comercial ?? null,
-        oficina:         first.max_unidades_oficina ?? null,
-        parqueadero:     first.max_unidades_parqueadero ?? null,
-        otro:            first.max_unidades_otro ?? null,
-      } : appData.maxUnidadesPorTipo,
+      proyectos: filteredProyectos,
+      rutas: filteredRutas,
+      moneda: proyectosChanged ? (first?.moneda ?? appData.moneda) : appData.moneda,
+      maxUnidadesPorTipo: proyectosChanged
+        ? (first ? {
+            apartamento:     first.max_unidades_apartamento ?? null,
+            casa:            first.max_unidades_casa ?? null,
+            bodega:          first.max_unidades_bodega ?? null,
+            local_comercial: first.max_unidades_local_comercial ?? null,
+            oficina:         first.max_unidades_oficina ?? null,
+            parqueadero:     first.max_unidades_parqueadero ?? null,
+            otro:            first.max_unidades_otro ?? null,
+          } : appData.maxUnidadesPorTipo)
+        : appData.maxUnidadesPorTipo,
     }
   }
 
@@ -365,7 +385,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       // AbortSignal timeout, so individual slow queries fail in isolation
       // and don't block the rest of the batch.
       let results = await fetchAllData()
-      const freshData = await filterProyectosByAssignment(applyResults(base, results))
+      const freshData = await filterDataByAssignment(applyResults(base, results))
       setData(freshData)
       // Hide skeleton as soon as the first fetch completes — data is visible even if
       // some secondary queries failed. Retries continue silently in the background.
@@ -387,7 +407,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
       // unless the DB connection pool was cold-starting).
       await new Promise(resolve => setTimeout(resolve, 2000))
       results = await fetchAllData()
-      const retryData = await filterProyectosByAssignment(applyResults(freshData, results))
+      const retryData = await filterDataByAssignment(applyResults(freshData, results))
       setData(retryData)
 
       const finalErrors = getQueryErrors(results)

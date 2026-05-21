@@ -182,6 +182,7 @@ export interface Ruta {
   nombre: string;
   descripcion?: string;
   tipo_ruta: 'clientes' | 'contadores' | 'unidades';
+  project_id?: string | null;
   cliente_ids: string[];
   contador_ids: string[];
   unidad_ids: string[];
