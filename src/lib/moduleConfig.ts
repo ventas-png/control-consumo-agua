@@ -41,5 +41,11 @@ export const CONDOMINIOS_MODULE_KEYS = new Set(['condominios', 'condominios_dash
 /** Módulos que no son configurables (siempre visibles para su rol). */
 export const NON_CONFIGURABLE_MODULES = ['perfil', 'admin_dashboard', 'empresa_proyectos', 'superadmin_empresas'] as const
 
-/** Roles que siempre tienen acceso total (bypass del sistema de permisos). */
-export const EXEMPT_ROLES: readonly UserRole[] = ['super_admin', 'company_owner', 'cliente'] as const
+/**
+ * Roles que siempre tienen acceso total (bypass del sistema de permisos).
+ * Debe coincidir con los roles exentos en la BD (user_has_permission:
+ * super_admin / company_owner / admin) y con EXEMPT_PLATFORM_ROLES en
+ * permissions.ts. 'cliente' se mantiene porque el portal del residente no
+ * pasa por el sidebar de módulos del personal.
+ */
+export const EXEMPT_ROLES: readonly UserRole[] = ['super_admin', 'company_owner', 'admin', 'cliente'] as const

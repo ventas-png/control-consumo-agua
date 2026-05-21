@@ -125,7 +125,7 @@ const PROJECT_EXEMPT_ROLES = new Set(['super_admin', 'company_owner', 'admin'])
 
 // Condominios system roles that restrict project visibility (everything except
 // administrador_general). Derived from systemRoleIds to avoid UUID drift.
-const RESTRICTED_COND_ROLE_IDS = new Set(
+const RESTRICTED_COND_ROLE_IDS = new Set<string>(
   Object.entries(SYSTEM_ROLE_IDS.condominios)
     .filter(([k]) => k !== 'administrador_general')
     .map(([, v]) => v)

@@ -151,6 +151,7 @@ export function RolPermisosModal({
 
   const condominiosSystemRoles = roles.filter(r => r.is_system && (r.service === 'condominios' || r.service == null))
   const aguaSystemRoles         = roles.filter(r => r.is_system && r.service === 'agua')
+  const platformSystemRoles     = roles.filter(r => r.is_system && r.service === 'general')
   const customRoles             = roles.filter(r => !r.is_system)
 
   async function handleSave() {
@@ -270,7 +271,25 @@ export function RolPermisosModal({
                         key={r.id}
                         role={r}
                         checked={selectedRoleIds.has(r.id)}
+                        expiresAt={expirations.get(r.id) ?? null}
                         onToggle={() => toggleRole(r.id)}
+                        onExpirationChange={(v) => setExpiration(r.id, v)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {platformSystemRoles.length > 0 && (
+                  <div style={{ marginTop: '14px' }}>
+                    <SectionHeader>Plataforma — roles del sistema</SectionHeader>
+                    {platformSystemRoles.map(r => (
+                      <RoleCard
+                        key={r.id}
+                        role={r}
+                        checked={selectedRoleIds.has(r.id)}
+                        expiresAt={expirations.get(r.id) ?? null}
+                        onToggle={() => toggleRole(r.id)}
+                        onExpirationChange={(v) => setExpiration(r.id, v)}
                       />
                     ))}
                   </div>
