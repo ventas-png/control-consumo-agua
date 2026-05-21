@@ -494,7 +494,12 @@ export function EmpresaSection({ currentUser }: Props) {
         if (password.length < 8) { Swal.showValidationMessage('La contraseña debe tener al menos 8 caracteres'); return false }
         if (!aguaEnabled && !condEnabled) { Swal.showValidationMessage('Selecciona acceso a al menos una aplicación'); return false }
         if (condEnabled && !condRol) { Swal.showValidationMessage('Selecciona un rol para Condominios'); return false }
-        return { nombre, email, password, rol: aguaRol ?? 'viewer', aguaRol, condRol }
+        // El tier de plataforma (app_users.role) NO debe ser un rol exento.
+        // 'admin' salta TODO el RBAC (condominios incluido) vía user_has_permission,
+        // así que un "Admin de Agua" se crea como 'operator' (no exento) y recibe
+        // su poder de agua desde el rol RBAC "Admin Agua" (user_roles), no del tier.
+        const platformTier = aguaRol === 'admin' ? 'operator' : (aguaRol ?? 'viewer')
+        return { nombre, email, password, rol: platformTier, aguaRol, condRol }
       },
     })
 
@@ -982,34 +987,18 @@ export function EmpresaSection({ currentUser }: Props) {
                     </svg>
                     Acceso
                   </button>
-                  {currentUser.servicio_agua !== false && (
-                    <button
-                      onClick={() => setRolCondModal(u)}
-                      title="Roles y permisos (agua + condominios)"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '5px',
-                        padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(27, 59, 54,0.3)',
-                        background: 'rgba(27, 59, 54,0.08)', color: 'var(--at-accent-2)',
-                        cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
-                      }}
-                    >
-                      💧 Rol
-                    </button>
-                  )}
-                  {currentUser.servicio_condominios !== false && (
-                    <button
-                      onClick={() => setRolCondModal(u)}
-                      title="Rol en módulo condominios"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '5px',
-                        padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(185, 106, 63,0.3)',
-                        background: 'rgba(185, 106, 63,0.08)', color: 'var(--at-accent-light)',
-                        cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
-                      }}
-                    >
-                      🏢 Rol
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setRolCondModal(u)}
+                    title="Roles y permisos (agua, condominios y plataforma)"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '5px',
+                      padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(27, 59, 54,0.3)',
+                      background: 'rgba(27, 59, 54,0.08)', color: 'var(--at-accent-2)',
+                      cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
+                    }}
+                  >
+                    🔑 Roles y permisos
+                  </button>
                   <button
                     onClick={() => void toggleActivoUsuario(u)}
                     title={u.activo ? 'Desactivar' : 'Activar'}
