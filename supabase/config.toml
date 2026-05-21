@@ -1,5 +1,15 @@
 [project]
 id = "nnsqmeigtgewatameexo"
 
+# Funciones que manejan su propia autenticación (deploy con --no-verify-jwt).
 [functions.create-cliente-account]
+verify_jwt = false
+
+[functions.create-user]
+verify_jwt = false
+
+[functions.log-security-event]
+verify_jwt = false
+
+[functions.complete-oauth-onboarding]
 verify_jwt = false
