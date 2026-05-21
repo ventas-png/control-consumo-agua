@@ -1,7 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 function getAllowedOrigins(): string[] {
-  const origins = new Set<string>()
+  // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
+  const origins = new Set<string>([
+    'https://administratodo.com',
+    'https://www.administratodo.com',
+    'https://administratodo.app',
+    'https://www.administratodo.app',
+  ])
 
   const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
   if (envOrigins) {

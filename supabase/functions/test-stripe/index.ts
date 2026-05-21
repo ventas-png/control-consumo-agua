@@ -2,16 +2,33 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // CORS utilities
 function getAllowedOrigins(): string[] {
+  // Production domains are always allowed (independent of the ALLOWED_ORIGINS secret).
+  const origins = new Set<string>([
+    'https://administratodo.com',
+    'https://www.administratodo.com',
+    'https://administratodo.app',
+    'https://www.administratodo.app',
+  ])
+
   const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
   if (envOrigins) {
-    return envOrigins.split(',').map(origin => origin.trim())
+    for (const origin of envOrigins.split(',')) {
+      const trimmed = origin.trim()
+      if (trimmed) origins.add(trimmed)
+    }
+  } else {
+    origins.add('http://localhost:5173')
+    origins.add('http://localhost:3000')
+    origins.add('http://127.0.0.1:5173')
+    origins.add('http://127.0.0.1:3000')
   }
-  return [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:3000',
-  ]
+
+  const appUrl = Deno.env.get('APP_URL')
+  if (appUrl) {
+    try { origins.add(new URL(appUrl).origin) } catch { /* ignore malformed APP_URL */ }
+  }
+
+  return [...origins]
 }
 
 function getCorsHeaders(origin: string | null) {
