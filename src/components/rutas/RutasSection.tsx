@@ -31,6 +31,7 @@ interface Props {
 const EMPTY_FORM = {
   nombre: '',
   descripcion: '',
+  project_id: '',
   fecha_programada: '',
   asignado_a: '',
   asignado_nombre: '',
@@ -57,7 +58,6 @@ export function RutasSection({
   const [creando, setCreando] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [tipoRuta, setTipoRuta] = useState<'clientes' | 'contadores' | 'unidades'>('clientes')
-  const [proyectoFiltro, setProyectoFiltro] = useState('')
   const [clientesEnRuta, setClientesEnRuta] = useState<Cliente[]>([])
   const [contadoresEnRuta, setContadoresEnRuta] = useState<Contador[]>([])
   const [unidadesEnRuta, setUnidadesEnRuta] = useState<Unidad[]>([])
@@ -96,9 +96,8 @@ export function RutasSection({
   }
 
   function abrirCrear() {
-    setForm(EMPTY_FORM)
+    setForm({ ...EMPTY_FORM, project_id: proyectos.length === 1 ? proyectos[0].id : '' })
     setTipoRuta('clientes')
-    setProyectoFiltro('')
     setClientesEnRuta([])
     setContadoresEnRuta([])
     setUnidadesEnRuta([])
@@ -111,6 +110,7 @@ export function RutasSection({
     setForm({
       nombre: ruta.nombre,
       descripcion: ruta.descripcion ?? '',
+      project_id: ruta.project_id ?? '',
       fecha_programada: ruta.fecha_programada ?? '',
       asignado_a: ruta.asignado_a ?? '',
       asignado_nombre: ruta.asignado_nombre ?? '',
@@ -119,7 +119,6 @@ export function RutasSection({
     })
     const tipo = ruta.tipo_ruta ?? 'clientes'
     setTipoRuta(tipo)
-    setProyectoFiltro('')
     if (tipo === 'contadores') {
       setClientesEnRuta([])
       setUnidadesEnRuta([])
@@ -155,10 +154,22 @@ export function RutasSection({
     setEditando(null)
     setForm(EMPTY_FORM)
     setTipoRuta('clientes')
-    setProyectoFiltro('')
     setClientesEnRuta([])
     setContadoresEnRuta([])
     setUnidadesEnRuta([])
+  }
+
+  // Switching the route's project drops item selections from the previous
+  // project so a route never mixes items the new project cannot contain. The
+  // first selection (from no project, e.g. opening a legacy route) keeps them.
+  function handleProjectChange(projectId: string) {
+    if (form.project_id && form.project_id !== projectId) {
+      setClientesEnRuta([])
+      setContadoresEnRuta([])
+      setUnidadesEnRuta([])
+      setBusqueda('')
+    }
+    setForm(prev => ({ ...prev, project_id: projectId }))
   }
 
   function handleUsuarioChange(userId: string) {
@@ -225,6 +236,10 @@ export function RutasSection({
       Swal.fire('Atención', 'El nombre de la ruta es obligatorio', 'warning')
       return
     }
+    if (!form.project_id) {
+      Swal.fire('Atención', 'Selecciona el proyecto de la ruta', 'warning')
+      return
+    }
     if (tipoRuta === 'clientes' && clientesEnRuta.length === 0) {
       Swal.fire('Atención', 'Agrega al menos un cliente a la ruta', 'warning')
       return
@@ -242,6 +257,7 @@ export function RutasSection({
     const payload = {
       nombre: form.nombre.trim(),
       descripcion: form.descripcion.trim() || null,
+      project_id: form.project_id,
       tipo_ruta: tipoRuta,
       cliente_ids: tipoRuta === 'clientes' ? clientesEnRuta.map(c => c.id) : [],
       contador_ids: tipoRuta === 'contadores' ? contadoresEnRuta.map(c => c.id) : [],
@@ -363,7 +379,7 @@ export function RutasSection({
   const contadoresDisponibles = contadores.filter(c => {
     if (!c.activo) return false
     if (contadoresEnRuta.find(r => r.id === c.id)) return false
-    if (proyectoFiltro && c.project_id !== proyectoFiltro) return false
+    if (!form.project_id || c.project_id !== form.project_id) return false
     const texto = busqueda.toLowerCase()
     if (!texto) return true
     return (
@@ -375,7 +391,7 @@ export function RutasSection({
   const unidadesDisponibles = unidades.filter(u => {
     if (!u.activo) return false
     if (unidadesEnRuta.find(r => r.id === u.id)) return false
-    if (proyectoFiltro && u.project_id !== proyectoFiltro) return false
+    if (!form.project_id || u.project_id !== form.project_id) return false
     const texto = busqueda.toLowerCase()
     if (!texto) return true
     return (
@@ -412,6 +428,17 @@ export function RutasSection({
               onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))}
               placeholder="Ej. Zona Norte – Lunes"
             />
+          </div>
+          <div>
+            <label style={labelStyle}>Proyecto *</label>
+            <select
+              style={inputStyle}
+              value={form.project_id}
+              onChange={e => handleProjectChange(e.target.value)}
+            >
+              <option value="">-- Selecciona un proyecto --</option>
+              {proyectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+            </select>
           </div>
           <div>
             <label style={labelStyle}>Fecha Programada</label>
@@ -485,7 +512,7 @@ export function RutasSection({
               return (
                 <button
                   key={tipo}
-                  onClick={() => { setTipoRuta(tipo); setBusqueda(''); setProyectoFiltro('') }}
+                  onClick={() => { setTipoRuta(tipo); setBusqueda('') }}
                   style={{
                     padding: '8px 18px',
                     border: active ? 'none' : '2px solid var(--at-line)',
@@ -578,14 +605,6 @@ export function RutasSection({
                 <div style={{ fontWeight: 700, marginBottom: '10px', color: 'var(--at-ink-2)' }}>
                   Contadores disponibles ({contadoresDisponibles.length})
                 </div>
-                <select
-                  style={{ ...inputStyle, marginBottom: '8px' }}
-                  value={proyectoFiltro}
-                  onChange={e => setProyectoFiltro(e.target.value)}
-                >
-                  <option value="">-- Todos los proyectos --</option>
-                  {proyectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                </select>
                 <input
                   style={{ ...inputStyle, marginBottom: '10px' }}
                   placeholder="Buscar contador..."
@@ -595,7 +614,7 @@ export function RutasSection({
                 <div style={{ maxHeight: '280px', overflowY: 'auto', border: '2px solid var(--at-line)', borderRadius: '10px' }}>
                   {contadoresDisponibles.length === 0 && (
                     <div style={{ padding: '16px', color: 'var(--at-ink-3)', textAlign: 'center', fontSize: '13px' }}>
-                      {busqueda || proyectoFiltro ? 'Sin resultados' : 'Todos los contadores ya están en la ruta'}
+                      {!form.project_id ? 'Selecciona un proyecto primero' : busqueda ? 'Sin resultados' : 'Todos los contadores ya están en la ruta'}
                     </div>
                   )}
                   {contadoresDisponibles.map(c => {
@@ -662,14 +681,6 @@ export function RutasSection({
                 <div style={{ fontWeight: 700, marginBottom: '10px', color: 'var(--at-ink-2)' }}>
                   Unidades disponibles ({unidadesDisponibles.length})
                 </div>
-                <select
-                  style={{ ...inputStyle, marginBottom: '8px' }}
-                  value={proyectoFiltro}
-                  onChange={e => setProyectoFiltro(e.target.value)}
-                >
-                  <option value="">-- Todos los proyectos --</option>
-                  {proyectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                </select>
                 <input
                   style={{ ...inputStyle, marginBottom: '10px' }}
                   placeholder="Buscar unidad..."
@@ -679,7 +690,7 @@ export function RutasSection({
                 <div style={{ maxHeight: '280px', overflowY: 'auto', border: '2px solid var(--at-line)', borderRadius: '10px' }}>
                   {unidadesDisponibles.length === 0 && (
                     <div style={{ padding: '16px', color: 'var(--at-ink-3)', textAlign: 'center', fontSize: '13px' }}>
-                      {busqueda || proyectoFiltro ? 'Sin resultados' : 'Todas las unidades ya están en la ruta'}
+                      {!form.project_id ? 'Selecciona un proyecto primero' : busqueda ? 'Sin resultados' : 'Todas las unidades ya están en la ruta'}
                     </div>
                   )}
                   {unidadesDisponibles.map(u => {
@@ -804,6 +815,7 @@ export function RutasSection({
             ? (ruta.unidad_ids ?? []).length
             : (ruta.cliente_ids ?? []).length
           const itemLabel = tipo === 'contadores' ? 'contador' : tipo === 'unidades' ? 'unidad' : 'cliente'
+          const proyectoNombre = ruta.project_id ? proyectos.find(p => p.id === ruta.project_id)?.nombre : null
           const preview = tipo === 'contadores'
             ? (ruta.contador_ids ?? []).slice(0, 4).map(id => contadores.find(c => c.id === id)?.numero_serie ?? '?')
             : tipo === 'unidades'
@@ -817,7 +829,7 @@ export function RutasSection({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '16px', marginBottom: '2px' }}>{ruta.nombre}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '2px' }}>{tipoLabel}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginBottom: '2px' }}>{tipoLabel}{proyectoNombre ? ` · ${proyectoNombre}` : ''}</div>
                   {ruta.descripcion && (
                     <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{ruta.descripcion}</div>
                   )}

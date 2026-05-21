@@ -37,6 +37,22 @@ const run = (
   }).map(r => r.id)
 
 describe('filterRutasByProjectAccess', () => {
+  it('keeps a route whose explicit project_id is accessible', () => {
+    const rutas = [ruta({ id: 'with-pid', project_id: P_21B, tipo_ruta: 'unidades', unidad_ids: ['u1'] })]
+    // No unidades provided: decision must come from project_id alone.
+    expect(run(rutas)).toEqual(['with-pid'])
+  })
+
+  it('hides a route whose explicit project_id is inaccessible', () => {
+    const rutas = [ruta({ id: 'with-pid', project_id: P_SQ, tipo_ruta: 'clientes', cliente_ids: ['cl1'] })]
+    expect(run(rutas)).toEqual([])
+  })
+
+  it('keeps an assigned route even when its project_id is inaccessible', () => {
+    const rutas = [ruta({ id: 'mine', project_id: P_SQ, asignado_a: ME })]
+    expect(run(rutas)).toEqual(['mine'])
+  })
+
   it('hides a unidades route whose units are all in an inaccessible project', () => {
     const rutas = [ruta({ id: 'sq-units', tipo_ruta: 'unidades', unidad_ids: ['u1', 'u2'] })]
     const unidades = [unidad('u1', P_SQ), unidad('u2', P_SQ)]

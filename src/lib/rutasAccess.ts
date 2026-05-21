@@ -50,6 +50,10 @@ export function filterRutasByProjectAccess({
     // policy, which exposes a user's own assigned routes regardless of project).
     if (ruta.asignado_a && ruta.asignado_a === userId) return true
 
+    // Prefer the route's explicit project when present.
+    if (ruta.project_id) return accessibleProjectIds.has(ruta.project_id)
+
+    // Legacy routes without a project_id: derive it from the route's items.
     const tipo = ruta.tipo_ruta ?? 'clientes'
     if (tipo === 'contadores') return itemsInAccessibleProject(ruta.contador_ids ?? [], contadorProject)
     if (tipo === 'unidades') return itemsInAccessibleProject(ruta.unidad_ids ?? [], unidadProject)
