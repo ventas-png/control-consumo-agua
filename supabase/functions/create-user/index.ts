@@ -110,7 +110,12 @@ Deno.serve(async (req) => {
       company_id: string
     }
 
-    const { email, password, full_name, role, company_id } = body
+    const { email: rawEmail, password, full_name, role, company_id } = body
+
+    // Normalize email (trim + lowercase) so a stray trailing space or different
+    // capitalization can't create an account the user is then unable to log in to:
+    // login normalizes the email, so the stored value must be normalized too.
+    const email = (rawEmail ?? '').trim().toLowerCase()
 
     if (!email || !password || !full_name || !role || !company_id) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
