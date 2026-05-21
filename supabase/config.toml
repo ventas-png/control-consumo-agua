@@ -1,5 +1,4 @@
-[project]
-id = "nnsqmeigtgewatameexo"
+project_id = "nnsqmeigtgewatameexo"
 
 # Funciones que manejan su propia autenticación (deploy con --no-verify-jwt).
 [functions.create-cliente-account]
