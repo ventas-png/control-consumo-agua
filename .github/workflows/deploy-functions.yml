@@ -66,3 +66,15 @@ jobs:
         run: |
           supabase functions deploy test-stripe \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy log-security-event (no JWT — fires before login)
+        run: |
+          supabase functions deploy log-security-event \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
+
+      - name: Deploy complete-oauth-onboarding (no JWT — verifies token itself)
+        run: |
+          supabase functions deploy complete-oauth-onboarding \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
