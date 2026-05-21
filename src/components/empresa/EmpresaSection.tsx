@@ -546,8 +546,9 @@ export function EmpresaSection({ currentUser }: Props) {
 
       void Swal.fire({ icon: 'success', title: 'Usuario creado', timer: 1500, showConfirmButton: false })
       void cargar()
-    } catch {
-      void Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No se pudo conectar con el servidor. Verifique su conexión e intente nuevamente.' })
+    } catch (err) {
+      console.error('create-user request failed:', err)
+      void Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No se pudo contactar el servicio de creación de usuarios. Intente nuevamente; si el problema persiste, contacte al soporte técnico.' })
     }
   }
 

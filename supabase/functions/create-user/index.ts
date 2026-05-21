@@ -1,9 +1,26 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 function getAllowedOrigins(): string[] {
+  const origins = new Set<string>()
+
   const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
-  if (envOrigins) return envOrigins.split(',').map(o => o.trim())
-  return ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000']
+  if (envOrigins) {
+    for (const o of envOrigins.split(',')) { const t = o.trim(); if (t) origins.add(t) }
+  } else {
+    origins.add('http://localhost:5173')
+    origins.add('http://localhost:3000')
+    origins.add('http://127.0.0.1:5173')
+    origins.add('http://127.0.0.1:3000')
+  }
+
+  // Always allow the configured public app URL so production CORS works even
+  // when ALLOWED_ORIGINS is unset (APP_URL is already set for Google OAuth).
+  const appUrl = Deno.env.get('APP_URL')
+  if (appUrl) {
+    try { origins.add(new URL(appUrl).origin) } catch { /* ignore malformed APP_URL */ }
+  }
+
+  return [...origins]
 }
 
 function getCorsHeaders(origin: string | null) {

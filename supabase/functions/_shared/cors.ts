@@ -5,18 +5,30 @@
 
 // Get allowed origins from environment or use defaults
 function getAllowedOrigins(): string[] {
+  const origins = new Set<string>()
+
   const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
   if (envOrigins) {
-    return envOrigins.split(',').map(origin => origin.trim())
+    for (const origin of envOrigins.split(',')) {
+      const trimmed = origin.trim()
+      if (trimmed) origins.add(trimmed)
+    }
+  } else {
+    // Default: localhost for development
+    origins.add('http://localhost:5173')
+    origins.add('http://localhost:3000')
+    origins.add('http://127.0.0.1:5173')
+    origins.add('http://127.0.0.1:3000')
   }
 
-  // Default: localhost for development
-  return [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:3000',
-  ]
+  // Always allow the configured public app URL so production CORS works even
+  // when ALLOWED_ORIGINS is unset (APP_URL is already set for Google OAuth).
+  const appUrl = Deno.env.get('APP_URL')
+  if (appUrl) {
+    try { origins.add(new URL(appUrl).origin) } catch { /* ignore malformed APP_URL */ }
+  }
+
+  return [...origins]
 }
 
 /**
