@@ -84,5 +84,5 @@ BEGIN
   RETURN inserted;
 END $$;
 
--- Permite invocarla manualmente desde la app (admins) si hiciera falta regenerar.
-GRANT EXECUTE ON FUNCTION public.generar_ocurrencias_rutas(int) TO authenticated;
+-- Los permisos se endurecen en 20260522000006: solo service_role (edge function)
+-- y el job (definer) la invocan; no se expone a anon/authenticated vía RPC.

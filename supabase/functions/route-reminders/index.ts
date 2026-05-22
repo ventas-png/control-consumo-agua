@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { getCorsHeaders } from '../_shared/cors.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -9,6 +8,30 @@ const APP_URL = Deno.env.get('APP_URL') ?? 'https://administratodo.com'
 
 // Guatemala is UTC-6 year-round (no DST), so a fixed offset is safe.
 const GT_OFFSET_MS = 6 * 60 * 60 * 1000
+
+// CORS con validación de origen (mismo enfoque que _shared/cors.ts y send-email).
+function getCorsHeaders(origin: string | null) {
+  const allowed = new Set<string>([
+    'https://administratodo.com', 'https://www.administratodo.com',
+    'https://administratodo.app', 'https://www.administratodo.app',
+  ])
+  const envOrigins = Deno.env.get('ALLOWED_ORIGINS')
+  if (envOrigins) {
+    for (const o of envOrigins.split(',')) { const t = o.trim(); if (t) allowed.add(t) }
+  } else {
+    allowed.add('http://localhost:5173'); allowed.add('http://localhost:3000')
+    allowed.add('http://127.0.0.1:5173'); allowed.add('http://127.0.0.1:3000')
+  }
+  const appUrl = Deno.env.get('APP_URL')
+  if (appUrl) { try { allowed.add(new URL(appUrl).origin) } catch { /* ignore */ } }
+  const list = [...allowed]
+  const allowOrigin = origin && list.includes(origin) ? origin : list[0]
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  }
+}
 
 // deno-lint-ignore no-explicit-any
 type Client = ReturnType<typeof createClient>
