@@ -12,7 +12,7 @@ interface Props {
   onSaved: () => void
 }
 
-const PALETTE = ['var(--at-primary)', 'var(--at-accent)', '#10b981', '#f59e0b', '#ef4444', 'var(--at-accent-2)', '#ec4899', 'var(--at-ink-3)', 'var(--at-accent)', '#84cc16']
+const PALETTE = ['var(--at-primary)', 'var(--at-accent)', 'var(--at-success)', 'var(--at-warning)', 'var(--at-danger)', 'var(--at-accent-2)', '#ec4899', 'var(--at-ink-3)', 'var(--at-accent)', '#84cc16']
 
 export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, onSaved }: Props) {
   const [name, setName] = useState('')
@@ -259,7 +259,7 @@ export function CustomRoleEditor({ companyId, roleId, cloneFromRoleId, onClose, 
           padding: '14px 24px', borderTop: '1px solid var(--at-line)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <div style={{ fontSize: '12px', color: error ? '#ef4444' : 'var(--at-ink-3)' }}>{error ?? ''}</div>
+          <div style={{ fontSize: '12px', color: error ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{error ?? ''}</div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={onClose} style={btnSecondary}>Cancelar</button>
             <button onClick={() => void handleSave()} disabled={saving || loading} style={{

@@ -52,7 +52,7 @@ const s = {
     fontFamily: 'monospace',
   },
   hint: { fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '6px' },
-  warning: { fontSize: '11px', color: '#ef4444', marginTop: '6px', fontWeight: 600 } as CSSProperties,
+  warning: { fontSize: '11px', color: 'var(--at-danger)', marginTop: '6px', fontWeight: 600 } as CSSProperties,
   link: { color: 'var(--at-primary)' },
   toggleSecretBtn: {
     position: 'absolute',
@@ -76,7 +76,7 @@ const s = {
   } as CSSProperties,
   fieldGroup: { marginBottom: '20px' },
   fieldGroupLast: { marginBottom: '24px' },
-  validationError: { fontSize: '11px', color: '#ef4444', marginTop: '4px' },
+  validationError: { fontSize: '11px', color: 'var(--at-danger)', marginTop: '4px' },
 } as const
 
 function badge(configured: boolean) {
@@ -85,8 +85,8 @@ function badge(configured: boolean) {
     borderRadius: '20px',
     fontSize: '11px',
     fontWeight: 700,
-    background: configured ? '#f0fdf4' : '#fee2e2',
-    color: configured ? '#15803d' : '#991b1b',
+    background: configured ? 'var(--at-success-tint)' : 'var(--at-danger-tint)',
+    color: configured ? 'var(--at-success-strong)' : 'var(--at-danger-strong)',
   } as CSSProperties
 }
 
@@ -95,7 +95,7 @@ function toggleBtn(active: boolean, saving: boolean) {
     padding: '10px 16px',
     borderRadius: '8px',
     border: 'none',
-    background: active ? '#10b981' : 'var(--at-line)',
+    background: active ? 'var(--at-success)' : 'var(--at-line)',
     color: active ? 'white' : 'var(--at-ink-3)',
     fontWeight: 700,
     fontSize: '13px',

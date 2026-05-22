@@ -19,13 +19,13 @@ interface UserMap { [id: string]: string }
 interface RoleMap { [id: string]: { name: string; color: string } }
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-  assign_role:       { label: 'Asignó rol',       color: '#22c55e' },
-  remove_role:       { label: 'Quitó rol',        color: '#ef4444' },
+  assign_role:       { label: 'Asignó rol',       color: 'var(--at-success)' },
+  remove_role:       { label: 'Quitó rol',        color: 'var(--at-danger)' },
   create_role:       { label: 'Creó rol',         color: 'var(--at-primary-2)' },
-  update_role:       { label: 'Editó rol',        color: '#f59e0b' },
-  delete_role:       { label: 'Eliminó rol',      color: '#ef4444' },
-  grant_permission:  { label: 'Agregó permiso',   color: '#22c55e' },
-  revoke_permission: { label: 'Quitó permiso',    color: '#ef4444' },
+  update_role:       { label: 'Editó rol',        color: 'var(--at-warning)' },
+  delete_role:       { label: 'Eliminó rol',      color: 'var(--at-danger)' },
+  grant_permission:  { label: 'Agregó permiso',   color: 'var(--at-success)' },
+  revoke_permission: { label: 'Quitó permiso',    color: 'var(--at-danger)' },
 }
 
 export function AuditLogModal({ onClose }: Props) {
@@ -141,7 +141,7 @@ export function AuditLogModal({ onClose }: Props) {
           {loading ? (
             <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', marginTop: '40px', fontSize: '13px' }}>Cargando…</div>
           ) : error ? (
-            <div style={{ textAlign: 'center', color: '#ef4444', marginTop: '40px', fontSize: '13px' }}>{error}</div>
+            <div style={{ textAlign: 'center', color: 'var(--at-danger)', marginTop: '40px', fontSize: '13px' }}>{error}</div>
           ) : rows.length === 0 ? (
             <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', marginTop: '40px', fontSize: '13px' }}>
               {filterAction ? 'Sin eventos para este filtro.' : 'Sin eventos en el log.'}

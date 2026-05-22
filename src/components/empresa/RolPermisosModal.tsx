@@ -362,7 +362,7 @@ export function RolPermisosModal({
           padding: '14px 24px', borderTop: '1px solid var(--at-line)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
         }}>
-          <div style={{ fontSize: '12px', color: error ? '#ef4444' : 'var(--at-ink-3)' }}>{error ?? ''}</div>
+          <div style={{ fontSize: '12px', color: error ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{error ?? ''}</div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={onClose} style={{
               padding: '8px 18px', borderRadius: '8px', border: '1px solid var(--at-line)',
@@ -461,7 +461,7 @@ function RoleCard({
             {expiresAt && (
               <span style={{
                 fontSize: '9px', fontWeight: 700,
-                color: expired ? '#ef4444' : expiresSoon ? '#f59e0b' : 'var(--at-primary)',
+                color: expired ? 'var(--at-danger)' : expiresSoon ? 'var(--at-warning)' : 'var(--at-primary)',
                 background: expired ? 'rgba(239,68,68,0.1)' : expiresSoon ? 'rgba(245,158,11,0.1)' : 'rgba(27, 59, 54,0.1)',
                 padding: '1px 5px', borderRadius: '4px',
                 letterSpacing: '0.04em', textTransform: 'uppercase',
@@ -475,7 +475,7 @@ function RoleCard({
         {!role.is_system && (
           <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
             <button onClick={onEdit} title="Editar" style={iconBtnStyle('var(--at-primary-2)')}>✎</button>
-            <button onClick={onDelete} title="Eliminar" style={iconBtnStyle('#ef4444')}>🗑</button>
+            <button onClick={onDelete} title="Eliminar" style={iconBtnStyle('var(--at-danger)')}>🗑</button>
           </div>
         )}
       </div>
@@ -535,9 +535,9 @@ function Banner({ color, children }: { color: string; children: React.ReactNode 
 
 function AccessBadge({ level, count, total }: { level: 'completo' | 'parcial' | 'ninguno'; count: number; total: number }) {
   const cfg = level === 'completo'
-    ? { color: '#22c55e', label: 'Completo' }
+    ? { color: 'var(--at-success)', label: 'Completo' }
     : level === 'parcial'
-      ? { color: '#f59e0b', label: `Parcial ${count}/${total}` }
+      ? { color: 'var(--at-warning)', label: `Parcial ${count}/${total}` }
       : { color: 'var(--at-ink-3)', label: 'Sin acceso' }
   return (
     <span style={{

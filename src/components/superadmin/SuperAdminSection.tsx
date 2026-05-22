@@ -350,7 +350,7 @@ export function SuperAdminSection() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                       <div style={{ color: 'var(--at-chip)', fontWeight: 700, fontSize: '16px' }}>{e.nombre}</div>
                       {!e.activa && (
-                        <span style={{ background: '#ef444422', color: '#f87171', fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', border: '1px solid #ef444444' }}>
+                        <span style={{ background: 'var(--at-danger)22', color: 'var(--at-danger)', fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '20px', border: '1px solid var(--at-danger)44' }}>
                           Inactiva
                         </span>
                       )}
@@ -363,7 +363,7 @@ export function SuperAdminSection() {
                         <span style={{ color: 'var(--at-accent-2)', fontWeight: 600 }}>{e.project_count}</span>/{e.max_projects} proyectos
                       </span>
                       <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>
-                        <span style={{ color: unitsAlerta ? '#f59e0b' : '#34d399', fontWeight: 600 }}>{e.unit_count ?? 0}</span>/{e.max_units} unidades
+                        <span style={{ color: unitsAlerta ? 'var(--at-warning)' : '#34d399', fontWeight: 600 }}>{e.unit_count ?? 0}</span>/{e.max_units} unidades
                       </span>
                       <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>
                         <span style={{ color: 'var(--at-accent-light)', fontWeight: 600 }}>{e.user_count}</span> usuarios
@@ -389,7 +389,7 @@ export function SuperAdminSection() {
                 <div style={{ marginBottom: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--at-ink-2)' }}>Uso de unidades</span>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: unitsAlerta ? '#f59e0b' : '#34d399' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: unitsAlerta ? 'var(--at-warning)' : '#34d399' }}>
                       {unitsUsoPct}%
                     </span>
                   </div>
@@ -397,7 +397,7 @@ export function SuperAdminSection() {
                     <div style={{
                       height: '100%',
                       width: `${Math.min(unitsUsoPct, 100)}%`,
-                      background: unitsUsoPct >= 100 ? '#ef4444' : unitsAlerta ? '#f59e0b' : '#34d399',
+                      background: unitsUsoPct >= 100 ? 'var(--at-danger)' : unitsAlerta ? 'var(--at-warning)' : '#34d399',
                       borderRadius: '3px',
                       transition: 'width 0.3s',
                     }} />
@@ -446,7 +446,7 @@ export function SuperAdminSection() {
                     />
                     {isEditingUnits && (
                       <>
-                        <button onClick={() => void actualizarMaxUnidades(e.id)} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg,#34d399,#059669)', color: 'white', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
+                        <button onClick={() => void actualizarMaxUnidades(e.id)} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg,#34d399,var(--at-success-strong))', color: 'var(--at-on-status)', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}>
                           Guardar
                         </button>
                         <button onClick={() => setEditingMaxUnits(prev => { const n = { ...prev }; delete n[e.id]; return n })} style={{ padding: '5px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--at-ink-3)', cursor: 'pointer', fontSize: '11px' }}>
