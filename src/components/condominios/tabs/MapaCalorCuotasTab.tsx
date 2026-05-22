@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import { CuotaCondominio, Unidad } from '../../../types'
+import { StatTile } from '../../shared/StatTile'
+import type { Tone } from '../../shared/statusTone'
 
 interface Props {
   cuotas: CuotaCondominio[]
@@ -27,9 +29,9 @@ function labelMes(ym: string): string {
 type EstadoCelda = 'pagado' | 'pendiente' | 'moroso' | 'sin_cuota'
 
 const CELDA_CFG: Record<EstadoCelda, { bg: string; color: string; label: string; order: number }> = {
-  pagado:    { bg: '#16a34a', color: 'white',   label: '✓', order: 0 },
-  pendiente: { bg: '#fde68a', color: '#92400e', label: '!', order: 2 },
-  moroso:    { bg: '#ef4444', color: 'white',    label: '✗', order: 3 },
+  pagado:    { bg: 'var(--at-success)', color: 'var(--at-on-status)', label: '✓', order: 0 },
+  pendiente: { bg: 'var(--at-warning)', color: 'var(--at-on-status)', label: '!', order: 2 },
+  moroso:    { bg: 'var(--at-danger)',  color: 'var(--at-on-status)', label: '✗', order: 3 },
   sin_cuota: { bg: 'var(--at-chip)', color: 'var(--at-line-strong)', label: '·', order: 1 },
 }
 
@@ -79,16 +81,13 @@ export default function MapaCalorCuotasTab({ cuotas, unidades, moneda }: Props) 
 
       {/* KPIs globales */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-        {[
-          { label: 'Tasa cobro global', val: `${Math.round(globalTasaCobro * 100)}%`, color: globalTasaCobro >= 0.9 ? '#16a34a' : globalTasaCobro >= 0.75 ? '#d97706' : '#ef4444', bg: globalTasaCobro >= 0.9 ? '#dcfce7' : globalTasaCobro >= 0.75 ? '#fef3c7' : '#fef2f2' },
-          { label: 'Unidades al día', val: `${unidadesAlDia} / ${unidades.length}`, color: '#16a34a', bg: '#dcfce7' },
-          { label: 'Deuda total activa', val: `${moneda} ${deudaTotal.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#ef4444', bg: '#fef2f2' },
-          { label: 'Morosos crónicos (≥3m)', val: String(cronicas), color: cronicas > 0 ? '#ef4444' : '#16a34a', bg: cronicas > 0 ? '#fef2f2' : '#dcfce7' },
-        ].map(k => (
-          <div key={k.label} style={{ flex: '1 1 130px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
-            <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: k.color, marginTop: 2 }}>{k.val}</div>
-          </div>
+        {([
+          { label: 'Tasa cobro global', val: `${Math.round(globalTasaCobro * 100)}%`, tone: (globalTasaCobro >= 0.9 ? 'success' : globalTasaCobro >= 0.75 ? 'warning' : 'danger') as Tone },
+          { label: 'Unidades al día', val: `${unidadesAlDia} / ${unidades.length}`, tone: 'success' as Tone },
+          { label: 'Deuda total activa', val: `${moneda} ${deudaTotal.toLocaleString('es', { minimumFractionDigits: 2 })}`, tone: 'danger' as Tone },
+          { label: 'Morosos crónicos (≥3m)', val: String(cronicas), tone: (cronicas > 0 ? 'danger' : 'success') as Tone },
+        ]).map(k => (
+          <StatTile key={k.label} label={k.label} value={k.val} tone={k.tone} style={{ flex: '1 1 130px', minWidth: 130 }} />
         ))}
       </div>
 
@@ -138,11 +137,11 @@ export default function MapaCalorCuotasTab({ cuotas, unidades, moneda }: Props) 
                   )
                 })}
                 <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700,
-                  color: row.tasaCobro >= 0.9 ? '#16a34a' : row.tasaCobro >= 0.7 ? '#d97706' : '#ef4444' }}>
+                  color: row.tasaCobro >= 0.9 ? 'var(--at-success)' : row.tasaCobro >= 0.7 ? 'var(--at-warning)' : 'var(--at-danger)' }}>
                   {Math.round(row.tasaCobro * 100)}%
                 </td>
                 <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: row.deudaTotal > 0 ? 700 : 400,
-                  color: row.deudaTotal > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>
+                  color: row.deudaTotal > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
                   {row.deudaTotal > 0 ? `${moneda} ${row.deudaTotal.toFixed(2)}` : '✓'}
                 </td>
               </tr>
@@ -154,15 +153,15 @@ export default function MapaCalorCuotasTab({ cuotas, unidades, moneda }: Props) 
               {totalesMes.map(t => (
                 <td key={t.mes} style={{ padding: '7px 3px', textAlign: 'center' }}>
                   <div style={{ fontSize: 10, fontWeight: 700,
-                    color: t.pct >= 0.9 ? '#16a34a' : t.pct >= 0.7 ? '#d97706' : t.total === 0 ? 'var(--at-line-strong)' : '#ef4444' }}>
+                    color: t.pct >= 0.9 ? 'var(--at-success)' : t.pct >= 0.7 ? 'var(--at-warning)' : t.total === 0 ? 'var(--at-line-strong)' : 'var(--at-danger)' }}>
                     {t.total > 0 ? `${Math.round(t.pct * 100)}%` : '—'}
                   </div>
                 </td>
               ))}
-              <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: globalTasaCobro >= 0.9 ? '#16a34a' : '#d97706' }}>
+              <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: globalTasaCobro >= 0.9 ? 'var(--at-success)' : 'var(--at-warning)' }}>
                 {Math.round(globalTasaCobro * 100)}%
               </td>
-              <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>
+              <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: 'var(--at-danger)' }}>
                 {moneda} {deudaTotal.toFixed(2)}
               </td>
             </tr>

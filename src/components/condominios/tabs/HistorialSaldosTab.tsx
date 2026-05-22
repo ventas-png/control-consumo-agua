@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase'
 import Swal from 'sweetalert2'
 import { toast } from '../../../lib/toast'
 import { HistorialSaldoUnidad, Unidad, CuotaCondominio } from '../../../types'
+import { StatusBadge } from '../../shared/StatusBadge'
 
 interface Props {
   historial: HistorialSaldoUnidad[]
@@ -77,13 +78,13 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
     <div style={{ padding: 16 }}>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
-        <div style={{ background: '#fef2f2', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#ef4444' }}>{moneda} {totalDeuda.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-          <div style={{ fontSize: 11, color: '#ef4444' }}>Deuda acumulada{filtroPeriodo ? ` (${filtroPeriodo})` : ' (todos los períodos)'}</div>
+        <div style={{ background: 'var(--at-danger-tint)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {totalDeuda.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-danger)' }}>Deuda acumulada{filtroPeriodo ? ` (${filtroPeriodo})` : ' (todos los períodos)'}</div>
         </div>
-        <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#16a34a' }}>{moneda} {totalPagos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-          <div style={{ fontSize: 11, color: '#16a34a' }}>Pagos recibidos</div>
+        <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {totalPagos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Pagos recibidos</div>
         </div>
         <div style={{ background: 'var(--at-surface-2)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-ink-2)' }}>{periodos.length}</div>
@@ -133,18 +134,18 @@ export default function HistorialSaldosTab({ historial, cuotas, unidades, proyec
                 const unidad = unidades.find(u => u.id === h.unidad_id)
                 const deudor = h.saldo_final > 0
                 return (
-                  <tr key={h.id} style={{ borderBottom: '1px solid var(--at-chip)', background: deudor ? '#fef9f9' : 'var(--at-surface)' }}>
+                  <tr key={h.id} style={{ borderBottom: '1px solid var(--at-chip)', background: deudor ? 'var(--at-danger-tint)' : 'var(--at-surface)' }}>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>{unidad?.nombre ?? h.unidad_nombre ?? '—'}</td>
                     <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{h.periodo}</td>
                     <td style={{ padding: '8px 12px', color: 'var(--at-ink-2)' }}>{moneda} {h.saldo_anterior.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px', color: '#dc2626' }}>+ {moneda} {h.cargos_periodo.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px', color: '#16a34a' }}>− {moneda} {h.pagos_periodo.toFixed(2)}</td>
-                    <td style={{ padding: '8px 12px', fontWeight: 700, color: deudor ? '#ef4444' : '#16a34a' }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--at-danger)' }}>+ {moneda} {h.cargos_periodo.toFixed(2)}</td>
+                    <td style={{ padding: '8px 12px', color: 'var(--at-success)' }}>− {moneda} {h.pagos_periodo.toFixed(2)}</td>
+                    <td style={{ padding: '8px 12px', fontWeight: 700, color: deudor ? 'var(--at-danger)' : 'var(--at-success)' }}>
                       {moneda} {h.saldo_final.toFixed(2)}
                     </td>
                     <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                       {h.num_cuotas_vencidas > 0
-                        ? <span style={{ padding: '2px 7px', borderRadius: 20, background: '#fee2e2', color: '#ef4444', fontSize: 11, fontWeight: 700 }}>{h.num_cuotas_vencidas}</span>
+                        ? <StatusBadge tone="danger">{h.num_cuotas_vencidas}</StatusBadge>
                         : <span style={{ color: 'var(--at-ink-3)', fontSize: 12 }}>—</span>
                       }
                     </td>
