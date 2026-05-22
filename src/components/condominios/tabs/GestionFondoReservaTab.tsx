@@ -15,10 +15,10 @@ interface Props {
 type TipoMov = 'aportacion' | 'retiro' | 'rendimiento' | 'ajuste'
 
 const TIPO_CFG: Record<TipoMov, { label: string; color: string; bg: string; signo: 1 | -1 }> = {
-  aportacion:  { label: 'Aportación',  color: '#16a34a', bg: '#dcfce7', signo:  1 },
+  aportacion:  { label: 'Aportación',  color: 'var(--at-success)', bg: 'var(--at-success-tint)', signo:  1 },
   rendimiento: { label: 'Rendimiento', color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', signo:  1 },
-  retiro:      { label: 'Retiro',      color: '#ef4444', bg: '#fef2f2', signo: -1 },
-  ajuste:      { label: 'Ajuste',      color: '#d97706', bg: '#fef3c7', signo:  1 },
+  retiro:      { label: 'Retiro',      color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', signo: -1 },
+  ajuste:      { label: 'Ajuste',      color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', signo:  1 },
 }
 
 const MESES_L = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
@@ -96,9 +96,9 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         {[
-          { label: 'Saldo actual', val: `${moneda} ${saldoActual.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: saldoActual >= 0 ? '#16a34a' : '#ef4444', bg: saldoActual >= 0 ? '#dcfce7' : '#fef2f2' },
-          { label: 'Aportaciones este mes', val: `${moneda} ${aportacionesMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#16a34a', bg: '#dcfce7' },
-          { label: 'Retiros este mes', val: `${moneda} ${retirosMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: retirosMes > 0 ? '#ef4444' : 'var(--at-ink-3)', bg: retirosMes > 0 ? '#fef2f2' : 'var(--at-surface-2)' },
+          { label: 'Saldo actual', val: `${moneda} ${saldoActual.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: saldoActual >= 0 ? 'var(--at-success)' : 'var(--at-danger)', bg: saldoActual >= 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)' },
+          { label: 'Aportaciones este mes', val: `${moneda} ${aportacionesMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+          { label: 'Retiros este mes', val: `${moneda} ${retirosMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: retirosMes > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)', bg: retirosMes > 0 ? 'var(--at-danger-tint)' : 'var(--at-surface-2)' },
           { label: 'Total movimientos', val: String(movimientos.length), color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 130px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
@@ -164,16 +164,16 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
               {tendencia.map(t => (
                 <div key={t.mes} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                   <div style={{ width: '100%', display: 'flex', gap: 2, alignItems: 'flex-end', height: 65 }}>
-                    <div style={{ flex: 1, background: '#16a34a', opacity: 0.8, borderRadius: '2px 2px 0 0', height: `${(t.ingresos / maxTend) * 60}px`, minHeight: t.ingresos > 0 ? 2 : 0 }} />
-                    <div style={{ flex: 1, background: '#ef4444', opacity: 0.7, borderRadius: '2px 2px 0 0', height: `${(t.egresos / maxTend) * 60}px`, minHeight: t.egresos > 0 ? 2 : 0 }} />
+                    <div style={{ flex: 1, background: 'var(--at-success)', opacity: 0.8, borderRadius: '2px 2px 0 0', height: `${(t.ingresos / maxTend) * 60}px`, minHeight: t.ingresos > 0 ? 2 : 0 }} />
+                    <div style={{ flex: 1, background: 'var(--at-danger)', opacity: 0.7, borderRadius: '2px 2px 0 0', height: `${(t.egresos / maxTend) * 60}px`, minHeight: t.egresos > 0 ? 2 : 0 }} />
                   </div>
                   <div style={{ fontSize: 9, color: 'var(--at-ink-3)' }}>{t.label}</div>
                 </div>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 14, marginTop: 6, fontSize: 10 }}>
-              <span style={{ color: '#16a34a', fontWeight: 600 }}>■ Entradas</span>
-              <span style={{ color: '#ef4444', fontWeight: 600 }}>■ Salidas</span>
+              <span style={{ color: 'var(--at-success)', fontWeight: 600 }}>■ Entradas</span>
+              <span style={{ color: 'var(--at-danger)', fontWeight: 600 }}>■ Salidas</span>
             </div>
           </div>
 
@@ -199,10 +199,10 @@ export default function GestionFondoReservaTab({ movimientos, proyectoId, compan
                         </div>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 10 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: cfg.signo > 0 ? '#16a34a' : '#ef4444' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: cfg.signo > 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
                           {cfg.signo > 0 ? '+' : '-'}{moneda} {m.monto.toLocaleString('es', { minimumFractionDigits: 2 })}
                         </div>
-                        <div style={{ fontSize: 10, color: m.saldoAcum >= 0 ? '#16a34a' : '#ef4444', fontWeight: 600 }}>
+                        <div style={{ fontSize: 10, color: m.saldoAcum >= 0 ? 'var(--at-success)' : 'var(--at-danger)', fontWeight: 600 }}>
                           Saldo: {moneda} {m.saldoAcum.toLocaleString('es', { minimumFractionDigits: 2 })}
                         </div>
                       </div>

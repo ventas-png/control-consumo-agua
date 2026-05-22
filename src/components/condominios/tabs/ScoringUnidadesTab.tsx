@@ -72,10 +72,10 @@ function calcScore(
 }
 
 const GRADO_CFG = {
-  A: { color: '#16a34a', bg: '#dcfce7', label: 'Excelente' },
+  A: { color: 'var(--at-success)', bg: 'var(--at-success-tint)', label: 'Excelente' },
   B: { color: '#65a30d', bg: '#ecfccb', label: 'Bueno' },
-  C: { color: '#d97706', bg: '#fef3c7', label: 'Regular' },
-  D: { color: '#ef4444', bg: '#fef2f2', label: 'Riesgo alto' },
+  C: { color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', label: 'Regular' },
+  D: { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', label: 'Riesgo alto' },
 }
 
 export default function ScoringUnidadesTab({ cuotas, infracciones, sanciones, unidades, moneda }: Props) {
@@ -118,17 +118,17 @@ export default function ScoringUnidadesTab({ cuotas, infracciones, sanciones, un
           <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--at-primary-hover)' }}>{promedio}</div>
           <div style={{ fontSize: 11, color: 'var(--at-primary-hover)', fontWeight: 600 }}>Puntaje promedio del condominio</div>
         </div>
-        <div style={{ background: '#dcfce7', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>{distribucion.A + distribucion.B}</div>
-          <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>Unidades grado A / B</div>
+        <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--at-success)' }}>{distribucion.A + distribucion.B}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-success)', fontWeight: 600 }}>Unidades grado A / B</div>
         </div>
-        <div style={{ background: '#fef2f2', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#ef4444' }}>{enRiesgo}</div>
-          <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>Unidades en riesgo (C / D)</div>
+        <div style={{ background: 'var(--at-danger-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--at-danger)' }}>{enRiesgo}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-danger)', fontWeight: 600 }}>Unidades en riesgo (C / D)</div>
         </div>
-        <div style={{ background: '#fff7ed', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#ea580c' }}>{moneda} {montoEnRiesgo.toLocaleString('es', { maximumFractionDigits: 0 })}</div>
-          <div style={{ fontSize: 11, color: '#ea580c', fontWeight: 600 }}>Monto en riesgo (C / D)</div>
+        <div style={{ background: 'var(--at-warning-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--at-warning)' }}>{moneda} {montoEnRiesgo.toLocaleString('es', { maximumFractionDigits: 0 })}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-warning)', fontWeight: 600 }}>Monto en riesgo (C / D)</div>
         </div>
       </div>
 

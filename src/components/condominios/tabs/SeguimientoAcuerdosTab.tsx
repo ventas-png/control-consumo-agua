@@ -14,10 +14,10 @@ interface Props {
 }
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  pendiente:   { bg: '#fef3c7', color: '#92400e',  label: 'Pendiente' },
+  pendiente:   { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)',  label: 'Pendiente' },
   en_proceso:  { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)',  label: 'En proceso' },
-  cumplido:    { bg: '#dcfce7', color: '#16a34a',  label: 'Cumplido' },
-  vencido:     { bg: '#fee2e2', color: '#ef4444',  label: 'Vencido' },
+  cumplido:    { bg: 'var(--at-success-tint)', color: 'var(--at-success)',  label: 'Cumplido' },
+  vencido:     { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)',  label: 'Vencido' },
   cancelado:   { bg: 'var(--at-chip)', color: 'var(--at-ink-3)',  label: 'Cancelado' },
 }
 
@@ -64,7 +64,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar acuerdo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar acuerdo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('seguimiento_acuerdos').delete().eq('id', id)
     onRefresh()
@@ -107,10 +107,10 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px', marginBottom: '16px' }}>
         {[
-          { label: 'Pendientes',  value: String(pendientes), color: '#f59e0b' },
+          { label: 'Pendientes',  value: String(pendientes), color: 'var(--at-warning)' },
           { label: 'En proceso',  value: String(enProceso),  color: 'var(--at-primary)' },
-          { label: 'Vencidos',    value: String(vencidos),   color: '#ef4444' },
-          { label: 'Cumplimiento', value: `${tasaCumplimiento}%`, color: tasaCumplimiento >= 70 ? '#10b981' : '#f59e0b' },
+          { label: 'Vencidos',    value: String(vencidos),   color: 'var(--at-danger)' },
+          { label: 'Cumplimiento', value: `${tasaCumplimiento}%`, color: tasaCumplimiento >= 70 ? 'var(--at-success)' : 'var(--at-warning)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.value}</div>
@@ -204,7 +204,7 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
                       {a.responsable && <span>👤 {a.responsable}</span>}
                       {acta && <span>📋 {acta.titulo}</span>}
                       {a.fecha_limite && (
-                        <span style={{ color: diasRestantes !== null && diasRestantes < 0 ? '#ef4444' : diasRestantes !== null && diasRestantes <= 7 ? '#f59e0b' : 'var(--at-ink-3)', fontWeight: diasRestantes !== null && diasRestantes <= 7 ? 700 : 400 }}>
+                        <span style={{ color: diasRestantes !== null && diasRestantes < 0 ? 'var(--at-danger)' : diasRestantes !== null && diasRestantes <= 7 ? 'var(--at-warning)' : 'var(--at-ink-3)', fontWeight: diasRestantes !== null && diasRestantes <= 7 ? 700 : 400 }}>
                           📅 {a.fecha_limite}{diasRestantes !== null ? ` (${diasRestantes >= 0 ? `${diasRestantes}d` : 'vencido'})` : ''}
                         </span>
                       )}
@@ -223,14 +223,14 @@ export function SeguimientoAcuerdosTab({ acuerdos, actas, proyectoId, companyId,
                       )}
                       {['pendiente', 'en_proceso', 'vencido'].includes(a.estado) && (
                         <button onClick={() => cambiarEstado(a.id, 'cumplido')}
-                          style={{ padding: '3px 8px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                          style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                           ✓ Cumplido
                         </button>
                       )}
                       <button onClick={() => startEdit(a as SeguimientoAcuerdo)}
                         style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(a.id)}
-                        style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </div>
                   )}
                 </div>

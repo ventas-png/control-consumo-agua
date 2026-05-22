@@ -17,8 +17,8 @@ interface Props {
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   activo:      { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Activo' },
-  completado:  { bg: '#dcfce7', color: '#16a34a', label: 'Completado' },
-  incumplido:  { bg: '#fee2e2', color: '#ef4444', label: 'Incumplido' },
+  completado:  { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Completado' },
+  incumplido:  { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Incumplido' },
   cancelado:   { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Cancelado' },
 }
 
@@ -84,7 +84,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar plan de pago?', text: 'Se eliminarán todas sus cuotas.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar plan de pago?', text: 'Se eliminarán todas sus cuotas.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('planes_pago_condominio').delete().eq('id', id)
     if (selected?.id === id) { setSelected(null); setCuotas([]) }
@@ -244,12 +244,12 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
                     <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                       {p.estado === 'activo' && (
                         <button onClick={() => cambiarEstadoPlan(p.id, 'incumplido')}
-                          style={{ padding: '3px 7px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                          style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
                           Incumplido
                         </button>
                       )}
                       <button onClick={() => handleDelete(p.id)}
-                        style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </div>
                   )}
                 </div>
@@ -276,7 +276,7 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
                       <span>{Math.round(cuotas.filter(c => c.pagado).length / cuotas.length * 100)}%</span>
                     </div>
                     <div style={{ height: '6px', background: 'var(--at-line)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${cuotas.filter(c => c.pagado).length / cuotas.length * 100}%`, background: '#10b981', borderRadius: '3px', transition: 'width 0.3s' }} />
+                      <div style={{ height: '100%', width: `${cuotas.filter(c => c.pagado).length / cuotas.length * 100}%`, background: 'var(--at-success)', borderRadius: '3px', transition: 'width 0.3s' }} />
                     </div>
                   </div>
                 )}
@@ -284,18 +284,18 @@ export function PlanPagoCondTab({ planes, unidades, proyectoId, companyId, moned
                   {cuotas.map(c => {
                     const vencida = !c.pagado && c.fecha_vencimiento < today
                     return (
-                      <div key={c.id} style={{ background: 'var(--at-surface)', borderRadius: '7px', padding: '8px 10px', border: `1px solid ${vencida ? '#fca5a5' : 'var(--at-line)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div key={c.id} style={{ background: 'var(--at-surface)', borderRadius: '7px', padding: '8px 10px', border: `1px solid ${vencida ? 'var(--at-danger-border)' : 'var(--at-line)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink-2)' }}>Cuota #{c.numero}</span>
                           <span style={{ fontSize: '12px', color: 'var(--at-primary)', fontWeight: 600, marginLeft: '8px' }}>{fmt(Number(c.monto), moneda)}</span>
-                          <div style={{ fontSize: '10px', color: vencida ? '#ef4444' : 'var(--at-ink-3)' }}>
+                          <div style={{ fontSize: '10px', color: vencida ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
                             Vence: {c.fecha_vencimiento}{vencida ? ' ⚠️ Vencida' : ''}
                           </div>
-                          {c.fecha_pago && <div style={{ fontSize: '10px', color: '#10b981' }}>Pagado: {c.fecha_pago}</div>}
+                          {c.fecha_pago && <div style={{ fontSize: '10px', color: 'var(--at-success)' }}>Pagado: {c.fecha_pago}</div>}
                         </div>
                         {canEdit && (
                           <button onClick={() => marcarCuotaPagada(c)}
-                            style={{ padding: '4px 9px', background: c.pagado ? '#dcfce7' : 'var(--at-chip)', color: c.pagado ? '#16a34a' : 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
+                            style={{ padding: '4px 9px', background: c.pagado ? 'var(--at-success-tint)' : 'var(--at-chip)', color: c.pagado ? 'var(--at-success)' : 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
                             {c.pagado ? '✓ Pagado' : 'Marcar pagado'}
                           </button>
                         )}

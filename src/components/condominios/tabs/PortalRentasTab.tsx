@@ -39,16 +39,16 @@ type SubTab = 'arrendamiento' | 'str'
 // ── Configs ───────────────────────────────────────────────────────────────────
 
 const ESTADO_CONTRATO: Record<EstadoContrato, { label: string; bg: string; color: string }> = {
-  activo:    { label: 'Activo',    bg: '#f0fdf4', color: '#16a34a' },
-  vencido:   { label: 'Vencido',  bg: '#fff7ed', color: '#c2410c' },
+  activo:    { label: 'Activo',    bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  vencido:   { label: 'Vencido',  bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
   terminado: { label: 'Terminado',bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
 const ESTADO_STR: Record<EstadoSTR, { label: string; bg: string; color: string }> = {
   confirmada: { label: 'Confirmada',  bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  en_curso:   { label: 'En curso',    bg: '#f0fdf4', color: '#16a34a' },
+  en_curso:   { label: 'En curso',    bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   completada: { label: 'Completada',  bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
-  cancelada:  { label: 'Cancelada',   bg: '#fef2f2', color: '#dc2626' },
+  cancelada:  { label: 'Cancelada',   bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
 }
 
 const PLATAFORMAS: Record<PlataformaSTR, string> = {
@@ -130,12 +130,12 @@ function SolicitudForm({ unidadId, proyectoId, companyId, clienteId, onSolicitud
 
       {prevRechazada && (
         <div style={{
-          background: '#fef2f2', border: '1px solid #fecaca',
+          background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)',
           borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px',
         }}>
-          <div style={{ fontWeight: 700, color: '#dc2626', marginBottom: '4px' }}>❌ Solicitud anterior rechazada</div>
+          <div style={{ fontWeight: 700, color: 'var(--at-danger)', marginBottom: '4px' }}>❌ Solicitud anterior rechazada</div>
           {prevRechazada.comentario_admin && (
-            <div style={{ color: '#7f1d1d' }}>Motivo: {prevRechazada.comentario_admin}</div>
+            <div style={{ color: 'var(--at-danger-strong)' }}>Motivo: {prevRechazada.comentario_admin}</div>
           )}
           <div style={{ color: 'var(--at-ink-3)', fontSize: '12px', marginTop: '4px' }}>Puedes enviar una nueva solicitud.</div>
         </div>
@@ -296,7 +296,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
   }
 
   async function deleteCA(c: ContratoArrendamiento) {
-    const r = await Swal.fire({ title: '¿Eliminar contrato?', text: `Arrendatario: ${c.arrendatario_nombre}`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await Swal.fire({ title: '¿Eliminar contrato?', text: `Arrendatario: ${c.arrendatario_nombre}`, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('contratos_arrendamiento').delete().eq('id', c.id)
     setContratos((prev: ContratoArrendamiento[]) => prev.filter((x: ContratoArrendamiento) => x.id !== c.id))
@@ -434,7 +434,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
   }
 
   async function deleteSTR(r: ReservaSTR) {
-    const res = await Swal.fire({ title: '¿Eliminar reserva?', text: `Huésped: ${r.huesped_nombre}`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#dc2626', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const res = await Swal.fire({ title: '¿Eliminar reserva?', text: `Huésped: ${r.huesped_nombre}`, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!res.isConfirmed) return
     await supabase.from('reservas_str').delete().eq('id', r.id)
     setReservas((prev: ReservaSTR[]) => prev.filter((x: ReservaSTR) => x.id !== r.id))
@@ -490,11 +490,11 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       <div>
         {header}
         <div style={{
-          background: '#fef3c7', border: '1.5px solid #fde68a',
+          background: 'var(--at-warning-tint)', border: '1.5px solid var(--at-warning-border)',
           borderRadius: '14px', padding: '24px 28px', maxWidth: '520px',
         }}>
           <div style={{ fontSize: '32px', marginBottom: '12px' }}>⏳</div>
-          <div style={{ fontWeight: 700, fontSize: '16px', color: '#92400e', marginBottom: '6px' }}>
+          <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--at-warning-strong)', marginBottom: '6px' }}>
             Solicitud en revisión
           </div>
           <div style={{ fontSize: '13px', color: '#78350f', lineHeight: 1.6 }}>
@@ -517,9 +517,9 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       {/* Authorization badge */}
       <div style={{
         display: 'inline-flex', alignItems: 'center', gap: '6px',
-        background: '#f0fdf4', border: '1px solid #bbf7d0',
+        background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)',
         borderRadius: '20px', padding: '4px 14px', marginBottom: '16px',
-        fontSize: '12px', fontWeight: 600, color: '#16a34a',
+        fontSize: '12px', fontWeight: 600, color: 'var(--at-success)',
       }}>
         ✅ Autorizado: {TIPO_RENTA_LABEL[tipoAprobado!]}
         {solicitudRenta.aprobado_por && <span style={{ fontWeight: 400, opacity: 0.8 }}>— {solicitudRenta.aprobado_por}</span>}
@@ -804,12 +804,12 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
 
                     {/* Adicionales */}
                     {huespedes.map((h, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: h.visitante_id ? '#f0fdf4' : 'var(--at-surface-2)', border: `1px solid ${h.visitante_id ? '#86efac' : 'var(--at-line)'}`, borderRadius: '8px', marginBottom: '6px' }}>
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: h.visitante_id ? 'var(--at-success-tint)' : 'var(--at-surface-2)', border: `1px solid ${h.visitante_id ? 'var(--at-success-border)' : 'var(--at-line)'}`, borderRadius: '8px', marginBottom: '6px' }}>
                         <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--at-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--at-ink-2)', fontWeight: 700, flexShrink: 0 }}>{i + 2}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--at-ink)' }}>
                             {h.es_menor ? '👶 ' : ''}{h.nombre}
-                            {h.visitante_id && <span style={{ marginLeft: 6, fontSize: '10px', color: '#16a34a', fontWeight: 600 }}>✓ Ingresado</span>}
+                            {h.visitante_id && <span style={{ marginLeft: 6, fontSize: '10px', color: 'var(--at-success)', fontWeight: 600 }}>✓ Ingresado</span>}
                           </div>
                           <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
                             {h.es_menor
@@ -819,7 +819,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                         </div>
                         {!h.visitante_id && (
                           <button type="button" onClick={() => quitarHuesped(i)}
-                            style={{ width: 22, height: 22, borderRadius: '50%', background: '#fee2e2', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--at-danger-tint)', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             ×
                           </button>
                         )}
@@ -837,7 +837,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--at-ink-2)', cursor: 'pointer', fontWeight: 600 }}>
                           <input type="checkbox" checked={huespedForm.es_menor} onChange={e => setHuespedForm(f => ({ ...f, es_menor: e.target.checked, identificacion: '' }))} />
                           Es menor de edad
-                          {huespedForm.es_menor && <span style={{ padding: '2px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '10px' }}>Menor</span>}
+                          {huespedForm.es_menor && <span style={{ padding: '2px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '20px', fontSize: '10px' }}>Menor</span>}
                         </label>
                         {huespedForm.es_menor ? (
                           <div>

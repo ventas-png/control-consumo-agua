@@ -13,9 +13,9 @@ interface Props {
 }
 
 const ESTADOS_PRESENCIA: { value: EstadoPresencia; label: string; color: string; bg: string }[] = [
-  { value: 'presente', label: 'Presente', color: '#10b981', bg: '#d1fae5' },
-  { value: 'ausente', label: 'Ausente', color: '#ef4444', bg: '#fee2e2' },
-  { value: 'tardanza', label: 'Tardanza', color: '#f59e0b', bg: '#fef3c7' },
+  { value: 'presente', label: 'Presente', color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  { value: 'ausente', label: 'Ausente', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
+  { value: 'tardanza', label: 'Tardanza', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   { value: 'permiso', label: 'Permiso', color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
   { value: 'vacaciones', label: 'Vacaciones', color: 'var(--at-primary-2)', bg: 'var(--at-primary-soft)' },
 ]
@@ -148,7 +148,7 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
             <input style={inp} placeholder="Opcional" value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Guardar'}
           </button>
         </div>
@@ -190,7 +190,7 @@ export default function PresenciaPersonalTab({ registros, proyectoId, companyId,
                   <div style={{ display: 'flex', gap: 6 }}>
                     {!r.hora_salida && r.estado === 'presente' && (
                       <button onClick={() => registrarSalida(r.id)}
-                        style={{ padding: '5px 10px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                        style={{ padding: '5px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                         Registrar salida
                       </button>
                     )}

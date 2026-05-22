@@ -123,7 +123,7 @@ function diasDeSemana(lunes: Date): Date[] {
 }
 
 const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
-  confirmada: { bg: '#f0fdf4', color: '#16a34a' },
+  confirmada: { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   pendiente:  { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
   cancelada:  { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
@@ -142,12 +142,12 @@ function pillStyle(bg: string, border: string, color: string): CSSProperties {
 }
 
 const CHIP_STYLES: Record<string, { bg: string; border: string; color: string }> = {
-  confirmada:        { bg: '#dcfce7', border: '#86efac', color: '#15803d' },
-  pendiente:         { bg: '#fef3c7', border: '#fcd34d', color: '#92400e' },
+  confirmada:        { bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', color: 'var(--at-success-strong)' },
+  pendiente:         { bg: 'var(--at-warning-tint)', border: '#fcd34d', color: 'var(--at-warning-strong)' },
   cancelada:         { bg: 'var(--at-chip)', border: 'var(--at-line-strong)', color: 'var(--at-ink-2)' },
-  no_show:           { bg: '#fee2e2', border: '#fca5a5', color: '#b91c1c' },
-  pagado:            { bg: '#dcfce7', border: '#86efac', color: '#15803d' },
-  cobro_pendiente:   { bg: '#fed7aa', border: '#fb923c', color: '#9a3412' },
+  no_show:           { bg: 'var(--at-danger-tint)', border: 'var(--at-danger-border)', color: 'var(--at-danger-strong)' },
+  pagado:            { bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', color: 'var(--at-success-strong)' },
+  cobro_pendiente:   { bg: 'var(--at-warning-border)', border: '#fb923c', color: 'var(--at-warning-strong)' },
 }
 
 function chipStyle(estado: string): CSSProperties {
@@ -193,10 +193,10 @@ const btnHero: CSSProperties = {
 
 const RESERVA_CAL_COLORS = [
   { bg: 'var(--at-primary-soft)', border: 'var(--at-accent-2)', color: 'var(--at-ink-deep)' },
-  { bg: '#d1fae5', border: '#6ee7b7', color: '#065f46' },
+  { bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', color: 'var(--at-success-strong)' },
   { bg: 'var(--at-accent-tint)', border: 'var(--at-accent-soft)', color: '#4c1d95' },
   { bg: '#fce7f3', border: '#f9a8d4', color: '#9d174d' },
-  { bg: '#fef3c7', border: '#fcd34d', color: '#78350f' },
+  { bg: 'var(--at-warning-tint)', border: '#fcd34d', color: '#78350f' },
 ]
 
 export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, onRefresh }: Props) {
@@ -345,7 +345,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       text: 'Esta acción no se puede deshacer.',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#ef4444',
+      confirmButtonColor: 'var(--at-danger)',
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar',
     })
@@ -463,7 +463,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   async function cancelarReserva(id: string) {
-    const r = await Swal.fire({ title: '¿Cancelar reserva?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, cancelar', cancelButtonText: 'No', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Cancelar reserva?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, cancelar', cancelButtonText: 'No', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const reserva = reservas.find(x => x.id === id)
     await supabase.from('reservas_amenidades').update({ estado: 'cancelada' }).eq('id', id)
@@ -601,7 +601,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       showCancelButton: true,
       confirmButtonText: 'Retener',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#dc2626',
+      confirmButtonColor: 'var(--at-danger)',
       preConfirm: () => {
         const monto = (document.getElementById('swal-monto') as HTMLInputElement | null)?.value ?? ''
         const motivo = (document.getElementById('swal-motivo') as HTMLTextAreaElement | null)?.value ?? ''
@@ -716,7 +716,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       inputPlaceholder: 'Ej. el salón está reservado para evento del condominio...',
       showCancelButton: true,
       confirmButtonText: 'Rechazar',
-      confirmButtonColor: '#ef4444',
+      confirmButtonColor: 'var(--at-danger)',
       cancelButtonText: 'Cancelar',
       inputValidator: v => (!v || !v.trim()) ? 'Indica un motivo.' : null,
     })
@@ -732,7 +732,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
   }
 
   async function eliminarBloqueo(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar bloqueo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, eliminar', cancelButtonText: 'No', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar bloqueo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, eliminar', cancelButtonText: 'No', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('amenidades_bloqueos').delete().eq('id', id)
     onRefresh()
@@ -781,10 +781,10 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
         const kpis = [
           { label: 'Amenidades activas', value: amenidadesActivas.length, accent: 'var(--at-primary)', icon: '🏊' },
           { label: 'Reservas hoy', value: hoyReservas, accent: 'var(--at-accent-2)', icon: '📅' },
-          { label: 'Pendientes aprobación', value: pendientesAprob, accent: pendientesAprob > 0 ? '#f59e0b' : 'var(--at-ink-3)', icon: '⏳' },
-          { label: 'Depósitos por cerrar', value: depositosPorCerrar, accent: depositosPorCerrar > 0 ? '#dc2626' : 'var(--at-ink-3)', icon: '💰' },
-          { label: 'Cobros en sitio', value: cobrosPendientes, accent: cobrosPendientes > 0 ? '#c2410c' : 'var(--at-ink-3)', icon: '🎟' },
-          { label: `Tarifa cobrada ${mes}`, value: `${moneda} ${tarifasMes.toFixed(2)}`, accent: '#16a34a', icon: '💸' },
+          { label: 'Pendientes aprobación', value: pendientesAprob, accent: pendientesAprob > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)', icon: '⏳' },
+          { label: 'Depósitos por cerrar', value: depositosPorCerrar, accent: depositosPorCerrar > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)', icon: '💰' },
+          { label: 'Cobros en sitio', value: cobrosPendientes, accent: cobrosPendientes > 0 ? 'var(--at-warning-strong)' : 'var(--at-ink-3)', icon: '🎟' },
+          { label: `Tarifa cobrada ${mes}`, value: `${moneda} ${tarifasMes.toFixed(2)}`, accent: 'var(--at-success)', icon: '💸' },
         ]
         return (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginBottom: 20 }}>
@@ -1081,7 +1081,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                     {/* Estado pill */}
                     {canEdit && (
                       <button onClick={() => toggleAmenidad(a)}
-                        style={{ position: 'absolute', top: 10, right: 10, padding: '4px 10px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, background: a.activo ? 'rgba(240,253,244,0.95)' : 'rgba(241,245,249,0.95)', color: a.activo ? '#15803d' : 'var(--at-ink-3)', backdropFilter: 'blur(4px)', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
+                        style={{ position: 'absolute', top: 10, right: 10, padding: '4px 10px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 800, background: a.activo ? 'rgba(240,253,244,0.95)' : 'rgba(241,245,249,0.95)', color: a.activo ? 'var(--at-success-strong)' : 'var(--at-ink-3)', backdropFilter: 'blur(4px)', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
                         {a.activo ? '● Activa' : '○ Inactiva'}
                       </button>
                     )}
@@ -1099,7 +1099,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                     </div>
                     {/* Badges */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>
-                      {a.requiere_deposito && <span style={pillStyle('#fffbeb', '#fde68a', '#92400e')}>💰 Dep. {moneda} {a.monto_deposito}</span>}
+                      {a.requiere_deposito && <span style={pillStyle('var(--at-warning-tint)', 'var(--at-warning-border)', 'var(--at-warning-strong)')}>💰 Dep. {moneda} {a.monto_deposito}</span>}
                       {a.requiere_tarifa && a.tarifa_uso != null && (
                         a.tarifa_uso_finde != null
                           ? <span style={pillStyle('var(--at-primary-tint)', 'var(--at-primary-soft-2)', 'var(--at-primary-hover)')}>🎟 L–V {moneda} {Number(a.tarifa_uso).toFixed(0)} · S–D {moneda} {Number(a.tarifa_uso_finde).toFixed(0)}</span>
@@ -1111,7 +1111,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                       {((a.minutos_preparacion_previa ?? 0) > 0 || (a.minutos_preparacion_posterior ?? 0) > 0) && (
                         <span style={pillStyle('var(--at-accent-tint-2)', 'var(--at-accent-soft-2)', 'var(--at-accent-dark)')}>🔧 {(a.minutos_preparacion_previa ?? 0) > 0 ? `${a.minutos_preparacion_previa}min prev.` : ''}{(a.minutos_preparacion_previa ?? 0) > 0 && (a.minutos_preparacion_posterior ?? 0) > 0 ? ' · ' : ''}{(a.minutos_preparacion_posterior ?? 0) > 0 ? `${a.minutos_preparacion_posterior}min post.` : ''}</span>
                       )}
-                      {a.requiere_aprobacion && <span style={pillStyle('#fff7ed', '#fed7aa', '#9a3412')}>👤 Aprobación</span>}
+                      {a.requiere_aprobacion && <span style={pillStyle('var(--at-warning-tint)', 'var(--at-warning-border)', 'var(--at-warning-strong)')}>👤 Aprobación</span>}
                       {a.reglamento && <span style={pillStyle('var(--at-accent-tint-2)', 'var(--at-accent-soft-2)', 'var(--at-accent-dark)')}>📜 Reglamento</span>}
                     </div>
                     {/* Stats footer */}
@@ -1133,9 +1133,9 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                             ✎ Editar
                           </button>
                           <button onClick={() => eliminarAmenidad(a.id)} title="Eliminar amenidad"
-                            style={{ padding: '5px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = '#fee2e2' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = '#fef2f2' }}>
+                            style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, transition: 'background 0.15s ease' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--at-danger-tint)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'var(--at-danger-tint)' }}>
                             🗑
                           </button>
                         </div>
@@ -1199,8 +1199,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                   if (tarifa <= 0) return null
                   const finde = esFinDeSemana(reservaForm.fecha) && am.tarifa_uso_finde != null
                   return (
-                    <div style={{ gridColumn: '1 / -1', background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: 10, padding: '12px 14px' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 8 }}>
+                    <div style={{ gridColumn: '1 / -1', background: 'var(--at-warning-tint)', border: '1.5px solid var(--at-warning-border)', borderRadius: 10, padding: '12px 14px' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--at-warning-strong)', marginBottom: 8 }}>
                         🎟 Tarifa por uso: {moneda} {tarifa.toFixed(2)} {finde && <span style={{ fontSize: 11, fontWeight: 600 }}>(fin de semana)</span>}
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
@@ -1238,7 +1238,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
             const pendientesAprob = reservas.filter(r => r.estado === 'pendiente' && r.fecha >= hoy).length
             if (pendientesAprob === 0) return null
             return (
-              <div style={{ background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: 12, padding: '12px 16px', marginBottom: 12, fontSize: 13, color: '#9a3412', fontWeight: 600 }}>
+              <div style={{ background: 'var(--at-warning-tint)', border: '1.5px solid var(--at-warning-border)', borderRadius: 12, padding: '12px 16px', marginBottom: 12, fontSize: 13, color: 'var(--at-warning-strong)', fontWeight: 600 }}>
                 ⚠ {pendientesAprob} reserva{pendientesAprob > 1 ? 's' : ''} esperando aprobación.
               </div>
             )
@@ -1259,7 +1259,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               {reservas.sort((a, b) => b.fecha.localeCompare(a.fecha)).map(r => {
                 const tieneTarifa = r.monto_tarifa != null && r.monto_tarifa > 0
                 const pendientePago = tieneTarifa && r.metodo_pago_tarifa === 'pagar_momento' && !r.tarifa_pagada && r.estado !== 'cancelada'
-                const accent = r.estado === 'confirmada' ? '#16a34a' : r.estado === 'pendiente' ? '#f59e0b' : 'var(--at-ink-3)'
+                const accent = r.estado === 'confirmada' ? 'var(--at-success)' : r.estado === 'pendiente' ? 'var(--at-warning)' : 'var(--at-ink-3)'
                 return (
                 <div key={r.id}
                   style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: 14, padding: '14px 18px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease, border-color 0.15s ease' }}
@@ -1284,20 +1284,20 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                       {r.num_invitados > 0 && ` · 👥 ${r.num_invitados} invitados`}
                     </div>
                     {r.rechazada_motivo && (
-                      <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 4, fontStyle: 'italic', background: '#fef2f2', padding: '4px 8px', borderRadius: 6, display: 'inline-block' }}>↩ {r.rechazada_motivo}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--at-danger-strong)', marginTop: 4, fontStyle: 'italic', background: 'var(--at-danger-tint)', padding: '4px 8px', borderRadius: 6, display: 'inline-block' }}>↩ {r.rechazada_motivo}</div>
                     )}
                   </div>
                   {r.estado === 'pendiente' && canEdit && (
                     <>
-                      <button onClick={() => aprobarReserva(r)} style={btnAction('#dcfce7', '#bbf7d0', '#15803d')}>✓ Aprobar</button>
-                      <button onClick={() => rechazarReserva(r)} style={btnAction('#fee2e2', '#fecaca', '#b91c1c')}>✗ Rechazar</button>
+                      <button onClick={() => aprobarReserva(r)} style={btnAction('var(--at-success-tint)', 'var(--at-success-border)', 'var(--at-success-strong)')}>✓ Aprobar</button>
+                      <button onClick={() => rechazarReserva(r)} style={btnAction('var(--at-danger-tint)', 'var(--at-danger-border)', 'var(--at-danger-strong)')}>✗ Rechazar</button>
                     </>
                   )}
                   {pendientePago && canEdit && (
-                    <button onClick={() => marcarTarifaPagada(r)} style={btnAction('#f0fdf4', '#bbf7d0', '#16a34a')}>Marcar pagado</button>
+                    <button onClick={() => marcarTarifaPagada(r)} style={btnAction('var(--at-success-tint)', 'var(--at-success-border)', 'var(--at-success)')}>Marcar pagado</button>
                   )}
                   {r.fecha < hoy && r.estado === 'confirmada' && canEdit && (
-                    <button onClick={() => marcarNoShow(r)} style={btnAction(r.no_show ? 'var(--at-chip)' : '#fff7ed', r.no_show ? 'var(--at-line-strong)' : '#fed7aa', r.no_show ? 'var(--at-ink-3)' : '#c2410c')}>
+                    <button onClick={() => marcarNoShow(r)} style={btnAction(r.no_show ? 'var(--at-chip)' : 'var(--at-warning-tint)', r.no_show ? 'var(--at-line-strong)' : 'var(--at-warning-border)', r.no_show ? 'var(--at-ink-3)' : 'var(--at-warning-strong)')}>
                       {r.no_show ? '↶ Quitar no-show' : 'No show'}
                     </button>
                   )}
@@ -1307,7 +1307,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                     </button>
                   )}
                   {r.estado !== 'cancelada' && canEdit && (
-                    <button onClick={() => cancelarReserva(r.id)} style={btnAction('#fef2f2', '#fecaca', '#dc2626')}>Cancelar</button>
+                    <button onClick={() => cancelarReserva(r.id)} style={btnAction('var(--at-danger-tint)', 'var(--at-danger-border)', 'var(--at-danger)')}>Cancelar</button>
                   )}
                 </div>
               )})}
@@ -1385,7 +1385,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                             position: 'relative',
                             height: ROW_H,
                             background: bloqDiaCompleto
-                              ? 'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 6px,#fde68a 6px,#fde68a 12px)'
+                              ? 'repeating-linear-gradient(45deg,var(--at-warning-tint),var(--at-warning-tint) 6px,var(--at-warning-border) 6px,var(--at-warning-border) 12px)'
                               : esHoy ? 'var(--at-primary-tint)' : '#fcfcfd',
                             border: `1px solid ${esHoy ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`,
                             borderRadius: 10,
@@ -1414,7 +1414,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                               const bottom = toPct(b.hora_fin!)
                               return (
                                 <div key={b.id} title={b.notas || MOTIVO_LABEL[b.motivo]}
-                                  style={{ position: 'absolute', left: 4, right: 4, top: `${top}%`, height: `${bottom - top}%`, borderRadius: 6, background: 'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 4px,#fde68a 4px,#fde68a 8px)', border: '1px solid #fcd34d', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#92400e' }}>
+                                  style={{ position: 'absolute', left: 4, right: 4, top: `${top}%`, height: `${bottom - top}%`, borderRadius: 6, background: 'repeating-linear-gradient(45deg,var(--at-warning-tint),var(--at-warning-tint) 4px,var(--at-warning-border) 4px,var(--at-warning-border) 8px)', border: '1px solid #fcd34d', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: 'var(--at-warning-strong)' }}>
                                   🚫 {MOTIVO_LABEL[b.motivo]}
                                 </div>
                               )
@@ -1481,7 +1481,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                     <span style={{ width: 14, height: 10, borderRadius: 4, background: 'var(--at-surface)', border: '1.5px dashed var(--at-accent-2)' }} /> Pendiente
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 14, height: 10, borderRadius: 4, background: 'repeating-linear-gradient(45deg,#fef3c7,#fef3c7 3px,#fde68a 3px,#fde68a 6px)', border: '1px solid #fcd34d' }} /> Bloqueado
+                    <span style={{ width: 14, height: 10, borderRadius: 4, background: 'repeating-linear-gradient(45deg,var(--at-warning-tint),var(--at-warning-tint) 3px,var(--at-warning-border) 3px,var(--at-warning-border) 6px)', border: '1px solid #fcd34d' }} /> Bloqueado
                   </span>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 14, height: 10, borderRadius: 4, background: '#E6CDBB44', border: '1px dashed var(--at-accent-light)' }} /> Preparación
@@ -1507,7 +1507,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               </span>
               {selectedReserva.estado !== 'cancelada' && canEdit && (
                 <button onClick={() => cancelarReserva(selectedReserva.id)}
-                  style={{ padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                   Cancelar
                 </button>
               )}
@@ -1526,7 +1526,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
       {vista === 'bloqueos' && (
         <>
           {showBloqueoForm && (
-            <div style={{ background: 'var(--at-surface)', border: '1.5px solid #fde68a', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+            <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-warning-border)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Nuevo bloqueo</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
@@ -1579,7 +1579,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                <button onClick={guardarBloqueo} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                <button onClick={guardarBloqueo} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
                   {saving ? 'Guardando...' : 'Registrar bloqueo'}
                 </button>
                 <button onClick={() => setShowBloqueoForm(false)} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -1592,7 +1592,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
               title="No hay bloqueos registrados"
               hint="Registra un bloqueo cuando una amenidad no esté disponible — mantenimiento, limpieza, evento privado, reparación. Puede ser día completo o sólo en un rango horario."
               action={canEdit ? (
-                <button onClick={() => setShowBloqueoForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
+                <button onClick={() => setShowBloqueoForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: 10, fontWeight: 700, cursor: 'pointer', fontSize: 13.5 }}>
                   + Registrar bloqueo
                 </button>
               ) : null}
@@ -1605,11 +1605,11 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 .map(b => {
                   const vigente = b.fecha_fin >= hoy
                   return (
-                    <div key={b.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${vigente ? '#fde68a' : 'var(--at-line)'}`, borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', opacity: vigente ? 1 : 0.7 }}>
+                    <div key={b.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${vigente ? 'var(--at-warning-border)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', opacity: vigente ? 1 : 0.7 }}>
                       <div style={{ flex: 1, minWidth: 220 }}>
                         <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>
                           {b.amenidad_nombre || amenidades.find(a => a.id === b.amenidad_id)?.nombre || 'Amenidad'}
-                          <span style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: '#fef3c7', color: '#92400e' }}>{MOTIVO_LABEL[b.motivo]}</span>
+                          <span style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 12, fontSize: 10.5, fontWeight: 700, background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' }}>{MOTIVO_LABEL[b.motivo]}</span>
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
                           {b.fecha_inicio === b.fecha_fin ? b.fecha_inicio : `${b.fecha_inicio} → ${b.fecha_fin}`}
@@ -1617,11 +1617,11 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                         </div>
                         {b.notas && <div style={{ fontSize: 11.5, color: 'var(--at-ink-3)', marginTop: 2 }}>{b.notas}</div>}
                       </div>
-                      <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, background: vigente ? '#fef3c7' : 'var(--at-chip)', color: vigente ? '#92400e' : 'var(--at-ink-3)' }}>
+                      <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, background: vigente ? 'var(--at-warning-tint)' : 'var(--at-chip)', color: vigente ? 'var(--at-warning-strong)' : 'var(--at-ink-3)' }}>
                         {vigente ? 'Vigente' : 'Pasado'}
                       </span>
                       {canEdit && (
-                        <button onClick={() => eliminarBloqueo(b.id)} style={{ padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        <button onClick={() => eliminarBloqueo(b.id)} style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                           Eliminar
                         </button>
                       )}
@@ -1730,15 +1730,15 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 )}
                 {r.deposito_estado === 'cobrado' && (
                   <>
-                    <button onClick={() => actualizarEstadoDeposito(r, 'devuelto')} style={btnAction('#dcfce7', '#86efac', '#15803d')}>↩ Devolver completo</button>
-                    <button onClick={() => retenerDeposito(r)} style={btnAction('#fee2e2', '#fca5a5', '#b91c1c')}>⚠ Retener por daños</button>
+                    <button onClick={() => actualizarEstadoDeposito(r, 'devuelto')} style={btnAction('var(--at-success-tint)', 'var(--at-success-border)', 'var(--at-success-strong)')}>↩ Devolver completo</button>
+                    <button onClick={() => retenerDeposito(r)} style={btnAction('var(--at-danger-tint)', 'var(--at-danger-border)', 'var(--at-danger-strong)')}>⚠ Retener por daños</button>
                   </>
                 )}
               </div>
             ) : null,
           })
         }
-        const accent = r.estado === 'confirmada' ? 'var(--at-accent-2)' : r.estado === 'pendiente' ? '#f59e0b' : 'var(--at-ink-3)'
+        const accent = r.estado === 'confirmada' ? 'var(--at-accent-2)' : r.estado === 'pendiente' ? 'var(--at-warning)' : 'var(--at-ink-3)'
         return (
           <div onClick={() => setReservaDetalle(null)}
             style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, animation: 'fadeIn 0.15s ease' }}>
@@ -1761,8 +1761,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                 <div style={{ position: 'relative' }}>
                   {steps.map((s, i) => {
                     const isLast = i === steps.length - 1
-                    const dotColor = s.done ? '#16a34a' : s.current ? accent : 'var(--at-line-strong)'
-                    const lineColor = s.done ? '#86efac' : 'var(--at-line)'
+                    const dotColor = s.done ? 'var(--at-success)' : s.current ? accent : 'var(--at-line-strong)'
+                    const lineColor = s.done ? 'var(--at-success-border)' : 'var(--at-line)'
                     return (
                       <div key={s.id} style={{ display: 'flex', gap: 14, position: 'relative', paddingBottom: isLast ? 0 : 18 }}>
                         {/* Línea vertical */}
@@ -1772,7 +1772,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                         {/* Bullet */}
                         <div style={{
                           width: 28, height: 28, borderRadius: '50%',
-                          background: s.done ? '#dcfce7' : s.current ? `${accent}22` : 'var(--at-chip)',
+                          background: s.done ? 'var(--at-success-tint)' : s.current ? `${accent}22` : 'var(--at-chip)',
                           border: `2px solid ${dotColor}`,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: dotColor, fontWeight: 800, fontSize: 13,
@@ -1787,8 +1787,8 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                             <div style={{ fontWeight: 800, fontSize: 14, color: s.done ? 'var(--at-ink)' : s.current ? 'var(--at-ink)' : 'var(--at-ink-3)' }}>{s.label}</div>
                             {s.id === 'aprobacion' && r.estado === 'pendiente' && canEdit && (
                               <div style={{ display: 'flex', gap: 6 }}>
-                                <button onClick={() => aprobarReserva(r)} style={btnAction('#dcfce7', '#bbf7d0', '#15803d')}>✓ Aprobar</button>
-                                <button onClick={() => rechazarReserva(r)} style={btnAction('#fee2e2', '#fecaca', '#b91c1c')}>✗ Rechazar</button>
+                                <button onClick={() => aprobarReserva(r)} style={btnAction('var(--at-success-tint)', 'var(--at-success-border)', 'var(--at-success-strong)')}>✓ Aprobar</button>
+                                <button onClick={() => rechazarReserva(r)} style={btnAction('var(--at-danger-tint)', 'var(--at-danger-border)', 'var(--at-danger-strong)')}>✗ Rechazar</button>
                               </div>
                             )}
                           </div>
@@ -1843,7 +1843,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                   const unidad = unidades.find(u => u.id === r.unidad_id)
                   const tieneTel = !!unidad?.propietario_telefono?.trim()
                   return (
-                    <div key={r.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${r.recordatorio_enviado ? '#bbf7d0' : 'var(--at-line)'}`, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <div key={r.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${r.recordatorio_enviado ? 'var(--at-success-border)' : 'var(--at-line)'}`, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                       <div style={{ flex: 1, minWidth: 220 }}>
                         <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)' }}>{r.amenidad_nombre}</div>
                         <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
@@ -1854,7 +1854,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                         </div>
                       </div>
                       {r.recordatorio_enviado && (
-                        <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, background: '#f0fdf4', color: '#16a34a' }}>
+                        <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, background: 'var(--at-success-tint)', color: 'var(--at-success)' }}>
                           ✓ Enviado
                         </span>
                       )}

@@ -13,8 +13,8 @@ interface Props {
 }
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string; icon: string }> = {
-  completo:          { bg: '#dcfce7', color: '#16a34a', label: 'Completo',           icon: '✅' },
-  con_observaciones: { bg: '#fef3c7', color: '#92400e', label: 'Con observaciones',  icon: '⚠️' },
+  completo:          { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Completo',           icon: '✅' },
+  con_observaciones: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Con observaciones',  icon: '⚠️' },
   pendiente:         { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Pendiente',          icon: '🕐' },
 }
 
@@ -104,7 +104,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
   }
 
   const handleDelete = async (c: ChecklistArea) => {
-    const r = await Swal.fire({ title: '¿Eliminar checklist?', text: `${c.area} · ${c.fecha}`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' })
+    const r = await Swal.fire({ title: '¿Eliminar checklist?', text: `${c.area} · ${c.fecha}`, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('checklist_areas').delete().eq('id', c.id)
     if (selected?.id === c.id) setSelected(null)
@@ -162,7 +162,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
                     {c.items.length > 0 && (
                       <div style={{ marginTop: '4px' }}>
                         <div style={{ height: '4px', background: 'var(--at-line)', borderRadius: '2px', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#16a34a' : 'var(--at-primary)', transition: 'width 0.3s' }} />
+                          <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? 'var(--at-success)' : 'var(--at-primary)', transition: 'width 0.3s' }} />
                         </div>
                         <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{c.items.filter(i => i.ok).length}/{c.items.length} ítems</div>
                       </div>
@@ -214,10 +214,10 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
               {formItems.length === 0 && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', fontStyle: 'italic' }}>Sin ítems añadidos</div>}
               {formItems.map((it, i) => (
                 <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px', background: 'var(--at-surface)', borderRadius: '8px', padding: '8px', border: '1px solid var(--at-line)' }}>
-                  <input type="checkbox" checked={it.ok} onChange={e => setItem(i, 'ok', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#16a34a' }} />
-                  <input value={it.item} onChange={e => setItem(i, 'item', e.target.value)} placeholder="Ítem de inspección" style={{ ...inputStyle, flex: 1, background: it.ok ? '#f0fdf4' : 'var(--at-surface)' }} />
+                  <input type="checkbox" checked={it.ok} onChange={e => setItem(i, 'ok', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--at-success)' }} />
+                  <input value={it.item} onChange={e => setItem(i, 'item', e.target.value)} placeholder="Ítem de inspección" style={{ ...inputStyle, flex: 1, background: it.ok ? 'var(--at-success-tint)' : 'var(--at-surface)' }} />
                   <input value={it.observacion} onChange={e => setItem(i, 'observacion', e.target.value)} placeholder="Observación" style={{ ...inputStyle, flex: 1 }} />
-                  <button onClick={() => removeItem(i)} style={{ padding: '4px 8px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
+                  <button onClick={() => removeItem(i)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
                 </div>
               ))}
             </div>
@@ -247,7 +247,7 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {canEdit && <button onClick={() => openEdit(selected)} style={{ padding: '6px 14px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>✏️ Editar</button>}
-                  <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>
+                  <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>
                 </div>
               </div>
 
@@ -255,10 +255,10 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>
                     <span>{done}/{selected.items.length} ítems completados</span>
-                    <span style={{ fontWeight: 700, color: pct === 100 ? '#16a34a' : 'var(--at-primary)' }}>{pct}%</span>
+                    <span style={{ fontWeight: 700, color: pct === 100 ? 'var(--at-success)' : 'var(--at-primary)' }}>{pct}%</span>
                   </div>
                   <div style={{ height: '8px', background: 'var(--at-line)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#16a34a' : 'var(--at-primary)', transition: 'width 0.3s' }} />
+                    <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? 'var(--at-success)' : 'var(--at-primary)', transition: 'width 0.3s' }} />
                   </div>
                 </div>
               )}
@@ -267,14 +267,14 @@ export function ChecklistAreasTab({ checklists, proyectoId, companyId, canCreate
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
                 {selected.items.map((it, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', borderRadius: '8px', background: it.ok ? '#f0fdf4' : 'var(--at-surface)', border: `1px solid ${it.ok ? '#bbf7d0' : 'var(--at-line)'}` }}>
+                  <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '10px 12px', borderRadius: '8px', background: it.ok ? 'var(--at-success-tint)' : 'var(--at-surface)', border: `1px solid ${it.ok ? 'var(--at-success-border)' : 'var(--at-line)'}` }}>
                     {canEdit ? (
-                      <input type="checkbox" checked={it.ok} onChange={() => toggleItem(selected, i)} style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer', accentColor: '#16a34a', flexShrink: 0 }} />
+                      <input type="checkbox" checked={it.ok} onChange={() => toggleItem(selected, i)} style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer', accentColor: 'var(--at-success)', flexShrink: 0 }} />
                     ) : (
                       <span style={{ fontSize: '16px', flexShrink: 0 }}>{it.ok ? '✅' : '○'}</span>
                     )}
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: it.ok ? '#166534' : 'var(--at-ink-2)', textDecoration: it.ok ? 'line-through' : 'none' }}>{it.item}</div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: it.ok ? 'var(--at-success-strong)' : 'var(--at-ink-2)', textDecoration: it.ok ? 'line-through' : 'none' }}>{it.item}</div>
                       {it.observacion && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{it.observacion}</div>}
                     </div>
                   </div>

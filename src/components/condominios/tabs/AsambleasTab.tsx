@@ -17,14 +17,14 @@ interface Props {
 
 const ESTADO_CONFIG: Record<EstadoAsamblea, { label: string; bg: string; color: string }> = {
   programada: { label: 'Programada', bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  en_curso:   { label: 'En curso',   bg: '#f0fdf4', color: '#16a34a' },
+  en_curso:   { label: 'En curso',   bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   finalizada: { label: 'Finalizada', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
-  cancelada:  { label: 'Cancelada',  bg: '#fef2f2', color: '#dc2626' },
+  cancelada:  { label: 'Cancelada',  bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
 }
 
 const VOTO_CONFIG: Record<TipoVoto, { label: string; bg: string; color: string }> = {
-  a_favor:    { label: 'A favor',    bg: '#f0fdf4', color: '#16a34a' },
-  en_contra:  { label: 'En contra',  bg: '#fef2f2', color: '#dc2626' },
+  a_favor:    { label: 'A favor',    bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  en_contra:  { label: 'En contra',  bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
   abstencion: { label: 'Abstención', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
@@ -120,7 +120,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
   }
 
   async function eliminar(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar asamblea?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await Swal.fire({ title: '¿Eliminar asamblea?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('asambleas').delete().eq('id', id)
     if (selectedId === id) setSelectedId(null)
@@ -243,7 +243,7 @@ export function AsambleasTab({ asambleas, unidades, proyectoId, companyId, userI
                     ) : (
                       <span style={{ padding: '3px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                     )}
-                    <button onClick={e => { e.stopPropagation(); eliminar(a.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px' }}>🗑</button>
+                    <button onClick={e => { e.stopPropagation(); eliminar(a.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px' }}>🗑</button>
                   </div>
                 </div>
               </div>

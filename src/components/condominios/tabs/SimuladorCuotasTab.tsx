@@ -103,22 +103,22 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
 
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 12, color: 'var(--at-ink-2)', fontWeight: 600, display: 'block', marginBottom: 6 }}>
-              Tasa de cobro — <span style={{ color: '#16a34a' }}>{pctCobro}%</span>
+              Tasa de cobro — <span style={{ color: 'var(--at-success)' }}>{pctCobro}%</span>
             </label>
             <input type="range" min={0} max={100} step={1}
               value={pctCobro}
               onChange={e => setPctCobro(Number(e.target.value))}
-              style={{ width: '100%', accentColor: '#16a34a' }} />
+              style={{ width: '100%', accentColor: 'var(--at-success)' }} />
           </div>
 
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 12, color: 'var(--at-ink-2)', fontWeight: 600, display: 'block', marginBottom: 6 }}>
-              Crecimiento egresos/año — <span style={{ color: '#ef4444' }}>{crecimientoEgresos}%</span>
+              Crecimiento egresos/año — <span style={{ color: 'var(--at-danger)' }}>{crecimientoEgresos}%</span>
             </label>
             <input type="range" min={-10} max={30} step={0.5}
               value={crecimientoEgresos}
               onChange={e => setCrecimientoEgresos(Number(e.target.value))}
-              style={{ width: '100%', accentColor: '#ef4444' }} />
+              style={{ width: '100%', accentColor: 'var(--at-danger)' }} />
           </div>
 
           <div style={{ marginBottom: 14 }}>
@@ -150,9 +150,9 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
           {/* KPIs */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {[
-              { label: 'Ingreso proyectado/mes', val: `${moneda} ${Math.round(cuotaMensual * totalUnidades * (pctCobro / 100)).toLocaleString('es')}`, color: '#16a34a', bg: '#dcfce7' },
-              { label: 'Saldo acumulado', val: `${saldoAcumulado >= 0 ? '+' : ''}${moneda} ${Math.round(saldoAcumulado).toLocaleString('es')}`, color: saldoAcumulado >= 0 ? '#16a34a' : '#ef4444', bg: saldoAcumulado >= 0 ? '#dcfce7' : '#fef2f2' },
-              { label: 'Meses en déficit', val: String(mesesNeg), color: mesesNeg === 0 ? '#16a34a' : '#ef4444', bg: mesesNeg === 0 ? '#dcfce7' : '#fef2f2' },
+              { label: 'Ingreso proyectado/mes', val: `${moneda} ${Math.round(cuotaMensual * totalUnidades * (pctCobro / 100)).toLocaleString('es')}`, color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+              { label: 'Saldo acumulado', val: `${saldoAcumulado >= 0 ? '+' : ''}${moneda} ${Math.round(saldoAcumulado).toLocaleString('es')}`, color: saldoAcumulado >= 0 ? 'var(--at-success)' : 'var(--at-danger)', bg: saldoAcumulado >= 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)' },
+              { label: 'Meses en déficit', val: String(mesesNeg), color: mesesNeg === 0 ? 'var(--at-success)' : 'var(--at-danger)', bg: mesesNeg === 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)' },
               { label: 'Punto de equilibrio', val: `${moneda} ${puntoEquilibrio.toLocaleString('es')}/unidad`, color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
               { label: 'Potencial máximo/mes', val: `${moneda} ${Math.round(cuotaMensual * totalUnidades).toLocaleString('es')}`, color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
             ].map(k => (
@@ -174,7 +174,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
                   <div style={{ width: '100%', display: 'flex', gap: 1, alignItems: 'flex-end', height: 120 }}>
                     <div style={{ flex: 1, background: 'var(--at-primary)', opacity: 0.8, borderRadius: '3px 3px 0 0',
                       height: `${(p.ingresos / maxBar) * 100}%`, minHeight: 2 }} />
-                    <div style={{ flex: 1, background: p.egresos > p.ingresos ? '#ef4444' : '#f97316', opacity: 0.8, borderRadius: '3px 3px 0 0',
+                    <div style={{ flex: 1, background: p.egresos > p.ingresos ? 'var(--at-danger)' : 'var(--at-warning)', opacity: 0.8, borderRadius: '3px 3px 0 0',
                       height: `${(p.egresos / maxBar) * 100}%`, minHeight: 2 }} />
                   </div>
                   <div style={{ fontSize: 9, color: 'var(--at-ink-3)', transform: 'rotate(-30deg)', marginTop: 4, whiteSpace: 'nowrap' }}>
@@ -189,7 +189,7 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
                 Ingresos
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 10, height: 10, background: '#f97316', borderRadius: 2, display: 'inline-block' }} />
+                <span style={{ width: 10, height: 10, background: 'var(--at-warning)', borderRadius: 2, display: 'inline-block' }} />
                 Egresos
               </span>
             </div>
@@ -209,14 +209,14 @@ export default function SimuladorCuotasTab({ cuotas, gastos, unidades, moneda }:
                 {proyeccion.reduce<{ rows: ReactElement[]; acum: number }>((acc, p, i) => {
                   acc.acum += p.superavit
                   acc.rows.push(
-                    <tr key={i} style={{ borderTop: '1px solid var(--at-chip)', background: p.superavit < 0 ? '#fef2f2' : undefined }}>
+                    <tr key={i} style={{ borderTop: '1px solid var(--at-chip)', background: p.superavit < 0 ? 'var(--at-danger-tint)' : undefined }}>
                       <td style={{ padding: '6px 10px', color: 'var(--at-ink-3)' }}>{labelMes(p.mes)} {p.mes.slice(0, 4)}</td>
-                      <td style={{ padding: '6px 10px', textAlign: 'right', color: '#16a34a' }}>{moneda} {Math.round(p.ingresos).toLocaleString('es')}</td>
-                      <td style={{ padding: '6px 10px', textAlign: 'right', color: '#ef4444' }}>{moneda} {Math.round(p.egresos).toLocaleString('es')}</td>
-                      <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, color: p.superavit >= 0 ? '#16a34a' : '#ef4444' }}>
+                      <td style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--at-success)' }}>{moneda} {Math.round(p.ingresos).toLocaleString('es')}</td>
+                      <td style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--at-danger)' }}>{moneda} {Math.round(p.egresos).toLocaleString('es')}</td>
+                      <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 600, color: p.superavit >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
                         {p.superavit >= 0 ? '+' : ''}{moneda} {Math.round(p.superavit).toLocaleString('es')}
                       </td>
-                      <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700, color: acc.acum >= 0 ? '#16a34a' : '#ef4444' }}>
+                      <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700, color: acc.acum >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
                         {acc.acum >= 0 ? '+' : ''}{moneda} {Math.round(acc.acum).toLocaleString('es')}
                       </td>
                     </tr>

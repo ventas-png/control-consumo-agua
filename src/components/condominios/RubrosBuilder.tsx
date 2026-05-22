@@ -21,7 +21,7 @@ const VALOR_PLACEHOLDER: Record<MetodoCalculo, string> = {
 
 const METODO_BADGE: Record<MetodoCalculo, { bg: string; color: string }> = {
   fijo:     { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  por_m2:   { bg: '#f0fdf4', color: '#16a34a' },
+  por_m2:   { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   alicuota: { bg: '#fdf4ff', color: 'var(--at-accent-hover)' },
 }
 
@@ -125,7 +125,7 @@ export function RubrosBuilder({ rubros, onChange, disabled, moneda = '' }: Props
                   <button
                     type="button"
                     onClick={() => eliminar(idx)}
-                    style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer', color: '#ef4444', fontSize: 14, flexShrink: 0 }}
+                    style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--at-danger)', fontSize: 14, flexShrink: 0 }}
                     title="Eliminar rubro"
                   >
                     ×
@@ -141,7 +141,7 @@ export function RubrosBuilder({ rubros, onChange, disabled, moneda = '' }: Props
       {rubros.some(r => r.metodo !== 'fijo') && (
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
           {rubros.some(r => r.metodo === 'por_m2') && (
-            <p style={{ margin: 0, fontSize: 11, color: '#16a34a' }}>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--at-success)' }}>
               🟢 <strong>Por m²:</strong> cada unidad paga valor × su área. Sin área = {monedaLabel}0.
             </p>
           )}

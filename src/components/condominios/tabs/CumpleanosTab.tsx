@@ -164,8 +164,8 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Hoy', val: cumpleHoy.length, icon: '🎂', color: cumpleHoy.length > 0 ? '#dc2626' : '#16a34a', bg: cumpleHoy.length > 0 ? '#fef2f2' : '#f0fdf4' },
-          { label: 'Esta semana', val: semanaMes.length, icon: '📅', color: '#d97706', bg: '#fef3c7' },
+          { label: 'Hoy', val: cumpleHoy.length, icon: '🎂', color: cumpleHoy.length > 0 ? 'var(--at-danger)' : 'var(--at-success)', bg: cumpleHoy.length > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)' },
+          { label: 'Esta semana', val: semanaMes.length, icon: '📅', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
           { label: 'Próximos 30d', val: proximos30.length, icon: '🗓️', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
           { label: 'Registrados', val: todos.length, icon: '👤', color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
         ].map(k => (
@@ -179,10 +179,10 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
 
       {/* Alerta de hoy */}
       {cumpleHoy.length > 0 && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '12px', padding: '14px 18px', marginBottom: '18px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '12px', padding: '14px 18px', marginBottom: '18px', display: 'flex', gap: '12px', alignItems: 'center' }}>
           <span style={{ fontSize: '28px' }}>🎂</span>
           <div>
-            <div style={{ fontWeight: 700, color: '#dc2626', fontSize: '14px', marginBottom: '6px' }}>¡Hoy es el cumpleaños de:</div>
+            <div style={{ fontWeight: 700, color: 'var(--at-danger)', fontSize: '14px', marginBottom: '6px' }}>¡Hoy es el cumpleaños de:</div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {cumpleHoy.map(c => {
                 const edad = calcularEdadAnio(c.anioNac, 0)
@@ -294,8 +294,8 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
                   return (
                     <div key={c.id} style={{
                       display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px',
-                      background: c.dias === 0 ? '#fef2f2' : c.dias <= 7 ? '#fff7ed' : 'var(--at-surface-2)',
-                      borderRadius: '8px', border: `1px solid ${c.dias === 0 ? '#fca5a5' : c.dias <= 7 ? '#fed7aa' : 'var(--at-line)'}`,
+                      background: c.dias === 0 ? 'var(--at-danger-tint)' : c.dias <= 7 ? 'var(--at-warning-tint)' : 'var(--at-surface-2)',
+                      borderRadius: '8px', border: `1px solid ${c.dias === 0 ? 'var(--at-danger-border)' : c.dias <= 7 ? 'var(--at-warning-border)' : 'var(--at-line)'}`,
                     }}>
                       <span style={{ fontSize: '18px', flexShrink: 0 }}>{c.dias === 0 ? '🎂' : '🎁'}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -310,7 +310,7 @@ export function CumpleanosTab({ personal, clientesBirthday, proyectoNombre = 'Co
                         <div style={{ padding: '2px 7px', borderRadius: '20px', fontSize: '10px', fontWeight: 700, background: COLOR[c.tipo].bg, color: COLOR[c.tipo].color, marginBottom: '3px' }}>
                           {c.tipo === 'residente' ? 'Residente' : 'Personal'}
                         </div>
-                        <div style={{ fontSize: '10px', fontWeight: 700, color: c.dias === 0 ? '#dc2626' : c.dias <= 7 ? '#ea580c' : 'var(--at-ink-3)' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 700, color: c.dias === 0 ? 'var(--at-danger)' : c.dias <= 7 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>
                           {c.dias === 0 ? '¡Hoy! 🎉' : `en ${c.dias}d`}
                         </div>
                       </div>

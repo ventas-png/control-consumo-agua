@@ -23,9 +23,9 @@ const TIPO_CFG: Record<TipoFlujoAprobacion, { label: string; icon: string }> = {
 }
 
 const ESTADO_CFG: Record<EstadoFlujoAprobacion, { label: string; color: string; bg: string }> = {
-  pendiente: { label: 'Pendiente', color: '#d97706', bg: '#fef3c7' },
-  aprobado:  { label: 'Aprobado',  color: '#16a34a', bg: '#dcfce7' },
-  rechazado: { label: 'Rechazado', color: '#ef4444', bg: '#fef2f2' },
+  pendiente: { label: 'Pendiente', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  aprobado:  { label: 'Aprobado',  color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  rechazado: { label: 'Rechazado', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
 const BLANK = { tipo: 'gasto_mayor' as TipoFlujoAprobacion, titulo: '', descripcion: '', monto: '' }
@@ -70,7 +70,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
       inputPlaceholder: 'Comentario (opcional)…',
       showCancelButton: true,
       confirmButtonText: nuevoEstado === 'aprobado' ? 'Aprobar' : 'Rechazar',
-      confirmButtonColor: nuevoEstado === 'aprobado' ? '#16a34a' : '#ef4444',
+      confirmButtonColor: nuevoEstado === 'aprobado' ? 'var(--at-success)' : 'var(--at-danger)',
       cancelButtonText: 'Cancelar',
     })
     if (comentario === undefined) return
@@ -85,7 +85,7 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
   }
 
   async function eliminar(flujo: FlujoAprobacionCond) {
-    const r = await Swal.fire({ title: '¿Eliminar solicitud?', text: flujo.titulo, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' })
+    const r = await Swal.fire({ title: '¿Eliminar solicitud?', text: flujo.titulo, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('flujo_aprobacion_cond').delete().eq('id', flujo.id)
     onRefresh()
@@ -203,18 +203,18 @@ export default function FlujoAprobacionTab({ flujos, proyectoId, companyId, mone
                   {canEdit && f.estado === 'pendiente' && (
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 10 }}>
                       <button onClick={() => resolver(f, 'aprobado')}
-                        style={{ padding: '5px 12px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                        style={{ padding: '5px 12px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
                         ✓ Aprobar
                       </button>
                       <button onClick={() => resolver(f, 'rechazado')}
-                        style={{ padding: '5px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                        style={{ padding: '5px 12px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
                         ✕ Rechazar
                       </button>
                     </div>
                   )}
                   {canEdit && f.estado !== 'pendiente' && (
                     <button onClick={() => eliminar(f)}
-                      style={{ padding: '4px 8px', border: '1px solid #fecaca', borderRadius: 5, cursor: 'pointer', background: '#fef2f2', color: '#ef4444', fontSize: 11, flexShrink: 0, marginLeft: 10 }}>
+                      style={{ padding: '4px 8px', border: '1px solid var(--at-danger-border)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontSize: 11, flexShrink: 0, marginLeft: 10 }}>
                       🗑
                     </button>
                   )}

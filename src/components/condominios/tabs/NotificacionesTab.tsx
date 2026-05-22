@@ -25,9 +25,9 @@ const EVENTO_LABELS: Record<EventoNotificacion, string> = {
 
 const CANAL_LABELS: Record<CanalNotificacion, { label: string; icon: string; color: string }> = {
   email:    { label: 'Email',    icon: '✉️',  color: 'var(--at-primary)' },
-  whatsapp: { label: 'WhatsApp', icon: '💬',  color: '#10b981' },
+  whatsapp: { label: 'WhatsApp', icon: '💬',  color: 'var(--at-success)' },
   push:     { label: 'Push',     icon: '🔔',  color: 'var(--at-accent)' },
-  sms:      { label: 'SMS',      icon: '📱',  color: '#f59e0b' },
+  sms:      { label: 'SMS',      icon: '📱',  color: 'var(--at-warning)' },
 }
 
 const DEST_LABELS: Record<DestinatarioNotificacion, string> = {
@@ -89,7 +89,7 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar regla?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar regla?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('reglas_notificacion').delete().eq('id', id)
     onRefresh()
@@ -116,9 +116,9 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
 
       {/* Stats */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <div style={{ background: '#dcfce7', borderRadius: '8px', padding: '8px 14px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '18px', fontWeight: 800, color: '#16a34a' }}>{activas}</span>
-          <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>reglas activas</span>
+        <div style={{ background: 'var(--at-success-tint)', borderRadius: '8px', padding: '8px 14px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--at-success)' }}>{activas}</span>
+          <span style={{ fontSize: '12px', color: 'var(--at-success)', fontWeight: 600 }}>reglas activas</span>
         </div>
         <div style={{ background: 'var(--at-chip)', borderRadius: '8px', padding: '8px 14px', display: 'flex', gap: '8px', alignItems: 'center' }}>
           <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--at-ink-3)' }}>{inactivas}</span>
@@ -219,11 +219,11 @@ export function NotificacionesTab({ reglas, proyectoId, companyId, canCreate, ca
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                       <button onClick={() => toggleActivo(r)}
-                        style={{ padding: '3px 8px', background: r.activo ? '#fef3c7' : '#dcfce7', color: r.activo ? '#92400e' : '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                        style={{ padding: '3px 8px', background: r.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', color: r.activo ? 'var(--at-warning-strong)' : 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                         {r.activo ? 'Desactivar' : 'Activar'}
                       </button>
                       <button onClick={() => startEdit(r)} style={{ padding: '3px 7px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDelete(r.id)} style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                      <button onClick={() => handleDelete(r.id)} style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </div>
                   )}
                 </div>

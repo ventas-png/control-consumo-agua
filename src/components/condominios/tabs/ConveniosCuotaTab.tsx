@@ -17,8 +17,8 @@ interface Props {
 
 const ESTADO_CFG: Record<EstadoConvenioCuota, { label: string; bg: string; color: string }> = {
   activo:      { label: 'Activo',      bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
-  cumplido:    { label: 'Cumplido',    bg: '#d1fae5', color: '#065f46' },
-  incumplido:  { label: 'Incumplido', bg: '#fee2e2', color: '#ef4444' },
+  cumplido:    { label: 'Cumplido',    bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)' },
+  incumplido:  { label: 'Incumplido', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
   anulado:     { label: 'Anulado',    bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
 
@@ -90,8 +90,8 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
           { label: 'Activos', val: activos, bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-          { label: 'Incumplidos', val: incumplidos, bg: '#fef2f2', color: '#ef4444' },
-          { label: 'Cumplidos', val: convenios.filter(c => c.estado === 'cumplido').length, bg: '#f0fdf4', color: '#16a34a' },
+          { label: 'Incumplidos', val: incumplidos, bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
+          { label: 'Cumplidos', val: convenios.filter(c => c.estado === 'cumplido').length, bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
           { label: 'Total', val: convenios.length, bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
@@ -192,7 +192,7 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ flex: 1, background: 'var(--at-line)', borderRadius: 20, height: 8, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', background: c.estado === 'cumplido' ? '#16a34a' : c.estado === 'incumplido' ? '#ef4444' : 'var(--at-accent-hover)', width: `${pct}%`, borderRadius: 20, transition: 'width 0.3s' }} />
+                      <div style={{ height: '100%', background: c.estado === 'cumplido' ? 'var(--at-success)' : c.estado === 'incumplido' ? 'var(--at-danger)' : 'var(--at-accent-hover)', width: `${pct}%`, borderRadius: 20, transition: 'width 0.3s' }} />
                     </div>
                     <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink-2)', whiteSpace: 'nowrap' }}>
                       {c.cuotas_pagadas}/{c.num_cuotas} · {moneda} {c.monto_cuota.toFixed(2)}/mes
@@ -223,11 +223,11 @@ export default function ConveniosCuotaTab({ convenios, unidades, proyectoId, com
               {canEdit && selected.estado === 'activo' && (
                 <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
                   <button onClick={() => registrarPago(selected)}
-                    style={{ flex: 1, padding: '7px 0', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    style={{ flex: 1, padding: '7px 0', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                     💳 Registrar pago
                   </button>
                   <button onClick={() => cambiarEstado(selected.id, 'incumplido')}
-                    style={{ padding: '7px 10px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ padding: '7px 10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     ✗
                   </button>
                 </div>

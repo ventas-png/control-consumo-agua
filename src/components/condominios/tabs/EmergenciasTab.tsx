@@ -14,13 +14,13 @@ interface Props {
 }
 
 const TIPOS: { value: TipoContactoEmergencia; label: string; icon: string; color: string }[] = [
-  { value: 'bomberos',       label: 'Bomberos',       icon: '🚒', color: '#ef4444' },
+  { value: 'bomberos',       label: 'Bomberos',       icon: '🚒', color: 'var(--at-danger)' },
   { value: 'policia',        label: 'Policía',        icon: '🚔', color: 'var(--at-primary-hover)' },
-  { value: 'ambulancia',     label: 'Ambulancia',     icon: '🚑', color: '#dc2626' },
+  { value: 'ambulancia',     label: 'Ambulancia',     icon: '🚑', color: 'var(--at-danger)' },
   { value: 'hospital',       label: 'Hospital',       icon: '🏥', color: 'var(--at-primary-hover)' },
-  { value: 'electricidad',   label: 'Electricidad',   icon: '⚡', color: '#d97706' },
+  { value: 'electricidad',   label: 'Electricidad',   icon: '⚡', color: 'var(--at-warning)' },
   { value: 'agua',           label: 'Agua',           icon: '💧', color: 'var(--at-primary)' },
-  { value: 'gas',            label: 'Gas',            icon: '🔥', color: '#ea580c' },
+  { value: 'gas',            label: 'Gas',            icon: '🔥', color: 'var(--at-warning)' },
   { value: 'administracion', label: 'Administración', icon: '🏢', color: 'var(--at-accent-hover)' },
   { value: 'general',        label: 'General',        icon: '📞', color: 'var(--at-ink-3)' },
 ]
@@ -75,7 +75,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar contacto?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar contacto?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('contactos_emergencia').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -98,8 +98,8 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
 
       {/* Directorio rápido — siempre visible arriba */}
       {activos.length > 0 && (
-        <div style={{ background: 'linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%)', border: '1.5px solid #fca5a5', borderRadius: '12px', padding: '16px 20px', marginBottom: '20px' }}>
-          <div style={{ fontWeight: 700, fontSize: '13px', color: '#991b1b', marginBottom: '12px' }}>🆘 Directorio de Emergencias</div>
+        <div style={{ background: 'linear-gradient(135deg, var(--at-danger-tint) 0%, var(--at-warning-tint) 100%)', border: '1.5px solid var(--at-danger-border)', borderRadius: '12px', padding: '16px 20px', marginBottom: '20px' }}>
+          <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-danger-strong)', marginBottom: '12px' }}>🆘 Directorio de Emergencias</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
             {activos.slice(0, 8).map(c => {
               const ti = tipoInfo(c.tipo)
@@ -110,7 +110,7 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--at-ink)' }}>{c.nombre}</div>
                     <div style={{ fontSize: '13px', color: ti.color, fontWeight: 700 }}>{c.telefono}</div>
-                    {c.disponible_24h && <div style={{ fontSize: '10px', color: '#10b981', fontWeight: 600 }}>24h</div>}
+                    {c.disponible_24h && <div style={{ fontSize: '10px', color: 'var(--at-success)', fontWeight: 600 }}>24h</div>}
                   </div>
                 </a>
               )
@@ -217,17 +217,17 @@ export function EmergenciasTab({ contactos, proyectoId, companyId, canCreate, ca
                     <div style={{ fontSize: '14px', fontWeight: 700, color: ti.color, marginTop: '2px' }}>{c.telefono}</div>
                     {c.telefono_alternativo && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>Alt: {c.telefono_alternativo}</div>}
                     <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
-                      {c.disponible_24h && <span style={{ fontSize: '10px', fontWeight: 700, color: '#10b981', background: '#d1fae5', padding: '1px 6px', borderRadius: '4px' }}>24H</span>}
+                      {c.disponible_24h && <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--at-success)', background: 'var(--at-success-tint)', padding: '1px 6px', borderRadius: '4px' }}>24H</span>}
                       <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--at-ink-3)', background: 'var(--at-chip)', padding: '1px 6px', borderRadius: '4px' }}>{ti.label}</span>
                     </div>
                   </div>
                   {canEdit && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <button onClick={() => startEdit(c)} style={{ padding: '4px 6px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => toggleActivo(c)} style={{ padding: '4px 6px', background: c.activo ? '#fef3c7' : '#d1fae5', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }} title={c.activo ? 'Desactivar' : 'Activar'}>
+                      <button onClick={() => toggleActivo(c)} style={{ padding: '4px 6px', background: c.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }} title={c.activo ? 'Desactivar' : 'Activar'}>
                         {c.activo ? '⏸️' : '▶️'}
                       </button>
-                      <button onClick={() => handleDelete(c.id)} style={{ padding: '4px 6px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                      <button onClick={() => handleDelete(c.id)} style={{ padding: '4px 6px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </div>
                   )}
                 </div>

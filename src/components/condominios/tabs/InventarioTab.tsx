@@ -23,9 +23,9 @@ const CATEGORIAS: { value: CategoriaInventario; label: string; icon: string }[] 
 ]
 
 const ESTADO_CONFIG: Record<EstadoInventario, { label: string; color: string; bg: string }> = {
-  disponible:    { label: 'Disponible',    color: '#10b981', bg: '#d1fae5' },
+  disponible:    { label: 'Disponible',    color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   en_uso:        { label: 'En Uso',        color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
-  en_reparacion: { label: 'En Reparación', color: '#f59e0b', bg: '#fef3c7' },
+  en_reparacion: { label: 'En Reparación', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   dado_de_baja:  { label: 'Baja',          color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 
@@ -101,7 +101,7 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar item?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar item?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('inventario_condominio').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -124,17 +124,17 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
 
       {/* Alertas */}
       {stockBajo.length > 0 && (
-        <div style={{ background: '#fee2e2', border: '1px solid #ef4444', borderRadius: '10px', padding: '10px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger)', borderRadius: '10px', padding: '10px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>⚠️</span>
-          <span style={{ fontSize: '13px', color: '#991b1b', fontWeight: 600 }}>
+          <span style={{ fontSize: '13px', color: 'var(--at-danger-strong)', fontWeight: 600 }}>
             {stockBajo.length} item{stockBajo.length > 1 ? 's' : ''} con stock bajo o agotado
           </span>
         </div>
       )}
       {porVencer.length > 0 && (
-        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '10px', padding: '10px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', borderRadius: '10px', padding: '10px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>📅</span>
-          <span style={{ fontSize: '13px', color: '#92400e', fontWeight: 600 }}>
+          <span style={{ fontSize: '13px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>
             {porVencer.length} item{porVencer.length > 1 ? 's' : ''} por vencer en menos de 30 días
           </span>
         </div>
@@ -258,7 +258,7 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
             const venceProx = item.fecha_vencimiento && item.fecha_vencimiento >= hoy &&
               new Date(item.fecha_vencimiento).getTime() - Date.now() < 30 * 24 * 3600 * 1000
             return (
-              <div key={item.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${stockAlerta ? '#fca5a5' : 'var(--at-line)'}`, borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div key={item.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${stockAlerta ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -274,7 +274,7 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
 
                 <div style={{ display: 'flex', gap: '12px', fontSize: '13px' }}>
                   <div>
-                    <span style={{ color: stockAlerta ? '#ef4444' : 'var(--at-ink)', fontWeight: 700 }}>{item.cantidad}</span>
+                    <span style={{ color: stockAlerta ? 'var(--at-danger)' : 'var(--at-ink)', fontWeight: 700 }}>{item.cantidad}</span>
                     <span style={{ color: 'var(--at-ink-3)', fontSize: '11px' }}> {item.unidad_medida}</span>
                   </div>
                   {item.costo_unitario != null && (
@@ -283,12 +283,12 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
                 </div>
 
                 {stockAlerta && (
-                  <div style={{ fontSize: '11px', background: '#fee2e2', color: '#ef4444', padding: '4px 8px', borderRadius: '6px', fontWeight: 600 }}>
+                  <div style={{ fontSize: '11px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', padding: '4px 8px', borderRadius: '6px', fontWeight: 600 }}>
                     Stock bajo (mín: {item.cantidad_minima})
                   </div>
                 )}
                 {venceProx && (
-                  <div style={{ fontSize: '11px', background: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: '6px', fontWeight: 600 }}>
+                  <div style={{ fontSize: '11px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', padding: '4px 8px', borderRadius: '6px', fontWeight: 600 }}>
                     Vence: {item.fecha_vencimiento}
                   </div>
                 )}
@@ -301,12 +301,12 @@ export function InventarioTab({ inventario, proyectoId, companyId, moneda, canCr
                       </button>
                     )}
                     {item.estado === 'en_uso' && (
-                      <button onClick={() => handleEstado(item.id, 'disponible')} style={{ flex: 1, padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                      <button onClick={() => handleEstado(item.id, 'disponible')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                         Disponible
                       </button>
                     )}
                     <button onClick={() => startEdit(item)} style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                    <button onClick={() => handleDelete(item.id)} style={{ padding: '4px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
+                    <button onClick={() => handleDelete(item.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
                   </div>
                 )}
               </div>

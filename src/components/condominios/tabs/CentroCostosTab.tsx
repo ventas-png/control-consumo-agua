@@ -10,8 +10,8 @@ interface Props {
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 const CAT_COLOR: Record<string, string> = {
-  mantenimiento: 'var(--at-primary-2)', servicios: 'var(--at-accent)', administracion: '#f59e0b',
-  seguridad: '#ef4444', limpieza: '#10b981', mejoras: 'var(--at-accent)', otro: 'var(--at-ink-3)',
+  mantenimiento: 'var(--at-primary-2)', servicios: 'var(--at-accent)', administracion: 'var(--at-warning)',
+  seguridad: 'var(--at-danger)', limpieza: 'var(--at-success)', mejoras: 'var(--at-accent)', otro: 'var(--at-ink-3)',
 }
 
 export default function CentroCostosTab({ gastos, cuotas, moneda }: Props) {
@@ -63,19 +63,19 @@ export default function CentroCostosTab({ gastos, cuotas, moneda }: Props) {
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
-        <div style={{ background: '#fef2f2', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#ef4444' }}>{moneda} {gastoTotal.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
-          <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>Total gastos {anio}</div>
+        <div style={{ background: 'var(--at-danger-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--at-danger)' }}>{moneda} {gastoTotal.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-danger)', fontWeight: 600 }}>Total gastos {anio}</div>
         </div>
-        <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#16a34a' }}>{moneda} {ingresoAnio.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
-          <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>Ingresos cuotas {anio}</div>
+        <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--at-success)' }}>{moneda} {ingresoAnio.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-success)', fontWeight: 600 }}>Ingresos cuotas {anio}</div>
         </div>
-        <div style={{ background: superavit >= 0 ? '#f0fdf4' : '#fef2f2', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 16, fontWeight: 800, color: superavit >= 0 ? '#16a34a' : '#ef4444' }}>
+        <div style={{ background: superavit >= 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: superavit >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
             {superavit >= 0 ? '+' : ''}{moneda} {Math.abs(superavit).toLocaleString('es', { minimumFractionDigits: 2 })}
           </div>
-          <div style={{ fontSize: 11, color: superavit >= 0 ? '#16a34a' : '#ef4444', fontWeight: 600 }}>
+          <div style={{ fontSize: 11, color: superavit >= 0 ? 'var(--at-success)' : 'var(--at-danger)', fontWeight: 600 }}>
             {superavit >= 0 ? 'Superávit' : 'Déficit'}
           </div>
         </div>
@@ -128,7 +128,7 @@ export default function CentroCostosTab({ gastos, cuotas, moneda }: Props) {
           {gastoTotal > 0 && (
             <div style={{ padding: '8px 12px', background: 'var(--at-surface-2)', borderRadius: 8, fontSize: 11, color: 'var(--at-ink-3)', textAlign: 'center' }}>
               Promedio mensual: <strong style={{ color: 'var(--at-ink-2)' }}>{moneda} {(gastoTotal / 12).toLocaleString('es', { minimumFractionDigits: 2 })}</strong>
-              {' · '}Mes más alto: <strong style={{ color: '#ef4444' }}>{moneda} {Math.max(...meses.map(m => m.monto)).toLocaleString('es', { minimumFractionDigits: 2 })}</strong>
+              {' · '}Mes más alto: <strong style={{ color: 'var(--at-danger)' }}>{moneda} {Math.max(...meses.map(m => m.monto)).toLocaleString('es', { minimumFractionDigits: 2 })}</strong>
             </div>
           )}
         </div>

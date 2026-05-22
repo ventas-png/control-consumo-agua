@@ -15,18 +15,18 @@ interface Props {
 
 const CATEGORIAS: { value: CategoriaActividad; label: string; icon: string; color: string }[] = [
   { value: 'recreativa',  label: 'Recreativa',  icon: '🎉', color: 'var(--at-accent)' },
-  { value: 'deportiva',   label: 'Deportiva',   icon: '⚽', color: '#10b981' },
+  { value: 'deportiva',   label: 'Deportiva',   icon: '⚽', color: 'var(--at-success)' },
   { value: 'cultural',    label: 'Cultural',    icon: '🎭', color: 'var(--at-accent)' },
   { value: 'educativa',   label: 'Educativa',   icon: '📚', color: 'var(--at-primary-2)' },
-  { value: 'salud',       label: 'Salud',       icon: '💪', color: '#ef4444' },
+  { value: 'salud',       label: 'Salud',       icon: '💪', color: 'var(--at-danger)' },
   { value: 'otro',        label: 'Otro',        icon: '📌', color: 'var(--at-ink-3)' },
 ]
 
 const ESTADOS: { value: EstadoActividad; label: string; color: string; bg: string }[] = [
   { value: 'programada', label: 'Programada', color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
-  { value: 'activa',     label: 'Activa',     color: '#10b981', bg: '#d1fae5' },
+  { value: 'activa',     label: 'Activa',     color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   { value: 'completada', label: 'Completada', color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
-  { value: 'cancelada',  label: 'Cancelada',  color: '#ef4444', bg: '#fef2f2' },
+  { value: 'cancelada',  label: 'Cancelada',  color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 ]
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
@@ -155,7 +155,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
               {disp !== null && (
                 <div style={{ marginTop: 4 }}>
                   <div style={{ height: 4, background: 'var(--at-line)', borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${Math.min(disp.pct, 100)}%`, background: disp.pct >= 100 ? '#ef4444' : disp.pct >= 80 ? '#f59e0b' : '#10b981', transition: 'width 0.3s' }} />
+                    <div style={{ height: '100%', width: `${Math.min(disp.pct, 100)}%`, background: disp.pct >= 100 ? 'var(--at-danger)' : disp.pct >= 80 ? 'var(--at-warning)' : 'var(--at-success)', transition: 'width 0.3s' }} />
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 1 }}>{a.inscritos}/{a.cupo_maximo} inscritos</div>
                 </div>
@@ -235,7 +235,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Crear actividad'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -296,10 +296,10 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
                 <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontSize: 13, fontWeight: 600 }}>Inscritos</span>
-                    <span style={{ fontSize: 13, color: disp.pct >= 100 ? '#ef4444' : 'var(--at-ink-2)' }}>{selected.inscritos} / {selected.cupo_maximo}</span>
+                    <span style={{ fontSize: 13, color: disp.pct >= 100 ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>{selected.inscritos} / {selected.cupo_maximo}</span>
                   </div>
                   <div style={{ height: 6, background: 'var(--at-line)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
-                    <div style={{ height: '100%', width: `${Math.min(disp.pct, 100)}%`, background: disp.pct >= 100 ? '#ef4444' : disp.pct >= 80 ? '#f59e0b' : '#10b981' }} />
+                    <div style={{ height: '100%', width: `${Math.min(disp.pct, 100)}%`, background: disp.pct >= 100 ? 'var(--at-danger)' : disp.pct >= 80 ? 'var(--at-warning)' : 'var(--at-success)' }} />
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{disp.libre > 0 ? `${disp.libre} cupos disponibles` : 'Sin cupos disponibles'}</div>
                 </div>
@@ -312,7 +312,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
               )}
 
               {selected.notas && (
-                <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#92400e' }}>
+                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'var(--at-warning-strong)' }}>
                   <strong>Nota: </strong>{selected.notas}
                 </div>
               )}
@@ -321,7 +321,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {selected.estado === 'programada' && (
                     <button onClick={() => cambiarEstado(selected, 'activa')}
-                      style={{ padding: '6px 14px', background: '#d1fae5', color: '#10b981', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ▶ Iniciar
                     </button>
                   )}
@@ -339,7 +339,7 @@ export default function ProgramaActividadesTab({ actividades, proyectoId, compan
                   )}
                   {(selected.estado === 'programada' || selected.estado === 'activa') && (
                     <button onClick={() => cambiarEstado(selected, 'cancelada')}
-                      style={{ padding: '6px 14px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ✕ Cancelar
                     </button>
                   )}

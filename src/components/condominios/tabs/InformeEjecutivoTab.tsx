@@ -75,33 +75,33 @@ export default function InformeEjecutivoTab({
   body{font-family:Arial,sans-serif;padding:32px;max-width:960px;margin:auto;color:#15291F;font-size:13px;line-height:1.5}
   .header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #15291F;padding-bottom:14px;margin-bottom:24px}
   h1{margin:0;font-size:22px}
-  h3{font-size:14px;font-weight:700;color:#15291F;border-bottom:1px solid #E1DDD0;padding-bottom:6px;margin:20px 0 12px}
+  h3{font-size:14px;font-weight:700;color:#15291F;border-bottom:1px solid var(--at-line);padding-bottom:6px;margin:20px 0 12px}
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
-  .kpi{border-radius:10px;padding:12px 14px;border:1px solid #E1DDD0}
-  .kpi-label{font-size:10px;color:#7E9389;margin-bottom:4px}
+  .kpi{border-radius:10px;padding:12px 14px;border:1px solid var(--at-line)}
+  .kpi-label{font-size:10px;color:var(--at-ink-3);margin-bottom:4px}
   .kpi-val{font-size:18px;font-weight:800}
-  .section{background:#FAF7EF;border-radius:10px;padding:14px 18px;margin-bottom:16px}
-  .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #EAE6D8;font-size:12px}
+  .section{background:var(--at-surface-2);border-radius:10px;padding:14px 18px;margin-bottom:16px}
+  .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--at-chip);font-size:12px}
   .row:last-child{border-bottom:none}
-  .label{color:#7E9389}
+  .label{color:var(--at-ink-3)}
   .value{font-weight:700}
-  .ok{color:#16a34a}.warn{color:#d97706}.bad{color:#ef4444}
+  .ok{color:var(--at-success)}.warn{color:var(--at-warning)}.bad{color:var(--at-danger)}
   .chart{display:flex;gap:8px;align-items:flex-end;height:${BAR_H+20}px;margin-top:8px}
   .bar-wrap{flex:1;text-align:center}
   .bar-group{display:flex;gap:2px;justify-content:center;align-items:flex-end;height:${BAR_H}px}
-  .bar-label{font-size:9px;color:#7E9389;margin-top:4px}
-  .footer{margin-top:32px;font-size:10px;color:#7E9389;border-top:1px solid #E1DDD0;padding-top:10px;display:flex;justify-content:space-between}
-  .alert-box{background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:12px}
-  .alert-title{font-weight:700;color:#ef4444;margin-bottom:2px}
+  .bar-label{font-size:9px;color:var(--at-ink-3);margin-top:4px}
+  .footer{margin-top:32px;font-size:10px;color:var(--at-ink-3);border-top:1px solid var(--at-line);padding-top:10px;display:flex;justify-content:space-between}
+  .alert-box{background:var(--at-danger-tint);border:1px solid var(--at-danger-border);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:12px}
+  .alert-title{font-weight:700;color:var(--at-danger);margin-bottom:2px}
   @media print{body{padding:20px}}
 </style>
 </head><body>
 <div class="header">
   <div>
     <h1>${proyectoNombre ?? 'Condominio'}</h1>
-    <div style="font-size:12px;color:#7E9389;margin-top:4px">Informe Ejecutivo Mensual — ${MESES[hoy.getMonth()]} ${hoy.getFullYear()}</div>
+    <div style="font-size:12px;color:var(--at-ink-3);margin-top:4px">Informe Ejecutivo Mensual — ${MESES[hoy.getMonth()]} ${hoy.getFullYear()}</div>
   </div>
-  <div style="text-align:right;font-size:11px;color:#7E9389">
+  <div style="text-align:right;font-size:11px;color:var(--at-ink-3)">
     Generado: ${hoy.toLocaleDateString('es', { day:'2-digit', month:'long', year:'numeric' })}<br>
     ${unidades.length} unidades registradas
   </div>
@@ -109,19 +109,19 @@ export default function InformeEjecutivoTab({
 
 <h3>📊 Resumen Financiero del Mes</h3>
 <div class="kpis">
-  <div class="kpi" style="background:#dcfce7">
+  <div class="kpi" style="background:var(--at-success-tint)">
     <div class="kpi-label">Cobrado este mes</div>
     <div class="kpi-val ok">${moneda} ${cobradoMes.toLocaleString('es',{minimumFractionDigits:2})}</div>
   </div>
-  <div class="kpi" style="background:#fef2f2">
+  <div class="kpi" style="background:var(--at-danger-tint)">
     <div class="kpi-label">Egresos este mes</div>
     <div class="kpi-val bad">${moneda} ${gastosMes.toLocaleString('es',{minimumFractionDigits:2})}</div>
   </div>
-  <div class="kpi" style="background:${superavit>=0?'#dcfce7':'#fef2f2'}">
+  <div class="kpi" style="background:${superavit>=0?'var(--at-success-tint)':'var(--at-danger-tint)'}">
     <div class="kpi-label">Superávit / Déficit</div>
     <div class="kpi-val ${superavit>=0?'ok':'bad'}">${superavit>=0?'+':''}${moneda} ${superavit.toLocaleString('es',{minimumFractionDigits:2})}</div>
   </div>
-  <div class="kpi" style="background:${tasaCobro>=0.9?'#dcfce7':tasaCobro>=0.7?'#fef3c7':'#fef2f2'}">
+  <div class="kpi" style="background:${tasaCobro>=0.9?'var(--at-success-tint)':tasaCobro>=0.7?'var(--at-warning-tint)':'var(--at-danger-tint)'}">
     <div class="kpi-label">Tasa de cobro</div>
     <div class="kpi-val ${tasaCobro>=0.9?'ok':tasaCobro>=0.7?'warn':'bad'}">${Math.round(tasaCobro*100)}%</div>
   </div>
@@ -138,27 +138,27 @@ export default function InformeEjecutivoTab({
   ${hist.map(m => `
   <div class="bar-wrap">
     <div class="bar-group">
-      ${barraH(m.ing,'#16a34a')}${barraH(m.egr,'#ef4444')}
+      ${barraH(m.ing,'var(--at-success)')}${barraH(m.egr,'var(--at-danger)')}
     </div>
     <div class="bar-label">${m.label}</div>
   </div>`).join('')}
 </div>
 <div style="display:flex;gap:16px;font-size:10px;margin-top:6px">
-  <span><span style="display:inline-block;width:10px;height:10px;background:#16a34a;border-radius:2px;margin-right:4px"></span>Ingresos</span>
-  <span><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;margin-right:4px"></span>Egresos</span>
+  <span><span style="display:inline-block;width:10px;height:10px;background:var(--at-success);border-radius:2px;margin-right:4px"></span>Ingresos</span>
+  <span><span style="display:inline-block;width:10px;height:10px;background:var(--at-danger);border-radius:2px;margin-right:4px"></span>Egresos</span>
 </div>
 
 <h3>🔧 Mantenimiento</h3>
 <div class="kpis">
-  <div class="kpi" style="background:${ticketsUrgentes>0?'#fef2f2':'var(--at-surface-2)'}">
+  <div class="kpi" style="background:${ticketsUrgentes>0?'var(--at-danger-tint)':'var(--at-surface-2)'}">
     <div class="kpi-label">Tickets urgentes abiertos</div>
     <div class="kpi-val ${ticketsUrgentes>0?'bad':'ok'}">${ticketsUrgentes}</div>
   </div>
-  <div class="kpi" style="background:#fef3c7">
+  <div class="kpi" style="background:var(--at-warning-tint)">
     <div class="kpi-label">Total tickets activos</div>
     <div class="kpi-val warn">${ticketsAbiertos}</div>
   </div>
-  <div class="kpi" style="background:#dcfce7">
+  <div class="kpi" style="background:var(--at-success-tint)">
     <div class="kpi-label">Cerrados este mes</div>
     <div class="kpi-val ok">${ticketsCerradosMes}</div>
   </div>
@@ -216,11 +216,11 @@ ${morosos > 5 ? `<div class="alert-box"><div class="alert-title">Alto nivel de m
       {/* Preview */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Cobrado este mes', val: `${moneda} ${cobrado.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#16a34a', bg: '#dcfce7' },
-          { label: 'Egresos este mes', val: `${moneda} ${gastosMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#ef4444', bg: '#fef2f2' },
-          { label: 'Tasa de cobro', val: `${Math.round(tasaCobro * 100)}%`, color: tasaCobro >= 0.9 ? '#16a34a' : tasaCobro >= 0.7 ? '#d97706' : '#ef4444', bg: tasaCobro >= 0.9 ? '#dcfce7' : tasaCobro >= 0.7 ? '#fef3c7' : '#fef2f2' },
-          { label: 'Tickets activos', val: String(tickets.filter(t => t.estado !== 'cerrado').length), color: '#d97706', bg: '#fef3c7' },
-          { label: 'Deuda acumulada', val: `${moneda} ${cuotas.filter(c => c.estado === 'pendiente' || c.estado === 'moroso').reduce((s, c) => s + c.monto, 0).toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#ef4444', bg: '#fef2f2' },
+          { label: 'Cobrado este mes', val: `${moneda} ${cobrado.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+          { label: 'Egresos este mes', val: `${moneda} ${gastosMes.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
+          { label: 'Tasa de cobro', val: `${Math.round(tasaCobro * 100)}%`, color: tasaCobro >= 0.9 ? 'var(--at-success)' : tasaCobro >= 0.7 ? 'var(--at-warning)' : 'var(--at-danger)', bg: tasaCobro >= 0.9 ? 'var(--at-success-tint)' : tasaCobro >= 0.7 ? 'var(--at-warning-tint)' : 'var(--at-danger-tint)' },
+          { label: 'Tickets activos', val: String(tickets.filter(t => t.estado !== 'cerrado').length), color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+          { label: 'Deuda acumulada', val: `${moneda} ${cuotas.filter(c => c.estado === 'pendiente' || c.estado === 'moroso').reduce((s, c) => s + c.monto, 0).toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
           { label: 'Unidades', val: String(unidades.length), color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>

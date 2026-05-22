@@ -19,9 +19,9 @@ type Modalidad = AsambleaDigital['modalidad']
 
 const ESTADO_CFG: Record<EstadoA, { label: string; color: string; bg: string }> = {
   programada: { label: 'Programada', color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
-  en_curso:   { label: 'En curso',   color: '#16a34a', bg: '#dcfce7' },
+  en_curso:   { label: 'En curso',   color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   finalizada: { label: 'Finalizada', color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
-  cancelada:  { label: 'Cancelada',  color: '#ef4444', bg: '#fef2f2' },
+  cancelada:  { label: 'Cancelada',  color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
 const MODALIDAD_CFG: Record<Modalidad, { label: string; icon: string }> = {
@@ -105,7 +105,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
   }
 
   async function eliminar(a: AsambleaDigital) {
-    const res = await Swal.fire({ icon: 'warning', title: '¿Eliminar asamblea?', text: a.titulo, showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonText: 'Cancelar', confirmButtonText: 'Eliminar' })
+    const res = await Swal.fire({ icon: 'warning', title: '¿Eliminar asamblea?', text: a.titulo, showCancelButton: true, confirmButtonColor: 'var(--at-danger)', cancelButtonText: 'Cancelar', confirmButtonText: 'Eliminar' })
     if (!res.isConfirmed) return
     await supabase.from('asambleas_digital').delete().eq('id', a.id)
     onRefresh()
@@ -131,10 +131,10 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
   function imprimirActa(a: AsambleaDigital) {
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acta — ${a.titulo}</title>
     <style>body{font-family:Arial,sans-serif;padding:40px;max-width:800px;margin:auto}
-    h1{font-size:22px;color:#15291F}h2{font-size:14px;color:#7E9389;font-weight:normal}
-    .meta{background:#FAF7EF;padding:12px;border-radius:8px;margin:16px 0;font-size:12px}
+    h1{font-size:22px;color:#15291F}h2{font-size:14px;color:var(--at-ink-3);font-weight:normal}
+    .meta{background:var(--at-surface-2);padding:12px;border-radius:8px;margin:16px 0;font-size:12px}
     pre{white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6}
-    .footer{margin-top:40px;border-top:1px solid #E1DDD0;padding-top:12px;font-size:11px;color:#7E9389}
+    .footer{margin-top:40px;border-top:1px solid var(--at-line);padding-top:12px;font-size:11px;color:var(--at-ink-3)}
     </style></head><body>
     <h1>ACTA DE ASAMBLEA</h1>
     <h2>${a.titulo}</h2>
@@ -291,7 +291,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                         </div>
                       </div>
                       <span style={{ padding: '3px 10px', borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 600 }}>{cfg.label}</span>
-                      {a.acta_url && <span style={{ fontSize: 11, color: '#16a34a' }}>📝 Acta</span>}
+                      {a.acta_url && <span style={{ fontSize: 11, color: 'var(--at-success)' }}>📝 Acta</span>}
                       <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{exp ? '▲' : '▼'}</span>
                     </div>
 
@@ -309,7 +309,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                           {canEdit && a.estado === 'programada' && (
                             <>
                               <button onClick={() => cambiarEstado(a, 'en_curso')}
-                                style={{ padding: '6px 14px', background: '#dcfce7', color: '#16a34a', border: '1px solid #16a34a', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                                style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                                 ▶ Iniciar
                               </button>
                               <button onClick={() => abrirEditar(a)}
@@ -317,7 +317,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                                 ✏️ Editar
                               </button>
                               <button onClick={() => cambiarEstado(a, 'cancelada')}
-                                style={{ padding: '6px 12px', background: '#fef2f2', color: '#ef4444', border: '1px solid #ef4444', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                                style={{ padding: '6px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                                 Cancelar
                               </button>
                             </>
@@ -342,7 +342,7 @@ export default function AsambleaDigitalTab({ asambleas, unidades, proyectoId, co
                           )}
                           {canEdit && a.estado !== 'en_curso' && (
                             <button onClick={() => eliminar(a)}
-                              style={{ padding: '6px 12px', background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                              style={{ padding: '6px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                               🗑️ Eliminar
                             </button>
                           )}

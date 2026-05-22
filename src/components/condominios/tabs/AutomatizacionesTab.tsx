@@ -23,8 +23,8 @@ const TRIGGER_CFG: Record<TriggerTipoAuto, { label: string; desc: (v: number) =>
 
 const ACCION_CFG: Record<AccionTipoAuto, { label: string; icon: string; color: string }> = {
   notificacion_interna: { label: 'Notificación interna', icon: '🔔', color: 'var(--at-primary)' },
-  crear_alerta:         { label: 'Crear alerta',         icon: '🚨', color: '#d97706' },
-  marcar_moroso:        { label: 'Marcar como moroso',   icon: '⚠️', color: '#ef4444' },
+  crear_alerta:         { label: 'Crear alerta',         icon: '🚨', color: 'var(--at-warning)' },
+  marcar_moroso:        { label: 'Marcar como moroso',   icon: '⚠️', color: 'var(--at-danger)' },
 }
 
 const BLANK = {
@@ -93,10 +93,10 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
         html: `<div style="text-align:left;font-size:14px">
           <p><strong>Disparador:</strong> ${TRIGGER_CFG[a.trigger_tipo].desc(a.trigger_valor)}</p>
           <p><strong>Acción:</strong> ${accion.icon} ${accion.label}</p>
-          <p style="font-size:20px;font-weight:800;color:#ef4444;margin:12px 0">${afectados} cuota${afectados !== 1 ? 's' : ''} serán marcadas como morosas</p>
+          <p style="font-size:20px;font-weight:800;color:var(--at-danger);margin:12px 0">${afectados} cuota${afectados !== 1 ? 's' : ''} serán marcadas como morosas</p>
         </div>`,
         icon: 'warning', showCancelButton: true,
-        confirmButtonText: '⚡ Ejecutar ahora', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626',
+        confirmButtonText: '⚡ Ejecutar ahora', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-danger)',
       })
       if (!isConfirmed) return
 
@@ -118,8 +118,8 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
       html: `<div style="text-align:left;font-size:14px">
         <p><strong>Disparador:</strong> ${TRIGGER_CFG[a.trigger_tipo].desc(a.trigger_valor)}</p>
         <p><strong>Acción:</strong> ${accion.icon} ${accion.label}</p>
-        <p style="font-size:20px;font-weight:700;color:${afectados > 0 ? '#ef4444' : '#16a34a'};margin:12px 0">${afectados} elemento${afectados !== 1 ? 's' : ''} afectado${afectados !== 1 ? 's' : ''}</p>
-        ${afectados > 0 ? `<p style="color:var(--at-ink-3);font-size:12px">Esta acción genera notificaciones internas — revisa el Centro de Notificaciones.</p>` : `<p style="color:#16a34a;font-size:12px">✓ No hay elementos que cumplan el criterio actualmente.</p>`}
+        <p style="font-size:20px;font-weight:700;color:${afectados > 0 ? 'var(--at-danger)' : 'var(--at-success)'};margin:12px 0">${afectados} elemento${afectados !== 1 ? 's' : ''} afectado${afectados !== 1 ? 's' : ''}</p>
+        ${afectados > 0 ? `<p style="color:var(--at-ink-3);font-size:12px">Esta acción genera notificaciones internas — revisa el Centro de Notificaciones.</p>` : `<p style="color:var(--at-success);font-size:12px">✓ No hay elementos que cumplan el criterio actualmente.</p>`}
       </div>`,
       icon: afectados > 0 ? 'warning' : 'success',
       confirmButtonText: 'Entendido',
@@ -129,7 +129,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
   }
 
   async function eliminar(id: string) {
-    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar automatización?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar automatización?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!isConfirmed) return
     await supabase.from('automatizaciones_cond').delete().eq('id', id)
     onRefresh()
@@ -148,13 +148,13 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
           <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--at-primary)' }}>{automatizaciones.length}</div>
           <div style={{ fontSize: 11, color: 'var(--at-primary)', fontWeight: 600 }}>Reglas configuradas</div>
         </div>
-        <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>{activas}</div>
-          <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>Activas</div>
+        <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--at-success)' }}>{activas}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-success)', fontWeight: 600 }}>Activas</div>
         </div>
-        <div style={{ background: '#fef3c7', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#d97706' }}>{automatizaciones.reduce((s, a) => s + evaluar(a), 0)}</div>
-          <div style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>Elementos afectados ahora</div>
+        <div style={{ background: 'var(--at-warning-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--at-warning)' }}>{automatizaciones.reduce((s, a) => s + evaluar(a), 0)}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-warning)', fontWeight: 600 }}>Elementos afectados ahora</div>
         </div>
       </div>
 
@@ -229,7 +229,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
                       <span style={{ fontWeight: 700, fontSize: 13 }}>{a.nombre}</span>
                       {!a.activa && <span style={{ fontSize: 10, background: 'var(--at-chip)', color: 'var(--at-ink-3)', padding: '1px 6px', borderRadius: 10 }}>Inactiva</span>}
                       {afectados > 0 && a.activa && (
-                        <span style={{ fontSize: 10, background: '#fef2f2', color: '#ef4444', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>
+                        <span style={{ fontSize: 10, background: 'var(--at-danger-tint)', color: 'var(--at-danger)', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>
                           {afectados} elemento{afectados !== 1 ? 's' : ''}
                         </span>
                       )}
@@ -250,7 +250,7 @@ export default function AutomatizacionesTab({ automatizaciones, cuotas, tickets,
                         {a.activa ? 'Pausar' : 'Activar'}
                       </button>
                       <button onClick={() => eliminar(a.id)}
-                        style={{ padding: '5px 10px', background: '#fef2f2', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#ef4444' }}>✕</button>
+                        style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>✕</button>
                     </div>
                   )}
                 </div>

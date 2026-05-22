@@ -20,8 +20,8 @@ const TIPO_UNIDAD_LABEL: Record<string, string> = {
 const PERIODICIDAD_LABEL: Record<string, { label: string; bg: string; color: string }> = {
   mensual:     { label: 'Mensual',     bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
   trimestral:  { label: 'Trimestral', bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)' },
-  semestral:   { label: 'Semestral',  bg: '#fef3c7', color: '#92400e' },
-  anual:       { label: 'Anual',      bg: '#dcfce7', color: '#16a34a' },
+  semestral:   { label: 'Semestral',  bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
+  anual:       { label: 'Anual',      bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   unica_vez:   { label: 'Única vez',  bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
 
@@ -87,7 +87,7 @@ export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, 
   }
 
   const handleDelete = async (t: TarifaCondominio) => {
-    const r = await Swal.fire({ title: '¿Eliminar tarifa?', text: t.concepto, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' })
+    const r = await Swal.fire({ title: '¿Eliminar tarifa?', text: t.concepto, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('tarifas_condominio').delete().eq('id', t.id)
     onRefresh()
@@ -108,7 +108,7 @@ export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '14px', marginBottom: '20px' }}>
         {[
-          { label: 'Tarifas Activas', value: String(activasCount), icon: '✅', bg: '#f0fdf4', color: '#16a34a' },
+          { label: 'Tarifas Activas', value: String(activasCount), icon: '✅', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
           { label: 'Total Mensual', value: fmt(totalMensual, moneda), icon: '📅', bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
           { label: 'Total Anual', value: fmt(totalAnual, moneda), icon: '📆', bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)' },
         ].map(k => (
@@ -223,7 +223,7 @@ export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, 
                   </div>
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
                     {canEdit && <button onClick={() => openEdit(t)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>}
-                    <button onClick={() => handleDelete(t)} style={{ padding: '4px 8px', background: '#fef2f2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#ef4444' }}>🗑</button>
+                    <button onClick={() => handleDelete(t)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>
                   </div>
                 </div>
 
@@ -234,7 +234,7 @@ export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, 
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
                   <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, background: per.bg, color: per.color }}>{per.label}</span>
                   <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}>{TIPO_UNIDAD_LABEL[t.tipo_unidad]}</span>
-                  {vencida && <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, background: '#fee2e2', color: '#ef4444' }}>Vencida</span>}
+                  {vencida && <span style={{ padding: '2px 8px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>Vencida</span>}
                 </div>
 
                 {(t.vigente_desde || t.vigente_hasta) && (
@@ -244,7 +244,7 @@ export function TarifasTab({ tarifas, proyectoId, companyId, moneda, canCreate, 
                 )}
 
                 {canEdit && (
-                  <button onClick={() => toggleActivo(t)} style={{ width: '100%', padding: '6px', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, background: t.activo ? '#fef2f2' : '#f0fdf4', color: t.activo ? '#ef4444' : '#16a34a' }}>
+                  <button onClick={() => toggleActivo(t)} style={{ width: '100%', padding: '6px', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, background: t.activo ? 'var(--at-danger-tint)' : 'var(--at-success-tint)', color: t.activo ? 'var(--at-danger)' : 'var(--at-success)' }}>
                     {t.activo ? '⏸ Desactivar' : '▶ Activar'}
                   </button>
                 )}

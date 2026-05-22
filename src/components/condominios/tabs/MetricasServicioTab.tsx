@@ -63,8 +63,8 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
   const maxCat = Math.max(...porCategoria.map(c => c.count), 1)
 
   const CAT_ICON: Record<string, string> = { instalaciones: '🔧', seguridad: '🛡️', servicios: '🧹', convivencia: '🤝', otro: '💬' }
-  const PRIOR_COLOR: Record<string, string> = { urgente: '#ef4444', alta: '#f97316', media: '#fbbf24', baja: '#86efac' }
-  const ESTADO_COLOR: Record<string, string> = { abierto: '#ef4444', en_proceso: '#f97316', resuelto: '#4ade80', cerrado: 'var(--at-ink-3)' }
+  const PRIOR_COLOR: Record<string, string> = { urgente: 'var(--at-danger)', alta: 'var(--at-warning)', media: '#fbbf24', baja: 'var(--at-success-border)' }
+  const ESTADO_COLOR: Record<string, string> = { abierto: 'var(--at-danger)', en_proceso: 'var(--at-warning)', resuelto: '#4ade80', cerrado: 'var(--at-ink-3)' }
 
   function kpiCard(label: string, val: string | number, sub: string, color: string, bg: string) {
     return (
@@ -90,9 +90,9 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
       {/* KPIs del período */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
         {kpiCard('Tickets del período', ticketsMes.length, `${tasaResolucionTickets}% resueltos`, 'var(--at-accent-hover)', 'var(--at-accent-tint-2)')}
-        {kpiCard('Tiempo prom. resolución', diasPromedioResolucion === 0 ? '—' : `${diasPromedioResolucion}d`, 'días hábiles estimados', diasPromedioResolucion <= 3 ? '#16a34a' : diasPromedioResolucion <= 7 ? '#d97706' : '#ef4444', diasPromedioResolucion <= 3 ? '#f0fdf4' : diasPromedioResolucion <= 7 ? '#fef3c7' : '#fef2f2')}
-        {kpiCard('Sugerencias respondidas', `${tasaRespuestaSugerencias}%`, `${sugerenciasMes.filter(s => s.estado === 'respondida').length} de ${sugerenciasMes.length}`, tasaRespuestaSugerencias >= 80 ? '#16a34a' : '#d97706', tasaRespuestaSugerencias >= 80 ? '#f0fdf4' : '#fef3c7')}
-        {kpiCard('Tasa de recaudación', `${tasaRecaudacion}%`, `${cuotasMes.filter(c => c.estado === 'pagado').length} de ${cuotasMes.length} cuotas`, tasaRecaudacion >= 80 ? '#16a34a' : tasaRecaudacion >= 60 ? '#d97706' : '#ef4444', tasaRecaudacion >= 80 ? '#f0fdf4' : tasaRecaudacion >= 60 ? '#fef3c7' : '#fef2f2')}
+        {kpiCard('Tiempo prom. resolución', diasPromedioResolucion === 0 ? '—' : `${diasPromedioResolucion}d`, 'días hábiles estimados', diasPromedioResolucion <= 3 ? 'var(--at-success)' : diasPromedioResolucion <= 7 ? 'var(--at-warning)' : 'var(--at-danger)', diasPromedioResolucion <= 3 ? 'var(--at-success-tint)' : diasPromedioResolucion <= 7 ? 'var(--at-warning-tint)' : 'var(--at-danger-tint)')}
+        {kpiCard('Sugerencias respondidas', `${tasaRespuestaSugerencias}%`, `${sugerenciasMes.filter(s => s.estado === 'respondida').length} de ${sugerenciasMes.length}`, tasaRespuestaSugerencias >= 80 ? 'var(--at-success)' : 'var(--at-warning)', tasaRespuestaSugerencias >= 80 ? 'var(--at-success-tint)' : 'var(--at-warning-tint)')}
+        {kpiCard('Tasa de recaudación', `${tasaRecaudacion}%`, `${cuotasMes.filter(c => c.estado === 'pagado').length} de ${cuotasMes.length} cuotas`, tasaRecaudacion >= 80 ? 'var(--at-success)' : tasaRecaudacion >= 60 ? 'var(--at-warning)' : 'var(--at-danger)', tasaRecaudacion >= 80 ? 'var(--at-success-tint)' : tasaRecaudacion >= 60 ? 'var(--at-warning-tint)' : 'var(--at-danger-tint)')}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
@@ -136,7 +136,7 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
                 <div key={t.periodo} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                   <div style={{ width: '100%', display: 'flex', gap: 1, alignItems: 'flex-end', height: 90 }}>
                     <div style={{ flex: 1, background: 'var(--at-accent-light)', borderRadius: '2px 2px 0 0', height: `${(t.total / maxTend) * 100}%`, minHeight: 2 }} title={`Tickets: ${t.total}`} />
-                    <div style={{ flex: 1, background: '#6ee7b7', borderRadius: '2px 2px 0 0', height: `${(t.visitantes / maxTend) * 100}%`, minHeight: 2 }} title={`Visitantes: ${t.visitantes}`} />
+                    <div style={{ flex: 1, background: 'var(--at-success-border)', borderRadius: '2px 2px 0 0', height: `${(t.visitantes / maxTend) * 100}%`, minHeight: 2 }} title={`Visitantes: ${t.visitantes}`} />
                   </div>
                   <div style={{ fontSize: 9, color: 'var(--at-ink-3)' }}>{t.periodo.slice(2)}</div>
                 </div>
@@ -144,7 +144,7 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
             </div>
             <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--at-ink-3)' }}>
               <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--at-accent-light)', borderRadius: 2, marginRight: 4 }} />Tickets</span>
-              <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#6ee7b7', borderRadius: 2, marginRight: 4 }} />Visitantes</span>
+              <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--at-success-border)', borderRadius: 2, marginRight: 4 }} />Visitantes</span>
             </div>
           </div>
         )}

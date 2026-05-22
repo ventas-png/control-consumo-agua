@@ -15,9 +15,9 @@ interface Props {
 
 const ESTADO_OPTIONS = ['abierto', 'en_proceso', 'resuelto', 'cerrado']
 const ESTADO_COLOR: Record<string, { bg: string; color: string }> = {
-  abierto:     { bg: '#fef3c7', color: '#92400e' },
+  abierto:     { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
   en_proceso:  { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
-  resuelto:    { bg: '#d1fae5', color: '#065f46' },
+  resuelto:    { bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)' },
   cerrado:     { bg: 'var(--at-chip)', color: 'var(--at-ink-2)' },
 }
 

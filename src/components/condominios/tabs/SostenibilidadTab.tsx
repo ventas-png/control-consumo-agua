@@ -106,8 +106,8 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
           { label: 'Agua consumida (6m)', value: `${totalM3Agua.toFixed(0)} m³`, icon: '💧', color: 'var(--at-primary)' },
           { label: 'CO₂ equiv. agua',     value: `${co2Agua.toFixed(0)} kg`,     icon: '🌊', color: 'var(--at-accent-hover)' },
           { label: 'Residuos totales',    value: `${totalKg.toFixed(0)} kg`,     icon: '🗑️', color: 'var(--at-ink-3)' },
-          { label: '% Reciclaje',         value: `${pctReciclaje.toFixed(0)}%`,  icon: '♻️', color: '#10b981' },
-          { label: 'CO₂ ahorrado',        value: `${co2Ahorrado.toFixed(0)} kg`, icon: '🌱', color: '#16a34a' },
+          { label: '% Reciclaje',         value: `${pctReciclaje.toFixed(0)}%`,  icon: '♻️', color: 'var(--at-success)' },
+          { label: 'CO₂ ahorrado',        value: `${co2Ahorrado.toFixed(0)} kg`, icon: '🌱', color: 'var(--at-success)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
@@ -154,10 +154,10 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
                 <div key={r.mes}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '3px' }}>
                     <span>{mesLabel(r.mes)}</span>
-                    <span style={{ fontWeight: 700, color: '#10b981' }}>{r.kg.toFixed(1)} kg</span>
+                    <span style={{ fontWeight: 700, color: 'var(--at-success)' }}>{r.kg.toFixed(1)} kg</span>
                   </div>
                   <div style={{ background: 'var(--at-chip)', borderRadius: '4px', height: '8px' }}>
-                    <div style={{ background: '#10b981', height: '8px', borderRadius: '4px', width: barWidth(r.kg, maxResiduo), transition: 'width 0.3s' }} />
+                    <div style={{ background: 'var(--at-success)', height: '8px', borderRadius: '4px', width: barWidth(r.kg, maxResiduo), transition: 'width 0.3s' }} />
                   </div>
                 </div>
               ))}
@@ -176,10 +176,10 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
                 <div key={tipo}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '3px' }}>
                     <span>{TIPO_LABELS[tipo]}</span>
-                    <span style={{ fontWeight: 700, color: TIPO_RECICLABLE.has(tipo) ? '#10b981' : 'var(--at-ink-3)' }}>{kg.toFixed(1)} kg</span>
+                    <span style={{ fontWeight: 700, color: TIPO_RECICLABLE.has(tipo) ? 'var(--at-success)' : 'var(--at-ink-3)' }}>{kg.toFixed(1)} kg</span>
                   </div>
                   <div style={{ background: 'var(--at-chip)', borderRadius: '4px', height: '8px' }}>
-                    <div style={{ background: TIPO_RECICLABLE.has(tipo) ? '#10b981' : 'var(--at-ink-3)', height: '8px', borderRadius: '4px', width: barWidth(kg, maxTipo), transition: 'width 0.3s' }} />
+                    <div style={{ background: TIPO_RECICLABLE.has(tipo) ? 'var(--at-success)' : 'var(--at-ink-3)', height: '8px', borderRadius: '4px', width: barWidth(kg, maxTipo), transition: 'width 0.3s' }} />
                   </div>
                 </div>
               ))}
@@ -188,8 +188,8 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
         </div>
 
         {/* Panel CO2 */}
-        <div style={{ background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)', border: '1.5px solid #6ee7b7', borderRadius: '12px', padding: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: '#065f46' }}>🌱 Equivalencias CO₂</h3>
+        <div style={{ background: 'linear-gradient(135deg, #ecfdf5, var(--at-success-tint))', border: '1.5px solid var(--at-success-border)', borderRadius: '12px', padding: '20px' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700, color: 'var(--at-success-strong)' }}>🌱 Equivalencias CO₂</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {[
               { icon: '💧', label: 'Agua tratada', detail: `${totalM3Agua.toFixed(0)} m³`, co2: co2Agua, desc: 'CO₂ equiv. generado' },
@@ -202,7 +202,7 @@ export function SostenibilidadTab({ residuos, proyectoId, companyId }: Props) {
                     <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{item.detail}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '16px', fontWeight: 800, color: item.saved ? '#16a34a' : 'var(--at-ink-3)' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 800, color: item.saved ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                       {item.saved ? '+' : ''}{item.co2.toFixed(0)} kg
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{item.desc}</div>

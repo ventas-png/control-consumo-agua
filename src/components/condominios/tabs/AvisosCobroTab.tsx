@@ -18,16 +18,16 @@ interface Props {
 interface DetalleItem { concepto: string; monto: string; periodo: string }
 
 const TIPO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  primer_aviso:       { bg: '#fef3c7', color: '#92400e', label: '1° Aviso' },
-  segundo_aviso:      { bg: '#fed7aa', color: '#c2410c', label: '2° Aviso' },
-  ultimo_aviso:       { bg: '#fee2e2', color: '#ef4444', label: 'Último Aviso' },
+  primer_aviso:       { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: '1° Aviso' },
+  segundo_aviso:      { bg: 'var(--at-warning-border)', color: 'var(--at-warning-strong)', label: '2° Aviso' },
+  ultimo_aviso:       { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Último Aviso' },
   notificacion_legal: { bg: 'var(--at-ink-2)', color: 'var(--at-surface-2)', label: 'Not. Legal' },
 }
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   emitido:    { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Emitido' },
   entregado:  { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', label: 'Entregado' },
-  pagado:     { bg: '#dcfce7', color: '#16a34a', label: 'Pagado' },
+  pagado:     { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Pagado' },
   anulado:    { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Anulado' },
 }
 
@@ -81,7 +81,7 @@ export function AvisosCobroTab({ avisos, unidades, proyectoId, companyId, moneda
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar aviso?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar aviso?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('avisos_cobro').delete().eq('id', id)
     onRefresh()
@@ -103,9 +103,9 @@ h1{font-size:20px;margin-bottom:2px}
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:${tipo?.bg};color:${tipo?.color};margin-bottom:16px}
 table{width:100%;border-collapse:collapse;margin:12px 0}
 th,td{border:1px solid #ccc;padding:7px 10px;text-align:left}
-th{background:#FAF7EF}
+th{background:var(--at-surface-2)}
 .total{font-size:16px;font-weight:800;color:#15291F;margin-top:12px;text-align:right}
-.footer{margin-top:40px;border-top:1px solid #ccc;padding-top:16px;font-size:11px;color:#7E9389}
+.footer{margin-top:40px;border-top:1px solid #ccc;padding-top:16px;font-size:11px;color:var(--at-ink-3)}
 .sig{margin-top:60px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
 .sig-box{border-top:1px solid #000;padding-top:8px;font-size:11px}</style></head>
 <body>
@@ -210,7 +210,7 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
                 <input style={{ ...inputStyle, fontSize: '12px' }} value={it.concepto} onChange={e => setItem(i, 'concepto', e.target.value)} placeholder="Concepto (ej: Cuota mantenimiento)" />
                 <input style={{ ...inputStyle, fontSize: '12px' }} value={it.periodo} onChange={e => setItem(i, 'periodo', e.target.value)} placeholder="Período" />
                 <input style={{ ...inputStyle, fontSize: '12px' }} type="number" step="0.01" value={it.monto} onChange={e => setItem(i, 'monto', e.target.value)} placeholder="Monto" />
-                <button onClick={() => removeItem(i)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>✕</button>
+                <button onClick={() => removeItem(i)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>✕</button>
               </div>
             ))}
             {detalle.filter(it => it.monto).length > 0 && (
@@ -264,19 +264,19 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
             const today = new Date().toISOString().slice(0, 10)
             const vencido = a.estado === 'emitido' && a.fecha_limite && a.fecha_limite < today
             return (
-              <div key={a.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${vencido ? '#fca5a5' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px' }}>
+              <div key={a.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${vencido ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: '13px' }}>{unidad?.nombre ?? '—'}</span>
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: ts.bg, color: ts.color }}>{ts.label}</span>
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>
-                      {vencido && <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 700 }}>⚠️ Vencido</span>}
+                      {vencido && <span style={{ fontSize: '10px', color: 'var(--at-danger)', fontWeight: 700 }}>⚠️ Vencido</span>}
                     </div>
                     <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--at-primary)' }}>{fmt(Number(a.monto_total), moneda)}</div>
                     <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', marginTop: '2px' }}>
                       <span>📅 Emitido: {a.fecha_emision}</span>
-                      {a.fecha_limite && <span style={{ color: vencido ? '#ef4444' : 'var(--at-ink-3)' }}>⏰ Límite: {a.fecha_limite}</span>}
+                      {a.fecha_limite && <span style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>⏰ Límite: {a.fecha_limite}</span>}
                       {a.enviado_por && <span>👤 {a.enviado_por}</span>}
                     </div>
                   </div>
@@ -293,14 +293,14 @@ ${a.notas ? `<p style="margin-top:16px;font-style:italic">${a.notas}</p>` : ''}
                         )}
                         {(a.estado === 'emitido' || a.estado === 'entregado') && (
                           <button onClick={() => cambiarEstado(a.id, 'pagado')}
-                            style={{ padding: '3px 7px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                            style={{ padding: '3px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
                             ✓ Pagado
                           </button>
                         )}
                         <button onClick={() => startEdit(a)}
                           style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                         <button onClick={() => handleDelete(a.id)}
-                          style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                          style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                       </>
                     )}
                   </div>

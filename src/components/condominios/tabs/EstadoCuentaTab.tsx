@@ -14,9 +14,9 @@ interface Props {
 }
 
 const ESTADO_STYLE: Record<string, { color: string; bg: string }> = {
-  pagado:   { color: '#10b981', bg: '#dcfce7' },
-  pendiente:{ color: '#f59e0b', bg: '#fef3c7' },
-  moroso:   { color: '#ef4444', bg: '#fee2e2' },
+  pagado:   { color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  pendiente:{ color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  moroso:   { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
 export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }: Props) {
@@ -37,14 +37,14 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
   const saldo = totals.total - totals.pagado
 
   async function marcarPagada(id: string) {
-    const r = await Swal.fire({ title: '¿Marcar como pagada?', icon: 'question', showCancelButton: true, confirmButtonText: 'Sí, pagada', confirmButtonColor: '#10b981' })
+    const r = await Swal.fire({ title: '¿Marcar como pagada?', icon: 'question', showCancelButton: true, confirmButtonText: 'Sí, pagada', confirmButtonColor: 'var(--at-success)' })
     if (!r.isConfirmed) return
     await supabase.from('cuotas_condominio').update({ estado: 'pagado' }).eq('id', id)
     onRefresh()
   }
 
   async function marcarMorosa(id: string) {
-    const r = await Swal.fire({ title: '¿Marcar como morosa?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, morosa', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Marcar como morosa?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Sí, morosa', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).eq('id', id)
     onRefresh()
@@ -74,9 +74,9 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
           { label: 'Total asignado', value: totals.total,    color: 'var(--at-primary)' },
-          { label: 'Recaudado',      value: totals.pagado,   color: '#10b981' },
-          { label: 'Saldo pendiente',value: saldo,           color: saldo > 0 ? '#f59e0b' : '#10b981' },
-          { label: 'Moroso',         value: totals.moroso,   color: totals.moroso > 0 ? '#ef4444' : '#10b981' },
+          { label: 'Recaudado',      value: totals.pagado,   color: 'var(--at-success)' },
+          { label: 'Saldo pendiente',value: saldo,           color: saldo > 0 ? 'var(--at-warning)' : 'var(--at-success)' },
+          { label: 'Moroso',         value: totals.moroso,   color: totals.moroso > 0 ? 'var(--at-danger)' : 'var(--at-success)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '16px', fontWeight: 800, color: k.color }}>{moneda} {k.value.toFixed(2)}</div>
@@ -99,7 +99,7 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
               <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{pagadas}/{totalU} cuotas pagadas — Cumplimiento: {totalU > 0 ? Math.round((pagadas/totalU)*100) : 0}%</div>
             </div>
             <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: saldo > 0 ? '#f59e0b' : '#10b981' }}>Saldo: {moneda} {saldo.toFixed(2)}</div>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: saldo > 0 ? 'var(--at-warning)' : 'var(--at-success)' }}>Saldo: {moneda} {saldo.toFixed(2)}</div>
             </div>
           </div>
         ) : null
@@ -135,12 +135,12 @@ export function EstadoCuentaTab({ cuotas, unidades, moneda, canEdit, onRefresh }
                       {canEdit && c.estado !== 'pagado' && (
                         <div style={{ display: 'flex', gap: '4px' }}>
                           <button onClick={() => marcarPagada(c.id)}
-                            style={{ padding: '3px 8px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                            style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                             ✓ Pagada
                           </button>
                           {c.estado === 'pendiente' && (
                             <button onClick={() => marcarMorosa(c.id)}
-                              style={{ padding: '3px 7px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+                              style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
                               Morosa
                             </button>
                           )}

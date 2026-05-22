@@ -18,10 +18,10 @@ interface Evento {
 }
 
 const TIPO_CFG = {
-  ticket:      { color: '#ef4444', bg: '#fef2f2',  icon: '🔧', label: 'Ticket' },
+  ticket:      { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)',  icon: '🔧', label: 'Ticket' },
   reserva:     { color: 'var(--at-primary)', bg: 'var(--at-primary-tint)',  icon: '📅', label: 'Reserva' },
-  plan:        { color: '#16a34a', bg: '#dcfce7',  icon: '🗓️', label: 'Plan manto.' },
-  inspeccion:  { color: '#d97706', bg: '#fef3c7',  icon: '🔍', label: 'Inspección' },
+  plan:        { color: 'var(--at-success)', bg: 'var(--at-success-tint)',  icon: '🗓️', label: 'Plan manto.' },
+  inspeccion:  { color: 'var(--at-warning)', bg: 'var(--at-warning-tint)',  icon: '🔍', label: 'Inspección' },
   vencimiento: { color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)',  icon: '⚠️', label: 'Vencimiento' },
 }
 
@@ -169,7 +169,7 @@ export default function CalendarioMantenimientoTab({ tickets, reservas, planesMa
                   style={{
                     minHeight: 72, padding: '4px 6px', borderTop: '1px solid var(--at-chip)',
                     borderRight: (i + 1) % 7 !== 0 ? '1px solid var(--at-chip)' : undefined,
-                    background: seleccionado ? 'var(--at-primary-tint)' : esHoy ? '#fefce8' : dia ? 'var(--at-surface)' : 'var(--at-surface-2)',
+                    background: seleccionado ? 'var(--at-primary-tint)' : esHoy ? 'var(--at-warning-tint)' : dia ? 'var(--at-surface)' : 'var(--at-surface-2)',
                     cursor: dia ? 'pointer' : 'default',
                   }}>
                   {dia && (

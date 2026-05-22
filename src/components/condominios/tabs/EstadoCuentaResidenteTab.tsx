@@ -23,9 +23,9 @@ interface Movimiento {
 }
 
 const ESTADO_CFG: Record<string, { color: string; bg: string }> = {
-  pagado:   { color: '#16a34a', bg: '#dcfce7' },
-  pendiente:{ color: '#d97706', bg: '#fef3c7' },
-  moroso:   { color: '#ef4444', bg: '#fef2f2' },
+  pagado:   { color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  pendiente:{ color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  moroso:   { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
   activo:   { color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
   aplicado: { color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
 }
@@ -108,25 +108,25 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
     <title>Estado de Cuenta — ${unidad?.nombre}</title>
     <style>
       body{font-family:Arial,sans-serif;padding:32px;max-width:900px;margin:auto;color:#15291F}
-      h1{font-size:20px;margin:0}h2{font-size:13px;color:#7E9389;font-weight:normal;margin:4px 0 0}
+      h1{font-size:20px;margin:0}h2{font-size:13px;color:var(--at-ink-3);font-weight:normal;margin:4px 0 0}
       .header{display:flex;justify-content:space-between;border-bottom:2px solid #15291F;padding-bottom:12px;margin-bottom:20px}
-      .meta{background:#FAF7EF;padding:12px 16px;border-radius:8px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px}
+      .meta{background:var(--at-surface-2);padding:12px 16px;border-radius:8px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px}
       .meta strong{font-size:16px;display:block}
       table{width:100%;border-collapse:collapse;font-size:12px}
-      th{background:#EAE6D8;padding:8px 10px;text-align:left;color:#7E9389;font-weight:600}
-      td{padding:8px 10px;border-bottom:1px solid #EAE6D8}
-      tfoot td{font-weight:700;border-top:2px solid #15291F;background:#FAF7EF}
-      .saldo{font-size:18px;font-weight:800;color:${saldo <= 0 ? '#16a34a' : '#ef4444'}}
-      .footer{margin-top:32px;font-size:10px;color:#7E9389;border-top:1px solid #E1DDD0;padding-top:8px}
+      th{background:var(--at-chip);padding:8px 10px;text-align:left;color:var(--at-ink-3);font-weight:600}
+      td{padding:8px 10px;border-bottom:1px solid var(--at-chip)}
+      tfoot td{font-weight:700;border-top:2px solid #15291F;background:var(--at-surface-2)}
+      .saldo{font-size:18px;font-weight:800;color:${saldo <= 0 ? 'var(--at-success)' : 'var(--at-danger)'}}
+      .footer{margin-top:32px;font-size:10px;color:var(--at-ink-3);border-top:1px solid var(--at-line);padding-top:8px}
     </style></head><body>
     <div class="header">
       <div><h1>Estado de Cuenta</h1><h2>${proyectoNombre ?? 'Condominio'}</h2></div>
-      <div style="text-align:right;font-size:12px;color:#7E9389">Generado: ${new Date().toLocaleDateString('es')}</div>
+      <div style="text-align:right;font-size:12px;color:var(--at-ink-3)">Generado: ${new Date().toLocaleDateString('es')}</div>
     </div>
     <div class="meta">
-      <div><span style="font-size:10px;color:#7E9389">Unidad</span><strong>${unidad?.nombre ?? unidadId}</strong></div>
-      <div><span style="font-size:10px;color:#7E9389">Período</span><strong>${anio}</strong></div>
-      <div><span style="font-size:10px;color:#7E9389">Saldo</span><strong class="saldo">${saldo <= 0 ? 'Al día' : moneda + ' ' + saldo.toFixed(2)}</strong></div>
+      <div><span style="font-size:10px;color:var(--at-ink-3)">Unidad</span><strong>${unidad?.nombre ?? unidadId}</strong></div>
+      <div><span style="font-size:10px;color:var(--at-ink-3)">Período</span><strong>${anio}</strong></div>
+      <div><span style="font-size:10px;color:var(--at-ink-3)">Saldo</span><strong class="saldo">${saldo <= 0 ? 'Al día' : moneda + ' ' + saldo.toFixed(2)}</strong></div>
     </div>
     <table>
       <thead><tr><th>Fecha</th><th>Descripción</th><th style="text-align:right">Cargo</th><th style="text-align:right">Abono</th><th style="text-align:center">Estado</th></tr></thead>
@@ -136,7 +136,7 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
           <td colspan="2">TOTALES</td>
           <td style="text-align:right">${moneda} ${totalCargos.toFixed(2)}</td>
           <td style="text-align:right">${moneda} ${totalAbonos.toFixed(2)}</td>
-          <td style="text-align:center;font-size:13px;color:${saldo <= 0 ? '#16a34a' : '#ef4444'}">${saldo <= 0 ? '✓ Al día' : 'Debe: ' + moneda + ' ' + saldo.toFixed(2)}</td>
+          <td style="text-align:center;font-size:13px;color:${saldo <= 0 ? 'var(--at-success)' : 'var(--at-danger)'}">${saldo <= 0 ? '✓ Al día' : 'Debe: ' + moneda + ' ' + saldo.toFixed(2)}</td>
         </tr>
       </tfoot>
     </table>
@@ -176,10 +176,10 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         {[
           { label: 'Unidad', val: unidad?.nombre ?? '—', color: 'var(--at-ink)', bg: 'var(--at-surface-2)' },
-          { label: 'Total cargos', val: `${moneda} ${totalCargos.toFixed(2)}`, color: '#ef4444', bg: '#fef2f2' },
-          { label: 'Total abonos', val: `${moneda} ${totalAbonos.toFixed(2)}`, color: '#16a34a', bg: '#dcfce7' },
-          { label: 'Saldo', val: saldo <= 0 ? '✓ Al día' : `${moneda} ${saldo.toFixed(2)}`, color: saldo <= 0 ? '#16a34a' : '#ef4444', bg: saldo <= 0 ? '#dcfce7' : '#fef2f2' },
-          { label: 'Cuotas pendientes', val: String(pendientes), color: pendientes === 0 ? '#16a34a' : '#d97706', bg: pendientes === 0 ? '#dcfce7' : '#fef3c7' },
+          { label: 'Total cargos', val: `${moneda} ${totalCargos.toFixed(2)}`, color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
+          { label: 'Total abonos', val: `${moneda} ${totalAbonos.toFixed(2)}`, color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+          { label: 'Saldo', val: saldo <= 0 ? '✓ Al día' : `${moneda} ${saldo.toFixed(2)}`, color: saldo <= 0 ? 'var(--at-success)' : 'var(--at-danger)', bg: saldo <= 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)' },
+          { label: 'Cuotas pendientes', val: String(pendientes), color: pendientes === 0 ? 'var(--at-success)' : 'var(--at-warning)', bg: pendientes === 0 ? 'var(--at-success-tint)' : 'var(--at-warning-tint)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '8px 12px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
@@ -211,9 +211,9 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
                   <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--at-chip)' : undefined }}>
                     <td style={{ padding: '9px 12px', color: 'var(--at-ink-3)' }}>{m.fecha}</td>
                     <td style={{ padding: '9px 12px', color: 'var(--at-ink)' }}>{m.descripcion}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', color: m.cargo > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>{m.cargo > 0 ? `${moneda} ${m.cargo.toFixed(2)}` : '—'}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', color: m.abono > 0 ? '#16a34a' : 'var(--at-ink-3)' }}>{m.abono > 0 ? `${moneda} ${m.abono.toFixed(2)}` : '—'}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600, color: acc.saldoAcum > 0 ? '#ef4444' : '#16a34a' }}>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', color: m.cargo > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{m.cargo > 0 ? `${moneda} ${m.cargo.toFixed(2)}` : '—'}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', color: m.abono > 0 ? 'var(--at-success)' : 'var(--at-ink-3)' }}>{m.abono > 0 ? `${moneda} ${m.abono.toFixed(2)}` : '—'}</td>
+                    <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600, color: acc.saldoAcum > 0 ? 'var(--at-danger)' : 'var(--at-success)' }}>
                       {acc.saldoAcum > 0 ? `${moneda} ${acc.saldoAcum.toFixed(2)}` : '✓'}
                     </td>
                     <td style={{ padding: '9px 12px', textAlign: 'right' }}>
@@ -227,9 +227,9 @@ export default function EstadoCuentaResidenteTab({ cuotas, recargosMora, conveni
             <tfoot>
               <tr style={{ borderTop: '2px solid var(--at-line)', background: 'var(--at-surface-2)' }}>
                 <td colSpan={2} style={{ padding: '9px 12px', fontWeight: 700 }}>TOTAL</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#ef4444' }}>{moneda} {totalCargos.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{moneda} {totalAbonos.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: saldo <= 0 ? '#16a34a' : '#ef4444' }}>
+                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {totalCargos.toFixed(2)}</td>
+                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {totalAbonos.toFixed(2)}</td>
+                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: saldo <= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
                   {saldo <= 0 ? '✓ Al día' : `${moneda} ${saldo.toFixed(2)}`}
                 </td>
                 <td />

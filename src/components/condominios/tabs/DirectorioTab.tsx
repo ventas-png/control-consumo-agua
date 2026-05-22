@@ -158,8 +158,8 @@ export function DirectorioTab({ personal, contactosEmergencia, proyectoId }: Pro
                   )}
                   <div style={{ marginTop: '4px' }}>
                     <span style={{ fontSize: '10px', fontWeight: 600, padding: '2px 6px', borderRadius: '20px',
-                      background: p.estado === 'activo' ? '#dcfce7' : 'var(--at-chip)',
-                      color: p.estado === 'activo' ? '#16a34a' : 'var(--at-ink-3)' }}>
+                      background: p.estado === 'activo' ? 'var(--at-success-tint)' : 'var(--at-chip)',
+                      color: p.estado === 'activo' ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                       {p.estado}
                     </span>
                   </div>
@@ -177,16 +177,16 @@ export function DirectorioTab({ personal, contactosEmergencia, proyectoId }: Pro
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '10px' }}>
             {filteredEmergencias.map(c => (
-              <div key={c.id} style={{ ...cardStyle, borderLeft: '4px solid #ef4444' }}>
+              <div key={c.id} style={{ ...cardStyle, borderLeft: '4px solid var(--at-danger)' }}>
                 <div style={{ fontSize: '24px' }}>🚨</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{c.nombre}</div>
                   <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', textTransform: 'capitalize' }}>{c.tipo}</div>
                   {c.telefono && (
-                    <a href={`tel:${c.telefono}`} style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444', display: 'block', marginTop: '4px', textDecoration: 'none' }}>📞 {c.telefono}</a>
+                    <a href={`tel:${c.telefono}`} style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-danger)', display: 'block', marginTop: '4px', textDecoration: 'none' }}>📞 {c.telefono}</a>
                   )}
                   {c.telefono_alternativo && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Alt: {c.telefono_alternativo}</div>}
-                  {c.disponible_24h && <div style={{ fontSize: '11px', color: '#10b981', marginTop: '2px', fontWeight: 600 }}>⏰ Disponible 24h</div>}
+                  {c.disponible_24h && <div style={{ fontSize: '11px', color: 'var(--at-success)', marginTop: '2px', fontWeight: 600 }}>⏰ Disponible 24h</div>}
                 </div>
               </div>
             ))}

@@ -58,8 +58,8 @@ const MOTIVO_LABEL: Record<BloqueoAmenidad['motivo'], string> = {
 type EstadoReserva = 'confirmada' | 'cancelada' | 'pendiente'
 
 const ESTADO_RES: Record<EstadoReserva, { label: string; bg: string; color: string }> = {
-  confirmada: { label: 'Confirmada', bg: '#f0fdf4', color: '#16a34a' },
-  pendiente:  { label: 'Pendiente',  bg: '#fff7ed', color: '#c2410c' },
+  confirmada: { label: 'Confirmada', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  pendiente:  { label: 'Pendiente',  bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
   cancelada:  { label: 'Cancelada',  bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
@@ -232,10 +232,10 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
               {/* Badges arriba */}
               <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-start' }}>
                 {a.requiere_aprobacion && (
-                  <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(254,215,170,0.95)', color: '#9a3412', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>Aprobación</span>
+                  <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(254,215,170,0.95)', color: 'var(--at-warning-strong)', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>Aprobación</span>
                 )}
                 {a.requiere_deposito && a.monto_deposito && (
-                  <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(254,243,199,0.95)', color: '#92400e', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>Depósito {moneda} {a.monto_deposito.toFixed(0)}</span>
+                  <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(254,243,199,0.95)', color: 'var(--at-warning-strong)', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>Depósito {moneda} {a.monto_deposito.toFixed(0)}</span>
                 )}
                 {a.requiere_tarifa && a.tarifa_uso != null && (
                   <span style={{ padding: '3px 9px', borderRadius: 999, background: 'rgba(219,234,254,0.95)', color: 'var(--at-primary-hover)', fontSize: 10, fontWeight: 800, backdropFilter: 'blur(4px)' }}>
@@ -283,7 +283,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
                 {amenidadesActivas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
               </select>
               {amenidadSel?.requiere_deposito && amenidadSel.monto_deposito && (
-                <p style={{ margin: '5px 0 0', fontSize: '12px', color: '#c2410c' }}>⚠ Esta amenidad requiere depósito de {moneda} {amenidadSel.monto_deposito.toFixed(2)}</p>
+                <p style={{ margin: '5px 0 0', fontSize: '12px', color: 'var(--at-warning-strong)' }}>⚠ Esta amenidad requiere depósito de {moneda} {amenidadSel.monto_deposito.toFixed(2)}</p>
               )}
               {(() => {
                 if (!amenidadSel) return null
@@ -294,7 +294,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
                   .slice(0, 3)
                 if (proximos.length === 0) return null
                 return (
-                  <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: '#fffbeb', border: '1px solid #fde68a', fontSize: 11.5, color: '#92400e' }}>
+                  <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', fontSize: 11.5, color: 'var(--at-warning-strong)' }}>
                     🚫 Fechas no disponibles: {proximos.map(b => `${b.fecha_inicio === b.fecha_fin ? b.fecha_inicio : `${b.fecha_inicio}→${b.fecha_fin}`}${b.hora_inicio ? ` ${b.hora_inicio}-${b.hora_fin}` : ''}`).join(' · ')}
                   </div>
                 )
@@ -326,7 +326,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
               )
             })()}
             {amenidadSel?.requiere_aprobacion && (
-              <div style={{ gridColumn: '1 / -1', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: 10, padding: '10px 14px', fontSize: 12.5, color: '#9a3412' }}>
+              <div style={{ gridColumn: '1 / -1', background: 'var(--at-warning-tint)', border: '1.5px solid var(--at-warning-border)', borderRadius: 10, padding: '10px 14px', fontSize: 12.5, color: 'var(--at-warning-strong)' }}>
                 ⚠ Esta amenidad requiere aprobación del administrador. Tu solicitud quedará en estado <strong>pendiente</strong> hasta ser confirmada.
               </div>
             )}
@@ -402,7 +402,7 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
           {(vistaFutura ? futuras : pasadas).sort((a, b) => a.fecha < b.fecha ? -1 : 1).map(r => {
             const ec = ESTADO_RES[(r.estado as EstadoReserva) ?? 'confirmada']
             const amenidad = amenidades.find(a => a.id === r.amenidad_id)
-            const accent = r.estado === 'confirmada' ? '#16a34a' : r.estado === 'pendiente' ? '#c2410c' : 'var(--at-ink-3)'
+            const accent = r.estado === 'confirmada' ? 'var(--at-success)' : r.estado === 'pendiente' ? 'var(--at-warning-strong)' : 'var(--at-ink-3)'
             return (
               <div key={r.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: 14, padding: '14px 16px 14px 22px', display: 'flex', alignItems: 'center', gap: 12, position: 'relative', overflow: 'hidden', transition: 'box-shadow 0.15s ease' }}
                 onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 16px -8px rgba(15,23,42,0.18)' }}
@@ -416,19 +416,19 @@ export function PortalReservasTab({ amenidades, reservas, bloqueos, unidadId, pr
                     {r.num_invitados > 0 && ` · ${r.num_invitados} invitado${r.num_invitados > 1 ? 's' : ''}`}
                   </div>
                   {r.monto_tarifa != null && r.monto_tarifa > 0 && (
-                    <div style={{ fontSize: 11.5, marginTop: 3, fontWeight: 700, color: r.metodo_pago_tarifa === 'cargar_unidad' ? 'var(--at-primary-hover)' : (r.tarifa_pagada ? '#16a34a' : '#c2410c') }}>
+                    <div style={{ fontSize: 11.5, marginTop: 3, fontWeight: 700, color: r.metodo_pago_tarifa === 'cargar_unidad' ? 'var(--at-primary-hover)' : (r.tarifa_pagada ? 'var(--at-success)' : 'var(--at-warning-strong)') }}>
                       🎟 {moneda} {Number(r.monto_tarifa).toFixed(2)}
                       {r.metodo_pago_tarifa === 'cargar_unidad' && ' · cargado a tu unidad'}
                       {r.metodo_pago_tarifa === 'pagar_momento' && (r.tarifa_pagada ? ' · pagado' : ' · pagar en sitio')}
                     </div>
                   )}
                   {r.rechazada_motivo && (
-                    <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 3, fontStyle: 'italic', background: '#fef2f2', padding: '3px 8px', borderRadius: 6, display: 'inline-block' }}>↩ {r.rechazada_motivo}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--at-danger-strong)', marginTop: 3, fontStyle: 'italic', background: 'var(--at-danger-tint)', padding: '3px 8px', borderRadius: 6, display: 'inline-block' }}>↩ {r.rechazada_motivo}</div>
                   )}
                 </div>
                 <span style={{ padding: '4px 11px', borderRadius: 999, fontSize: 11, fontWeight: 800, background: ec.bg, color: ec.color, flexShrink: 0, border: `1px solid ${ec.color}33` }}>{ec.label}</span>
                 {vistaFutura && r.estado !== 'cancelada' && (
-                  <button onClick={() => cancelarReserva(r.id)} style={{ padding: '6px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: '#dc2626', fontWeight: 700, flexShrink: 0 }}>
+                  <button onClick={() => cancelarReserva(r.id)} style={{ padding: '6px 12px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 12, color: 'var(--at-danger)', fontWeight: 700, flexShrink: 0 }}>
                     Cancelar
                   </button>
                 )}

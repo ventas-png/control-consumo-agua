@@ -28,8 +28,8 @@ const TIPOS: { value: TipoPoliza; label: string; icon: string }[] = [
 ]
 
 const ESTADO_CONFIG: Record<EstadoPoliza, { label: string; color: string; bg: string }> = {
-  vigente:   { label: 'Vigente',   color: '#10b981', bg: '#d1fae5' },
-  vencida:   { label: 'Vencida',   color: '#ef4444', bg: '#fee2e2' },
+  vigente:   { label: 'Vigente',   color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  vencida:   { label: 'Vencida',   color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
   cancelada: { label: 'Cancelada', color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 
@@ -96,7 +96,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar póliza?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar póliza?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('polizas_seguro').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -141,9 +141,9 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
     <div style={{ padding: '20px 24px' }}>
 
       {porVencer.length > 0 && (
-        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>⚠️</span>
-          <span style={{ fontSize: '13px', color: '#92400e', fontWeight: 600 }}>
+          <span style={{ fontSize: '13px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>
             {porVencer.length} póliza{porVencer.length > 1 ? 's' : ''} vence{porVencer.length === 1 ? '' : 'n'} en los próximos 60 días
           </span>
         </div>
@@ -156,7 +156,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={exportarPDF} disabled={polizas.length === 0} style={{ padding: '7px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
-          <button onClick={exportarXlsx} disabled={polizas.length === 0} style={{ padding: '7px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
+          <button onClick={exportarXlsx} disabled={polizas.length === 0} style={{ padding: '7px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
           {canCreate && !showForm && (
             <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               + Nueva Póliza
@@ -295,7 +295,7 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
                       <div>{p.fecha_inicio}</div>
                       <div>→ {p.fecha_vencimiento}</div>
                       {diasRestantes !== null && p.estado === 'vigente' && (
-                        <div style={{ color: diasRestantes < 60 ? '#f59e0b' : '#10b981', fontWeight: 600, fontSize: '11px' }}>
+                        <div style={{ color: diasRestantes < 60 ? 'var(--at-warning)' : 'var(--at-success)', fontWeight: 600, fontSize: '11px' }}>
                           {diasRestantes > 0 ? `${diasRestantes}d restantes` : 'Vencida'}
                         </div>
                       )}
@@ -320,12 +320,12 @@ export function PolizasTab({ polizas, proyectoId, companyId, moneda, proyectoNom
                               const msg = `🛡️ Póliza ${p.numero_poliza}\nAseguradora: ${p.aseguradora}\nTipo: ${tipoInfo(p.tipo).label}\nVencimiento: ${p.fecha_vencimiento}${dias !== null ? ` (${dias} días)` : ''}\nEstado: ${ESTADO_CONFIG[p.estado].label}${p.prima_anual ? `\nPrima anual: ${moneda} ${p.prima_anual.toFixed(2)}` : ''}`
                               window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
                             }}
-                            style={{ padding: '4px 8px', background: '#dcfce7', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#16a34a' }}
+                            style={{ padding: '4px 8px', background: 'var(--at-success-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-success)' }}
                           >💬</button>
                         )}
                         {p.documento_url && <SecureFileLink src={p.documento_url} style={{ padding: '4px 8px', background: 'var(--at-chip)', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: 'var(--at-ink-2)' }}>📄</SecureFileLink>}
                         {canEdit && <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-                        {canEdit && <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
+                        {canEdit && <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                       </div>
                     </td>
                   </tr>

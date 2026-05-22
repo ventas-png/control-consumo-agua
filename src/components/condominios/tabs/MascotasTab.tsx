@@ -86,7 +86,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
   }
 
   async function eliminar(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar mascota?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await Swal.fire({ title: '¿Eliminar mascota?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('mascotas').delete().eq('id', id)
     onRefresh()
@@ -108,9 +108,9 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
 
       {/* Vacunas vencidas */}
       {vencidasVacuna.length > 0 && (
-        <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>⚠️</span>
-          <span style={{ fontSize: '13.5px', color: '#92400e', fontWeight: 600 }}>
+          <span style={{ fontSize: '13.5px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>
             {vencidasVacuna.length} mascota{vencidasVacuna.length > 1 ? 's' : ''} con vacuna vencida (más de 1 año): {vencidasVacuna.map(m => m.nombre).join(', ')}
           </span>
         </div>
@@ -208,11 +208,11 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
               : null
             const vacunaVencida = vacunaDays !== null && vacunaDays > 365
             return (
-              <div key={m.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${vacunaVencida ? '#fde68a' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px' }}>
+              <div key={m.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${vacunaVencida ? 'var(--at-warning-border)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                   {m.foto_url
                     ? <SecureImage src={m.foto_url} alt={m.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--at-line)', flexShrink: 0 }} />
-                    : <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                    : <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--at-success-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
                         {ESPECIE_ICON[m.especie]}
                       </div>
                   }
@@ -225,7 +225,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
                   {m.unidad_nombre && <span>📍 {m.unidad_nombre}</span>}
                   {m.color && <span>🎨 {m.color}</span>}
                   {m.fecha_ultima_vacuna && (
-                    <span style={{ color: vacunaVencida ? '#dc2626' : '#16a34a', fontWeight: vacunaVencida ? 700 : 400 }}>
+                    <span style={{ color: vacunaVencida ? 'var(--at-danger)' : 'var(--at-success)', fontWeight: vacunaVencida ? 700 : 400 }}>
                       💉 Vacuna: {m.fecha_ultima_vacuna} {vacunaVencida ? '⚠️ Vencida' : ''}
                     </span>
                   )}
@@ -233,7 +233,7 @@ export function MascotasTab({ mascotas, unidades, proyectoId, companyId, canCrea
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
                     <button onClick={() => startEdit(m)} style={{ flex: 1, padding: '6px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)' }}>✏️ Editar</button>
-                    <button onClick={() => eliminar(m.id)} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px' }}>🗑</button>
+                    <button onClick={() => eliminar(m.id)} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px' }}>🗑</button>
                   </div>
                 )}
               </div>

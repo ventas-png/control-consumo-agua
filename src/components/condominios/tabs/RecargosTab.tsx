@@ -17,7 +17,7 @@ interface Props {
 }
 
 const ESTADO_CFG: Record<EstadoRecargo, { label: string; bg: string; color: string }> = {
-  pendiente: { label: 'Pendiente', bg: '#fef3c7', color: '#92400e' },
+  pendiente: { label: 'Pendiente', bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
   aplicado:  { label: 'Aplicado',  bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
   anulado:   { label: 'Anulado',   bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
@@ -112,7 +112,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
                Tipo: <b>${tipoRecargo === 'porcentaje' ? pct + '%' : moneda + ' ' + pct + ' fijo'}</b><br>
                ${unidadesMorosas.length} unidades afectadas</p>`,
         icon: 'question', showCancelButton: true,
-        confirmButtonText: 'Aplicar', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626',
+        confirmButtonText: 'Aplicar', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-danger)',
       })
       if (!conf.isConfirmed) return
     } else {
@@ -158,9 +158,9 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
           { label: 'Recargos aplicados', val: recargos.filter(r => r.estado === 'aplicado').length, sub: `${moneda} ${totalAplicado.toLocaleString()}`, bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-          { label: 'Pendientes de aplicar', val: recargos.filter(r => r.estado === 'pendiente').length, sub: `${moneda} ${totalPendiente.toLocaleString()}`, bg: '#fef3c7', color: '#d97706' },
+          { label: 'Pendientes de aplicar', val: recargos.filter(r => r.estado === 'pendiente').length, sub: `${moneda} ${totalPendiente.toLocaleString()}`, bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
           { label: 'Anulados', val: recargos.filter(r => r.estado === 'anulado').length, sub: '', bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
-          { label: 'Unidades con mora', val: new Set(cuotas.filter(c => c.estado === 'moroso').map(c => c.unidad_id)).size, sub: '', bg: '#fef2f2', color: '#ef4444' },
+          { label: 'Unidades con mora', val: new Set(cuotas.filter(c => c.estado === 'moroso').map(c => c.unidad_id)).size, sub: '', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: k.color }}>{k.val}</div>
@@ -188,7 +188,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
         <div style={{ display: 'flex', gap: 8 }}>
           {canCreate && (
             <button onClick={aplicarMasivo} disabled={saving}
-              style={{ padding: '8px 14px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+              style={{ padding: '8px 14px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
               ⚡ Recargo masivo
             </button>
           )}
@@ -241,7 +241,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
             </div>
           </div>
           {montoPreview !== null && (
-            <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 13, color: '#92400e' }}>
+            <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 13, color: 'var(--at-warning-strong)' }}>
               Monto a cobrar: <strong>{moneda} {montoPreview.toFixed(2)}</strong>
             </div>
           )}
@@ -275,7 +275,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
                     <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{r.fecha_aplicacion}</td>
                     <td style={{ padding: '8px 12px', color: 'var(--at-ink-2)' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : 'Fijo'}</td>
                     <td style={{ padding: '8px 12px', color: 'var(--at-ink-2)' }}>{r.tipo === 'porcentaje' ? `${r.valor}%` : `${moneda} ${r.valor}`}</td>
-                    <td style={{ padding: '8px 12px', fontWeight: 700, color: '#dc2626' }}>{moneda} {r.monto_calculado.toFixed(2)}</td>
+                    <td style={{ padding: '8px 12px', fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {r.monto_calculado.toFixed(2)}</td>
                     <td style={{ padding: '8px 12px' }}>
                       <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                     </td>
@@ -286,7 +286,7 @@ export default function RecargosTab({ recargos, cuotas, reglas, unidades, proyec
                           <button onClick={() => cambiarEstado(r, 'aplicado')}
                             style={{ padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>Aplicar</button>
                           <button onClick={() => cambiarEstado(r, 'anulado')}
-                            style={{ padding: '4px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>Anular</button>
+                            style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>Anular</button>
                         </div>
                       )}
                     </td>

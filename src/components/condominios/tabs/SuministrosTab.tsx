@@ -26,9 +26,9 @@ const CATEGORIAS: { value: CategoriaSupministro; label: string; icon: string }[]
 const UNIDADES: UnidadMedidaSum[] = ['unidad', 'litro', 'kg', 'metro', 'caja', 'rollo', 'otro']
 
 const TIPOS_MOV: { value: TipoMovimientoSum; label: string; color: string }[] = [
-  { value: 'entrada', label: 'Entrada', color: '#10b981' },
-  { value: 'salida',  label: 'Salida',  color: '#ef4444' },
-  { value: 'ajuste',  label: 'Ajuste',  color: '#f59e0b' },
+  { value: 'entrada', label: 'Entrada', color: 'var(--at-success)' },
+  { value: 'salida',  label: 'Salida',  color: 'var(--at-danger)' },
+  { value: 'ajuste',  label: 'Ajuste',  color: 'var(--at-warning)' },
 ]
 
 export default function SuministrosTab({ suministros, movimientos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
@@ -141,7 +141,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
         </div>
 
         {alertas.length > 0 && !soloAlertas && (
-          <div style={{ padding: '6px 12px', background: '#fef3c7', borderBottom: '1px solid #fde68a', fontSize: 12, color: '#92400e' }}>
+          <div style={{ padding: '6px 12px', background: 'var(--at-warning-tint)', borderBottom: '1px solid var(--at-warning-border)', fontSize: 12, color: 'var(--at-warning-strong)' }}>
             ⚠️ {alertas.length} suministros bajo mínimo
           </div>
         )}
@@ -153,14 +153,14 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
           const alerta = s.stock_actual <= s.stock_minimo
           return (
             <div key={s.id} onClick={() => { setSelected(s); setVista('lista') }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', opacity: s.activo ? 1 : 0.5, borderLeft: alerta ? '3px solid #f59e0b' : '3px solid transparent' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === s.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', opacity: s.activo ? 1 : 0.5, borderLeft: alerta ? '3px solid var(--at-warning)' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {s.nombre}</span>
-                <span style={{ fontWeight: 700, fontSize: 14, color: alerta ? '#ef4444' : '#10b981' }}>
+                <span style={{ fontWeight: 700, fontSize: 14, color: alerta ? 'var(--at-danger)' : 'var(--at-success)' }}>
                   {s.stock_actual} {s.unidad_medida}
                 </span>
               </div>
-              {alerta && <div style={{ fontSize: 11, color: '#f59e0b' }}>⚠️ Mínimo: {s.stock_minimo}</div>}
+              {alerta && <div style={{ fontSize: 11, color: 'var(--at-warning)' }}>⚠️ Mínimo: {s.stock_minimo}</div>}
               {s.ubicacion && <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{s.ubicacion}</div>}
             </div>
           )
@@ -217,7 +217,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Guardar'}
               </button>
               <button onClick={() => setVista('lista')}
@@ -306,7 +306,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
             {/* Stock KPI */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
               {[
-                { label: `Stock actual (${selected.unidad_medida})`, value: selected.stock_actual, color: selected.stock_actual <= selected.stock_minimo ? '#ef4444' : '#10b981' },
+                { label: `Stock actual (${selected.unidad_medida})`, value: selected.stock_actual, color: selected.stock_actual <= selected.stock_minimo ? 'var(--at-danger)' : 'var(--at-success)' },
                 { label: `Stock mínimo (${selected.unidad_medida})`, value: selected.stock_minimo, color: 'var(--at-ink-3)' },
                 { label: `Costo unitario (${moneda})`, value: selected.costo_unitario?.toFixed(2) ?? '—', color: 'var(--at-accent)' },
               ].map(k => (
@@ -318,7 +318,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
             </div>
 
             {selected.stock_actual <= selected.stock_minimo && (
-              <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
+              <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--at-warning-strong)' }}>
                 ⚠️ Stock bajo mínimo — requiere reposición
               </div>
             )}

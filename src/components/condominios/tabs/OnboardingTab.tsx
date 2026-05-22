@@ -24,8 +24,8 @@ const CHECKLIST: { key: keyof OnboardingResidente; label: string; icon: string }
 ]
 
 const ESTADO_CONFIG: Record<EstadoOnboarding, { label: string; color: string; bg: string }> = {
-  en_proceso: { label: 'En Proceso', color: '#f59e0b', bg: '#fef3c7' },
-  completado: { label: 'Completado', color: '#10b981', bg: '#d1fae5' },
+  en_proceso: { label: 'En Proceso', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  completado: { label: 'Completado', color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   cancelado:  { label: 'Cancelado',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 
@@ -113,7 +113,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar onboarding?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar onboarding?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('onboarding_residentes').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -127,9 +127,9 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
     <div style={{ padding: '20px 24px' }}>
 
       {enProceso > 0 && (
-        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>👋</span>
-          <span style={{ fontSize: '13px', color: '#92400e', fontWeight: 600 }}>
+          <span style={{ fontSize: '13px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>
             {enProceso} proceso{enProceso > 1 ? 's' : ''} de onboarding en curso
           </span>
         </div>
@@ -242,7 +242,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
                       </button>
                     )}
                     {canEdit && <button onClick={() => startEdit(o)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-                    {canEdit && <button onClick={() => handleDelete(o.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
+                    {canEdit && <button onClick={() => handleDelete(o.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                   </div>
                 </div>
 
@@ -250,10 +250,10 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Progreso</span>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: pct === 100 ? '#10b981' : '#f59e0b' }}>{pct}%</span>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: pct === 100 ? 'var(--at-success)' : 'var(--at-warning)' }}>{pct}%</span>
                   </div>
                   <div style={{ height: '6px', background: 'var(--at-chip)', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#10b981' : '#f59e0b', borderRadius: '3px', transition: 'width 0.3s' }} />
+                    <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? 'var(--at-success)' : 'var(--at-warning)', borderRadius: '3px', transition: 'width 0.3s' }} />
                   </div>
                 </div>
 
@@ -263,7 +263,7 @@ export function OnboardingTab({ onboardings, unidades, proyectoId, companyId, ca
                     const done = o[c.key] as boolean
                     return (
                       <button key={c.key} onClick={() => canEdit && toggleCheck(o.id, c.key, done)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 10px', background: done ? '#d1fae5' : 'var(--at-surface-2)', border: `1.5px solid ${done ? '#10b981' : 'var(--at-line)'}`, borderRadius: '8px', fontSize: '12px', cursor: canEdit ? 'pointer' : 'default', textAlign: 'left', fontWeight: done ? 600 : 400, color: done ? '#065f46' : 'var(--at-ink-3)' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 10px', background: done ? 'var(--at-success-tint)' : 'var(--at-surface-2)', border: `1.5px solid ${done ? 'var(--at-success)' : 'var(--at-line)'}`, borderRadius: '8px', fontSize: '12px', cursor: canEdit ? 'pointer' : 'default', textAlign: 'left', fontWeight: done ? 600 : 400, color: done ? 'var(--at-success-strong)' : 'var(--at-ink-3)' }}>
                         <span>{done ? '✅' : '⬜'}</span>
                         <span>{c.label}</span>
                       </button>

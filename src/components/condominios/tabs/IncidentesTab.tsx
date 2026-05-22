@@ -15,18 +15,18 @@ interface Props {
 }
 
 const TIPO_STYLE: Record<string, { bg: string; color: string; label: string; icon: string }> = {
-  robo:       { bg: '#fee2e2', color: '#dc2626', label: 'Robo',       icon: '🚨' },
-  vandalismo: { bg: '#fef3c7', color: '#92400e', label: 'Vandalismo', icon: '🔨' },
-  accidente:  { bg: '#fed7aa', color: '#c2410c', label: 'Accidente',  icon: '🩺' },
-  incendio:   { bg: '#fecaca', color: '#b91c1c', label: 'Incendio',   icon: '🔥' },
+  robo:       { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Robo',       icon: '🚨' },
+  vandalismo: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Vandalismo', icon: '🔨' },
+  accidente:  { bg: 'var(--at-warning-border)', color: 'var(--at-warning-strong)', label: 'Accidente',  icon: '🩺' },
+  incendio:   { bg: 'var(--at-danger-border)', color: 'var(--at-danger-strong)', label: 'Incendio',   icon: '🔥' },
   pelea:      { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', label: 'Pelea',      icon: '⚡' },
   otro:       { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Otro',       icon: '📋' },
 }
 
 const ESTADO_FLOW: Record<string, { bg: string; color: string; label: string; next?: string; nextLabel?: string }> = {
-  reportado:    { bg: '#fee2e2', color: '#dc2626', label: 'Reportado',    next: 'investigando', nextLabel: 'Iniciar Investigación' },
-  investigando: { bg: '#fef3c7', color: '#92400e', label: 'Investigando', next: 'resuelto',     nextLabel: 'Marcar Resuelto' },
-  resuelto:     { bg: '#dcfce7', color: '#16a34a', label: 'Resuelto',     next: 'cerrado',      nextLabel: 'Cerrar' },
+  reportado:    { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Reportado',    next: 'investigando', nextLabel: 'Iniciar Investigación' },
+  investigando: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Investigando', next: 'resuelto',     nextLabel: 'Marcar Resuelto' },
+  resuelto:     { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Resuelto',     next: 'cerrado',      nextLabel: 'Cerrar' },
   cerrado:      { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Cerrado' },
 }
 
@@ -93,7 +93,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
   }
 
   const handleDelete = async (i: IncidenteSeguridad) => {
-    const r = await Swal.fire({ title: '¿Eliminar incidente?', text: i.descripcion, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' })
+    const r = await Swal.fire({ title: '¿Eliminar incidente?', text: i.descripcion, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('incidentes_seguridad').delete().eq('id', i.id)
     if (selected?.id === i.id) setSelected(null)
@@ -135,8 +135,8 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
         <div style={{ padding: '14px', borderBottom: '1px solid var(--at-line)', background: 'var(--at-surface-2)' }}>
           {/* KPI strip */}
           <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '60px', background: abiertos > 0 ? '#fee2e2' : '#f0fdf4', borderRadius: '8px', padding: '6px', textAlign: 'center' }}>
-              <div style={{ fontWeight: 800, fontSize: '18px', color: abiertos > 0 ? '#dc2626' : '#16a34a' }}>{abiertos}</div>
+            <div style={{ flex: 1, minWidth: '60px', background: abiertos > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)', borderRadius: '8px', padding: '6px', textAlign: 'center' }}>
+              <div style={{ fontWeight: 800, fontSize: '18px', color: abiertos > 0 ? 'var(--at-danger)' : 'var(--at-success)' }}>{abiertos}</div>
               <div style={{ fontSize: '10px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Abiertos</div>
             </div>
             <div style={{ flex: 1, minWidth: '60px', background: 'var(--at-chip)', borderRadius: '8px', padding: '6px', textAlign: 'center' }}>
@@ -147,12 +147,12 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
 
           <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
             {canCreate && (
-              <button onClick={openNew} style={{ flex: 1, padding: '8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              <button onClick={openNew} style={{ flex: 1, padding: '8px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
                 🚨 Registrar
               </button>
             )}
             <button onClick={exportarPDF} disabled={incidentes.length === 0} style={{ padding: '8px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="PDF">📄</button>
-            <button onClick={exportarXlsx} disabled={incidentes.length === 0} style={{ padding: '8px 10px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="Excel">📊</button>
+            <button onClick={exportarXlsx} disabled={incidentes.length === 0} style={{ padding: '8px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }} title="Excel">📊</button>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -179,7 +179,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
             const es = ESTADO_FLOW[i.estado]
             return (
               <div key={i.id} onClick={() => { setSelected(i); setShowForm(false) }}
-                style={{ padding: '12px 14px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === i.id ? '#fff1f2' : 'var(--at-surface)', borderLeft: selected?.id === i.id ? '3px solid #ef4444' : '3px solid transparent' }}>
+                style={{ padding: '12px 14px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === i.id ? 'var(--at-danger-tint)' : 'var(--at-surface)', borderLeft: selected?.id === i.id ? '3px solid var(--at-danger)' : '3px solid transparent' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -250,7 +250,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              <button onClick={handleSave} disabled={saving} style={{ padding: '8px 20px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
                 {saving ? 'Guardando…' : 'Guardar'}
               </button>
               <button onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
@@ -283,7 +283,7 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {canEdit && <button onClick={() => openEdit(selected)} style={{ padding: '6px 14px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>✏️ Editar</button>}
-                  <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>
+                  <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>
                 </div>
               </div>
 
@@ -305,8 +305,8 @@ export function IncidentesTab({ incidentes, proyectoId, companyId, proyectoNombr
               </div>
 
               {selected.seguimiento && (
-                <div style={{ background: '#fefce8', borderRadius: '8px', padding: '12px', marginBottom: '16px', border: '1px solid #fde68a' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>Seguimiento</div>
+                <div style={{ background: 'var(--at-warning-tint)', borderRadius: '8px', padding: '12px', marginBottom: '16px', border: '1px solid var(--at-warning-border)' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-warning-strong)', marginBottom: '4px' }}>Seguimiento</div>
                   <p style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-2)' }}>{selected.seguimiento}</p>
                 </div>
               )}

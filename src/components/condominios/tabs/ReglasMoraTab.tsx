@@ -68,7 +68,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
   }
 
   async function eliminar(id: string) {
-    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar regla?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar regla?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!isConfirmed) return
     await supabase.from('reglas_mora_config').delete().eq('id', id)
     onRefresh()
@@ -102,7 +102,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
         </span>
         {canCreate && (
           <button onClick={mostrarForm ? cancelar : abrirNueva}
-            style={{ padding: '8px 16px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm && !editId ? '✕ Cancelar' : '+ Nueva regla'}
           </button>
         )}
@@ -110,7 +110,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#fff7f7', border: '1px solid #fecaca', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#fff7f7', border: '1px solid var(--at-danger-border)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>{editId ? 'Editar regla' : 'Nueva regla de mora'}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 3' }}>
@@ -148,7 +148,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={guardar} disabled={saving}
-              style={{ padding: '8px 20px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+              style={{ padding: '8px 20px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
               {saving ? 'Guardando…' : editId ? '💾 Actualizar' : '✅ Crear regla'}
             </button>
             <button onClick={cancelar} style={{ padding: '8px 16px', background: 'var(--at-chip)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
@@ -170,7 +170,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <span style={{ fontWeight: 700, fontSize: 14 }}>{r.nombre}</span>
-                    <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: r.activa ? '#dcfce7' : 'var(--at-chip)', color: r.activa ? '#16a34a' : 'var(--at-ink-3)' }}>
+                    <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: r.activa ? 'var(--at-success-tint)' : 'var(--at-chip)', color: r.activa ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                       {r.activa ? 'Activa' : 'Inactiva'}
                     </span>
                   </div>
@@ -183,7 +183,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   <button onClick={() => toggleActiva(r)}
-                    style={{ padding: '5px 10px', background: r.activa ? '#fef3c7' : '#dcfce7', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, color: r.activa ? '#92400e' : '#166534' }}>
+                    style={{ padding: '5px 10px', background: r.activa ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, color: r.activa ? 'var(--at-warning-strong)' : 'var(--at-success-strong)' }}>
                     {r.activa ? 'Pausar' : 'Activar'}
                   </button>
                   {canEdit && (
@@ -194,7 +194,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
                   )}
                   {canEdit && (
                     <button onClick={() => eliminar(r.id)}
-                      style={{ padding: '5px 10px', background: '#fef2f2', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#ef4444' }}>
+                      style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>
                       🗑
                     </button>
                   )}
@@ -206,7 +206,7 @@ export default function ReglasMoraTab({ reglas, proyectoId, companyId, moneda, c
       )}
 
       {/* Info box */}
-      <div style={{ marginTop: 16, padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 12, color: '#92400e' }}>
+      <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, fontSize: 12, color: 'var(--at-warning-strong)' }}>
         <strong>ℹ️ Nota:</strong> Estas reglas definen la configuración. Para aplicar recargos a las unidades morosas, usa el módulo <strong>Recargos mora</strong> con la opción "Recargo masivo".
       </div>
     </div>

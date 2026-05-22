@@ -15,10 +15,10 @@ interface Props {
 
 const ESTADO_STYLE: Record<EstadoObra, { bg: string; color: string; label: string }> = {
   planificada:    { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', label: 'Planificada' },
-  en_ejecucion:  { bg: '#fef3c7', color: '#92400e', label: 'En ejecución' },
-  completada:    { bg: '#dcfce7', color: '#16a34a', label: 'Completada' },
+  en_ejecucion:  { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'En ejecución' },
+  completada:    { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Completada' },
   pausada:       { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Pausada' },
-  cancelada:     { bg: '#fee2e2', color: '#ef4444', label: 'Cancelada' },
+  cancelada:     { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Cancelada' },
 }
 
 const BLANK = { titulo: '', descripcion: '', area: '', contratista: '', monto_contrato: '', fecha_inicio: '', fecha_fin_estimada: '', fecha_fin_real: '', estado: 'planificada' as EstadoObra, progreso: '0', notas: '' }
@@ -63,7 +63,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar obra?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar obra?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('obras_mejoras').delete().eq('id', id)
     if (selected?.id === id) setSelected(null)
@@ -105,8 +105,8 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px', marginBottom: '16px' }}>
         {[
           { label: 'Total', value: String(obras.length), color: 'var(--at-ink-3)' },
-          { label: 'En ejecución', value: String(enEjecucion), color: '#f59e0b' },
-          { label: 'Completadas', value: String(completadas), color: '#10b981' },
+          { label: 'En ejecución', value: String(enEjecucion), color: 'var(--at-warning)' },
+          { label: 'Completadas', value: String(completadas), color: 'var(--at-success)' },
           { label: 'Presupuestado', value: fmt(totalPresupuestado, moneda), color: 'var(--at-primary)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
@@ -218,7 +218,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
                     {/* Progress bar */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <div style={{ flex: 1, height: '6px', background: 'var(--at-line)', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${progreso}%`, background: progreso === 100 ? '#10b981' : progreso > 50 ? 'var(--at-primary)' : '#f59e0b', borderRadius: '3px', transition: 'width 0.3s' }} />
+                        <div style={{ height: '100%', width: `${progreso}%`, background: progreso === 100 ? 'var(--at-success)' : progreso > 50 ? 'var(--at-primary)' : 'var(--at-warning)', borderRadius: '3px', transition: 'width 0.3s' }} />
                       </div>
                       <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-2)', minWidth: '30px' }}>{progreso}%</span>
                     </div>
@@ -228,7 +228,7 @@ export function ObrasTab({ obras, proyectoId, companyId, moneda, canCreate, canE
                       <button onClick={() => startEdit(o)}
                         style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(o.id)}
-                        style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </div>
                   )}
                 </div>

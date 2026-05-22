@@ -48,10 +48,10 @@ export default function UtilizacionAmenidadesTab({ amenidades, reservas, moneda 
   function heatmapColor(val: number, max: number): string {
     if (max === 0 || val === 0) return 'var(--at-chip)'
     const pct = val / max
-    if (pct > 0.75) return '#16a34a'
+    if (pct > 0.75) return 'var(--at-success)'
     if (pct > 0.5)  return '#65a30d'
     if (pct > 0.25) return '#ca8a04'
-    return '#fde68a'
+    return 'var(--at-warning-border)'
   }
 
   return (
@@ -76,7 +76,7 @@ export default function UtilizacionAmenidadesTab({ amenidades, reservas, moneda 
                   <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink-2)' }}>{s.am.nombre}</span>
                   <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--at-ink-3)' }}>
                     <span>✅ {s.confirmadas} conf.</span>
-                    <span style={{ color: '#ef4444' }}>❌ {s.canceladas} canc.</span>
+                    <span style={{ color: 'var(--at-danger)' }}>❌ {s.canceladas} canc.</span>
                     <span style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{s.total} total</span>
                   </div>
                 </div>
@@ -101,9 +101,9 @@ export default function UtilizacionAmenidadesTab({ amenidades, reservas, moneda 
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                   {[
                     { label: 'Reservas', val: String(s.total), color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
-                    { label: 'Tasa cancel.', val: `${Math.round(s.tasaCancelacion * 100)}%`, color: s.tasaCancelacion > 0.2 ? '#ef4444' : '#16a34a', bg: s.tasaCancelacion > 0.2 ? '#fef2f2' : '#dcfce7' },
+                    { label: 'Tasa cancel.', val: `${Math.round(s.tasaCancelacion * 100)}%`, color: s.tasaCancelacion > 0.2 ? 'var(--at-danger)' : 'var(--at-success)', bg: s.tasaCancelacion > 0.2 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)' },
                     { label: 'Invitados', val: String(s.totalInvitados), color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
-                    ...(s.depositos > 0 ? [{ label: 'Depósitos', val: `${moneda} ${s.depositos.toLocaleString('es')}`, color: '#16a34a', bg: '#dcfce7' }] : []),
+                    ...(s.depositos > 0 ? [{ label: 'Depósitos', val: `${moneda} ${s.depositos.toLocaleString('es')}`, color: 'var(--at-success)', bg: 'var(--at-success-tint)' }] : []),
                   ].map(k => (
                     <div key={k.label} style={{ flex: '1 1 70px', background: k.bg, borderRadius: 8, padding: '6px 10px', border: `1px solid ${k.color}22` }}>
                       <div style={{ fontSize: 9, color: 'var(--at-ink-3)' }}>{k.label}</div>

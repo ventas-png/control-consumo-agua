@@ -14,18 +14,18 @@ interface Props {
 }
 
 const TIPOS: { value: TipoIncidenciaElevador; label: string; icon: string; color: string }[] = [
-  { value: 'falla',                    label: 'Falla',              icon: '⚠️', color: '#ef4444' },
+  { value: 'falla',                    label: 'Falla',              icon: '⚠️', color: 'var(--at-danger)' },
   { value: 'mantenimiento_preventivo', label: 'Mant. preventivo',  icon: '🔧', color: 'var(--at-accent)' },
-  { value: 'mantenimiento_correctivo', label: 'Mant. correctivo',  icon: '🛠️', color: '#f59e0b' },
-  { value: 'inspeccion_legal',         label: 'Inspección legal',  icon: '🏛️', color: '#10b981' },
+  { value: 'mantenimiento_correctivo', label: 'Mant. correctivo',  icon: '🛠️', color: 'var(--at-warning)' },
+  { value: 'inspeccion_legal',         label: 'Inspección legal',  icon: '🏛️', color: 'var(--at-success)' },
   { value: 'otro',                     label: 'Otro',              icon: '📋', color: 'var(--at-ink-3)' },
 ]
 
 const ESTADOS: { value: EstadoIncidenciaElevador; label: string; color: string; bg: string }[] = [
   { value: 'reportado',            label: 'Reportado',           color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
-  { value: 'en_atencion',          label: 'En atención',         color: '#f59e0b', bg: '#fef3c7' },
-  { value: 'resuelto',             label: 'Resuelto',            color: '#10b981', bg: '#d1fae5' },
-  { value: 'requiere_seguimiento', label: 'Req. seguimiento',    color: '#ef4444', bg: '#fef2f2' },
+  { value: 'en_atencion',          label: 'En atención',         color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  { value: 'resuelto',             label: 'Resuelto',            color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  { value: 'requiere_seguimiento', label: 'Req. seguimiento',    color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 ]
 
 export default function IncidenciasElevadorTab({ registros, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
@@ -115,7 +115,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div>
               <span style={{ fontWeight: 600, fontSize: 14 }}>Elevadores ({lista.length})</span>
-              {fallas > 0 && <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#fef2f2', color: '#ef4444', fontWeight: 700 }}>{fallas} falla{fallas > 1 ? 's' : ''}</span>}
+              {fallas > 0 && <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontWeight: 700 }}>{fallas} falla{fallas > 1 ? 's' : ''}</span>}
             </div>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
@@ -229,7 +229,7 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Registrar'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -278,9 +278,9 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
                   </div>
                 )}
                 {selected.costo != null && (
-                  <div style={{ background: '#f0fdf4', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#16a34a' }}>Costo</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: '#16a34a' }}>{moneda} {selected.costo.toLocaleString()}</div>
+                  <div style={{ background: 'var(--at-success-tint)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Costo</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {selected.costo.toLocaleString()}</div>
                   </div>
                 )}
                 {selected.proxima_inspeccion && (
@@ -292,14 +292,14 @@ export default function IncidenciasElevadorTab({ registros, proyectoId, companyI
               </div>
 
               {selected.observaciones && (
-                <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
+                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--at-warning-strong)' }}>
                   {selected.observaciones}
                 </div>
               )}
 
               {canEdit && selected.estado !== 'resuelto' && (
                 <button onClick={() => avanzarEstado(selected)}
-                  style={{ padding: '6px 14px', background: '#d1fae5', color: '#10b981', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                  style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                   ▶ {selected.estado === 'reportado' ? 'Atender' : 'Resolver'}
                 </button>
               )}

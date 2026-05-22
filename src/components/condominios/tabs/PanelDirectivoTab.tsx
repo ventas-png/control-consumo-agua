@@ -43,9 +43,9 @@ function Kpi({ label, val, sub, color, bg }: { label: string; val: string; sub?:
 function Semaforo({ valor, umbralBueno, umbralMalo, invertir = false }: { valor: number; umbralBueno: number; umbralMalo: number; invertir?: boolean }) {
   let color: string
   if (!invertir) {
-    color = valor >= umbralBueno ? '#16a34a' : valor >= umbralMalo ? '#d97706' : '#ef4444'
+    color = valor >= umbralBueno ? 'var(--at-success)' : valor >= umbralMalo ? 'var(--at-warning)' : 'var(--at-danger)'
   } else {
-    color = valor <= umbralBueno ? '#16a34a' : valor <= umbralMalo ? '#d97706' : '#ef4444'
+    color = valor <= umbralBueno ? 'var(--at-success)' : valor <= umbralMalo ? 'var(--at-warning)' : 'var(--at-danger)'
   }
   return <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: color, marginRight: 5 }} />
 }
@@ -128,7 +128,7 @@ export default function PanelDirectivoTab({
     return Math.max(0, Math.min(100, p))
   }, [tasaMorosidad, ejecucionPresupuesto, ticketsUrgentes, polizasVencenProx60, inspeccionesReprobadas, infraccionesActivas])
 
-  const saludColor = puntajeSalud >= 80 ? '#16a34a' : puntajeSalud >= 60 ? '#d97706' : '#ef4444'
+  const saludColor = puntajeSalud >= 80 ? 'var(--at-success)' : puntajeSalud >= 60 ? 'var(--at-warning)' : 'var(--at-danger)'
   const saludLabel = puntajeSalud >= 80 ? 'Óptimo' : puntajeSalud >= 60 ? 'Regular' : 'Crítico'
 
   const SECTION = { background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 14, marginBottom: 14 }
@@ -202,7 +202,7 @@ export default function PanelDirectivoTab({
         <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)' }}>Panel Directivo</div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={exportarInformePDF} style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📄 PDF</button>
-          <button onClick={exportarResumenXlsx} style={{ padding: '5px 10px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📊 Excel</button>
+          <button onClick={exportarResumenXlsx} style={{ padding: '5px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📊 Excel</button>
         </div>
       </div>
       <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 14 }}>Indicadores clave para la junta directiva · {hoy}</div>
@@ -226,11 +226,11 @@ export default function PanelDirectivoTab({
 
       {/* KPIs principales */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-        <Kpi label="Tasa de cobranza" val={`${tasaCobranza.toFixed(1)}%`} sub="este mes" color={tasaCobranza >= 90 ? '#16a34a' : tasaCobranza >= 70 ? '#d97706' : '#ef4444'} bg={tasaCobranza >= 90 ? '#dcfce7' : tasaCobranza >= 70 ? '#fef3c7' : '#fef2f2'} />
-        <Kpi label="Unidades morosas" val={String(morosos)} sub={`${tasaMorosidad.toFixed(1)}% del total`} color={morosos === 0 ? '#16a34a' : morosos < 5 ? '#d97706' : '#ef4444'} bg={morosos === 0 ? '#dcfce7' : morosos < 5 ? '#fef3c7' : '#fef2f2'} />
-        <Kpi label="Tickets urgentes" val={String(ticketsUrgentes)} sub={`${ticketsAbiertos} abiertos total`} color={ticketsUrgentes === 0 ? '#16a34a' : '#ef4444'} bg={ticketsUrgentes === 0 ? '#dcfce7' : '#fef2f2'} />
-        <Kpi label="Fondo de reserva" val={`${moneda} ${saldoFondo.toLocaleString('es', { minimumFractionDigits: 0 })}`} sub="saldo acumulado" color={saldoFondo > 0 ? '#16a34a' : '#ef4444'} bg={saldoFondo > 0 ? '#dcfce7' : '#fef2f2'} />
-        <Kpi label="Recargos mora" val={`${moneda} ${recargosPendientes.toLocaleString('es', { minimumFractionDigits: 2 })}`} sub="pendientes de cobro" color={recargosPendientes > 0 ? '#ef4444' : '#16a34a'} bg={recargosPendientes > 0 ? '#fef2f2' : '#dcfce7'} />
+        <Kpi label="Tasa de cobranza" val={`${tasaCobranza.toFixed(1)}%`} sub="este mes" color={tasaCobranza >= 90 ? 'var(--at-success)' : tasaCobranza >= 70 ? 'var(--at-warning)' : 'var(--at-danger)'} bg={tasaCobranza >= 90 ? 'var(--at-success-tint)' : tasaCobranza >= 70 ? 'var(--at-warning-tint)' : 'var(--at-danger-tint)'} />
+        <Kpi label="Unidades morosas" val={String(morosos)} sub={`${tasaMorosidad.toFixed(1)}% del total`} color={morosos === 0 ? 'var(--at-success)' : morosos < 5 ? 'var(--at-warning)' : 'var(--at-danger)'} bg={morosos === 0 ? 'var(--at-success-tint)' : morosos < 5 ? 'var(--at-warning-tint)' : 'var(--at-danger-tint)'} />
+        <Kpi label="Tickets urgentes" val={String(ticketsUrgentes)} sub={`${ticketsAbiertos} abiertos total`} color={ticketsUrgentes === 0 ? 'var(--at-success)' : 'var(--at-danger)'} bg={ticketsUrgentes === 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)'} />
+        <Kpi label="Fondo de reserva" val={`${moneda} ${saldoFondo.toLocaleString('es', { minimumFractionDigits: 0 })}`} sub="saldo acumulado" color={saldoFondo > 0 ? 'var(--at-success)' : 'var(--at-danger)'} bg={saldoFondo > 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)'} />
+        <Kpi label="Recargos mora" val={`${moneda} ${recargosPendientes.toLocaleString('es', { minimumFractionDigits: 2 })}`} sub="pendientes de cobro" color={recargosPendientes > 0 ? 'var(--at-danger)' : 'var(--at-success)'} bg={recargosPendientes > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)'} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -286,7 +286,7 @@ export default function PanelDirectivoTab({
                 {row.alert !== undefined && <Semaforo valor={row.alert ? 1 : 0} umbralBueno={0} umbralMalo={0.5} invertir />}
                 {row.label}
               </span>
-              <span style={{ fontWeight: 700, color: row.alert ? '#d97706' : 'var(--at-ink)' }}>{row.val}</span>
+              <span style={{ fontWeight: 700, color: row.alert ? 'var(--at-warning)' : 'var(--at-ink)' }}>{row.val}</span>
             </div>
           ))}
         </div>
@@ -318,8 +318,8 @@ export default function PanelDirectivoTab({
         <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 10 }}>📊 Financiero del mes — {mesActual}</div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', height: 80 }}>
           {[
-            { label: 'Cobrado', val: cobradoMes, color: '#16a34a' },
-            { label: 'Pendiente', val: pendienteMes, color: '#d97706' },
+            { label: 'Cobrado', val: cobradoMes, color: 'var(--at-success)' },
+            { label: 'Pendiente', val: pendienteMes, color: 'var(--at-warning)' },
             { label: 'Gasto', val: gastosMes, color: 'var(--at-primary)' },
           ].map(b => {
             const pct = maxFinanciero > 0 ? (b.val / maxFinanciero) * 64 : 0
@@ -336,34 +336,34 @@ export default function PanelDirectivoTab({
           <div style={{ flex: 2, paddingLeft: 8, borderLeft: '1px solid var(--at-line)' }}>
             <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 4 }}>Ejecución presupuestal</div>
             <div style={{ height: 8, background: 'var(--at-line)', borderRadius: 4, marginBottom: 4 }}>
-              <div style={{ height: 8, borderRadius: 4, background: ejecucionPresupuesto > 100 ? '#ef4444' : 'var(--at-primary)', width: `${Math.min(ejecucionPresupuesto, 100)}%`, transition: 'width 0.4s' }} />
+              <div style={{ height: 8, borderRadius: 4, background: ejecucionPresupuesto > 100 ? 'var(--at-danger)' : 'var(--at-primary)', width: `${Math.min(ejecucionPresupuesto, 100)}%`, transition: 'width 0.4s' }} />
             </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ejecucionPresupuesto > 100 ? '#ef4444' : 'var(--at-primary)' }}>{ejecucionPresupuesto.toFixed(1)}%</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ejecucionPresupuesto > 100 ? 'var(--at-danger)' : 'var(--at-primary)' }}>{ejecucionPresupuesto.toFixed(1)}%</div>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)', marginTop: 6 }}>Fondo reserva: {moneda} {saldoFondo.toFixed(0)}</div>
-            <div style={{ fontSize: 10, color: recargosPendientes > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>Recargos mora: {moneda} {recargosPendientes.toFixed(0)}</div>
+            <div style={{ fontSize: 10, color: recargosPendientes > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>Recargos mora: {moneda} {recargosPendientes.toFixed(0)}</div>
           </div>
         </div>
       </div>
 
       {/* Alertas con acciones recomendadas */}
       {alertas.length > 0 && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: 12, marginTop: 4 }}>
-          <div style={{ fontWeight: 700, fontSize: 12, color: '#ef4444', marginBottom: 8 }}>⚠ Alertas que requieren atención</div>
+        <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 10, padding: 12, marginTop: 4 }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--at-danger)', marginBottom: 8 }}>⚠ Alertas que requieren atención</div>
           {alertas.map((a, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, background: a.nivel === 'rojo' ? '#fef2f2' : '#fff7ed', borderRadius: 8, padding: '6px 10px', border: `1px solid ${a.nivel === 'rojo' ? '#fecaca' : '#fed7aa'}` }}>
+            <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, background: a.nivel === 'rojo' ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)', borderRadius: 8, padding: '6px 10px', border: `1px solid ${a.nivel === 'rojo' ? 'var(--at-danger-border)' : 'var(--at-warning-border)'}` }}>
               <span style={{ fontSize: 14, flexShrink: 0 }}>{a.nivel === 'rojo' ? '🔴' : '🟠'}</span>
               <div>
-                <div style={{ fontSize: 11, color: a.nivel === 'rojo' ? '#b91c1c' : '#9a3412', fontWeight: 700 }}>{a.texto}</div>
-                <div style={{ fontSize: 10, color: a.nivel === 'rojo' ? '#dc2626' : '#ea580c', marginTop: 2 }}>→ {a.accion}</div>
+                <div style={{ fontSize: 11, color: a.nivel === 'rojo' ? 'var(--at-danger-strong)' : 'var(--at-warning-strong)', fontWeight: 700 }}>{a.texto}</div>
+                <div style={{ fontSize: 10, color: a.nivel === 'rojo' ? 'var(--at-danger)' : 'var(--at-warning)', marginTop: 2 }}>→ {a.accion}</div>
               </div>
             </div>
           ))}
         </div>
       )}
       {alertas.length === 0 && (
-        <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: 12, marginTop: 4, textAlign: 'center' }}>
+        <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: 10, padding: 12, marginTop: 4, textAlign: 'center' }}>
           <span style={{ fontSize: 16 }}>✅</span>
-          <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, marginTop: 4 }}>Sin alertas críticas — el condominio opera en condiciones normales</div>
+          <div style={{ fontSize: 12, color: 'var(--at-success)', fontWeight: 700, marginTop: 4 }}>Sin alertas críticas — el condominio opera en condiciones normales</div>
         </div>
       )}
     </div>

@@ -157,14 +157,14 @@ export default function GraficasTendenciasTab({ cuotas, tickets, gastos, inciden
   const graficas: Card[] = [
     {
       titulo: 'Tasa de cobro mensual', subtitulo: `Promedio 12m: ${promedioTasa}%`,
-      color: promedioTasa >= 80 ? '#16a34a' : '#d97706', bg: promedioTasa >= 80 ? '#dcfce7' : '#fef3c7',
+      color: promedioTasa >= 80 ? 'var(--at-success)' : 'var(--at-warning)', bg: promedioTasa >= 80 ? 'var(--at-success-tint)' : 'var(--at-warning-tint)',
       resumen: `${promedioTasa}%`,
       tendencia: tendenciaTasa,
       tipo: 'line', datos: tasaCobro, fmt: v => `${v}%`,
     },
     {
       titulo: 'Cuotas en mora por período', subtitulo: 'Pendientes/morosas al vencer',
-      color: '#ef4444', bg: '#fef2f2',
+      color: 'var(--at-danger)', bg: 'var(--at-danger-tint)',
       resumen: `${mora[11].val} este mes`,
       tipo: 'bar', datos: mora, fmt: v => String(v),
     },
@@ -183,7 +183,7 @@ export default function GraficasTendenciasTab({ cuotas, tickets, gastos, inciden
     },
     {
       titulo: 'Incidentes de seguridad', subtitulo: `Total 12m: ${totalIncidentes12} incidentes`,
-      color: '#dc2626', bg: '#fef2f2',
+      color: 'var(--at-danger)', bg: 'var(--at-danger-tint)',
       resumen: `${incidentesM[11].val} este mes`,
       tipo: 'bar', datos: incidentesM, fmt: v => String(v),
     },
@@ -211,7 +211,7 @@ export default function GraficasTendenciasTab({ cuotas, tickets, gastos, inciden
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 16, fontWeight: 800, color: g.color }}>{g.resumen}</div>
                 {g.tendencia !== undefined && (
-                  <div style={{ fontSize: 10, color: g.tendencia >= 0 ? '#16a34a' : '#ef4444', fontWeight: 600 }}>
+                  <div style={{ fontSize: 10, color: g.tendencia >= 0 ? 'var(--at-success)' : 'var(--at-danger)', fontWeight: 600 }}>
                     {g.tendencia >= 0 ? '↑' : '↓'} {Math.abs(g.tendencia)} vs inicio
                   </div>
                 )}

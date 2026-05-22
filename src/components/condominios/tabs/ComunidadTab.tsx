@@ -16,9 +16,9 @@ interface Props {
 
 const TIPO_CONFIG: Record<TipoAnuncio, { label: string; bg: string; color: string; icon: string }> = {
   aviso:         { label: 'Aviso', bg: 'var(--at-primary-tint)', color: 'var(--at-primary)', icon: '📢' },
-  urgente:       { label: 'Urgente', bg: '#fef2f2', color: '#dc2626', icon: '🚨' },
+  urgente:       { label: 'Urgente', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', icon: '🚨' },
   evento:        { label: 'Evento', bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)', icon: '🎉' },
-  mantenimiento: { label: 'Mantenimiento', bg: '#fff7ed', color: '#ea580c', icon: '🔧' },
+  mantenimiento: { label: 'Mantenimiento', bg: 'var(--at-warning-tint)', color: 'var(--at-warning)', icon: '🔧' },
 }
 
 export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreate, onRefresh }: Props) {
@@ -75,7 +75,7 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
   }
 
   async function eliminar(id: string) {
-    const result = await Swal.fire({ title: '¿Eliminar anuncio?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: '#ef4444' })
+    const result = await Swal.fire({ title: '¿Eliminar anuncio?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-danger)' })
     if (!result.isConfirmed) return
     await supabase.from('anuncios_comunidad').delete().eq('id', id)
     onRefresh()
@@ -199,11 +199,11 @@ export function ComunidadTab({ anuncios, proyectoId, companyId, userId, canCreat
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
                     {canCreate && (
                       <button onClick={() => toggleActivo(a)} title={a.activo ? 'Desactivar' : 'Activar'}
-                        style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid var(--at-line)', background: a.activo ? '#f0fdf4' : 'var(--at-surface-2)', color: a.activo ? '#16a34a' : 'var(--at-ink-3)' }}>
+                        style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: '1px solid var(--at-line)', background: a.activo ? 'var(--at-success-tint)' : 'var(--at-surface-2)', color: a.activo ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                         {a.activo ? '✓ Activo' : '○ Inactivo'}
                       </button>
                     )}
-                    <button onClick={() => eliminar(a.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '15px', padding: '4px', textAlign: 'center' }}>🗑</button>
+                    <button onClick={() => eliminar(a.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '4px', textAlign: 'center' }}>🗑</button>
                   </div>
                 </div>
               </div>

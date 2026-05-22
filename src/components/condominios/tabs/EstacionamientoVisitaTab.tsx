@@ -154,7 +154,7 @@ export default function EstacionamientoVisitaTab({
             <input style={inp} placeholder="Observaciones opcionales" value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} />
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Registrar entrada'}
           </button>
         </div>
@@ -163,9 +163,9 @@ export default function EstacionamientoVisitaTab({
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
         {[
-          { label: 'Activos ahora', value: activos.length, color: '#10b981' },
+          { label: 'Activos ahora', value: activos.length, color: 'var(--at-success)' },
           { label: 'Salidas hoy', value: historial.length, color: 'var(--at-accent)' },
-          { label: 'Total del día', value: registrosFiltrados.length, color: '#f59e0b' },
+          { label: 'Total del día', value: registrosFiltrados.length, color: 'var(--at-warning)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
             <div style={{ fontSize: 24, fontWeight: 700, color: k.color }}>{k.value}</div>
@@ -182,7 +182,7 @@ export default function EstacionamientoVisitaTab({
             {activos.map(r => {
               const unidad = unidades.find(u => u.id === r.unidad_visitada)
               return (
-                <div key={r.id} style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={r.id} style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                     <span style={{ fontWeight: 700, fontSize: 16 }}>{TIPOS_VEHICULO.find(t => t.value === r.tipo_vehiculo)?.label?.split(' ')[0]}</span>
                     <div>
@@ -196,7 +196,7 @@ export default function EstacionamientoVisitaTab({
                   </div>
                   {canEdit && (
                     <button onClick={() => registrarSalida(r.id, r.placa)}
-                      style={{ padding: '6px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 12px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                       Registrar salida
                     </button>
                   )}

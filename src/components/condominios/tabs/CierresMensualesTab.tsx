@@ -53,7 +53,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
         <p>Cuotas emitidas: <b>${moneda} ${calc.totalEmitidas.toFixed(2)}</b></p>
         <p>Cuotas cobradas: <b>${moneda} ${calc.totalCobradas.toFixed(2)}</b></p>
         <p>Gastos del mes: <b>${moneda} ${calc.totalGastos.toFixed(2)}</b></p>
-        <p>Saldo: <b style="color:${calc.saldo >= 0 ? '#10b981' : '#ef4444'}">${moneda} ${calc.saldo.toFixed(2)}</b></p>
+        <p>Saldo: <b style="color:${calc.saldo >= 0 ? 'var(--at-success)' : 'var(--at-danger)'}">${moneda} ${calc.saldo.toFixed(2)}</b></p>
         <p>Unidades morosas: <b>${calc.unidadesMorosas}</b></p>
       </div>`,
       icon: 'question', showCancelButton: true, confirmButtonText: 'Confirmar Cierre', confirmButtonColor: 'var(--at-primary)',
@@ -95,7 +95,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
   async function toggleEstado(c: CierreMensual) {
     const nuevoEstado = c.estado === 'cerrado' ? 'borrador' : 'cerrado'
     if (nuevoEstado === 'cerrado') {
-      const r = await Swal.fire({ title: `¿Cerrar período ${c.periodo}?`, text: 'Un cierre finalizado bloquea modificaciones.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Cerrar período', confirmButtonColor: '#ef4444' })
+      const r = await Swal.fire({ title: `¿Cerrar período ${c.periodo}?`, text: 'Un cierre finalizado bloquea modificaciones.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Cerrar período', confirmButtonColor: 'var(--at-danger)' })
       if (!r.isConfirmed) return
     }
     await supabase.from('cierres_mensuales').update({ estado: nuevoEstado }).eq('id', c.id)
@@ -103,7 +103,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar cierre?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar cierre?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('cierres_mensuales').delete().eq('id', id)
     onRefresh()
@@ -154,9 +154,9 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
                 {[
                   { label: 'Cuotas emitidas', value: preview.totalEmitidas,    color: 'var(--at-primary)' },
-                  { label: 'Cuotas cobradas', value: preview.totalCobradas,    color: '#10b981' },
-                  { label: 'Gastos del mes',  value: preview.totalGastos,      color: '#ef4444' },
-                  { label: 'Saldo neto',      value: preview.saldo,            color: preview.saldo >= 0 ? '#10b981' : '#ef4444' },
+                  { label: 'Cuotas cobradas', value: preview.totalCobradas,    color: 'var(--at-success)' },
+                  { label: 'Gastos del mes',  value: preview.totalGastos,      color: 'var(--at-danger)' },
+                  { label: 'Saldo neto',      value: preview.saldo,            color: preview.saldo >= 0 ? 'var(--at-success)' : 'var(--at-danger)' },
                 ].map(k => (
                   <div key={k.label} style={{ textAlign: 'center', padding: '8px' }}>
                     <div style={{ fontSize: '15px', fontWeight: 800, color: k.color }}>{moneda} {k.value.toFixed(2)}</div>
@@ -164,7 +164,7 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
                   </div>
                 ))}
               </div>
-              {preview.unidadesMorosas > 0 && <div style={{ marginTop: '8px', fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>⚠️ {preview.unidadesMorosas} unidad(es) con cuotas morosas</div>}
+              {preview.unidadesMorosas > 0 && <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--at-danger)', fontWeight: 600 }}>⚠️ {preview.unidadesMorosas} unidad(es) con cuotas morosas</div>}
             </div>
           )}
         </div>
@@ -188,16 +188,16 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
                 <tr key={c.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
                   <td style={{ padding: '10px 12px', fontWeight: 700 }}>{c.periodo}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--at-ink-3)' }}>{moneda} {c.total_cuotas_emitidas.toFixed(2)}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: '#10b981', fontWeight: 600 }}>{moneda} {c.total_cuotas_cobradas.toFixed(2)}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: '#ef4444' }}>{moneda} {c.total_gastos.toFixed(2)}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: c.saldo_periodo >= 0 ? '#10b981' : '#ef4444' }}>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--at-success)', fontWeight: 600 }}>{moneda} {c.total_cuotas_cobradas.toFixed(2)}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--at-danger)' }}>{moneda} {c.total_gastos.toFixed(2)}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: c.saldo_periodo >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
                     {c.saldo_periodo >= 0 ? '+' : ''}{moneda} {c.saldo_periodo.toFixed(2)}
                   </td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', color: c.unidades_morosas > 0 ? '#ef4444' : 'var(--at-ink-3)', fontWeight: c.unidades_morosas > 0 ? 700 : 400 }}>{c.unidades_morosas}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', color: c.unidades_morosas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)', fontWeight: c.unidades_morosas > 0 ? 700 : 400 }}>{c.unidades_morosas}</td>
                   <td style={{ padding: '10px 12px' }}>
                     <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
-                      background: c.estado === 'cerrado' ? '#dcfce7' : '#fef3c7',
-                      color: c.estado === 'cerrado' ? '#16a34a' : '#92400e' }}>
+                      background: c.estado === 'cerrado' ? 'var(--at-success-tint)' : 'var(--at-warning-tint)',
+                      color: c.estado === 'cerrado' ? 'var(--at-success)' : 'var(--at-warning-strong)' }}>
                       {c.estado === 'cerrado' ? '✓ Cerrado' : 'Borrador'}
                     </span>
                   </td>
@@ -210,11 +210,11 @@ export function CierresMensualesTab({ cierres, cuotas, gastos, proyectoId, compa
                       {canEdit && (
                         <>
                           <button onClick={() => toggleEstado(c)}
-                            style={{ padding: '3px 8px', background: c.estado === 'cerrado' ? '#fef3c7' : '#dcfce7', color: c.estado === 'cerrado' ? '#92400e' : '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                            style={{ padding: '3px 8px', background: c.estado === 'cerrado' ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', color: c.estado === 'cerrado' ? 'var(--at-warning-strong)' : 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                             {c.estado === 'cerrado' ? '↩ Reabrir' : '✓ Cerrar'}
                           </button>
                           <button onClick={() => handleDelete(c.id)}
-                            style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                            style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                         </>
                       )}
                     </div>

@@ -107,7 +107,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
   }
 
   async function eliminar(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar plantilla?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await Swal.fire({ title: '¿Eliminar plantilla?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('plantillas_cuota').delete().eq('id', id)
     onRefresh()
@@ -185,7 +185,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nueva plantilla'}
           </button>
         )}
@@ -260,7 +260,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
           </div>
 
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Guardar plantilla'}
           </button>
         </div>
@@ -281,7 +281,7 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)' }}>{p.nombre}</span>
-                    <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#16a34a' }}>{PERIODO_LABELS[p.periodicidad]}</span>
+                    <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'var(--at-success-tint)', color: 'var(--at-success)' }}>{PERIODO_LABELS[p.periodicidad]}</span>
                     <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, background: 'var(--at-chip)', color: 'var(--at-ink-2)' }}>{p.concepto}</span>
                     {tieneRubros && (
                       <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, background: 'var(--at-primary-tint)', color: 'var(--at-primary)' }}>
@@ -307,8 +307,8 @@ export default function PlantillasCuotaTab({ plantillas, unidades, proyectoId, c
                   {canEdit && (
                     <>
                       <button onClick={() => startEdit(p)} style={{ padding: '7px 12px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>✏️</button>
-                      <button onClick={() => toggleActiva(p)} style={{ padding: '7px 12px', background: p.activa ? '#fef3c7' : '#f0fdf4', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{p.activa ? '⏸' : '▶'}</button>
-                      <button onClick={() => eliminar(p.id)} style={{ padding: '7px 10px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>🗑</button>
+                      <button onClick={() => toggleActiva(p)} style={{ padding: '7px 12px', background: p.activa ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>{p.activa ? '⏸' : '▶'}</button>
+                      <button onClick={() => eliminar(p.id)} style={{ padding: '7px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: 14 }}>🗑</button>
                     </>
                   )}
                 </div>

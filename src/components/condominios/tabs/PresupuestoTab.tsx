@@ -33,9 +33,9 @@ function pct(exec: number, budget: number) {
 }
 
 function barColor(p: number) {
-  if (p >= 100) return '#ef4444'
-  if (p >= 80)  return '#f59e0b'
-  return '#10b981'
+  if (p >= 100) return 'var(--at-danger)'
+  if (p >= 80)  return 'var(--at-warning)'
+  return 'var(--at-success)'
 }
 
 export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, moneda, proyectoNombre = 'Condominio', canEdit, onRefresh }: Props) {
@@ -91,7 +91,7 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar presupuesto?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar presupuesto?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('presupuesto_condominio').delete().eq('id', id)
     onRefresh()
@@ -142,7 +142,7 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
             {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <button onClick={exportarPDF} style={{ padding: '6px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
-          <button onClick={exportarXlsx} style={{ padding: '6px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
+          <button onClick={exportarXlsx} style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
         </div>
       </div>
 
@@ -150,7 +150,7 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         {[
           { label: 'Total presupuestado', value: `${moneda} ${totalPresupuestado.toFixed(0)}`,   icon: '📋', color: 'var(--at-primary)' },
-          { label: 'Total ejecutado',     value: `${moneda} ${totalEjecutado.toFixed(0)}`,       icon: '💰', color: pct(totalEjecutado, totalPresupuestado) >= 100 ? '#ef4444' : '#10b981' },
+          { label: 'Total ejecutado',     value: `${moneda} ${totalEjecutado.toFixed(0)}`,       icon: '💰', color: pct(totalEjecutado, totalPresupuestado) >= 100 ? 'var(--at-danger)' : 'var(--at-success)' },
           { label: 'Disponible',          value: `${moneda} ${Math.max(0, totalPresupuestado - totalEjecutado).toFixed(0)}`, icon: '✅', color: 'var(--at-accent)' },
           { label: '% Ejecución',         value: `${pct(totalEjecutado, totalPresupuestado)}%`,  icon: '📈', color: barColor(pct(totalEjecutado, totalPresupuestado)) },
         ].map(k => (
@@ -210,7 +210,7 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
                   <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: ejecutado > 0 ? 700 : 400, color: ejecutado > 0 ? 'var(--at-ink)' : 'var(--at-line-strong)' }}>
                     {ejecutado > 0 ? `${moneda} ${ejecutado.toFixed(0)}` : '—'}
                   </td>
-                  <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: presupuestado > 0 ? (varianza < 0 ? '#ef4444' : '#10b981') : 'var(--at-line-strong)' }}>
+                  <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700, color: presupuestado > 0 ? (varianza < 0 ? 'var(--at-danger)' : 'var(--at-success)') : 'var(--at-line-strong)' }}>
                     {presupuestado > 0 ? `${varianza >= 0 ? '+' : ''}${moneda} ${varianza.toFixed(0)}` : '—'}
                   </td>
                   <td style={{ padding: '12px 14px', textAlign: 'right' }}>
@@ -229,7 +229,7 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
                         <button onClick={() => startEdit(cat)} style={{ padding: '3px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                           {presupuestado > 0 ? '✏️' : '+ Asignar'}
                         </button>
-                        {p && <button onClick={() => handleDelete(p.id)} style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
+                        {p && <button onClick={() => handleDelete(p.id)} style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                       </div>
                     )}
                   </td>
@@ -241,7 +241,7 @@ export function PresupuestoTab({ presupuestos, gastos, proyectoId, companyId, mo
               <td style={{ padding: '12px 14px', fontWeight: 800, color: 'var(--at-ink)' }}>TOTAL</td>
               <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: 'var(--at-ink)' }}>{moneda} {totalPresupuestado.toFixed(0)}</td>
               <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: 'var(--at-ink)' }}>{moneda} {totalEjecutado.toFixed(0)}</td>
-              <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: totalPresupuestado - totalEjecutado < 0 ? '#ef4444' : '#10b981' }}>
+              <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: totalPresupuestado - totalEjecutado < 0 ? 'var(--at-danger)' : 'var(--at-success)' }}>
                 {totalPresupuestado > 0 ? `${totalPresupuestado - totalEjecutado >= 0 ? '+' : ''}${moneda} ${(totalPresupuestado - totalEjecutado).toFixed(0)}` : '—'}
               </td>
               <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: barColor(pct(totalEjecutado, totalPresupuestado)) }}>

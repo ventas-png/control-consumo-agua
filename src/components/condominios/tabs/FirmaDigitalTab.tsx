@@ -14,9 +14,9 @@ interface Props {
 }
 
 const ESTADO_CONFIG: Record<EstadoFirma, { label: string; color: string; bg: string; icon: string }> = {
-  pendiente: { label: 'Pendiente', color: '#f59e0b', bg: '#fef3c7', icon: '⏳' },
-  firmado:   { label: 'Firmado',   color: '#10b981', bg: '#d1fae5', icon: '✅' },
-  rechazado: { label: 'Rechazado', color: '#ef4444', bg: '#fee2e2', icon: '❌' },
+  pendiente: { label: 'Pendiente', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '⏳' },
+  firmado:   { label: 'Firmado',   color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '✅' },
+  rechazado: { label: 'Rechazado', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', icon: '❌' },
   expirado:  { label: 'Expirado',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)', icon: '⌛' },
 }
 
@@ -76,7 +76,7 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar firma?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar firma?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('firmas_digitales').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -101,9 +101,9 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
           { label: 'Total solicitudes', value: String(firmas.length), icon: '📝', color: 'var(--at-primary)' },
-          { label: 'Pendientes',        value: String(pendientes),    icon: '⏳', color: '#f59e0b' },
-          { label: 'Firmados',          value: String(firmados),      icon: '✅', color: '#10b981' },
-          { label: 'Expirados pronto',  value: String(expirados),     icon: '⌛', color: '#ef4444' },
+          { label: 'Pendientes',        value: String(pendientes),    icon: '⏳', color: 'var(--at-warning)' },
+          { label: 'Firmados',          value: String(firmados),      icon: '✅', color: 'var(--at-success)' },
+          { label: 'Expirados pronto',  value: String(expirados),     icon: '⌛', color: 'var(--at-danger)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
@@ -209,16 +209,16 @@ export function FirmaDigitalTab({ firmas, unidades, proyectoId, companyId, canCr
                   {f.unidad_nombre && <div>🏠 {f.unidad_nombre}</div>}
                   {f.firmante_nombre && <div>👤 {f.firmante_nombre}</div>}
                   {f.firmante_email && <div>✉️ {f.firmante_email}</div>}
-                  {f.fecha_vencimiento && <div style={{ color: venceProto ? '#ef4444' : 'var(--at-ink-3)', fontWeight: venceProto ? 700 : 400 }}>📅 Vence: {f.fecha_vencimiento}{venceProto ? ' ⚠️' : ''}</div>}
-                  {f.fecha_firma && <div style={{ color: '#10b981', fontWeight: 600 }}>✅ Firmado: {new Date(f.fecha_firma).toLocaleDateString()}</div>}
+                  {f.fecha_vencimiento && <div style={{ color: venceProto ? 'var(--at-danger)' : 'var(--at-ink-3)', fontWeight: venceProto ? 700 : 400 }}>📅 Vence: {f.fecha_vencimiento}{venceProto ? ' ⚠️' : ''}</div>}
+                  {f.fecha_firma && <div style={{ color: 'var(--at-success)', fontWeight: 600 }}>✅ Firmado: {new Date(f.fecha_firma).toLocaleDateString()}</div>}
                 </div>
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {f.estado === 'pendiente' && (
-                      <button onClick={() => marcarFirmado(f.id)} style={{ flex: 1, padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>✅ Marcar firmado</button>
+                      <button onClick={() => marcarFirmado(f.id)} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>✅ Marcar firmado</button>
                     )}
                     <button onClick={() => startEdit(f)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                    <button onClick={() => handleDelete(f.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                    <button onClick={() => handleDelete(f.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                   </div>
                 )}
               </div>

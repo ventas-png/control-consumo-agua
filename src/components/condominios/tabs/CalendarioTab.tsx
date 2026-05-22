@@ -26,10 +26,10 @@ interface CalEvent {
 
 const TIPO_COLOR: Record<string, string> = {
   evento:        'var(--at-primary)',
-  mantenimiento: '#f59e0b',
+  mantenimiento: 'var(--at-warning)',
   asamblea:      'var(--at-accent)',
-  vencimiento:   '#ef4444',
-  recordatorio:  '#10b981',
+  vencimiento:   'var(--at-danger)',
+  recordatorio:  'var(--at-success)',
   agenda:        'var(--at-ink-3)',
 }
 
@@ -111,7 +111,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar evento?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar evento?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('eventos_calendario').delete().eq('id', id)
     onRefresh()
@@ -174,7 +174,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
             <div>
               <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }}>Color</label>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
-                {['var(--at-primary)','#10b981','#f59e0b','#ef4444','var(--at-accent)','#ec4899','var(--at-ink)'].map(c => (
+                {['var(--at-primary)','var(--at-success)','var(--at-warning)','var(--at-danger)','var(--at-accent)','#ec4899','var(--at-ink)'].map(c => (
                   <div key={c} onClick={() => setF('color', c)}
                     style={{ width: '20px', height: '20px', borderRadius: '50%', background: c, cursor: 'pointer', border: form.color === c ? '2px solid var(--at-ink)' : '2px solid transparent' }} />
                 ))}
@@ -225,7 +225,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
                   style={{
                     minHeight: '70px', padding: '6px', borderRight: (idx + 1) % 7 !== 0 ? '1px solid var(--at-chip)' : 'none',
                     borderBottom: '1px solid var(--at-chip)', cursor: day ? 'pointer' : 'default',
-                    background: isSelected ? 'var(--at-primary-tint)' : isToday ? '#fefce8' : day ? 'var(--at-surface)' : 'var(--at-surface-2)',
+                    background: isSelected ? 'var(--at-primary-tint)' : isToday ? 'var(--at-warning-tint)' : day ? 'var(--at-surface)' : 'var(--at-surface-2)',
                   }}>
                   {day && (
                     <>
@@ -268,7 +268,7 @@ export function CalendarioTab({ eventos, asambleas, agenda, proyectoId, companyI
                       <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-ink)' }}>{e.titulo}</div>
                       {canEdit && e.source === 'evento' && (
                         <button onClick={() => handleDelete(e.id)}
-                          style={{ padding: '2px 6px', background: '#fee2e2', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', color: '#ef4444', flexShrink: 0, marginLeft: '6px' }}>🗑️</button>
+                          style={{ padding: '2px 6px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', color: 'var(--at-danger)', flexShrink: 0, marginLeft: '6px' }}>🗑️</button>
                       )}
                     </div>
                     {e.hora && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>🕐 {e.hora}</div>}

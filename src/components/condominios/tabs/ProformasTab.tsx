@@ -19,9 +19,9 @@ type EstadoP = Proforma['estado']
 const ESTADO_CFG: Record<EstadoP, { label: string; color: string; bg: string; next?: EstadoP; nextLabel?: string }> = {
   borrador:      { label: 'Borrador',     color: 'var(--at-ink-3)', bg: 'var(--at-chip)', next: 'enviada',     nextLabel: 'Enviar a proveedor' },
   enviada:       { label: 'Enviada',      color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', next: 'aprobada',    nextLabel: 'Aprobar' },
-  aprobada:      { label: 'Aprobada',     color: '#16a34a', bg: '#dcfce7', next: 'convertida_oc', nextLabel: 'Convertir a OC' },
+  aprobada:      { label: 'Aprobada',     color: 'var(--at-success)', bg: 'var(--at-success-tint)', next: 'convertida_oc', nextLabel: 'Convertir a OC' },
   convertida_oc: { label: 'OC generada', color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
-  rechazada:     { label: 'Rechazada',    color: '#ef4444', bg: '#fef2f2' },
+  rechazada:     { label: 'Rechazada',    color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
 const BLANK = {
@@ -108,14 +108,14 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
   }
 
   async function rechazar(p: Proforma) {
-    const res = await Swal.fire({ icon: 'warning', title: '¿Rechazar proforma?', text: p.concepto, showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Rechazar', cancelButtonText: 'Cancelar' })
+    const res = await Swal.fire({ icon: 'warning', title: '¿Rechazar proforma?', text: p.concepto, showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Rechazar', cancelButtonText: 'Cancelar' })
     if (!res.isConfirmed) return
     await supabase.from('proformas_condominio').update({ estado: 'rechazada' }).eq('id', p.id)
     onRefresh()
   }
 
   async function eliminar(p: Proforma) {
-    const res = await Swal.fire({ icon: 'warning', title: '¿Eliminar?', text: p.concepto, showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const res = await Swal.fire({ icon: 'warning', title: '¿Eliminar?', text: p.concepto, showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!res.isConfirmed) return
     await supabase.from('proformas_condominio').delete().eq('id', p.id)
     onRefresh()
@@ -210,7 +210,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
             const exp = expandida === p.id
             const vencida = p.fecha_validez && p.fecha_validez < new Date().toISOString().slice(0, 10) && p.estado !== 'convertida_oc' && p.estado !== 'rechazada'
             return (
-              <div key={p.id} style={{ background: 'var(--at-surface)', border: `1px solid ${vencida ? '#fca5a5' : 'var(--at-line)'}`, borderRadius: 12, overflow: 'hidden' }}>
+              <div key={p.id} style={{ background: 'var(--at-surface)', border: `1px solid ${vencida ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: 12, overflow: 'hidden' }}>
                 <div onClick={() => setExpandida(exp ? null : p.id)}
                   style={{ padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ flex: 1 }}>
@@ -220,7 +220,7 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
                       {p.fecha_validez && ` · Válida hasta: ${p.fecha_validez}`}
                     </div>
                   </div>
-                  {vencida && <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>VENCIDA</span>}
+                  {vencida && <span style={{ fontSize: 10, color: 'var(--at-danger)', fontWeight: 600 }}>VENCIDA</span>}
                   <span style={{ padding: '3px 10px', borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 600 }}>{cfg.label}</span>
                   <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{exp ? '▲' : '▼'}</span>
                 </div>
@@ -243,14 +243,14 @@ export default function ProformasTab({ proformas, proveedores, proyectoId, compa
                             ✏️ Editar
                           </button>
                           <button onClick={() => rechazar(p)}
-                            style={{ padding: '6px 12px', background: '#fef2f2', color: '#ef4444', border: '1px solid #ef4444', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                            style={{ padding: '6px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                             ✗ Rechazar
                           </button>
                         </>
                       )}
                       {canEdit && (p.estado === 'borrador' || p.estado === 'rechazada') && (
                         <button onClick={() => eliminar(p)}
-                          style={{ padding: '6px 12px', background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                          style={{ padding: '6px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                           🗑️
                         </button>
                       )}

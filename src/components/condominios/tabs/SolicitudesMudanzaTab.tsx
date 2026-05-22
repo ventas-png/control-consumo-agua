@@ -49,12 +49,12 @@ const TIPO_CFG: Record<TipoSolicitudMudanza, { label: string; icon: string }> = 
 }
 
 const ESTADO_CFG: Record<EstadoSolicitudMudanza, { label: string; color: string; bg: string; icon: string }> = {
-  pendiente:  { label: 'Pendiente',  color: '#d97706', bg: '#fef3c7', icon: '⏳' },
-  aprobada:   { label: 'Aprobada',   color: '#16a34a', bg: '#dcfce7', icon: '✅' },
-  rechazada:  { label: 'Rechazada',  color: '#dc2626', bg: '#fef2f2', icon: '❌' },
+  pendiente:  { label: 'Pendiente',  color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '⏳' },
+  aprobada:   { label: 'Aprobada',   color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '✅' },
+  rechazada:  { label: 'Rechazada',  color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', icon: '❌' },
   programada: { label: 'Programada', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)', icon: '📅' },
-  en_curso:   { label: 'En Curso',   color: '#f59e0b', bg: '#fef3c7', icon: '🚚' },
-  completada: { label: 'Completada', color: '#10b981', bg: '#d1fae5', icon: '🏁' },
+  en_curso:   { label: 'En Curso',   color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '🚚' },
+  completada: { label: 'Completada', color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '🏁' },
   cancelada:  { label: 'Cancelada',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)', icon: '🚫' },
 }
 
@@ -167,7 +167,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
       inputLabel: nuevoEstado === 'aprobada' ? 'Comentario (opcional)' : 'Motivo del rechazo',
       inputPlaceholder: 'Escriba un comentario…',
       showCancelButton: true,
-      confirmButtonColor: nuevoEstado === 'aprobada' ? '#16a34a' : '#dc2626',
+      confirmButtonColor: nuevoEstado === 'aprobada' ? 'var(--at-success)' : 'var(--at-danger)',
       confirmButtonText: nuevoEstado === 'aprobada' ? 'Aprobar' : 'Rechazar',
       cancelButtonText: 'Cancelar',
     })
@@ -246,9 +246,9 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
         </div>
       )}
       {depositosPendientes.length > 0 && (
-        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>💰</span>
-          <span style={{ fontSize: '13px', color: '#92400e', fontWeight: 600 }}>
+          <span style={{ fontSize: '13px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>
             {depositosPendientes.length} depósito{depositosPendientes.length > 1 ? 's' : ''} pendiente{depositosPendientes.length > 1 ? 's' : ''} de cobro
           </span>
         </div>
@@ -313,9 +313,9 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
       {/* KPIs */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {[
-          { label: 'Pendientes', count: pendientes, color: '#f59e0b', bg: '#fef3c7' },
-          { label: 'Aprobadas',  count: aprobadas,  color: '#16a34a', bg: '#dcfce7' },
-          { label: 'Rechazadas', count: rechazadas, color: '#dc2626', bg: '#fef2f2' },
+          { label: 'Pendientes', count: pendientes, color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+          { label: 'Aprobadas',  count: aprobadas,  color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+          { label: 'Rechazadas', count: rechazadas, color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, border: `1px solid ${k.color}30`, borderRadius: '10px', padding: '12px 20px', minWidth: '110px' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: k.color }}>{k.count}</div>
@@ -327,11 +327,11 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
       {/* Filters */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button style={chipStyle(filtroEstado === 'all', 'var(--at-ink-3)')} onClick={() => setFiltroEstado('all')}>Todas</button>
-        <button style={chipStyle(filtroEstado === 'pendiente', '#f59e0b')} onClick={() => setFiltroEstado('pendiente')}>⏳ Pendientes</button>
-        <button style={chipStyle(filtroEstado === 'aprobada', '#16a34a')} onClick={() => setFiltroEstado('aprobada')}>✅ Aprobadas</button>
+        <button style={chipStyle(filtroEstado === 'pendiente', 'var(--at-warning)')} onClick={() => setFiltroEstado('pendiente')}>⏳ Pendientes</button>
+        <button style={chipStyle(filtroEstado === 'aprobada', 'var(--at-success)')} onClick={() => setFiltroEstado('aprobada')}>✅ Aprobadas</button>
         <button style={chipStyle(filtroEstado === 'operativas', 'var(--at-primary)')} onClick={() => setFiltroEstado('operativas')}>🚚 En ejecución</button>
-        <button style={chipStyle(filtroEstado === 'completada', '#10b981')} onClick={() => setFiltroEstado('completada')}>🏁 Completadas</button>
-        <button style={chipStyle(filtroEstado === 'rechazada', '#dc2626')} onClick={() => setFiltroEstado('rechazada')}>❌ Rechazadas</button>
+        <button style={chipStyle(filtroEstado === 'completada', 'var(--at-success)')} onClick={() => setFiltroEstado('completada')}>🏁 Completadas</button>
+        <button style={chipStyle(filtroEstado === 'rechazada', 'var(--at-danger)')} onClick={() => setFiltroEstado('rechazada')}>❌ Rechazadas</button>
         <button style={chipStyle(filtroEstado === 'cancelada', 'var(--at-ink-3)')} onClick={() => setFiltroEstado('cancelada')}>🚫 Canceladas</button>
       </div>
 
@@ -371,7 +371,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
                   <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
                     {s.ascensor_reservado && <span style={{ fontSize: '10px', fontWeight: 600, background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', padding: '1px 6px', borderRadius: '4px' }}>🛗 Ascensor</span>}
                     {s.deposito_requerido && (
-                      <span style={{ fontSize: '10px', fontWeight: 600, background: s.deposito_pagado ? '#d1fae5' : '#fef3c7', color: s.deposito_pagado ? '#059669' : '#92400e', padding: '1px 6px', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '10px', fontWeight: 600, background: s.deposito_pagado ? 'var(--at-success-tint)' : 'var(--at-warning-tint)', color: s.deposito_pagado ? 'var(--at-success-strong)' : 'var(--at-warning-strong)', padding: '1px 6px', borderRadius: '4px' }}>
                         💰 {s.deposito_pagado ? 'Depósito pagado' : 'Depósito pendiente'}{s.monto_deposito ? ` (${moneda} ${s.monto_deposito})` : ''}
                       </span>
                     )}
@@ -416,7 +416,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
                 )}
 
                 {s.estado !== 'pendiente' && s.estado !== 'rechazada' && s.fecha_autorizada && (
-                  <div style={{ marginTop: '8px', fontSize: '12.5px', color: '#16a34a', fontWeight: 600 }}>
+                  <div style={{ marginTop: '8px', fontSize: '12.5px', color: 'var(--at-success)', fontWeight: 600 }}>
                     ✅ Fecha autorizada: {s.fecha_autorizada}{s.hora_autorizada ? ` a las ${s.hora_autorizada}` : ''}
                   </div>
                 )}
@@ -441,12 +441,12 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
                     <button
                       disabled={saving}
                       onClick={e => { e.stopPropagation(); resolver(s, 'aprobada') }}
-                      style={{ padding: '8px 18px', background: '#16a34a', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13px', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}
+                      style={{ padding: '8px 18px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13px', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}
                     >✅ Aprobar</button>
                     <button
                       disabled={saving}
                       onClick={e => { e.stopPropagation(); resolver(s, 'rechazada') }}
-                      style={{ padding: '8px 18px', background: '#dc2626', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13px', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}
+                      style={{ padding: '8px 18px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '13px', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}
                     >❌ Rechazar</button>
                   </div>
                 )}
@@ -526,7 +526,7 @@ export function SolicitudesMudanzaTab({ solicitudes, unidades, proyectoId, compa
                             const msg = `🚚 Recordatorio de mudanza\nUnidad: ${unidadNombre(s)}\nTipo: ${tipo.label}\nFecha: ${s.fecha_autorizada ?? s.fecha_solicitada ?? ''}${s.hora_autorizada ? `\nHora: ${s.hora_autorizada}` : ''}${s.ascensor_reservado ? '\n🛗 Ascensor reservado' : ''}${s.deposito_requerido && !s.deposito_pagado ? `\n⚠️ Depósito pendiente${s.monto_deposito ? ` (${moneda} ${s.monto_deposito})` : ''}` : ''}`
                             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
                           }}
-                          style={{ padding: '6px 14px', background: '#dcfce7', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: '#16a34a' }}
+                          style={{ padding: '6px 14px', background: 'var(--at-success-tint)', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: 'var(--at-success)' }}
                         >💬 Recordatorio WhatsApp</button>
                       </div>
                     )}

@@ -15,17 +15,17 @@ interface Props {
 
 const CAT_CFG: Record<CategoriaProyectoCond, { label: string; icon: string; color: string }> = {
   mejora:        { label: 'Mejora',        icon: '🏗️', color: 'var(--at-primary-hover)' },
-  mantenimiento: { label: 'Mantenimiento', icon: '🔧', color: '#d97706' },
+  mantenimiento: { label: 'Mantenimiento', icon: '🔧', color: 'var(--at-warning)' },
   seguridad:     { label: 'Seguridad',     icon: '🛡️', color: 'var(--at-accent-hover)' },
   tecnologia:    { label: 'Tecnología',    icon: '💻', color: 'var(--at-primary-hover)' },
   otro:          { label: 'Otro',          icon: '📌', color: 'var(--at-ink-3)' },
 }
 const ESTADO_CFG: Record<EstadoProyectoCond, { label: string; bg: string; color: string; barColor: string }> = {
   planificado:  { label: 'Planificado',  bg: 'var(--at-primary-tint)', color: 'var(--at-primary)', barColor: 'var(--at-accent-2)' },
-  en_progreso:  { label: 'En progreso',  bg: '#fef3c7', color: '#d97706', barColor: '#fbbf24' },
+  en_progreso:  { label: 'En progreso',  bg: 'var(--at-warning-tint)', color: 'var(--at-warning)', barColor: '#fbbf24' },
   pausado:      { label: 'Pausado',      bg: 'var(--at-chip)', color: 'var(--at-ink-3)', barColor: 'var(--at-line-strong)' },
-  completado:   { label: 'Completado',   bg: '#dcfce7', color: '#16a34a', barColor: '#4ade80' },
-  cancelado:    { label: 'Cancelado',    bg: '#fee2e2', color: '#ef4444', barColor: '#fca5a5' },
+  completado:   { label: 'Completado',   bg: 'var(--at-success-tint)', color: 'var(--at-success)', barColor: '#4ade80' },
+  cancelado:    { label: 'Cancelado',    bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', barColor: 'var(--at-danger-border)' },
 }
 
 const BLANK = {
@@ -103,7 +103,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
   }
 
   async function eliminar(id: string) {
-    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar proyecto?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar proyecto?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!isConfirmed) return
     await supabase.from('proyectos_condominio').delete().eq('id', id)
     onRefresh()
@@ -117,10 +117,10 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'En progreso', val: enProgreso, bg: '#fef3c7', color: '#d97706' },
-          { label: 'Completados', val: proyectos.filter(p => p.estado === 'completado').length, bg: '#dcfce7', color: '#16a34a' },
+          { label: 'En progreso', val: enProgreso, bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+          { label: 'Completados', val: proyectos.filter(p => p.estado === 'completado').length, bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
           { label: 'Presupuesto total', val: `${moneda} ${totalPresupuesto.toFixed(2)}`, bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-          { label: 'Costo real', val: `${moneda} ${totalCostoReal.toFixed(2)}`, bg: totalCostoReal > totalPresupuesto && totalPresupuesto > 0 ? '#fef2f2' : 'var(--at-surface-2)', color: totalCostoReal > totalPresupuesto && totalPresupuesto > 0 ? '#ef4444' : 'var(--at-ink-2)' },
+          { label: 'Costo real', val: `${moneda} ${totalCostoReal.toFixed(2)}`, bg: totalCostoReal > totalPresupuesto && totalPresupuesto > 0 ? 'var(--at-danger-tint)' : 'var(--at-surface-2)', color: totalCostoReal > totalPresupuesto && totalPresupuesto > 0 ? 'var(--at-danger)' : 'var(--at-ink-2)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: k.color }}>{k.val}</div>
@@ -233,7 +233,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
                         <span style={{ fontSize: 16 }}>{cat.icon}</span>
                         <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)' }}>{p.nombre}</span>
                         <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: est.bg, color: est.color }}>{est.label}</span>
-                        {sobrePresupuesto && <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, background: '#fef2f2', color: '#ef4444', fontWeight: 700 }}>⚠ Sobre presupuesto</span>}
+                        {sobrePresupuesto && <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontWeight: 700 }}>⚠ Sobre presupuesto</span>}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>
                         {cat.label}
@@ -253,7 +253,7 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
                   {(p.presupuesto || p.costo_real) && (
                     <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 11, color: 'var(--at-ink-3)' }}>
                       {p.presupuesto && <span>Presupuesto: <strong>{moneda} {p.presupuesto.toFixed(2)}</strong></span>}
-                      {p.costo_real && <span>Real: <strong style={{ color: sobrePresupuesto ? '#ef4444' : '#16a34a' }}>{moneda} {p.costo_real.toFixed(2)}</strong></span>}
+                      {p.costo_real && <span>Real: <strong style={{ color: sobrePresupuesto ? 'var(--at-danger)' : 'var(--at-success)' }}>{moneda} {p.costo_real.toFixed(2)}</strong></span>}
                     </div>
                   )}
                 </div>
@@ -287,11 +287,11 @@ export default function ProyectosCondominioTab({ proyectos, proyectoId, companyI
                     📊 Avance
                   </button>
                   <button onClick={() => abrirEditar(selected)}
-                    style={{ flex: 1, padding: '7px 0', background: '#f0fdf4', color: '#16a34a', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ flex: 1, padding: '7px 0', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     ✏️ Editar
                   </button>
                   <button onClick={() => eliminar(selected.id)}
-                    style={{ padding: '7px 10px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ padding: '7px 10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     🗑
                   </button>
                 </div>

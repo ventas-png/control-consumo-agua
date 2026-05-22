@@ -17,15 +17,15 @@ interface Props {
 const CATEGORIAS: { value: CategoriaCargoAdicional; label: string; icon: string; color: string }[] = [
   { value: 'reparacion',     label: 'Reparación',      icon: '🔧', color: 'var(--at-accent)' },
   { value: 'exceso_consumo', label: 'Exceso consumo',  icon: '💧', color: 'var(--at-primary-2)' },
-  { value: 'dano',           label: 'Daño',            icon: '⚠️', color: '#ef4444' },
+  { value: 'dano',           label: 'Daño',            icon: '⚠️', color: 'var(--at-danger)' },
   { value: 'servicio',       label: 'Servicio extra',  icon: '🛎️', color: 'var(--at-accent)' },
-  { value: 'multa',          label: 'Multa',           icon: '⚖️', color: '#f97316' },
+  { value: 'multa',          label: 'Multa',           icon: '⚖️', color: 'var(--at-warning)' },
   { value: 'otro',           label: 'Otro',            icon: '📄', color: 'var(--at-ink-3)' },
 ]
 
 const ESTADOS: { value: EstadoCargoAdicional; label: string; color: string; bg: string }[] = [
-  { value: 'pendiente', label: 'Pendiente', color: '#f59e0b', bg: '#fef3c7' },
-  { value: 'pagado',    label: 'Pagado',    color: '#10b981', bg: '#d1fae5' },
+  { value: 'pendiente', label: 'Pendiente', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  { value: 'pagado',    label: 'Pagado',    color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   { value: 'anulado',   label: 'Anulado',   color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 ]
 
@@ -85,7 +85,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
   }
 
   async function anular(c: CargoAdicionalUnidad) {
-    const res = await Swal.fire({ title: 'Anular cargo', text: '¿Confirmar anulación?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Anular', confirmButtonColor: '#ef4444' })
+    const res = await Swal.fire({ title: 'Anular cargo', text: '¿Confirmar anulación?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Anular', confirmButtonColor: 'var(--at-danger)' })
     if (!res.isConfirmed) return
     await supabase.from('cargos_adicionales_unidad').update({ estado: 'anulado' as EstadoCargoAdicional }).eq('id', c.id)
     onRefresh()
@@ -99,8 +99,8 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
         {[
-          { label: 'Total pendiente', value: `${moneda} ${totalPendiente.toLocaleString()}`, color: '#f59e0b', bg: '#fef3c7' },
-          { label: 'Total cobrado', value: `${moneda} ${totalCobrado.toLocaleString()}`, color: '#10b981', bg: '#d1fae5' },
+          { label: 'Total pendiente', value: `${moneda} ${totalPendiente.toLocaleString()}`, color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+          { label: 'Total cobrado', value: `${moneda} ${totalCobrado.toLocaleString()}`, color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
           { label: 'Registros activos', value: cargos.filter(c => c.estado === 'pendiente').length, color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
@@ -174,7 +174,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear cargo'}
           </button>
         </div>
@@ -191,7 +191,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
             <div key={unidadId} style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingBottom: 4, borderBottom: '2px solid var(--at-line)' }}>
                 <span style={{ fontWeight: 700, fontSize: 14 }}>🏠 {unidad?.nombre || 'Unidad'}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#f59e0b' }}>{moneda} {totalUnidad.toLocaleString()}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--at-warning)' }}>{moneda} {totalUnidad.toLocaleString()}</span>
               </div>
               <div style={{ display: 'grid', gap: 8 }}>
                 {items.map(c => {
@@ -199,7 +199,7 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                   const est = ESTADOS.find(e => e.value === c.estado)
                   const vencido = c.fecha_vencimiento && new Date(c.fecha_vencimiento) < new Date() && c.estado === 'pendiente'
                   return (
-                    <div key={c.id} style={{ background: 'var(--at-surface)', border: `1px solid ${vencido ? '#fecaca' : 'var(--at-line)'}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={c.id} style={{ background: 'var(--at-surface)', border: `1px solid ${vencido ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                           <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: cat?.color + '20', color: cat?.color }}>{cat?.icon} {cat?.label}</span>
@@ -207,19 +207,19 @@ export default function CargosAdicionalesTab({ cargos, unidades, proyectoId, com
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 3 }}>
                           {c.fecha_cargo}
-                          {c.fecha_vencimiento && <span> · Vence: <span style={{ color: vencido ? '#ef4444' : 'var(--at-ink-3)' }}>{c.fecha_vencimiento}</span></span>}
+                          {c.fecha_vencimiento && <span> · Vence: <span style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{c.fecha_vencimiento}</span></span>}
                           {c.referencia && <span> · Ref: {c.referencia}</span>}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                        <span style={{ fontWeight: 700, fontSize: 16, color: c.estado === 'pagado' ? '#10b981' : '#ef4444' }}>
+                        <span style={{ fontWeight: 700, fontSize: 16, color: c.estado === 'pagado' ? 'var(--at-success)' : 'var(--at-danger)' }}>
                           {moneda} {c.monto.toLocaleString()}
                         </span>
                         <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: est?.bg, color: est?.color }}>{est?.label}</span>
                         {canEdit && c.estado === 'pendiente' && (
                           <div style={{ display: 'flex', gap: 4 }}>
                             <button onClick={() => marcarPagado(c)}
-                              style={{ padding: '4px 10px', background: '#d1fae5', color: '#10b981', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                              style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                               ✓ Pagado
                             </button>
                             <button onClick={() => anular(c)}

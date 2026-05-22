@@ -11,9 +11,9 @@ const PLATAFORMA_LABEL: Record<string, string> = {
   airbnb: 'Airbnb', booking: 'Booking.com', vrbo: 'VRBO', directo: 'Directo', otro: 'Otro',
 }
 const PLATAFORMA_COLOR: Record<string, { bg: string; color: string }> = {
-  airbnb:  { bg: '#fff1f2', color: '#e11d48' },
+  airbnb:  { bg: 'var(--at-danger-tint)', color: '#e11d48' },
   booking: { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  vrbo:    { bg: '#f0fdf4', color: '#16a34a' },
+  vrbo:    { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   directo: { bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)' },
   otro:    { bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
 }
@@ -535,7 +535,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
     const acompsActivos = !esAcompanante ? visitantes.filter(a => a.visitante_principal_id === v.id && !a.hora_salida) : []
 
     const borderColor = enPremisa
-      ? (isSTRMember ? 'var(--at-accent-soft)' : esAcompanante ? 'var(--at-primary-soft-2)' : '#bbf7d0')
+      ? (isSTRMember ? 'var(--at-accent-soft)' : esAcompanante ? 'var(--at-primary-soft-2)' : 'var(--at-success-border)')
       : 'var(--at-line)'
     const borderLeft = isSTRMember
       ? '4px solid var(--at-accent)'
@@ -553,18 +553,18 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
         }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
           {v.foto_url
-            ? <SecureImage src={v.foto_url} alt={v.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `2px solid ${enPremisa ? (isSTRMember ? 'var(--at-accent)' : esAcompanante ? 'var(--at-primary-2)' : '#10b981') : 'var(--at-line)'}` }} />
+            ? <SecureImage src={v.foto_url} alt={v.nombre} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: `2px solid ${enPremisa ? (isSTRMember ? 'var(--at-accent)' : esAcompanante ? 'var(--at-primary-2)' : 'var(--at-success)') : 'var(--at-line)'}` }} />
             : <div style={{
                 width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
                 background: v.es_menor
-                  ? (enPremisa ? '#fef9c3' : '#fef3c7')
+                  ? (enPremisa ? 'var(--at-warning-tint)' : 'var(--at-warning-tint)')
                   : isSTRMember
                     ? (enPremisa ? 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))' : 'var(--at-accent-tint)')
                     : esAcompanante
                       ? (enPremisa ? 'linear-gradient(135deg,var(--at-primary-2),var(--at-primary))' : 'var(--at-accent-soft-2)')
-                      : (enPremisa ? 'linear-gradient(135deg,#10b981,#059669)' : 'var(--at-line)'),
+                      : (enPremisa ? 'linear-gradient(135deg,var(--at-success),var(--at-success-strong))' : 'var(--at-line)'),
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: v.es_menor ? '#854d0e' : (enPremisa ? 'white' : 'var(--at-ink-3)'),
+                color: v.es_menor ? 'var(--at-warning-strong)' : (enPremisa ? 'white' : 'var(--at-ink-3)'),
                 fontWeight: 700, fontSize: '15px',
               }}>
               {v.es_menor ? '👶' : v.nombre.charAt(0).toUpperCase()}
@@ -574,7 +574,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{v.nombre}</span>
               {v.es_menor && (
-                <span style={{ padding: '2px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Menor</span>
+                <span style={{ padding: '2px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Menor</span>
               )}
               {esAcompanante && (
                 <span style={{ padding: '2px 7px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', borderRadius: '20px', fontSize: '10.5px', fontWeight: 700 }}>Acompañante</span>
@@ -599,7 +599,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
           <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
             <span>Entrada: {new Date(v.hora_entrada).toLocaleString('es', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</span>
             {v.hora_salida && <span style={{ color: 'var(--at-ink-3)' }}>· Salida: {new Date(v.hora_salida).toLocaleString('es', { hour: '2-digit', minute: '2-digit' })}</span>}
-            {enPremisa && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: isSTRMember ? 'var(--at-accent-tint)' : esAcompanante ? 'var(--at-primary-soft)' : '#dcfce7', color: isSTRMember ? 'var(--at-accent-dark)' : esAcompanante ? 'var(--at-primary-hover)' : '#16a34a', fontWeight: 700 }}>En premisas</span>}
+            {enPremisa && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: isSTRMember ? 'var(--at-accent-tint)' : esAcompanante ? 'var(--at-primary-soft)' : 'var(--at-success-tint)', color: isSTRMember ? 'var(--at-accent-dark)' : esAcompanante ? 'var(--at-primary-hover)' : 'var(--at-success)', fontWeight: 700 }}>En premisas</span>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
             <button onClick={() => setVisitanteDetalle(v)}
@@ -610,7 +610,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
                 <button onClick={() => salidaHabilitada && iniciarSalida(v)}
                   title={!salidaHabilitada ? `Salida programada: ${fechaSalidaSTR}` : undefined}
-                  style={{ padding: '6px 12px', background: salidaHabilitada ? '#fef3c7' : 'var(--at-chip)', color: salidaHabilitada ? '#92400e' : 'var(--at-ink-3)', border: `1px solid ${salidaHabilitada ? '#fde68a' : 'var(--at-line)'}`, borderRadius: '8px', cursor: salidaHabilitada ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  style={{ padding: '6px 12px', background: salidaHabilitada ? 'var(--at-warning-tint)' : 'var(--at-chip)', color: salidaHabilitada ? 'var(--at-warning-strong)' : 'var(--at-ink-3)', border: `1px solid ${salidaHabilitada ? 'var(--at-warning-border)' : 'var(--at-line)'}`, borderRadius: '8px', cursor: salidaHabilitada ? 'pointer' : 'not-allowed', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap' }}>
                   Registrar salida
                 </button>
                 {!salidaHabilitada && <span style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>Hasta {fechaSalidaSTR}</span>}
@@ -635,7 +635,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
             📄 PDF
           </button>
           <button onClick={exportarXlsx} disabled={filtrados.length === 0}
-            style={{ padding: '9px 14px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+            style={{ padding: '9px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             📊 Excel
           </button>
           {canCreate && reservasSTR.some(r => (r.estado === 'confirmada' || r.estado === 'en_curso') && r.fecha_salida >= hoy) && (
@@ -646,7 +646,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
           )}
           {canCreate && mudanzasElegibles.length > 0 && (
             <button onClick={() => setShowMudanzaModal(true)}
-              style={{ padding: '10px 16px', background: 'linear-gradient(135deg,#f97316,#ea580c)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              style={{ padding: '10px 16px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
               🚛 Mudanza
             </button>
           )}
@@ -663,7 +663,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
       <div style={{ display: 'flex', background: 'var(--at-surface)', borderRadius: '12px', border: '1px solid var(--at-line)', overflow: 'hidden', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', flexWrap: 'wrap' }}>
         {([
           { label: 'Hoy', value: visitasHoy, icon: '📅', color: 'var(--at-primary)' },
-          { label: 'En premisas', value: enPremisas, icon: '🟢', color: '#16a34a' },
+          { label: 'En premisas', value: enPremisas, icon: '🟢', color: 'var(--at-success)' },
           { label: 'Esta semana', value: estaSemana, icon: '📆', color: 'var(--at-accent-hover)' },
           { label: 'Total histórico', value: totalHistorico, icon: '📊', color: 'var(--at-ink-2)' },
         ] as const).map((kpi, i) => (
@@ -692,7 +692,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
             {f === 'hoy' ? 'Hoy' : f === 'semana' ? 'Semana' : f === 'mes' ? 'Mes' : 'Todos'}
           </button>
         ))}
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', color: 'var(--at-ink-2)', cursor: 'pointer', padding: '9px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', background: soloActivos ? '#f0fdf4' : 'var(--at-surface-2)', whiteSpace: 'nowrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', color: 'var(--at-ink-2)', cursor: 'pointer', padding: '9px 14px', border: '1.5px solid var(--at-line)', borderRadius: '10px', background: soloActivos ? 'var(--at-success-tint)' : 'var(--at-surface-2)', whiteSpace: 'nowrap' }}>
           <input type="checkbox" checked={soloActivos} onChange={e => setSoloActivos(e.target.checked)} />
           Solo en premisas
         </label>
@@ -759,7 +759,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                       const enPremisasGrupo = conVisitante.filter(({ v }) => v && !v.hora_salida)
                       const salieronGrupo = conVisitante.filter(({ v }) => v && !!v.hora_salida)
                       return (
-                        <div key={r.id} style={{ background: lleno ? '#f0fdf4' : 'var(--at-surface-2)', border: `1.5px solid ${lleno ? '#86efac' : 'var(--at-line)'}`, borderRadius: '12px', padding: '14px 16px' }}>
+                        <div key={r.id} style={{ background: lleno ? 'var(--at-success-tint)' : 'var(--at-surface-2)', border: `1.5px solid ${lleno ? 'var(--at-success-border)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '14px 16px' }}>
                           {/* Header */}
                           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px', gap: '10px' }}>
                             <div style={{ minWidth: 0 }}>
@@ -775,7 +775,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                                 <span>👥 {r.num_adultos}A{r.num_ninos > 0 ? `+${r.num_ninos}N` : ''}</span>
                               </div>
                             </div>
-                            <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, flexShrink: 0, background: lleno ? '#dcfce7' : '#fef3c7', color: lleno ? '#16a34a' : '#92400e' }}>
+                            <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, flexShrink: 0, background: lleno ? 'var(--at-success-tint)' : 'var(--at-warning-tint)', color: lleno ? 'var(--at-success)' : 'var(--at-warning-strong)' }}>
                               {enPremisasAhora}/{capacidad} en premisas
                             </span>
                           </div>
@@ -784,9 +784,9 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                           {enPremisasGrupo.length > 0 && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '6px' }}>
                               {enPremisasGrupo.map(({ h }) => (
-                                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
+                                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '8px' }}>
                                   <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink)', flex: 1 }}>{h.es_menor ? '👶 ' : ''}{h.nombre}{h.identificacion ? <span style={{ color: 'var(--at-ink-3)', fontWeight: 400 }}> · {h.identificacion}</span> : ''}</span>
-                                  <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 700 }}>✓ En premisas</span>
+                                  <span style={{ fontSize: '11px', color: 'var(--at-success)', fontWeight: 700 }}>✓ En premisas</span>
                                 </div>
                               ))}
                             </div>
@@ -796,16 +796,16 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                           {salieronGrupo.length > 0 && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '6px' }}>
                               {salieronGrupo.map(({ h }) => (
-                                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px' }}>
+                                <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '8px' }}>
                                   <div style={{ flex: 1, fontSize: '12px' }}>
                                     <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{h.es_menor ? '👶 ' : ''}{h.nombre}</span>
                                     {h.identificacion && <span style={{ color: 'var(--at-ink-3)' }}> · {h.identificacion}</span>}
-                                    <span style={{ marginLeft: 6, fontSize: '10px', color: '#92400e', fontWeight: 600 }}>🚪 Salió</span>
+                                    <span style={{ marginLeft: 6, fontSize: '10px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>🚪 Salió</span>
                                   </div>
                                   <button
                                     onClick={() => !lleno && abrirRegistroSTR(r, h)}
                                     disabled={lleno}
-                                    style={{ padding: '5px 12px', background: !lleno ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'var(--at-chip)', color: !lleno ? 'white' : 'var(--at-ink-3)', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: !lleno ? 'pointer' : 'not-allowed', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                                    style={{ padding: '5px 12px', background: !lleno ? 'linear-gradient(135deg,var(--at-warning),var(--at-warning))' : 'var(--at-chip)', color: !lleno ? 'white' : 'var(--at-ink-3)', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: !lleno ? 'pointer' : 'not-allowed', fontSize: '11px', whiteSpace: 'nowrap' }}>
                                     Reingresar
                                   </button>
                                 </div>
@@ -821,7 +821,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                                   <div style={{ flex: 1, fontSize: '12px' }}>
                                     <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{h.es_menor ? '👶 ' : ''}{h.nombre}</span>
                                     {h.identificacion && <span style={{ color: 'var(--at-ink-3)' }}> · {h.identificacion}</span>}
-                                    {h.es_menor && <span style={{ marginLeft: 4, padding: '1px 6px', background: '#fef9c3', color: '#854d0e', borderRadius: '10px', fontSize: '10px', fontWeight: 600 }}>Menor</span>}
+                                    {h.es_menor && <span style={{ marginLeft: 4, padding: '1px 6px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '10px', fontSize: '10px', fontWeight: 600 }}>Menor</span>}
                                   </div>
                                   <button
                                     onClick={() => ingresoHabilitado && !lleno && abrirRegistroSTR(r, h)}
@@ -845,7 +845,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                           )}
 
                           {lleno && (
-                            <div style={{ textAlign: 'center', padding: '8px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', fontSize: '12px', color: '#15803d', fontWeight: 600 }}>
+                            <div style={{ textAlign: 'center', padding: '8px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '8px', fontSize: '12px', color: 'var(--at-success-strong)', fontWeight: 600 }}>
                               ✓ Capacidad completa — {enPremisasAhora}/{capacidad} en premisas
                             </div>
                           )}
@@ -872,7 +872,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
           style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
           <div onClick={e => e.stopPropagation()}
             style={{ background: 'var(--at-surface)', borderRadius: '16px', width: '100%', maxWidth: '660px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '16px', overflow: 'hidden' }}>
-            <div style={{ background: 'linear-gradient(135deg,#f97316,#ea580c)', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Mudanza autorizada</div>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'white' }}>🚛 Registrar ingreso de mudanza</h3>
@@ -919,14 +919,14 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                       const enCurso = s.estado === 'en_curso'
                       const personasDentro = visitantes.filter(v => v.solicitud_mudanza_id === s.id && !v.hora_salida).length
                       return (
-                        <div key={s.id} style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '12px', padding: '14px 16px' }}>
+                        <div key={s.id} style={{ background: 'var(--at-warning-tint)', border: '1.5px solid var(--at-warning-border)', borderRadius: '12px', padding: '14px 16px' }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px', gap: '10px' }}>
                             <div style={{ minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                 <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>
                                   {TIPO_MUDANZA_LABEL[s.tipo_mudanza] ?? s.tipo_mudanza}
                                 </span>
-                                <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: enCurso ? '#dcfce7' : '#ffedd5', color: enCurso ? '#16a34a' : '#c2410c' }}>
+                                <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: enCurso ? 'var(--at-success-tint)' : 'var(--at-warning-tint)', color: enCurso ? 'var(--at-success)' : 'var(--at-warning-strong)' }}>
                                   {enCurso ? 'En curso' : (s.estado === 'programada' ? 'Programada' : 'Aprobada')}
                                 </span>
                               </div>
@@ -943,7 +943,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                               )}
                             </div>
                             {personasDentro > 0 && (
-                              <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, flexShrink: 0, background: '#dcfce7', color: '#16a34a' }}>
+                              <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, flexShrink: 0, background: 'var(--at-success-tint)', color: 'var(--at-success)' }}>
                                 {personasDentro} en premisas
                               </span>
                             )}
@@ -952,7 +952,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                           <button
                             onClick={() => ingresoHabilitado && abrirRegistroMudanza(s)}
                             disabled={!ingresoHabilitado}
-                            style={{ width: '100%', padding: '8px', background: ingresoHabilitado ? 'linear-gradient(135deg,#f97316,#ea580c)' : 'var(--at-chip)', color: ingresoHabilitado ? 'white' : 'var(--at-ink-3)', border: 'none', borderRadius: '8px', cursor: ingresoHabilitado ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: '12px', boxSizing: 'border-box' }}>
+                            style={{ width: '100%', padding: '8px', background: ingresoHabilitado ? 'linear-gradient(135deg,var(--at-warning),var(--at-warning))' : 'var(--at-chip)', color: ingresoHabilitado ? 'white' : 'var(--at-ink-3)', border: 'none', borderRadius: '8px', cursor: ingresoHabilitado ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: '12px', boxSizing: 'border-box' }}>
                             {ingresoHabilitado ? '+ Registrar ingreso de mudanza' : `Habilitado el ${fechaEfectiva}`}
                           </button>
                         </div>
@@ -980,7 +980,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                   <div style={{ fontSize: '11px', color: 'var(--at-accent-hover)', fontWeight: 600, marginTop: '2px' }}>🏠 Renta corta — ingreso al grupo</div>
                 )}
                 {mudanzaCtx && (
-                  <div style={{ fontSize: '11px', color: '#ea580c', fontWeight: 600, marginTop: '2px' }}>🚛 Mudanza autorizada — ingreso al grupo</div>
+                  <div style={{ fontSize: '11px', color: 'var(--at-warning)', fontWeight: 600, marginTop: '2px' }}>🚛 Mudanza autorizada — ingreso al grupo</div>
                 )}
               </div>
               <button onClick={resetForm}
@@ -1021,7 +1021,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                     Es menor de edad
                   </label>
                   {formEsMenor && (
-                    <span style={{ padding: '2px 8px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>
+                    <span style={{ padding: '2px 8px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>
                   )}
                 </div>
                 {formEsMenor ? (
@@ -1070,26 +1070,26 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 {(fotosExpiradas.foto || fotosExpiradas.documento || fotosExpiradas.vehiculo) && (
-                  <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#92400e', marginBottom: 10 }}>
+                  <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--at-warning-strong)', marginBottom: 10 }}>
                     ⚠️ Una o más fotos tienen más de 90 días. Se recomienda renovarlas.
                   </div>
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
                   <div>
                     <ImageUploader value={fotoUrl} onChange={setFotoUrl} folder="visitantes" label="Foto del visitante" capture />
-                    {fotosExpiradas.foto && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                    {fotosExpiradas.foto && <div style={{ fontSize: 11, color: 'var(--at-warning)', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
                   </div>
                   <div>
                     {!formEsMenor && (
                       <>
                         <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto del DPI / Documento" capture />
-                        {fotosExpiradas.documento && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                        {fotosExpiradas.documento && <div style={{ fontSize: 11, color: 'var(--at-warning)', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
                       </>
                     )}
                   </div>
                   <div>
                     <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" capture />
-                    {fotosExpiradas.vehiculo && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                    {fotosExpiradas.vehiculo && <div style={{ fontSize: 11, color: 'var(--at-warning)', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
                   </div>
                 </div>
               </div>
@@ -1118,7 +1118,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
                   {acompanantes.map(a => (
                     <div key={a.tempId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: a.es_menor ? '#fef9c3' : 'var(--at-primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', flexShrink: 0 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: a.es_menor ? 'var(--at-warning-tint)' : 'var(--at-primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', flexShrink: 0 }}>
                         {a.es_menor ? '👶' : '👤'}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1130,7 +1130,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                         </div>
                       </div>
                       <button type="button" onClick={() => quitarAcompanante(a.tempId)}
-                        style={{ width: 22, height: 22, borderRadius: '50%', background: '#fee2e2', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--at-danger-tint)', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         ×
                       </button>
                     </div>
@@ -1161,7 +1161,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--at-ink-2)', cursor: 'pointer', fontWeight: 600 }}>
                     <input type="checkbox" checked={acompForm.es_menor} onChange={e => setAcompForm(f => ({ ...f, es_menor: e.target.checked, identificacion: '' }))} />
                     Es menor de edad
-                    {acompForm.es_menor && <span style={{ padding: '2px 8px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '11px' }}>Menor</span>}
+                    {acompForm.es_menor && <span style={{ padding: '2px 8px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '20px', fontSize: '11px' }}>Menor</span>}
                   </label>
                   {acompForm.es_menor ? (
                     <div>
@@ -1259,7 +1259,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flexShrink: 0 }}>
-                      <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: enPremisasAhora >= capacidad ? '#dcfce7' : 'var(--at-accent-tint)', color: enPremisasAhora >= capacidad ? '#16a34a' : 'var(--at-accent-dark)' }}>
+                      <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: enPremisasAhora >= capacidad ? 'var(--at-success-tint)' : 'var(--at-accent-tint)', color: enPremisasAhora >= capacidad ? 'var(--at-success)' : 'var(--at-accent-dark)' }}>
                         {enPremisasAhora}/{capacidad} en premisas
                       </span>
                     </div>
@@ -1280,19 +1280,19 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
             const horaEfectiva = solicitud.hora_autorizada ?? solicitud.hora_solicitada ?? ''
             return (
               <div key={solicitud.id}>
-                <div style={{ background: 'linear-gradient(to right,#fff7ed,#ffedd5)', border: '1.5px solid #fdba74', borderRadius: '12px', padding: '12px 16px', marginBottom: '4px' }}>
+                <div style={{ background: 'linear-gradient(to right,var(--at-warning-tint),var(--at-warning-tint))', border: '1.5px solid #fdba74', borderRadius: '12px', padding: '12px 16px', marginBottom: '4px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: '14px', color: '#9a3412' }}>
+                      <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-warning-strong)' }}>
                         🚛 {TIPO_MUDANZA_LABEL[solicitud.tipo_mudanza] ?? solicitud.tipo_mudanza}
-                        {solicitud.unidad_nombre && <span style={{ fontWeight: 400, color: '#c2410c', marginLeft: 6 }}>— {solicitud.unidad_nombre}</span>}
+                        {solicitud.unidad_nombre && <span style={{ fontWeight: 400, color: 'var(--at-warning-strong)', marginLeft: 6 }}>— {solicitud.unidad_nombre}</span>}
                       </div>
-                      <div style={{ fontSize: '12px', color: '#c2410c', marginTop: '2px' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--at-warning-strong)', marginTop: '2px' }}>
                         {fechaEfectiva}{horaEfectiva ? ` ${horaEfectiva}` : ''}{solicitud.hora_fin ? ` → ${solicitud.hora_fin}` : ''}
                         {solicitud.empresa_mudanza ? ` · ${solicitud.empresa_mudanza}` : ''}
                       </div>
                     </div>
-                    <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#ffedd5', color: '#c2410c' }}>
+                    <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' }}>
                       {enPremisasAhora} en premisas
                     </span>
                   </div>
@@ -1315,7 +1315,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '18px 20px', borderBottom: '1px solid var(--at-chip)' }}>
               {visitanteDetalle.foto_url
                 ? <SecureImage src={visitanteDetalle.foto_url} alt={visitanteDetalle.nombre} style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--at-line)', flexShrink: 0 }} />
-                : <div style={{ width: 52, height: 52, borderRadius: '50%', background: !visitanteDetalle.hora_salida ? 'linear-gradient(135deg,#10b981,#059669)' : 'var(--at-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: !visitanteDetalle.hora_salida ? 'white' : 'var(--at-ink-3)', fontWeight: 800, fontSize: '20px', flexShrink: 0 }}>
+                : <div style={{ width: 52, height: 52, borderRadius: '50%', background: !visitanteDetalle.hora_salida ? 'linear-gradient(135deg,var(--at-success),var(--at-success-strong))' : 'var(--at-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: !visitanteDetalle.hora_salida ? 'white' : 'var(--at-ink-3)', fontWeight: 800, fontSize: '20px', flexShrink: 0 }}>
                     {visitanteDetalle.es_menor ? '👶' : visitanteDetalle.nombre.charAt(0).toUpperCase()}
                   </div>
               }
@@ -1323,7 +1323,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '17px', fontWeight: 800, color: 'var(--at-ink)' }}>{visitanteDetalle.nombre}</span>
                   {visitanteDetalle.es_menor && (
-                    <span style={{ padding: '2px 8px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>
+                    <span style={{ padding: '2px 8px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>
                   )}
                   {visitanteDetalle.visitante_principal_id && (
                     <span style={{ padding: '2px 8px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Acompañante</span>
@@ -1332,7 +1332,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                     <span style={{ padding: '2px 8px', background: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>STR</span>
                   )}
                   {visitanteDetalle.solicitud_mudanza_id && (
-                    <span style={{ padding: '2px 8px', background: '#fff7ed', color: '#ea580c', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Mudanza</span>
+                    <span style={{ padding: '2px 8px', background: 'var(--at-warning-tint)', color: 'var(--at-warning)', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Mudanza</span>
                   )}
                 </div>
                 {visitanteDetalle.unidad_nombre && <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginTop: '2px' }}>📍 {visitanteDetalle.unidad_nombre}</div>}
@@ -1393,7 +1393,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                   const salidaHabilitada = !fechaSalidaSTR || hoy >= fechaSalidaSTR
                   return salidaHabilitada ? (
                     <button onClick={() => { setVisitanteDetalle(null); iniciarSalida(visitanteDetalle) }}
-                      style={{ padding: '9px 18px', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                      style={{ padding: '9px 18px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: '1px solid var(--at-warning-border)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
                       Registrar salida
                     </button>
                   ) : null
@@ -1419,24 +1419,24 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                 <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                   {salidaPendiente.nombre}
                   {salidaPendiente.unidad_nombre ? ` · ${salidaPendiente.unidad_nombre}` : ''}
-                  {salidaPendiente.es_menor && <span style={{ marginLeft: 6, padding: '1px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>}
+                  {salidaPendiente.es_menor && <span style={{ marginLeft: 6, padding: '1px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>}
                   {salidaPendiente.visitante_principal_id && <span style={{ marginLeft: 6, padding: '1px 7px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Acompañante</span>}
                   {salidaPendiente.reserva_str_id && <span style={{ marginLeft: 6, padding: '1px 7px', background: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>STR</span>}
-                  {salidaPendiente.solicitud_mudanza_id && <span style={{ marginLeft: 6, padding: '1px 7px', background: '#fff7ed', color: '#ea580c', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Mudanza</span>}
+                  {salidaPendiente.solicitud_mudanza_id && <span style={{ marginLeft: 6, padding: '1px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning)', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Mudanza</span>}
                 </div>
               </div>
               <div style={{ padding: '20px 24px' }}>
                 <p style={{ margin: '0 0 14px', fontSize: '13.5px', color: 'var(--at-ink-2)', fontWeight: 600 }}>¿Cómo fue la salida?</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
                   <button onClick={() => setModoSalida('sin_novedad')}
-                    style={{ padding: '14px 12px', borderRadius: '10px', border: `2px solid ${modoSalida === 'sin_novedad' ? '#16a34a' : 'var(--at-line)'}`, background: modoSalida === 'sin_novedad' ? '#f0fdf4' : 'var(--at-surface-2)', color: modoSalida === 'sin_novedad' ? '#15803d' : 'var(--at-ink-2)', fontWeight: 700, fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
+                    style={{ padding: '14px 12px', borderRadius: '10px', border: `2px solid ${modoSalida === 'sin_novedad' ? 'var(--at-success)' : 'var(--at-line)'}`, background: modoSalida === 'sin_novedad' ? 'var(--at-success-tint)' : 'var(--at-surface-2)', color: modoSalida === 'sin_novedad' ? 'var(--at-success-strong)' : 'var(--at-ink-2)', fontWeight: 700, fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
                     ✅ Sin novedad
-                    <div style={{ fontSize: '11px', fontWeight: 400, marginTop: '4px', color: modoSalida === 'sin_novedad' ? '#16a34a' : 'var(--at-ink-3)' }}>Todo en orden</div>
+                    <div style={{ fontSize: '11px', fontWeight: 400, marginTop: '4px', color: modoSalida === 'sin_novedad' ? 'var(--at-success)' : 'var(--at-ink-3)' }}>Todo en orden</div>
                   </button>
                   <button onClick={() => setModoSalida('con_novedad')}
-                    style={{ padding: '14px 12px', borderRadius: '10px', border: `2px solid ${modoSalida === 'con_novedad' ? '#dc2626' : 'var(--at-line)'}`, background: modoSalida === 'con_novedad' ? '#fff1f2' : 'var(--at-surface-2)', color: modoSalida === 'con_novedad' ? '#dc2626' : 'var(--at-ink-2)', fontWeight: 700, fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
+                    style={{ padding: '14px 12px', borderRadius: '10px', border: `2px solid ${modoSalida === 'con_novedad' ? 'var(--at-danger)' : 'var(--at-line)'}`, background: modoSalida === 'con_novedad' ? 'var(--at-danger-tint)' : 'var(--at-surface-2)', color: modoSalida === 'con_novedad' ? 'var(--at-danger)' : 'var(--at-ink-2)', fontWeight: 700, fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
                     ⚠️ Con novedad
-                    <div style={{ fontSize: '11px', fontWeight: 400, marginTop: '4px', color: modoSalida === 'con_novedad' ? '#ef4444' : 'var(--at-ink-3)' }}>Registrar incidencia</div>
+                    <div style={{ fontSize: '11px', fontWeight: 400, marginTop: '4px', color: modoSalida === 'con_novedad' ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>Registrar incidencia</div>
                   </button>
                 </div>
 
@@ -1455,10 +1455,10 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                 )}
 
                 {modoSalida === 'con_novedad' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: '10px', marginBottom: '16px' }}>
-                    <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#c2410c' }}>Detalle de la novedad</div>
-                    <div style={{ background: 'var(--at-surface)', border: '1px solid #fed7aa', borderRadius: '8px', padding: '10px 12px' }}>
-                      <div style={{ fontSize: '10.5px', fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Datos del registro (incluidos automáticamente)</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px', background: 'var(--at-warning-tint)', border: '1.5px solid var(--at-warning-border)', borderRadius: '10px', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--at-warning-strong)' }}>Detalle de la novedad</div>
+                    <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-warning-border)', borderRadius: '8px', padding: '10px 12px' }}>
+                      <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--at-warning-strong)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Datos del registro (incluidos automáticamente)</div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
                         <span style={{ fontSize: '12px', color: 'var(--at-ink-2)' }}>👤 <b>{salidaPendiente.nombre}</b></span>
                         {salidaPendiente.identificacion && <span style={{ fontSize: '12px', color: 'var(--at-ink-2)' }}>🪪 {salidaPendiente.identificacion}</span>}
@@ -1517,7 +1517,7 @@ export function VisitantesTab({ visitantes, unidades, reservasSTR, solicitudesMu
                     Cancelar
                   </button>
                   <button onClick={confirmarSalida} disabled={guardandoSalida || modoSalida === 'idle'}
-                    style={{ padding: '9px 20px', background: modoSalida === 'idle' ? 'var(--at-line)' : modoSalida === 'sin_novedad' ? 'linear-gradient(135deg,#16a34a,#15803d)' : 'linear-gradient(135deg,#dc2626,#b91c1c)', color: modoSalida === 'idle' ? 'var(--at-ink-3)' : 'white', border: 'none', borderRadius: '8px', cursor: modoSalida === 'idle' ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '13px' }}>
+                    style={{ padding: '9px 20px', background: modoSalida === 'idle' ? 'var(--at-line)' : modoSalida === 'sin_novedad' ? 'linear-gradient(135deg,var(--at-success),var(--at-success-strong))' : 'linear-gradient(135deg,var(--at-danger),var(--at-danger-strong))', color: modoSalida === 'idle' ? 'var(--at-ink-3)' : 'white', border: 'none', borderRadius: '8px', cursor: modoSalida === 'idle' ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: '13px' }}>
                     {guardandoSalida ? 'Registrando...' : modoSalida === 'con_novedad' ? '⚠️ Registrar salida y novedad' : '✓ Confirmar salida'}
                   </button>
                 </div>

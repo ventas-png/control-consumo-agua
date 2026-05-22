@@ -7,17 +7,17 @@ interface Props {
 }
 
 const PRIORIDAD_COLOR: Record<string, string> = {
-  urgente: '#ef4444',
-  alta:    '#f97316',
-  media:   '#d97706',
+  urgente: 'var(--at-danger)',
+  alta:    'var(--at-warning)',
+  media:   'var(--at-warning)',
   baja:    'var(--at-ink-3)',
 }
 
 const ESTADO_COLOR: Record<string, string> = {
   abierto:    'var(--at-ink-3)',
-  en_proceso: '#d97706',
+  en_proceso: 'var(--at-warning)',
   resuelto:   'var(--at-primary)',
-  cerrado:    '#16a34a',
+  cerrado:    'var(--at-success)',
 }
 
 function diasDiff(desde: string, hasta: string): number {
@@ -104,8 +104,8 @@ export default function GanttMantenimientoTab({ tickets, moneda }: Props) {
           <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
             {[
               { label: 'Tickets totales', val: String(tickets.length), color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
-              { label: 'Cerrados', val: String(stats.cerrados), color: '#16a34a', bg: '#dcfce7' },
-              { label: 'Activos', val: String(stats.totalAbiertos), color: '#d97706', bg: '#fef3c7' },
+              { label: 'Cerrados', val: String(stats.cerrados), color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+              { label: 'Activos', val: String(stats.totalAbiertos), color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
               { label: 'Costo total real', val: `${moneda} ${stats.costoTotal.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
             ].map(k => (
               <div key={k.label} style={{ flex: '1 1 110px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '10px 14px' }}>

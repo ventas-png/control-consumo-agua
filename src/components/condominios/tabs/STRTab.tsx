@@ -36,8 +36,8 @@ interface Props {
 const ESTADO_CONFIG: Record<EstadoSTR, { label: string; color: string; bg: string }> = {
   confirmada: { label: 'Confirmada', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
   en_curso:   { label: 'En curso',   color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
-  completada: { label: 'Completada', color: '#10b981', bg: '#d1fae5' },
-  cancelada:  { label: 'Cancelada',  color: '#ef4444', bg: '#fee2e2' },
+  completada: { label: 'Completada', color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  cancelada:  { label: 'Cancelada',  color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
 const PLATAFORMA_ICON: Record<PlataformaSTR, string> = {
@@ -237,7 +237,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar reserva?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar reserva?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('reservas_str').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -263,8 +263,8 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
         {[
           { label: 'Total reservas',  value: String(reservasSTR.length),    icon: '🏨', color: 'var(--at-primary)' },
           { label: 'En curso',        value: String(enCurso),               icon: '🔑', color: 'var(--at-accent)' },
-          { label: 'Próximas',        value: String(proximas),              icon: '📅', color: '#f59e0b' },
-          { label: 'Ingreso del mes', value: ingresoMes > 0 ? `${moneda} ${ingresoMes.toFixed(0)}` : '—', icon: '💰', color: '#10b981' },
+          { label: 'Próximas',        value: String(proximas),              icon: '📅', color: 'var(--at-warning)' },
+          { label: 'Ingreso del mes', value: ingresoMes > 0 ? `${moneda} ${ingresoMes.toFixed(0)}` : '—', icon: '💰', color: 'var(--at-success)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
@@ -392,12 +392,12 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
 
               {/* Additional guests */}
               {huespedes.map((h, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: h.visitante_id ? '#f0fdf4' : 'var(--at-surface-2)', border: `1px solid ${h.visitante_id ? '#86efac' : 'var(--at-line)'}`, borderRadius: '8px', marginBottom: '6px' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: h.visitante_id ? 'var(--at-success-tint)' : 'var(--at-surface-2)', border: `1px solid ${h.visitante_id ? 'var(--at-success-border)' : 'var(--at-line)'}`, borderRadius: '8px', marginBottom: '6px' }}>
                   <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--at-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--at-ink-2)', fontWeight: 700, flexShrink: 0 }}>{i + 2}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--at-ink)' }}>
                       {h.es_menor ? '👶 ' : ''}{h.nombre}
-                      {h.visitante_id && <span style={{ marginLeft: 6, fontSize: '10px', color: '#16a34a', fontWeight: 600 }}>✓ Ingresado</span>}
+                      {h.visitante_id && <span style={{ marginLeft: 6, fontSize: '10px', color: 'var(--at-success)', fontWeight: 600 }}>✓ Ingresado</span>}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
                       {h.es_menor
@@ -407,7 +407,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                   </div>
                   {!h.visitante_id && (
                     <button onClick={() => quitarHuesped(i)}
-                      style={{ width: 22, height: 22, borderRadius: '50%', background: '#fee2e2', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--at-danger-tint)', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       ×
                     </button>
                   )}
@@ -425,7 +425,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--at-ink-2)', cursor: 'pointer', fontWeight: 600 }}>
                     <input type="checkbox" checked={huespedForm.es_menor} onChange={e => setHuespedForm(f => ({ ...f, es_menor: e.target.checked, identificacion: '' }))} />
                     Es menor de edad
-                    {huespedForm.es_menor && <span style={{ padding: '2px 7px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '10px' }}>Menor</span>}
+                    {huespedForm.es_menor && <span style={{ padding: '2px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '20px', fontSize: '10px' }}>Menor</span>}
                   </label>
                   {huespedForm.es_menor ? (
                     <div>
@@ -534,7 +534,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                 </div>
                 {/* Group progress */}
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                  <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: lleno ? '#dcfce7' : '#fef3c7', color: lleno ? '#16a34a' : '#92400e' }}>
+                  <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: lleno ? 'var(--at-success-tint)' : 'var(--at-warning-tint)', color: lleno ? 'var(--at-success)' : 'var(--at-warning-strong)' }}>
                     {ingresados}/{capacidad} ingresados
                   </span>
                   {preregistrados > 0 && !lleno && (
@@ -549,10 +549,10 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                       <button onClick={() => handleEstado(r.id, 'en_curso')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Check-in</button>
                     )}
                     {r.estado === 'en_curso' && (
-                      <button onClick={() => handleEstado(r.id, 'completada')} style={{ flex: 1, padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Check-out</button>
+                      <button onClick={() => handleEstado(r.id, 'completada')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Check-out</button>
                     )}
                     <button onClick={() => startEdit(r)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                    <button onClick={() => handleDelete(r.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                    <button onClick={() => handleDelete(r.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                   </div>
                 )}
               </div>

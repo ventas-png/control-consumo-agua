@@ -16,15 +16,15 @@ interface Props {
 }
 
 const TIPO_STYLE: Record<string, { bg: string; color: string; label: string; sign: string }> = {
-  aporte:  { bg: '#dcfce7', color: '#16a34a', label: 'Aporte',  sign: '+' },
-  retiro:  { bg: '#fee2e2', color: '#ef4444', label: 'Retiro',  sign: '-' },
-  ajuste:  { bg: '#fef3c7', color: '#92400e', label: 'Ajuste',  sign: '±' },
+  aporte:  { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Aporte',  sign: '+' },
+  retiro:  { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Retiro',  sign: '-' },
+  ajuste:  { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Ajuste',  sign: '±' },
 }
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  pendiente:  { bg: '#fef3c7', color: '#92400e', label: 'Pendiente' },
-  aprobado:   { bg: '#dcfce7', color: '#16a34a', label: 'Aprobado' },
-  rechazado:  { bg: '#fee2e2', color: '#ef4444', label: 'Rechazado' },
+  pendiente:  { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Pendiente' },
+  aprobado:   { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Aprobado' },
+  rechazado:  { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Rechazado' },
 }
 
 const BLANK = {
@@ -84,7 +84,7 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
   }
 
   const handleDelete = async (m: FondoReserva) => {
-    const r = await Swal.fire({ title: '¿Eliminar movimiento?', text: m.concepto, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' })
+    const r = await Swal.fire({ title: '¿Eliminar movimiento?', text: m.concepto, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('fondo_reserva_condominio').delete().eq('id', m.id)
     onRefresh()
@@ -142,9 +142,9 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '14px', marginBottom: '20px' }}>
         {[
-          { label: 'Saldo Actual', value: fmt(saldoTotal, moneda), color: saldoTotal >= 0 ? '#16a34a' : '#ef4444', bg: saldoTotal >= 0 ? '#dcfce7' : '#fee2e2', icon: '🏦' },
-          { label: 'Total Aportes', value: fmt(totalAportes, moneda), color: '#16a34a', bg: '#f0fdf4', icon: '📥' },
-          { label: 'Total Retiros', value: fmt(totalRetiros, moneda), color: '#ef4444', bg: '#fef2f2', icon: '📤' },
+          { label: 'Saldo Actual', value: fmt(saldoTotal, moneda), color: saldoTotal >= 0 ? 'var(--at-success)' : 'var(--at-danger)', bg: saldoTotal >= 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', icon: '🏦' },
+          { label: 'Total Aportes', value: fmt(totalAportes, moneda), color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '📥' },
+          { label: 'Total Retiros', value: fmt(totalRetiros, moneda), color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', icon: '📤' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
             <div style={{ fontSize: '24px', marginBottom: '4px' }}>{k.icon}</div>
@@ -179,7 +179,7 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
             📄 PDF
           </button>
           <button onClick={exportarXlsx} disabled={filtered.length === 0}
-            style={{ padding: '7px 14px', background: filtered.length === 0 ? 'var(--at-chip)' : '#f0fdf4', color: filtered.length === 0 ? 'var(--at-ink-3)' : '#16a34a', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: filtered.length === 0 ? 'not-allowed' : 'pointer' }}>
+            style={{ padding: '7px 14px', background: filtered.length === 0 ? 'var(--at-chip)' : 'var(--at-success-tint)', color: filtered.length === 0 ? 'var(--at-ink-3)' : 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: filtered.length === 0 ? 'not-allowed' : 'pointer' }}>
             📊 Excel
           </button>
         </div>
@@ -281,7 +281,7 @@ export function FondoReservaTab({ movimientos, proyectoId, companyId, moneda, pr
                     {canEdit && (
                       <button onClick={() => openEdit(m)} style={{ padding: '5px 10px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
                     )}
-                    <button onClick={() => handleDelete(m)} style={{ padding: '5px 10px', background: '#fef2f2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#ef4444' }}>🗑</button>
+                    <button onClick={() => handleDelete(m)} style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>
                   </div>
                 )}
               </div>

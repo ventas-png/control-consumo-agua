@@ -8,8 +8,8 @@ interface Props {
 
 const ESTADO_CFG: Record<string, { color: string; bg: string; label: string }> = {
   borrador: { color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)',  label: 'Borrador' },
-  activa:   { color: '#16a34a', bg: '#dcfce7',  label: 'Activa' },
-  cerrada:  { color: '#ef4444', bg: '#fef2f2',  label: 'Cerrada' },
+  activa:   { color: 'var(--at-success)', bg: 'var(--at-success-tint)',  label: 'Activa' },
+  cerrada:  { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)',  label: 'Cerrada' },
 }
 
 export default function EncuestaDashboardTab({ encuestas, respuestas }: Props) {

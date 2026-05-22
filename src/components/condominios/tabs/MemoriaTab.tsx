@@ -82,7 +82,7 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar memoria?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar memoria?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('memoria_labores').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -206,21 +206,21 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: m.estado === 'publicado' ? '#d1fae5' : 'var(--at-chip)', color: m.estado === 'publicado' ? '#059669' : 'var(--at-ink-3)' }}>
+                    <span style={{ padding: '2px 7px', borderRadius: '5px', fontSize: '11px', fontWeight: 700, background: m.estado === 'publicado' ? 'var(--at-success-tint)' : 'var(--at-chip)', color: m.estado === 'publicado' ? 'var(--at-success-strong)' : 'var(--at-ink-3)' }}>
                       {m.estado === 'publicado' ? '✅ Publicado' : '📝 Borrador'}
                     </span>
                   </div>
                 </div>
                 {m.estado === 'borrador' && canEdit && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => handlePublicar(m.id)} style={{ flex: 1, padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Publicar</button>
+                    <button onClick={() => handlePublicar(m.id)} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Publicar</button>
                     <button onClick={() => startEdit(m)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                    <button onClick={() => handleDelete(m.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                    <button onClick={() => handleDelete(m.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                   </div>
                 )}
                 {m.estado === 'publicado' && canEdit && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => handleDelete(m.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                    <button onClick={() => handleDelete(m.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                   </div>
                 )}
               </div>
@@ -241,8 +241,8 @@ export function MemoriaTab({ memorias, proyectoId, companyId, userId, canCreate,
                   {[
                     { v: selected.tickets_resueltos,      label: '🔧 Tickets',      color: 'var(--at-primary)' },
                     { v: selected.visitantes_registrados, label: '🚪 Visitantes',    color: 'var(--at-accent)' },
-                    { v: selected.cuotas_cobradas,        label: '💳 Cuotas',        color: '#10b981' },
-                    { v: selected.incidencias_atendidas,  label: '⚠️ Incidencias',  color: '#f59e0b' },
+                    { v: selected.cuotas_cobradas,        label: '💳 Cuotas',        color: 'var(--at-success)' },
+                    { v: selected.incidencias_atendidas,  label: '⚠️ Incidencias',  color: 'var(--at-warning)' },
                   ].filter(x => x.v != null).map(k => (
                     <div key={k.label} style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
                       <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.v}</div>

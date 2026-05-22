@@ -34,16 +34,16 @@ const CAT_CFG: Record<CategoriaVencimiento, { label: string; icon: string; color
   contrato:      { label: 'Contrato',      icon: '📄', color: 'var(--at-primary)' },
   permiso:       { label: 'Permiso',       icon: '🏛️', color: 'var(--at-accent-hover)' },
   certificacion: { label: 'Certificación', icon: '🎖️', color: 'var(--at-primary-hover)' },
-  seguro:        { label: 'Seguro',        icon: '🛡️', color: '#d97706' },
+  seguro:        { label: 'Seguro',        icon: '🛡️', color: 'var(--at-warning)' },
   otro:          { label: 'Otro',          icon: '📌', color: 'var(--at-ink-3)' },
 }
 
 function urgencia(dias: number): { color: string; bg: string; label: string } {
-  if (dias < 0)  return { color: '#ef4444', bg: '#fef2f2', label: 'Vencido' }
-  if (dias <= 15) return { color: '#dc2626', bg: '#fee2e2', label: `${dias}d` }
-  if (dias <= 30) return { color: '#ea580c', bg: '#fff7ed', label: `${dias}d` }
-  if (dias <= 60) return { color: '#d97706', bg: '#fef3c7', label: `${dias}d` }
-  return { color: '#16a34a', bg: '#f0fdf4', label: `${dias}d` }
+  if (dias < 0)  return { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', label: 'Vencido' }
+  if (dias <= 15) return { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', label: `${dias}d` }
+  if (dias <= 30) return { color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', label: `${dias}d` }
+  if (dias <= 60) return { color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', label: `${dias}d` }
+  return { color: 'var(--at-success)', bg: 'var(--at-success-tint)', label: `${dias}d` }
 }
 
 const BLANK = {
@@ -145,9 +145,9 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Vencidos', val: vencidos, bg: '#fef2f2', color: '#ef4444' },
-          { label: 'Próximos 30d', val: proximos30, bg: '#fff7ed', color: '#ea580c' },
-          { label: 'Próximos 60d', val: proximos60, bg: '#fef3c7', color: '#d97706' },
+          { label: 'Vencidos', val: vencidos, bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
+          { label: 'Próximos 30d', val: proximos30, bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+          { label: 'Próximos 60d', val: proximos60, bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
           { label: 'Total seguidos', val: items.length, bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
@@ -169,14 +169,14 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
           <span style={{ width: 1, background: 'var(--at-line)', margin: '0 4px' }} />
           {(Object.keys(PLAZO_LABEL) as (keyof typeof PLAZO_LABEL)[]).map(p => (
             <button key={p} onClick={() => setFiltroPlazo(p as typeof filtroPlazo)}
-              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroPlazo === p ? '#ef4444' : 'var(--at-line)', background: filtroPlazo === p ? '#fef2f2' : 'var(--at-surface)', color: filtroPlazo === p ? '#ef4444' : 'var(--at-ink-3)' }}>
+              style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroPlazo === p ? 'var(--at-danger)' : 'var(--at-line)', background: filtroPlazo === p ? 'var(--at-danger-tint)' : 'var(--at-surface)', color: filtroPlazo === p ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
               {PLAZO_LABEL[p]}
             </button>
           ))}
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#d97706', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Agregar vencimiento'}
           </button>
         )}
@@ -184,7 +184,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
 
       {/* Formulario manual */}
       {mostrarForm && (
-        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nuevo vencimiento manual</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>
@@ -219,7 +219,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#d97706', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Agregar'}
           </button>
         </div>
@@ -237,7 +237,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
             const u = urgencia(item.dias)
             const origenIcon = { poliza: '🛡️', contrato: '🤝', inspeccion: '🏛️', extra: '📌' }[item.origen]
             return (
-              <div key={`${item.origen}-${item.id}`} style={{ background: 'var(--at-surface)', border: `1px solid ${item.dias < 0 ? '#fecaca' : item.dias <= 30 ? '#fed7aa' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div key={`${item.origen}-${item.id}`} style={{ background: 'var(--at-surface)', border: `1px solid ${item.dias < 0 ? 'var(--at-danger-border)' : item.dias <= 30 ? 'var(--at-warning-border)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 20, flexShrink: 0 }}>{origenIcon}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-ink)' }}>{item.titulo}</div>
@@ -252,7 +252,7 @@ export default function VencimientosCriticosTab({ vencimientosExtra, polizas, co
                   </div>
                   {item.origen === 'extra' && canEdit && !item.renovado && (
                     <button onClick={() => marcarRenovado(item.id)}
-                      style={{ marginTop: 4, padding: '2px 8px', background: '#f0fdf4', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: '#16a34a' }}>
+                      style={{ marginTop: 4, padding: '2px 8px', background: 'var(--at-success-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: 'var(--at-success)' }}>
                       ✓ Renovado
                     </button>
                   )}

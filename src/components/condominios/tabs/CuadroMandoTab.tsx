@@ -25,11 +25,11 @@ interface Props {
 }
 
 function semaforo(val: number, verde: number, amarillo: number) {
-  return val <= verde ? '#16a34a' : val <= amarillo ? '#d97706' : '#ef4444'
+  return val <= verde ? 'var(--at-success)' : val <= amarillo ? 'var(--at-warning)' : 'var(--at-danger)'
 }
 
 function semaforoInv(val: number, verde: number, amarillo: number) {
-  return val >= verde ? '#16a34a' : val >= amarillo ? '#d97706' : '#ef4444'
+  return val >= verde ? 'var(--at-success)' : val >= amarillo ? 'var(--at-warning)' : 'var(--at-danger)'
 }
 
 interface KpiCard { label: string; val: string | number; color: string; sub?: string; icon: string }
@@ -68,7 +68,7 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
       { label: 'Tasa de cobro', val: `${tasaCobro}%`, color: semaforoInv(tasaCobro, 90, 70), sub: `${pagadas}/${totalCuotas} cuotas`, icon: '💳' },
       { label: 'Cuotas morosas', val: morosas, color: semaforo(morosas, 0, 5), sub: 'Vencidas hoy', icon: '⚠️' },
       { label: 'Cartera vencida', val: `${moneda} ${montoPendiente.toLocaleString('es', { maximumFractionDigits: 0 })}`, color: semaforo(montoPendiente, 0, 5000), sub: 'Saldo por cobrar', icon: '📊' },
-      { label: 'Ejecución presup.', val: `${ejecucion}%`, color: ejecucion > 100 ? '#ef4444' : ejecucion > 80 ? '#d97706' : '#16a34a', sub: `${moneda} ${gastosMes.toLocaleString('es', { maximumFractionDigits: 0 })} gastado`, icon: '💸' },
+      { label: 'Ejecución presup.', val: `${ejecucion}%`, color: ejecucion > 100 ? 'var(--at-danger)' : ejecucion > 80 ? 'var(--at-warning)' : 'var(--at-success)', sub: `${moneda} ${gastosMes.toLocaleString('es', { maximumFractionDigits: 0 })} gastado`, icon: '💸' },
     ]
   }, [cuotas, gastos, presupuestos, hoy, mes, moneda])
 
@@ -91,7 +91,7 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
   const vencimientos30 = useMemo(() => [
     ...polizas.filter(p => p.fecha_vencimiento && p.fecha_vencimiento >= hoy && p.fecha_vencimiento <= en30).map(p => ({ titulo: `Póliza: ${p.tipo}`, fecha: p.fecha_vencimiento, tipo: 'Seguro', color: 'var(--at-accent-hover)' })),
     ...contratosProveedores.filter(c => c.fecha_fin && c.fecha_fin >= hoy && c.fecha_fin <= en30).map(c => ({ titulo: `Contrato: ${c.proveedor_nombre}`, fecha: c.fecha_fin!, tipo: 'Contrato', color: 'var(--at-primary-hover)' })),
-    ...inspecciones.filter(i => i.fecha_proxima && i.fecha_proxima >= hoy && i.fecha_proxima <= en30).map(i => ({ titulo: `Inspección: ${i.tipo}`, fecha: i.fecha_proxima!, tipo: 'Inspección', color: '#d97706' })),
+    ...inspecciones.filter(i => i.fecha_proxima && i.fecha_proxima >= hoy && i.fecha_proxima <= en30).map(i => ({ titulo: `Inspección: ${i.tipo}`, fecha: i.fecha_proxima!, tipo: 'Inspección', color: 'var(--at-warning)' })),
     ...vencimientosExtra.filter(v => !v.renovado && v.fecha_vencimiento >= hoy && v.fecha_vencimiento <= en30).map(v => ({ titulo: v.titulo, fecha: v.fecha_vencimiento, tipo: 'Extra', color: 'var(--at-ink-3)' })),
   ].sort((a, b) => a.fecha.localeCompare(b.fecha)), [polizas, contratosProveedores, inspecciones, vencimientosExtra, hoy, en30])
 
@@ -151,7 +151,7 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
         <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--at-ink)' }}>Cuadro de Mando · {hoy}</div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={exportarResumenPDF} style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📄 PDF</button>
-          <button onClick={exportarResumenXlsx} style={{ padding: '5px 10px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📊 Excel</button>
+          <button onClick={exportarResumenXlsx} style={{ padding: '5px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>📊 Excel</button>
         </div>
       </div>
       {/* Sección financiera */}
@@ -171,10 +171,10 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
         <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>🔧 Tickets abiertos por prioridad</div>
           {[
-            { label: 'Urgente', val: ticketsPorPrioridad.urgente, color: '#ef4444', bg: '#fef2f2' },
-            { label: 'Alta',    val: ticketsPorPrioridad.alta,    color: '#f97316', bg: '#fff7ed' },
-            { label: 'Media',   val: ticketsPorPrioridad.media,   color: '#d97706', bg: '#fef3c7' },
-            { label: 'Baja',    val: ticketsPorPrioridad.baja,    color: '#16a34a', bg: '#dcfce7' },
+            { label: 'Urgente', val: ticketsPorPrioridad.urgente, color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
+            { label: 'Alta',    val: ticketsPorPrioridad.alta,    color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+            { label: 'Media',   val: ticketsPorPrioridad.media,   color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+            { label: 'Baja',    val: ticketsPorPrioridad.baja,    color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
           ].map(r => (
             <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
               <div style={{ width: 52, fontSize: 11, color: r.color, fontWeight: 600 }}>{r.label}</div>
@@ -199,7 +199,7 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
               {vencimientos30.map((v, i) => {
                 const dias = diasRestantes(v.fecha)
                 return (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: dias <= 7 ? '#fef2f2' : 'var(--at-surface-2)', borderRadius: 7 }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: dias <= 7 ? 'var(--at-danger-tint)' : 'var(--at-surface-2)', borderRadius: 7 }}>
                     <div style={{ width: 32, height: 32, borderRadius: 8, background: v.color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <span style={{ fontSize: 10, fontWeight: 700, color: v.color }}>{dias}d</span>
                     </div>
@@ -217,14 +217,14 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
 
       {/* Acciones recomendadas */}
       {recomendaciones.length > 0 && (
-        <div style={{ marginTop: 16, background: '#fffbeb', borderRadius: 10, padding: '12px 16px', border: '1px solid #fde68a' }}>
-          <div style={{ fontWeight: 700, fontSize: 12, color: '#92400e', marginBottom: 8 }}>💡 Acciones recomendadas</div>
+        <div style={{ marginTop: 16, background: 'var(--at-warning-tint)', borderRadius: 10, padding: '12px 16px', border: '1px solid var(--at-warning-border)' }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--at-warning-strong)', marginBottom: 8 }}>💡 Acciones recomendadas</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {recomendaciones.map((r, i) => (
-              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '5px 8px', background: r.prioridad === 'alta' ? '#fef2f2' : 'var(--at-surface)', borderRadius: 7, border: `1px solid ${r.prioridad === 'alta' ? '#fecaca' : 'var(--at-line)'}` }}>
+              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '5px 8px', background: r.prioridad === 'alta' ? 'var(--at-danger-tint)' : 'var(--at-surface)', borderRadius: 7, border: `1px solid ${r.prioridad === 'alta' ? 'var(--at-danger-border)' : 'var(--at-line)'}` }}>
                 <span style={{ fontSize: 14 }}>{r.icono}</span>
-                <span style={{ fontSize: 11, color: r.prioridad === 'alta' ? '#b91c1c' : 'var(--at-ink-2)', fontWeight: r.prioridad === 'alta' ? 700 : 500 }}>{r.texto}</span>
-                {r.prioridad === 'alta' && <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, background: '#fef2f2', color: '#ef4444', padding: '1px 5px', borderRadius: 4, border: '1px solid #fecaca' }}>URGENTE</span>}
+                <span style={{ fontSize: 11, color: r.prioridad === 'alta' ? 'var(--at-danger-strong)' : 'var(--at-ink-2)', fontWeight: r.prioridad === 'alta' ? 700 : 500 }}>{r.texto}</span>
+                {r.prioridad === 'alta' && <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, background: 'var(--at-danger-tint)', color: 'var(--at-danger)', padding: '1px 5px', borderRadius: 4, border: '1px solid var(--at-danger-border)' }}>URGENTE</span>}
               </div>
             ))}
           </div>
@@ -245,7 +245,7 @@ export default function CuadroMandoTab({ cuotas, tickets, visitantes, gastos, pr
             const color = item.invert
               ? semaforoInv(item.score, 90, 70)
               : semaforo(item.score, 0, 3)
-            const emoji = color === '#16a34a' ? '🟢' : color === '#d97706' ? '🟡' : '🔴'
+            const emoji = color === 'var(--at-success)' ? '🟢' : color === 'var(--at-warning)' ? '🟡' : '🔴'
             return (
               <div key={item.area} style={{ textAlign: 'center', padding: '8px 4px' }}>
                 <div style={{ fontSize: 20 }}>{emoji}</div>

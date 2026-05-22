@@ -70,7 +70,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
   }
 
   async function handleDeleteMovimiento(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar movimiento?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar movimiento?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('movimientos_caja').delete().eq('id', id)
     onRefresh()
@@ -147,19 +147,19 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '3px' }}>
                       <span style={{ fontWeight: 700, fontSize: '13px' }}>{c.responsable}</span>
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px',
-                        background: c.estado === 'abierta' ? '#dcfce7' : 'var(--at-chip)',
-                        color: c.estado === 'abierta' ? '#16a34a' : 'var(--at-ink-3)' }}>
+                        background: c.estado === 'abierta' ? 'var(--at-success-tint)' : 'var(--at-chip)',
+                        color: c.estado === 'abierta' ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                         {c.estado === 'abierta' ? 'Abierta' : 'Cerrada'}
                       </span>
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Apertura: {c.fecha_apertura}</div>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: sal >= 0 ? 'var(--at-primary)' : '#ef4444', marginTop: '3px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: sal >= 0 ? 'var(--at-primary)' : 'var(--at-danger)', marginTop: '3px' }}>
                       Saldo: {fmt(sal, moneda)}
                     </div>
                   </div>
                   {canEdit && c.estado === 'abierta' && (
                     <button onClick={e => { e.stopPropagation(); handleCerrarCaja(c) }}
-                      style={{ padding: '4px 9px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
+                      style={{ padding: '4px 9px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
                       Cerrar
                     </button>
                   )}
@@ -176,8 +176,8 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
               {[
                 { label: 'Monto inicial', value: fmt(Number(selected.monto_inicial), moneda), color: 'var(--at-ink-3)' },
-                { label: 'Ingresos', value: fmt(totalIngresos, moneda), color: '#10b981' },
-                { label: 'Egresos', value: fmt(totalEgresos, moneda), color: '#ef4444' },
+                { label: 'Ingresos', value: fmt(totalIngresos, moneda), color: 'var(--at-success)' },
+                { label: 'Egresos', value: fmt(totalEgresos, moneda), color: 'var(--at-danger)' },
               ].map(k => (
                 <div key={k.label} style={{ background: 'var(--at-surface)', borderRadius: '8px', padding: '8px', textAlign: 'center', border: '1px solid var(--at-line)' }}>
                   <div style={{ fontSize: '13px', fontWeight: 700, color: k.color }}>{k.value}</div>
@@ -185,8 +185,8 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
                 </div>
               ))}
             </div>
-            <div style={{ textAlign: 'center', marginBottom: '12px', padding: '8px', background: saldo >= 0 ? '#dcfce7' : '#fee2e2', borderRadius: '8px' }}>
-              <span style={{ fontWeight: 800, fontSize: '14px', color: saldo >= 0 ? '#16a34a' : '#ef4444' }}>Saldo actual: {fmt(saldo, moneda)}</span>
+            <div style={{ textAlign: 'center', marginBottom: '12px', padding: '8px', background: saldo >= 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', borderRadius: '8px' }}>
+              <span style={{ fontWeight: 800, fontSize: '14px', color: saldo >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>Saldo actual: {fmt(saldo, moneda)}</span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -246,7 +246,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
                 {[...selectedMovs].sort((a, b) => b.fecha.localeCompare(a.fecha)).map(m => (
                   <div key={m.id} style={{ background: 'var(--at-surface)', borderRadius: '7px', padding: '7px 10px', border: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: m.tipo === 'ingreso' ? '#10b981' : '#ef4444' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: m.tipo === 'ingreso' ? 'var(--at-success)' : 'var(--at-danger)' }}>
                         {m.tipo === 'ingreso' ? '+' : '-'}{fmt(Number(m.monto), moneda)}
                       </span>
                       <span style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginLeft: '8px' }}>{m.concepto}</span>
@@ -255,7 +255,7 @@ export function CajaChicaTab({ cajas, movimientos, proyectoId, companyId, moneda
                     </div>
                     {canEdit && (
                       <button onClick={() => handleDeleteMovimiento(m.id)}
-                        style={{ padding: '2px 6px', background: '#fee2e2', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        style={{ padding: '2px 6px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '4px', fontSize: '10px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     )}
                   </div>
                 ))}

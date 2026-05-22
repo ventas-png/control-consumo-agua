@@ -22,10 +22,10 @@ const TIPOS: { value: TipoCertificado; label: string; icon: string }[] = [
 ]
 
 const ESTADOS: { value: EstadoCertificado; label: string; color: string; bg: string }[] = [
-  { value: 'pendiente',   label: 'Pendiente',   color: '#f59e0b', bg: '#fef3c7' },
+  { value: 'pendiente',   label: 'Pendiente',   color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   { value: 'en_proceso',  label: 'En proceso',  color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
-  { value: 'aprobado',    label: 'Aprobado',    color: '#10b981', bg: '#d1fae5' },
-  { value: 'rechazado',   label: 'Rechazado',   color: '#ef4444', bg: '#fef2f2' },
+  { value: 'aprobado',    label: 'Aprobado',    color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  { value: 'rechazado',   label: 'Rechazado',   color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
   { value: 'entregado',   label: 'Entregado',   color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 ]
 
@@ -77,7 +77,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
   }
 
   async function rechazar(s: SolicitudCertificado) {
-    const res = await Swal.fire({ title: 'Rechazar solicitud', text: '¿Confirmar rechazo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Rechazar', confirmButtonColor: '#ef4444' })
+    const res = await Swal.fire({ title: 'Rechazar solicitud', text: '¿Confirmar rechazo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Rechazar', confirmButtonColor: 'var(--at-danger)' })
     if (!res.isConfirmed) return
     await supabase.from('solicitudes_certificado').update({ estado: 'rechazado' as EstadoCertificado }).eq('id', s.id)
     if (selected?.id === s.id) setSelected(prev => prev ? { ...prev, estado: 'rechazado' } as SolicitudCertificado : null)
@@ -170,7 +170,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Crear solicitud'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -207,7 +207,7 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
                       </button>
                     )}
                     <button onClick={() => rechazar(selected)}
-                      style={{ padding: '7px 12px', background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '7px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ✕ Rechazar
                     </button>
                   </div>
@@ -223,12 +223,12 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
                   return (
                     <div key={f} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                       <div style={{ textAlign: 'center', minWidth: 80 }}>
-                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: actual ? e.color : pasado ? '#d1fae5' : 'var(--at-chip)', margin: '0 auto 4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: actual ? 'white' : pasado ? '#10b981' : 'var(--at-ink-3)', fontWeight: 700 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: actual ? e.color : pasado ? 'var(--at-success-tint)' : 'var(--at-chip)', margin: '0 auto 4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: actual ? 'white' : pasado ? 'var(--at-success)' : 'var(--at-ink-3)', fontWeight: 700 }}>
                           {pasado ? '✓' : i + 1}
                         </div>
                         <div style={{ fontSize: 10, color: actual ? e.color : 'var(--at-ink-3)', fontWeight: actual ? 700 : 400 }}>{e.label}</div>
                       </div>
-                      {i < FLUJO.length - 1 && <div style={{ width: 24, height: 2, background: pasado ? '#10b981' : 'var(--at-line)', marginBottom: 16 }} />}
+                      {i < FLUJO.length - 1 && <div style={{ width: 24, height: 2, background: pasado ? 'var(--at-success)' : 'var(--at-line)', marginBottom: 16 }} />}
                     </div>
                   )
                 })}
@@ -250,8 +250,8 @@ export default function SolicitudCertificadoTab({ solicitudes, unidades, proyect
               </div>
 
               {selected.observaciones && (
-                <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 12px', fontSize: 13 }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: '#92400e', marginBottom: 3 }}>Observaciones</div>
+                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 12px', fontSize: 13 }}>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--at-warning-strong)', marginBottom: 3 }}>Observaciones</div>
                   {selected.observaciones}
                 </div>
               )}

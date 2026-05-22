@@ -16,18 +16,18 @@ interface Props {
 
 const TIPO_STYLE: Record<string, { bg: string; color: string; label: string; icon: string }> = {
   remodelacion: { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', label: 'Remodelación', icon: '🔨' },
-  ampliacion:   { bg: '#fef3c7', color: '#92400e', label: 'Ampliación',   icon: '📐' },
+  ampliacion:   { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Ampliación',   icon: '📐' },
   reparacion:   { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Reparación',   icon: '🔧' },
-  pintura:      { bg: '#dcfce7', color: '#16a34a', label: 'Pintura',      icon: '🎨' },
+  pintura:      { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Pintura',      icon: '🎨' },
   otro:         { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Otro',         icon: '📋' },
 }
 
 const ESTADO_FLOW: Record<string, { bg: string; color: string; label: string; next?: string; nextLabel?: string }> = {
   solicitado:   { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Solicitado',   next: 'aprobado',      nextLabel: 'Aprobar' },
-  aprobado:     { bg: '#dcfce7', color: '#16a34a', label: 'Aprobado',     next: 'en_ejecucion',  nextLabel: 'Iniciar Ejecución' },
-  en_ejecucion: { bg: '#fef3c7', color: '#92400e', label: 'En Ejecución', next: 'completado',    nextLabel: 'Marcar Completado' },
-  completado:   { bg: '#f0fdf4', color: '#166534', label: 'Completado' },
-  rechazado:    { bg: '#fee2e2', color: '#ef4444', label: 'Rechazado' },
+  aprobado:     { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Aprobado',     next: 'en_ejecucion',  nextLabel: 'Iniciar Ejecución' },
+  en_ejecucion: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'En Ejecución', next: 'completado',    nextLabel: 'Marcar Completado' },
+  completado:   { bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)', label: 'Completado' },
+  rechazado:    { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Rechazado' },
 }
 
 const BLANK = {
@@ -96,14 +96,14 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
   }
 
   const rechazar = async (p: PermisoObraUnidad) => {
-    const r = await Swal.fire({ title: '¿Rechazar permiso?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Rechazar' })
+    const r = await Swal.fire({ title: '¿Rechazar permiso?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Rechazar' })
     if (!r.isConfirmed) return
     await supabase.from('permisos_obra_unidad').update({ estado: 'rechazado' }).eq('id', p.id)
     onRefresh()
   }
 
   const handleDelete = async (p: PermisoObraUnidad) => {
-    const r = await Swal.fire({ title: '¿Eliminar permiso?', text: p.descripcion, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' })
+    const r = await Swal.fire({ title: '¿Eliminar permiso?', text: p.descripcion, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('permisos_obra_unidad').delete().eq('id', p.id)
     if (selected?.id === p.id) setSelected(null)
@@ -268,7 +268,7 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {canEdit && <button onClick={() => openEdit(selected)} style={{ padding: '6px 14px', background: 'var(--at-chip)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>✏️ Editar</button>}
-                  <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>
+                  <button onClick={() => handleDelete(selected)} style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>🗑 Eliminar</button>
                 </div>
               </div>
 
@@ -303,7 +303,7 @@ export function PermisosObraTab({ permisos, unidades, proyectoId, companyId, mon
                     </button>
                   )}
                   {(selected.estado === 'solicitado' || selected.estado === 'aprobado') && (
-                    <button onClick={() => rechazar(selected)} style={{ padding: '8px 18px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+                    <button onClick={() => rechazar(selected)} style={{ padding: '8px 18px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
                       ✗ Rechazar
                     </button>
                   )}

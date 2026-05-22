@@ -15,8 +15,8 @@ interface Props {
 interface TareaItem { tarea: string; completado: boolean; observaciones: string }
 
 const TURNO_STYLE: Record<string, { bg: string; color: string; label: string; icon: string }> = {
-  'mañana': { bg: '#fef3c7', color: '#92400e', label: 'Mañana',   icon: '🌅' },
-  'tarde':  { bg: '#fed7aa', color: '#c2410c', label: 'Tarde',    icon: '☀️' },
+  'mañana': { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Mañana',   icon: '🌅' },
+  'tarde':  { bg: 'var(--at-warning-border)', color: 'var(--at-warning-strong)', label: 'Tarde',    icon: '☀️' },
   'noche':  { bg: 'var(--at-accent-soft-2)', color: 'var(--at-accent-dark)', label: 'Noche',    icon: '🌙' },
 }
 
@@ -72,7 +72,7 @@ export function BitacoraManto({ registros, proyectoId, companyId, canCreate, can
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('bitacora_manto').delete().eq('id', id)
     if (selected?.id === id) setSelected(null)
@@ -97,7 +97,7 @@ export function BitacoraManto({ registros, proyectoId, companyId, canCreate, can
     const completadas = tareasList.filter(t => t.completado).length
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bitácora Mantenimiento</title>
 <style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px}
-table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #ccc;padding:6px 8px}th{background:#FAF7EF}
+table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #ccc;padding:6px 8px}th{background:var(--at-surface-2)}
 .check{color:${ts.color};font-weight:700}.footer{margin-top:40px;border-top:1px solid #ccc;padding-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:40px}
 .sig{border-top:1px solid #000;margin-top:50px;padding-top:6px;font-size:11px}</style></head><body>
 <h1>Bitácora de Mantenimiento — ${ts.icon} ${ts.label}</h1>
@@ -189,7 +189,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
                 <input style={{ ...inputStyle, fontSize: '12px', textDecoration: t.completado ? 'line-through' : 'none', color: t.completado ? 'var(--at-ink-3)' : 'var(--at-ink)' }}
                   value={t.tarea} onChange={e => setTarea(i, 'tarea', e.target.value)} placeholder="Descripción de la tarea" />
                 <input style={{ ...inputStyle, fontSize: '12px' }} value={t.observaciones} onChange={e => setTarea(i, 'observaciones', e.target.value)} placeholder="Notas…" />
-                <button onClick={() => removeTarea(i)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>✕</button>
+                <button onClick={() => removeTarea(i)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>✕</button>
               </div>
             ))}
           </div>
@@ -221,7 +221,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
         ))}
         <input type="date" value={filtroFecha} onChange={e => setFiltroFecha(e.target.value)}
           style={{ padding: '4px 8px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '12px', background: 'var(--at-surface-2)', color: 'var(--at-ink)' }} />
-        {filtroFecha && <button onClick={() => setFiltroFecha('')} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>✕ Limpiar fecha</button>}
+        {filtroFecha && <button onClick={() => setFiltroFecha('')} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>✕ Limpiar fecha</button>}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1fr' : '1fr', gap: '16px' }}>
@@ -242,20 +242,20 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
                       <span style={{ fontSize: '14px' }}>{ts.icon}</span>
                       <span style={{ fontWeight: 700, fontSize: '13px' }}>{r.fecha}</span>
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: ts.bg, color: ts.color }}>{ts.label}</span>
-                      {r.firmado && <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '20px', background: '#dcfce7', color: '#16a34a' }}>✓ Firmado</span>}
+                      {r.firmado && <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '20px', background: 'var(--at-success-tint)', color: 'var(--at-success)' }}>✓ Firmado</span>}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                       <span>👤 {r.responsable}</span>
                       {r.area && <span>📍 {r.area}</span>}
                       {tareasList.length > 0 && (
-                        <span style={{ color: completadas === tareasList.length ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+                        <span style={{ color: completadas === tareasList.length ? 'var(--at-success)' : 'var(--at-warning)', fontWeight: 600 }}>
                           ✓ {completadas}/{tareasList.length} tareas
                         </span>
                       )}
                     </div>
                     {tareasList.length > 0 && (
                       <div style={{ height: '4px', background: 'var(--at-line)', borderRadius: '2px', marginTop: '5px', overflow: 'hidden', maxWidth: '200px' }}>
-                        <div style={{ height: '100%', width: `${completadas / tareasList.length * 100}%`, background: completadas === tareasList.length ? '#10b981' : 'var(--at-primary)', borderRadius: '2px' }} />
+                        <div style={{ height: '100%', width: `${completadas / tareasList.length * 100}%`, background: completadas === tareasList.length ? 'var(--at-success)' : 'var(--at-primary)', borderRadius: '2px' }} />
                       </div>
                     )}
                   </div>
@@ -266,7 +266,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
                       <button onClick={() => startEdit(r)}
                         style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(r.id)}
-                        style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </>}
                   </div>
                 </div>
@@ -286,7 +286,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {canEdit && (
                     <button onClick={() => toggleFirmado(selected)}
-                      style={{ padding: '4px 9px', background: selected.firmado ? '#dcfce7' : 'var(--at-surface)', border: `1px solid ${selected.firmado ? '#86efac' : 'var(--at-line)'}`, borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600, color: selected.firmado ? '#16a34a' : 'var(--at-ink-3)' }}>
+                      style={{ padding: '4px 9px', background: selected.firmado ? 'var(--at-success-tint)' : 'var(--at-surface)', border: `1px solid ${selected.firmado ? 'var(--at-success-border)' : 'var(--at-line)'}`, borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600, color: selected.firmado ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                       {selected.firmado ? '✓ Firmado' : 'Firmar'}
                     </button>
                   )}
@@ -314,7 +314,7 @@ ${r.observaciones ? `<p><strong>Observaciones generales:</strong> ${r.observacio
                       {canEdit ? (
                         <input type="checkbox" checked={t.completado} onChange={() => toggleTareaCompletada(selected, i)} style={{ width: '15px', height: '15px', cursor: 'pointer', flexShrink: 0 }} />
                       ) : (
-                        <span style={{ fontSize: '14px', color: t.completado ? '#10b981' : 'var(--at-line)' }}>{t.completado ? '✓' : '○'}</span>
+                        <span style={{ fontSize: '14px', color: t.completado ? 'var(--at-success)' : 'var(--at-line)' }}>{t.completado ? '✓' : '○'}</span>
                       )}
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '12px', fontWeight: 600, color: t.completado ? 'var(--at-ink-3)' : 'var(--at-ink-2)', textDecoration: t.completado ? 'line-through' : 'none' }}>{t.tarea}</div>

@@ -17,8 +17,8 @@ interface Props {
 }
 
 const TIPO_LABELS: Record<TipoAlerta, { label: string; color: string; bg: string }> = {
-  urgente:       { label: 'Urgente',       color: '#ef4444', bg: '#fee2e2' },
-  vencimiento:   { label: 'Vencimiento',   color: '#f59e0b', bg: '#fef3c7' },
+  urgente:       { label: 'Urgente',       color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
+  vencimiento:   { label: 'Vencimiento',   color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   recordatorio:  { label: 'Recordatorio',  color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
   aviso:         { label: 'Aviso',         color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
 }
@@ -167,7 +167,7 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar alerta?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar alerta?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('alertas_condominio').delete().eq('id', id)
     onRefresh()
@@ -191,8 +191,8 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Urgentes activas',   value: totalUrgentes,    icon: '🚨', color: '#ef4444' },
-          { label: 'Vencimientos próximos', value: totalVencimientos, icon: '⏰', color: '#f59e0b' },
+          { label: 'Urgentes activas',   value: totalUrgentes,    icon: '🚨', color: 'var(--at-danger)' },
+          { label: 'Vencimientos próximos', value: totalVencimientos, icon: '⏰', color: 'var(--at-warning)' },
           { label: 'Auto-detectadas',    value: totalAuto,        icon: '🤖', color: 'var(--at-primary)' },
           { label: 'Manuales activas',   value: alertas.filter(a => a.estado === 'activa').length, icon: '📌', color: 'var(--at-accent)' },
         ].map(k => (
@@ -318,7 +318,7 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
                       {canEdit && a.estado === 'activa' && (
                         <>
                           <button onClick={() => handleEstado(a.id, 'resuelta')}
-                            style={{ padding: '4px 10px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                            style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                             ✓ Resolver
                           </button>
                           <button onClick={() => handleEstado(a.id, 'ignorada')}
@@ -329,7 +329,7 @@ export function AlertasTab({ alertas, polizas, contratos, inspecciones, llaves, 
                       )}
                       {canEdit && (
                         <button onClick={() => handleDelete(a.id)}
-                          style={{ padding: '4px 7px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>
+                          style={{ padding: '4px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>
                           🗑️
                         </button>
                       )}

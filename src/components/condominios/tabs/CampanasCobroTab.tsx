@@ -18,14 +18,14 @@ interface Props {
 }
 
 const CANAL_CFG: Record<CanalCampana, { label: string; icon: string; bg: string; color: string }> = {
-  whatsapp: { label: 'WhatsApp', icon: '💬', bg: '#dcfce7', color: '#16a34a' },
+  whatsapp: { label: 'WhatsApp', icon: '💬', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   email:    { label: 'Email',    icon: '✉️',  bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
   sms:      { label: 'SMS',      icon: '📱', bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)' },
 }
 const ESTADO_CFG: Record<EstadoCampana, { label: string; bg: string; color: string }> = {
   borrador:   { label: 'Borrador',   bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
   enviada:    { label: 'Enviada',    bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
-  completada: { label: 'Completada', bg: '#dcfce7', color: '#16a34a' },
+  completada: { label: 'Completada', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
 }
 
 const BLANK = {
@@ -91,7 +91,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
   }
 
   async function eliminar(id: string) {
-    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar campaña?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar campaña?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!isConfirmed) return
     await supabase.from('campanas_cobro').delete().eq('id', id)
     onRefresh()
@@ -110,7 +110,7 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
         {[
           { label: 'Total campañas', val: campanas.length, bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
           { label: 'Enviadas', val: campanas.filter(c => c.estado === 'enviada').length, bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-          { label: 'Completadas', val: completadas, bg: '#dcfce7', color: '#16a34a' },
+          { label: 'Completadas', val: completadas, bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
           { label: 'Mensajes enviados', val: totalEnviadas, bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
@@ -244,13 +244,13 @@ export default function CampanasCobroTab({ campanas, cuotas, unidades, proyectoI
               <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
                 {selected.estado === 'enviada' && canEdit && (
                   <button onClick={() => completar(selected.id)}
-                    style={{ flex: 1, padding: '7px 0', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ flex: 1, padding: '7px 0', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     ✅ Completar
                   </button>
                 )}
                 {selected.estado === 'borrador' && canEdit && (
                   <button onClick={() => eliminar(selected.id)}
-                    style={{ flex: 1, padding: '7px 0', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ flex: 1, padding: '7px 0', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     🗑 Eliminar
                   </button>
                 )}

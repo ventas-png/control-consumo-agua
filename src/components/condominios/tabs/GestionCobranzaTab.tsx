@@ -18,12 +18,12 @@ interface Props {
 
 const ETAPAS: { value: EtapaCobranza; label: string; color: string; bg: string }[] = [
   { value: 'aviso_amistoso',       label: 'Aviso amistoso',       color: 'var(--at-primary-2)', bg: 'var(--at-primary-soft)' },
-  { value: 'recordatorio',         label: 'Recordatorio',         color: '#f59e0b', bg: '#fef3c7' },
-  { value: 'carta_formal',         label: 'Carta formal',         color: '#f97316', bg: '#fff7ed' },
-  { value: 'suspension_servicios', label: 'Susp. servicios',      color: '#ef4444', bg: '#fef2f2' },
-  { value: 'cobro_juridico',       label: 'Cobro jurídico',       color: '#dc2626', bg: '#fef2f2' },
+  { value: 'recordatorio',         label: 'Recordatorio',         color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  { value: 'carta_formal',         label: 'Carta formal',         color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  { value: 'suspension_servicios', label: 'Susp. servicios',      color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
+  { value: 'cobro_juridico',       label: 'Cobro jurídico',       color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
   { value: 'acuerdo_pago',         label: 'Acuerdo de pago',      color: 'var(--at-accent)', bg: 'var(--at-accent-tint-2)' },
-  { value: 'resuelto',             label: 'Resuelto',             color: '#10b981', bg: '#d1fae5' },
+  { value: 'resuelto',             label: 'Resuelto',             color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
 ]
 
 const FLUJO_ETAPAS: EtapaCobranza[] = [
@@ -177,7 +177,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
             <span style={{ fontWeight: 600, fontSize: 14 }}>Cobranza ({lista.length})</span>
             <div style={{ display: 'flex', gap: 4 }}>
               <button onClick={exportarPDF} disabled={cobranzas.length === 0} style={{ padding: '4px 8px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>📄</button>
-              <button onClick={exportarXlsx} disabled={cobranzas.length === 0} style={{ padding: '4px 8px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>📊</button>
+              <button onClick={exportarXlsx} disabled={cobranzas.length === 0} style={{ padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: 5, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>📊</button>
               {canCreate && (
                 <button onClick={() => { setMostrarForm(true); setSelected(null) }}
                   style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
@@ -188,13 +188,13 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
           </div>
           {/* KPI montos */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-            <div style={{ background: '#fef2f2', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
-              <div style={{ fontWeight: 700, color: '#dc2626', fontSize: 13 }}>{moneda} {totalAdeudado.toLocaleString()}</div>
-              <div style={{ fontSize: 10, color: '#dc2626' }}>Adeudado activo</div>
+            <div style={{ background: 'var(--at-danger-tint)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, color: 'var(--at-danger)', fontSize: 13 }}>{moneda} {totalAdeudado.toLocaleString()}</div>
+              <div style={{ fontSize: 10, color: 'var(--at-danger)' }}>Adeudado activo</div>
             </div>
-            <div style={{ background: '#d1fae5', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
-              <div style={{ fontWeight: 700, color: '#10b981', fontSize: 13 }}>{moneda} {totalRecuperado.toLocaleString()}</div>
-              <div style={{ fontSize: 10, color: '#10b981' }}>Recuperado</div>
+            <div style={{ background: 'var(--at-success-tint)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, color: 'var(--at-success)', fontSize: 13 }}>{moneda} {totalRecuperado.toLocaleString()}</div>
+              <div style={{ fontSize: 10, color: 'var(--at-success)' }}>Recuperado</div>
             </div>
           </div>
           <select style={inp} value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoCobranza | '')}>
@@ -220,7 +220,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
               </div>
               <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
                 {unidad && <span>{unidad.nombre} · </span>}
-                Pendiente: <span style={{ color: '#ef4444', fontWeight: 600 }}>{moneda} {pendiente.toLocaleString()}</span>
+                Pendiente: <span style={{ color: 'var(--at-danger)', fontWeight: 600 }}>{moneda} {pendiente.toLocaleString()}</span>
               </div>
               <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 1 }}>{c.fecha_inicio} · {c.contactos.length} contactos</div>
             </div>
@@ -270,7 +270,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Crear'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -301,7 +301,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     {siguienteEtapa && (
                       <button onClick={() => avanzarEtapa(selected)}
-                        style={{ padding: '7px 12px', background: '#f97316', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                        style={{ padding: '7px 12px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                         ↑ {ETAPAS.find(e => e.value === siguienteEtapa)?.label}
                       </button>
                     )}
@@ -310,7 +310,7 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
                       💰 Montos
                     </button>
                     <button onClick={() => marcarResuelto(selected)}
-                      style={{ padding: '7px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '7px 12px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ✅ Resolver
                     </button>
                   </div>
@@ -320,9 +320,9 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
               {/* Montos */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
                 {[
-                  { label: 'Adeudado', value: `${moneda} ${selected.monto_adeudado.toLocaleString()}`, color: '#ef4444' },
-                  { label: 'Pagado', value: `${moneda} ${selected.monto_pagado.toLocaleString()}`, color: '#10b981' },
-                  { label: 'Pendiente', value: `${moneda} ${pendiente.toLocaleString()}`, color: pendiente > 0 ? '#f59e0b' : '#10b981' },
+                  { label: 'Adeudado', value: `${moneda} ${selected.monto_adeudado.toLocaleString()}`, color: 'var(--at-danger)' },
+                  { label: 'Pagado', value: `${moneda} ${selected.monto_pagado.toLocaleString()}`, color: 'var(--at-success)' },
+                  { label: 'Pendiente', value: `${moneda} ${pendiente.toLocaleString()}`, color: pendiente > 0 ? 'var(--at-warning)' : 'var(--at-success)' },
                 ].map(k => (
                   <div key={k.label} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: k.color }}>{k.value}</div>
@@ -383,8 +383,8 @@ export default function GestionCobranzaTab({ cobranzas, unidades, proyectoId, co
               )}
 
               {selected.observaciones && (
-                <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 12px', marginTop: 12, fontSize: 13 }}>
-                  <div style={{ fontWeight: 600, fontSize: 11, color: '#92400e', marginBottom: 3 }}>Observaciones</div>
+                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 12px', marginTop: 12, fontSize: 13 }}>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--at-warning-strong)', marginBottom: 3 }}>Observaciones</div>
                   {selected.observaciones}
                 </div>
               )}

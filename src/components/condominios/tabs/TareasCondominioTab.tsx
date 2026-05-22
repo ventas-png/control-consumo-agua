@@ -14,17 +14,17 @@ interface Props {
 }
 
 const ESTADOS: { value: EstadoTarea; label: string; color: string; bg: string }[] = [
-  { value: 'pendiente',   label: 'Pendiente',   color: '#f59e0b', bg: '#fef3c7' },
+  { value: 'pendiente',   label: 'Pendiente',   color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   { value: 'en_proceso',  label: 'En proceso',  color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
-  { value: 'completada',  label: 'Completada',  color: '#10b981', bg: '#d1fae5' },
+  { value: 'completada',  label: 'Completada',  color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   { value: 'cancelada',   label: 'Cancelada',   color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 ]
 
 const PRIORIDADES: { value: PrioridadTarea; label: string; color: string }[] = [
   { value: 'baja',    label: '🔵 Baja',    color: 'var(--at-primary-2)' },
-  { value: 'media',   label: '🟡 Media',   color: '#f59e0b' },
-  { value: 'alta',    label: '🔴 Alta',    color: '#ef4444' },
-  { value: 'urgente', label: '🚨 Urgente', color: '#dc2626' },
+  { value: 'media',   label: '🟡 Media',   color: 'var(--at-warning)' },
+  { value: 'alta',    label: '🔴 Alta',    color: 'var(--at-danger)' },
+  { value: 'urgente', label: '🚨 Urgente', color: 'var(--at-danger)' },
 ]
 
 const CATEGORIAS: { value: CategoriaTareaCondominio; label: string }[] = [
@@ -158,7 +158,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
         </div>
 
         {vencidas.length > 0 && (
-          <div style={{ padding: '6px 12px', background: '#fef2f2', borderBottom: '1px solid #fecaca', fontSize: 12, color: '#dc2626' }}>
+          <div style={{ padding: '6px 12px', background: 'var(--at-danger-tint)', borderBottom: '1px solid var(--at-danger-border)', fontSize: 12, color: 'var(--at-danger)' }}>
             🔴 {vencidas.length} tarea(s) vencida(s)
           </div>
         )}
@@ -172,7 +172,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
           const vencida = dias !== null && dias < 0 && t.estado !== 'completada' && t.estado !== 'cancelada'
           return (
             <div key={t.id} onClick={() => { setSelected(t); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === t.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: vencida ? '3px solid #ef4444' : '3px solid transparent' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === t.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: vencida ? '3px solid var(--at-danger)' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 13, flex: 1, marginRight: 8 }}>{t.titulo}</span>
                 <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 8, background: est?.bg, color: est?.color, flexShrink: 0 }}>{est?.label}</span>
@@ -182,7 +182,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
                 {t.asignado_a && <span>→ {t.asignado_a}</span>}
               </div>
               {t.fecha_limite && (
-                <div style={{ fontSize: 11, color: vencida ? '#ef4444' : dias !== null && dias <= 3 ? '#f59e0b' : 'var(--at-ink-3)', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: vencida ? 'var(--at-danger)' : dias !== null && dias <= 3 ? 'var(--at-warning)' : 'var(--at-ink-3)', marginTop: 2 }}>
                   {vencida ? `⚠️ Vencida hace ${Math.abs(dias!)} días` : dias === 0 ? '⏰ Vence hoy' : `Vence: ${t.fecha_limite}`}
                 </div>
               )}
@@ -244,7 +244,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Crear tarea'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -292,7 +292,7 @@ export default function TareasCondominioTab({ tareas, proyectoId, companyId, mon
               </div>
 
               {dias !== null && selected.estado !== 'completada' && selected.estado !== 'cancelada' && (
-                <div style={{ padding: '8px 12px', borderRadius: 8, marginBottom: 12, background: dias < 0 ? '#fef2f2' : dias <= 3 ? '#fef3c7' : '#f0fdf4', fontSize: 13, color: dias < 0 ? '#dc2626' : dias <= 3 ? '#92400e' : '#166534' }}>
+                <div style={{ padding: '8px 12px', borderRadius: 8, marginBottom: 12, background: dias < 0 ? 'var(--at-danger-tint)' : dias <= 3 ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', fontSize: 13, color: dias < 0 ? 'var(--at-danger)' : dias <= 3 ? 'var(--at-warning-strong)' : 'var(--at-success-strong)' }}>
                   {dias < 0 ? `⚠️ Vencida hace ${Math.abs(dias)} días` : dias === 0 ? '⏰ Vence hoy' : `✅ Vence en ${dias} días (${selected.fecha_limite})`}
                 </div>
               )}

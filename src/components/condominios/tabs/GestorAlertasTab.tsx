@@ -30,9 +30,9 @@ interface Alerta {
 }
 
 const SEV_CFG: Record<Severidad, { color: string; bg: string; border: string; icon: string; label: string; order: number }> = {
-  critica: { color: '#dc2626', bg: '#fef2f2', border: '#fca5a5', icon: '🚨', label: 'Crítica', order: 0 },
-  alta:    { color: '#ea580c', bg: '#fff7ed', border: '#fdba74', icon: '⚠️', label: 'Alta',    order: 1 },
-  media:   { color: '#d97706', bg: '#fef3c7', border: '#fde68a', icon: '🔔', label: 'Media',   order: 2 },
+  critica: { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', border: 'var(--at-danger-border)', icon: '🚨', label: 'Crítica', order: 0 },
+  alta:    { color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', border: '#fdba74', icon: '⚠️', label: 'Alta',    order: 1 },
+  media:   { color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', border: 'var(--at-warning-border)', icon: '🔔', label: 'Media',   order: 2 },
   baja:    { color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', border: 'var(--at-primary-soft-2)', icon: 'ℹ️', label: 'Baja',    order: 3 },
 }
 

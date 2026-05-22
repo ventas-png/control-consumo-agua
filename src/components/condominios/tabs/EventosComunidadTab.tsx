@@ -17,17 +17,17 @@ interface Props {
 
 const TIPO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   cultural:    { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', label: 'Cultural' },
-  deportivo:   { bg: '#dcfce7', color: '#16a34a', label: 'Deportivo' },
+  deportivo:   { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Deportivo' },
   social:      { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Social' },
-  informativo: { bg: '#fef3c7', color: '#92400e', label: 'Informativo' },
+  informativo: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Informativo' },
   otro:        { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Otro' },
 }
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   programado: { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Programado' },
-  en_curso:   { bg: '#dcfce7', color: '#16a34a', label: 'En curso' },
+  en_curso:   { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'En curso' },
   realizado:  { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Realizado' },
-  cancelado:  { bg: '#fee2e2', color: '#ef4444', label: 'Cancelado' },
+  cancelado:  { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Cancelado' },
 }
 
 const BLANK_EVENTO = { titulo: '', descripcion: '', tipo: 'social', fecha: '', hora_inicio: '', hora_fin: '', lugar: '', capacidad_max: '', estado: 'programado', asistentes_real: '', costo_estimado: '' }
@@ -75,7 +75,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar evento?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar evento?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('eventos_comunidad').delete().eq('id', id)
     if (selected?.id === id) setSelected(null)
@@ -237,7 +237,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
                     <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                       {ev.estado === 'programado' && (
                         <button onClick={() => cambiarEstado(ev.id, 'en_curso')}
-                          style={{ padding: '3px 7px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                          style={{ padding: '3px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
                           Iniciar
                         </button>
                       )}
@@ -250,7 +250,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
                       <button onClick={() => startEdit(ev)}
                         style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(ev.id)}
-                        style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </div>
                   )}
                 </div>
@@ -311,7 +311,7 @@ export function EventosComunidadTab({ eventos, asistentes, unidades, proyectoId,
                       {canEdit && (
                         <div style={{ display: 'flex', gap: '4px' }}>
                           <button onClick={() => marcarAsistio(a.id, !a.asistio)}
-                            style={{ padding: '3px 7px', background: a.asistio ? '#dcfce7' : 'var(--at-chip)', color: a.asistio ? '#16a34a' : 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                            style={{ padding: '3px 7px', background: a.asistio ? 'var(--at-success-tint)' : 'var(--at-chip)', color: a.asistio ? 'var(--at-success)' : 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
                             {a.asistio ? '✓ Asistió' : 'Sin confirmar'}
                           </button>
                         </div>

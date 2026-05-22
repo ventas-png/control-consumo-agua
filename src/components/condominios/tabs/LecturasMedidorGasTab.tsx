@@ -87,13 +87,13 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-accent)' }}>{totalConsumo.toFixed(2)}</div>
           <div style={{ fontSize: 11, color: 'var(--at-accent)' }}>m³ consumo total</div>
         </div>
-        <div style={{ background: '#d1fae5', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#10b981' }}>{moneda} {totalCosto.toLocaleString()}</div>
-          <div style={{ fontSize: 11, color: '#10b981' }}>Costo total</div>
+        <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {totalCosto.toLocaleString()}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Costo total</div>
         </div>
-        <div style={{ background: alertasFuga > 0 ? '#fef2f2' : 'var(--at-chip)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: alertasFuga > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>{alertasFuga}</div>
-          <div style={{ fontSize: 11, color: alertasFuga > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>Alertas de fuga</div>
+        <div style={{ background: alertasFuga > 0 ? 'var(--at-danger-tint)' : 'var(--at-chip)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: alertasFuga > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{alertasFuga}</div>
+          <div style={{ fontSize: 11, color: alertasFuga > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>Alertas de fuga</div>
         </div>
         <div style={{ background: 'var(--at-surface-2)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-ink-2)' }}>{lecturas.length}</div>
@@ -103,7 +103,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
 
       {/* Alerta fugas */}
       {alertasFuga > 0 && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#ef4444' }}>
+        <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--at-danger)' }}>
           🚨 <strong>{alertasFuga} alerta{alertasFuga > 1 ? 's' : ''} de fuga detectada{alertasFuga > 1 ? 's' : ''}</strong> — revisar con urgencia
         </div>
       )}
@@ -124,7 +124,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nueva lectura'}
           </button>
         )}
@@ -177,7 +177,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
             {consumoCalculado != null && form.costo_unitario && (
               <div>
                 <label style={lbl}>Costo total estimado</label>
-                <div style={{ ...inp, background: '#f0fdf4', color: '#16a34a', fontWeight: 600 }}>
+                <div style={{ ...inp, background: 'var(--at-success-tint)', color: 'var(--at-success)', fontWeight: 600 }}>
                   {moneda} {(consumoCalculado * parseFloat(form.costo_unitario)).toFixed(2)}
                 </div>
               </div>
@@ -188,7 +188,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 20 }}>
               <input type="checkbox" id="fuga_check" checked={form.alerta_fuga} onChange={e => setForm(p => ({ ...p, alerta_fuga: e.target.checked }))} />
-              <label htmlFor="fuga_check" style={{ fontSize: 13, cursor: 'pointer', color: form.alerta_fuga ? '#ef4444' : 'var(--at-ink-2)' }}>
+              <label htmlFor="fuga_check" style={{ fontSize: 13, cursor: 'pointer', color: form.alerta_fuga ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>
                 🚨 Alerta de fuga
               </label>
             </div>
@@ -198,7 +198,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Registrar'}
           </button>
         </div>
@@ -221,9 +221,9 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
               {lista.map(l => {
                 const unidad = unidades.find(u => u.id === l.unidad_id)
                 return (
-                  <tr key={l.id} style={{ borderBottom: '1px solid var(--at-chip)', background: l.alerta_fuga ? '#fef2f2' : 'var(--at-surface)' }}>
+                  <tr key={l.id} style={{ borderBottom: '1px solid var(--at-chip)', background: l.alerta_fuga ? 'var(--at-danger-tint)' : 'var(--at-surface)' }}>
                     <td style={{ padding: '8px 12px', fontWeight: 600 }}>
-                      {l.alerta_fuga && <span style={{ color: '#ef4444', marginRight: 4 }}>🚨</span>}
+                      {l.alerta_fuga && <span style={{ color: 'var(--at-danger)', marginRight: 4 }}>🚨</span>}
                       {unidad?.nombre ?? l.area ?? 'Área común'}
                     </td>
                     <td style={{ padding: '8px 12px', color: 'var(--at-ink-3)' }}>{l.periodo ?? '—'}</td>
@@ -233,7 +233,7 @@ export default function LecturasMedidorGasTab({ lecturas, unidades, proyectoId, 
                     <td style={{ padding: '8px 12px', color: 'var(--at-accent)', fontWeight: 600 }}>
                       {l.consumo != null ? `${l.consumo.toFixed(3)} m³` : '—'}
                     </td>
-                    <td style={{ padding: '8px 12px', color: '#10b981', fontWeight: 600 }}>
+                    <td style={{ padding: '8px 12px', color: 'var(--at-success)', fontWeight: 600 }}>
                       {l.costo_total != null ? `${moneda} ${l.costo_total.toFixed(2)}` : '—'}
                     </td>
                     <td style={{ padding: '8px 12px' }}>

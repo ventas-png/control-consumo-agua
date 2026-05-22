@@ -15,10 +15,10 @@ interface Props {
 }
 
 const ESTADO_CONFIG: Record<EstadoLlave, { label: string; color: string; bg: string }> = {
-  activa:   { label: 'Activa',    color: '#10b981', bg: '#d1fae5' },
+  activa:   { label: 'Activa',    color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   devuelta: { label: 'Devuelta',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
-  perdida:  { label: 'Perdida',   color: '#ef4444', bg: '#fee2e2' },
-  bloqueada:{ label: 'Bloqueada', color: '#f59e0b', bg: '#fef3c7' },
+  perdida:  { label: 'Perdida',   color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
+  bloqueada:{ label: 'Bloqueada', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
 }
 
 const TIPO_CONFIG: Record<TipoLlave, { label: string; icon: string }> = {
@@ -80,7 +80,7 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('llaves_condominio').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -105,8 +105,8 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
           { label: 'Total registros', value: String(llaves.length),     icon: '🔑', color: 'var(--at-primary)' },
-          { label: 'Activas',         value: String(activas),           icon: '✅', color: '#10b981' },
-          { label: 'Perdidas',        value: String(perdidas),          icon: '❌', color: '#ef4444' },
+          { label: 'Activas',         value: String(activas),           icon: '✅', color: 'var(--at-success)' },
+          { label: 'Perdidas',        value: String(perdidas),          icon: '❌', color: 'var(--at-danger)' },
           { label: 'Depósitos activos', value: depositoTotal > 0 ? `${moneda} ${depositoTotal.toFixed(0)}` : '—', icon: '💰', color: 'var(--at-accent)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
@@ -213,7 +213,7 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
             const est = ESTADO_CONFIG[l.estado]
             const tc  = TIPO_CONFIG[l.tipo]
             return (
-              <div key={l.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${l.estado === 'perdida' ? '#fca5a5' : 'var(--at-line)'}`, borderRadius: '10px', padding: '16px' }}>
+              <div key={l.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${l.estado === 'perdida' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                   <div>
                     <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--at-ink)' }}>{tc.icon} {l.descripcion}</div>
@@ -226,7 +226,7 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
                   {l.codigo && <div>🔢 {l.codigo}</div>}
                   {l.fecha_entrega && <div>📅 Entregada: {l.fecha_entrega}</div>}
                   {l.fecha_devolucion && <div>📅 Devuelta: {l.fecha_devolucion}</div>}
-                  {l.monto_deposito && <div style={{ fontWeight: 600, color: l.deposito_pagado ? '#10b981' : '#f59e0b' }}>💰 Depósito: {moneda} {l.monto_deposito.toFixed(0)} {l.deposito_pagado ? '✅' : '⚠️ Pendiente'}</div>}
+                  {l.monto_deposito && <div style={{ fontWeight: 600, color: l.deposito_pagado ? 'var(--at-success)' : 'var(--at-warning)' }}>💰 Depósito: {moneda} {l.monto_deposito.toFixed(0)} {l.deposito_pagado ? '✅' : '⚠️ Pendiente'}</div>}
                 </div>
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -234,10 +234,10 @@ export function LlavesTab({ llaves, unidades, proyectoId, companyId, moneda, can
                       <button onClick={() => handleEstado(l.id, 'devuelta')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Devolver</button>
                     )}
                     {(l.estado === 'activa' || l.estado === 'bloqueada') && (
-                      <button onClick={() => handleEstado(l.id, 'perdida')} style={{ flex: 1, padding: '4px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Reportar pérdida</button>
+                      <button onClick={() => handleEstado(l.id, 'perdida')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Reportar pérdida</button>
                     )}
                     <button onClick={() => startEdit(l)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                    <button onClick={() => handleDelete(l.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                    <button onClick={() => handleDelete(l.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                   </div>
                 )}
               </div>

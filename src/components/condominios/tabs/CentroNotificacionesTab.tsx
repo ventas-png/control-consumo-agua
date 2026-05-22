@@ -32,10 +32,10 @@ interface Notificacion {
 }
 
 const URG: Record<Urgencia, { color: string; bg: string; border: string; label: string; order: number }> = {
-  critico: { color: '#ef4444', bg: '#fef2f2', border: '#fca5a5', label: 'Crítico', order: 0 },
-  alto:    { color: '#d97706', bg: '#fef3c7', border: '#fcd34d', label: 'Alto',    order: 1 },
+  critico: { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', border: 'var(--at-danger-border)', label: 'Crítico', order: 0 },
+  alto:    { color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', border: '#fcd34d', label: 'Alto',    order: 1 },
   medio:   { color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', border: 'var(--at-accent-2)', label: 'Medio',   order: 2 },
-  info:    { color: '#16a34a', bg: '#dcfce7', border: '#86efac', label: 'Info',    order: 3 },
+  info:    { color: 'var(--at-success)', bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', label: 'Info',    order: 3 },
 }
 
 const CAT_ICON: Record<CategoriaNotif, string> = {
@@ -212,9 +212,9 @@ export default function CentroNotificacionesTab({
       </div>
 
       {notificaciones.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 0', background: '#f0fdf4', borderRadius: 12, border: '1px solid #86efac' }}>
+        <div style={{ textAlign: 'center', padding: '48px 0', background: 'var(--at-success-tint)', borderRadius: 12, border: '1px solid var(--at-success-border)' }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
-          <div style={{ fontWeight: 700, color: '#16a34a', fontSize: 15 }}>Todo en orden</div>
+          <div style={{ fontWeight: 700, color: 'var(--at-success)', fontSize: 15 }}>Todo en orden</div>
           <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>No hay acciones pendientes en este momento</div>
         </div>
       ) : (

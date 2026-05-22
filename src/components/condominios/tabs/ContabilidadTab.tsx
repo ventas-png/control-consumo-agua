@@ -17,17 +17,17 @@ interface Props {
 
 const CAT_CONFIG: Record<CategoriaGasto, { label: string; icon: string; color: string }> = {
   mantenimiento: { label: 'Mantenimiento', icon: '🔧', color: 'var(--at-primary)' },
-  servicios:     { label: 'Servicios',     icon: '💡', color: '#f59e0b' },
+  servicios:     { label: 'Servicios',     icon: '💡', color: 'var(--at-warning)' },
   administrativo:{ label: 'Administrativo',icon: '📋', color: 'var(--at-accent)' },
-  seguridad:     { label: 'Seguridad',     icon: '🛡️', color: '#ef4444' },
-  limpieza:      { label: 'Limpieza',      icon: '🧹', color: '#10b981' },
-  obras:         { label: 'Obras',         icon: '🏗️', color: '#f97316' },
+  seguridad:     { label: 'Seguridad',     icon: '🛡️', color: 'var(--at-danger)' },
+  limpieza:      { label: 'Limpieza',      icon: '🧹', color: 'var(--at-success)' },
+  obras:         { label: 'Obras',         icon: '🏗️', color: 'var(--at-warning)' },
   otros:         { label: 'Otros',         icon: '📁', color: 'var(--at-ink-3)' },
 }
 
 const ESTADO_CONFIG: Record<EstadoGasto, { label: string; color: string; bg: string }> = {
-  pendiente: { label: 'Pendiente', color: '#f59e0b', bg: '#fef3c7' },
-  pagado:    { label: 'Pagado',    color: '#10b981', bg: '#d1fae5' },
+  pendiente: { label: 'Pendiente', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  pagado:    { label: 'Pagado',    color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   anulado:   { label: 'Anulado',   color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 
@@ -125,7 +125,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar gasto?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar gasto?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('gastos_condominio').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -142,8 +142,8 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
         {[
           { label: `Gastos ${thisYear}`, value: `${moneda} ${totalAnio.toFixed(0)}`,     icon: '📊', color: 'var(--at-primary)' },
           { label: 'Gastos del mes',    value: `${moneda} ${totalMes.toFixed(0)}`,       icon: '📅', color: 'var(--at-accent)' },
-          { label: 'Pendientes pago',   value: `${moneda} ${pendientes.reduce((s,g) => s+g.monto,0).toFixed(0)}`, icon: '⏳', color: '#f59e0b' },
-          { label: 'Registros',         value: String(gastos.length),                    icon: '🗂️', color: '#10b981' },
+          { label: 'Pendientes pago',   value: `${moneda} ${pendientes.reduce((s,g) => s+g.monto,0).toFixed(0)}`, icon: '⏳', color: 'var(--at-warning)' },
+          { label: 'Registros',         value: String(gastos.length),                    icon: '🗂️', color: 'var(--at-success)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
@@ -159,7 +159,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
             <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Gastos del Condominio</h2>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={exportarPDF} disabled={filtered.length === 0} style={{ padding: '6px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
-              <button onClick={exportarXlsx} disabled={gastos.length === 0} style={{ padding: '6px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
+              <button onClick={exportarXlsx} disabled={gastos.length === 0} style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
               {canCreate && !showForm && (
                 <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>+ Nuevo Gasto</button>
               )}
@@ -288,7 +288,7 @@ export function ContabilidadTab({ gastos, proyectoId, companyId, moneda, proyect
                           {canEdit && (
                             <div style={{ display: 'flex', gap: '4px' }}>
                               <button onClick={() => startEdit(g)} style={{ padding: '3px 7px', background: 'var(--at-chip)', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                              <button onClick={() => handleDelete(g.id)} style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                              <button onClick={() => handleDelete(g.id)} style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                             </div>
                           )}
                         </td>

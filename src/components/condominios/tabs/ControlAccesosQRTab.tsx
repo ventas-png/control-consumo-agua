@@ -206,7 +206,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                 </div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
                   <button onClick={guardarPreAutorizacion} disabled={registrando}
-                    style={{ padding: '8px 16px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                    style={{ padding: '8px 16px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
                     {registrando ? 'Guardando…' : '✓ Guardar pre-autorización'}
                   </button>
                   <button onClick={() => setQrGenerado(null)}
@@ -239,9 +239,9 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
             </div>
 
             {resultadoValidacion && (
-              <div style={{ background: resultadoValidacion.ok ? '#f0fdf4' : '#fef2f2', border: `1px solid ${resultadoValidacion.ok ? '#86efac' : '#fca5a5'}`, borderRadius: 10, padding: 16 }}>
+              <div style={{ background: resultadoValidacion.ok ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', border: `1px solid ${resultadoValidacion.ok ? 'var(--at-success-border)' : 'var(--at-danger-border)'}`, borderRadius: 10, padding: 16 }}>
                 <div style={{ fontSize: 24, marginBottom: 6 }}>{resultadoValidacion.ok ? '✅' : '❌'}</div>
-                <div style={{ fontWeight: 700, fontSize: 13, color: resultadoValidacion.ok ? '#16a34a' : '#ef4444', marginBottom: 4 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: resultadoValidacion.ok ? 'var(--at-success)' : 'var(--at-danger)', marginBottom: 4 }}>
                   {resultadoValidacion.msg}
                 </div>
                 {resultadoValidacion.visitante && (
@@ -254,7 +254,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                 )}
                 {resultadoValidacion.ok && !resultadoValidacion.visitante?.hora_entrada && (
                   <button onClick={registrarEntradaDesdeQR} disabled={registrando}
-                    style={{ width: '100%', padding: '8px 0', background: '#16a34a', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                    style={{ width: '100%', padding: '8px 0', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
                     {registrando ? 'Registrando…' : '🚪 Registrar entrada'}
                   </button>
                 )}
@@ -279,7 +279,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {preAutorizados.map(v => (
                 <div key={v.id} style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: v.hora_entrada ? '#dcfce7' : 'var(--at-primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: v.hora_entrada ? 'var(--at-success-tint)' : 'var(--at-primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
                     {v.hora_entrada ? '🟢' : '📱'}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -294,7 +294,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
                   </div>
                   {v.hora_entrada && !v.hora_salida && (
                     <button onClick={() => registrarSalida(v)}
-                      style={{ padding: '5px 12px', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#d97706', fontWeight: 600 }}>
+                      style={{ padding: '5px 12px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-warning)', fontWeight: 600 }}>
                       Registrar salida
                     </button>
                   )}
@@ -304,7 +304,7 @@ export default function ControlAccesosQRTab({ visitantes, unidades, proyectoId, 
           )}
 
           {vencidos.length > 0 && (
-            <div style={{ marginTop: 16, padding: '10px 14px', background: '#fef2f2', borderRadius: 8, fontSize: 11, color: 'var(--at-ink-3)' }}>
+            <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--at-danger-tint)', borderRadius: 8, fontSize: 11, color: 'var(--at-ink-3)' }}>
               {vencidos.length} pre-autorización(es) vencida(s) sin usar — ya no son válidas.
             </div>
           )}

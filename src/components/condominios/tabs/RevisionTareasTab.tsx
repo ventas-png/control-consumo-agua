@@ -17,8 +17,8 @@ interface Props {
 
 const ESTADO_REV: Record<EstadoRevision, { label: string; icon: string; bg: string; color: string; border: string }> = {
   pendiente: { label: 'Pendiente revisión', icon: '⏳', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)', border: 'var(--at-line)' },
-  aprobado:  { label: 'Aprobado',           icon: '✅', bg: '#f0fdf4', color: '#16a34a', border: '#86efac' },
-  rechazado: { label: 'Rechazado',          icon: '❌', bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
+  aprobado:  { label: 'Aprobado',           icon: '✅', bg: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'var(--at-success-border)' },
+  rechazado: { label: 'Rechazado',          icon: '❌', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'var(--at-danger-border)' },
 }
 
 export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userId, canEdit, onRefresh }: Props) {
@@ -49,7 +49,7 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
         title: '¿Por qué rechazas esta tarea?',
         input: 'textarea', inputPlaceholder: 'Describe el motivo del rechazo...',
         showCancelButton: true, confirmButtonText: 'Rechazar', cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#ef4444',
+        confirmButtonColor: 'var(--at-danger)',
       }) ?? { value: undefined }
       if (value === undefined) return
       comentario = value as string || null
@@ -134,14 +134,14 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                       {bloque.turno === 'tarde'  && <span>☀️ Tarde</span>}
                       {bloque.turno === 'noche'  && <span>🌙 Noche</span>}
                       {bloque.puntaje_completitud !== null && bloque.puntaje_completitud !== undefined && (
-                        <span style={{ fontWeight: 700, color: bloque.puntaje_completitud >= 80 ? '#16a34a' : bloque.puntaje_completitud >= 50 ? '#ea580c' : '#dc2626' }}>
+                        <span style={{ fontWeight: 700, color: bloque.puntaje_completitud >= 80 ? 'var(--at-success)' : bloque.puntaje_completitud >= 50 ? 'var(--at-warning)' : 'var(--at-danger)' }}>
                           Completitud: {bloque.puntaje_completitud}%
                         </span>
                       )}
                       {rev.total > 0 && (
                         <>
-                          {rev.aprobadas > 0 && <span style={{ color: '#16a34a' }}>✅ {rev.aprobadas} aprobadas</span>}
-                          {rev.rechazadas > 0 && <span style={{ color: '#dc2626' }}>❌ {rev.rechazadas} rechazadas</span>}
+                          {rev.aprobadas > 0 && <span style={{ color: 'var(--at-success)' }}>✅ {rev.aprobadas} aprobadas</span>}
+                          {rev.rechazadas > 0 && <span style={{ color: 'var(--at-danger)' }}>❌ {rev.rechazadas} rechazadas</span>}
                           {rev.pendientes > 0 && <span style={{ color: 'var(--at-ink-3)' }}>⏳ {rev.pendientes} por revisar</span>}
                         </>
                       )}
@@ -151,8 +151,8 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                   {/* Badge revisión */}
                   {rev.total > 0 && (
                     <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, flexShrink: 0,
-                      background: revisionCompleta ? (rev.rechazadas > 0 ? '#fef2f2' : '#f0fdf4') : 'var(--at-primary-tint)',
-                      color: revisionCompleta ? (rev.rechazadas > 0 ? '#dc2626' : '#16a34a') : 'var(--at-primary)' }}>
+                      background: revisionCompleta ? (rev.rechazadas > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)') : 'var(--at-primary-tint)',
+                      color: revisionCompleta ? (rev.rechazadas > 0 ? 'var(--at-danger)' : 'var(--at-success)') : 'var(--at-primary)' }}>
                       {revisionCompleta ? (rev.rechazadas > 0 ? '⚠ Con rechazos' : '✓ Revisado') : 'Pendiente revisión'}
                     </span>
                   )}
@@ -179,13 +179,13 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '3px' }}>
                                     <span style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--at-ink)' }}>{t.titulo}</span>
-                                    <span style={{ fontSize: '11.5px', padding: '1px 7px', borderRadius: '20px', background: t.estado === 'completada' ? '#dcfce7' : t.estado === 'con_observacion' ? '#fef3c7' : t.estado === 'omitida' ? 'var(--at-accent-tint)' : 'var(--at-chip)', color: t.estado === 'completada' ? '#16a34a' : t.estado === 'con_observacion' ? '#92400e' : 'var(--at-ink-3)', fontWeight: 600 }}>
+                                    <span style={{ fontSize: '11.5px', padding: '1px 7px', borderRadius: '20px', background: t.estado === 'completada' ? 'var(--at-success-tint)' : t.estado === 'con_observacion' ? 'var(--at-warning-tint)' : t.estado === 'omitida' ? 'var(--at-accent-tint)' : 'var(--at-chip)', color: t.estado === 'completada' ? 'var(--at-success)' : t.estado === 'con_observacion' ? 'var(--at-warning-strong)' : 'var(--at-ink-3)', fontWeight: 600 }}>
                                       {t.estado === 'completada' ? '✅ Completada' : t.estado === 'con_observacion' ? '⚠️ Con observación' : t.estado === 'omitida' ? '⏭ Omitida' : '⏳ Pendiente'}
                                     </span>
                                   </div>
                                   {t.descripcion && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{t.descripcion}</div>}
                                   {t.notas_operativo && (
-                                    <div style={{ fontSize: '12.5px', color: '#ea580c', marginTop: '3px' }}>💬 {t.notas_operativo}</div>
+                                    <div style={{ fontSize: '12.5px', color: 'var(--at-warning)', marginTop: '3px' }}>💬 {t.notas_operativo}</div>
                                   )}
                                   {t.completada_en && (
                                     <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
@@ -193,7 +193,7 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                                     </div>
                                   )}
                                   {rev?.comentario && (
-                                    <div style={{ fontSize: '12.5px', color: rev.estado === 'rechazado' ? '#dc2626' : '#16a34a', marginTop: '4px', fontStyle: 'italic' }}>
+                                    <div style={{ fontSize: '12.5px', color: rev.estado === 'rechazado' ? 'var(--at-danger)' : 'var(--at-success)', marginTop: '4px', fontStyle: 'italic' }}>
                                       {rev.estado === 'rechazado' ? '❌' : '✅'} {rev.comentario}
                                     </div>
                                   )}
@@ -202,11 +202,11 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                                 {canEdit && esCompletada && (
                                   <div style={{ display: 'flex', gap: '5px', flexShrink: 0 }}>
                                     <button onClick={() => revisar(t.id, bloque.id, 'aprobado')}
-                                      style={{ padding: '6px 12px', background: revEstado === 'aprobado' ? '#16a34a' : '#f0fdf4', color: revEstado === 'aprobado' ? 'white' : '#16a34a', border: '1.5px solid #86efac', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>
+                                      style={{ padding: '6px 12px', background: revEstado === 'aprobado' ? 'var(--at-success)' : 'var(--at-success-tint)', color: revEstado === 'aprobado' ? 'white' : 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>
                                       ✓ Aprobar
                                     </button>
                                     <button onClick={() => revisar(t.id, bloque.id, 'rechazado')}
-                                      style={{ padding: '6px 12px', background: revEstado === 'rechazado' ? '#dc2626' : '#fef2f2', color: revEstado === 'rechazado' ? 'white' : '#dc2626', border: '1.5px solid #fecaca', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>
+                                      style={{ padding: '6px 12px', background: revEstado === 'rechazado' ? 'var(--at-danger)' : 'var(--at-danger-tint)', color: revEstado === 'rechazado' ? 'white' : 'var(--at-danger)', border: '1.5px solid var(--at-danger-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>
                                       ✕ Rechazar
                                     </button>
                                   </div>
@@ -224,12 +224,12 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
                     {/* Resumen del bloque revisado */}
                     {rev.total > 0 && (
                       <div style={{ marginTop: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        <div style={{ padding: '10px 16px', background: '#f0fdf4', borderRadius: '10px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a' }}>{rev.aprobadas}</div>
+                        <div style={{ padding: '10px 16px', background: 'var(--at-success-tint)', borderRadius: '10px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--at-success)' }}>{rev.aprobadas}</div>
                           <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>Aprobadas</div>
                         </div>
-                        <div style={{ padding: '10px 16px', background: '#fef2f2', borderRadius: '10px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '20px', fontWeight: 800, color: '#dc2626' }}>{rev.rechazadas}</div>
+                        <div style={{ padding: '10px 16px', background: 'var(--at-danger-tint)', borderRadius: '10px', textAlign: 'center' }}>
+                          <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--at-danger)' }}>{rev.rechazadas}</div>
                           <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>Rechazadas</div>
                         </div>
                         <div style={{ padding: '10px 16px', background: 'var(--at-surface-2)', borderRadius: '10px', textAlign: 'center' }}>

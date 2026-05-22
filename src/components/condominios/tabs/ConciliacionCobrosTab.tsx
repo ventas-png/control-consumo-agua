@@ -88,7 +88,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
       const diff = diferencia > 0
         ? `Pago en exceso de ${moneda} ${diferencia.toFixed(2)}. Considere aplicar el saldo a otra cuota.`
         : `Pago insuficiente: falta ${moneda} ${Math.abs(diferencia).toFixed(2)}. La cuota permanece pendiente.`
-      await Swal.fire({ icon: 'warning', title: 'Diferencia registrada', text: diff, confirmButtonColor: '#d97706' })
+      await Swal.fire({ icon: 'warning', title: 'Diferencia registrada', text: diff, confirmButtonColor: 'var(--at-warning)' })
     } else {
       Swal.fire({ icon: 'success', title: 'Conciliado', text: 'Cuota marcada como pagada.', timer: 1500, showConfirmButton: false })
     }
@@ -108,9 +108,9 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         {[
-          { label: 'Cuotas pendientes', val: cuotasPendientes.length, color: '#ef4444', bg: '#fef2f2' },
-          { label: 'Monto pendiente', val: `${moneda} ${totalPendiente.toLocaleString('es', { maximumFractionDigits: 0 })}`, color: '#d97706', bg: '#fef3c7' },
-          { label: 'Conciliadas hoy', val: conciliacionesHoy.length, color: '#16a34a', bg: '#dcfce7' },
+          { label: 'Cuotas pendientes', val: cuotasPendientes.length, color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
+          { label: 'Monto pendiente', val: `${moneda} ${totalPendiente.toLocaleString('es', { maximumFractionDigits: 0 })}`, color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+          { label: 'Conciliadas hoy', val: conciliacionesHoy.length, color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
           { label: 'Cobrado hoy', val: `${moneda} ${montoConciliadoHoy.toLocaleString('es', { maximumFractionDigits: 0 })}`, color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
@@ -150,7 +150,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
                 const esConciliando = conciliando === cuota.id
                 const vencida = cuota.fecha_vencimiento && cuota.fecha_vencimiento < new Date().toISOString().slice(0, 10)
                 return (
-                  <div key={cuota.id} style={{ background: 'var(--at-surface)', border: `1px solid ${vencida ? '#fca5a5' : 'var(--at-line)'}`, borderRadius: 10, overflow: 'hidden' }}>
+                  <div key={cuota.id} style={{ background: 'var(--at-surface)', border: `1px solid ${vencida ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: 10, overflow: 'hidden' }}>
                     <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-ink)' }}>{cuota.concepto}</div>
@@ -160,10 +160,10 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 800, fontSize: 15, color: vencida ? '#ef4444' : 'var(--at-ink)' }}>
+                        <div style={{ fontWeight: 800, fontSize: 15, color: vencida ? 'var(--at-danger)' : 'var(--at-ink)' }}>
                           {moneda} {cuota.monto.toFixed(2)}
                         </div>
-                        <div style={{ fontSize: 10, padding: '1px 8px', borderRadius: 20, background: cuota.estado === 'moroso' ? '#fef2f2' : '#fef3c7', color: cuota.estado === 'moroso' ? '#ef4444' : '#d97706', fontWeight: 600 }}>
+                        <div style={{ fontSize: 10, padding: '1px 8px', borderRadius: 20, background: cuota.estado === 'moroso' ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)', color: cuota.estado === 'moroso' ? 'var(--at-danger)' : 'var(--at-warning)', fontWeight: 600 }}>
                           {cuota.estado}
                         </div>
                       </div>
@@ -209,7 +209,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
                           </div>
                         </div>
                         {form.monto && Math.abs(parseFloat(form.monto) - cuota.monto) > 0.01 && (
-                          <div style={{ marginTop: 6, fontSize: 11, color: parseFloat(form.monto) < cuota.monto ? '#ef4444' : '#d97706', fontWeight: 600 }}>
+                          <div style={{ marginTop: 6, fontSize: 11, color: parseFloat(form.monto) < cuota.monto ? 'var(--at-danger)' : 'var(--at-warning)', fontWeight: 600 }}>
                             {parseFloat(form.monto) < cuota.monto
                               ? `⚠️ Pago insuficiente: falta ${moneda} ${(cuota.monto - parseFloat(form.monto)).toFixed(2)}`
                               : `ℹ️ Pago en exceso: ${moneda} ${(parseFloat(form.monto) - cuota.monto).toFixed(2)} de diferencia`}
@@ -217,7 +217,7 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
                         )}
                         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                           <button onClick={aplicarConciliacion} disabled={saving || !form.monto}
-                            style={{ padding: '7px 18px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                            style={{ padding: '7px 18px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
                             {saving ? 'Aplicando…' : '✓ Aplicar'}
                           </button>
                           <button onClick={cancelarConciliacion}
@@ -261,15 +261,15 @@ export default function ConciliacionCobrosTab({ cuotas, unidades, conciliaciones
                         <td style={{ padding: '8px 10px', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cuota?.concepto ?? '—'}</td>
                         <td style={{ padding: '8px 10px', textAlign: 'right' }}>{moneda} {c.monto_cuota.toFixed(2)}</td>
                         <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600 }}>{moneda} {c.monto_recibido.toFixed(2)}</td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', color: Math.abs(diff) < 0.01 ? '#16a34a' : diff > 0 ? '#d97706' : '#ef4444', fontWeight: 600 }}>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', color: Math.abs(diff) < 0.01 ? 'var(--at-success)' : diff > 0 ? 'var(--at-warning)' : 'var(--at-danger)', fontWeight: 600 }}>
                           {Math.abs(diff) < 0.01 ? '✓' : diff > 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)}
                         </td>
                         <td style={{ padding: '8px 10px' }}>{c.metodo_pago}</td>
                         <td style={{ padding: '8px 10px', color: 'var(--at-ink-3)', fontSize: 10 }}>{c.referencia_pago ?? '—'}</td>
                         <td style={{ padding: '8px 10px' }}>
                           <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600,
-                            background: c.estado === 'conciliado' ? '#dcfce7' : '#fef3c7',
-                            color: c.estado === 'conciliado' ? '#16a34a' : '#d97706' }}>
+                            background: c.estado === 'conciliado' ? 'var(--at-success-tint)' : 'var(--at-warning-tint)',
+                            color: c.estado === 'conciliado' ? 'var(--at-success)' : 'var(--at-warning)' }}>
                             {c.estado}
                           </span>
                         </td>

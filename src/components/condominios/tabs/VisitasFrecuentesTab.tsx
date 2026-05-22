@@ -90,7 +90,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
   }
 
   async function eliminar(v: VisitaFrecuente) {
-    const res = await Swal.fire({ title: 'Eliminar visita frecuente', text: `¿Eliminar a ${v.nombre}?`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const res = await Swal.fire({ title: 'Eliminar visita frecuente', text: `¿Eliminar a ${v.nombre}?`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!res.isConfirmed) return
     await supabase.from('visitas_frecuentes').delete().eq('id', v.id)
     if (selected?.id === v.id) setSelected(null)
@@ -183,7 +183,7 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Guardar'}
           </button>
         </div>
@@ -230,11 +230,11 @@ export default function VisitasFrecuentesTab({ visitas, unidades, proyectoId, co
                         {canEdit && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                             <button onClick={() => toggleActivo(v)} title={v.activo ? 'Desactivar' : 'Activar'}
-                              style={{ padding: '4px 8px', background: v.activo ? 'var(--at-chip)' : '#d1fae5', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                              style={{ padding: '4px 8px', background: v.activo ? 'var(--at-chip)' : 'var(--at-success-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                               {v.activo ? '⏸' : '▶'}
                             </button>
                             <button onClick={() => eliminar(v)} title="Eliminar"
-                              style={{ padding: '4px 8px', background: '#fef2f2', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#ef4444' }}>
+                              style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>
                               🗑
                             </button>
                           </div>

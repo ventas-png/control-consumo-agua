@@ -16,9 +16,9 @@ interface Props {
 
 const TIPO_STYLE: Record<string, { bg: string; color: string; label: string; icon: string }> = {
   tarjeta:       { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Tarjeta',       icon: '💳' },
-  codigo:        { bg: '#fef3c7', color: '#92400e', label: 'Código',         icon: '🔢' },
+  codigo:        { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Código',         icon: '🔢' },
   llave_digital: { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', label: 'Llave digital',  icon: '📱' },
-  biometrico:    { bg: '#dcfce7', color: '#16a34a', label: 'Biométrico',     icon: '🔏' },
+  biometrico:    { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Biométrico',     icon: '🔏' },
 }
 
 const BLANK = { unidad_id: '', tipo: 'tarjeta', identificador: '', titular: '', activo: true, fecha_emision: new Date().toISOString().slice(0, 10), fecha_vencimiento: '', notas: '' }
@@ -62,7 +62,7 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar acceso?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar acceso?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('accesos_residentes').delete().eq('id', id)
     onRefresh()
@@ -107,12 +107,12 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
       {(vencidos.length > 0 || porVencer.length > 0) && (
         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
           {vencidos.length > 0 && (
-            <div style={{ background: '#fee2e2', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>
+            <div style={{ background: 'var(--at-danger-tint)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: 'var(--at-danger)', fontWeight: 600 }}>
               ⚠️ {vencidos.length} acceso(s) vencido(s)
             </div>
           )}
           {porVencer.length > 0 && (
-            <div style={{ background: '#fef3c7', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#92400e', fontWeight: 600 }}>
+            <div style={{ background: 'var(--at-warning-tint)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>
               🕐 {porVencer.length} por vencer en 30 días
             </div>
           )}
@@ -216,7 +216,7 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
             const vencido = a.fecha_vencimiento && a.fecha_vencimiento < today
             const proxVencer = a.fecha_vencimiento && !vencido && a.fecha_vencimiento <= addDays(today, 30)
             return (
-              <div key={a.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${vencido ? '#fca5a5' : proxVencer ? '#fde68a' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px', opacity: a.activo ? 1 : 0.6 }}>
+              <div key={a.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${vencido ? 'var(--at-danger-border)' : proxVencer ? 'var(--at-warning-border)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px', opacity: a.activo ? 1 : 0.6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
@@ -229,7 +229,7 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
                     {unidad && <div style={{ fontSize: '11px', color: 'var(--at-primary)' }}>🏠 {unidad.nombre}</div>}
                     <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>Emitido: {a.fecha_emision}</div>
                     {a.fecha_vencimiento && (
-                      <div style={{ fontSize: '11px', color: vencido ? '#ef4444' : proxVencer ? '#f59e0b' : 'var(--at-ink-3)', fontWeight: (vencido || proxVencer) ? 700 : 400 }}>
+                      <div style={{ fontSize: '11px', color: vencido ? 'var(--at-danger)' : proxVencer ? 'var(--at-warning)' : 'var(--at-ink-3)', fontWeight: (vencido || proxVencer) ? 700 : 400 }}>
                         Vence: {a.fecha_vencimiento}{vencido ? ' ⚠️' : proxVencer ? ' 🕐' : ''}
                       </div>
                     )}
@@ -237,13 +237,13 @@ export function AccesosResTab({ accesos, unidades, proyectoId, companyId, canCre
                   {canEdit && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                       <button onClick={() => toggleActivo(a)}
-                        style={{ padding: '3px 7px', background: a.activo ? '#fee2e2' : '#dcfce7', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', color: a.activo ? '#ef4444' : '#16a34a' }}>
+                        style={{ padding: '3px 7px', background: a.activo ? 'var(--at-danger-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', color: a.activo ? 'var(--at-danger)' : 'var(--at-success)' }}>
                         {a.activo ? 'Desact.' : 'Activar'}
                       </button>
                       <button onClick={() => startEdit(a)}
                         style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(a.id)}
-                        style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </div>
                   )}
                 </div>

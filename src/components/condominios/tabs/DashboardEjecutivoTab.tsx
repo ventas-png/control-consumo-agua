@@ -85,8 +85,8 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
   const ticketsAbiertos = tickets.filter(t => t.estado === 'abierto').length
   const ticketsTotal    = tickets.length
   const ticketsPorPrio  = [
-    { label: 'Urgente', count: tickets.filter(t => t.prioridad === 'urgente' && t.estado !== 'cerrado').length, color: '#ef4444' },
-    { label: 'Alta',    count: tickets.filter(t => t.prioridad === 'alta'    && t.estado !== 'cerrado').length, color: '#f59e0b' },
+    { label: 'Urgente', count: tickets.filter(t => t.prioridad === 'urgente' && t.estado !== 'cerrado').length, color: 'var(--at-danger)' },
+    { label: 'Alta',    count: tickets.filter(t => t.prioridad === 'alta'    && t.estado !== 'cerrado').length, color: 'var(--at-warning)' },
     { label: 'Media',   count: tickets.filter(t => t.prioridad === 'media'   && t.estado !== 'cerrado').length, color: 'var(--at-primary)' },
     { label: 'Baja',    count: tickets.filter(t => t.prioridad === 'baja'    && t.estado !== 'cerrado').length, color: 'var(--at-ink-3)' },
   ]
@@ -115,12 +115,12 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginBottom: '16px' }}>
           <KpiCard label="Cobranza del mes" value={`${tasaCobranza}%`}
             sub={`${moneda} ${totalCobrado.toFixed(0)} / ${totalEmitido.toFixed(0)}`}
-            color={tasaCobranza >= 80 ? '#10b981' : tasaCobranza >= 60 ? '#f59e0b' : '#ef4444'} />
-          <KpiCard label="Morosos" value={String(morosos)} sub="unidades" color={morosos > 0 ? '#ef4444' : '#10b981'} />
+            color={tasaCobranza >= 80 ? 'var(--at-success)' : tasaCobranza >= 60 ? 'var(--at-warning)' : 'var(--at-danger)'} />
+          <KpiCard label="Morosos" value={String(morosos)} sub="unidades" color={morosos > 0 ? 'var(--at-danger)' : 'var(--at-success)'} />
           <KpiCard label="Gastos del año" value={`${moneda} ${(totalGastos / 1000).toFixed(1)}k`}
             sub={presupuestoTotal > 0 ? `${ejecucionPpto}% del ppto.` : 'Sin presupuesto'} color='#B96A3F' />
           <KpiCard label="Sanciones pend." value={`${moneda} ${montoSanciones.toFixed(0)}`}
-            sub={`${sancionesPendientes.length} sanciones`} color={montoSanciones > 0 ? '#f59e0b' : '#10b981'} />
+            sub={`${sancionesPendientes.length} sanciones`} color={montoSanciones > 0 ? 'var(--at-warning)' : 'var(--at-success)'} />
         </div>
 
         {/* Trend chart */}
@@ -160,11 +160,11 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
           <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '12px' }}>🔧 Mantenimiento</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             <div style={{ textAlign: 'center', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px' }}>
-              <div style={{ fontSize: '20px', fontWeight: 800, color: ticketsAbiertos > 0 ? '#f59e0b' : '#10b981' }}>{ticketsAbiertos}</div>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: ticketsAbiertos > 0 ? 'var(--at-warning)' : 'var(--at-success)' }}>{ticketsAbiertos}</div>
               <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>tickets abiertos</div>
             </div>
             <div style={{ textAlign: 'center', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px' }}>
-              <div style={{ fontSize: '20px', fontWeight: 800, color: planesVencidos > 0 ? '#ef4444' : '#10b981' }}>{planesVencidos}</div>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: planesVencidos > 0 ? 'var(--at-danger)' : 'var(--at-success)' }}>{planesVencidos}</div>
               <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>planes vencidos</div>
             </div>
           </div>
@@ -187,21 +187,21 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
               <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>visitas este mes</div>
             </div>
             <div style={{ textAlign: 'center', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px' }}>
-              <div style={{ fontSize: '20px', fontWeight: 800, color: infraccionesAbiertas > 0 ? '#f59e0b' : '#10b981' }}>{infraccionesAbiertas}</div>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: infraccionesAbiertas > 0 ? 'var(--at-warning)' : 'var(--at-success)' }}>{infraccionesAbiertas}</div>
               <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>infracciones abiertas</div>
             </div>
           </div>
           <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '8px' }}>Unidades ({totalUnidades} total)</div>
-          <MiniBar label="Con deuda" value={conDeuda} total={totalUnidades} color="#ef4444" />
-          <MiniBar label="Al día" value={totalUnidades - conDeuda} total={totalUnidades} color="#10b981" />
+          <MiniBar label="Con deuda" value={conDeuda} total={totalUnidades} color="var(--at-danger)" />
+          <MiniBar label="Al día" value={totalUnidades - conDeuda} total={totalUnidades} color="var(--at-success)" />
         </div>
 
         {/* Resumen ejecutivo */}
         <div style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--at-ink)', marginBottom: '12px' }}>📋 Resumen ejecutivo</div>
           {[
-            { label: `Cobranza ${periodoActual}`, pct: tasaCobranza, color: tasaCobranza >= 80 ? '#10b981' : '#f59e0b' },
-            { label: 'Ejecución presupuesto', pct: ejecucionPpto, color: ejecucionPpto <= 90 ? 'var(--at-primary)' : '#ef4444' },
+            { label: `Cobranza ${periodoActual}`, pct: tasaCobranza, color: tasaCobranza >= 80 ? 'var(--at-success)' : 'var(--at-warning)' },
+            { label: 'Ejecución presupuesto', pct: ejecucionPpto, color: ejecucionPpto <= 90 ? 'var(--at-primary)' : 'var(--at-danger)' },
             { label: 'Tickets resueltos', pct: ticketsTotal > 0 ? Math.round((ticketsTotal - ticketsAbiertos) / ticketsTotal * 100) : 100, color: 'var(--at-accent)' },
           ].map(r => (
             <div key={r.label} style={{ marginBottom: '12px' }}>

@@ -15,17 +15,17 @@ type FuenteConflicto = 'infracciones' | 'sugerencias'
 type FiltroEstado = 'todos' | 'activos' | 'resueltos'
 
 const ESTADO_INF_CFG: Record<EstadoInfraccion, { label: string; color: string; bg: string }> = {
-  emitida:      { label: 'Emitida',       color: '#d97706', bg: '#fef3c7' },
+  emitida:      { label: 'Emitida',       color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   notificada:   { label: 'Notificada',    color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
   en_descargo:  { label: 'En descargo',   color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
-  resuelta:     { label: 'Resuelta',      color: '#16a34a', bg: '#dcfce7' },
+  resuelta:     { label: 'Resuelta',      color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   anulada:      { label: 'Anulada',       color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)' },
 }
 
 const ESTADO_SUG_CFG: Record<EstadoSugerencia, { label: string; color: string; bg: string }> = {
-  pendiente:   { label: 'Pendiente',   color: '#d97706', bg: '#fef3c7' },
+  pendiente:   { label: 'Pendiente',   color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   en_revision: { label: 'En revisión', color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
-  respondida:  { label: 'Respondida',  color: '#16a34a', bg: '#dcfce7' },
+  respondida:  { label: 'Respondida',  color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   archivada:   { label: 'Archivada',   color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)' },
 }
 
@@ -138,10 +138,10 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         {[
-          { label: 'Infracciones activas',  val: String(infActivas),  color: infActivas > 0 ? '#ef4444' : '#16a34a', bg: infActivas > 0 ? '#fef2f2' : '#dcfce7' },
-          { label: 'Infracciones resueltas', val: String(infracciones.filter(i => i.estado === 'resuelta').length), color: '#16a34a', bg: '#dcfce7' },
-          { label: 'Sugerencias pendientes', val: String(sugActivas), color: sugActivas > 5 ? '#ef4444' : '#d97706', bg: sugActivas > 5 ? '#fef2f2' : '#fef3c7' },
-          { label: 'Sugerencias respondidas', val: String(sugerencias.filter(s => s.estado === 'respondida').length), color: '#16a34a', bg: '#dcfce7' },
+          { label: 'Infracciones activas',  val: String(infActivas),  color: infActivas > 0 ? 'var(--at-danger)' : 'var(--at-success)', bg: infActivas > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)' },
+          { label: 'Infracciones resueltas', val: String(infracciones.filter(i => i.estado === 'resuelta').length), color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+          { label: 'Sugerencias pendientes', val: String(sugActivas), color: sugActivas > 5 ? 'var(--at-danger)' : 'var(--at-warning)', bg: sugActivas > 5 ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)' },
+          { label: 'Sugerencias respondidas', val: String(sugerencias.filter(s => s.estado === 'respondida').length), color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
@@ -199,7 +199,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
                   <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>
                     {inf.fecha_infraccion}
                     {inf.monto_multa && <span> · Multa: ${inf.monto_multa.toFixed(2)}</span>}
-                    {inf.resolucion && <span style={{ color: '#16a34a', fontWeight: 600 }}> · Resolución: {inf.resolucion.slice(0, 60)}</span>}
+                    {inf.resolucion && <span style={{ color: 'var(--at-success)', fontWeight: 600 }}> · Resolución: {inf.resolucion.slice(0, 60)}</span>}
                   </div>
                 </div>
                 {puedeAvanzar && (
@@ -236,7 +236,7 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
                     <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink)', marginBottom: 2 }}>{sug.titulo}</div>
                     <div style={{ fontSize: 11, color: 'var(--at-ink-2)', marginBottom: sug.respuesta ? 6 : 0 }}>{sug.descripcion}</div>
                     {sug.respuesta && (
-                      <div style={{ fontSize: 11, color: '#16a34a', background: '#f0fdf4', padding: '5px 8px', borderRadius: 6, marginTop: 4 }}>
+                      <div style={{ fontSize: 11, color: 'var(--at-success)', background: 'var(--at-success-tint)', padding: '5px 8px', borderRadius: 6, marginTop: 4 }}>
                         <strong>Respuesta:</strong> {sug.respuesta}
                       </div>
                     )}
@@ -245,8 +245,8 @@ export default function GestionConflictosTab({ infracciones, sugerencias, unidad
                   {canEdit && (sug.estado === 'pendiente' || sug.estado === 'en_revision') && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginLeft: 10, flexShrink: 0 }}>
                       <button onClick={() => responderSugerencia(sug)} disabled={resolviendo === sug.id}
-                        style={{ padding: '4px 10px', borderRadius: 7, border: '1px solid #16a34a', fontSize: 11,
-                          background: '#dcfce7', color: '#16a34a', cursor: 'pointer', fontWeight: 700 }}>
+                        style={{ padding: '4px 10px', borderRadius: 7, border: '1px solid var(--at-success)', fontSize: 11,
+                          background: 'var(--at-success-tint)', color: 'var(--at-success)', cursor: 'pointer', fontWeight: 700 }}>
                         {resolviendo === sug.id ? '…' : '✏ Responder'}
                       </button>
                       <button onClick={() => archivarSugerencia(sug)} disabled={resolviendo === sug.id}

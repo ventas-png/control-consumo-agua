@@ -22,7 +22,7 @@ interface Props {
 }
 
 function semColorText(val: number, verde: number, amarillo: number) {
-  return val <= verde ? '#16a34a' : val <= amarillo ? '#d97706' : '#ef4444'
+  return val <= verde ? 'var(--at-success)' : val <= amarillo ? 'var(--at-warning)' : 'var(--at-danger)'
 }
 
 export default function ResumenEjecutivoTab({
@@ -75,13 +75,13 @@ export default function ResumenEjecutivoTab({
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Resumen Ejecutivo — ${proyectoNombre ?? ''}</title>
 <style>
   *{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;color:#15291F;padding:24px;max-width:900px;margin:0 auto}
-  h1{margin:0 0 4px;font-size:20px}p{margin:0 0 16px;color:#7E9389;font-size:11px}
-  h2{font-size:13px;margin:20px 0 8px;color:#15291F;border-bottom:2px solid #E1DDD0;padding-bottom:4px}
+  h1{margin:0 0 4px;font-size:20px}p{margin:0 0 16px;color:var(--at-ink-3);font-size:11px}
+  h2{font-size:13px;margin:20px 0 8px;color:#15291F;border-bottom:2px solid var(--at-line);padding-bottom:4px}
   .grid{display:grid;gap:10px}.g4{grid-template-columns:repeat(4,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
-  .kpi{background:#FAF7EF;border-radius:8px;padding:10px 12px;border-top:3px solid var(--c)}
-  .kpi .val{font-size:18px;font-weight:800;color:var(--c)}.kpi .lbl{font-size:10px;color:#7E9389;font-weight:600}
-  table{width:100%;border-collapse:collapse}th{background:#FAF7EF;padding:6px 8px;text-align:left;border-bottom:2px solid #E1DDD0;font-size:10px;text-transform:uppercase;color:#7E9389}
-  td{padding:6px 8px;border-bottom:1px solid #EAE6D8;font-size:11px}
+  .kpi{background:var(--at-surface-2);border-radius:8px;padding:10px 12px;border-top:3px solid var(--c)}
+  .kpi .val{font-size:18px;font-weight:800;color:var(--c)}.kpi .lbl{font-size:10px;color:var(--at-ink-3);font-weight:600}
+  table{width:100%;border-collapse:collapse}th{background:var(--at-surface-2);padding:6px 8px;text-align:left;border-bottom:2px solid var(--at-line);font-size:10px;text-transform:uppercase;color:var(--at-ink-3)}
+  td{padding:6px 8px;border-bottom:1px solid var(--at-chip);font-size:11px}
   .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700}
   .btn{padding:8px 16px;background:#1B3B36;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;margin-bottom:16px}
   @media print{.btn{display:none}}
@@ -92,16 +92,16 @@ export default function ResumenEjecutivoTab({
 
 <h2>Finanzas y cobro</h2>
 <div class="grid g4" style="margin-bottom:14px">
-  <div class="kpi" style="--c:${financiero.tasaCobro >= 90 ? '#16a34a' : financiero.tasaCobro >= 70 ? '#d97706' : '#ef4444'}">
+  <div class="kpi" style="--c:${financiero.tasaCobro >= 90 ? 'var(--at-success)' : financiero.tasaCobro >= 70 ? 'var(--at-warning)' : 'var(--at-danger)'}">
     <div class="val">${financiero.tasaCobro}%</div><div class="lbl">Tasa de cobro (${financiero.pagadas}/${cuotas.length} cuotas)</div>
   </div>
-  <div class="kpi" style="--c:${financiero.morosas === 0 ? '#16a34a' : financiero.morosas <= 5 ? '#d97706' : '#ef4444'}">
+  <div class="kpi" style="--c:${financiero.morosas === 0 ? 'var(--at-success)' : financiero.morosas <= 5 ? 'var(--at-warning)' : 'var(--at-danger)'}">
     <div class="val">${financiero.morosas}</div><div class="lbl">Cuotas morosas</div>
   </div>
-  <div class="kpi" style="--c:#ef4444">
+  <div class="kpi" style="--c:var(--at-danger)">
     <div class="val">${moneda} ${financiero.montoMora.toLocaleString('es', { maximumFractionDigits: 0 })}</div><div class="lbl">Cartera vencida</div>
   </div>
-  <div class="kpi" style="--c:${ejecucionPct > 100 ? '#ef4444' : ejecucionPct > 80 ? '#d97706' : '#16a34a'}">
+  <div class="kpi" style="--c:${ejecucionPct > 100 ? 'var(--at-danger)' : ejecucionPct > 80 ? 'var(--at-warning)' : 'var(--at-success)'}">
     <div class="val">${ejecucionPct}%</div><div class="lbl">Ejecución presupuestal (${moneda} ${financiero.gastosMes.toLocaleString('es', { maximumFractionDigits: 0 })})</div>
   </div>
 </div>
@@ -113,8 +113,8 @@ ${top5Morosos.length > 0 ? `
   <tbody>
     ${top5Morosos.map((m, i) => `<tr style="background:${i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)'}">
       <td><strong>${m.unidad.nombre}</strong></td>
-      <td style="color:#ef4444;font-weight:700">${m.count}</td>
-      <td style="color:#ef4444;font-weight:700">${moneda} ${m.monto.toFixed(2)}</td>
+      <td style="color:var(--at-danger);font-weight:700">${m.count}</td>
+      <td style="color:var(--at-danger);font-weight:700">${moneda} ${m.monto.toFixed(2)}</td>
     </tr>`).join('')}
   </tbody>
 </table>` : ''}
@@ -127,10 +127,10 @@ ${ticketsCriticos.length > 0 ? `
     ${ticketsCriticos.slice(0, 8).map(t => `<tr>
       <td>${t.titulo}</td>
       <td>${t.unidad_nombre ?? '—'}</td>
-      <td><span class="badge" style="background:${t.prioridad === 'urgente' ? '#fef2f2' : '#fff7ed'};color:${t.prioridad === 'urgente' ? '#ef4444' : '#f97316'}">${t.prioridad}</span></td>
+      <td><span class="badge" style="background:${t.prioridad === 'urgente' ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)'};color:${t.prioridad === 'urgente' ? 'var(--at-danger)' : 'var(--at-warning)'}">${t.prioridad}</span></td>
     </tr>`).join('')}
   </tbody>
-</table>` : '<h2>Tickets críticos</h2><p style="color:#16a34a">✓ Sin tickets urgentes o de alta prioridad abiertos</p>'}
+</table>` : '<h2>Tickets críticos</h2><p style="color:var(--at-success)">✓ Sin tickets urgentes o de alta prioridad abiertos</p>'}
 
 ${venc30.length > 0 ? `
 <h2>Vencimientos en los próximos 30 días (${venc30.length})</h2>
@@ -142,7 +142,7 @@ ${venc30.length > 0 ? `
       return `<tr>
         <td>${v.titulo}</td>
         <td>${v.fecha}</td>
-        <td style="color:${dias <= 7 ? '#ef4444' : '#d97706'};font-weight:700">${dias} días</td>
+        <td style="color:${dias <= 7 ? 'var(--at-danger)' : 'var(--at-warning)'};font-weight:700">${dias} días</td>
       </tr>`
     }).join('')}
   </tbody>
@@ -176,10 +176,10 @@ ${venc30.length > 0 ? `
       <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Finanzas y cobro</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
         {[
-          { label: 'Tasa de cobro', val: `${financiero.tasaCobro}%`, sub: `${financiero.pagadas}/${cuotas.length} cuotas`, color: financiero.tasaCobro >= 90 ? '#16a34a' : financiero.tasaCobro >= 70 ? '#d97706' : '#ef4444' },
+          { label: 'Tasa de cobro', val: `${financiero.tasaCobro}%`, sub: `${financiero.pagadas}/${cuotas.length} cuotas`, color: financiero.tasaCobro >= 90 ? 'var(--at-success)' : financiero.tasaCobro >= 70 ? 'var(--at-warning)' : 'var(--at-danger)' },
           { label: 'Cuotas morosas', val: financiero.morosas, sub: 'Vencidas hoy', color: semColorText(financiero.morosas, 0, 5) },
-          { label: 'Cartera vencida', val: `${moneda} ${financiero.montoMora.toLocaleString('es', { maximumFractionDigits: 0 })}`, sub: 'Saldo en mora', color: '#ef4444' },
-          { label: 'Ejecución presup.', val: `${ejecPct}%`, sub: `${moneda} ${financiero.gastosMes.toLocaleString('es', { maximumFractionDigits: 0 })} gastado`, color: ejecPct > 100 ? '#ef4444' : ejecPct > 80 ? '#d97706' : '#16a34a' },
+          { label: 'Cartera vencida', val: `${moneda} ${financiero.montoMora.toLocaleString('es', { maximumFractionDigits: 0 })}`, sub: 'Saldo en mora', color: 'var(--at-danger)' },
+          { label: 'Ejecución presup.', val: `${ejecPct}%`, sub: `${moneda} ${financiero.gastosMes.toLocaleString('es', { maximumFractionDigits: 0 })} gastado`, color: ejecPct > 100 ? 'var(--at-danger)' : ejecPct > 80 ? 'var(--at-warning)' : 'var(--at-success)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: `1px solid ${k.color}33`, borderRadius: 10, padding: '12px 14px', borderTop: `3px solid ${k.color}` }}>
             <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.val}</div>
@@ -194,14 +194,14 @@ ${venc30.length > 0 ? `
         <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>⚠️ Top morosos</div>
           {top5Morosos.length === 0 ? (
-            <div style={{ fontSize: 12, color: '#16a34a', textAlign: 'center', padding: '20px 0' }}>✓ Sin unidades morosas</div>
+            <div style={{ fontSize: 12, color: 'var(--at-success)', textAlign: 'center', padding: '20px 0' }}>✓ Sin unidades morosas</div>
           ) : top5Morosos.map((m, i) => (
             <div key={m.unidad.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < top5Morosos.length - 1 ? '1px solid var(--at-chip)' : 'none' }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>{m.unidad.nombre}</div>
                 <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{m.count} cuotas vencidas</div>
               </div>
-              <div style={{ fontWeight: 700, color: '#ef4444', fontSize: 13 }}>{moneda} {m.monto.toFixed(2)}</div>
+              <div style={{ fontWeight: 700, color: 'var(--at-danger)', fontSize: 13 }}>{moneda} {m.monto.toFixed(2)}</div>
             </div>
           ))}
         </div>
@@ -210,13 +210,13 @@ ${venc30.length > 0 ? `
         <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>🔧 Tickets críticos ({ticketsCriticos.length})</div>
           {ticketsCriticos.length === 0 ? (
-            <div style={{ fontSize: 12, color: '#16a34a', textAlign: 'center', padding: '20px 0' }}>✓ Sin tickets urgentes abiertos</div>
+            <div style={{ fontSize: 12, color: 'var(--at-success)', textAlign: 'center', padding: '20px 0' }}>✓ Sin tickets urgentes abiertos</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
               {ticketsCriticos.slice(0, 6).map(t => (
-                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 8px', background: '#fef2f2', borderRadius: 6 }}>
+                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 8px', background: 'var(--at-danger-tint)', borderRadius: 6 }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{t.titulo}</span>
-                  <span style={{ color: t.prioridad === 'urgente' ? '#ef4444' : '#f97316', fontWeight: 700, flexShrink: 0, marginLeft: 6 }}>{t.prioridad}</span>
+                  <span style={{ color: t.prioridad === 'urgente' ? 'var(--at-danger)' : 'var(--at-warning)', fontWeight: 700, flexShrink: 0, marginLeft: 6 }}>{t.prioridad}</span>
                 </div>
               ))}
             </div>
@@ -226,15 +226,15 @@ ${venc30.length > 0 ? `
 
       {/* Vencimientos */}
       {venc30.length > 0 && (
-        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: 16, marginBottom: 14 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: '#d97706' }}>⏳ Vencimientos próximos 30 días ({venc30.length})</div>
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 12, padding: 16, marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: 'var(--at-warning)' }}>⏳ Vencimientos próximos 30 días ({venc30.length})</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {venc30.map((v, i) => {
               const dias = Math.ceil((new Date(v.fecha).getTime() - Date.now()) / 86400000)
               return (
-                <div key={i} style={{ padding: '4px 10px', background: 'var(--at-surface)', border: `1px solid ${dias <= 7 ? '#fca5a5' : '#fde68a'}`, borderRadius: 8, fontSize: 11 }}>
+                <div key={i} style={{ padding: '4px 10px', background: 'var(--at-surface)', border: `1px solid ${dias <= 7 ? 'var(--at-danger-border)' : 'var(--at-warning-border)'}`, borderRadius: 8, fontSize: 11 }}>
                   <strong>{v.titulo}</strong>
-                  <span style={{ color: dias <= 7 ? '#ef4444' : '#d97706', marginLeft: 6 }}>{dias}d · {v.fecha}</span>
+                  <span style={{ color: dias <= 7 ? 'var(--at-danger)' : 'var(--at-warning)', marginLeft: 6 }}>{dias}d · {v.fecha}</span>
                 </div>
               )
             })}

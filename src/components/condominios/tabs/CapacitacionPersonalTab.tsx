@@ -15,9 +15,9 @@ interface Props {
 
 const ESTADO_CFG: Record<EstadoCapacitacion, { label: string; bg: string; color: string }> = {
   planificado: { label: 'Planificado', bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
-  en_progreso: { label: 'En progreso', bg: '#fef3c7', color: '#d97706' },
-  completado:  { label: 'Completado',  bg: '#dcfce7', color: '#16a34a' },
-  vencido:     { label: 'Vencido',     bg: '#fee2e2', color: '#ef4444' },
+  en_progreso: { label: 'En progreso', bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+  completado:  { label: 'Completado',  bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  vencido:     { label: 'Vencido',     bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
 }
 
 const BLANK = {
@@ -78,7 +78,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
   }
 
   async function eliminar(id: string) {
-    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!isConfirmed) return
     await supabase.from('capacitacion_personal_cond').delete().eq('id', id)
     onRefresh()
@@ -95,9 +95,9 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Completadas', val: capacitaciones.filter(c => c.estado === 'completado').length, bg: '#dcfce7', color: '#16a34a' },
-          { label: 'En progreso', val: capacitaciones.filter(c => c.estado === 'en_progreso').length, bg: '#fef3c7', color: '#d97706' },
-          { label: 'Cert. por vencer (30d)', val: proxVencer, bg: '#fff7ed', color: '#ea580c' },
+          { label: 'Completadas', val: capacitaciones.filter(c => c.estado === 'completado').length, bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+          { label: 'En progreso', val: capacitaciones.filter(c => c.estado === 'en_progreso').length, bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+          { label: 'Cert. por vencer (30d)', val: proxVencer, bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
           { label: `Inversión total`, val: `${moneda} ${totalCosto.toFixed(2)}`, bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
@@ -213,7 +213,7 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontWeight: 600, fontSize: 13 }}>{c.curso}</span>
                             <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
-                            {certAlerta && <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, background: '#fff7ed', color: '#ea580c', fontWeight: 700 }}>⚠ Cert. vence en {diasCert}d</span>}
+                            {certAlerta && <span style={{ padding: '1px 8px', borderRadius: 20, fontSize: 10, background: 'var(--at-warning-tint)', color: 'var(--at-warning)', fontWeight: 700 }}>⚠ Cert. vence en {diasCert}d</span>}
                           </div>
                           <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>
                             {c.proveedor && `${c.proveedor} · `}
@@ -226,10 +226,10 @@ export default function CapacitacionPersonalTab({ capacitaciones, proyectoId, co
                           <div style={{ display: 'flex', gap: 4 }}>
                             {c.estado !== 'completado' && (
                               <button onClick={() => cambiarEstado(c.id, 'completado')}
-                                style={{ padding: '4px 8px', background: '#dcfce7', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: '#16a34a' }}>✓</button>
+                                style={{ padding: '4px 8px', background: 'var(--at-success-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: 'var(--at-success)' }}>✓</button>
                             )}
                             <button onClick={() => eliminar(c.id)}
-                              style={{ padding: '4px 8px', background: '#fef2f2', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: '#ef4444' }}>✕</button>
+                              style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: 'var(--at-danger)' }}>✕</button>
                           </div>
                         )}
                       </div>

@@ -162,19 +162,19 @@ export default function ExportacionTab({ cuotas, gastos, tickets, visitantes, un
       ],
     },
     {
-      icon: '⚠️', title: 'Deudores / Morosos', accentColor: '#dc2626', bg: '#fef2f2', border: '#fecaca',
+      icon: '⚠️', title: 'Deudores / Morosos', accentColor: 'var(--at-danger)', bg: 'var(--at-danger-tint)', border: 'var(--at-danger-border)',
       desc: `${morosos.length} cuotas vencidas — ${moneda} ${morosos.reduce((s, c) => s + c.monto, 0).toLocaleString('es', { minimumFractionDigits: 2 })}`,
       actions: [
-        { label: '📊 Excel', color: '#dc2626', onClick: exportMorosos },
-        { label: '📄 PDF', color: '#7f1d1d', onClick: pdfMorosos },
+        { label: '📊 Excel', color: 'var(--at-danger)', onClick: exportMorosos },
+        { label: '📄 PDF', color: 'var(--at-danger-strong)', onClick: pdfMorosos },
       ],
     },
     {
-      icon: '💸', title: 'Gastos', accentColor: '#d97706', bg: '#fef3c7', border: '#fde68a',
+      icon: '💸', title: 'Gastos', accentColor: 'var(--at-warning)', bg: 'var(--at-warning-tint)', border: 'var(--at-warning-border)',
       desc: `${gastosFiltrados.length} gastos del año`,
       period: { value: anio, onChange: setAnio, options: anios },
       actions: [
-        { label: '📊 Excel', color: '#d97706', onClick: exportGastos },
+        { label: '📊 Excel', color: 'var(--at-warning)', onClick: exportGastos },
       ],
     },
     {

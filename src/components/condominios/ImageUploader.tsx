@@ -101,7 +101,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
             onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           <button
             onClick={handleRemove}
-            style={{ position: 'absolute', top: -8, right: -8, zIndex: 1, width: 24, height: 24, borderRadius: '50%', background: '#ef4444', color: 'white', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
+            style={{ position: 'absolute', top: -8, right: -8, zIndex: 1, width: 24, height: 24, borderRadius: '50%', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
             ×
           </button>
         </div>
@@ -128,7 +128,7 @@ export function ImageUploader({ value, onChange, folder, label = 'Foto', maxSize
         accept={capture ? 'image/*;capture=camera' : 'image/*'}
         {...(capture ? { capture: 'environment' } : {})}
         onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }} />
-      {error && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>{error}</div>}
+      {error && <div style={{ fontSize: 11, color: 'var(--at-danger)', marginTop: 4 }}>{error}</div>}
     </div>
   )
 }
@@ -203,7 +203,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <button
               onClick={() => handleRemove(url)}
-              style={{ position: 'absolute', top: -7, right: -7, zIndex: 1, width: 20, height: 20, borderRadius: '50%', background: '#ef4444', color: 'white', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ position: 'absolute', top: -7, right: -7, zIndex: 1, width: 20, height: 20, borderRadius: '50%', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               ×
             </button>
           </div>
@@ -230,7 +230,7 @@ export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', 
         accept={capture ? 'image/*;capture=camera' : 'image/*'}
         {...(capture ? { capture: 'environment' } : { multiple: true })}
         onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = '' }} />
-      {error && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>{error}</div>}
+      {error && <div style={{ fontSize: 11, color: 'var(--at-danger)', marginTop: 4 }}>{error}</div>}
     </div>
   )
 }

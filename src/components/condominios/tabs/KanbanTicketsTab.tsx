@@ -14,15 +14,15 @@ interface Props {
 
 const COLUMNAS: { estado: EstadoTicket; label: string; color: string; bg: string; bgHeader: string }[] = [
   { estado: 'abierto',    label: 'Abierto',    color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)', bgHeader: 'var(--at-chip)' },
-  { estado: 'en_proceso', label: 'En proceso', color: '#d97706', bg: '#fffbeb', bgHeader: '#fef3c7' },
+  { estado: 'en_proceso', label: 'En proceso', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', bgHeader: 'var(--at-warning-tint)' },
   { estado: 'resuelto',   label: 'Resuelto',   color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', bgHeader: 'var(--at-primary-soft)' },
-  { estado: 'cerrado',    label: 'Cerrado',    color: '#16a34a', bg: '#f0fdf4', bgHeader: '#dcfce7' },
+  { estado: 'cerrado',    label: 'Cerrado',    color: 'var(--at-success)', bg: 'var(--at-success-tint)', bgHeader: 'var(--at-success-tint)' },
 ]
 
 const PRIORIDAD_CFG: Record<PrioridadTicket, { label: string; color: string; bg: string; order: number }> = {
-  urgente: { label: 'Urgente', color: 'white', bg: '#ef4444', order: 0 },
-  alta:    { label: 'Alta',    color: 'white', bg: '#f97316', order: 1 },
-  media:   { label: 'Media',   color: 'white', bg: '#d97706', order: 2 },
+  urgente: { label: 'Urgente', color: 'var(--at-on-status)', bg: 'var(--at-danger)', order: 0 },
+  alta:    { label: 'Alta',    color: 'var(--at-on-status)', bg: 'var(--at-warning)', order: 1 },
+  media:   { label: 'Media',   color: 'var(--at-on-status)', bg: 'var(--at-warning)', order: 2 },
   baja:    { label: 'Baja',    color: 'var(--at-ink-2)', bg: 'var(--at-line)', order: 3 },
 }
 
@@ -69,7 +69,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
       const { value: notas } = await Swal.fire({
         title: 'Cerrar ticket', input: 'textarea',
         inputLabel: 'Notas de cierre (opcional)', inputPlaceholder: 'Descripción de la solución...',
-        showCancelButton: true, confirmButtonText: 'Cerrar ticket', cancelButtonText: 'Cancelar', confirmButtonColor: '#16a34a',
+        showCancelButton: true, confirmButtonText: 'Cerrar ticket', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-success)',
       })
       if (notas === undefined) { setMoviendo(null); return }
       updates.notas_cierre = notas || null
@@ -78,7 +78,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
         const { value: costoReal } = await Swal.fire({
           title: 'Costo real', input: 'number',
           inputLabel: `Costo estimado: ${moneda} ${ticket.costo_estimado}`,
-          inputPlaceholder: '0.00', showCancelButton: true, confirmButtonText: 'Confirmar', confirmButtonColor: '#16a34a',
+          inputPlaceholder: '0.00', showCancelButton: true, confirmButtonText: 'Confirmar', confirmButtonColor: 'var(--at-success)',
         })
         if (costoReal !== undefined) updates.costo_real = costoReal ? parseFloat(costoReal as string) : null
       }
@@ -99,7 +99,7 @@ export default function KanbanTicketsTab({ tickets, proyectoId: _proyectoId, com
         <div>
           <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--at-ink)' }}>Kanban de Tickets</div>
           <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>
-            {totalAbiertos} activos · {totalUrgentes > 0 && <span style={{ color: '#ef4444', fontWeight: 700 }}>{totalUrgentes} urgentes · </span>}
+            {totalAbiertos} activos · {totalUrgentes > 0 && <span style={{ color: 'var(--at-danger)', fontWeight: 700 }}>{totalUrgentes} urgentes · </span>}
             {tickets.filter(t => t.estado === 'cerrado').length} cerrados
           </div>
         </div>

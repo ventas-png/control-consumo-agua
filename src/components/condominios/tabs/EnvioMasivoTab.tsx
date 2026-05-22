@@ -25,7 +25,7 @@ const SEGMENTO_CFG: Record<SegmentoEnvio, { label: string; icon: string; desc: s
 }
 
 const CANAL_CFG: Record<CanalPlantilla, { label: string; icon: string; color: string }> = {
-  whatsapp: { label: 'WhatsApp', icon: '💬', color: '#16a34a' },
+  whatsapp: { label: 'WhatsApp', icon: '💬', color: 'var(--at-success)' },
   email:    { label: 'Email',    icon: '📧', color: 'var(--at-primary)' },
   sms:      { label: 'SMS',      icon: '📱', color: 'var(--at-accent-hover)' },
 }
@@ -234,7 +234,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
             )}
           </div>
 
-          <div style={{ padding: '8px 14px', background: '#fef3c7', borderRadius: 8, fontSize: 11, color: '#d97706' }}>
+          <div style={{ padding: '8px 14px', background: 'var(--at-warning-tint)', borderRadius: 8, fontSize: 11, color: 'var(--at-warning)' }}>
             ⚠️ El sistema registra el envío en el log de notificaciones. La entrega real depende de la integración con WhatsApp/Email/SMS configurada en la plataforma de comunicaciones.
           </div>
         </div>
@@ -244,7 +244,7 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
         <div>
           <div style={{ textAlign: 'center', padding: '32px 0 20px' }}>
             <div style={{ fontSize: 48, marginBottom: 10 }}>✅</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#16a34a', marginBottom: 6 }}>Envío registrado</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--at-success)', marginBottom: 6 }}>Envío registrado</div>
             <div style={{ fontSize: 13, color: 'var(--at-ink-3)', marginBottom: 20 }}>
               Se registraron <strong>{destinatarios.length}</strong> mensajes en el log de notificaciones enviadas.
             </div>
@@ -255,11 +255,11 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
           </div>
 
           {plantilla?.canal === 'whatsapp' && destinatarios.length > 0 && (
-            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#15803d', marginBottom: 4 }}>
+            <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-success-strong)', marginBottom: 4 }}>
                 💬 Links directos de WhatsApp
               </div>
-              <div style={{ fontSize: 11, color: '#16a34a', marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: 'var(--at-success)', marginBottom: 12 }}>
                 Haz clic en cada botón para abrir WhatsApp con el mensaje pre-cargado. Selecciona el contacto al abrir.
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 340, overflowY: 'auto' }}>
@@ -267,10 +267,10 @@ export default function EnvioMasivoTab({ plantillas, cuotas, unidades, reservas,
                   const msg = resolverVariables(plantilla.cuerpo, u, cuotas.filter(c => c.unidad_id === u.id), moneda)
                   const url = `https://wa.me/?text=${encodeURIComponent(msg)}`
                   return (
-                    <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'var(--at-surface)', border: '1px solid #bbf7d0', borderRadius: 8 }}>
+                    <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'var(--at-surface)', border: '1px solid var(--at-success-border)', borderRadius: 8 }}>
                       <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--at-ink)' }}>{u.nombre}</span>
                       <a href={url} target="_blank" rel="noreferrer"
-                        style={{ padding: '5px 12px', background: '#16a34a', color: 'white', borderRadius: 6, fontSize: 11, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                        style={{ padding: '5px 12px', background: 'var(--at-success)', color: 'var(--at-on-status)', borderRadius: 6, fontSize: 11, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
                         💬 Abrir WhatsApp
                       </a>
                     </div>

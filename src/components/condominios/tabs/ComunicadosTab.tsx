@@ -17,8 +17,8 @@ interface Props {
 const TIPO_LABELS: Record<TipoComunicado, { label: string; icon: string; color: string }> = {
   carta:        { label: 'Carta',        icon: '✉️',  color: 'var(--at-primary)' },
   circular:     { label: 'Circular',     icon: '📢',  color: 'var(--at-accent)' },
-  aviso:        { label: 'Aviso',        icon: '📌',  color: '#f59e0b' },
-  certificado:  { label: 'Certificado',  icon: '📜',  color: '#10b981' },
+  aviso:        { label: 'Aviso',        icon: '📌',  color: 'var(--at-warning)' },
+  certificado:  { label: 'Certificado',  icon: '📜',  color: 'var(--at-success)' },
   acta:         { label: 'Acta',         icon: '📋',  color: 'var(--at-ink-3)' },
 }
 
@@ -104,7 +104,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar comunicado?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar comunicado?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('comunicados_condominio').delete().eq('id', id)
     if (selectedId === id) setSelectedId(null)
@@ -240,7 +240,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
                         <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{tl.icon} {c.titulo}</div>
                         <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                           {tl.label} — {DEST_LABELS[c.destinatario]}{c.unidad_nombre ? ` (${c.unidad_nombre})` : ''} — {c.fecha_envio}
-                          {c.firmado && <span style={{ marginLeft: '6px', color: '#10b981', fontWeight: 700 }}>✓ Firmado</span>}
+                          {c.firmado && <span style={{ marginLeft: '6px', color: 'var(--at-success)', fontWeight: 700 }}>✓ Firmado</span>}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
@@ -251,7 +251,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
                         )}
                         {canEdit && (
                           <button onClick={e => { e.stopPropagation(); handleDelete(c.id) }}
-                            style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                            style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                         )}
                       </div>
                     </div>
@@ -290,7 +290,7 @@ export function ComunicadosTab({ comunicados, unidades, proyectoId, companyId, u
               <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 800, textAlign: 'center', color: 'var(--at-ink)' }}>{selected.titulo}</h3>
               <div style={{ whiteSpace: 'pre-wrap', color: 'var(--at-ink)' }}>{selected.contenido}</div>
               {selected.firmado && (
-                <div style={{ marginTop: '30px', borderTop: '1px solid var(--at-line)', paddingTop: '12px', textAlign: 'center', fontSize: '11px', color: '#10b981', fontWeight: 600 }}>
+                <div style={{ marginTop: '30px', borderTop: '1px solid var(--at-line)', paddingTop: '12px', textAlign: 'center', fontSize: '11px', color: 'var(--at-success)', fontWeight: 600 }}>
                   ✓ Documento firmado
                 </div>
               )}

@@ -14,10 +14,10 @@ interface Props {
 
 const CATEGORIAS: { value: CategoriaReglamento; label: string; icon: string; color: string }[] = [
   { value: 'convivencia',   label: 'Convivencia',    icon: '🤝', color: 'var(--at-accent)' },
-  { value: 'pagos',         label: 'Pagos',          icon: '💳', color: '#10b981' },
-  { value: 'seguridad',     label: 'Seguridad',      icon: '🛡️', color: '#ef4444' },
+  { value: 'pagos',         label: 'Pagos',          icon: '💳', color: 'var(--at-success)' },
+  { value: 'seguridad',     label: 'Seguridad',      icon: '🛡️', color: 'var(--at-danger)' },
   { value: 'areas_comunes', label: 'Áreas comunes',  icon: '🏊', color: 'var(--at-primary-2)' },
-  { value: 'mascotas',      label: 'Mascotas',       icon: '🐾', color: '#f59e0b' },
+  { value: 'mascotas',      label: 'Mascotas',       icon: '🐾', color: 'var(--at-warning)' },
   { value: 'mudanzas',      label: 'Mudanzas',       icon: '🚚', color: 'var(--at-accent)' },
   { value: 'otro',          label: 'Otro',           icon: '📄', color: 'var(--at-ink-3)' },
 ]
@@ -197,7 +197,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : `✅ ${editando ? 'Actualizar' : 'Crear'}`}
               </button>
               <button onClick={() => { setMostrarForm(false); setEditando(false); resetForm() }}
@@ -221,7 +221,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
                   <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>
                     Versión {selected.version}
                     {selected.fecha_vigencia && <span> · Vigente desde {selected.fecha_vigencia}</span>}
-                    {!selected.vigente && <span style={{ color: '#ef4444' }}> · DEROGADO</span>}
+                    {!selected.vigente && <span style={{ color: 'var(--at-danger)' }}> · DEROGADO</span>}
                   </div>
                 </div>
                 {canEdit && (
@@ -231,7 +231,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
                       ✏️ Editar
                     </button>
                     <button onClick={() => toggleVigente(selected)}
-                      style={{ padding: '6px 12px', background: selected.vigente ? '#fef2f2' : '#d1fae5', color: selected.vigente ? '#ef4444' : '#10b981', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 12px', background: selected.vigente ? 'var(--at-danger-tint)' : 'var(--at-success-tint)', color: selected.vigente ? 'var(--at-danger)' : 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       {selected.vigente ? 'Derogar' : 'Restablecer'}
                     </button>
                   </div>
@@ -243,7 +243,7 @@ export default function ReglamentoTab({ articulos, proyectoId, companyId, canCre
               </div>
 
               {selected.notas && (
-                <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginTop: 12, fontSize: 12, color: '#92400e' }}>
+                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', marginTop: 12, fontSize: 12, color: 'var(--at-warning-strong)' }}>
                   <strong>Nota: </strong>{selected.notas}
                 </div>
               )}

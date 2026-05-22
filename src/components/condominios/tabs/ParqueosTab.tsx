@@ -21,7 +21,7 @@ const TIPO_LABELS: Record<TipoParqueo, string> = {
 
 const TIPO_COLORS: Record<TipoParqueo, { bg: string; color: string }> = {
   asignado:      { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  visita:        { bg: '#f0fdf4', color: '#16a34a' },
+  visita:        { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   discapacitado: { bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)' },
 }
 
@@ -88,7 +88,7 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
   }
 
   async function eliminar(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar parqueo?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await Swal.fire({ title: '¿Eliminar parqueo?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('parqueos_condominio').delete().eq('id', id)
     onRefresh()
@@ -103,7 +103,7 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
         <div>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Parqueos</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
-            {parqueos.length} espacios · <span style={{ color: '#16a34a', fontWeight: 600 }}>{libres} libres</span> · {ocupados} asignados
+            {parqueos.length} espacios · <span style={{ color: 'var(--at-success)', fontWeight: 600 }}>{libres} libres</span> · {ocupados} asignados
           </p>
         </div>
         {canCreate && (
@@ -191,12 +191,12 @@ export function ParqueosTab({ parqueos, unidades, proyectoId, companyId, canCrea
                 </div>
                 {p.unidad_nombre && <div style={{ fontSize: '12.5px', color: 'var(--at-primary)', fontWeight: 600, marginBottom: '4px' }}>📍 {p.unidad_nombre}</div>}
                 {p.placa_vehiculo && <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)', marginBottom: '2px' }}>🚗 {p.placa_vehiculo}{p.marca_vehiculo ? ` · ${p.marca_vehiculo}` : ''}{p.color_vehiculo ? ` · ${p.color_vehiculo}` : ''}</div>}
-                {!tieneUnidad && <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>Disponible</div>}
+                {!tieneUnidad && <div style={{ fontSize: '12px', color: 'var(--at-success)', fontWeight: 600 }}>Disponible</div>}
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
                     <button onClick={() => startEdit(p)} style={{ flex: 1, padding: '6px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)' }}>✏️ Editar</button>
-                    <button onClick={() => toggleActivo(p)} style={{ padding: '6px 10px', background: p.activo ? '#fef3c7' : '#f0fdf4', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px' }}>{p.activo ? '⏸' : '▶'}</button>
-                    <button onClick={() => eliminar(p.id)} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px' }}>🗑</button>
+                    <button onClick={() => toggleActivo(p)} style={{ padding: '6px 10px', background: p.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px' }}>{p.activo ? '⏸' : '▶'}</button>
+                    <button onClick={() => eliminar(p.id)} style={{ padding: '6px 10px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px' }}>🗑</button>
                   </div>
                 )}
               </div>

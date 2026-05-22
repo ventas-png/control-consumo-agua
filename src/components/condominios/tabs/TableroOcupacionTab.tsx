@@ -13,7 +13,7 @@ type EstadoOcupacion = 'propietario' | 'en_renta' | 'libre' | 'inactiva'
 const EST_CFG: Record<EstadoOcupacion, { label: string; color: string; bg: string; border: string }> = {
   propietario: { label: 'Propietario',  color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', border: 'var(--at-primary-soft-2)' },
   en_renta:    { label: 'En renta',     color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)', border: 'var(--at-accent-soft)' },
-  libre:       { label: 'Libre',        color: '#16a34a', bg: '#dcfce7', border: '#86efac' },
+  libre:       { label: 'Libre',        color: 'var(--at-success)', bg: 'var(--at-success-tint)', border: 'var(--at-success-border)' },
   inactiva:    { label: 'Inactiva',     color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)', border: 'var(--at-line)' },
 }
 
@@ -86,12 +86,12 @@ export default function TableroOcupacionTab({ unidades, contratos, cuotas, moned
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         {[
-          { label: 'Tasa de ocupación', val: `${Math.round(resumen.tasaOcup * 100)}%`, color: resumen.tasaOcup >= 0.9 ? '#16a34a' : resumen.tasaOcup >= 0.7 ? '#d97706' : '#ef4444', bg: resumen.tasaOcup >= 0.9 ? '#dcfce7' : resumen.tasaOcup >= 0.7 ? '#fef3c7' : '#fef2f2' },
+          { label: 'Tasa de ocupación', val: `${Math.round(resumen.tasaOcup * 100)}%`, color: resumen.tasaOcup >= 0.9 ? 'var(--at-success)' : resumen.tasaOcup >= 0.7 ? 'var(--at-warning)' : 'var(--at-danger)', bg: resumen.tasaOcup >= 0.9 ? 'var(--at-success-tint)' : resumen.tasaOcup >= 0.7 ? 'var(--at-warning-tint)' : 'var(--at-danger-tint)' },
           { label: 'Propietarios',  val: String(resumen.propiet),  color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
           { label: 'En renta',      val: String(resumen.enRenta),  color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
-          { label: 'Libres',        val: String(resumen.libre),    color: '#16a34a', bg: '#dcfce7' },
+          { label: 'Libres',        val: String(resumen.libre),    color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
           { label: 'Renta mensual', val: `${moneda} ${resumen.rentaMensual.toLocaleString('es')}`, color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
-          { label: 'Con deuda',     val: String(resumen.conDeuda), color: resumen.conDeuda > 0 ? '#ef4444' : '#16a34a', bg: resumen.conDeuda > 0 ? '#fef2f2' : '#dcfce7' },
+          { label: 'Con deuda',     val: String(resumen.conDeuda), color: resumen.conDeuda > 0 ? 'var(--at-danger)' : 'var(--at-success)', bg: resumen.conDeuda > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
@@ -177,16 +177,16 @@ function UnitCard({ d, moneda }: { d: { u: Unidad; contrato: ContratoArrendamien
       d.contrato ? `Arrendatario: ${d.contrato.arrendatario_nombre}` : '',
       d.tieneDeuda ? `Deuda: ${moneda} ${d.deuda.toFixed(2)}` : '',
     ].filter(Boolean).join('\n')}
-      style={{ padding: '6px 10px', borderRadius: 8, border: `1.5px solid ${d.tieneDeuda ? '#fca5a5' : cfg.border}`,
-        background: d.tieneDeuda ? '#fef2f2' : cfg.bg, cursor: 'default', minWidth: 72, textAlign: 'center' }}>
+      style={{ padding: '6px 10px', borderRadius: 8, border: `1.5px solid ${d.tieneDeuda ? 'var(--at-danger-border)' : cfg.border}`,
+        background: d.tieneDeuda ? 'var(--at-danger-tint)' : cfg.bg, cursor: 'default', minWidth: 72, textAlign: 'center' }}>
       <div style={{ fontSize: 9, color: cfg.color, fontWeight: 700, marginBottom: 2 }}>
         {(TIPO_ICON as Record<string, string>)[d.u.tipo] ?? '📋'}
       </div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: d.tieneDeuda ? '#ef4444' : 'var(--at-ink-2)' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: d.tieneDeuda ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>
         {d.u.nombre.length > 8 ? d.u.nombre.slice(0, 8) + '…' : d.u.nombre}
       </div>
       <div style={{ fontSize: 8, color: cfg.color, fontWeight: 600 }}>{cfg.label}</div>
-      {d.tieneDeuda && <div style={{ fontSize: 8, color: '#ef4444', fontWeight: 700 }}>⚠ debe</div>}
+      {d.tieneDeuda && <div style={{ fontSize: 8, color: 'var(--at-danger)', fontWeight: 700 }}>⚠ debe</div>}
     </div>
   )
 }

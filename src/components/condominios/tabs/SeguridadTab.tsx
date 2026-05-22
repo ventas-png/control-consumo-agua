@@ -14,9 +14,9 @@ const PLATAFORMA_LABEL: Record<string, string> = {
 }
 
 const PLATAFORMA_COLOR: Record<string, { bg: string; color: string }> = {
-  airbnb:   { bg: '#fff1f2', color: '#e11d48' },
+  airbnb:   { bg: 'var(--at-danger-tint)', color: '#e11d48' },
   booking:  { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  vrbo:     { bg: '#f0fdf4', color: '#16a34a' },
+  vrbo:     { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   directo:  { bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)' },
   otro:     { bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
 }
@@ -40,9 +40,9 @@ interface Props {
 }
 
 const PRIORIDAD_CONFIG: Record<PrioridadNovedad, { label: string; bg: string; color: string }> = {
-  normal:  { label: 'Normal',  bg: '#f0fdf4', color: '#16a34a' },
-  alta:    { label: 'Alta',    bg: '#fff7ed', color: '#ea580c' },
-  critica: { label: 'Crítica', bg: '#fef2f2', color: '#dc2626' },
+  normal:  { label: 'Normal',  bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  alta:    { label: 'Alta',    bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+  critica: { label: 'Crítica', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
 }
 
 const TIPO_NOVEDAD_CONFIG: Record<TipoNovedad, { label: string; icon: string }> = {
@@ -55,14 +55,14 @@ const TIPO_NOVEDAD_CONFIG: Record<TipoNovedad, { label: string; icon: string }> 
 
 const ESTADO_RONDA: Record<EstadoRonda, { label: string; bg: string; color: string }> = {
   en_curso:   { label: 'En curso',   bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  completada: { label: 'Completada', bg: '#f0fdf4', color: '#16a34a' },
-  incompleta: { label: 'Incompleta', bg: '#fef2f2', color: '#dc2626' },
+  completada: { label: 'Completada', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  incompleta: { label: 'Incompleta', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
 }
 
 const VISITA_CONFIG: Record<EstadoVisitaControl, { label: string; icon: string; bg: string; color: string }> = {
   pendiente: { label: 'Pendiente', icon: '⏳', bg: 'var(--at-surface-2)',  color: 'var(--at-ink-3)' },
-  ok:        { label: 'OK',        icon: '✅', bg: '#f0fdf4',  color: '#16a34a' },
-  novedad:   { label: 'Novedad',   icon: '⚠️', bg: '#fff7ed',  color: '#ea580c' },
+  ok:        { label: 'OK',        icon: '✅', bg: 'var(--at-success-tint)',  color: 'var(--at-success)' },
+  novedad:   { label: 'Novedad',   icon: '⚠️', bg: 'var(--at-warning-tint)',  color: 'var(--at-warning)' },
   omitido:   { label: 'Omitido',   icon: '⏭',  bg: 'var(--at-accent-tint-2)',  color: 'var(--at-accent-hover)' },
 }
 
@@ -197,7 +197,7 @@ export function SeguridadTab({
   }
 
   async function eliminarNovedad(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar novedad?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await Swal.fire({ title: '¿Eliminar novedad?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('novedades_seguridad').delete().eq('id', id)
     onRefresh()
@@ -336,7 +336,7 @@ export function SeguridadTab({
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Seguridad</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
             {novedadesHoy.length} novedades hoy
-            {criticas > 0 && <span style={{ color: '#dc2626', fontWeight: 700 }}> · {criticas} críticas</span>}
+            {criticas > 0 && <span style={{ color: 'var(--at-danger)', fontWeight: 700 }}> · {criticas} críticas</span>}
             {rondaEnCurso && <span style={{ color: 'var(--at-primary)', fontWeight: 600 }}> · Ronda en curso</span>}
           </p>
         </div>
@@ -355,7 +355,7 @@ export function SeguridadTab({
                 </button>
               )}
               {rondaEnCurso && (
-                <button onClick={() => finalizarRonda(rondaEnCurso.id, 'completada')} style={{ padding: '9px 16px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+                <button onClick={() => finalizarRonda(rondaEnCurso.id, 'completada')} style={{ padding: '9px 16px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
                   ✓ Finalizar ronda
                 </button>
               )}
@@ -383,7 +383,7 @@ export function SeguridadTab({
             </div>
             {canEdit && (
               <button onClick={() => finalizarRonda(rondaEnCurso.id, 'incompleta')}
-                style={{ padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                 Marcar incompleta
               </button>
             )}
@@ -394,7 +394,7 @@ export function SeguridadTab({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                 <div style={{ flex: 1, height: '8px', background: 'var(--at-primary-soft)', borderRadius: '99px', overflow: 'hidden' }}>
-                  <div style={{ width: `${progreso}%`, height: '100%', background: progreso === 100 ? '#16a34a' : 'var(--at-primary-2)', borderRadius: '99px', transition: 'width .4s' }} />
+                  <div style={{ width: `${progreso}%`, height: '100%', background: progreso === 100 ? 'var(--at-success)' : 'var(--at-primary-2)', borderRadius: '99px', transition: 'width .4s' }} />
                 </div>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--at-primary-hover)', whiteSpace: 'nowrap' }}>{puntosCompletados}/{puntosRondaActual.length} puntos ({progreso}%)</span>
               </div>
@@ -405,19 +405,19 @@ export function SeguridadTab({
                   const area = punto.area_nombre ?? punto.area_id
                   const icono = punto.area_icono ?? '📍'
                   return (
-                    <div key={punto.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: vc.bg, borderRadius: '9px', border: `1px solid ${visita?.estado === 'ok' ? '#bbf7d0' : visita?.estado === 'novedad' ? '#fed7aa' : 'var(--at-line)'}` }}>
+                    <div key={punto.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: vc.bg, borderRadius: '9px', border: `1px solid ${visita?.estado === 'ok' ? 'var(--at-success-border)' : visita?.estado === 'novedad' ? 'var(--at-warning-border)' : 'var(--at-line)'}` }}>
                       <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--at-accent)', width: '16px', textAlign: 'center' }}>{idx + 1}</span>
                       <span style={{ fontSize: '18px' }}>{icono}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--at-ink)' }}>{area}</div>
                         {punto.instrucciones && <div style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>{punto.instrucciones}</div>}
-                        {visita?.notas && <div style={{ fontSize: '11.5px', color: '#ea580c' }}>⚠ {visita.notas}</div>}
+                        {visita?.notas && <div style={{ fontSize: '11.5px', color: 'var(--at-warning)' }}>⚠ {visita.notas}</div>}
                       </div>
                       <span style={{ fontSize: '14px' }}>{vc.icon}</span>
                       {canEdit && visita && visita.estado === 'pendiente' && (
                         <div style={{ display: 'flex', gap: '4px' }}>
-                          <button onClick={() => marcarVisita(visita.id, 'ok')} title="OK" style={{ padding: '4px 9px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>✅</button>
-                          <button onClick={() => marcarVisitaConNovedad(visita.id)} title="Novedad" style={{ padding: '4px 9px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>⚠️</button>
+                          <button onClick={() => marcarVisita(visita.id, 'ok')} title="OK" style={{ padding: '4px 9px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>✅</button>
+                          <button onClick={() => marcarVisitaConNovedad(visita.id)} title="Novedad" style={{ padding: '4px 9px', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>⚠️</button>
                           <button onClick={() => marcarVisita(visita.id, 'omitido')} title="Omitir" style={{ padding: '4px 9px', background: 'var(--at-accent-tint-2)', border: '1px solid var(--at-accent-soft-2)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>⏭</button>
                         </div>
                       )}
@@ -566,7 +566,7 @@ export function SeguridadTab({
                 const pc = PRIORIDAD_CONFIG[n.prioridad]
                 const tc = TIPO_NOVEDAD_CONFIG[n.tipo]
                 const rondaVinculada = n.ronda_id ? rondas.find(r => r.id === n.ronda_id) : null
-                const accentColor = n.prioridad === 'critica' ? '#dc2626' : n.prioridad === 'alta' ? '#ea580c' : '#16a34a'
+                const accentColor = n.prioridad === 'critica' ? 'var(--at-danger)' : n.prioridad === 'alta' ? 'var(--at-warning)' : 'var(--at-success)'
                 return (
                   <div key={n.id} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '12px', overflow: 'hidden', display: 'flex' }}>
                     {/* Accent stripe */}
@@ -603,7 +603,7 @@ export function SeguridadTab({
                             </button>
                             {canEdit && (
                               <button onClick={() => eliminarNovedad(n.id)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px', padding: '2px 4px' }}>
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '14px', padding: '2px 4px' }}>
                                 🗑
                               </button>
                             )}
@@ -650,8 +650,8 @@ export function SeguridadTab({
                     {rutaNombre && <span>🗺 {rutaNombre}</span>}
                     {visitasR.length > 0 && (
                       <>
-                        {okCount > 0 && <span style={{ color: '#16a34a' }}>✅ {okCount}</span>}
-                        {novCount > 0 && <span style={{ color: '#ea580c' }}>⚠️ {novCount}</span>}
+                        {okCount > 0 && <span style={{ color: 'var(--at-success)' }}>✅ {okCount}</span>}
+                        {novCount > 0 && <span style={{ color: 'var(--at-warning)' }}>⚠️ {novCount}</span>}
                         {omitCount > 0 && <span style={{ color: 'var(--at-accent-hover)' }}>⏭ {omitCount}</span>}
                       </>
                     )}
@@ -661,7 +661,7 @@ export function SeguridadTab({
                 </div>
                 <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: ec.bg, color: ec.color, flexShrink: 0 }}>{ec.label}</span>
                 {canEdit && r.estado === 'en_curso' && (
-                  <button onClick={() => finalizarRonda(r.id, 'completada')} style={{ padding: '6px 12px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, flexShrink: 0 }}>
+                  <button onClick={() => finalizarRonda(r.id, 'completada')} style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, flexShrink: 0 }}>
                     ✓ Completar
                   </button>
                 )}
@@ -676,7 +676,7 @@ export function SeguridadTab({
         const pc = PRIORIDAD_CONFIG[novedadDetalle.prioridad]
         const tc = TIPO_NOVEDAD_CONFIG[novedadDetalle.tipo]
         const rondaVinculada = novedadDetalle.ronda_id ? rondas.find(r => r.id === novedadDetalle.ronda_id) : null
-        const accentColor = novedadDetalle.prioridad === 'critica' ? '#dc2626' : novedadDetalle.prioridad === 'alta' ? '#ea580c' : '#16a34a'
+        const accentColor = novedadDetalle.prioridad === 'critica' ? 'var(--at-danger)' : novedadDetalle.prioridad === 'alta' ? 'var(--at-warning)' : 'var(--at-success)'
         return (
           <div onClick={() => setNovedadDetalle(null)}
             style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
@@ -751,7 +751,7 @@ export function SeguridadTab({
                       )}
                       <div>
                         <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Comentarios</div>
-                        <p style={{ margin: 0, fontSize: '14.5px', color: 'var(--at-ink)', lineHeight: 1.6, background: '#fffbeb', padding: '12px 14px', borderRadius: '10px', border: '1px solid #fde68a', whiteSpace: 'pre-wrap' }}>
+                        <p style={{ margin: 0, fontSize: '14.5px', color: 'var(--at-ink)', lineHeight: 1.6, background: 'var(--at-warning-tint)', padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--at-warning-border)', whiteSpace: 'pre-wrap' }}>
                           {comentario}
                         </p>
                       </div>
@@ -789,7 +789,7 @@ export function SeguridadTab({
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '4px', borderTop: '1px solid var(--at-chip)' }}>
                   {canEdit && (
                     <button onClick={async () => { setNovedadDetalle(null); await eliminarNovedad(novedadDetalle.id) }}
-                      style={{ padding: '9px 16px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                      style={{ padding: '9px 16px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1.5px solid var(--at-danger-border)', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
                       🗑 Eliminar
                     </button>
                   )}
@@ -874,16 +874,16 @@ export function SeguridadTab({
               {/* Resultado: visitante encontrado */}
               {searchResult === 'found' && (
                 <div>
-                  <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '14px 16px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                  <div style={{ background: 'var(--at-success-tint)', border: '1.5px solid var(--at-success-border)', borderRadius: '12px', padding: '14px 16px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       {searchResultVisitantes[0]?.foto_url
-                        ? <SecureImage src={searchResultVisitantes[0].foto_url} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #86efac', flexShrink: 0 }} />
-                        : <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,#10b981,#059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '18px', flexShrink: 0 }}>
+                        ? <SecureImage src={searchResultVisitantes[0].foto_url} alt="" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--at-success-border)', flexShrink: 0 }} />
+                        : <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,var(--at-success),var(--at-success-strong))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--at-on-status)', fontWeight: 800, fontSize: '18px', flexShrink: 0 }}>
                             {searchResultVisitantes[0]?.nombre.charAt(0).toUpperCase()}
                           </div>
                       }
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '15px', color: '#15803d' }}>
+                        <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--at-success-strong)' }}>
                           {searchResultVisitantes[0]?.nombre}
                         </div>
                         <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
@@ -904,7 +904,7 @@ export function SeguridadTab({
                     {searchResultVisitantes.map(v => {
                       const enPremisa = !v.hora_salida
                       return (
-                        <div key={v.id} style={{ background: enPremisa ? '#f0fdf4' : 'var(--at-surface-2)', border: `1.5px solid ${enPremisa ? '#bbf7d0' : 'var(--at-line)'}`, borderRadius: '10px', padding: '10px 14px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <div key={v.id} style={{ background: enPremisa ? 'var(--at-success-tint)' : 'var(--at-surface-2)', border: `1.5px solid ${enPremisa ? 'var(--at-success-border)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '10px 14px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                           {v.foto_url && <SecureImage src={v.foto_url} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--at-ink)' }}>
@@ -921,7 +921,7 @@ export function SeguridadTab({
                           </div>
                           <div style={{ flexShrink: 0 }}>
                             {enPremisa
-                              ? <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', background: '#dcfce7', color: '#16a34a', fontWeight: 700 }}>En premisas</span>
+                              ? <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', background: 'var(--at-success-tint)', color: 'var(--at-success)', fontWeight: 700 }}>En premisas</span>
                               : <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>
                                   Salida {new Date(v.hora_salida!).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
                                 </span>
@@ -936,14 +936,14 @@ export function SeguridadTab({
 
               {/* Resultado: no encontrado */}
               {searchResult === 'not_found' && (
-                <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                <div style={{ background: 'var(--at-danger-tint)', border: '1.5px solid var(--at-danger-border)', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#dc2626' }}>No se encontró ningún visitante con ese DPI</div>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-danger)' }}>No se encontró ningún visitante con ese DPI</div>
                     <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', marginTop: '2px' }}>Complete el formulario para registrarlo como nuevo visitante.</div>
                   </div>
                   {canCreate && !showRegForm && (
                     <button onClick={() => setShowRegForm(true)}
-                      style={{ padding: '8px 16px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fecaca', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>
+                      style={{ padding: '8px 16px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1.5px solid var(--at-danger-border)', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>
                       + Registrar nuevo
                     </button>
                   )}
@@ -999,14 +999,14 @@ export function SeguridadTab({
                           const plat = PLATAFORMA_COLOR[r.plataforma] ?? PLATAFORMA_COLOR.otro
                           const enCurso = r.estado === 'en_curso'
                           return (
-                            <div key={r.id} style={{ background: enCurso ? '#f0fdf4' : 'var(--at-surface-2)', border: `1.5px solid ${enCurso ? '#86efac' : 'var(--at-line)'}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            <div key={r.id} style={{ background: enCurso ? 'var(--at-success-tint)' : 'var(--at-surface-2)', border: `1.5px solid ${enCurso ? 'var(--at-success-border)' : 'var(--at-line)'}`, borderRadius: '12px', padding: '12px 14px', display: 'flex', gap: '12px', alignItems: 'center' }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                   <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{r.huesped_nombre}</span>
                                   <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: plat.bg, color: plat.color }}>
                                     {PLATAFORMA_LABEL[r.plataforma] ?? r.plataforma}
                                   </span>
-                                  {enCurso && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#dcfce7', color: '#16a34a' }}>En curso</span>}
+                                  {enCurso && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-success-tint)', color: 'var(--at-success)' }}>En curso</span>}
                                 </div>
                                 <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '3px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                   {r.unidad_nombre && <span>🏠 {r.unidad_nombre}</span>}
@@ -1079,22 +1079,22 @@ export function SeguridadTab({
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
                       {(fotosExpiradas.foto || fotosExpiradas.documento || fotosExpiradas.vehiculo) && (
-                        <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#92400e', marginBottom: 10 }}>
+                        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--at-warning-strong)', marginBottom: 10 }}>
                           ⚠️ Una o más fotos tienen más de 90 días. Se recomienda renovarlas.
                         </div>
                       )}
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                         <div>
                           <ImageUploader value={fotoPersonaUrl} onChange={setFotoPersonaUrl} folder="visitantes" label="Foto del visitante" capture />
-                          {fotosExpiradas.foto && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                          {fotosExpiradas.foto && <div style={{ fontSize: 11, color: 'var(--at-warning)', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
                         </div>
                         <div>
                           <ImageUploader value={fotoDocumentoUrl} onChange={setFotoDocumentoUrl} folder="visitantes" label="Foto DPI / Documento" capture />
-                          {fotosExpiradas.documento && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                          {fotosExpiradas.documento && <div style={{ fontSize: 11, color: 'var(--at-warning)', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
                         </div>
                         <div>
                           <ImageUploader value={fotoVehiculoUrl} onChange={setFotoVehiculoUrl} folder="visitantes" label="Foto del vehículo" capture />
-                          {fotosExpiradas.vehiculo && <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
+                          {fotosExpiradas.vehiculo && <div style={{ fontSize: 11, color: 'var(--at-warning)', marginTop: 3 }}>⚠️ Mayor a 90 días — renovar</div>}
                         </div>
                       </div>
                     </div>

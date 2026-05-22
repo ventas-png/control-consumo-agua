@@ -14,18 +14,18 @@ interface Props {
 
 const TIPOS: { value: TipoAutoridad; label: string; icon: string; color: string }[] = [
   { value: 'policia',        label: 'Policía',        icon: '👮', color: 'var(--at-primary-2)' },
-  { value: 'bomberos',       label: 'Bomberos',       icon: '🚒', color: '#ef4444' },
-  { value: 'salud',          label: 'Salud',          icon: '🏥', color: '#10b981' },
+  { value: 'bomberos',       label: 'Bomberos',       icon: '🚒', color: 'var(--at-danger)' },
+  { value: 'salud',          label: 'Salud',          icon: '🏥', color: 'var(--at-success)' },
   { value: 'municipalidad',  label: 'Municipalidad',  icon: '🏛️', color: 'var(--at-accent)' },
-  { value: 'electricidad',   label: 'Electricidad',   icon: '⚡', color: '#f59e0b' },
+  { value: 'electricidad',   label: 'Electricidad',   icon: '⚡', color: 'var(--at-warning)' },
   { value: 'agua',           label: 'Agua',           icon: '💧', color: 'var(--at-accent-2)' },
   { value: 'otro',           label: 'Otro',           icon: '🔍', color: 'var(--at-ink-3)' },
 ]
 
 const RESULTADOS: { value: ResultadoAutoridad; label: string; color: string; bg: string }[] = [
-  { value: 'sin_novedad',       label: 'Sin novedad',       color: '#10b981', bg: '#d1fae5' },
-  { value: 'acta_levantada',    label: 'Acta levantada',    color: '#f59e0b', bg: '#fef3c7' },
-  { value: 'sancion',           label: 'Sanción',           color: '#ef4444', bg: '#fef2f2' },
+  { value: 'sin_novedad',       label: 'Sin novedad',       color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  { value: 'acta_levantada',    label: 'Acta levantada',    color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  { value: 'sancion',           label: 'Sanción',           color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
   { value: 'recomendacion',     label: 'Recomendación',     color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
   { value: 'otro',              label: 'Otro',              color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 ]
@@ -101,7 +101,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
             <div>
               <span style={{ fontWeight: 600, fontSize: 14 }}>Autoridades ({lista.length})</span>
               {pendientesSeguimiento > 0 && (
-                <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#fef3c7', color: '#f59e0b', fontWeight: 700 }}>{pendientesSeguimiento} seg.</span>
+                <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'var(--at-warning-tint)', color: 'var(--at-warning)', fontWeight: 700 }}>{pendientesSeguimiento} seg.</span>
               )}
             </div>
             {canCreate && (
@@ -128,7 +128,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
           const res = RESULTADOS.find(x => x.value === r.resultado)
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: `3px solid ${r.requiere_seguimiento ? '#f59e0b' : tipo?.color}` }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: `3px solid ${r.requiere_seguimiento ? 'var(--at-warning)' : tipo?.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
                 {r.resultado && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: res?.bg, color: res?.color }}>{res?.label}</span>}
@@ -138,7 +138,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
                 {r.fecha}
                 {r.nombre_institucion && <span> · {r.nombre_institucion}</span>}
               </div>
-              {r.requiere_seguimiento && <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 2 }}>⚠ Requiere seguimiento{r.fecha_seguimiento ? ` · ${r.fecha_seguimiento}` : ''}</div>}
+              {r.requiere_seguimiento && <div style={{ fontSize: 10, color: 'var(--at-warning)', marginTop: 2 }}>⚠ Requiere seguimiento{r.fecha_seguimiento ? ` · ${r.fecha_seguimiento}` : ''}</div>}
             </div>
           )
         })}
@@ -207,7 +207,7 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Registrar'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -256,14 +256,14 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
               </div>
 
               {selected.requiere_seguimiento && (
-                <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: '#92400e' }}>⚠ Requiere seguimiento</div>
-                    {selected.fecha_seguimiento && <div style={{ fontSize: 12, color: '#92400e', marginTop: 2 }}>Fecha: {selected.fecha_seguimiento}</div>}
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-warning-strong)' }}>⚠ Requiere seguimiento</div>
+                    {selected.fecha_seguimiento && <div style={{ fontSize: 12, color: 'var(--at-warning-strong)', marginTop: 2 }}>Fecha: {selected.fecha_seguimiento}</div>}
                   </div>
                   {canEdit && (
                     <button onClick={() => marcarSeguimientoRealizado(selected)}
-                      style={{ padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 12px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ✓ Realizado
                     </button>
                   )}
@@ -283,9 +283,9 @@ export default function RegistroAutoridadesTab({ registros, proyectoId, companyI
         {!mostrarForm && !selected && (
           <div>
             {conSeguimiento > 0 && (
-              <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, color: '#92400e', marginBottom: 4 }}>Seguimientos activos: {conSeguimiento}</div>
-                <div style={{ fontSize: 12, color: '#92400e' }}>Filtra por "solo con seguimiento" para ver los pendientes</div>
+              <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-warning-strong)', marginBottom: 4 }}>Seguimientos activos: {conSeguimiento}</div>
+                <div style={{ fontSize: 12, color: 'var(--at-warning-strong)' }}>Filtra por "solo con seguimiento" para ver los pendientes</div>
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: 'var(--at-ink-3)', fontSize: 14 }}>

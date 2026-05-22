@@ -15,17 +15,17 @@ interface Props {
 
 const CATEGORIAS: { value: CategoriaNota; label: string; icon: string; color: string }[] = [
   { value: 'general',       label: 'General',       icon: '📝', color: 'var(--at-ink-3)' },
-  { value: 'urgente',       label: 'Urgente',       icon: '🚨', color: '#ef4444' },
-  { value: 'recordatorio',  label: 'Recordatorio',  icon: '⏰', color: '#f59e0b' },
+  { value: 'urgente',       label: 'Urgente',       icon: '🚨', color: 'var(--at-danger)' },
+  { value: 'recordatorio',  label: 'Recordatorio',  icon: '⏰', color: 'var(--at-warning)' },
   { value: 'seguimiento',   label: 'Seguimiento',   icon: '🔄', color: 'var(--at-accent)' },
-  { value: 'reunion',       label: 'Reunión',       icon: '👥', color: '#10b981' },
+  { value: 'reunion',       label: 'Reunión',       icon: '👥', color: 'var(--at-success)' },
   { value: 'otro',          label: 'Otro',          icon: '📌', color: 'var(--at-accent)' },
 ]
 
 const PRIORIDADES: { value: PrioridadNota; label: string; color: string; bg: string }[] = [
   { value: 'normal',  label: 'Normal',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
-  { value: 'alta',    label: 'Alta',    color: '#f59e0b', bg: '#fef3c7' },
-  { value: 'urgente', label: 'Urgente', color: '#ef4444', bg: '#fef2f2' },
+  { value: 'alta',    label: 'Alta',    color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  { value: 'urgente', label: 'Urgente', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 ]
 
 export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombre, canCreate, canEdit, onRefresh }: Props) {
@@ -99,7 +99,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
   }
 
   async function resolver(n: NotaAdmin) {
-    const res = await Swal.fire({ title: 'Resolver nota', text: '¿Marcar como resuelta?', icon: 'question', showCancelButton: true, confirmButtonText: 'Resolver', confirmButtonColor: '#10b981' })
+    const res = await Swal.fire({ title: 'Resolver nota', text: '¿Marcar como resuelta?', icon: 'question', showCancelButton: true, confirmButtonText: 'Resolver', confirmButtonColor: 'var(--at-success)' })
     if (!res.isConfirmed) return
     await supabase.from('notas_admin').update({ resuelta: true, fijada: false }).eq('id', n.id)
     if (selected?.id === n.id) setSelected(null)
@@ -107,7 +107,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
   }
 
   async function eliminar(n: NotaAdmin) {
-    const res = await Swal.fire({ title: 'Eliminar nota', text: '¿Eliminar esta nota?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const res = await Swal.fire({ title: 'Eliminar nota', text: '¿Eliminar esta nota?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!res.isConfirmed) return
     await supabase.from('notas_admin').delete().eq('id', n.id)
     if (selected?.id === n.id) setSelected(null)
@@ -130,7 +130,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
     const dias = diasHastaRecordatorio(n.fecha_recordatorio)
     return (
       <div onClick={() => { setSelected(n); setMostrarForm(false) }}
-        style={{ background: highlight ? '#fffbeb' : n.resuelta ? 'var(--at-surface-2)' : 'var(--at-surface)', border: `1px solid ${selected?.id === n.id ? 'var(--at-accent)' : highlight ? '#fde68a' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', opacity: n.resuelta ? 0.65 : 1, marginBottom: 8 }}>
+        style={{ background: highlight ? 'var(--at-warning-tint)' : n.resuelta ? 'var(--at-surface-2)' : 'var(--at-surface)', border: `1px solid ${selected?.id === n.id ? 'var(--at-accent)' : highlight ? 'var(--at-warning-border)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer', opacity: n.resuelta ? 0.65 : 1, marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
             {n.fijada && <span title="Fijada">📌</span>}
@@ -144,11 +144,11 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
         <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: cat?.color }}>{cat?.icon} {cat?.label}</span>
           {dias !== null && (
-            <span style={{ fontSize: 10, color: dias < 0 ? '#ef4444' : dias === 0 ? '#f59e0b' : 'var(--at-ink-3)' }}>
+            <span style={{ fontSize: 10, color: dias < 0 ? 'var(--at-danger)' : dias === 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>
               ⏰ {dias < 0 ? `Vencido ${Math.abs(dias)}d` : dias === 0 ? 'Hoy' : `En ${dias}d`}
             </span>
           )}
-          {n.resuelta && <span style={{ fontSize: 10, color: '#10b981' }}>✓ Resuelta</span>}
+          {n.resuelta && <span style={{ fontSize: 10, color: 'var(--at-success)' }}>✓ Resuelta</span>}
         </div>
       </div>
     )
@@ -182,7 +182,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
         <div style={{ padding: '10px 12px' }}>
           {fijadas.length > 0 && (
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>📌 Fijadas</div>
+              <div style={{ fontSize: 10, color: 'var(--at-warning)', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>📌 Fijadas</div>
               {fijadas.map(n => <NotaCard key={n.id} n={n} highlight />)}
             </div>
           )}
@@ -230,7 +230,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : `✅ ${editando ? 'Actualizar' : 'Crear nota'}`}
               </button>
               <button onClick={resetForm}
@@ -252,8 +252,8 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: cat?.color + '20', color: cat?.color }}>{cat?.icon} {cat?.label}</span>
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: prio?.bg, color: prio?.color }}>{prio?.label}</span>
-                    {selected.fijada && <span style={{ fontSize: 11, color: '#f59e0b' }}>📌 Fijada</span>}
-                    {selected.resuelta && <span style={{ fontSize: 11, color: '#10b981' }}>✓ Resuelta</span>}
+                    {selected.fijada && <span style={{ fontSize: 11, color: 'var(--at-warning)' }}>📌 Fijada</span>}
+                    {selected.resuelta && <span style={{ fontSize: 11, color: 'var(--at-success)' }}>✓ Resuelta</span>}
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 18 }}>{selected.titulo}</div>
                   <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4 }}>
@@ -268,7 +268,7 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
                       ✏️ Editar
                     </button>
                     <button onClick={() => toggleFijada(selected)}
-                      style={{ padding: '6px 12px', background: selected.fijada ? '#fef3c7' : 'var(--at-chip)', color: selected.fijada ? '#f59e0b' : 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 12px', background: selected.fijada ? 'var(--at-warning-tint)' : 'var(--at-chip)', color: selected.fijada ? 'var(--at-warning)' : 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       {selected.fijada ? '📌 Desfijar' : '📌 Fijar'}
                     </button>
                   </div>
@@ -276,10 +276,10 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
               </div>
 
               {dias !== null && (
-                <div style={{ background: dias < 0 ? '#fef2f2' : dias === 0 ? '#fef3c7' : 'var(--at-accent-tint)', border: `1px solid ${dias < 0 ? '#fecaca' : dias === 0 ? '#fde68a' : 'var(--at-accent-soft)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ background: dias < 0 ? 'var(--at-danger-tint)' : dias === 0 ? 'var(--at-warning-tint)' : 'var(--at-accent-tint)', border: `1px solid ${dias < 0 ? 'var(--at-danger-border)' : dias === 0 ? 'var(--at-warning-border)' : 'var(--at-accent-soft)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 16 }}>⏰</span>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: dias < 0 ? '#ef4444' : dias === 0 ? '#f59e0b' : 'var(--at-accent)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: dias < 0 ? 'var(--at-danger)' : dias === 0 ? 'var(--at-warning)' : 'var(--at-accent)' }}>
                       {dias < 0 ? `Recordatorio vencido hace ${Math.abs(dias)} días` : dias === 0 ? 'Recordatorio: hoy' : `Recordatorio en ${dias} días`}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{selected.fecha_recordatorio}</div>
@@ -294,11 +294,11 @@ export default function NotasAdminTab({ notas, proyectoId, companyId, autorNombr
               {canEdit && !selected.resuelta && (
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => resolver(selected)}
-                    style={{ padding: '6px 14px', background: '#d1fae5', color: '#10b981', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     ✓ Resolver
                   </button>
                   <button onClick={() => eliminar(selected)}
-                    style={{ padding: '6px 14px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                    style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                     🗑 Eliminar
                   </button>
                 </div>
