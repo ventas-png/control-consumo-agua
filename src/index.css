@@ -30,6 +30,12 @@
   --at-accent-soft-2: #EFE0D5;
   --at-accent-tint: #F4EBE3;
   --at-accent-tint-2: #FAF1EA;
+  /* Semantic status tokens (success / warning / danger / info) */
+  --at-success: #16a34a; --at-success-tint: #dcfce7; --at-success-border: #bbf7d0; --at-success-strong: #15803d;
+  --at-warning: #d97706; --at-warning-tint: #fef3c7; --at-warning-border: #fde68a; --at-warning-strong: #92400e;
+  --at-danger: #ef4444; --at-danger-tint: #fef2f2; --at-danger-border: #fecaca; --at-danger-strong: #dc2626;
+  --at-info: #2563eb; --at-info-tint: #dbeafe; --at-info-border: #bfdbfe; --at-info-strong: #1d4ed8;
+  --at-on-status: #ffffff;
   --at-font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --at-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
@@ -51,6 +57,11 @@
     --at-accent-hover: #D49A72; --at-accent-dark: #C8865C; --at-accent-darker: #B5764A;
     --at-accent-light: #D9A580; --at-accent-soft: #2E2018; --at-accent-soft-2: #3A2A20;
     --at-accent-tint: #1F1610; --at-accent-tint-2: #261A12;
+    --at-success: #4ade80; --at-success-tint: #14271c; --at-success-border: #1f3a2a; --at-success-strong: #86efac;
+    --at-warning: #fbbf24; --at-warning-tint: #2a2008; --at-warning-border: #3a2e0f; --at-warning-strong: #fcd34d;
+    --at-danger: #f87171; --at-danger-tint: #2a1414; --at-danger-border: #3a1f1f; --at-danger-strong: #fca5a5;
+    --at-info: #60a5fa; --at-info-tint: #0f1f33; --at-info-border: #1e3a5f; --at-info-strong: #93c5fd;
+    --at-on-status: #0B1410;
     color-scheme: dark;
   }
 }
@@ -66,6 +77,11 @@
   --at-accent-hover: #D49A72; --at-accent-dark: #C8865C; --at-accent-darker: #B5764A;
   --at-accent-light: #D9A580; --at-accent-soft: #2E2018; --at-accent-soft-2: #3A2A20;
   --at-accent-tint: #1F1610; --at-accent-tint-2: #261A12;
+  --at-success: #4ade80; --at-success-tint: #14271c; --at-success-border: #1f3a2a; --at-success-strong: #86efac;
+  --at-warning: #fbbf24; --at-warning-tint: #2a2008; --at-warning-border: #3a2e0f; --at-warning-strong: #fcd34d;
+  --at-danger: #f87171; --at-danger-tint: #2a1414; --at-danger-border: #3a1f1f; --at-danger-strong: #fca5a5;
+  --at-info: #60a5fa; --at-info-tint: #0f1f33; --at-info-border: #1e3a5f; --at-info-strong: #93c5fd;
+  --at-on-status: #0B1410;
   color-scheme: dark;
 }
 
@@ -116,6 +132,17 @@ body {
 }
 button:focus:not(:focus-visible) {
   outline: none;
+}
+
+/* Shared <Button> primitive — hover/active feedback */
+.at-btn {
+  transition: filter 0.15s ease, opacity 0.15s ease, transform 0.05s ease;
+}
+.at-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.at-btn:active:not(:disabled) {
+  transform: translateY(0.5px);
 }
 
 /* ─── Pulse Animation (online badge) ────────────────────────────────────── */
