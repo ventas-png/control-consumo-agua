@@ -40,7 +40,7 @@ export function ConversationList({ conversations, activeId, onSelect, filter, un
             style={{
               width: '100%', textAlign: 'left', padding: '12px 14px',
               border: 'none', borderBottom: '1px solid var(--at-chip)',
-              background: isActive ? 'var(--at-primary-tint)' : isUnseen ? '#fffbeb' : 'var(--at-surface)',
+              background: isActive ? 'var(--at-primary-tint)' : isUnseen ? 'var(--at-warning-tint)' : 'var(--at-surface)',
               cursor: 'pointer', transition: 'background 0.12s',
               display: 'flex', flexDirection: 'column', gap: '4px',
             }}
@@ -55,7 +55,7 @@ export function ConversationList({ conversations, activeId, onSelect, filter, un
                 {isUnseen && (
                   <span className="new-assignment-dot" style={{
                     display: 'inline-block', width: '8px', height: '8px',
-                    borderRadius: '50%', background: '#f97316', flexShrink: 0,
+                    borderRadius: '50%', background: 'var(--at-warning)', flexShrink: 0,
                   }} />
                 )}
                 {conv.subject}

@@ -434,7 +434,7 @@ export function EmpresaSection({ currentUser }: Props) {
           </p>
           <div style="display:grid;grid-template-columns:${cols};gap:12px">
             ${showAgua ? `
-            <div id="card-agua" style="border:1px solid #1B3B3633;border-radius:10px;padding:12px">
+            <div id="card-agua" style="border:1px solid var(--at-primary)33;border-radius:10px;padding:12px">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--at-ink);margin-bottom:2px">
                 <input type="checkbox" id="chk-agua" style="width:16px;height:16px;cursor:pointer;accent-color:var(--at-primary)" />
                 💧 Control de Agua
@@ -448,7 +448,7 @@ export function EmpresaSection({ currentUser }: Props) {
             </div>
             ` : ''}
             ${showCond ? `
-            <div id="card-cond" style="border:1px solid #B96A3F33;border-radius:10px;padding:12px">
+            <div id="card-cond" style="border:1px solid var(--at-accent)33;border-radius:10px;padding:12px">
               <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--at-ink);margin-bottom:2px">
                 <input type="checkbox" id="chk-cond" style="width:16px;height:16px;cursor:pointer;accent-color:var(--at-accent)" />
                 🏢 Condominios

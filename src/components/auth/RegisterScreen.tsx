@@ -151,15 +151,15 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
           <div style={{
             textAlign: 'center',
             padding: '32px 20px',
-            background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
+            background: 'linear-gradient(135deg, var(--at-success-tint), var(--at-success-tint))',
             borderRadius: '16px',
-            border: '1px solid #bbf7d0',
+            border: '1px solid var(--at-success-border)',
           }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>✅</div>
-            <p style={{ margin: 0, fontWeight: 600, color: '#15803d', fontSize: '15px' }}>
+            <p style={{ margin: 0, fontWeight: 600, color: 'var(--at-success-strong)', fontSize: '15px' }}>
               ¡Cuenta creada exitosamente!
             </p>
-            <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#166534' }}>
+            <p style={{ margin: '6px 0 0', fontSize: '13px', color: 'var(--at-success-strong)' }}>
               Iniciando sesión...
             </p>
           </div>
@@ -322,14 +322,14 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
                   style={{
                     width: '100%', boxSizing: 'border-box',
                     padding: '10px 14px', fontSize: '14px',
-                    border: `1.5px solid ${confirmPassword && confirmPassword !== password ? '#ef4444' : 'var(--at-line)'}`,
+                    border: `1.5px solid ${confirmPassword && confirmPassword !== password ? 'var(--at-danger)' : 'var(--at-line)'}`,
                     borderRadius: '10px',
                     background: 'var(--at-surface-2)', color: 'var(--at-ink)',
                     transition: 'border-color 0.2s, box-shadow 0.2s',
                   }}
                 />
                 {confirmPassword && confirmPassword !== password && (
-                  <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: '#ef4444' }}>
+                  <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: 'var(--at-danger)' }}>
                     Las contraseñas no coinciden
                   </p>
                 )}
@@ -341,11 +341,11 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
               <div style={{
                 marginTop: '16px',
                 padding: '12px 14px',
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
+                background: 'var(--at-danger-tint)',
+                border: '1px solid var(--at-danger-border)',
                 borderRadius: '10px',
                 fontSize: '13px',
-                color: '#b91c1c',
+                color: 'var(--at-danger-strong)',
                 display: 'flex',
                 gap: '8px',
                 alignItems: 'flex-start',

@@ -17,8 +17,8 @@ export function Header({ currentUser }: Props) {
         <span>Control de Agua Potable — {currentUser.name}</span>
       </div>
       <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', background: isOnline ? '#e6fffa' : '#fef3c7', color: isOnline ? '#047857' : '#92400e', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
-          <span style={{ width: '6px', height: '6px', background: isOnline ? '#10b981' : '#f59e0b', borderRadius: '50%', display: 'inline-block' }} />
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', background: isOnline ? '#e6fffa' : 'var(--at-warning-tint)', color: isOnline ? '#047857' : 'var(--at-warning-strong)', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
+          <span style={{ width: '6px', height: '6px', background: isOnline ? 'var(--at-success)' : 'var(--at-warning)', borderRadius: '50%', display: 'inline-block' }} />
           {isOnline ? 'Supabase Conectado' : 'Modo Offline'}
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>

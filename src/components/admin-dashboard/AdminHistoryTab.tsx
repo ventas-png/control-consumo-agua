@@ -176,7 +176,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
         <StatCard
           label="Total Registros"
           value={String(stats.total)}
-          bg="#EEF2EC" border="#C2D2CA" labelColor="#102622" valueColor="#102622"
+          bg="#EEF2EC" border="#C2D2CA" labelColor="var(--at-primary-hover)" valueColor="var(--at-primary-hover)"
         />
         <StatCard
           label="Consumo Total"

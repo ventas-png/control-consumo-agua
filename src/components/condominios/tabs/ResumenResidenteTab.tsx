@@ -94,7 +94,7 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
     <div class="kpi">
       <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Saldo cuotas</div><div class="kpi-val" style="color:${saldoPendiente > 0 ? 'var(--at-danger)' : 'var(--at-success)'}">${moneda} ${saldoPendiente.toFixed(2)}</div></div>
       <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Recargos pendientes</div><div class="kpi-val" style="color:${saldoRecargos > 0 ? 'var(--at-warning)' : 'var(--at-success)'}">${moneda} ${saldoRecargos.toFixed(2)}</div></div>
-      <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Tickets activos</div><div class="kpi-val" style="color:#1B3B36">${ticketsUnidad.length}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Tickets activos</div><div class="kpi-val" style="color:var(--at-primary)">${ticketsUnidad.length}</div></div>
     </div>
     <section><h3>Cuotas (últimos 12 meses)</h3>
     <table><tr><th>Concepto</th><th>Período</th><th>Monto</th><th>Estado</th></tr>

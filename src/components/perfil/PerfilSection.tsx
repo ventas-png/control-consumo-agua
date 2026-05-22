@@ -23,9 +23,9 @@ function FeedbackMsg({ fb }: { fb: FeedbackState }) {
       borderRadius: '8px',
       fontSize: '13px',
       fontWeight: 500,
-      background: fb.type === 'success' ? '#f0fdf4' : '#fef2f2',
-      color: fb.type === 'success' ? '#16a34a' : '#dc2626',
-      border: `1px solid ${fb.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
+      background: fb.type === 'success' ? 'var(--at-success-tint)' : 'var(--at-danger-tint)',
+      color: fb.type === 'success' ? 'var(--at-success)' : 'var(--at-danger)',
+      border: `1px solid ${fb.type === 'success' ? 'var(--at-success-border)' : 'var(--at-danger-border)'}`,
     }}>
       {fb.type === 'success' ? '✅' : '⚠️'} {fb.msg}
     </div>
@@ -307,7 +307,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
                 placeholder="Repite la nueva contraseña"
                 rightEl={eyeBtn(showPw.confirm, () => setShowPw(s => ({ ...s, confirm: !s.confirm })))}
               />
-              <SubmitBtn loading={pwLoading} label="Cambiar contraseña" color="#9C5733" />
+              <SubmitBtn loading={pwLoading} label="Cambiar contraseña" color="var(--at-accent-hover)" />
               <FeedbackMsg fb={pwFb} />
             </form>
           </Card>
@@ -315,7 +315,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
 
         {/* Card 3 — Correo */}
         <Card title="Cambiar correo electrónico">
-          <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#92400e', marginBottom: '16px' }}>
+          <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: 'var(--at-warning-strong)', marginBottom: '16px' }}>
             ℹ️ Se enviará un enlace de confirmación al nuevo correo. El cambio se aplicará solo al confirmar.
           </div>
           <form onSubmit={handleEmailSubmit}>
@@ -328,7 +328,7 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
               onChange={setNewEmail}
               placeholder="nuevo@ejemplo.com"
             />
-            <SubmitBtn loading={emailLoading} label="Solicitar cambio" color="#577B69" />
+            <SubmitBtn loading={emailLoading} label="Solicitar cambio" color="var(--at-accent-2)" />
             <FeedbackMsg fb={emailFb} />
           </form>
         </Card>

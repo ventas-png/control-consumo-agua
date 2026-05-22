@@ -17,7 +17,7 @@ interface Props {
 
 /**
  * Badge de estado homologado — reemplaza los cientos de
- * `<span style={{ background: '#dcfce7', color: '#16a34a', … }}>` repartidos por
+ * `<span style={{ background: 'var(--at-success-tint)', color: 'var(--at-success)', … }}>` repartidos por
  * los tabs. Usa tokens semánticos, por lo que respeta el modo claro/oscuro.
  *
  *   <StatusBadge estado={cuota.estado} />          // deriva tono + etiqueta

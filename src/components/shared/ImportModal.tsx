@@ -258,7 +258,7 @@ export function ImportModal<T>({
           {step === 'done' && (
             <div style={{ padding: '40px', textAlign: 'center' }}>
               <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
-              <p style={{ fontSize: '16px', fontWeight: 600, color: '#16a34a' }}>
+              <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--at-success)' }}>
                 {importedCount} {importedCount === 1 ? entityLabel : plural} importado{importedCount === 1 ? '' : 's'}
               </p>
             </div>
@@ -355,11 +355,11 @@ function PreviewStep<T>({
   return (
     <div>
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-        <div style={statBox('#dcfce7', '#166534')}>
+        <div style={statBox('var(--at-success-tint)', 'var(--at-success-strong)')}>
           ✅ {validCount} {validCount === 1 ? entityLabel : entityLabelPlural} válido{validCount === 1 ? '' : 's'}
         </div>
         {invalidCount > 0 && (
-          <div style={statBox('#fee2e2', '#991b1b')}>
+          <div style={statBox('var(--at-danger-tint)', 'var(--at-danger-strong)')}>
             ❌ {invalidCount} con error{invalidCount === 1 ? '' : 'es'}
           </div>
         )}
@@ -375,17 +375,17 @@ function PreviewStep<T>({
           <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '8px' }}>
             Filas con error:
           </div>
-          <div style={{ maxHeight: '280px', overflowY: 'auto', border: '1px solid #fecaca', borderRadius: '8px' }}>
+          <div style={{ maxHeight: '280px', overflowY: 'auto', border: '1px solid var(--at-danger-border)', borderRadius: '8px' }}>
             {rows.filter(r => !r.valid).slice(0, 100).map(r => (
               <div key={r.index} style={errorRowStyle}>
                 {renderErrorRow
                   ? renderErrorRow(r.raw, r.errors)
                   : (
                     <>
-                      <div style={{ fontWeight: 600, fontSize: '12px', color: '#991b1b' }}>
+                      <div style={{ fontWeight: 600, fontSize: '12px', color: 'var(--at-danger-strong)' }}>
                         Fila {r.index}
                       </div>
-                      <div style={{ fontSize: '12px', color: '#7f1d1d' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--at-danger-strong)' }}>
                         {r.errors.join(' · ')}
                       </div>
                     </>
@@ -468,5 +468,5 @@ function statBox(bg: string, color: string): CSSProperties {
   }
 }
 const errorRowStyle: CSSProperties = {
-  padding: '10px 14px', borderBottom: '1px solid #fecaca', background: '#fef2f2',
+  padding: '10px 14px', borderBottom: '1px solid var(--at-danger-border)', background: 'var(--at-danger-tint)',
 }

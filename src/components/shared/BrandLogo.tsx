@@ -8,7 +8,7 @@ interface BrandLogoProps {
   accent?: string
 }
 
-export function BrandLogo({ size = 32, bg = '#1B3B36', window = '#FFFFFF', accent = '#B96A3F' }: BrandLogoProps) {
+export function BrandLogo({ size = 32, bg = 'var(--at-primary)', window = '#FFFFFF', accent = 'var(--at-accent)' }: BrandLogoProps) {
   return (
     <svg viewBox="0 0 32 32" width={size} height={size} aria-hidden="true">
       <rect x="2" y="2" width="28" height="28" rx="8" fill={bg} />

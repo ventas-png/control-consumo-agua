@@ -357,9 +357,9 @@ export function LoginScreen({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
             {/* Error message */}
             {error && (
               <div style={{
-                background: '#fef2f2', border: '1px solid #fecaca',
+                background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)',
                 borderRadius: '10px', padding: '10px 14px',
-                color: '#dc2626', fontSize: '14px', fontWeight: 600,
+                color: 'var(--at-danger)', fontSize: '14px', fontWeight: 600,
                 marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px',
                 animation: shake ? 'shake 0.4s ease' : 'none',
               }}>

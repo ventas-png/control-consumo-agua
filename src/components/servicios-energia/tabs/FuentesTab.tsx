@@ -204,7 +204,7 @@ export default function FuentesTab({
       html: `<b>${nombre}</b> y todas sus facturas serán eliminadas.`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#dc2626',
+      confirmButtonColor: 'var(--at-danger)',
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar',
     })
@@ -306,12 +306,12 @@ export default function FuentesTab({
                     {!f.potencia_contratada_kw && !f.capacidad_solar_kwp ? '—' : ''}
                   </td>
                   <td style={{ padding: '0.5rem' }}>
-                    <span style={{ color: f.activo ? 'var(--at-primary)' : '#dc2626' }}>{f.activo ? '● Activa' : '● Inactiva'}</span>
+                    <span style={{ color: f.activo ? 'var(--at-primary)' : 'var(--at-danger)' }}>{f.activo ? '● Activa' : '● Inactiva'}</span>
                   </td>
                   {canEdit && (
                     <td style={{ padding: '0.5rem', textAlign: 'center' }}>
                       <button onClick={() => handleStartEdit(f)} style={{ marginRight: '0.5rem', padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Editar</button>
-                      <button onClick={() => handleDelete(f.id, f.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Eliminar</button>
+                      <button onClick={() => handleDelete(f.id, f.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Eliminar</button>
                     </td>
                   )}
                 </tr>

@@ -83,7 +83,7 @@ export default function ResumenEjecutivoTab({
   table{width:100%;border-collapse:collapse}th{background:var(--at-surface-2);padding:6px 8px;text-align:left;border-bottom:2px solid var(--at-line);font-size:10px;text-transform:uppercase;color:var(--at-ink-3)}
   td{padding:6px 8px;border-bottom:1px solid var(--at-chip);font-size:11px}
   .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700}
-  .btn{padding:8px 16px;background:#1B3B36;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;margin-bottom:16px}
+  .btn{padding:8px 16px;background:var(--at-primary);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;margin-bottom:16px}
   @media print{.btn{display:none}}
 </style></head><body>
 <button class="btn" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>

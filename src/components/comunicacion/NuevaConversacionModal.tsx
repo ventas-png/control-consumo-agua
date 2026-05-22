@@ -95,7 +95,7 @@ export function NuevaConversacionModal({ clientes, onClose, onConfirm, sending, 
               </div>
             )}
             {selectedCliente && (
-              <div style={{ marginTop: '5px', padding: '6px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '7px', fontSize: '12.5px', color: '#166534', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ marginTop: '5px', padding: '6px 10px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '7px', fontSize: '12.5px', color: 'var(--at-success-strong)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>✓ {selectedCliente.nombre} <span style={{ opacity: 0.7 }}>#{selectedCliente.codigo}</span></span>
                 <button onClick={() => { setClienteId(''); setSearch('') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-ink-3)', fontSize: '14px' }}>×</button>
               </div>

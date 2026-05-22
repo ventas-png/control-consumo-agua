@@ -455,7 +455,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
             width: '5px',
             height: '5px',
             borderRadius: '50%',
-            background: '#B96A3F',
+            background: 'var(--at-accent)',
             boxShadow: '0 0 6px rgba(185,106,63,0.7)',
             flexShrink: 0,
           }} />
@@ -472,7 +472,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
       style={{
         width: '256px',
         minWidth: '256px',
-        background: '#102622',
+        background: 'var(--at-primary-hover)',
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
@@ -490,7 +490,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
             <BrandLogo size={38} />
           </div>
           <div>
-            <div style={{ color: '#F2EFE7', fontWeight: 700, fontSize: '15px', letterSpacing: '-0.3px', lineHeight: '1.2' }}>
+            <div style={{ color: 'var(--at-bg)', fontWeight: 700, fontSize: '15px', letterSpacing: '-0.3px', lineHeight: '1.2' }}>
               AdministraTodo
             </div>
             <div style={{ color: '#8FA398', fontSize: '11px', marginTop: '2px', letterSpacing: '0.02em' }}>
@@ -550,7 +550,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
                   {entry.id === 'comunicacion' && unreadComunicacion > 0 && (
                     <span style={{
                       width: '7px', height: '7px', borderRadius: '50%',
-                      background: '#ef4444',
+                      background: 'var(--at-danger)',
                       boxShadow: '0 0 6px rgba(239,68,68,0.7)',
                       flexShrink: 0,
                     }} />
@@ -616,7 +616,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
               width: '34px',
               height: '34px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #577B69 0%, #B96A3F 100%)',
+              background: 'linear-gradient(135deg, var(--at-accent-2) 0%, var(--at-accent) 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -665,7 +665,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
             borderRadius: '8px',
             cursor: 'pointer',
             background: hoveredLogout ? 'rgba(239,68,68,0.1)' : 'transparent',
-            color: hoveredLogout ? '#f87171' : '#B4C5BB',
+            color: hoveredLogout ? 'var(--at-danger)' : '#B4C5BB',
             fontSize: '13px',
             fontWeight: 500,
             transition: 'all 0.14s ease',

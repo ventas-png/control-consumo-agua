@@ -75,7 +75,7 @@ export function PasswordResetModal({ onClose }: Props) {
                 style={{ width: '100%', padding: '12px', border: '2px solid var(--at-line)', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
               />
               {emailError && (
-                <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>{emailError}</p>
+                <p style={{ color: 'var(--at-danger)', fontSize: '12px', marginTop: '4px' }}>{emailError}</p>
               )}
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
@@ -96,7 +96,7 @@ export function PasswordResetModal({ onClose }: Props) {
           </>
         ) : (
           <div style={{ textAlign: 'center' }}>
-            <div style={{ padding: '20px', background: '#d1fae5', borderRadius: '8px', marginBottom: '16px', color: '#059669', fontWeight: 600 }}>
+            <div style={{ padding: '20px', background: 'var(--at-success-tint)', borderRadius: '8px', marginBottom: '16px', color: 'var(--at-success-strong)', fontWeight: 600 }}>
               ✅ ¡Correo enviado! Revisa tu bandeja de entrada.
             </div>
             <p style={{ color: 'var(--at-ink-3)', marginBottom: '20px' }}>

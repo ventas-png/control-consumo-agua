@@ -174,7 +174,7 @@ export function ReporteConsolidadoTab({
             <KpiBox label="Cobrado período"      value={fmt(cobrado, moneda)}    color='var(--at-success)' bg='var(--at-success-tint)' border='var(--at-success-border)' />
             <KpiBox label="Pendiente período"    value={fmt(pendiente, moneda)}  color={pendiente > 0 ? 'var(--at-danger)' : 'var(--at-success)'} />
             <KpiBox label="Cuotas morosas"       value={String(morosos)}          color={morosos > 0 ? 'var(--at-danger)' : 'var(--at-success)'} />
-            <KpiBox label="Total gastos"         value={fmt(totalGastos, moneda)} color='#9C5733' />
+            <KpiBox label="Total gastos"         value={fmt(totalGastos, moneda)} color='var(--at-accent-hover)' />
             <KpiBox label="Ppto. mensual est."   value={presupuestoPeriodo > 0 ? fmt(presupuestoPeriodo, moneda) : '—'} sub='Pro-rata anual' />
             <KpiBox label="% Cobrado vs ppto."   value={presupuestoPeriodo > 0 ? pct(cobrado, presupuestoPeriodo) : '—'} color={cobrado >= presupuestoPeriodo ? 'var(--at-success)' : 'var(--at-danger)'} />
           </div>
@@ -230,7 +230,7 @@ export function ReporteConsolidadoTab({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px,1fr))', gap: '10px' }}>
             <KpiBox label="Anuncios publicados"  value={String(anunciosPeriodo.length)} />
             <KpiBox label="Reservas realizadas"  value={String(reservasPeriodo.length)} sub={`${reservasCanceladas} canceladas`} />
-            <KpiBox label="Uso de amenidades"    value={reservasPeriodo.length > 0 ? `${reservasPeriodo.length}` : '—'} color='#9C5733' />
+            <KpiBox label="Uso de amenidades"    value={reservasPeriodo.length > 0 ? `${reservasPeriodo.length}` : '—'} color='var(--at-accent-hover)' />
           </div>
         </Section>
 

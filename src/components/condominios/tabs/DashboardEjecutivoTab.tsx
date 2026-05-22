@@ -118,7 +118,7 @@ export function DashboardEjecutivoTab({ cuotas, tickets, visitantes, gastos, pre
             color={tasaCobranza >= 80 ? 'var(--at-success)' : tasaCobranza >= 60 ? 'var(--at-warning)' : 'var(--at-danger)'} />
           <KpiCard label="Morosos" value={String(morosos)} sub="unidades" color={morosos > 0 ? 'var(--at-danger)' : 'var(--at-success)'} />
           <KpiCard label="Gastos del año" value={`${moneda} ${(totalGastos / 1000).toFixed(1)}k`}
-            sub={presupuestoTotal > 0 ? `${ejecucionPpto}% del ppto.` : 'Sin presupuesto'} color='#B96A3F' />
+            sub={presupuestoTotal > 0 ? `${ejecucionPpto}% del ppto.` : 'Sin presupuesto'} color='var(--at-accent)' />
           <KpiCard label="Sanciones pend." value={`${moneda} ${montoSanciones.toFixed(0)}`}
             sub={`${sancionesPendientes.length} sanciones`} color={montoSanciones > 0 ? 'var(--at-warning)' : 'var(--at-success)'} />
         </div>

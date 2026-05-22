@@ -338,7 +338,7 @@ export function RolPermisosModal({
             ) : (
               <>
                 {selectedRoleIds.size > 1 && (
-                  <Banner color="#1B3B36">{selectedRoleIds.size} roles activos — permisos combinados</Banner>
+                  <Banner color="var(--at-primary)">{selectedRoleIds.size} roles activos — permisos combinados</Banner>
                 )}
 
                 <SubsectionHeader>Condominios</SubsectionHeader>

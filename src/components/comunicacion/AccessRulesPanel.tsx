@@ -81,8 +81,8 @@ export function AccessRulesPanel({ companyId, accessRules, onSave, canEdit, serv
       </div>
       {!canEdit && (
         <div style={{
-          background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px',
-          padding: '10px 14px', color: '#92400e', fontSize: '12.5px', marginBottom: '14px',
+          background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '8px',
+          padding: '10px 14px', color: 'var(--at-warning-strong)', fontSize: '12.5px', marginBottom: '14px',
           display: 'flex', alignItems: 'center', gap: '8px',
         }}>
           <span>⚠️</span>

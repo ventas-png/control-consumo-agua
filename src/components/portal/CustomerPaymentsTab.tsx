@@ -87,7 +87,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
         marginBottom: '28px',
       }}>
         <div style={{
-          background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+          background: 'linear-gradient(135deg, var(--at-warning), var(--at-warning))',
           borderRadius: '16px',
           padding: '20px',
           color: 'white',
@@ -124,7 +124,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                 background: 'var(--at-surface)',
                 borderRadius: '12px',
                 padding: '16px',
-                border: esMora ? '2px solid #dc2626' : '1px solid var(--at-line)',
+                border: esMora ? '2px solid var(--at-danger)' : '1px solid var(--at-line)',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
               }}
             >
@@ -140,8 +140,8 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                         borderRadius: '20px',
                         fontSize: '11px',
                         fontWeight: 700,
-                        background: '#fee2e2',
-                        color: '#dc2626',
+                        background: 'var(--at-danger-tint)',
+                        color: 'var(--at-danger)',
                       }}>
                         ⚠️ En mora
                       </span>
@@ -159,7 +159,7 @@ export function CustomerPaymentsTab({ registros, currentUser, moneda }: Props) {
                     </div>
                     <div>
                       <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Saldo</div>
-                      <div style={{ fontWeight: 700, color: saldo > 0 ? '#ef4444' : '#10b981', fontSize: '14px' }}>
+                      <div style={{ fontWeight: 700, color: saldo > 0 ? 'var(--at-danger)' : 'var(--at-success)', fontSize: '14px' }}>
                         {moneda} {saldo.toFixed(2)}
                       </div>
                     </div>

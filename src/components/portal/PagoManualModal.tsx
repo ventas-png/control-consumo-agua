@@ -165,7 +165,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
             </div>
             <div>
               <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Saldo Pendiente</div>
-              <div style={{ fontWeight: 700, color: '#ef4444', fontSize: '16px' }}>{moneda} {saldo.toFixed(2)}</div>
+              <div style={{ fontWeight: 700, color: 'var(--at-danger)', fontSize: '16px' }}>{moneda} {saldo.toFixed(2)}</div>
             </div>
           </div>
         </div>
@@ -336,7 +336,7 @@ export function PagoManualModal({ registro, moneda, currentUser, onClose, onSucc
               padding: '12px',
               borderRadius: '8px',
               border: 'none',
-              background: loading ? 'var(--at-line-strong)' : 'linear-gradient(135deg, #10b981, #059669)',
+              background: loading ? 'var(--at-line-strong)' : 'linear-gradient(135deg, var(--at-success), var(--at-success-strong))',
               color: 'white',
               fontWeight: 700,
               fontSize: '14px',

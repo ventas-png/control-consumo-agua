@@ -78,7 +78,7 @@ export function PasswordResetPage({ onBack }: Props) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 50%, var(--at-accent-2) 100%)' }}>
         <div style={cardStyle}>
-          <div style={{ background: '#fef2f2', color: '#dc2626', padding: '15px', borderRadius: '8px', marginBottom: '16px' }}>
+          <div style={{ background: 'var(--at-danger-tint)', color: 'var(--at-danger)', padding: '15px', borderRadius: '8px', marginBottom: '16px' }}>
             Enlace inválido o expirado. Solicita un nuevo restablecimiento.
           </div>
           <button onClick={onBack} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
@@ -106,7 +106,7 @@ export function PasswordResetPage({ onBack }: Props) {
                 placeholder="Mínimo 6 caracteres"
                 style={{ width: '100%', padding: '12px', border: '2px solid var(--at-line)', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
               />
-              {newPassError && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>{newPassError}</p>}
+              {newPassError && <p style={{ color: 'var(--at-danger)', fontSize: '12px', marginTop: '4px' }}>{newPassError}</p>}
             </div>
             <div style={{ marginBottom: '24px' }}>
               <label htmlFor="reset-confirm-password" style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>Confirmar Contraseña</label>
@@ -118,7 +118,7 @@ export function PasswordResetPage({ onBack }: Props) {
                 placeholder="Repite tu nueva contraseña"
                 style={{ width: '100%', padding: '12px', border: '2px solid var(--at-line)', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box' }}
               />
-              {confirmError && <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>{confirmError}</p>}
+              {confirmError && <p style={{ color: 'var(--at-danger)', fontSize: '12px', marginTop: '4px' }}>{confirmError}</p>}
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
@@ -138,7 +138,7 @@ export function PasswordResetPage({ onBack }: Props) {
           </>
         ) : (
           <div style={{ textAlign: 'center' }}>
-            <div style={{ padding: '20px', background: '#d1fae5', borderRadius: '8px', marginBottom: '20px', color: '#059669', fontWeight: 600 }}>
+            <div style={{ padding: '20px', background: 'var(--at-success-tint)', borderRadius: '8px', marginBottom: '20px', color: 'var(--at-success-strong)', fontWeight: 600 }}>
               ✅ ¡Contraseña actualizada exitosamente!
             </div>
             <p style={{ color: 'var(--at-ink-3)', marginBottom: '20px' }}>
