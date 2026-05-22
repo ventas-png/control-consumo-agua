@@ -50,6 +50,7 @@ const TIPOS_AGUA_VALIDOS: TipoAgua[] = [
 
 const COLUMNS: ImportColumn[] = [
   { key: 'numero_serie',                width: 14, exampleValues: ['MED-001', 'MED-002'] },
+  { key: 'unidad',                      width: 20, exampleValues: ['Apto. 1AB', ''] },
   { key: 'tipo_agua',                   width: 20, exampleValues: ['potable', 'riego'] },
   { key: 'lectura_inicial',             width: 16, exampleValues: [0, 0] },
   { key: 'descripcion',                 width: 22, exampleValues: ['Medidor zona A', 'Medidor riego sur'] },
@@ -66,7 +67,9 @@ const COLUMNS: ImportColumn[] = [
   { key: 'garantia_instalacion_vence',  width: 26, exampleValues: ['2027-01-15', ''] },
 ]
 
-type ContadorRow = Partial<Contador>
+// `_unidad_nombre` es transitorio: lo captura validateRow y onInsertBatch lo
+// resuelve a unidad_id (no es columna de la tabla, se elimina antes del insert).
+type ContadorRow = Partial<Contador> & { _unidad_nombre?: string }
 
 function validateRow(row: Record<string, unknown>): RowValidationResult<ContadorRow> {
   const errors: string[] = []
@@ -92,6 +95,7 @@ function validateRow(row: Record<string, unknown>): RowValidationResult<Contador
     ok: true,
     data: {
       numero_serie,
+      _unidad_nombre:             String(row['unidad'] ?? '').trim() || undefined,
       tipo_agua,
       lectura_inicial,
       descripcion:                String(row['descripcion'] ?? '').trim() || undefined,
@@ -125,6 +129,24 @@ export function ImportContadoresModal({ currentUser, onClose, onImportado }: Pro
   const [ids, setIds] = useState<{ projectId: string; companyId: string } | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
   const insertedRef = useRef<Contador[]>([])
+  // Mapa nombre_unidad (minúsculas) → unidad, cacheado para no re-consultar por lote.
+  const unidadMapRef = useRef<Map<string, { id: string; project_id: string; company_id: string }> | null>(null)
+
+  async function getUnidadMap() {
+    if (unidadMapRef.current) return unidadMapRef.current
+    const map = new Map<string, { id: string; project_id: string; company_id: string }>()
+    if (ids) {
+      const { data } = await supabase
+        .from('unidades')
+        .select('id, nombre, project_id, company_id')
+        .eq('company_id', ids.companyId)
+      for (const u of (data ?? []) as Array<{ id: string; nombre: string; project_id: string; company_id: string }>) {
+        if (u.nombre) map.set(u.nombre.trim().toLowerCase(), { id: u.id, project_id: u.project_id, company_id: u.company_id })
+      }
+    }
+    unidadMapRef.current = map
+    return map
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -183,12 +205,20 @@ export function ImportContadoresModal({ currentUser, onClose, onImportado }: Pro
       columns={COLUMNS}
       validateRow={validateRow}
       onInsertBatch={async (batch) => {
-        const payload = batch.map(c => ({
-          ...c,
-          project_id: ids.projectId,
-          company_id: ids.companyId,
-          activo: true,
-        }))
+        const unidadMap = await getUnidadMap()
+        const payload = batch.map(({ _unidad_nombre, ...rest }) => {
+          // Si la fila trae unidad y coincide con una de la empresa, el contador
+          // hereda su proyecto/empresa (el trigger en BD garantiza el invariante).
+          // Si no coincide o no viene, queda en el proyecto del usuario importador.
+          const u = _unidad_nombre ? unidadMap.get(_unidad_nombre.toLowerCase()) : undefined
+          return {
+            ...rest,
+            project_id: u?.project_id ?? ids.projectId,
+            company_id: u?.company_id ?? ids.companyId,
+            unidad_id: u?.id,
+            activo: true,
+          }
+        })
         const { data, error } = await supabase.from('contadores').insert(payload).select()
         if (error) return { ok: 0, error: error.message }
         if (data) insertedRef.current.push(...(data as Contador[]))
