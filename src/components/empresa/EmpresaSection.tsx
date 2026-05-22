@@ -593,9 +593,9 @@ export function EmpresaSection({ currentUser }: Props) {
 
       {/* Header empresa */}
       <div className="empresa-card" style={{
-        background: 'linear-gradient(135deg, var(--at-ink), var(--at-ink))',
+        background: 'var(--at-surface)',
         borderRadius: '16px', padding: '24px 24px 20px', marginBottom: '24px',
-        border: '1px solid rgba(255,255,255,0.06)',
+        border: '1px solid var(--at-line)',
       }}>
         <div className="empresa-header-inner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
           {/* Left: logo + info */}
@@ -607,7 +607,7 @@ export function EmpresaSection({ currentUser }: Props) {
               style={{
                 width: 56, height: 56, borderRadius: 12, overflow: 'hidden',
                 cursor: 'pointer', flexShrink: 0,
-                border: '2px solid rgba(255,255,255,0.18)',
+                border: '2px solid var(--at-line)',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
               }}
             >
@@ -625,7 +625,7 @@ export function EmpresaSection({ currentUser }: Props) {
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                <h1 style={{ color: 'var(--at-chip)', fontSize: '20px', fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
+                <h1 style={{ color: 'var(--at-ink)', fontSize: '20px', fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
                   {empresa?.nombre ?? 'Mi Empresa'}
                 </h1>
               </div>
@@ -658,7 +658,7 @@ export function EmpresaSection({ currentUser }: Props) {
           {/* Right: stats + edit button */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px', flexShrink: 0 }}>
             <div className="empresa-stats-box" style={{
-              background: 'rgba(27, 59, 54,0.12)', border: '1px solid rgba(27, 59, 54,0.25)',
+              background: 'var(--at-primary-tint)', border: '1px solid var(--at-primary-soft)',
               borderRadius: '10px', padding: '10px 16px', textAlign: 'center',
             }}>
               <div style={{ color: 'var(--at-accent-2)', fontSize: '22px', fontWeight: 700, lineHeight: 1 }}>
@@ -670,8 +670,8 @@ export function EmpresaSection({ currentUser }: Props) {
               onClick={() => void editarEmpresa()}
               style={{
                 padding: '7px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
-                border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)',
-                color: 'var(--at-line-strong)', cursor: 'pointer', whiteSpace: 'nowrap',
+                border: '1px solid var(--at-line-strong)', background: 'var(--at-surface-2)',
+                color: 'var(--at-ink-2)', cursor: 'pointer', whiteSpace: 'nowrap',
                 transition: 'background 0.15s',
               }}
             >
@@ -684,7 +684,7 @@ export function EmpresaSection({ currentUser }: Props) {
       {/* Proyectos */}
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h2 style={{ color: 'var(--at-line)', fontSize: '16px', fontWeight: 600, margin: 0 }}>Proyectos</h2>
+          <h2 style={{ color: 'var(--at-ink)', fontSize: '16px', fontWeight: 600, margin: 0 }}>Proyectos</h2>
           <button
             onClick={() => void crearProyecto()}
             disabled={empresa ? proyectos.length >= empresa.max_projects : false}
@@ -707,7 +707,7 @@ export function EmpresaSection({ currentUser }: Props) {
 
         {proyectos.length === 0 ? (
           <div style={{
-            background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)',
+            background: 'var(--at-surface-2)', border: '1px dashed var(--at-line)',
             borderRadius: '12px', padding: '32px', textAlign: 'center',
           }}>
             <p style={{ color: 'var(--at-ink-2)', margin: 0 }}>No hay proyectos. Crea el primero.</p>
@@ -718,8 +718,8 @@ export function EmpresaSection({ currentUser }: Props) {
               const estadoCfg = ESTADO_CONFIG[p.estado ?? 'activo']
               return (
               <div key={p.id} className="proyecto-card" style={{
-                background: 'var(--at-ink)', borderRadius: '14px',
-                border: '1px solid rgba(255,255,255,0.06)',
+                background: 'var(--at-surface)', borderRadius: '14px',
+                border: '1px solid var(--at-line)',
                 overflow: 'hidden',
                 borderTop: `3px solid ${estadoCfg.color}`,
               }}>
@@ -740,7 +740,7 @@ export function EmpresaSection({ currentUser }: Props) {
                     style={{
                       width: 42, height: 42, borderRadius: 10, overflow: 'hidden',
                       cursor: 'pointer', flexShrink: 0,
-                      border: '1px solid rgba(255,255,255,0.12)',
+                      border: '1px solid var(--at-line)',
                       boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                     }}
                   >
@@ -758,7 +758,7 @@ export function EmpresaSection({ currentUser }: Props) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '3px' }}>
-                      <span style={{ color: 'var(--at-line)', fontWeight: 600, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ color: 'var(--at-ink)', fontWeight: 600, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.nombre}
                       </span>
                     </div>
@@ -773,7 +773,7 @@ export function EmpresaSection({ currentUser }: Props) {
                       {/* Moneda badge */}
                       <span style={{
                         fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
-                        background: 'rgba(27, 59, 54,0.12)', color: 'var(--at-accent-2)', whiteSpace: 'nowrap',
+                        background: 'var(--at-primary-tint)', color: 'var(--at-accent-2)', whiteSpace: 'nowrap',
                       }}>
                         {p.moneda ?? 'Q'}
                       </span>
@@ -788,8 +788,8 @@ export function EmpresaSection({ currentUser }: Props) {
                       onClick={() => void editarProyecto(p)}
                       title="Editar proyecto"
                       style={{
-                        padding: '5px 12px', borderRadius: '7px', border: '1px solid rgba(255,255,255,0.15)',
-                        background: 'rgba(255,255,255,0.06)', color: 'var(--at-ink-3)',
+                        padding: '5px 12px', borderRadius: '7px', border: '1px solid var(--at-line-strong)',
+                        background: 'var(--at-surface-2)', color: 'var(--at-ink-3)',
                         cursor: 'pointer', fontSize: '12px', fontWeight: 500,
                       }}
                     >
@@ -814,7 +814,7 @@ export function EmpresaSection({ currentUser }: Props) {
                 {(p.descripcion || p.direccion || (p.latitud && p.longitud)) && (
                   <div style={{
                     padding: '10px 16px 12px',
-                    borderTop: '1px solid rgba(255,255,255,0.05)',
+                    borderTop: '1px solid var(--at-line)',
                   }}>
                     {p.descripcion && (
                       <p style={{ color: 'var(--at-ink-3)', fontSize: '12px', margin: '0 0 6px', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -836,15 +836,15 @@ export function EmpresaSection({ currentUser }: Props) {
                 {/* Footer buttons (shown on mobile only) */}
                 <div className="proyecto-btn-footer" style={{
                   gap: '8px', padding: '10px 14px',
-                  borderTop: '1px solid rgba(255,255,255,0.06)',
-                  background: 'rgba(0,0,0,0.2)',
+                  borderTop: '1px solid var(--at-line)',
+                  background: 'var(--at-surface-2)',
                 }}>
                   <button
                     onClick={() => void editarProyecto(p)}
                     style={{
                       flex: 1, padding: '9px 0', borderRadius: '8px',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      background: 'rgba(255,255,255,0.07)', color: 'var(--at-line-strong)',
+                      border: '1px solid var(--at-line-strong)',
+                      background: 'var(--at-surface-2)', color: 'var(--at-ink-2)',
                       cursor: 'pointer', fontSize: '13px', fontWeight: 600,
                     }}
                   >
@@ -872,7 +872,7 @@ export function EmpresaSection({ currentUser }: Props) {
       {/* Usuarios */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h2 style={{ color: 'var(--at-line)', fontSize: '16px', fontWeight: 600, margin: 0 }}>Usuarios de la Empresa</h2>
+          <h2 style={{ color: 'var(--at-ink)', fontSize: '16px', fontWeight: 600, margin: 0 }}>Usuarios de la Empresa</h2>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={() => setShowAuditLog(true)}
@@ -880,8 +880,8 @@ export function EmpresaSection({ currentUser }: Props) {
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '9px 14px', borderRadius: '8px',
-                border: '1px solid rgba(148,163,184,0.3)',
-                background: 'rgba(148,163,184,0.08)', color: 'var(--at-line-strong)',
+                border: '1px solid var(--at-line-strong)',
+                background: 'var(--at-surface-2)', color: 'var(--at-ink-2)',
                 cursor: 'pointer', fontSize: '13px', fontWeight: 600,
               }}
             >
@@ -906,15 +906,15 @@ export function EmpresaSection({ currentUser }: Props) {
 
         {(currentUser.role === 'company_owner' || currentUser.role === 'admin') && (
           <div style={{
-            background: 'rgba(185, 106, 63,0.06)',
-            border: '1px solid rgba(185, 106, 63,0.18)',
+            background: 'var(--at-accent-tint)',
+            border: '1px solid var(--at-accent-soft)',
             borderRadius: '10px', padding: '10px 14px', marginBottom: '12px',
             display: 'flex', alignItems: 'flex-start', gap: '10px',
-            color: 'var(--at-line-strong)', fontSize: '12px', lineHeight: 1.5,
+            color: 'var(--at-ink-2)', fontSize: '12px', lineHeight: 1.5,
           }}>
             <span style={{ color: 'var(--at-accent-light)', fontSize: '14px', lineHeight: 1, marginTop: '1px' }}>💡</span>
             <div>
-              <strong style={{ color: 'var(--at-line)' }}>Personalización fina de permisos:</strong>{' '}
+              <strong style={{ color: 'var(--at-ink)' }}>Personalización fina de permisos:</strong>{' '}
               Asigna un rol del sistema desde el botón <em>Roles y permisos</em> en cada usuario.
               Si necesitas un perfil distinto, crea un <em>rol personalizado</em> desde el mismo modal y
               ajusta exactamente qué tabs/acciones permite. Los cambios se auditan en{' '}
@@ -925,7 +925,7 @@ export function EmpresaSection({ currentUser }: Props) {
 
         {usuarios.length === 0 ? (
           <div style={{
-            background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)',
+            background: 'var(--at-surface-2)', border: '1px dashed var(--at-line)',
             borderRadius: '12px', padding: '32px', textAlign: 'center',
           }}>
             <p style={{ color: 'var(--at-ink-2)', margin: 0 }}>No hay usuarios. Agrega el primero.</p>
@@ -934,8 +934,8 @@ export function EmpresaSection({ currentUser }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {usuarios.map(u => (
               <div key={u.id} style={{
-                background: 'var(--at-ink)', borderRadius: '12px', padding: '14px 18px',
-                border: '1px solid rgba(255,255,255,0.06)',
+                background: 'var(--at-surface)', borderRadius: '12px', padding: '14px 18px',
+                border: '1px solid var(--at-line)',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
                 flexWrap: 'wrap',
                 opacity: u.activo ? 1 : 0.5,
@@ -951,7 +951,7 @@ export function EmpresaSection({ currentUser }: Props) {
                     {u.full_name.charAt(0).toUpperCase()}
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ color: 'var(--at-line)', fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ color: 'var(--at-ink)', fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {u.full_name}
                     </div>
                     <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '3px' }}>
@@ -977,8 +977,8 @@ export function EmpresaSection({ currentUser }: Props) {
                     title="Asignar acceso a proyectos"
                     style={{
                       display: 'flex', alignItems: 'center', gap: '5px',
-                      padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(27, 59, 54,0.3)',
-                      background: 'rgba(27, 59, 54,0.08)', color: 'var(--at-accent-2)',
+                      padding: '6px 10px', borderRadius: '7px', border: '1px solid var(--at-primary-soft)',
+                      background: 'var(--at-primary-tint)', color: 'var(--at-accent-2)',
                       cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                     }}
                   >
@@ -992,8 +992,8 @@ export function EmpresaSection({ currentUser }: Props) {
                     title="Roles y permisos (agua, condominios y plataforma)"
                     style={{
                       display: 'flex', alignItems: 'center', gap: '5px',
-                      padding: '6px 10px', borderRadius: '7px', border: '1px solid rgba(27, 59, 54,0.3)',
-                      background: 'rgba(27, 59, 54,0.08)', color: 'var(--at-accent-2)',
+                      padding: '6px 10px', borderRadius: '7px', border: '1px solid var(--at-primary-soft)',
+                      background: 'var(--at-primary-tint)', color: 'var(--at-accent-2)',
                       cursor: 'pointer', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                     }}
                   >
@@ -1022,9 +1022,9 @@ export function EmpresaSection({ currentUser }: Props) {
       {/* Configuración de Pagos Online */}
       {currentUser.company_id && (
         <div style={{
-          background: 'linear-gradient(135deg, var(--at-ink), var(--at-ink))',
+          background: 'var(--at-surface)',
           borderRadius: '16px', padding: '24px',
-          border: '1px solid rgba(255,255,255,0.06)',
+          border: '1px solid var(--at-line)',
           marginTop: '24px',
         }}>
           <StripePayPalConfig

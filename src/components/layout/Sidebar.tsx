@@ -472,7 +472,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
       style={{
         width: '256px',
         minWidth: '256px',
-        background: 'var(--at-primary-hover)',
+        background: 'var(--at-nav-bg)',
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
@@ -490,7 +490,7 @@ export function Sidebar({ activeSection, userRole, currentUser, canViewModule, o
             <BrandLogo size={38} />
           </div>
           <div>
-            <div style={{ color: 'var(--at-bg)', fontWeight: 700, fontSize: '15px', letterSpacing: '-0.3px', lineHeight: '1.2' }}>
+            <div style={{ color: 'var(--at-nav-ink)', fontWeight: 700, fontSize: '15px', letterSpacing: '-0.3px', lineHeight: '1.2' }}>
               AdministraTodo
             </div>
             <div style={{ color: '#8FA398', fontSize: '11px', marginTop: '2px', letterSpacing: '0.02em' }}>
