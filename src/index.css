@@ -36,6 +36,8 @@
   --at-danger: #ef4444; --at-danger-tint: #fef2f2; --at-danger-border: #fecaca; --at-danger-strong: #dc2626;
   --at-info: #2563eb; --at-info-tint: #dbeafe; --at-info-border: #bfdbfe; --at-info-strong: #1d4ed8;
   --at-on-status: #ffffff;
+  /* Nav rail oscuro — fijo en ambos temas (sólo en :root, sin override dark) */
+  --at-nav-bg: #102622; --at-nav-ink: #ECEFE8;
   --at-font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --at-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
@@ -192,8 +194,8 @@ button:focus:not(:focus-visible) {
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 .proyecto-card:hover {
-  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.4);
-  border-color: rgba(255, 255, 255, 0.13) !important;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  border-color: var(--at-line-strong) !important;
 }
 .proyecto-card:active {
   transform: scale(0.99);
