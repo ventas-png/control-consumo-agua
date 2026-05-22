@@ -38,12 +38,12 @@ const TIPOS_AGUA: { value: TipoAgua; label: string }[] = [
 
 const TIPO_COLORES: Record<TipoAgua, { bg: string; color: string }> = {
   potable:             { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
-  rehuso:              { bg: '#dcfce7', color: '#166534' },
+  rehuso:              { bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)' },
   piscina:             { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
-  desalinada:          { bg: '#fef9c3', color: '#854d0e' },
-  riego:               { bg: '#d1fae5', color: '#065f46' },
+  desalinada:          { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
+  riego:               { bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)' },
   jacuzzi:             { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-darker)' },
-  consumo_humano:      { bg: '#ffedd5', color: '#c2410c' },
+  consumo_humano:      { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
   desmineralizada:     { bg: '#fce7f3', color: '#9d174d' },
   residuales_tratadas: { bg: 'var(--at-chip)', color: 'var(--at-ink-2)' },
 }
@@ -315,7 +315,7 @@ export function ContadoresSection({
       html: `<b>${c.numero_serie}</b> será eliminado permanentemente.`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#ef4444',
+      confirmButtonColor: 'var(--at-danger)',
       cancelButtonColor: 'var(--at-ink-3)',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
@@ -415,7 +415,7 @@ export function ContadoresSection({
             ? (
               <span style={{
                 padding: '3px 10px', borderRadius: 12,
-                background: '#f0fdf4', color: '#065f46',
+                background: 'var(--at-success-tint)', color: 'var(--at-success-strong)',
                 fontSize: 12, fontWeight: 600,
               }}>
                 🏠 {nombre}
@@ -448,8 +448,8 @@ export function ContadoresSection({
         render: c => {
           const baseStyle: CSSProperties = {
             padding: '4px 14px', borderRadius: 20, fontWeight: 600, fontSize: 12,
-            background: c.activo ? '#dcfce7' : '#fee2e2',
-            color: c.activo ? '#166534' : '#991b1b',
+            background: c.activo ? 'var(--at-success-tint)' : 'var(--at-danger-tint)',
+            color: c.activo ? 'var(--at-success-strong)' : 'var(--at-danger-strong)',
           }
           if (canEdit) {
             return (
@@ -481,7 +481,7 @@ export function ContadoresSection({
             <button
               onClick={() => handleEliminar(c)}
               style={{
-                padding: '5px 12px', background: '#fef2f2', color: '#dc2626',
+                padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)',
                 border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
               }}
             >Eliminar</button>
@@ -904,8 +904,8 @@ export function ContadoresSection({
                   cursor: 'pointer',
                   fontWeight: 600,
                   fontSize: '13px',
-                  background: form.activo ? '#dcfce7' : '#fee2e2',
-                  color: form.activo ? '#166534' : '#991b1b',
+                  background: form.activo ? 'var(--at-success-tint)' : 'var(--at-danger-tint)',
+                  color: form.activo ? 'var(--at-success-strong)' : 'var(--at-danger-strong)',
                 }}
               >
                 {form.activo ? 'Activo' : 'Inactivo'}
@@ -1051,7 +1051,7 @@ function CaracteristicasCell({ contador: c }: { contador: Contador }) {
       {c.llave_antifraude && <Field label="Antifraude" value={c.llave_antifraude} />}
       {c.valvula_aire && <Field label="V. Aire" value={c.valvula_aire} />}
       {c.fecha_reemplazo_sugerida && (
-        <div style={{ color: reemplazoVencido ? '#dc2626' : 'var(--at-primary-hover)', fontWeight: 600 }}>
+        <div style={{ color: reemplazoVencido ? 'var(--at-danger)' : 'var(--at-primary-hover)', fontWeight: 600 }}>
           Reemplazo: {formatDate(c.fecha_reemplazo_sugerida)}
         </div>
       )}
@@ -1064,7 +1064,7 @@ function CaracteristicasCell({ contador: c }: { contador: Contador }) {
       )}
       {c.contratista_instalador && <Field label="Instalador" value={c.contratista_instalador} />}
       {c.garantia_instalacion_vence && (
-        <div style={{ color: garantiaVencida ? '#dc2626' : '#059669', fontWeight: 600 }}>
+        <div style={{ color: garantiaVencida ? 'var(--at-danger)' : 'var(--at-success-strong)', fontWeight: 600 }}>
           Garantía: {formatDate(c.garantia_instalacion_vence)}
         </div>
       )}

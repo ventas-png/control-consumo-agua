@@ -78,9 +78,9 @@ const TIPO_AGUA_LABELS: Record<string, string> = {
 
 const TIPO_COLORES: Record<TipoUnidad, { bg: string; color: string }> = {
   apartamento:     { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
-  casa:            { bg: '#dcfce7', color: '#166534' },
-  bodega:          { bg: '#fef9c3', color: '#854d0e' },
-  local_comercial: { bg: '#ffedd5', color: '#c2410c' },
+  casa:            { bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)' },
+  bodega:          { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
+  local_comercial: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
   oficina:         { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-darker)' },
   parqueadero:     { bg: 'var(--at-chip)', color: 'var(--at-ink-2)' },
   otro:            { bg: '#fce7f3', color: '#9d174d' },
@@ -438,7 +438,7 @@ export function UnidadesSection({
       html,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#ef4444',
+      confirmButtonColor: 'var(--at-danger)',
       cancelButtonColor: 'var(--at-ink-3)',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
@@ -609,7 +609,7 @@ export function UnidadesSection({
                 <div style={{ fontSize: '11px', fontWeight: 600, color: col.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {r.label}
                 </div>
-                <div style={{ fontSize: '22px', fontWeight: 700, color: r.max !== null && r.total >= r.max ? '#ef4444' : 'var(--at-ink)', margin: '2px 0' }}>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: r.max !== null && r.total >= r.max ? 'var(--at-danger)' : 'var(--at-ink)', margin: '2px 0' }}>
                   {r.total}{r.max !== null ? <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--at-ink-3)' }}>/{r.max}</span> : null}
                 </div>
               </div>
@@ -966,8 +966,8 @@ export function UnidadesSection({
                 cursor: 'pointer',
                 fontWeight: 600,
                 fontSize: '13px',
-                background: form.activo ? '#dcfce7' : '#fee2e2',
-                color: form.activo ? '#166534' : '#991b1b',
+                background: form.activo ? 'var(--at-success-tint)' : 'var(--at-danger-tint)',
+                color: form.activo ? 'var(--at-success-strong)' : 'var(--at-danger-strong)',
               }}
             >
               {form.activo ? 'Activa' : 'Inactiva'}
@@ -1123,7 +1123,7 @@ function UnidadCard({
         borderRadius: 14,
         boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
-        border: u.activo ? '1px solid var(--at-line)' : '1px solid #fca5a5',
+        border: u.activo ? '1px solid var(--at-line)' : '1px solid var(--at-danger-border)',
         opacity: u.activo ? 1 : 0.75,
       }}
     >
@@ -1151,8 +1151,8 @@ function UnidadCard({
           </div>
           <span style={{
             padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600,
-            background: u.activo ? '#dcfce7' : '#fee2e2',
-            color: u.activo ? '#166534' : '#991b1b', flexShrink: 0,
+            background: u.activo ? 'var(--at-success-tint)' : 'var(--at-danger-tint)',
+            color: u.activo ? 'var(--at-success-strong)' : 'var(--at-danger-strong)', flexShrink: 0,
           }}>
             {u.activo ? 'Activa' : 'Inactiva'}
           </span>
@@ -1189,8 +1189,8 @@ function UnidadCard({
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{
                 padding: '2px 9px', borderRadius: 10, fontSize: 11, fontWeight: 600,
-                background: u.contrato_suministro === 'si' ? '#dcfce7' : u.contrato_suministro === 'no' ? '#fee2e2' : 'var(--at-chip)',
-                color:      u.contrato_suministro === 'si' ? '#166534' : u.contrato_suministro === 'no' ? '#991b1b' : 'var(--at-ink-2)',
+                background: u.contrato_suministro === 'si' ? 'var(--at-success-tint)' : u.contrato_suministro === 'no' ? 'var(--at-danger-tint)' : 'var(--at-chip)',
+                color:      u.contrato_suministro === 'si' ? 'var(--at-success-strong)' : u.contrato_suministro === 'no' ? 'var(--at-danger-strong)' : 'var(--at-ink-2)',
               }}>
                 📄 Contrato: {CONTRATOS_SUMINISTRO.find(c => c.value === u.contrato_suministro)?.label ?? u.contrato_suministro}
               </span>
@@ -1251,8 +1251,8 @@ function UnidadCard({
               onClick={onToggleActivo}
               style={{
                 flex: 1, padding: '7px 0',
-                background: u.activo ? '#fef9c3' : '#f0fdf4',
-                color: u.activo ? '#854d0e' : '#166534',
+                background: u.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)',
+                color: u.activo ? 'var(--at-warning-strong)' : 'var(--at-success-strong)',
                 border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12,
               }}
             >
@@ -1261,7 +1261,7 @@ function UnidadCard({
             <button
               onClick={onEliminar}
               style={{
-                padding: '7px 12px', background: '#fef2f2', color: '#dc2626',
+                padding: '7px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)',
                 border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: 12,
               }}
             >

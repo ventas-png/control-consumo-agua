@@ -116,11 +116,11 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
             </div>
             <div>
               <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Abonado</div>
-              <div style={{ fontWeight: 700, color: '#10b981' }}>{moneda} {abonado.toFixed(2)}</div>
+              <div style={{ fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {abonado.toFixed(2)}</div>
             </div>
             <div>
               <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Saldo</div>
-              <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '16px' }}>{moneda} {saldo.toFixed(2)}</div>
+              <div style={{ fontWeight: 700, color: 'var(--at-warning)', fontSize: '16px' }}>{moneda} {saldo.toFixed(2)}</div>
             </div>
           </div>
         </div>
@@ -223,10 +223,10 @@ export function PagoModal({ registro, cliente, moneda, currentUserId, formasPago
           {montoNum > 0 && montoNum <= saldo && (
             <div style={{
               padding: '12px 16px', borderRadius: '8px', marginBottom: '20px',
-              background: esPagoCompleto ? '#f0fdf4' : '#fffbeb',
-              border: `1px solid ${esPagoCompleto ? '#bbf7d0' : '#fde68a'}`,
+              background: esPagoCompleto ? 'var(--at-success-tint)' : 'var(--at-warning-tint)',
+              border: `1px solid ${esPagoCompleto ? 'var(--at-success-border)' : 'var(--at-warning-border)'}`,
               fontSize: '13px', fontWeight: 600,
-              color: esPagoCompleto ? '#15803d' : '#b45309',
+              color: esPagoCompleto ? 'var(--at-success-strong)' : 'var(--at-warning-strong)',
             }}>
               {esPagoCompleto
                 ? `✅ Con este pago el cargo quedará PAGADO COMPLETAMENTE`

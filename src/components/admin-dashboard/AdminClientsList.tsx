@@ -29,11 +29,11 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'pagado':
-        return { bg: 'rgba(16, 185, 129, 0.15)', color: '#059669', label: '✓ Pagado' }
+        return { bg: 'rgba(16, 185, 129, 0.15)', color: 'var(--at-success-strong)', label: '✓ Pagado' }
       case 'pendiente':
-        return { bg: 'rgba(245, 158, 11, 0.15)', color: '#d97706', label: '⏳ Pendiente' }
+        return { bg: 'rgba(245, 158, 11, 0.15)', color: 'var(--at-warning)', label: '⏳ Pendiente' }
       case 'mora':
-        return { bg: 'rgba(239, 68, 68, 0.15)', color: '#dc2626', label: '⚠ Mora' }
+        return { bg: 'rgba(239, 68, 68, 0.15)', color: 'var(--at-danger)', label: '⚠ Mora' }
       default:
         return { bg: 'rgba(148, 163, 184, 0.15)', color: 'var(--at-ink-3)', label: 'Sin lectura' }
     }
@@ -115,7 +115,7 @@ export function AdminClientsList({ clientes, registros, moneda }: Props) {
                   <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '4px' }}>
                     Recaudo Total
                   </div>
-                  <div style={{ fontWeight: '700', fontSize: '16px', color: '#10b981' }}>
+                  <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--at-success)' }}>
                     {stats.recaudoTotal.toFixed(2)} {moneda}
                   </div>
                 </div>

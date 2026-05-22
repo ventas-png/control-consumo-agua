@@ -12,9 +12,9 @@ interface Props {
 type FiltroEstado = 'todos' | 'pagado' | 'pendiente' | 'mora'
 
 const ESTADO_STYLES: Record<string, { bg: string; color: string; label: string }> = {
-  pagado:    { bg: '#dcfce7', color: '#166534', label: '✓ Pagado' },
-  pendiente: { bg: '#fef3c7', color: '#b45309', label: '⏳ Pendiente' },
-  mora:      { bg: '#fee2e2', color: '#991b1b', label: '⚠ Mora' },
+  pagado:    { bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)', label: '✓ Pagado' },
+  pendiente: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: '⏳ Pendiente' },
+  mora:      { bg: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', label: '⚠ Mora' },
 }
 
 interface RowVm {
@@ -94,7 +94,7 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
       align: 'right',
       accessor: r => r.registro.monto_calculado ?? 0,
       render: r => (
-        <span style={{ color: '#10b981', fontWeight: 600 }}>
+        <span style={{ color: 'var(--at-success)', fontWeight: 600 }}>
           {formatCurrency(r.registro.monto_calculado, moneda)}
         </span>
       ),
@@ -181,12 +181,12 @@ export function AdminHistoryTab({ registros, clientes, moneda }: Props) {
         <StatCard
           label="Consumo Total"
           value={`${formatNumber(stats.consumoTotal)} m³`}
-          bg="#f0fdf4" border="#bbf7d0" labelColor="#166534" valueColor="#15803d"
+          bg="var(--at-success-tint)" border="var(--at-success-border)" labelColor="var(--at-success-strong)" valueColor="var(--at-success-strong)"
         />
         <StatCard
           label="Recaudo Total"
           value={formatCurrency(stats.recaudoTotal, moneda)}
-          bg="#f7fee7" border="#dcfce7" labelColor="#4d7c0f" valueColor="#65a30d"
+          bg="#f7fee7" border="var(--at-success-tint)" labelColor="#4d7c0f" valueColor="#65a30d"
         />
       </div>
 

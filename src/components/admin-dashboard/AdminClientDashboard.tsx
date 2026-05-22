@@ -337,10 +337,10 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px' }}>
                 {([
-                  { label: 'Sin asignar', sub: 'sin agente asignado', value: convStats.sinAsignar, from: '#f59e0b', to: '#d97706', icon: '📥' },
-                  { label: 'Cerradas hoy', sub: 'últimas 24 horas', value: convStats.cerradasHoy, from: '#10b981', to: '#059669', icon: '✅' },
-                  { label: 'Críticas', sub: 'abiertas > 48h', value: convStats.criticas, from: '#ef4444', to: '#dc2626', icon: '🚨' },
-                  { label: 'Urgentes', sub: 'abiertas 24–48h', value: convStats.urgentes, from: '#f97316', to: '#ea580c', icon: '⚠️' },
+                  { label: 'Sin asignar', sub: 'sin agente asignado', value: convStats.sinAsignar, from: 'var(--at-warning)', to: 'var(--at-warning)', icon: '📥' },
+                  { label: 'Cerradas hoy', sub: 'últimas 24 horas', value: convStats.cerradasHoy, from: 'var(--at-success)', to: 'var(--at-success-strong)', icon: '✅' },
+                  { label: 'Críticas', sub: 'abiertas > 48h', value: convStats.criticas, from: 'var(--at-danger)', to: 'var(--at-danger)', icon: '🚨' },
+                  { label: 'Urgentes', sub: 'abiertas 24–48h', value: convStats.urgentes, from: 'var(--at-warning)', to: 'var(--at-warning)', icon: '⚠️' },
                   { label: 'En proceso', sub: 'abiertas < 24h', value: convStats.enProceso, from: 'var(--at-primary)', to: 'var(--at-primary-hover)', icon: '🔄' },
                 ] as const).map(card => (
                   <button
@@ -375,10 +375,10 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                     <thead>
                       <tr style={{ background: 'var(--at-surface-2)' }}>
                         <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)', borderBottom: '2px solid var(--at-line)' }}>Proyecto</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#d97706', borderBottom: '2px solid var(--at-line)' }}>📥 Sin asignar</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#059669', borderBottom: '2px solid var(--at-line)' }}>✅ Cerradas hoy</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#dc2626', borderBottom: '2px solid var(--at-line)' }}>🚨 Críticas</th>
-                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#ea580c', borderBottom: '2px solid var(--at-line)' }}>⚠️ Urgentes</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-warning)', borderBottom: '2px solid var(--at-line)' }}>📥 Sin asignar</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-success-strong)', borderBottom: '2px solid var(--at-line)' }}>✅ Cerradas hoy</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-danger)', borderBottom: '2px solid var(--at-line)' }}>🚨 Críticas</th>
+                        <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-warning)', borderBottom: '2px solid var(--at-line)' }}>⚠️ Urgentes</th>
                         <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-primary-hover)', borderBottom: '2px solid var(--at-line)' }}>🔄 En proceso</th>
                       </tr>
                     </thead>
@@ -395,13 +395,13 @@ export function AdminClientDashboard({ currentUser, data, moneda, isLoading = fa
                             onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)'}
                           >
                             <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--at-ink)', borderBottom: '1px solid var(--at-chip)' }}>
-                              {hasCritica && <span style={{ marginRight: 6, color: '#ef4444' }}>●</span>}
+                              {hasCritica && <span style={{ marginRight: 6, color: 'var(--at-danger)' }}>●</span>}
                               {p.nombre}
                             </td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.sinAsignar > 0 ? 700 : 400, color: s.sinAsignar > 0 ? '#d97706' : 'var(--at-ink-3)' }}>{s.sinAsignar}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cerradasHoy > 0 ? 700 : 400, color: s.cerradasHoy > 0 ? '#059669' : 'var(--at-ink-3)' }}>{s.cerradasHoy}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.criticas > 0 ? 700 : 400, color: s.criticas > 0 ? '#dc2626' : 'var(--at-ink-3)' }}>{s.criticas}</td>
-                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.urgentes > 0 ? 700 : 400, color: s.urgentes > 0 ? '#ea580c' : 'var(--at-ink-3)' }}>{s.urgentes}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.sinAsignar > 0 ? 700 : 400, color: s.sinAsignar > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{s.sinAsignar}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cerradasHoy > 0 ? 700 : 400, color: s.cerradasHoy > 0 ? 'var(--at-success-strong)' : 'var(--at-ink-3)' }}>{s.cerradasHoy}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.criticas > 0 ? 700 : 400, color: s.criticas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{s.criticas}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.urgentes > 0 ? 700 : 400, color: s.urgentes > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{s.urgentes}</td>
                             <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.enProceso > 0 ? 700 : 400, color: s.enProceso > 0 ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>{s.enProceso}</td>
                           </tr>
                         )

@@ -81,7 +81,7 @@ function AdminDashboardChartsImpl({ registros }: Props) {
           {
             label: 'Recaudo (Q)',
             data: chartsData.dataRecaudo,
-            borderColor: '#10b981',
+            borderColor: 'var(--at-success)',
             backgroundColor: 'rgba(16, 185, 129, 0.1)',
             borderWidth: 3,
             fill: true,
@@ -130,8 +130,8 @@ function AdminDashboardChartsImpl({ registros }: Props) {
         labels: ['Pagado', 'Pendiente', 'En Mora'],
         datasets: [{
           data: chartsData.estados,
-          backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
-          borderColor: ['#059669', '#d97706', '#dc2626'],
+          backgroundColor: ['var(--at-success)', 'var(--at-warning)', 'var(--at-danger)'],
+          borderColor: ['var(--at-success-strong)', 'var(--at-warning)', 'var(--at-danger)'],
           borderWidth: 2,
         }],
       },

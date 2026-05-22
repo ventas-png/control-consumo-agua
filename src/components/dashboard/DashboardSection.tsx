@@ -90,8 +90,8 @@ export function DashboardSection({ registros, moneda = 'Q', isLoading = false }:
 
   const statCards = [
     { label: 'Consumo Mes (m³)', value: consumoTotal.toFixed(2), bg: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-primary-hover) 100%)' },
-    { label: `Recaudo Estimado (${moneda})`, value: recaudoTotal.toFixed(2), bg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
-    { label: 'Pendientes de Pago', value: String(pendientes), bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' },
+    { label: `Recaudo Estimado (${moneda})`, value: recaudoTotal.toFixed(2), bg: 'linear-gradient(135deg, var(--at-success) 0%, var(--at-success-strong) 100%)' },
+    { label: 'Pendientes de Pago', value: String(pendientes), bg: 'linear-gradient(135deg, var(--at-warning) 0%, var(--at-warning) 100%)' },
   ]
 
   return (

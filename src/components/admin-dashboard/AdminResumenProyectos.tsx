@@ -16,11 +16,11 @@ const TIPOLOGIA_META: Partial<Record<TipoAgua, { label: string; icon: string; co
   rehuso:              { label: 'Rehúso',              icon: '♻️', color: 'var(--at-accent-2)' },
   piscina:             { label: 'Piscina',             icon: '🏊', color: 'var(--at-accent-2)' },
   desalinada:          { label: 'Desalinada',          icon: '🌊', color: 'var(--at-accent)' },
-  riego:               { label: 'Riego',               icon: '🌿', color: '#10b981' },
+  riego:               { label: 'Riego',               icon: '🌿', color: 'var(--at-success)' },
   jacuzzi:             { label: 'Jacuzzi',             icon: '🛁', color: 'var(--at-accent)' },
   consumo_humano:      { label: 'Consumo Humano',      icon: '🚰', color: 'var(--at-accent-2)' },
   desmineralizada:     { label: 'Desmineralizada',     icon: '🧪', color: 'var(--at-accent)' },
-  residuales_tratadas: { label: 'Residuales Tratadas', icon: '🔄', color: '#f97316' },
+  residuales_tratadas: { label: 'Residuales Tratadas', icon: '🔄', color: 'var(--at-warning)' },
 }
 
 interface ProyectoStats {
@@ -144,7 +144,7 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
                   </th>
                 )
               })}
-              <th style={th('#059669')}>Recaudo {moneda}</th>
+              <th style={th('var(--at-success-strong)')}>Recaudo {moneda}</th>
             </tr>
           </thead>
           <tbody>
@@ -172,7 +172,7 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
                       </td>
                     )
                   })}
-                  <td style={tdVal(ps.totalMonto, '#059669')}>
+                  <td style={tdVal(ps.totalMonto, 'var(--at-success-strong)')}>
                     {ps.totalMonto > 0
                       ? ps.totalMonto.toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                       : '—'}
@@ -198,7 +198,7 @@ function AdminResumenProyectosImpl({ registros, contadores, proyectos, unidades,
                   </td>
                 )
               })}
-              <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: '#059669', fontSize: '13px' }}>
+              <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: 'var(--at-success-strong)', fontSize: '13px' }}>
                 {totals.totalMonto.toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </td>
             </tr>

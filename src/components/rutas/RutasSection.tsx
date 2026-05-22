@@ -358,7 +358,7 @@ export function RutasSection({
       text: 'Esta acción no se puede deshacer',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#ef4444',
+      confirmButtonColor: 'var(--at-danger)',
       cancelButtonColor: 'var(--at-ink-3)',
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar',
@@ -403,10 +403,10 @@ export function RutasSection({
   const hoy = new Date().toISOString().split('T')[0]
 
   function estadoRuta(ruta: Ruta) {
-    if (ruta.completada) return { label: 'Completada', color: '#166534', bg: '#dcfce7' }
+    if (ruta.completada) return { label: 'Completada', color: 'var(--at-success-strong)', bg: 'var(--at-success-tint)' }
     if (ruta.fecha_programada && ruta.fecha_programada < hoy)
-      return { label: 'Vencida', color: '#dc2626', bg: '#fef2f2' }
-    if (ruta.fecha_programada === hoy) return { label: 'Hoy', color: '#d97706', bg: '#fef9c3' }
+      return { label: 'Vencida', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' }
+    if (ruta.fecha_programada === hoy) return { label: 'Hoy', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' }
     return { label: 'Pendiente', color: 'var(--at-primary-hover)', bg: 'var(--at-primary-soft)' }
   }
 
@@ -590,7 +590,7 @@ export function RutasSection({
                           <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{c.codigo}</div>
                         </div>
                       </div>
-                      <button onClick={() => quitarCliente(idx)} style={{ padding: '2px 8px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
+                      <button onClick={() => quitarCliente(idx)} style={{ padding: '2px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
                     </div>
                   ))}
                 </div>
@@ -666,7 +666,7 @@ export function RutasSection({
                           <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{c.tipo_agua}{c.descripcion ? ` · ${c.descripcion}` : ''}</div>
                         </div>
                       </div>
-                      <button onClick={() => quitarContador(idx)} style={{ padding: '2px 8px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
+                      <button onClick={() => quitarContador(idx)} style={{ padding: '2px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
                     </div>
                   ))}
                 </div>
@@ -742,7 +742,7 @@ export function RutasSection({
                           <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{u.tipo}{u.piso != null ? ` · Piso ${u.piso}` : ''}</div>
                         </div>
                       </div>
-                      <button onClick={() => quitarUnidad(idx)} style={{ padding: '2px 8px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
+                      <button onClick={() => quitarUnidad(idx)} style={{ padding: '2px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
                     </div>
                   ))}
                 </div>
@@ -765,7 +765,7 @@ export function RutasSection({
             <button
               onClick={() => handleGuardar(true)}
               disabled={saving}
-              style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+              style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-success) 0%, var(--at-success-strong) 100%)', color: 'var(--at-on-status)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
             >
               {saving ? 'Guardando...' : '💾 Guardar y Notificar'}
             </button>
@@ -856,7 +856,7 @@ export function RutasSection({
                 {!ruta.completada && (
                   <button
                     onClick={() => onEjecutarRuta(ruta)}
-                    style={{ padding: '8px 14px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
+                    style={{ padding: '8px 14px', background: 'linear-gradient(135deg, var(--at-success) 0%, var(--at-success-strong) 100%)', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
                   >
                     ▶ Ejecutar
                   </button>
@@ -871,7 +871,7 @@ export function RutasSection({
                     </button>
                     <button
                       onClick={() => handleEliminar(ruta)}
-                      style={{ padding: '8px 14px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
+                      style={{ padding: '8px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
                     >
                       Eliminar
                     </button>

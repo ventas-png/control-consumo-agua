@@ -392,8 +392,8 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
     fontSize: '14px', cursor: 'pointer',
   }
   const btnDanger: CSSProperties = {
-    padding: '10px 22px', background: '#fef2f2', color: '#b91c1c',
-    border: '1px solid #fecaca', borderRadius: '8px', fontWeight: 600,
+    padding: '10px 22px', background: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)',
+    border: '1px solid var(--at-danger-border)', borderRadius: '8px', fontWeight: 600,
     fontSize: '14px', cursor: 'pointer',
   }
 
@@ -522,14 +522,14 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
             <div>
               {/* Summary badges */}
               <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                <span style={{ padding: '6px 14px', background: '#dcfce7', color: '#166534', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
+                <span style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
                   ✅ {nuevos.length} nuevo{nuevos.length !== 1 ? 's' : ''}
                 </span>
                 <span style={{ padding: '6px 14px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
                   🔁 {yaExisten.length} ya en sistema
                 </span>
                 {conErrores.length > 0 && (
-                  <span style={{ padding: '6px 14px', background: '#fee2e2', color: '#991b1b', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
+                  <span style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', borderRadius: '20px', fontSize: '13px', fontWeight: 600 }}>
                     ❌ {conErrores.length} con error{conErrores.length !== 1 ? 'es' : ''}
                   </span>
                 )}
@@ -557,7 +557,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                     </p>
                   ) : (
                     <>
-                      <p style={{ fontSize: '13px', color: '#166534', background: '#f0fdf4', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid #bbf7d0' }}>
+                      <p style={{ fontSize: '13px', color: 'var(--at-success-strong)', background: 'var(--at-success-tint)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-success-border)' }}>
                         ✅ Estos {nuevos.length} cliente{nuevos.length !== 1 ? 's' : ''} serán agregados a tu empresa al confirmar.
                       </p>
                       <div style={{ overflowX: 'auto', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
@@ -571,7 +571,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                           </thead>
                           <tbody>
                             {nuevos.map(row => (
-                              <tr key={row.index} style={{ background: '#f0fdf4', borderBottom: '1px solid var(--at-line)' }}>
+                              <tr key={row.index} style={{ background: 'var(--at-success-tint)', borderBottom: '1px solid var(--at-line)' }}>
                                 <td style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.index}</td>
                                 <td style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)' }}>{row.data.nombre ?? '—'}</td>
                                 <td style={{ padding: '9px 14px', color: 'var(--at-ink-2)' }}>{row.data.codigo ?? '—'}</td>
@@ -634,7 +634,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                     </p>
                   ) : (
                     <>
-                      <p style={{ fontSize: '13px', color: '#92400e', background: '#fffbeb', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid #fde68a' }}>
+                      <p style={{ fontSize: '13px', color: 'var(--at-warning-strong)', background: 'var(--at-warning-tint)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', border: '1px solid var(--at-warning-border)' }}>
                         ⚠️ Estas {conErrores.length} fila{conErrores.length !== 1 ? 's' : ''} contienen errores y no serán importadas. Descárgalas para revisarlas y corregirlas.
                       </p>
                       <div style={{ overflowX: 'auto', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
@@ -648,12 +648,12 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                           </thead>
                           <tbody>
                             {conErrores.map(row => (
-                              <tr key={row.index} style={{ background: '#fff1f2', borderBottom: '1px solid var(--at-line)' }}>
+                              <tr key={row.index} style={{ background: 'var(--at-danger-tint)', borderBottom: '1px solid var(--at-line)' }}>
                                 <td style={{ padding: '9px 14px', color: 'var(--at-ink-3)' }}>{row.index}</td>
                                 <td style={{ padding: '9px 14px', fontWeight: 600, color: 'var(--at-ink)' }}>{row.rawData['nombre'] || '—'}</td>
                                 <td style={{ padding: '9px 14px', color: 'var(--at-ink-2)' }}>{row.rawData['codigo'] || '—'}</td>
                                 <td style={{ padding: '9px 14px' }}>
-                                  <span title={row.errors.join('\n')} style={{ color: '#dc2626', cursor: 'help' }}>
+                                  <span title={row.errors.join('\n')} style={{ color: 'var(--at-danger)', cursor: 'help' }}>
                                     ❌ {row.errors[0]}{row.errors.length > 1 ? ` (+${row.errors.length - 1})` : ''}
                                   </span>
                                 </td>
@@ -682,7 +682,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
           {step === 'done' && (
             <div style={{ textAlign: 'center', padding: '32px 0' }}>
               <div style={{ fontSize: '52px', marginBottom: '16px' }}>✅</div>
-              <div style={{ fontWeight: 700, color: '#166534', fontSize: '20px', marginBottom: '12px' }}>
+              <div style={{ fontWeight: 700, color: 'var(--at-success-strong)', fontSize: '20px', marginBottom: '12px' }}>
                 {importados} cliente{importados !== 1 ? 's' : ''} importado{importados !== 1 ? 's' : ''} correctamente
               </div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '16px', fontSize: '14px', color: 'var(--at-ink-3)' }}>
@@ -692,7 +692,7 @@ export function ImportClientesModal({ existingClientes, userId, companyId, onClo
                   </span>
                 )}
                 {analyzed.conErrores.length > 0 && (
-                  <span style={{ padding: '6px 14px', background: '#fee2e2', color: '#991b1b', borderRadius: '20px', fontWeight: 600 }}>
+                  <span style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', borderRadius: '20px', fontWeight: 600 }}>
                     ❌ {analyzed.conErrores.length} con errores
                   </span>
                 )}

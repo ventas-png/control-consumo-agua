@@ -18,16 +18,16 @@ interface Props {
 type Tab = 'arrendamiento' | 'str'
 
 const ESTADO_CONTRATO_CONFIG: Record<EstadoContrato, { label: string; bg: string; color: string }> = {
-  activo:    { label: 'Activo',    bg: '#f0fdf4', color: '#16a34a' },
-  vencido:   { label: 'Vencido',   bg: '#fef2f2', color: '#dc2626' },
+  activo:    { label: 'Activo',    bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  vencido:   { label: 'Vencido',   bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
   terminado: { label: 'Terminado', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
 const ESTADO_STR_CONFIG: Record<EstadoSTR, { label: string; color: string; bg: string }> = {
   confirmada: { label: 'Confirmada', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
   en_curso:   { label: 'En curso',   color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
-  completada: { label: 'Completada', color: '#10b981', bg: '#d1fae5' },
-  cancelada:  { label: 'Cancelada',  color: '#ef4444', bg: '#fee2e2' },
+  completada: { label: 'Completada', color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  cancelada:  { label: 'Cancelada',  color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
 const PLATAFORMA_LABEL: Record<PlataformaSTR, string> = {
@@ -192,7 +192,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
       text: `Arrendatario: ${c.arrendatario_nombre}`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#ef4444',
+      confirmButtonColor: 'var(--at-danger)',
       cancelButtonColor: 'var(--at-ink-3)',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
@@ -307,7 +307,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
       text: `Huésped: ${r.huesped_nombre}`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#ef4444',
+      confirmButtonColor: 'var(--at-danger)',
       cancelButtonColor: 'var(--at-ink-3)',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
@@ -613,7 +613,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                                 </button>
                                 <button
                                   onClick={() => handleEliminarContrato(c)}
-                                  style={{ padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                                  style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
                                 >
                                   Eliminar
                                 </button>
@@ -876,7 +876,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
                                 </button>
                                 <button
                                   onClick={() => handleEliminarSTR(r)}
-                                  style={{ padding: '5px 12px', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                                  style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
                                 >
                                   Eliminar
                                 </button>
