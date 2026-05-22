@@ -52,6 +52,12 @@ jobs:
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
             --no-verify-jwt
 
+      - name: Deploy delete-user
+        run: |
+          supabase functions deploy delete-user \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
+
       - name: Deploy save-payment-config
         run: |
           supabase functions deploy save-payment-config \

@@ -565,12 +565,71 @@ export function EmpresaSection({ currentUser }: Props) {
     void cargar()
   }
 
+  async function eliminarUsuario(usuario: Usuario) {
+    const { isConfirmed } = await Swal.fire({
+      icon: 'warning',
+      title: 'Eliminar usuario definitivamente',
+      html: `
+        <p style="color:var(--at-ink-2);font-size:14px;line-height:1.5;margin:0 0 14px;text-align:left">
+          Esta acción <strong>no se puede deshacer</strong>. Se eliminarán el acceso y el perfil de
+          <strong>${usuario.full_name}</strong>. Los registros que haya creado se conservan,
+          pero quedarán sin autor asignado.
+        </p>
+        <p style="color:var(--at-ink-3);font-size:13px;margin:0;text-align:left">
+          Para confirmar, escribe el nombre del usuario:
+        </p>
+      `,
+      input: 'text',
+      inputPlaceholder: usuario.full_name,
+      inputAttributes: { autocapitalize: 'off', autocorrect: 'off' },
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar definitivamente',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+      inputValidator: (v: string) =>
+        (v ?? '').trim().toLowerCase() === usuario.full_name.trim().toLowerCase()
+          ? null
+          : 'El nombre no coincide',
+    })
+    if (!isConfirmed) return
+
+    try {
+      const { data: session } = await supabase.auth.getSession()
+      const token = session.session?.access_token
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+      const res = await fetch(`${supabaseUrl}/functions/v1/delete-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token ?? ''}` },
+        body: JSON.stringify({ user_id: usuario.id }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json() as { error?: string }
+        void Swal.fire({ icon: 'error', title: 'No se pudo eliminar', text: err.error ?? 'No se pudo eliminar el usuario.' })
+        return
+      }
+
+      void Swal.fire({ icon: 'success', title: 'Usuario eliminado', timer: 1500, showConfirmButton: false })
+      void cargar()
+    } catch (err) {
+      console.error('delete-user request failed:', err)
+      void Swal.fire({ icon: 'error', title: 'Error de conexión', text: 'No se pudo contactar el servicio de eliminación. Intente nuevamente; si el problema persiste, contacte al soporte técnico.' })
+    }
+  }
+
   const roleBadgeColor: Record<string, string> = {
     admin: 'var(--at-primary)',
     operator: 'var(--at-success)', operador: 'var(--at-success)',
     viewer: 'var(--at-accent)', visor: 'var(--at-accent)',
     collector: 'var(--at-warning)',
   }
+
+  // Who can permanently delete users, and which target roles are deletable.
+  // Mirrors the server-side checks in the delete-user edge function so the button
+  // only appears when the action would actually succeed.
+  const isSuperAdmin = currentUser.role === 'super_admin'
+  const canDeleteUsers = isSuperAdmin || currentUser.role === 'company_owner' || currentUser.role === 'admin'
+  const DELETABLE_TARGET_ROLES = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
 
   if (loading) {
     return (
@@ -1012,6 +1071,24 @@ export function EmpresaSection({ currentUser }: Props) {
                   >
                     {u.activo ? 'Desactivar' : 'Activar'}
                   </button>
+                  {canDeleteUsers && (isSuperAdmin || DELETABLE_TARGET_ROLES.includes(u.role)) && (
+                    <button
+                      onClick={() => void eliminarUsuario(u)}
+                      title="Eliminar definitivamente"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                        padding: '6px 10px', borderRadius: '7px', whiteSpace: 'nowrap',
+                        border: '1px solid var(--at-danger)',
+                        background: 'var(--at-danger)', color: '#fff',
+                        cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                      }}
+                    >
+                      <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Eliminar
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
