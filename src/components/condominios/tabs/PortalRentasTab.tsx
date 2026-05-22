@@ -497,7 +497,7 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
           <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--at-warning-strong)', marginBottom: '6px' }}>
             Solicitud en revisión
           </div>
-          <div style={{ fontSize: '13px', color: '#78350f', lineHeight: 1.6 }}>
+          <div style={{ fontSize: '13px', color: 'var(--at-warning-strong)', lineHeight: 1.6 }}>
             Tu solicitud para operar <strong>{TIPO_RENTA_LABEL[solicitudRenta.tipo_renta]}</strong> fue enviada el {fechaSol} y está siendo revisada por la administración.
           </div>
           <div style={{ marginTop: '12px', fontSize: '12.5px', color: '#a16207' }}>

@@ -1006,7 +1006,7 @@ export function EmpresaSection({ currentUser }: Props) {
                       padding: '6px 10px', borderRadius: '7px', whiteSpace: 'nowrap',
                       border: `1px solid ${u.activo ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
                       background: u.activo ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
-                      color: u.activo ? 'var(--at-danger)' : '#4ade80',
+                      color: u.activo ? 'var(--at-danger)' : 'var(--at-success)',
                       cursor: 'pointer', fontSize: '12px', fontWeight: 600,
                     }}
                   >

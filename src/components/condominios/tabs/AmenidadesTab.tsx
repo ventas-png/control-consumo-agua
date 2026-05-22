@@ -196,7 +196,7 @@ const RESERVA_CAL_COLORS = [
   { bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', color: 'var(--at-success-strong)' },
   { bg: 'var(--at-accent-tint)', border: 'var(--at-accent-soft)', color: '#4c1d95' },
   { bg: '#fce7f3', border: '#f9a8d4', color: '#9d174d' },
-  { bg: 'var(--at-warning-tint)', border: '#fcd34d', color: '#78350f' },
+  { bg: 'var(--at-warning-tint)', border: '#fcd34d', color: 'var(--at-warning-strong)' },
 ]
 
 export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyectoId, companyId, userId, moneda, canCreate, canEdit, onRefresh }: Props) {
@@ -1386,7 +1386,7 @@ export function AmenidadesTab({ amenidades, reservas, bloqueos, unidades, proyec
                             height: ROW_H,
                             background: bloqDiaCompleto
                               ? 'repeating-linear-gradient(45deg,var(--at-warning-tint),var(--at-warning-tint) 6px,var(--at-warning-border) 6px,var(--at-warning-border) 12px)'
-                              : esHoy ? 'var(--at-primary-tint)' : '#fcfcfd',
+                              : esHoy ? 'var(--at-primary-tint)' : 'var(--at-surface-2)',
                             border: `1px solid ${esHoy ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`,
                             borderRadius: 10,
                             overflow: 'hidden',

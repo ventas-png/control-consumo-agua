@@ -505,7 +505,7 @@ export function ContadoresSection({
   const labelStyle: CSSProperties = {
     fontSize: '13px',
     fontWeight: 600,
-    color: '#4a5568',
+    color: 'var(--at-ink-2)',
     marginBottom: '5px',
     display: 'block',
   }

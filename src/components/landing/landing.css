@@ -5,20 +5,23 @@
 ───────────────────────────────────────────────────────────────────────── */
 
 .at-root {
-  /* Verdant palette — pine + creme + clay */
-  --c-bg: #F2EFE7;
-  --c-surface: #FFFFFF;
-  --c-ink: #15291F;
-  --c-ink_2: #3E5A4C;
-  --c-ink_3: #7E9389;
-  --c-line: #E1DDD0;
-  --c-line_strong: #C7C2B0;
-  --c-primary: #1B3B36;
-  --c-primary_hover: #102622;
-  --c-primary_soft: #D9E2DC;
-  --c-accent: #B96A3F;
-  --c-accent_2: #577B69;
-  --c-chip: #EAE6D8;
+  /* Homologado: los tokens del landing referencian los tokens de la app
+     (--at-*, definidos en index.css) como única fuente de verdad. Los valores
+     en modo claro son idénticos; el modo oscuro ahora coincide con la app y se
+     hereda automáticamente (ver index.css), por eso no se redefine abajo. */
+  --c-bg: var(--at-bg);
+  --c-surface: var(--at-surface);
+  --c-ink: var(--at-ink);
+  --c-ink_2: var(--at-ink-2);
+  --c-ink_3: var(--at-ink-3);
+  --c-line: var(--at-line);
+  --c-line_strong: var(--at-line-strong);
+  --c-primary: var(--at-primary);
+  --c-primary_hover: var(--at-primary-hover);
+  --c-primary_soft: var(--at-primary-soft);
+  --c-accent: var(--at-accent);
+  --c-accent_2: var(--at-accent-2);
+  --c-chip: var(--at-chip);
   --font-display: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-body: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -1939,20 +1942,9 @@
 }
 
 /* ─── Dark theme (landing/login) ──────────────────────────────────────────
-   Sigue al sistema, salvo override manual con [data-theme] en <html>. */
+   Los tokens --c-* heredan el modo oscuro vía --at-* (index.css); aquí sólo se
+   declara color-scheme para el scope del landing. */
 [data-theme="dark"] .at-root,
 html:not([data-theme="light"]) .at-root {
   color-scheme: dark;
-}
-[data-theme="dark"] .at-root {
-  --c-bg: #0A1410; --c-surface: #0F1D17; --c-ink: #EFEDDF; --c-ink_2: #B5C2BA;
-  --c-ink_3: #788A80; --c-line: #1A2A22; --c-line_strong: #2A3D33;
-  --c-primary: #7FB29F; --c-primary_hover: #9CC6B6; --c-primary_soft: #15241D; --c-chip: #15211A;
-}
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) .at-root {
-    --c-bg: #0A1410; --c-surface: #0F1D17; --c-ink: #EFEDDF; --c-ink_2: #B5C2BA;
-    --c-ink_3: #788A80; --c-line: #1A2A22; --c-line_strong: #2A3D33;
-    --c-primary: #7FB29F; --c-primary_hover: #9CC6B6; --c-primary_soft: #15241D; --c-chip: #15211A;
-  }
 }

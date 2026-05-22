@@ -467,7 +467,7 @@ function Pagination({ currentPage, totalPages, onChange }: {
   const btnStyle = (active: boolean, disabled = false): CSSProperties => ({
     minWidth: 40, height: 40, padding: '0 10px',
     background: active ? 'var(--at-primary)' : disabled ? 'var(--at-chip)' : 'var(--at-surface-2)',
-    color: active ? 'white' : disabled ? '#cbd5e0' : 'var(--at-ink-2)',
+    color: active ? 'white' : disabled ? 'var(--at-line-strong)' : 'var(--at-ink-2)',
     border: '1px solid', borderColor: active ? 'var(--at-primary)' : 'var(--at-line)',
     borderRadius: 8, fontSize: 13, fontWeight: active ? 700 : 400,
     cursor: disabled ? 'not-allowed' : 'pointer',
@@ -518,7 +518,7 @@ function viewBtnStyle(active: boolean): CSSProperties {
 }
 
 const filterFieldStyle: CSSProperties = {
-  padding: '10px 12px', border: '1px solid #cbd5e0', borderRadius: 8, fontSize: 14,
+  padding: '10px 12px', border: '1px solid var(--at-line-strong)', borderRadius: 8, fontSize: 14,
 }
 
 const btnEditStyle: CSSProperties = {

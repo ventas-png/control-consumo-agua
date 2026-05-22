@@ -429,7 +429,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
 
                       {/* Detalle de rubros expandido */}
                       {exp && (
-                        <div style={{ background: '#f8faff', borderTop: '1px solid var(--at-accent-soft-2)', padding: '8px 12px 8px 48px' }}>
+                        <div style={{ background: 'var(--at-surface-2)', borderTop: '1px solid var(--at-accent-soft-2)', padding: '8px 12px 8px 48px' }}>
                           {rubrosDetalle.map((rd, ri) => (
                             <div key={ri} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--at-ink-2)', marginBottom: 3 }}>
                               <span style={{ color: 'var(--at-ink-2)' }}>

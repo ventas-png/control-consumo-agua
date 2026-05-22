@@ -328,7 +328,7 @@ export function ClienteRentasModal({ cliente, unidades, companyId, canEdit, onCl
     fontSize: '14px', width: '100%', boxSizing: 'border-box' as const, outline: 'none',
   }
   const labelStyle = {
-    fontSize: '13px', fontWeight: 600 as const, color: '#4a5568',
+    fontSize: '13px', fontWeight: 600 as const, color: 'var(--at-ink-2)',
     marginBottom: '4px', display: 'block',
   }
   const btnPrimary = {
