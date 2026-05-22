@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, type CSSProperties, type DragEvent} from '
 import Swal from 'sweetalert2'
 import type { Cliente, Contador, Unidad, Proyecto, Ruta, UserRole } from '../../types'
 import { supabase } from '../../lib/supabase'
-import { enviarNotificacionRuta } from '../../lib/email'
+import { enviarNotificacionRuta, dispararRecordatorioRuta } from '../../lib/email'
 import { APP_CONFIG } from '../../lib/config'
+import type { FrecuenciaRuta } from '../../types'
 
 interface AppUser {
   id: string
@@ -37,6 +38,57 @@ const EMPTY_FORM = {
   asignado_nombre: '',
   asignado_email: '',
   asignado_telefono: '',
+  // Periodicidad
+  frecuencia: 'unica' as FrecuenciaRuta,
+  dias_semana: [] as number[],
+  intervalo_dias: '14',
+  dia_mes: '1',
+  fechas_especificas: [] as string[],
+  hora_programada: '',
+  recurrencia_activa: true,
+  fecha_inicio: '',
+  fecha_fin: '',
+  recordatorio_anticipacion_min: 1440,
+  recordatorio_canales: ['email', 'app'] as string[],
+}
+
+// ISO: 1 = lunes … 7 = domingo
+const DIAS_SEMANA: { iso: number; label: string }[] = [
+  { iso: 1, label: 'L' }, { iso: 2, label: 'M' }, { iso: 3, label: 'M' },
+  { iso: 4, label: 'J' }, { iso: 5, label: 'V' }, { iso: 6, label: 'S' }, { iso: 7, label: 'D' },
+]
+const DIAS_NOMBRE: Record<number, string> = { 1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb', 7: 'Dom' }
+
+const FRECUENCIAS: { value: FrecuenciaRuta; label: string }[] = [
+  { value: 'unica', label: 'Única' },
+  { value: 'diaria', label: 'Diaria' },
+  { value: 'semanal', label: 'Semanal' },
+  { value: 'quincenal', label: 'Quincenal' },
+  { value: 'mensual', label: 'Mensual' },
+  { value: 'fechas', label: 'Fechas específicas' },
+]
+
+const ANTICIPACION_OPCIONES: { value: number; label: string }[] = [
+  { value: 0, label: 'A la hora programada' },
+  { value: 30, label: '30 minutos antes' },
+  { value: 120, label: '2 horas antes' },
+  { value: 1440, label: '1 día antes' },
+  { value: 2880, label: '2 días antes' },
+]
+
+function describirRecurrencia(ruta: Ruta): string {
+  const f = ruta.frecuencia ?? 'unica'
+  const hora = ruta.hora_programada ? ` · ${String(ruta.hora_programada).slice(0, 5)}` : ''
+  if (f === 'unica') return 'Una vez'
+  if (f === 'diaria') return `Diaria${hora}`
+  if (f === 'semanal') {
+    const dias = (ruta.dias_semana ?? []).slice().sort((a, b) => a - b).map(d => DIAS_NOMBRE[d]).join(', ')
+    return `Semanal${dias ? `: ${dias}` : ''}${hora}`
+  }
+  if (f === 'quincenal') return `Cada ${ruta.intervalo_dias ?? 14} días${hora}`
+  if (f === 'mensual') return `Mensual · día ${ruta.dia_mes ?? 1}${hora}`
+  if (f === 'fechas') return `${(ruta.fechas_especificas ?? []).length} fecha(s)${hora}`
+  return 'Una vez'
 }
 
 export function RutasSection({
@@ -63,6 +115,8 @@ export function RutasSection({
   const [unidadesEnRuta, setUnidadesEnRuta] = useState<Unidad[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [saving, setSaving] = useState(false)
+  const [recordandoId, setRecordandoId] = useState<string | null>(null)
+  const [nuevaFecha, setNuevaFecha] = useState('')
   const [usuarios, setUsuarios] = useState<AppUser[]>([])
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null)
   const dragOver = useRef<number | null>(null)
@@ -116,6 +170,17 @@ export function RutasSection({
       asignado_nombre: ruta.asignado_nombre ?? '',
       asignado_email: ruta.asignado_email ?? '',
       asignado_telefono: ruta.asignado_telefono ?? '',
+      frecuencia: ruta.frecuencia ?? 'unica',
+      dias_semana: ruta.dias_semana ?? [],
+      intervalo_dias: String(ruta.intervalo_dias ?? 14),
+      dia_mes: String(ruta.dia_mes ?? 1),
+      fechas_especificas: ruta.fechas_especificas ?? [],
+      hora_programada: ruta.hora_programada ? String(ruta.hora_programada).slice(0, 5) : '',
+      recurrencia_activa: ruta.recurrencia_activa ?? false,
+      fecha_inicio: ruta.fecha_inicio ?? '',
+      fecha_fin: ruta.fecha_fin ?? '',
+      recordatorio_anticipacion_min: ruta.recordatorio_anticipacion_min ?? 1440,
+      recordatorio_canales: ruta.recordatorio_canales ?? ['email', 'app'],
     })
     const tipo = ruta.tipo_ruta ?? 'clientes'
     setTipoRuta(tipo)
@@ -179,6 +244,57 @@ export function RutasSection({
       asignado_a: userId,
       asignado_nombre: usuario?.full_name ?? '',
     }))
+  }
+
+  function toggleDiaSemana(iso: number) {
+    setForm(prev => ({
+      ...prev,
+      dias_semana: prev.dias_semana.includes(iso)
+        ? prev.dias_semana.filter(d => d !== iso)
+        : [...prev.dias_semana, iso].sort((a, b) => a - b),
+    }))
+  }
+
+  function agregarFecha() {
+    if (!nuevaFecha) return
+    setForm(prev => ({
+      ...prev,
+      fechas_especificas: prev.fechas_especificas.includes(nuevaFecha)
+        ? prev.fechas_especificas
+        : [...prev.fechas_especificas, nuevaFecha].sort(),
+    }))
+    setNuevaFecha('')
+  }
+
+  function quitarFecha(fecha: string) {
+    setForm(prev => ({ ...prev, fechas_especificas: prev.fechas_especificas.filter(f => f !== fecha) }))
+  }
+
+  function toggleCanal(canal: 'email' | 'app') {
+    setForm(prev => ({
+      ...prev,
+      recordatorio_canales: prev.recordatorio_canales.includes(canal)
+        ? prev.recordatorio_canales.filter(c => c !== canal)
+        : [...prev.recordatorio_canales, canal],
+    }))
+  }
+
+  async function handleRecordarAhora(ruta: Ruta) {
+    setRecordandoId(ruta.id)
+    try {
+      const r = await dispararRecordatorioRuta(ruta.id)
+      Swal.fire({
+        icon: 'success',
+        title: 'Recordatorio enviado',
+        text: `Se notificó a ${r.notified} usuario(s)${r.emailed ? ` y se enviaron ${r.emailed} correo(s)` : ''}.`,
+        timer: 2600,
+        showConfirmButton: false,
+      })
+    } catch (err) {
+      Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo enviar el recordatorio', 'error')
+    } finally {
+      setRecordandoId(null)
+    }
   }
 
   function agregarCliente(cliente: Cliente) {
@@ -252,6 +368,25 @@ export function RutasSection({
       Swal.fire('Atención', 'Agrega al menos una unidad a la ruta', 'warning')
       return
     }
+    // Validaciones de periodicidad
+    if (form.frecuencia === 'unica' && !form.fecha_programada) {
+      Swal.fire('Atención', 'Indica la fecha programada de la ruta', 'warning')
+      return
+    }
+    if (form.frecuencia === 'semanal' && form.dias_semana.length === 0) {
+      Swal.fire('Atención', 'Selecciona al menos un día de la semana', 'warning')
+      return
+    }
+    if (form.frecuencia === 'quincenal' && !form.fecha_inicio) {
+      Swal.fire('Atención', 'Para una ruta quincenal indica la fecha de inicio', 'warning')
+      return
+    }
+    if (form.frecuencia === 'fechas' && form.fechas_especificas.length === 0) {
+      Swal.fire('Atención', 'Agrega al menos una fecha específica', 'warning')
+      return
+    }
+
+    const esRecurrente = form.frecuencia !== 'unica'
 
     setSaving(true)
     const payload = {
@@ -267,6 +402,18 @@ export function RutasSection({
       asignado_email: form.asignado_email || null,
       asignado_telefono: form.asignado_telefono || null,
       fecha_programada: form.fecha_programada || null,
+      // Periodicidad
+      frecuencia: form.frecuencia,
+      recurrencia_activa: esRecurrente ? form.recurrencia_activa : false,
+      dias_semana: form.frecuencia === 'semanal' ? form.dias_semana : [],
+      intervalo_dias: form.frecuencia === 'quincenal' ? (parseInt(form.intervalo_dias, 10) || 14) : null,
+      dia_mes: form.frecuencia === 'mensual' ? (parseInt(form.dia_mes, 10) || 1) : null,
+      fechas_especificas: form.frecuencia === 'fechas' ? form.fechas_especificas : [],
+      hora_programada: form.hora_programada || null,
+      fecha_inicio: esRecurrente ? (form.fecha_inicio || null) : null,
+      fecha_fin: esRecurrente ? (form.fecha_fin || null) : null,
+      recordatorio_anticipacion_min: Number(form.recordatorio_anticipacion_min) || 1440,
+      recordatorio_canales: form.recordatorio_canales,
     }
 
     let rutaGuardada: Ruta | null = null
@@ -457,6 +604,153 @@ export function RutasSection({
               onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))}
               placeholder="Opcional"
             />
+          </div>
+        </div>
+
+        {/* Periodicidad y recordatorios */}
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: '12px', padding: '20px', marginBottom: '24px', border: '1px solid var(--at-line)' }}>
+          <div style={{ fontWeight: 700, marginBottom: '16px', color: 'var(--at-ink-2)' }}>Periodicidad y Recordatorios</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', alignItems: 'start' }}>
+            <div>
+              <label style={labelStyle}>Frecuencia</label>
+              <select
+                style={inputStyle}
+                value={form.frecuencia}
+                onChange={e => setForm(p => ({ ...p, frecuencia: e.target.value as FrecuenciaRuta }))}
+              >
+                {FRECUENCIAS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Hora (opcional)</label>
+              <input
+                type="time"
+                style={inputStyle}
+                value={form.hora_programada}
+                onChange={e => setForm(p => ({ ...p, hora_programada: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {/* Inputs condicionales por frecuencia */}
+          {form.frecuencia === 'semanal' && (
+            <div style={{ marginTop: '14px' }}>
+              <label style={labelStyle}>Días de la semana</label>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {DIAS_SEMANA.map(d => {
+                  const active = form.dias_semana.includes(d.iso)
+                  return (
+                    <button
+                      key={d.iso}
+                      type="button"
+                      onClick={() => toggleDiaSemana(d.iso)}
+                      title={DIAS_NOMBRE[d.iso]}
+                      style={{
+                        width: '38px', height: '38px', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, fontSize: '13px',
+                        border: active ? 'none' : '2px solid var(--at-line)',
+                        background: active ? 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 100%)' : 'var(--at-surface)',
+                        color: active ? 'white' : 'var(--at-ink-2)',
+                      }}
+                    >
+                      {d.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {form.frecuencia === 'quincenal' && (
+            <div style={{ marginTop: '14px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+              <div>
+                <label style={labelStyle}>Cada cuántos días</label>
+                <input
+                  type="number" min={1} style={inputStyle}
+                  value={form.intervalo_dias}
+                  onChange={e => setForm(p => ({ ...p, intervalo_dias: e.target.value }))}
+                />
+              </div>
+            </div>
+          )}
+
+          {form.frecuencia === 'mensual' && (
+            <div style={{ marginTop: '14px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+              <div>
+                <label style={labelStyle}>Día del mes (1–31)</label>
+                <input
+                  type="number" min={1} max={31} style={inputStyle}
+                  value={form.dia_mes}
+                  onChange={e => setForm(p => ({ ...p, dia_mes: e.target.value }))}
+                />
+                <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '4px' }}>Si el mes no tiene ese día, se usa el último.</div>
+              </div>
+            </div>
+          )}
+
+          {form.frecuencia === 'fechas' && (
+            <div style={{ marginTop: '14px' }}>
+              <label style={labelStyle}>Fechas específicas</label>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <input type="date" style={{ ...inputStyle, width: 'auto' }} value={nuevaFecha} onChange={e => setNuevaFecha(e.target.value)} />
+                <button type="button" onClick={agregarFecha} style={{ padding: '10px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>Agregar</button>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
+                {form.fechas_especificas.map(f => (
+                  <span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'var(--at-chip)', borderRadius: '20px', fontSize: '12px', fontWeight: 600 }}>
+                    {new Date(f + 'T12:00:00').toLocaleDateString('es-GT')}
+                    <button type="button" onClick={() => quitarFecha(f)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--at-danger)', fontWeight: 700 }}>×</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ventana de vigencia (solo recurrentes) */}
+          {form.frecuencia !== 'unica' && (
+            <div style={{ marginTop: '14px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+              <div>
+                <label style={labelStyle}>Inicia el{form.frecuencia === 'quincenal' ? ' *' : ''}</label>
+                <input type="date" style={inputStyle} value={form.fecha_inicio} onChange={e => setForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
+              </div>
+              <div>
+                <label style={labelStyle}>Termina el (opcional)</label>
+                <input type="date" style={inputStyle} value={form.fecha_fin} onChange={e => setForm(p => ({ ...p, fecha_fin: e.target.value }))} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '24px' }}>
+                <input id="recurrencia_activa" type="checkbox" checked={form.recurrencia_activa} onChange={e => setForm(p => ({ ...p, recurrencia_activa: e.target.checked }))} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
+                <label htmlFor="recurrencia_activa" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', cursor: 'pointer' }}>Recurrencia activa</label>
+              </div>
+            </div>
+          )}
+
+          {/* Recordatorios */}
+          <div style={{ marginTop: '18px', borderTop: '1px dashed var(--at-line)', paddingTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', alignItems: 'start' }}>
+            <div>
+              <label style={labelStyle}>Avisar</label>
+              <select
+                style={inputStyle}
+                value={form.recordatorio_anticipacion_min}
+                onChange={e => setForm(p => ({ ...p, recordatorio_anticipacion_min: Number(e.target.value) }))}
+              >
+                {ANTICIPACION_OPCIONES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Canales del recordatorio</label>
+              <div style={{ display: 'flex', gap: '16px', paddingTop: '8px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.recordatorio_canales.includes('email')} onChange={() => toggleCanal('email')} style={{ width: '17px', height: '17px', cursor: 'pointer' }} />
+                  Email
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.recordatorio_canales.includes('app')} onChange={() => toggleCanal('app')} style={{ width: '17px', height: '17px', cursor: 'pointer' }} />
+                  Notificación en app
+                </label>
+              </div>
+            </div>
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '10px' }}>
+            Los recordatorios llegan al operador asignado y a los administradores. El envío automático corre cada hora en el servidor.
           </div>
         </div>
 
@@ -840,7 +1134,8 @@ export function RutasSection({
               </div>
 
               <div style={{ fontSize: '13px', color: 'var(--at-ink-2)', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div>📅 {ruta.fecha_programada ? new Date(ruta.fecha_programada + 'T12:00:00').toLocaleDateString('es-GT') : 'Sin fecha'}</div>
+                <div>🔁 {describirRecurrencia(ruta)}</div>
+                <div>📅 {ruta.fecha_programada ? new Date(ruta.fecha_programada + 'T12:00:00').toLocaleDateString('es-GT') : ((ruta.frecuencia ?? 'unica') !== 'unica' ? 'Recurrente' : 'Sin fecha')}</div>
                 <div>👤 {ruta.asignado_nombre ?? 'Sin asignar'}</div>
                 <div>📍 {itemCount} {itemLabel}{itemCount !== 1 ? 's' : ''}</div>
               </div>
@@ -863,6 +1158,14 @@ export function RutasSection({
                 )}
                 {canEdit && (
                   <>
+                    <button
+                      onClick={() => handleRecordarAhora(ruta)}
+                      disabled={recordandoId === ruta.id}
+                      title="Enviar recordatorio al operador y administradores"
+                      style={{ padding: '8px 14px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: recordandoId === ruta.id ? 'wait' : 'pointer', fontSize: '13px' }}
+                    >
+                      {recordandoId === ruta.id ? 'Enviando…' : '🔔 Recordar'}
+                    </button>
                     <button
                       onClick={() => abrirEditar(ruta)}
                       style={{ padding: '8px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}

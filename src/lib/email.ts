@@ -161,6 +161,25 @@ export async function enviarNotificacionRuta(ruta: Ruta, companyId?: string): Pr
   await emailjs.send(APP_CONFIG.EMAILJS_SERVICE_ID, APP_CONFIG.EMAILJS_TEMPLATE_RUTA_ASIGNADA, params)
 }
 
+// Dispara el recordatorio de una ruta (email + notificación in-app) vía el edge
+// function route-reminders, autenticando con el JWT del administrador actual.
+export async function dispararRecordatorioRuta(
+  rutaId: string,
+  ocurrenciaId?: string
+): Promise<{ processed: number; emailed: number; notified: number }> {
+  const token = await getAuthToken()
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/route-reminders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(ocurrenciaId ? { ocurrencia_id: ocurrenciaId } : { ruta_id: rutaId }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(err.error ?? 'No se pudo enviar el recordatorio')
+  }
+  return res.json() as Promise<{ processed: number; emailed: number; notified: number }>
+}
+
 export interface BroadcastEmailResult {
   sent: string[]
   failed: { email: string; error: string }[]
