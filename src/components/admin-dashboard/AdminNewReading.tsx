@@ -275,12 +275,12 @@ export function AdminNewReading({ clientes, tarifas, onReadingAdded, proyectoId 
         {calculation.total > 0 && (
           <div style={{
             padding: '12px',
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
+            background: 'var(--at-success-tint)',
+            border: '1px solid var(--at-success-border)',
             borderRadius: '8px',
             fontSize: '16px',
             fontWeight: '700',
-            color: '#15803d',
+            color: 'var(--at-success-strong)',
             marginBottom: '20px',
           }}>
             💰 Total a Pagar: Q {calculation.total.toFixed(2)}

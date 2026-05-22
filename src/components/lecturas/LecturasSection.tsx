@@ -406,12 +406,12 @@ export function LecturasSection({
       }
     : rutaModoManual
     ? {
-        bg: '#f0fdf4',
-        border: '#bbf7d0',
-        color: '#166534',
+        bg: 'var(--at-success-tint)',
+        border: 'var(--at-success-border)',
+        color: 'var(--at-success-strong)',
         texto: `Modo Ruta ACTIVO — Unidad ${rutaIndex + 1} de ${unidadesOrdenadas.length}`,
       }
-    : { bg: '#f0fdf4', border: '#bbf7d0', color: '#166534', texto: 'Modo Manual' }
+    : { bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', color: 'var(--at-success-strong)', texto: 'Modo Manual' }
 
   return (
     <div>
@@ -424,7 +424,7 @@ export function LecturasSection({
           enModoRuta ? (
             <button
               onClick={detenerRuta}
-              style={{ padding: '8px 16px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
+              style={{ padding: '8px 16px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
             >
               Detener Ruta
             </button>
@@ -486,7 +486,7 @@ export function LecturasSection({
 
             {/* Selector de contador */}
             {contadoresDeUnidad.length === 0 ? (
-              <div style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', color: '#854d0e', fontWeight: 600, fontSize: '14px' }}>
+              <div style={{ background: 'var(--at-warning-tint)', border: '1px solid #fde047', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', color: 'var(--at-warning-strong)', fontWeight: 600, fontSize: '14px' }}>
                 Esta unidad no tiene contadores activos asignados.
               </div>
             ) : (
@@ -530,12 +530,12 @@ export function LecturasSection({
                 </div>
 
                 {sinTarifa && (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', padding: '14px 18px', marginBottom: '12px', color: '#dc2626', fontWeight: 600, fontSize: '14px' }}>
+                  <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '10px', padding: '14px 18px', marginBottom: '12px', color: 'var(--at-danger)', fontWeight: 600, fontSize: '14px' }}>
                     El contador no tiene tarifa asignada. Vaya a Contadores y asigne una tarifa antes de registrar lecturas.
                   </div>
                 )}
                 {tarifaExpirada && (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', padding: '14px 18px', marginBottom: '12px', color: '#dc2626', fontWeight: 600, fontSize: '14px' }}>
+                  <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '10px', padding: '14px 18px', marginBottom: '12px', color: 'var(--at-danger)', fontWeight: 600, fontSize: '14px' }}>
                     Tarifa no vigente. No es posible registrar lecturas hasta que se actualice la tarifa del contador.
                   </div>
                 )}
@@ -543,16 +543,16 @@ export function LecturasSection({
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '20px' }}>
                   <div>
                     <label style={labelStyle}>Lectura Actual</label>
-                    <input type="number" step="0.01" value={lecturaActual} onChange={e => setLecturaActual(e.target.value)} placeholder="Ingrese lectura del medidor" style={{ ...inputStyle, borderColor: consumoInvalido ? '#dc2626' : 'var(--at-line)' }} />
+                    <input type="number" step="0.01" value={lecturaActual} onChange={e => setLecturaActual(e.target.value)} placeholder="Ingrese lectura del medidor" style={{ ...inputStyle, borderColor: consumoInvalido ? 'var(--at-danger)' : 'var(--at-line)' }} />
                   </div>
                   <div>
                     <label style={labelStyle}>Consumo Calculado (m³)</label>
-                    <input type="text" readOnly value={consumo !== null ? (consumoInvalido ? consumo.toFixed(2) + ' (ERROR)' : consumo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? '#dc2626' : 'var(--at-primary)', background: '#f7fafc' }} />
+                    <input type="text" readOnly value={consumo !== null ? (consumoInvalido ? consumo.toFixed(2) + ' (ERROR)' : consumo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? 'var(--at-danger)' : 'var(--at-primary)', background: '#f7fafc' }} />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={labelStyle}>Desglose de Cobro</label>
                     {calculo ? (
-                      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', color: '#166534' }}>
+                      <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', color: 'var(--at-success-strong)' }}>
                         {calculo.desglose.tramo === 1 && (
                           <>
                             <div>Consumo <strong>{consumo?.toFixed(2)} m³</strong> ≤ mínimo <strong>{tarifaDelContador?.consumo_minimo ?? 0} m³</strong> → Solo canon fijo</div>
@@ -581,8 +581,8 @@ export function LecturasSection({
                     <label style={labelStyle}>Fecha Lectura Anterior</label>
                     {esPrimeraLectura ? (
                       <>
-                        <input type="date" value={fechaAnteriorManual || (ultimaLecturaInfo.fecha ? ultimaLecturaInfo.fecha.split('T')[0] : '')} onChange={e => setFechaAnteriorManual(e.target.value)} style={{ ...inputStyle, borderColor: '#f59e0b' }} />
-                        <div style={{ fontSize: '11px', color: '#b45309', marginTop: '4px' }}>Primera lectura — puede establecer la fecha de inicio del servicio</div>
+                        <input type="date" value={fechaAnteriorManual || (ultimaLecturaInfo.fecha ? ultimaLecturaInfo.fecha.split('T')[0] : '')} onChange={e => setFechaAnteriorManual(e.target.value)} style={{ ...inputStyle, borderColor: 'var(--at-warning)' }} />
+                        <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', marginTop: '4px' }}>Primera lectura — puede establecer la fecha de inicio del servicio</div>
                       </>
                     ) : (
                       <input type="date" readOnly value={fechaLecturaAnterior ? fechaLecturaAnterior.split('T')[0] : ''} style={{ ...inputStyle, background: '#f7fafc', color: 'var(--at-ink)' }} />
@@ -615,17 +615,17 @@ export function LecturasSection({
                   <div>
                     <label style={labelStyle}>Ubicación GPS</label>
                     {gpsLoading && (
-                      <div style={{ padding: '12px', background: '#fef9c3', border: '1px solid #fde047', borderRadius: '10px', fontSize: '13px', color: '#854d0e' }}>
+                      <div style={{ padding: '12px', background: 'var(--at-warning-tint)', border: '1px solid #fde047', borderRadius: '10px', fontSize: '13px', color: 'var(--at-warning-strong)' }}>
                         📡 Obteniendo ubicación automáticamente...
                       </div>
                     )}
                     {gps && !gpsLoading && (
-                      <div style={{ padding: '12px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: '10px', fontSize: '13px', color: '#166534' }}>
+                      <div style={{ padding: '12px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '10px', fontSize: '13px', color: 'var(--at-success-strong)' }}>
                         ✅ GPS activo: {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
                       </div>
                     )}
                     {gpsError && !gpsLoading && (
-                      <div style={{ padding: '12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', fontSize: '13px', color: '#dc2626' }}>
+                      <div style={{ padding: '12px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '10px', fontSize: '13px', color: 'var(--at-danger)' }}>
                         ⚠️ {gpsError} — la lectura se guardará sin coordenadas
                       </div>
                     )}

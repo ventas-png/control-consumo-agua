@@ -362,7 +362,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
       html: `<b>${c.nombre}</b> será removido de esta empresa. El registro del cliente se mantendrá en la plataforma y podrá ser re-vinculado posteriormente.`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#ef4444',
+      confirmButtonColor: 'var(--at-danger)',
       cancelButtonColor: 'var(--at-ink-3)',
       confirmButtonText: 'Sí, quitar',
       cancelButtonText: 'Cancelar',
@@ -463,9 +463,9 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               title={count > 0 ? `${count} unidad${count !== 1 ? 'es' : ''} asignada${count !== 1 ? 's' : ''}` : 'Sin unidades asignadas'}
               style={{
                 padding: '4px 12px',
-                background: count > 0 ? '#f0fdf4' : 'var(--at-surface-2)',
-                color: count > 0 ? '#16a34a' : 'var(--at-ink-3)',
-                border: `1px solid ${count > 0 ? '#bbf7d0' : 'var(--at-line)'}`,
+                background: count > 0 ? 'var(--at-success-tint)' : 'var(--at-surface-2)',
+                color: count > 0 ? 'var(--at-success)' : 'var(--at-ink-3)',
+                border: `1px solid ${count > 0 ? 'var(--at-success-border)' : 'var(--at-line)'}`,
                 borderRadius: 20,
                 cursor: 'pointer',
                 fontWeight: 600,
@@ -498,7 +498,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
             <button
               onClick={() => handleEliminar(c)}
               style={{
-                padding: '5px 12px', background: '#fef2f2', color: '#dc2626',
+                padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)',
                 border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12,
               }}
             >
@@ -701,13 +701,13 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
       {onboardingStep === 'result_match2' && lookupResult && (
         <div>
           <div style={{
-            background: '#fffbeb',
-            border: '2px solid #f59e0b',
+            background: 'var(--at-warning-tint)',
+            border: '2px solid var(--at-warning)',
             borderRadius: '12px',
             padding: '20px',
             marginBottom: '20px',
           }}>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: '#92400e', marginBottom: '8px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--at-warning-strong)', marginBottom: '8px' }}>
               Coincidencia parcial encontrada
             </div>
             <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#78350f', lineHeight: '1.5' }}>
@@ -715,7 +715,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
               Sin embargo, el/los siguiente(s) dato(s) no coincide(n):
             </p>
             {lookupResult.mismatched_fields && lookupResult.mismatched_fields.length > 0 && (
-              <ul style={{ margin: '0 0 12px', paddingLeft: '20px', color: '#92400e', fontSize: '14px' }}>
+              <ul style={{ margin: '0 0 12px', paddingLeft: '20px', color: 'var(--at-warning-strong)', fontSize: '14px' }}>
                 {lookupResult.mismatched_fields.map(field => (
                   <li key={field} style={{ marginBottom: '4px', fontWeight: 600 }}>
                     {fieldLabelMap[field] || field}
@@ -953,8 +953,8 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
                     cursor: 'pointer',
                     fontWeight: 600,
                     fontSize: '13px',
-                    background: form.puede_crear_cuenta ? '#dcfce7' : 'var(--at-chip)',
-                    color: form.puede_crear_cuenta ? '#166534' : 'var(--at-ink-3)',
+                    background: form.puede_crear_cuenta ? 'var(--at-success-tint)' : 'var(--at-chip)',
+                    color: form.puede_crear_cuenta ? 'var(--at-success-strong)' : 'var(--at-ink-3)',
                   }}
                 >
                   {form.puede_crear_cuenta ? 'Sí' : 'No'}
@@ -1162,7 +1162,7 @@ function ContactoCell({ cliente: c }: { cliente: Cliente }) {
             href={`https://wa.me/${formatPhoneForWa(c.whatsapp)}`}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: '#16a34a', textDecoration: 'none' }}
+            style={{ color: 'var(--at-success)', textDecoration: 'none' }}
             title="Abrir WhatsApp"
           >
             💬 {sanitizeHTML(c.whatsapp)}
@@ -1189,8 +1189,8 @@ function CuentaCell({
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
       <span style={{
         ...pill,
-        background: c.puede_crear_cuenta ? '#dcfce7' : 'var(--at-chip)',
-        color: c.puede_crear_cuenta ? '#166534' : 'var(--at-ink-3)',
+        background: c.puede_crear_cuenta ? 'var(--at-success-tint)' : 'var(--at-chip)',
+        color: c.puede_crear_cuenta ? 'var(--at-success-strong)' : 'var(--at-ink-3)',
       }}>
         {c.puede_crear_cuenta ? 'Habilitado' : 'Deshabilitado'}
       </span>
@@ -1203,8 +1203,8 @@ function CuentaCell({
               title={activoEntry.activo ? 'Clic para ocultar datos al cliente' : 'Clic para mostrar datos al cliente'}
               style={{
                 ...pill, border: 'none', cursor: 'pointer',
-                background: activoEntry.activo ? '#f0fdf4' : '#fff7ed',
-                color: activoEntry.activo ? '#15803d' : '#c2410c',
+                background: activoEntry.activo ? 'var(--at-success-tint)' : 'var(--at-warning-tint)',
+                color: activoEntry.activo ? 'var(--at-success-strong)' : 'var(--at-warning-strong)',
               }}
             >
               {activoEntry.activo ? '● Datos visibles' : '○ Datos ocultos'}

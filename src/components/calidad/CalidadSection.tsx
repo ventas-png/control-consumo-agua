@@ -203,9 +203,9 @@ export function CalidadSection({
         const cumple = r.cumplimiento[p.key]
         const rango = p.min === p.max && p.min === 0 ? '= 0' : p.min > 0 ? `${p.min} – ${p.max}` : `≤ ${p.max}`
         const badge = cumple === null || val === undefined ? '<span style="color:var(--at-ink-3);">—</span>'
-          : cumple ? '<span style="color:#166534;font-weight:600;">✅ CUMPLE</span>'
-          : '<span style="color:#991b1b;font-weight:600;">❌ NO CUMPLE</span>'
-        filas += `<tr style="border-bottom:1px solid var(--at-chip);${cumple === false ? 'background:#fff5f5;' : cumple === true ? 'background:#f0fdf4;' : ''}">
+          : cumple ? '<span style="color:var(--at-success-strong);font-weight:600;">✅ CUMPLE</span>'
+          : '<span style="color:var(--at-danger-strong);font-weight:600;">❌ NO CUMPLE</span>'
+        filas += `<tr style="border-bottom:1px solid var(--at-chip);${cumple === false ? 'background:#fff5f5;' : cumple === true ? 'background:var(--at-success-tint);' : ''}">
           <td style="padding:8px;font-size:13px;">${p.label}</td>
           <td style="padding:8px;font-size:13px;text-align:center;">${p.unidad || '—'}</td>
           <td style="padding:8px;font-size:13px;text-align:center;">${val !== undefined ? val : '—'}</td>
@@ -220,7 +220,7 @@ export function CalidadSection({
         <strong>Fecha:</strong> ${new Date(r.fecha).toLocaleString('es-GT')}<br>
         <strong>Tipología:</strong> ${tipologia ? tipologia.label : fuente?.tipo_agua ?? ''}<br>
         ${r.observaciones ? '<strong>Obs.:</strong> ' + sanitizeHTML(r.observaciones) + '<br>' : ''}
-        <strong>Resultado:</strong> ${r.cumple_total ? '<span style="color:#166534;font-weight:700;">✅ CUMPLE</span>' : '<span style="color:#991b1b;font-weight:700;">❌ NO CUMPLE</span>'}
+        <strong>Resultado:</strong> ${r.cumple_total ? '<span style="color:var(--at-success-strong);font-weight:700;">✅ CUMPLE</span>' : '<span style="color:var(--at-danger-strong);font-weight:700;">❌ NO CUMPLE</span>'}
       </div>
       <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -333,14 +333,14 @@ export function CalidadSection({
                         <td style={{ padding: '10px' }}>{sanitizeHTML(f.nombre)}</td>
                         <td style={{ padding: '10px', fontSize: '13px' }}>{tipologia?.label ?? f.tipo_agua}</td>
                         <td style={{ padding: '10px' }}>
-                          <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, background: f.activo ? '#dcfce7' : '#fee2e2', color: f.activo ? '#166534' : '#991b1b' }}>
+                          <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, background: f.activo ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', color: f.activo ? 'var(--at-success-strong)' : 'var(--at-danger-strong)' }}>
                             {f.activo ? 'Activa' : 'Inactiva'}
                           </span>
                         </td>
                         <td style={{ padding: '10px' }}>
                           <div style={{ display: 'flex', gap: '6px' }}>
                             <button onClick={() => editarFuente(f)} style={{ background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>✏️ Editar</button>
-                            <button onClick={() => toggleFuente(f.id, f.activo)} style={{ background: f.activo ? '#f59e0b' : '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>
+                            <button onClick={() => toggleFuente(f.id, f.activo)} style={{ background: f.activo ? 'var(--at-warning)' : 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>
                               {f.activo ? '⏸ Desactivar' : '▶ Activar'}
                             </button>
                           </div>
@@ -395,7 +395,7 @@ export function CalidadSection({
                         type="number" step="any" value={val}
                         onChange={e => setParametroValues(prev => ({ ...prev, [p.key]: e.target.value }))}
                         placeholder="Ingrese valor"
-                        style={{ ...inputStyle, borderColor: ok === null ? 'var(--at-line)' : ok ? '#10b981' : '#ef4444' }}
+                        style={{ ...inputStyle, borderColor: ok === null ? 'var(--at-line)' : ok ? 'var(--at-success)' : 'var(--at-danger)' }}
                       />
                     </div>
                   )
@@ -406,7 +406,7 @@ export function CalidadSection({
                 <div style={{ fontWeight: 600, marginBottom: '8px', fontSize: '14px' }}>Resumen de Cumplimiento</div>
                 {cvl.total === 0
                   ? <span style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>Ingrese los valores para ver el cumplimiento.</span>
-                  : <span style={{ background: cvl.noCumple === 0 ? '#dcfce7' : '#fee2e2', color: cvl.noCumple === 0 ? '#166534' : '#991b1b', padding: '4px 12px', borderRadius: '8px', fontWeight: 600 }}>
+                  : <span style={{ background: cvl.noCumple === 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', color: cvl.noCumple === 0 ? 'var(--at-success-strong)' : 'var(--at-danger-strong)', padding: '4px 12px', borderRadius: '8px', fontWeight: 600 }}>
                     {cvl.noCumple === 0 ? '✅ CUMPLE' : '❌ NO CUMPLE'} — {cvl.cumple}/{cvl.total + cvl.pendiente} parámetros OK{cvl.pendiente > 0 ? `, ${cvl.pendiente} pendiente(s)` : ''}
                   </span>
                 }
@@ -427,7 +427,7 @@ export function CalidadSection({
                 <input type="file" accept=".pdf,image/*" hidden onChange={handleReporteFile} />
               </label>
               <span style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>{reporteNombre ?? 'Ningún archivo seleccionado'}</span>
-              {reporteNombre && <button onClick={() => { setReporteBase64(null); setReporteTipo(null); setReporteNombre(null) }} style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '13px' }}>✕ Quitar</button>}
+              {reporteNombre && <button onClick={() => { setReporteBase64(null); setReporteTipo(null); setReporteNombre(null) }} style={{ background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '6px', padding: '6px 12px', cursor: 'pointer', fontSize: '13px' }}>✕ Quitar</button>}
             </div>
           </div>
 
@@ -501,7 +501,7 @@ export function CalidadSection({
                       <td style={{ padding: '10px', fontWeight: 600, color: 'var(--at-primary-hover)' }}>{fuente ? sanitizeHTML(fuente.identificador) : '—'}</td>
                       <td style={{ padding: '10px', fontSize: '13px' }}>{tipologia?.label ?? fuente?.tipo_agua ?? '—'}</td>
                       <td style={{ padding: '10px', textAlign: 'center' }}>
-                        <span style={{ background: r.cumple_total ? '#dcfce7' : '#fee2e2', color: r.cumple_total ? '#166534' : '#991b1b', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600 }}>
+                        <span style={{ background: r.cumple_total ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', color: r.cumple_total ? 'var(--at-success-strong)' : 'var(--at-danger-strong)', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600 }}>
                           {r.cumple_total ? '✅ CUMPLE' : '❌ NO CUMPLE'}
                         </span>
                       </td>
@@ -512,7 +512,7 @@ export function CalidadSection({
                           <button onClick={async () => {
                             const { generarPDFAnalisis } = await import('../../lib/pdf')
                             generarPDFAnalisis(r, empresa)
-                          }} style={{ background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
+                          }} style={{ background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
                           {r.reporte_base64 && <button onClick={() => verReporte(r)} style={{ background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', cursor: 'pointer', fontSize: '12px' }}>📎 Reporte</button>}
                         </div>
                       </td>

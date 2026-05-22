@@ -207,7 +207,7 @@ export function TarifasSection({
       html: `<b>${t.nombre}</b> será eliminada permanentemente.`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#ef4444',
+      confirmButtonColor: 'var(--at-danger)',
       cancelButtonColor: 'var(--at-ink-3)',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
@@ -439,8 +439,8 @@ export function TarifasSection({
                   cursor: 'pointer',
                   fontWeight: 600,
                   fontSize: '13px',
-                  background: form.activa ? '#dcfce7' : '#fee2e2',
-                  color: form.activa ? '#166534' : '#991b1b',
+                  background: form.activa ? 'var(--at-success-tint)' : 'var(--at-danger-tint)',
+                  color: form.activa ? 'var(--at-success-strong)' : 'var(--at-danger-strong)',
                 }}
               >
                 {form.activa ? 'Activa' : 'Inactiva'}
@@ -587,8 +587,8 @@ export function TarifasSection({
                             cursor: 'pointer',
                             fontWeight: 600,
                             fontSize: '12px',
-                            background: t.activa ? '#dcfce7' : '#fee2e2',
-                            color: t.activa ? '#166534' : '#991b1b',
+                            background: t.activa ? 'var(--at-success-tint)' : 'var(--at-danger-tint)',
+                            color: t.activa ? 'var(--at-success-strong)' : 'var(--at-danger-strong)',
                           }}
                         >
                           {t.activa ? 'Activa' : 'Inactiva'}
@@ -599,8 +599,8 @@ export function TarifasSection({
                           borderRadius: '20px',
                           fontWeight: 600,
                           fontSize: '12px',
-                          background: t.activa ? '#dcfce7' : '#fee2e2',
-                          color: t.activa ? '#166534' : '#991b1b',
+                          background: t.activa ? 'var(--at-success-tint)' : 'var(--at-danger-tint)',
+                          color: t.activa ? 'var(--at-success-strong)' : 'var(--at-danger-strong)',
                         }}>
                           {t.activa ? 'Activa' : 'Inactiva'}
                         </span>
@@ -611,9 +611,9 @@ export function TarifasSection({
                         const status = getRevisionStatus(t)
                         if (status === 'none') return <span style={{ color: 'var(--at-ink-3)', fontSize: '12px' }}>—</span>
                         const cfg = {
-                          expired: { bg: '#fee2e2', color: '#991b1b', prefix: 'Vencida: ' },
-                          soon:    { bg: '#fef9c3', color: '#854d0e', prefix: 'Próxima: ' },
-                          ok:      { bg: '#dcfce7', color: '#166534', prefix: '' },
+                          expired: { bg: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', prefix: 'Vencida: ' },
+                          soon:    { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', prefix: 'Próxima: ' },
+                          ok:      { bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)', prefix: '' },
                         }[status]
                         return (
                           <span style={{
@@ -648,8 +648,8 @@ export function TarifasSection({
                             onClick={() => handleEliminar(t)}
                             style={{
                               padding: '5px 12px',
-                              background: '#fef2f2',
-                              color: '#dc2626',
+                              background: 'var(--at-danger-tint)',
+                              color: 'var(--at-danger)',
                               border: 'none',
                               borderRadius: '6px',
                               cursor: 'pointer',

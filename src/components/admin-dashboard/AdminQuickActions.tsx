@@ -16,14 +16,14 @@ export function AdminQuickActions({ onNavigate }: Props) {
       label: 'Armar Rutas',
       description: 'Crear/editar rutas',
       icon: '🚗',
-      color: '#f59e0b',
+      color: 'var(--at-warning)',
     },
     {
       id: 'contadores',
       label: 'Contadores',
       description: 'Gestionar contadores',
       icon: '📊',
-      color: '#10b981',
+      color: 'var(--at-success)',
     },
     {
       id: 'calidad',

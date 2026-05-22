@@ -87,9 +87,9 @@ export function MapaSection({ clientes, registros }: Props) {
       <div style={{ padding: '15px 20px', background: 'var(--at-surface)', borderBottom: '1px solid var(--at-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ margin: 0, fontSize: '18px' }}>Geolocalización de Medidores</h3>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <span style={{ padding: '4px 12px', background: '#fee2e2', color: '#991b1b', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>🔴 Mora</span>
-          <span style={{ padding: '4px 12px', background: '#fef3c7', color: '#92400e', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>🟡 Pendiente</span>
-          <span style={{ padding: '4px 12px', background: '#d1fae5', color: '#065f46', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>🟢 Pagado</span>
+          <span style={{ padding: '4px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>🔴 Mora</span>
+          <span style={{ padding: '4px 12px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>🟡 Pendiente</span>
+          <span style={{ padding: '4px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>🟢 Pagado</span>
         </div>
       </div>
       <div ref={mapRef} style={{ flex: 1, width: '100%' }} />

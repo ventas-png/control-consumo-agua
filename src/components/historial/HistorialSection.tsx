@@ -21,9 +21,9 @@ interface Props {
 }
 
 const ESTADO_PILL: Record<string, { bg: string; color: string; icon: string }> = {
-  pendiente: { bg: '#fef3c7', color: '#92400e', icon: '⏳' },
-  pagado:    { bg: '#d1fae5', color: '#065f46', icon: '✓' },
-  mora:      { bg: '#fee2e2', color: '#991b1b', icon: '⚠️' },
+  pendiente: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', icon: '⏳' },
+  pagado:    { bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)', icon: '✓' },
+  mora:      { bg: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', icon: '⚠️' },
 }
 
 const TIPO_AGUA_LABELS: Record<string, string> = {
@@ -257,9 +257,9 @@ export function HistorialSection({
         <StatCard label="Total Registros" value={String(stats.totalRegistros)} color="#1B3B36" icon="📝" moneda={moneda} />
         <StatCard label="Total Consumo" value={`${formatNumber(stats.totalConsumo)} m³`} color="#577B69" icon="💧" moneda={moneda} />
         <StatCard label="Total Monto" value={stats.totalMonto} color="#B96A3F" icon="💰" moneda={moneda} />
-        <StatCard label="Pagado" value={stats.pagado} color="#10b981" icon="✓" moneda={moneda} />
-        <StatCard label="Pendiente" value={stats.pendiente} color="#f59e0b" icon={`⏳ (${stats.countPendiente})`} moneda={moneda} />
-        <StatCard label="En Mora" value={stats.mora} color="#ef4444" icon={`⚠️ (${stats.countMora})`} moneda={moneda} />
+        <StatCard label="Pagado" value={stats.pagado} color="var(--at-success)" icon="✓" moneda={moneda} />
+        <StatCard label="Pendiente" value={stats.pendiente} color="var(--at-warning)" icon={`⏳ (${stats.countPendiente})`} moneda={moneda} />
+        <StatCard label="En Mora" value={stats.mora} color="var(--at-danger)" icon={`⚠️ (${stats.countMora})`} moneda={moneda} />
       </div>
 
       {/* Filters Panel */}
@@ -358,7 +358,7 @@ export function HistorialSection({
                   <span style={pillStyle(p)}>{p.icon} {r.estado}</span>
                   <div style={{ display: 'flex', gap: 6 }}>
                     {canEdit && (
-                      <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado })} style={{ padding: '6px 10px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>✏️</button>
+                      <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado })} style={{ padding: '6px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>✏️</button>
                     )}
                     <button onClick={() => enviarWhatsApp(r)} style={{ padding: '6px 10px', background: '#25D366', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>💬</button>
                   </div>
@@ -523,7 +523,7 @@ const filterFieldStyle: CSSProperties = {
 
 const btnEditStyle: CSSProperties = {
   padding: '8px 12px', minHeight: 36,
-  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+  background: 'linear-gradient(135deg, var(--at-warning) 0%, var(--at-warning) 100%)',
   color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
   fontSize: 12, fontWeight: 600,
 }

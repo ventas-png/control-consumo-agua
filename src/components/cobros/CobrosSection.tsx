@@ -275,9 +275,9 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
       {/* Header con resumen */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '16px', marginBottom: '28px' }}>
         {[
-          { label: 'Total por Cobrar', value: `${moneda} ${totalPendiente.toFixed(2)}`, icon: '💰', bg: 'linear-gradient(135deg,#f59e0b,#d97706)', },
-          { label: 'En Mora', value: `${countMora} cobro${countMora !== 1 ? 's' : ''}`, icon: '⚠️', bg: 'linear-gradient(135deg,#ef4444,#dc2626)', },
-          { label: 'Pagos Hoy', value: pagos.filter(p => p.created_at?.startsWith(new Date().toISOString().split('T')[0])).length.toString(), icon: '✅', bg: 'linear-gradient(135deg,#10b981,#059669)', },
+          { label: 'Total por Cobrar', value: `${moneda} ${totalPendiente.toFixed(2)}`, icon: '💰', bg: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', },
+          { label: 'En Mora', value: `${countMora} cobro${countMora !== 1 ? 's' : ''}`, icon: '⚠️', bg: 'linear-gradient(135deg,var(--at-danger),var(--at-danger))', },
+          { label: 'Pagos Hoy', value: pagos.filter(p => p.created_at?.startsWith(new Date().toISOString().split('T')[0])).length.toString(), icon: '✅', bg: 'linear-gradient(135deg,var(--at-success),var(--at-success-strong))', },
           { label: 'Convenios Activos', value: convenios.filter(c => c.estado === 'activo').length.toString(), icon: '🤝', bg: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', },
         ].map((s, i) => (
           <div key={i} style={{ background: s.bg, borderRadius: '16px', padding: '20px', color: 'white', boxShadow: '0 8px 20px rgba(0,0,0,0.12)' }}>
@@ -333,7 +333,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
               <>
                 <button onClick={marcarMora} style={{
                   padding: '10px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                  background: '#fee2e2', color: '#dc2626', fontWeight: 600, fontSize: '13px',
+                  background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontWeight: 600, fontSize: '13px',
                 }}>
                   ⚠️ Marcar mora ({selectedRows.size})
                 </button>
@@ -403,17 +403,17 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                         <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--at-ink)' }}>
                           {total.toFixed(2)}
                         </td>
-                        <td className="table-col-secondary" style={{ padding: '14px 16px', textAlign: 'right', color: abonado > 0 ? '#10b981' : 'var(--at-ink-3)' }}>
+                        <td className="table-col-secondary" style={{ padding: '14px 16px', textAlign: 'right', color: abonado > 0 ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                           {abonado > 0 ? abonado.toFixed(2) : '—'}
                         </td>
-                        <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: isMora ? '#dc2626' : '#f59e0b', fontSize: '15px' }}>
+                        <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: isMora ? 'var(--at-danger)' : 'var(--at-warning)', fontSize: '15px' }}>
                           {saldo.toFixed(2)}
                         </td>
                         <td style={{ padding: '14px 16px' }}>
                           <span style={{
                             padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700,
-                            background: isMora ? '#fee2e2' : '#fef3c7',
-                            color: isMora ? '#dc2626' : '#b45309',
+                            background: isMora ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)',
+                            color: isMora ? 'var(--at-danger)' : 'var(--at-warning-strong)',
                           }}>
                             {isMora ? '⚠ Mora' : '⏳ Pendiente'}
                           </span>
@@ -498,8 +498,8 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                               borderRadius: '20px',
                               fontSize: '11px',
                               fontWeight: 700,
-                              background: '#fef3c7',
-                              color: '#b45309',
+                              background: 'var(--at-warning-tint)',
+                              color: 'var(--at-warning-strong)',
                             }}>
                               ⏳ Pendiente de verificación
                             </span>
@@ -537,7 +537,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                               padding: '10px',
                               borderRadius: '8px',
                               border: 'none',
-                              background: verificando === pago.id ? 'var(--at-line-strong)' : '#10b981',
+                              background: verificando === pago.id ? 'var(--at-line-strong)' : 'var(--at-success)',
                               color: 'white',
                               fontWeight: 700,
                               fontSize: '13px',
@@ -553,9 +553,9 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                             style={{
                               padding: '10px',
                               borderRadius: '8px',
-                              border: '1.5px solid #ef4444',
+                              border: '1.5px solid var(--at-danger)',
                               background: 'var(--at-surface)',
-                              color: '#ef4444',
+                              color: 'var(--at-danger)',
                               fontWeight: 700,
                               fontSize: '13px',
                               cursor: verificando === pago.id ? 'not-allowed' : 'pointer',
@@ -647,9 +647,9 @@ interface ConveniosListaProps {
 
 function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: ConveniosListaProps) {
   const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
-    activo:     { label: 'Activo',      bg: '#dcfce7', color: '#15803d' },
+    activo:     { label: 'Activo',      bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)' },
     completado: { label: 'Completado',  bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
-    incumplido: { label: 'Incumplido',  bg: '#fee2e2', color: '#dc2626' },
+    incumplido: { label: 'Incumplido',  bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
     cancelado:  { label: 'Cancelado',   bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
   }
 
@@ -702,7 +702,7 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
                     <button onClick={() => cambiarEstado(conv.id, 'completado')} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', fontSize: '12px', fontWeight: 600 }}>
                       ✓ Completar
                     </button>
-                    <button onClick={() => cambiarEstado(conv.id, 'incumplido')} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: '#fee2e2', color: '#dc2626', fontSize: '12px', fontWeight: 600 }}>
+                    <button onClick={() => cambiarEstado(conv.id, 'incumplido')} style={{ padding: '5px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontSize: '12px', fontWeight: 600 }}>
                       ✗ Incumplido
                     </button>
                   </div>
@@ -713,11 +713,11 @@ function ConveniosLista({ convenios, clientes, moneda, canEdit, onRefresh }: Con
             {/* Barra de progreso */}
             <div style={{ marginTop: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
-                <span style={{ color: 'var(--at-ink-3)' }}>Pagado: <strong style={{ color: '#10b981' }}>{moneda} {conv.monto_pagado.toFixed(2)}</strong></span>
+                <span style={{ color: 'var(--at-ink-3)' }}>Pagado: <strong style={{ color: 'var(--at-success)' }}>{moneda} {conv.monto_pagado.toFixed(2)}</strong></span>
                 <span style={{ color: 'var(--at-ink-3)' }}>Total: <strong style={{ color: 'var(--at-ink)' }}>{moneda} {conv.monto_total.toFixed(2)}</strong></span>
               </div>
               <div style={{ height: '8px', background: 'var(--at-line)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: pct >= 100 ? '#10b981' : 'var(--at-primary)', borderRadius: '4px', transition: 'width 0.3s' }} />
+                <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: pct >= 100 ? 'var(--at-success)' : 'var(--at-primary)', borderRadius: '4px', transition: 'width 0.3s' }} />
               </div>
               <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '4px', textAlign: 'right' }}>{pct.toFixed(1)}% completado</div>
             </div>

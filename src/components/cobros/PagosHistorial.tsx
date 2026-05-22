@@ -41,12 +41,12 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
   const totalPagos = pagosFiltrados.reduce((acc, p) => acc + p.monto, 0)
 
   const METODO_COLOR: Record<string, { bg: string; color: string }> = {
-    efectivo:       { bg: '#dcfce7', color: '#15803d' },
+    efectivo:       { bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)' },
     transferencia:  { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
     deposito:       { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
     tarjeta_credito:{ bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)' },
     tarjeta_debito: { bg: '#f5d0fe', color: '#a21caf' },
-    cheque:         { bg: '#fef9c3', color: '#854d0e' },
+    cheque:         { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
     convenio_pago:  { bg: '#fce7f3', color: '#be185d' },
     otro:           { bg: 'var(--at-chip)', color: 'var(--at-ink-2)' },
   }
@@ -81,11 +81,11 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
       </div>
 
       {/* Resumen */}
-      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: '14px', color: '#15803d', fontWeight: 600 }}>
+      <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: '14px', color: 'var(--at-success-strong)', fontWeight: 600 }}>
           {pagosFiltrados.length} pago{pagosFiltrados.length !== 1 ? 's' : ''}
         </span>
-        <span style={{ fontSize: '18px', fontWeight: 700, color: '#15803d' }}>
+        <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--at-success-strong)' }}>
           Total: {moneda} {totalPagos.toFixed(2)}
         </span>
       </div>
@@ -120,7 +120,7 @@ export function PagosHistorial({ pagos, clientes, moneda, loading, formasPagoLab
                         <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{cliente?.nombre ?? '—'}</div>
                         <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{cliente?.codigo}</div>
                       </td>
-                      <td style={{ padding: '14px 16px', fontWeight: 700, color: '#10b981', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '14px 16px', fontWeight: 700, color: 'var(--at-success)', whiteSpace: 'nowrap' }}>
                         {moneda} {p.monto.toFixed(2)}
                       </td>
                       <td style={{ padding: '14px 16px' }}>
