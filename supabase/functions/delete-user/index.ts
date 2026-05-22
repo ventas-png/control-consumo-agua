@@ -154,8 +154,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 1) Delete the profile row. user_roles cascades; audit/author links across
-    //    the schema are cleared to NULL (see migration 20260522000001).
+    // 1) Remove RBAC role assignments first. The audit trigger on user_roles
+    //    (trg_audit_user_roles) inserts into permission_audit_log with
+    //    target_user_id = this user; doing it while the app_users row still
+    //    exists keeps that insert valid. Letting the app_users delete cascade
+    //    into user_roles instead fires the trigger after the row is gone, which
+    //    violates permission_audit_log_target_user_id_fkey.
+    const { error: rolesDelError } = await adminClient.from('user_roles').delete().eq('user_id', targetId)
+    if (rolesDelError) {
+      return new Response(JSON.stringify({ error: 'No se pudieron eliminar los roles del usuario: ' + rolesDelError.message }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // 2) Delete the profile row. Audit/author links across the schema are
+    //    cleared to NULL (see migration 20260522000001).
     const { error: profileDelError } = await adminClient.from('app_users').delete().eq('id', targetId)
     if (profileDelError) {
       return new Response(JSON.stringify({ error: 'No se pudo eliminar el perfil: ' + profileDelError.message }), {
@@ -163,7 +176,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // 2) Delete the auth login so the person can no longer sign in.
+    // 3) Delete the auth login so the person can no longer sign in.
     const { error: authDelError } = await adminClient.auth.admin.deleteUser(targetId)
     if (authDelError) {
       // Profile is already gone, so the user has effectively lost access; surface
@@ -173,7 +186,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // 3) Audit (best-effort). target_user_id is intentionally null — the row is
+    // 4) Audit (best-effort). target_user_id is intentionally null — the row is
     //    gone — so the identity is preserved in details instead.
     await adminClient.from('permission_audit_log').insert({
       actor_id: caller.id,
