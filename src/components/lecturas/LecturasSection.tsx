@@ -28,7 +28,7 @@ export function LecturasSection({
   contadores,
   registros,
   tarifas,
-  userRole,
+  userRole: _userRole,
   currentUser: _currentUser,
   proyectos = [],
   moneda = 'Q',
@@ -36,7 +36,7 @@ export function LecturasSection({
   rutaActiva,
   onClearRuta,
   onRutaCompletada,
-  canCreate: _canCreate = true,
+  canCreate = true,
 }: Props) {
   // Derive project_id from selected unidad/contador, then fall back to single-project context
   const defaultProjectId = proyectos.length === 1 ? proyectos[0].id : null
@@ -127,7 +127,10 @@ export function LecturasSection({
     return () => navigator.geolocation.clearWatch(watchId)
   }, [])
 
-  const canEdit = userRole !== 'viewer'
+  // Quién puede registrar lecturas se decide por permiso RBAC (agua.lecturas.create),
+  // no por el rol de plataforma: un "Operador Agua" tiene role='viewer' pero sí debe
+  // poder guardar. Usar userRole !== 'viewer' ocultaba el botón Guardar para ellos.
+  const canEdit = canCreate
 
   const unidadSeleccionada = unidades.find(u => u.id === selectedUnidadId) ?? null
   const clienteDeUnidad = unidadSeleccionada?.cliente_id
