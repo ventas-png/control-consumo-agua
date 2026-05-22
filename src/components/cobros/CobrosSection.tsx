@@ -478,7 +478,7 @@ export function CobrosSection({ registros, clientes, userRole, currentUser, mone
                         background: 'var(--at-surface)',
                         borderRadius: '12px',
                         padding: '16px',
-                        border: '2px solid #fbbf24',
+                        border: '2px solid var(--at-warning)',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
                       }}
                     >

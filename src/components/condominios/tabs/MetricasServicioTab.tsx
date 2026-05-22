@@ -63,8 +63,8 @@ export default function MetricasServicioTab({ tickets, sugerencias, visitantes, 
   const maxCat = Math.max(...porCategoria.map(c => c.count), 1)
 
   const CAT_ICON: Record<string, string> = { instalaciones: '🔧', seguridad: '🛡️', servicios: '🧹', convivencia: '🤝', otro: '💬' }
-  const PRIOR_COLOR: Record<string, string> = { urgente: 'var(--at-danger)', alta: 'var(--at-warning)', media: '#fbbf24', baja: 'var(--at-success-border)' }
-  const ESTADO_COLOR: Record<string, string> = { abierto: 'var(--at-danger)', en_proceso: 'var(--at-warning)', resuelto: '#4ade80', cerrado: 'var(--at-ink-3)' }
+  const PRIOR_COLOR: Record<string, string> = { urgente: 'var(--at-danger)', alta: 'var(--at-warning)', media: 'var(--at-warning)', baja: 'var(--at-success-border)' }
+  const ESTADO_COLOR: Record<string, string> = { abierto: 'var(--at-danger)', en_proceso: 'var(--at-warning)', resuelto: 'var(--at-success)', cerrado: 'var(--at-ink-3)' }
 
   function kpiCard(label: string, val: string | number, sub: string, color: string, bg: string) {
     return (

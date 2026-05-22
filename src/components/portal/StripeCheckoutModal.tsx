@@ -54,7 +54,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
         title: 'Integración Stripe',
         html: `
           <p>Redirigiendo a Stripe para procesar el pago...</p>
-          <p style="font-family: monospace; font-size: 11px; color: #666; margin-top: 12px;">
+          <p style="font-family: monospace; font-size: 11px; color: var(--at-ink-3); margin-top: 12px;">
             Client Secret: ${clientSecret.substring(0, 20)}...
           </p>
         `,

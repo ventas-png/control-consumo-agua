@@ -749,7 +749,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                             : isAgent
                             ? 'var(--at-primary)'
                             : 'var(--at-chip)',
-                          color: isNote ? '#78350f' : isAgent ? 'white' : 'var(--at-ink)',
+                          color: isNote ? 'var(--at-warning-strong)' : isAgent ? 'white' : 'var(--at-ink)',
                           border: isNote ? '1px solid var(--at-warning-border)' : 'none',
                           boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                         }}>

@@ -104,7 +104,7 @@ export default function KpisFinancierosTab({ cuotas, gastos, unidades, moneda }:
         <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 12, padding: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Antigüedad de deuda</div>
           {[
-            { label: '0–30 días', items: aging30, color: '#fbbf24' },
+            { label: '0–30 días', items: aging30, color: 'var(--at-warning)' },
             { label: '31–60 días', items: aging60, color: 'var(--at-warning)' },
             { label: '61–90 días', items: aging90, color: 'var(--at-danger)' },
             { label: '+90 días', items: aging90plus, color: 'var(--at-danger-strong)' },

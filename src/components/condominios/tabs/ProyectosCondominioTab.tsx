@@ -22,9 +22,9 @@ const CAT_CFG: Record<CategoriaProyectoCond, { label: string; icon: string; colo
 }
 const ESTADO_CFG: Record<EstadoProyectoCond, { label: string; bg: string; color: string; barColor: string }> = {
   planificado:  { label: 'Planificado',  bg: 'var(--at-primary-tint)', color: 'var(--at-primary)', barColor: 'var(--at-accent-2)' },
-  en_progreso:  { label: 'En progreso',  bg: 'var(--at-warning-tint)', color: 'var(--at-warning)', barColor: '#fbbf24' },
+  en_progreso:  { label: 'En progreso',  bg: 'var(--at-warning-tint)', color: 'var(--at-warning)', barColor: 'var(--at-warning)' },
   pausado:      { label: 'Pausado',      bg: 'var(--at-chip)', color: 'var(--at-ink-3)', barColor: 'var(--at-line-strong)' },
-  completado:   { label: 'Completado',   bg: 'var(--at-success-tint)', color: 'var(--at-success)', barColor: '#4ade80' },
+  completado:   { label: 'Completado',   bg: 'var(--at-success-tint)', color: 'var(--at-success)', barColor: 'var(--at-success)' },
   cancelado:    { label: 'Cancelado',    bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', barColor: 'var(--at-danger-border)' },
 }
 

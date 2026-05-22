@@ -90,7 +90,7 @@ export function RutasSection({
   const labelStyle: CSSProperties = {
     fontSize: '13px',
     fontWeight: 600,
-    color: '#4a5568',
+    color: 'var(--at-ink-2)',
     marginBottom: '4px',
     display: 'block',
   }

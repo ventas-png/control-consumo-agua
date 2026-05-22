@@ -393,7 +393,7 @@ export function LecturasSection({
   }
 
   const inputStyle: CSSProperties = { padding: '12px 16px', border: '2px solid var(--at-line)', borderRadius: '10px', fontSize: '15px', width: '100%', boxSizing: 'border-box' }
-  const labelStyle: CSSProperties = { fontSize: '14px', fontWeight: 600, color: '#4a5568', marginBottom: '6px', display: 'block' }
+  const labelStyle: CSSProperties = { fontSize: '14px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px', display: 'block' }
 
   const consumoInvalido = consumo !== null && consumo < 0
 
@@ -547,7 +547,7 @@ export function LecturasSection({
                   </div>
                   <div>
                     <label style={labelStyle}>Consumo Calculado (m³)</label>
-                    <input type="text" readOnly value={consumo !== null ? (consumoInvalido ? consumo.toFixed(2) + ' (ERROR)' : consumo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? 'var(--at-danger)' : 'var(--at-primary)', background: '#f7fafc' }} />
+                    <input type="text" readOnly value={consumo !== null ? (consumoInvalido ? consumo.toFixed(2) + ' (ERROR)' : consumo.toFixed(2)) : ''} style={{ ...inputStyle, fontWeight: 'bold', color: consumoInvalido ? 'var(--at-danger)' : 'var(--at-primary)', background: 'var(--at-surface-2)' }} />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={labelStyle}>Desglose de Cobro</label>
@@ -556,25 +556,25 @@ export function LecturasSection({
                         {calculo.desglose.tramo === 1 && (
                           <>
                             <div>Consumo <strong>{consumo?.toFixed(2)} m³</strong> ≤ mínimo <strong>{tarifaDelContador?.consumo_minimo ?? 0} m³</strong> → Solo canon fijo</div>
-                            <div style={{ marginTop: '6px', fontSize: '15px', fontWeight: 700 }}>Total: {moneda}{calculo.total.toFixed(2)} <span style={{ fontSize: '11px', fontWeight: 400, color: '#4ade80' }}>({calculo.tipo_cobro})</span></div>
+                            <div style={{ marginTop: '6px', fontSize: '15px', fontWeight: 700 }}>Total: {moneda}{calculo.total.toFixed(2)} <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--at-success)' }}>({calculo.tipo_cobro})</span></div>
                           </>
                         )}
                         {calculo.desglose.tramo === 2 && (
                           <>
                             <div><strong>{calculo.desglose.consumo_m3?.toFixed(2)} m³</strong> × {moneda}{calculo.desglose.precio_m3?.toFixed(2)}/m³</div>
-                            <div style={{ marginTop: '6px', fontSize: '15px', fontWeight: 700 }}>Total: {moneda}{calculo.total.toFixed(2)} <span style={{ fontSize: '11px', fontWeight: 400, color: '#4ade80' }}>({calculo.tipo_cobro})</span></div>
+                            <div style={{ marginTop: '6px', fontSize: '15px', fontWeight: 700 }}>Total: {moneda}{calculo.total.toFixed(2)} <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--at-success)' }}>({calculo.tipo_cobro})</span></div>
                           </>
                         )}
                         {calculo.desglose.tramo === 3 && (
                           <>
                             <div>Derecho: <strong>{calculo.desglose.derecho_m3?.toFixed(2)} m³</strong> × {moneda}{calculo.desglose.precio_m3?.toFixed(2)}/m³ = {moneda}{calculo.desglose.monto_base?.toFixed(2)}</div>
                             <div>+ Exceso: <strong>{calculo.desglose.exceso_m3?.toFixed(2)} m³</strong> × {moneda}{calculo.desglose.precio_exceso?.toFixed(2)}/m³ = {moneda}{calculo.desglose.monto_exceso?.toFixed(2)}</div>
-                            <div style={{ marginTop: '6px', fontSize: '15px', fontWeight: 700 }}>Total: {moneda}{calculo.total.toFixed(2)} <span style={{ fontSize: '11px', fontWeight: 400, color: '#4ade80' }}>({calculo.tipo_cobro})</span></div>
+                            <div style={{ marginTop: '6px', fontSize: '15px', fontWeight: 700 }}>Total: {moneda}{calculo.total.toFixed(2)} <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--at-success)' }}>({calculo.tipo_cobro})</span></div>
                           </>
                         )}
                       </div>
                     ) : (
-                      <div style={{ ...inputStyle, color: 'var(--at-ink-3)', background: '#f7fafc' }}>—</div>
+                      <div style={{ ...inputStyle, color: 'var(--at-ink-3)', background: 'var(--at-surface-2)' }}>—</div>
                     )}
                   </div>
                   <div>
@@ -585,7 +585,7 @@ export function LecturasSection({
                         <div style={{ fontSize: '11px', color: 'var(--at-warning-strong)', marginTop: '4px' }}>Primera lectura — puede establecer la fecha de inicio del servicio</div>
                       </>
                     ) : (
-                      <input type="date" readOnly value={fechaLecturaAnterior ? fechaLecturaAnterior.split('T')[0] : ''} style={{ ...inputStyle, background: '#f7fafc', color: 'var(--at-ink)' }} />
+                      <input type="date" readOnly value={fechaLecturaAnterior ? fechaLecturaAnterior.split('T')[0] : ''} style={{ ...inputStyle, background: 'var(--at-surface-2)', color: 'var(--at-ink)' }} />
                     )}
                   </div>
                   <div>
@@ -594,7 +594,7 @@ export function LecturasSection({
                   </div>
                   <div>
                     <label style={labelStyle}>Días de Servicio</label>
-                    <input type="text" readOnly value={diasServicio !== null ? `${diasServicio} días` : '—'} style={{ ...inputStyle, fontWeight: 'bold', color: diasServicio !== null ? 'var(--at-primary)' : 'var(--at-ink-3)', background: '#f7fafc' }} />
+                    <input type="text" readOnly value={diasServicio !== null ? `${diasServicio} días` : '—'} style={{ ...inputStyle, fontWeight: 'bold', color: diasServicio !== null ? 'var(--at-primary)' : 'var(--at-ink-3)', background: 'var(--at-surface-2)' }} />
                   </div>
                   <div>
                     <label style={labelStyle}>Estado Pago</label>
@@ -631,7 +631,7 @@ export function LecturasSection({
                     )}
                   </div>
                   <div>
-                    <label style={{ border: '3px dashed #cbd5e0', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: '#f7fafc', display: 'block' }}>
+                    <label style={{ border: '3px dashed var(--at-line-strong)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', background: 'var(--at-surface-2)', display: 'block' }}>
                       <input type="file" accept="image/*" capture="environment" hidden onChange={handlePhoto} />
                       {foto ? <img src={foto} style={{ maxWidth: '100%', maxHeight: '150px', borderRadius: '8px' }} alt="foto" /> : <span>📷 Tocar para foto</span>}
                     </label>

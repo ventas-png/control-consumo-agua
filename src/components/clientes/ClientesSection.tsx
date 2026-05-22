@@ -524,7 +524,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
   const labelStyle: CSSProperties = {
     fontSize: '13px',
     fontWeight: 600,
-    color: '#4a5568',
+    color: 'var(--at-ink-2)',
     marginBottom: '5px',
     display: 'block',
   }
@@ -710,7 +710,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
             <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--at-warning-strong)', marginBottom: '8px' }}>
               Coincidencia parcial encontrada
             </div>
-            <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#78350f', lineHeight: '1.5' }}>
+            <p style={{ margin: '0 0 12px', fontSize: '14px', color: 'var(--at-warning-strong)', lineHeight: '1.5' }}>
               Se encontró un cliente con datos similares: <b>{sanitizeHTML(lookupResult.cliente_nombre ?? '')}</b>.
               Sin embargo, el/los siguiente(s) dato(s) no coincide(n):
             </p>
@@ -723,7 +723,7 @@ export function ClientesSection({ clientes, unidades = [], userRole, userId, cur
                 ))}
               </ul>
             )}
-            <p style={{ margin: 0, fontSize: '14px', color: '#78350f', lineHeight: '1.5' }}>
+            <p style={{ margin: 0, fontSize: '14px', color: 'var(--at-warning-strong)', lineHeight: '1.5' }}>
               Debe verificar con el cliente si ya cuenta con algún usuario en la plataforma para corregir el dato que no coincide.
             </p>
           </div>

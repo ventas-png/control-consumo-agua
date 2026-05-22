@@ -103,7 +103,7 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
           <span style={{ fontSize: '22px' }}>{fileIcon(fileName ?? '')}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-success-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</div>
-            <div style={{ fontSize: '11px', color: '#4ade80' }}>Subido</div>
+            <div style={{ fontSize: '11px', color: 'var(--at-success)' }}>Subido</div>
           </div>
           {signedUrl && (
             <a href={signedUrl} target="_blank" rel="noreferrer"

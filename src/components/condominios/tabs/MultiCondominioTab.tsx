@@ -146,7 +146,7 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
                     <span>{tasaRec}% · Mora {tasaMora}%</span>
                   </div>
                   <div style={{ background: 'var(--at-danger-tint)', borderRadius: 4, height: 8 }}>
-                    <div style={{ height: '100%', background: tasaRec >= 80 ? '#4ade80' : tasaRec >= 60 ? '#fbbf24' : 'var(--at-danger)', width: `${tasaRec}%`, borderRadius: 4 }} />
+                    <div style={{ height: '100%', background: tasaRec >= 80 ? 'var(--at-success)' : tasaRec >= 60 ? 'var(--at-warning)' : 'var(--at-danger)', width: `${tasaRec}%`, borderRadius: 4 }} />
                   </div>
                 </div>
               </div>

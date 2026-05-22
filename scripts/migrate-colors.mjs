@@ -63,6 +63,20 @@ const MAP = {
   '#d9e2dc': 'var(--at-primary-soft)', '#9cc6b6': 'var(--at-primary-mint)',
   // verdes semánticos adicionales vistos en el repo
   '#1e8a5b': 'var(--at-success)', '#34d399': 'var(--at-success)',
+  // ── Repaso fino (cola): grises genéricos, casi-blancos e inks → neutrales.
+  // NO incluye colores de marca/decorativos (rosa STR, teal, WhatsApp, Google,
+  // púrpura, lima) ni amarillos puros (cambio de matiz). Las vistas de
+  // impresión/PDF se saltan por archivo (ver isPrintFile abajo).
+  '#15291f': 'var(--at-ink)', '#3e5a4c': 'var(--at-ink-2)',
+  '#4a5568': 'var(--at-ink-2)', '#4b5563': 'var(--at-ink-2)', '#374151': 'var(--at-ink-2)',
+  '#666': 'var(--at-ink-3)', '#666666': 'var(--at-ink-3)', '#6b7280': 'var(--at-ink-3)', '#64748b': 'var(--at-ink-3)', '#8fa398': 'var(--at-ink-3)',
+  '#ccc': 'var(--at-line-strong)', '#cccccc': 'var(--at-line-strong)', '#cbd5e0': 'var(--at-line-strong)', '#d1d5db': 'var(--at-line-strong)',
+  '#e2e8f0': 'var(--at-line)', '#e5e7eb': 'var(--at-line)',
+  '#f7fafc': 'var(--at-surface-2)', '#f9fafb': 'var(--at-surface-2)', '#fafafe': 'var(--at-surface-2)', '#f8faff': 'var(--at-surface-2)', '#fcfcfd': 'var(--at-surface-2)', '#fafafa': 'var(--at-surface-2)',
+  '#4ade80': 'var(--at-success)', '#fbbf24': 'var(--at-warning)', '#78350f': 'var(--at-warning-strong)',
+  // Nota: NO se mapean los mints de marca (#8fa398/#b4c5bb/#dce6e0/#c2d2ca):
+  // se usan como texto sobre superficies oscuras fijas (Sidebar) y un token que
+  // se invierte por tema rompería su contraste. Esos componentes se saltan abajo.
 }
 
 const args = process.argv.slice(2)
@@ -85,8 +99,19 @@ function walk(dir) {
 }
 
 let totalRepl = 0, totalFiles = 0, totalWarn = 0, totalSolid = 0
+// Vistas de impresión / exportación a PDF: sus colores fijos (negro sobre
+// blanco) son intencionales y las CSS vars no resuelven en la ventana de
+// impresión, así que NUNCA se tokenizan.
+const isPrintFile = src => /jspdf|html2canvas|exportUtils|window\.print|\.print\(\)|document\.write/.test(src)
+
+// Componentes con tematización a mano sobre superficie oscura fija (nav/marca):
+// sus colores no deben tokenizarse a tokens que se invierten por tema.
+const SKIP_FILES = /(Sidebar|Header|NavTabs|BrandLogo|LoginScreen)\.tsx$/
+
 for (const file of walk(root)) {
+  if (SKIP_FILES.test(file)) { console.log(`⏭️  ${file}: omitido (tematización a mano / superficie oscura)`); continue }
   let src = readFileSync(file, 'utf8')
+  if (isPrintFile(src)) { console.log(`⏭️  ${file}: omitido (vista de impresión/PDF)`); continue }
   let count = 0
   for (const [hex, token] of Object.entries(MAP)) {
     const re = new RegExp(hex, 'gi')
