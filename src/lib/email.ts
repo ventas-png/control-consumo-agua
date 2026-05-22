@@ -55,7 +55,8 @@ async function sendViaGmailApi(
 export async function enviarReciboEmail(
   email: string,
   registro: Registro,
-  empresa: Empresa
+  empresa: Empresa,
+  moneda = ''
 ): Promise<void> {
   const gmailConfig = await getGmailConfig(empresa.id)
 
@@ -75,7 +76,8 @@ export async function enviarReciboEmail(
         total_pagar: registro.monto_calculado.toFixed(2),
         fecha: new Date().toLocaleDateString('es-GT'),
         tipo_cobro: registro.tipo_cobro ?? '',
-        moneda: '',
+        mes: registro.mes ?? '',
+        moneda,
       }
     )
     return
@@ -210,45 +212,6 @@ export async function enviarComunicadoBroadcast(
   }
 
   return { sent, failed }
-}
-
-export async function sendPasswordResetEmail(
-  email: string,
-  token: string,
-  empresa: Empresa
-): Promise<void> {
-  const resetLink = `${window.location.origin}${window.location.pathname}?reset_token=${token}`
-
-  const gmailConfig = await getGmailConfig(empresa.id)
-
-  if (gmailConfig.configured && gmailConfig.company_id) {
-    await sendViaGmailApi(
-      gmailConfig.company_id,
-      'password_reset',
-      email,
-      email,
-      {
-        empresa_nombre: empresa.nombre ?? 'Control de Consumo de Agua',
-        empresa_logo: '',
-        reset_link: resetLink,
-        hora_expiracion: '1 hora',
-      }
-    )
-    return
-  }
-
-  // Fallback: EmailJS
-  const params = {
-    to_email: email,
-    reset_link: resetLink,
-    empresa_nombre: empresa.nombre ?? 'Control de Consumo de Agua',
-    hora_expiracion: '1 hora',
-  }
-  await emailjs.send(
-    APP_CONFIG.EMAILJS_SERVICE_ID,
-    APP_CONFIG.EMAILJS_TEMPLATE_PASSWORD_RESET,
-    params
-  )
 }
 
 // Send a custom email from the superadmin to a company

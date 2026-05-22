@@ -491,6 +491,7 @@ export default function App() {
                 currentUser={currentUser}
                 proyectos={proyectos}
                 moneda={moneda}
+                empresa={empresa}
                 onRegistroAdded={addRegistro}
                 rutaActiva={rutaActivaParaLecturas}
                 onClearRuta={() => setRutaActivaParaLecturas(null)}

@@ -1,9 +1,11 @@
 import { useState, useEffect, type CSSProperties, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
-import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa, Contador, Unidad, Proyecto, UserSession } from '../../types'
+import type { Cliente, Registro, GPS, UserRole, Ruta, Tarifa, Contador, Unidad, Proyecto, UserSession, Empresa } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
+import { enviarReciboEmail } from '../../lib/email'
+import { toast } from '../../lib/toast'
 
 interface Props {
   clientes: Cliente[]
@@ -15,6 +17,7 @@ interface Props {
   currentUser?: UserSession | null
   proyectos?: Proyecto[]
   moneda?: string
+  empresa?: Empresa | null
   onRegistroAdded: (registro: Registro) => void
   rutaActiva?: Ruta | null
   onClearRuta?: () => void
@@ -32,6 +35,7 @@ export function LecturasSection({
   currentUser: _currentUser,
   proyectos = [],
   moneda = 'Q',
+  empresa,
   onRegistroAdded,
   rutaActiva,
   onClearRuta,
@@ -272,6 +276,16 @@ export function LecturasSection({
 
     const nuevoRegistro = data[0] as Registro
     onRegistroAdded(nuevoRegistro)
+
+    // Enviar el recibo por correo automáticamente si el cliente tiene email.
+    // Best-effort: usa el Gmail de la empresa y cae a EmailJS como respaldo;
+    // un fallo de envío no interrumpe el flujo de la lectura.
+    const reciboEmail = clienteDeUnidad?.email
+    if (reciboEmail && empresa) {
+      enviarReciboEmail(reciboEmail, nuevoRegistro, empresa, moneda)
+        .then(() => toast.success(`Recibo enviado a ${reciboEmail}`))
+        .catch(() => toast.warning('No se pudo enviar el recibo por correo. Verifica la configuración de correo.'))
+    }
 
     const result = await Swal.fire({
       icon: 'success',

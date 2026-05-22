@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, type ChangeEvent} from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../lib/supabase'
 import { GoogleEmailConfig } from '../empresa/GoogleEmailConfig'
+import { enviarNotificacionSuperAdmin } from '../../lib/email'
+import { toast } from '../../lib/toast'
 
 interface Empresa {
   id: string
@@ -278,6 +280,22 @@ export function SuperAdminSection() {
       const err = await res.json() as { error?: string }
       void Swal.fire({ icon: 'error', title: 'Advertencia', text: `Empresa creada pero error al crear administrador: ${err.error ?? 'Error desconocido'}` })
     } else {
+      // Correo de bienvenida al nuevo suscriptor, enviado desde el correo del
+      // super admin (best-effort: no bloquea la creación si el envío falla).
+      enviarNotificacionSuperAdmin(
+        formValues.ownerEmail,
+        formValues.ownerNombre,
+        'bienvenida_empresa',
+        {
+          empresa_nombre: formValues.empresaNombre,
+          platform_name: 'AdministraTodo',
+          login_email: formValues.ownerEmail,
+          max_projects: String(formValues.maxProj),
+          app_url: window.location.origin,
+        }
+      )
+        .then(() => toast.success('Correo de bienvenida enviado al suscriptor'))
+        .catch(() => toast.warning('Empresa creada, pero no se pudo enviar el correo de bienvenida. Verifica la conexión de Gmail del super admin.'))
       void Swal.fire({ icon: 'success', title: 'Empresa creada', text: `"${formValues.empresaNombre}" lista con su administrador.`, timer: 2000, showConfirmButton: false })
       void cargar()
     }

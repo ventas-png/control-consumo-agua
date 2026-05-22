@@ -12,3 +12,7 @@ verify_jwt = false
 
 [functions.complete-oauth-onboarding]
 verify_jwt = false
+
+# Reset de contraseña público: el usuario no está autenticado al solicitarlo.
+[functions.send-password-reset]
+verify_jwt = false

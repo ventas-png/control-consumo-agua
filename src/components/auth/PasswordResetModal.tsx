@@ -23,8 +23,12 @@ export function PasswordResetModal({ onClose }: Props) {
     setLoading(true)
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail.toLowerCase(), {
-        redirectTo: window.location.origin,
+      // Enviado desde el correo definitivo de la plataforma (Gmail del super
+      // admin) vía la Edge Function send-password-reset. La función siempre
+      // responde con éxito genérico para no revelar si el correo existe; con
+      // respaldo automático al correo nativo de Supabase si el Gmail falla.
+      const { error } = await supabase.functions.invoke('send-password-reset', {
+        body: { email: cleanEmail.toLowerCase() },
       })
 
       if (error) {
