@@ -86,9 +86,9 @@ const TIPO_AGUA_LABELS: Record<string, string> = {
 }
 
 const ESTADO_COLORS: Record<string, { bg: string; color: string; label: string }> = {
-  pendiente: { bg: '#fef3c7', color: '#92400e', label: 'Pendiente' },
-  pagado: { bg: '#d1fae5', color: '#065f46', label: 'Pagado' },
-  mora: { bg: '#fee2e2', color: '#991b1b', label: 'Mora' },
+  pendiente: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Pendiente' },
+  pagado: { bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)', label: 'Pagado' },
+  mora: { bg: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', label: 'Mora' },
 }
 
 // Handles both 'YYYY-MM-DD' and full ISO timestamps ('YYYY-MM-DDTHH:mm:ssZ')
@@ -382,13 +382,13 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     // Per-counter datasets — one dataset per active counter
     const CHART_COLOR_SETS = [
       { full: 'var(--at-primary)', soft: 'rgba(27, 59, 54,0.5)' },
-      { full: '#10b981', soft: 'rgba(16,185,129,0.5)' },
-      { full: '#f59e0b', soft: 'rgba(245,158,11,0.5)' },
+      { full: 'var(--at-success)', soft: 'rgba(16,185,129,0.5)' },
+      { full: 'var(--at-warning)', soft: 'rgba(245,158,11,0.5)' },
       { full: 'var(--at-accent)', soft: 'rgba(185, 106, 63,0.5)' },
-      { full: '#ef4444', soft: 'rgba(239,68,68,0.5)' },
+      { full: 'var(--at-danger)', soft: 'rgba(239,68,68,0.5)' },
       { full: '#ec4899', soft: 'rgba(236,72,153,0.5)' },
       { full: 'var(--at-accent-2)', soft: 'rgba(87, 123, 105,0.5)' },
-      { full: '#f97316', soft: 'rgba(249,115,22,0.5)' },
+      { full: 'var(--at-warning)', soft: 'rgba(249,115,22,0.5)' },
     ]
     const chartDatasets = filteredContadores.map((contador, idx) => {
       const colorSet = CHART_COLOR_SETS[idx % CHART_COLOR_SETS.length]
@@ -508,7 +508,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               type: 'line' as const,
               label: 'Tendencia',
               data: trendData,
-              borderColor: '#f59e0b',
+              borderColor: 'var(--at-warning)',
               borderWidth: 2,
               borderDash: [6, 4],
               pointRadius: 0,
@@ -632,7 +632,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           {isNull ? (
             <span style={{ fontSize: '14px', color: 'var(--at-ink-3)' }}>Sin datos</span>
           ) : (
-            <span style={{ fontSize: '20px', fontWeight: 700, color: positive ? '#ef4444' : '#10b981' }}>
+            <span style={{ fontSize: '20px', fontWeight: 700, color: positive ? 'var(--at-danger)' : 'var(--at-success)' }}>
               {positive ? '▲' : '▼'} {Math.abs(pct!).toFixed(1)}%
             </span>
           )}
@@ -685,7 +685,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
           {[
             { label: 'Consumo Mes Actual', value: `${consumoMesActual.toFixed(2)} m³`, icon: '💧', bg: 'linear-gradient(135deg, var(--at-primary), var(--at-primary-hover))' },
             { label: 'Promedio Mensual', value: `${consumoPromedio.toFixed(2)} m³`, icon: '📊', bg: 'linear-gradient(135deg, var(--at-accent-2), #0f766e)' },
-            { label: 'Monto Pendiente', value: `${moneda} ${montoPendiente.toFixed(2)}`, icon: '💳', bg: montoPendiente > 0 ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)' },
+            { label: 'Monto Pendiente', value: `${moneda} ${montoPendiente.toFixed(2)}`, icon: '💳', bg: montoPendiente > 0 ? 'linear-gradient(135deg, var(--at-warning), var(--at-warning))' : 'linear-gradient(135deg, var(--at-success), var(--at-success-strong))' },
             { label: 'Contadores Activos', value: String(contadoresActivos), icon: '🔢', bg: 'linear-gradient(135deg, var(--at-accent), var(--at-accent-hover))' },
           ].map(card => (
             <div key={card.label} style={{ background: card.bg, borderRadius: '16px', padding: '20px', color: 'white', boxShadow: '0 6px 20px rgba(0,0,0,0.12)' }}>
@@ -814,7 +814,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
               <div style={{ display: 'flex', gap: '10px', fontSize: '11px', color: 'var(--at-ink-3)', alignItems: 'center', marginLeft: 'auto' }}>
                 <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'var(--at-primary)', marginRight: '4px' }} />Mes actual</span>
                 <span><span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(27, 59, 54,0.45)', marginRight: '4px' }} />Anteriores</span>
-                <span><span style={{ display: 'inline-block', width: '18px', height: '0px', borderTop: '2px dashed #f59e0b', marginRight: '4px', verticalAlign: 'middle' }} />Tendencia</span>
+                <span><span style={{ display: 'inline-block', width: '18px', height: '0px', borderTop: '2px dashed var(--at-warning)', marginRight: '4px', verticalAlign: 'middle' }} />Tendencia</span>
               </div>
             )}
           </div>
@@ -1175,7 +1175,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 { icon: '🏢', label: 'Empresas', value: companies.length, color: 'var(--at-accent)' },
                 { icon: '🏠', label: 'Unidades activas', value: unidades.length, color: 'var(--at-primary)' },
                 { icon: '💧', label: 'Contadores activos', value: contadores.length, color: 'var(--at-accent-2)' },
-                { icon: '📋', label: 'Registros de lectura', value: lecturas.length, color: '#f59e0b' },
+                { icon: '📋', label: 'Registros de lectura', value: lecturas.length, color: 'var(--at-warning)' },
               ].map(s => (
                 <div
                   key={s.label}
@@ -1320,7 +1320,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                             <span style={{
                               padding: '3px 10px', borderRadius: '20px',
-                              background: '#dcfce7', color: '#166534',
+                              background: 'var(--at-success-tint)', color: 'var(--at-success-strong)',
                               fontSize: '11px', fontWeight: 600,
                             }}>Activo</span>
                             <span style={{ color: 'var(--at-ink-3)', fontSize: '16px', transition: 'transform 0.2s', display: 'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
@@ -1511,9 +1511,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
                 {contactoMsg && (
                   <div style={{
                     padding: '11px 14px', borderRadius: '10px', fontSize: '13px',
-                    background: contactoMsg.type === 'success' ? '#f0fdf4' : '#fef2f2',
-                    border: `1px solid ${contactoMsg.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
-                    color: contactoMsg.type === 'success' ? '#166534' : '#b91c1c',
+                    background: contactoMsg.type === 'success' ? 'var(--at-success-tint)' : 'var(--at-danger-tint)',
+                    border: `1px solid ${contactoMsg.type === 'success' ? 'var(--at-success-border)' : 'var(--at-danger-border)'}`,
+                    color: contactoMsg.type === 'success' ? 'var(--at-success-strong)' : 'var(--at-danger-strong)',
                     display: 'flex', gap: '8px', alignItems: 'center',
                   }}>
                     <span>{contactoMsg.type === 'success' ? '✅' : '⚠️'}</span>

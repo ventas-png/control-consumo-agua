@@ -112,9 +112,9 @@ const STATUS_LABELS: Record<ConversationStatus, string> = {
 
 const STATUS_COLORS: Record<ConversationStatus, string> = {
   abierta: 'var(--at-primary-2)',
-  en_progreso: '#f59e0b',
+  en_progreso: 'var(--at-warning)',
   esperando_cliente: 'var(--at-accent)',
-  resuelta: '#10b981',
+  resuelta: 'var(--at-success)',
   cerrada: 'var(--at-ink-3)',
 }
 
@@ -280,7 +280,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                   {unreadCount > 0 && (
                     <span style={{
                       minWidth: '18px', height: '18px', borderRadius: '999px',
-                      background: '#ef4444', color: 'white',
+                      background: 'var(--at-danger)', color: 'var(--at-on-status)',
                       fontSize: '10px', fontWeight: 700,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       padding: '0 4px',
@@ -419,7 +419,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
               Urgencia
             </label>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {([['baja', 'Baja', '#10b981'], ['media', 'Normal', '#f59e0b'], ['alta', 'Alta', '#ef4444']] as const).map(([val, label, color]) => (
+              {([['baja', 'Baja', 'var(--at-success)'], ['media', 'Normal', 'var(--at-warning)'], ['alta', 'Alta', 'var(--at-danger)']] as const).map(([val, label, color]) => (
                 <button
                   key={val}
                   onClick={() => setNewPriority(val as ConversationPriority)}
@@ -466,9 +466,9 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
 
           {formError && (
             <div style={{
-              background: '#fee2e2', border: '1px solid #fca5a5',
+              background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)',
               borderRadius: '8px', padding: '10px 12px',
-              color: '#991b1b', fontSize: '13px', marginBottom: '14px',
+              color: 'var(--at-danger-strong)', fontSize: '13px', marginBottom: '14px',
             }}>
               {formError}
             </div>
@@ -924,7 +924,7 @@ export function CustomerComunicacion({ currentUser, companyId }: Props) {
                     </div>
                     <svg
                       width="14" height="14"
-                      fill="none" stroke="#7E9389" strokeWidth="2"
+                      fill="none" stroke="var(--at-ink-3)" strokeWidth="2"
                       viewBox="0 0 24 24"
                       style={{ flexShrink: 0, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
                     >

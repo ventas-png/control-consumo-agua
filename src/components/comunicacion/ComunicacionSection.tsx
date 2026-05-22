@@ -454,9 +454,9 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px' }}>
         {[
           { label: 'Abiertas', value: stats.abiertas, color: 'var(--at-primary-2)' },
-          { label: 'En Progreso', value: stats.en_progreso, color: '#f59e0b' },
+          { label: 'En Progreso', value: stats.en_progreso, color: 'var(--at-warning)' },
           { label: 'Esperando', value: stats.esperando, color: 'var(--at-accent)' },
-          { label: 'Resueltas', value: stats.resueltas, color: '#10b981' },
+          { label: 'Resueltas', value: stats.resueltas, color: 'var(--at-success)' },
         ].map(s => (
           <div key={s.label} style={{
             background: 'var(--at-surface)',
@@ -692,8 +692,8 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                       <button
                         onClick={handleOpenAssignModal}
                         style={{
-                          background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px',
-                          fontSize: '11.5px', color: '#15803d', cursor: 'pointer', padding: '4px 10px', fontWeight: 600,
+                          background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '6px',
+                          fontSize: '11.5px', color: 'var(--at-success-strong)', cursor: 'pointer', padding: '4px 10px', fontWeight: 600,
                         }}
                       >
                         👥 Asignar a...
@@ -745,12 +745,12 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                           padding: '10px 13px',
                           borderRadius: isAgent ? '14px 14px 3px 14px' : '14px 14px 14px 3px',
                           background: isNote
-                            ? '#fffbeb'
+                            ? 'var(--at-warning-tint)'
                             : isAgent
                             ? 'var(--at-primary)'
                             : 'var(--at-chip)',
                           color: isNote ? '#78350f' : isAgent ? 'white' : 'var(--at-ink)',
-                          border: isNote ? '1px solid #fde68a' : 'none',
+                          border: isNote ? '1px solid var(--at-warning-border)' : 'none',
                           boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                         }}>
                           <div style={{ fontSize: '11px', fontWeight: 600, marginBottom: '4px', opacity: 0.7 }}>
@@ -790,7 +790,7 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                   {!activeConversation.is_internal && (
                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--at-ink-3)', cursor: 'pointer', marginBottom: '8px', userSelect: 'none' }}>
                       <input type="checkbox" checked={isInternalNote} onChange={e => setIsInternalNote(e.target.checked)}
-                        style={{ width: '13px', height: '13px', accentColor: '#f59e0b' }} />
+                        style={{ width: '13px', height: '13px', accentColor: 'var(--at-warning)' }} />
                       Nota interna (solo visible para el equipo)
                     </label>
                   )}
@@ -834,13 +834,13 @@ export function ComunicacionSection({ currentUser, clientes, proyectos, unidades
                       style={{
                         flex: 1,
                         padding: '10px 12px',
-                        border: `1px solid ${isInternalNote ? '#fde68a' : 'var(--at-line)'}`,
+                        border: `1px solid ${isInternalNote ? 'var(--at-warning-border)' : 'var(--at-line)'}`,
                         borderRadius: '10px',
                         fontSize: '13px',
                         resize: 'none',
                         outline: 'none',
                         fontFamily: 'inherit',
-                        background: isInternalNote ? '#fffbeb' : 'var(--at-surface)',
+                        background: isInternalNote ? 'var(--at-warning-tint)' : 'var(--at-surface)',
                       }}
                       onKeyDown={e => {
                         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSendMessage()

@@ -75,14 +75,14 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
 
         <div
           style={{
-            backgroundColor: '#fffbeb',
+            backgroundColor: 'var(--at-warning-tint)',
             padding: '1.5rem',
             borderRadius: '8px',
-            borderLeft: '4px solid #ea580c',
+            borderLeft: '4px solid var(--at-warning)',
           }}
         >
           <div style={{ fontSize: '0.9rem', color: 'var(--at-ink-2)', marginBottom: '0.5rem' }}>kWh Generados</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#ea580c' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--at-warning)' }}>
             {totalesGlobales.kwh_generados.toFixed(2)}
           </div>
         </div>
@@ -92,25 +92,25 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
             backgroundColor: '#F4EBE3',
             padding: '1.5rem',
             borderRadius: '8px',
-            borderLeft: '4px solid #B96A3F',
+            borderLeft: '4px solid var(--at-accent)',
           }}
         >
           <div style={{ fontSize: '0.9rem', color: 'var(--at-ink-2)', marginBottom: '0.5rem' }}>kWh Netos</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#B96A3F' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--at-accent)' }}>
             {(totalesGlobales.kwh_consumidos - totalesGlobales.kwh_exportados).toFixed(2)}
           </div>
         </div>
 
         <div
           style={{
-            backgroundColor: '#dcfce7',
+            backgroundColor: 'var(--at-success-tint)',
             padding: '1.5rem',
             borderRadius: '8px',
-            borderLeft: '4px solid #16a34a',
+            borderLeft: '4px solid var(--at-success)',
           }}
         >
           <div style={{ fontSize: '0.9rem', color: 'var(--at-ink-2)', marginBottom: '0.5rem' }}>Costo Total</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#16a34a' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--at-success)' }}>
             {moneda} {totalesGlobales.monto_total.toFixed(2)}
           </div>
         </div>
@@ -148,7 +148,7 @@ export default function DashboardTab({ facturasEnergia, fuentesEnergia, moneda }
           </div>
           <div>
             <div style={{ fontSize: '0.85rem', color: 'var(--at-ink-2)' }}>Crédito Exportación</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#dc2626' }}>
+            <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--at-danger)' }}>
               {moneda} {totalesGlobales.monto_credito_exportacion.toFixed(2)}
             </div>
           </div>

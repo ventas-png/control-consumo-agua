@@ -181,7 +181,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
           <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--at-ink)' }}>📊 Recaudación — últimos 6 meses</h3>
           <div style={{ display: 'flex', gap: 14, fontSize: '11px', color: 'var(--at-ink-3)' }}>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'var(--at-primary-soft-2)', marginRight: 4 }} />Emitido</span>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#34d399', marginRight: 4 }} />Cobrado</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'var(--at-success)', marginRight: 4 }} />Cobrado</span>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'var(--at-danger-border)', marginRight: 4 }} />Gastos</span>
           </div>
         </div>
@@ -197,7 +197,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
                   {/* Emitido */}
                   <rect x={x} y={chartH - hE} width={barW} height={hE} rx={3} fill="#C2D2CA" />
                   {/* Cobrado */}
-                  <rect x={x + barW + gap} y={chartH - hC} width={barW} height={hC} rx={3} fill="#34d399" />
+                  <rect x={x + barW + gap} y={chartH - hC} width={barW} height={hC} rx={3} fill="var(--at-success)" />
                   {/* Gastos */}
                   <rect x={x + (barW + gap) * 2} y={chartH - hG} width={barW} height={hG} rx={3} fill="var(--at-danger-border)" />
                   {/* Mes label */}

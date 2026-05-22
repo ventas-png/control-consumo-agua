@@ -18,10 +18,10 @@ export const PRIORITY_LABELS: Record<ConversationPriority, string> = {
 }
 
 export const PRIORITY_COLORS: Record<ConversationPriority, string> = {
-  baja: '#10b981',
-  media: '#f59e0b',
-  alta: '#ef4444',
-  urgente: '#9C5733',
+  baja: 'var(--at-success)',
+  media: 'var(--at-warning)',
+  alta: 'var(--at-danger)',
+  urgente: 'var(--at-accent-hover)',
 }
 
 export const STATUS_LABELS: Record<ConversationStatus, string> = {
@@ -33,11 +33,11 @@ export const STATUS_LABELS: Record<ConversationStatus, string> = {
 }
 
 export const STATUS_COLORS: Record<ConversationStatus, string> = {
-  abierta: '#3b82f6',
-  en_progreso: '#f59e0b',
-  esperando_cliente: '#B96A3F',
-  resuelta: '#10b981',
-  cerrada: '#7E9389',
+  abierta: 'var(--at-info)',
+  en_progreso: 'var(--at-warning)',
+  esperando_cliente: 'var(--at-accent)',
+  resuelta: 'var(--at-success)',
+  cerrada: 'var(--at-ink-3)',
 }
 
 export const ROLE_LABELS: Record<string, string> = {

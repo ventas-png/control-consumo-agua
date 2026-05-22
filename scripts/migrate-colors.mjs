@@ -56,6 +56,13 @@ const MAP = {
   '#7e9389': 'var(--at-ink-3)',
   '#e1ddd0': 'var(--at-line)', '#c7c2b0': 'var(--at-line-strong)',
   '#faf7ef': 'var(--at-surface-2)', '#f2efe7': 'var(--at-bg)', '#eae6d8': 'var(--at-chip)',
+  // marca: accent / primary (valores EXACTOS del tema claro) → su token.
+  '#b96a3f': 'var(--at-accent)', '#9c5733': 'var(--at-accent-hover)', '#ce8a63': 'var(--at-accent-light)',
+  '#577b69': 'var(--at-accent-2)',
+  '#1b3b36': 'var(--at-primary)', '#102622': 'var(--at-primary-hover)', '#2f5d4f': 'var(--at-primary-2)',
+  '#d9e2dc': 'var(--at-primary-soft)', '#9cc6b6': 'var(--at-primary-mint)',
+  // verdes semánticos adicionales vistos en el repo
+  '#1e8a5b': 'var(--at-success)', '#34d399': 'var(--at-success)',
 }
 
 const args = process.argv.slice(2)

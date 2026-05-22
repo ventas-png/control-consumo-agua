@@ -95,7 +95,7 @@ export default function FacturasTab({
       text: '¿Está seguro de que desea eliminar esta factura?',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#dc2626',
+      confirmButtonColor: 'var(--at-danger)',
       confirmButtonText: 'Eliminar',
     })
 
@@ -113,8 +113,8 @@ export default function FacturasTab({
 
   const getEstadoColor = (estado: string) => {
     if (estado === 'pagada') return 'var(--at-primary)'
-    if (estado === 'vencida') return '#dc2626'
-    return '#f59e0b'
+    if (estado === 'vencida') return 'var(--at-danger)'
+    return 'var(--at-warning)'
   }
 
   return (
@@ -240,7 +240,7 @@ export default function FacturasTab({
                             onClick={() => handleDelete(f.id)}
                             style={{
                               padding: '0.25rem 0.75rem',
-                              backgroundColor: '#dc2626',
+                              backgroundColor: 'var(--at-danger)',
                               color: 'white',
                               border: 'none',
                               borderRadius: '3px',

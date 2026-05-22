@@ -138,7 +138,7 @@ export default function ProveedoresTab({
       html: `<b>${nombre}</b> será eliminado permanentemente.`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#dc2626',
+      confirmButtonColor: 'var(--at-danger)',
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar',
     })
@@ -221,14 +221,14 @@ export default function ProveedoresTab({
                 <td style={{ padding: '0.75rem', textTransform: 'capitalize' }}>{p.tipo}</td>
                 <td style={{ padding: '0.75rem' }}>{p.contacto || '-'}</td>
                 <td style={{ padding: '0.75rem' }}>
-                  <span style={{ color: p.activo ? 'var(--at-primary)' : '#dc2626' }}>{p.activo ? '● Activo' : '● Inactivo'}</span>
+                  <span style={{ color: p.activo ? 'var(--at-primary)' : 'var(--at-danger)' }}>{p.activo ? '● Activo' : '● Inactivo'}</span>
                 </td>
                 {canEdit && (
                   <td style={{ padding: '0.75rem', textAlign: 'center' }}>
                     <button onClick={() => handleStartEdit(p)} style={{ marginRight: '0.5rem', padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>
                       Editar
                     </button>
-                    <button onClick={() => handleDelete(p.id, p.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>
+                    <button onClick={() => handleDelete(p.id, p.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>
                       Eliminar
                     </button>
                   </td>

@@ -437,19 +437,19 @@ function BroadcastCard({ broadcast }: { broadcast: Broadcast }) {
               <strong style={{ color: 'var(--at-ink)' }}>{broadcast.recipient_count}</strong> destinatarios
             </span>
             <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
-              <strong style={{ color: '#059669' }}>{broadcast.read_count ?? 0}</strong> leídos ({pct}%)
+              <strong style={{ color: 'var(--at-success-strong)' }}>{broadcast.read_count ?? 0}</strong> leídos ({pct}%)
             </span>
             {broadcast.send_email && (
               <span style={{
                 padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                background: '#fef3c7', color: '#92400e',
+                background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)',
               }}>📧 Email</span>
             )}
           </div>
         </div>
 
         <svg
-          width="16" height="16" fill="none" stroke="#7E9389" viewBox="0 0 24 24"
+          width="16" height="16" fill="none" stroke="var(--at-ink-3)" viewBox="0 0 24 24"
           style={{ flexShrink: 0, transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

@@ -156,12 +156,12 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             alignItems: 'center',
             gap: '6px',
             padding: '5px 11px',
-            background: isOnline ? '#f0fdf4' : '#fffbeb',
-            color: isOnline ? '#15803d' : '#92400e',
+            background: isOnline ? 'var(--at-success-tint)' : 'var(--at-warning-tint)',
+            color: isOnline ? 'var(--at-success-strong)' : 'var(--at-warning-strong)',
             borderRadius: '20px',
             fontSize: '12px',
             fontWeight: 500,
-            border: `1px solid ${isOnline ? '#bbf7d0' : '#fde68a'}`,
+            border: `1px solid ${isOnline ? 'var(--at-success-border)' : 'var(--at-warning-border)'}`,
             letterSpacing: '0.01em',
           }}
         >
@@ -170,7 +170,7 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
             style={{
               width: '6px',
               height: '6px',
-              background: isOnline ? '#22c55e' : '#f59e0b',
+              background: isOnline ? 'var(--at-success)' : 'var(--at-warning)',
               borderRadius: '50%',
               display: 'inline-block',
               boxShadow: isOnline ? '0 0 0 2px rgba(34,197,94,0.25)' : '0 0 0 2px rgba(245,158,11,0.25)',

@@ -254,9 +254,9 @@ export function HistorialSection({
 
       {/* Stats — derivados del filtered set */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <StatCard label="Total Registros" value={String(stats.totalRegistros)} color="#1B3B36" icon="📝" moneda={moneda} />
-        <StatCard label="Total Consumo" value={`${formatNumber(stats.totalConsumo)} m³`} color="#577B69" icon="💧" moneda={moneda} />
-        <StatCard label="Total Monto" value={stats.totalMonto} color="#B96A3F" icon="💰" moneda={moneda} />
+        <StatCard label="Total Registros" value={String(stats.totalRegistros)} color="var(--at-primary)" icon="📝" moneda={moneda} />
+        <StatCard label="Total Consumo" value={`${formatNumber(stats.totalConsumo)} m³`} color="var(--at-accent-2)" icon="💧" moneda={moneda} />
+        <StatCard label="Total Monto" value={stats.totalMonto} color="var(--at-accent)" icon="💰" moneda={moneda} />
         <StatCard label="Pagado" value={stats.pagado} color="var(--at-success)" icon="✓" moneda={moneda} />
         <StatCard label="Pendiente" value={stats.pendiente} color="var(--at-warning)" icon={`⏳ (${stats.countPendiente})`} moneda={moneda} />
         <StatCard label="En Mora" value={stats.mora} color="var(--at-danger)" icon={`⚠️ (${stats.countMora})`} moneda={moneda} />

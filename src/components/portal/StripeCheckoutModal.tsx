@@ -115,7 +115,7 @@ export function StripeCheckoutModal({ registro, moneda, currentUser, onClose, on
             </div>
             <div>
               <div style={{ color: 'var(--at-ink-3)', marginBottom: '2px' }}>Saldo Pendiente</div>
-              <div style={{ fontWeight: 700, color: '#ef4444', fontSize: '16px' }}>{moneda} {saldo.toFixed(2)}</div>
+              <div style={{ fontWeight: 700, color: 'var(--at-danger)', fontSize: '16px' }}>{moneda} {saldo.toFixed(2)}</div>
             </div>
           </div>
         </div>

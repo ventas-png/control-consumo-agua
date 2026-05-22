@@ -102,16 +102,16 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
 
         {/* Google account info */}
         <div style={{
-          background: '#f0fdf4', border: '1.5px solid #86efac',
+          background: 'var(--at-success-tint)', border: '1.5px solid var(--at-success-border)',
           borderRadius: '12px', padding: '12px 14px', marginBottom: '20px',
           display: 'flex', alignItems: 'center', gap: '10px',
         }}>
           <span style={{ fontSize: '20px' }}>✅</span>
           <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: '#15803d' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--at-success-strong)' }}>
               {googleUser.full_name}
             </div>
-            <div style={{ fontSize: '12px', color: '#16a34a' }}>{googleUser.email}</div>
+            <div style={{ fontSize: '12px', color: 'var(--at-success)' }}>{googleUser.email}</div>
           </div>
         </div>
 
@@ -149,9 +149,9 @@ export default function OAuthOnboardingScreen({ googleUser, onSuccess, onCancel 
 
           {error && (
             <div style={{
-              background: '#fef2f2', border: '1.5px solid #fca5a5',
+              background: 'var(--at-danger-tint)', border: '1.5px solid var(--at-danger-border)',
               borderRadius: '10px', padding: '10px 14px',
-              fontSize: '13px', color: '#dc2626', marginBottom: '16px',
+              fontSize: '13px', color: 'var(--at-danger)', marginBottom: '16px',
             }}>
               {error}
             </div>

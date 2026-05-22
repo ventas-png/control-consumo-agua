@@ -126,7 +126,7 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
         </Bloque>
 
         {/* Reservas hoy */}
-        <Bloque titulo="Reservas de amenidades hoy" icon="🏊" count={reservasHoy.length} color="#1B3B36">
+        <Bloque titulo="Reservas de amenidades hoy" icon="🏊" count={reservasHoy.length} color="var(--at-primary)">
           {reservasHoy.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Sin reservas para hoy</div>
           ) : (

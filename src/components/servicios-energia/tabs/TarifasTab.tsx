@@ -183,7 +183,7 @@ export default function TarifasTab({
       html: `<b>${nombre}</b> será eliminada permanentemente.`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#dc2626',
+      confirmButtonColor: 'var(--at-danger)',
       confirmButtonText: 'Eliminar',
       cancelButtonText: 'Cancelar',
     })
@@ -291,12 +291,12 @@ export default function TarifasTab({
                   <td style={{ padding: '0.5rem', textAlign: 'right' }}>{moneda} {Number(t.cargo_fijo).toFixed(2)}</td>
                   <td style={{ padding: '0.5rem', textAlign: 'right' }}>{Number(t.iva_porcentaje).toFixed(2)}</td>
                   <td style={{ padding: '0.5rem' }}>
-                    <span style={{ color: t.activa ? 'var(--at-primary)' : '#dc2626' }}>{t.activa ? '● Activa' : '● Inactiva'}</span>
+                    <span style={{ color: t.activa ? 'var(--at-primary)' : 'var(--at-danger)' }}>{t.activa ? '● Activa' : '● Inactiva'}</span>
                   </td>
                   {canEdit && (
                     <td style={{ padding: '0.5rem', textAlign: 'center' }}>
                       <button onClick={() => handleStartEdit(t)} style={{ marginRight: '0.5rem', padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Editar</button>
-                      <button onClick={() => handleDelete(t.id, t.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Eliminar</button>
+                      <button onClick={() => handleDelete(t.id, t.nombre)} style={{ padding: '0.25rem 0.75rem', backgroundColor: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Eliminar</button>
                     </td>
                   )}
                 </tr>
