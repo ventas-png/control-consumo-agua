@@ -121,7 +121,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
       showCancelButton: true,
       confirmButtonText: 'Desconectar',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#ef4444',
+      confirmButtonColor: 'var(--at-danger)',
     })
     if (!isConfirmed) return
 
@@ -196,7 +196,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
       confirmButtonText: 'Guardar',
       cancelButtonText: 'Cancelar',
       ...(existing ? {
-        footer: `<button id="swal-delete-tpl" type="button" style="background:none;border:none;color:#ef4444;font-size:13px;font-weight:600;cursor:pointer;">Eliminar personalización</button>`,
+        footer: `<button id="swal-delete-tpl" type="button" style="background:none;border:none;color:var(--at-danger);font-size:13px;font-weight:600;cursor:pointer;">Eliminar personalización</button>`,
         didOpen: () => {
           document.getElementById('swal-delete-tpl')?.addEventListener('click', () => {
             Swal.close()
@@ -242,7 +242,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
       text: 'El template volverá al diseño predeterminado del sistema.',
       showCancelButton: true,
       confirmButtonText: 'Eliminar',
-      confirmButtonColor: '#ef4444',
+      confirmButtonColor: 'var(--at-danger)',
     })
     if (!isConfirmed) return
     await supabase.from('email_templates').delete().eq('id', templateId)
@@ -295,7 +295,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
           <div>
             {config ? (
               <>
-                <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#166534' }}>Conectado</p>
+                <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--at-success-strong)' }}>Conectado</p>
                 <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--at-ink-3)' }}>
                   Enviando desde: <strong>{config.email}</strong>
                 </p>
@@ -317,7 +317,7 @@ export function GoogleEmailConfig({ companyId, isSuperadmin = false }: Props) {
               onClick={() => void handleDisconnect()}
               style={{
                 padding: '8px 16px', borderRadius: '8px', border: '1.5px solid rgba(239,68,68,.4)',
-                background: 'rgba(239,68,68,.08)', color: '#dc2626',
+                background: 'rgba(239,68,68,.08)', color: 'var(--at-danger)',
                 cursor: 'pointer', fontSize: '13px', fontWeight: 600,
               }}
             >

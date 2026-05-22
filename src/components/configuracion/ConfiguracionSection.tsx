@@ -32,7 +32,7 @@ export function ConfiguracionSection({ onLogout }: Props) {
         </button>
         <button
           onClick={onLogout}
-          style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+          style={{ padding: '12px 24px', background: 'linear-gradient(135deg, var(--at-danger) 0%, var(--at-danger) 100%)', color: 'var(--at-on-status)', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
         >
           🚪 Cerrar Sesión
         </button>

@@ -14,9 +14,9 @@ import { SYSTEM_ROLE_IDS, type AguaSystemRoleKey, type CondominiosSystemRoleKey 
 import { CONDOMINIOS_ROLES } from '../../lib/condominiosRoles'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
-  activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: '#22c55e' },
+  activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: 'var(--at-success)' },
   inactivo:   { label: 'Inactivo',   bg: 'rgba(100,116,139,0.2)', color: 'var(--at-ink-3)' },
-  suspendido: { label: 'Suspendido', bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+  suspendido: { label: 'Suspendido', bg: 'rgba(245,158,11,0.15)', color: 'var(--at-warning)' },
 }
 
 const TIPOS_UNIDAD_LABELS: { key: keyof Proyecto; label: string }[] = [
@@ -567,9 +567,9 @@ export function EmpresaSection({ currentUser }: Props) {
 
   const roleBadgeColor: Record<string, string> = {
     admin: 'var(--at-primary)',
-    operator: '#10b981', operador: '#10b981',
+    operator: 'var(--at-success)', operador: 'var(--at-success)',
     viewer: 'var(--at-accent)', visor: 'var(--at-accent)',
-    collector: '#f59e0b',
+    collector: 'var(--at-warning)',
   }
 
   if (loading) {
@@ -1006,7 +1006,7 @@ export function EmpresaSection({ currentUser }: Props) {
                       padding: '6px 10px', borderRadius: '7px', whiteSpace: 'nowrap',
                       border: `1px solid ${u.activo ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.3)'}`,
                       background: u.activo ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)',
-                      color: u.activo ? '#f87171' : '#4ade80',
+                      color: u.activo ? 'var(--at-danger)' : '#4ade80',
                       cursor: 'pointer', fontSize: '12px', fontWeight: 600,
                     }}
                   >
