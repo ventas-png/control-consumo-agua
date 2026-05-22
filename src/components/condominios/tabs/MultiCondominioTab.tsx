@@ -80,17 +80,17 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
     <div style={{ padding: 16 }}>
       {/* KPIs globales */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
-        <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#16a34a' }}>{moneda} {totalRecaudado.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
-          <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>Recaudado total — todos los condominios</div>
+        <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--at-success)' }}>{moneda} {totalRecaudado.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-success)', fontWeight: 600 }}>Recaudado total — todos los condominios</div>
         </div>
-        <div style={{ background: '#fef2f2', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#ef4444' }}>{moneda} {totalVencido.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
-          <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>Cartera vencida global</div>
+        <div style={{ background: 'var(--at-danger-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--at-danger)' }}>{moneda} {totalVencido.toLocaleString('es', { minimumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-danger)', fontWeight: 600 }}>Cartera vencida global</div>
         </div>
-        <div style={{ background: '#fff7ed', borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#f97316' }}>{totalTicketsAbiertos}</div>
-          <div style={{ fontSize: 11, color: '#f97316', fontWeight: 600 }}>Tickets abiertos en total</div>
+        <div style={{ background: 'var(--at-warning-tint)', borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--at-warning)' }}>{totalTicketsAbiertos}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-warning)', fontWeight: 600 }}>Tickets abiertos en total</div>
         </div>
         <div style={{ background: 'var(--at-primary-tint)', borderRadius: 10, padding: '12px 16px' }}>
           <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--at-primary)' }}>{totalUnidades}</div>
@@ -113,11 +113,11 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
                     <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{r.unidades} unidades · {r.visitantesHoy} visitantes hoy</div>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: tasaRec >= 80 ? '#dcfce7' : tasaRec >= 60 ? '#fef3c7' : '#fef2f2', color: tasaRec >= 80 ? '#16a34a' : tasaRec >= 60 ? '#d97706' : '#ef4444' }}>
+                    <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: tasaRec >= 80 ? 'var(--at-success-tint)' : tasaRec >= 60 ? 'var(--at-warning-tint)' : 'var(--at-danger-tint)', color: tasaRec >= 80 ? 'var(--at-success)' : tasaRec >= 60 ? 'var(--at-warning)' : 'var(--at-danger)' }}>
                       {tasaRec}% recaudación
                     </span>
                     {r.ticketsAbiertos > 0 && (
-                      <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: '#fff7ed', color: '#f97316' }}>
+                      <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: 'var(--at-warning-tint)', color: 'var(--at-warning)' }}>
                         {r.ticketsAbiertos} tickets abiertos
                       </span>
                     )}
@@ -127,10 +127,10 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
                   {[
                     { label: 'Cuotas totales', val: r.cuotasTotales, color: 'var(--at-ink-2)' },
-                    { label: 'Pagadas', val: r.cuotasPagadas, color: '#16a34a' },
-                    { label: 'Morosas', val: r.cuotasMorosas, color: '#ef4444' },
-                    { label: `Recaudado ${moneda}`, val: r.montoRecaudado.toLocaleString('es', { maximumFractionDigits: 0 }), color: '#16a34a' },
-                    { label: `Mora ${moneda}`, val: r.montoVencido.toLocaleString('es', { maximumFractionDigits: 0 }), color: r.montoVencido > 0 ? '#ef4444' : '#16a34a' },
+                    { label: 'Pagadas', val: r.cuotasPagadas, color: 'var(--at-success)' },
+                    { label: 'Morosas', val: r.cuotasMorosas, color: 'var(--at-danger)' },
+                    { label: `Recaudado ${moneda}`, val: r.montoRecaudado.toLocaleString('es', { maximumFractionDigits: 0 }), color: 'var(--at-success)' },
+                    { label: `Mora ${moneda}`, val: r.montoVencido.toLocaleString('es', { maximumFractionDigits: 0 }), color: r.montoVencido > 0 ? 'var(--at-danger)' : 'var(--at-success)' },
                   ].map(k => (
                     <div key={k.label} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: k.color }}>{k.val}</div>
@@ -145,8 +145,8 @@ export default function MultiCondominioTab({ proyectos, companyId, moneda }: Pro
                     <span>Recaudación</span>
                     <span>{tasaRec}% · Mora {tasaMora}%</span>
                   </div>
-                  <div style={{ background: '#fee2e2', borderRadius: 4, height: 8 }}>
-                    <div style={{ height: '100%', background: tasaRec >= 80 ? '#4ade80' : tasaRec >= 60 ? '#fbbf24' : '#f87171', width: `${tasaRec}%`, borderRadius: 4 }} />
+                  <div style={{ background: 'var(--at-danger-tint)', borderRadius: 4, height: 8 }}>
+                    <div style={{ height: '100%', background: tasaRec >= 80 ? '#4ade80' : tasaRec >= 60 ? '#fbbf24' : 'var(--at-danger)', width: `${tasaRec}%`, borderRadius: 4 }} />
                   </div>
                 </div>
               </div>

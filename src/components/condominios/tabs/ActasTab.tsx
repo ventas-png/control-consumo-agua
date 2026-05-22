@@ -14,9 +14,9 @@ interface Props {
 
 const TIPO_LABELS: Record<TipoActa, { label: string; icon: string; color: string }> = {
   ordinaria:    { label: 'Ordinaria',    icon: '📋', color: 'var(--at-primary)' },
-  extraordinaria:{ label: 'Extraordinaria', icon: '⚡', color: '#f59e0b' },
+  extraordinaria:{ label: 'Extraordinaria', icon: '⚡', color: 'var(--at-warning)' },
   junta:        { label: 'Junta Directiva', icon: '👑', color: 'var(--at-accent)' },
-  comite:       { label: 'Comité',       icon: '👥', color: '#10b981' },
+  comite:       { label: 'Comité',       icon: '👥', color: 'var(--at-success)' },
   otro:         { label: 'Otro',         icon: '📁', color: 'var(--at-ink-3)' },
 }
 
@@ -101,7 +101,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar acta?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar acta?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('actas_reunion').delete().eq('id', id)
     if (viewId === id) setViewId(null)
@@ -120,7 +120,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
     const agenda = (a.orden_del_dia as PuntoAgenda[]).map((p, i) => `
       <div style="margin-bottom:14px"><strong>${i+1}. ${p.punto}</strong>
       ${p.descripcion ? `<p style="margin:4px 0;color:#444">${p.descripcion}</p>` : ''}
-      ${p.acuerdo ? `<p style="margin:4px 0;background:#f0fdf4;padding:6px;border-left:3px solid #22c55e"><strong>Acuerdo:</strong> ${p.acuerdo}</p>` : ''}
+      ${p.acuerdo ? `<p style="margin:4px 0;background:var(--at-success-tint);padding:6px;border-left:3px solid var(--at-success)"><strong>Acuerdo:</strong> ${p.acuerdo}</p>` : ''}
       </div>`).join('')
     win.document.write(`<html><head><title>${a.titulo}</title>
     <style>body{font-family:serif;max-width:750px;margin:40px auto;font-size:13px;line-height:1.7}h1{font-size:17px;text-align:center}h2{font-size:14px;border-bottom:1px solid #ccc;padding-bottom:4px}ul{margin:0;padding-left:20px}.meta{color:#666;font-size:12px;text-align:center;margin-bottom:24px}</style>
@@ -132,7 +132,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
     ${a.acuerdos ? `<h2>Acuerdos Generales</h2><p>${a.acuerdos}</p>` : ''}
     ${a.observaciones ? `<h2>Observaciones</h2><p>${a.observaciones}</p>` : ''}
     ${a.redactada_por ? `<div style="margin-top:40px;text-align:right;color:#666;font-size:12px">Redactada por: ${a.redactada_por}</div>` : ''}
-    ${a.aprobada ? '<div style="margin-top:10px;text-align:center;color:#16a34a;font-weight:bold">✓ ACTA APROBADA</div>' : ''}
+    ${a.aprobada ? '<div style="margin-top:10px;text-align:center;color:var(--at-success);font-weight:bold">✓ ACTA APROBADA</div>' : ''}
     </body></html>`)
     win.document.close(); win.print()
   }
@@ -212,7 +212,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
                 <input style={{ ...inputStyle, fontSize: '12px' }} value={a.nombre} onChange={e => updateAsistente(i, 'nombre', e.target.value)} placeholder="Nombre" />
                 <input style={{ ...inputStyle, fontSize: '12px' }} value={a.unidad} onChange={e => updateAsistente(i, 'unidad', e.target.value)} placeholder="Unidad" />
                 <input style={{ ...inputStyle, fontSize: '12px' }} value={a.rol} onChange={e => updateAsistente(i, 'rol', e.target.value)} placeholder="Rol" />
-                <button onClick={() => removeAsistente(i)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>✕</button>
+                <button onClick={() => removeAsistente(i)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>✕</button>
               </div>
             ))}
           </div>
@@ -227,10 +227,10 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
               <div key={i} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', padding: '10px', marginBottom: '6px' }}>
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
                   <input style={{ ...inputStyle, flex: 1, fontSize: '12px' }} value={p.punto} onChange={e => updatePunto(i, 'punto', e.target.value)} placeholder={`Punto ${i+1}`} />
-                  <button onClick={() => removePunto(i)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>✕</button>
+                  <button onClick={() => removePunto(i)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>✕</button>
                 </div>
                 <input style={{ ...inputStyle, fontSize: '12px', marginBottom: '4px' }} value={p.descripcion} onChange={e => updatePunto(i, 'descripcion', e.target.value)} placeholder="Descripción (opcional)" />
-                <input style={{ ...inputStyle, fontSize: '12px', background: '#f0fdf4', borderColor: '#bbf7d0' }} value={p.acuerdo} onChange={e => updatePunto(i, 'acuerdo', e.target.value)} placeholder="Acuerdo tomado (opcional)" />
+                <input style={{ ...inputStyle, fontSize: '12px', background: 'var(--at-success-tint)', borderColor: 'var(--at-success-border)' }} value={p.acuerdo} onChange={e => updatePunto(i, 'acuerdo', e.target.value)} placeholder="Acuerdo tomado (opcional)" />
               </div>
             ))}
           </div>
@@ -272,7 +272,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
                       <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setViewId(viewId === a.id ? null : a.id)}>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                           <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink)' }}>{tl.icon} {a.titulo}</span>
-                          {a.aprobada && <span style={{ fontSize: '10px', fontWeight: 700, color: '#10b981', background: '#dcfce7', padding: '2px 6px', borderRadius: '20px' }}>✓ Aprobada</span>}
+                          {a.aprobada && <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--at-success)', background: 'var(--at-success-tint)', padding: '2px 6px', borderRadius: '20px' }}>✓ Aprobada</span>}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
                           {tl.label} — {a.fecha}{a.lugar ? ` — ${a.lugar}` : ''}{a.hora_inicio ? ` — ${a.hora_inicio}` : ''}
@@ -283,11 +283,11 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
                       {canEdit && (
                         <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
                           <button onClick={() => handlePrint(a)} style={{ padding: '3px 7px', background: 'var(--at-chip)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
-                          <button onClick={() => toggleAprobada(a)} style={{ padding: '3px 7px', background: a.aprobada ? '#fef3c7' : '#dcfce7', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+                          <button onClick={() => toggleAprobada(a)} style={{ padding: '3px 7px', background: a.aprobada ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
                             {a.aprobada ? '↩' : '✓'}
                           </button>
                           <button onClick={() => startEdit(a)} style={{ padding: '3px 7px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                          <button onClick={() => handleDelete(a.id)} style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                          <button onClick={() => handleDelete(a.id)} style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                         </div>
                       )}
                     </div>
@@ -321,7 +321,7 @@ export function ActasTab({ actas, proyectoId, companyId, canCreate, canEdit, onR
                     <div key={i} style={{ marginBottom: '8px', paddingLeft: '8px', borderLeft: '3px solid var(--at-line)' }}>
                       <div style={{ fontWeight: 600 }}>{i+1}. {p.punto}</div>
                       {p.descripcion && <div style={{ color: 'var(--at-ink-3)', marginTop: '2px' }}>{p.descripcion}</div>}
-                      {p.acuerdo && <div style={{ background: '#f0fdf4', padding: '4px 6px', borderRadius: '4px', marginTop: '4px', color: '#16a34a', fontWeight: 600 }}>✓ {p.acuerdo}</div>}
+                      {p.acuerdo && <div style={{ background: 'var(--at-success-tint)', padding: '4px 6px', borderRadius: '4px', marginTop: '4px', color: 'var(--at-success)', fontWeight: 600 }}>✓ {p.acuerdo}</div>}
                     </div>
                   ))}
                 </div>

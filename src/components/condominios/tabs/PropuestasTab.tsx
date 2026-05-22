@@ -25,15 +25,15 @@ const CATEGORIAS: { value: CategoriaPropuesta; label: string; icon: string }[] =
 
 const PRIORIDAD_CONFIG: Record<PrioridadPropuesta, { label: string; color: string; bg: string }> = {
   baja:  { label: 'Baja',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
-  media: { label: 'Media', color: '#f59e0b', bg: '#fef3c7' },
-  alta:  { label: 'Alta',  color: '#ef4444', bg: '#fee2e2' },
+  media: { label: 'Media', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  alta:  { label: 'Alta',  color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
 const ESTADO_CONFIG: Record<EstadoPropuesta, { label: string; color: string; bg: string }> = {
   propuesta:     { label: 'Propuesta',     color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
   en_evaluacion: { label: 'En Evaluación', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
-  aprobada:      { label: 'Aprobada',      color: '#10b981', bg: '#d1fae5' },
-  rechazada:     { label: 'Rechazada',     color: '#ef4444', bg: '#fee2e2' },
+  aprobada:      { label: 'Aprobada',      color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  rechazada:     { label: 'Rechazada',     color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
   en_ejecucion:  { label: 'En Ejecución',  color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
   completada:    { label: 'Completada',    color: 'var(--at-ink)', bg: 'var(--at-line)' },
 }
@@ -112,7 +112,7 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar propuesta?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar propuesta?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('propuestas_inversion').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -245,21 +245,21 @@ export function PropuestasTab({ propuestas, proyectoId, companyId, userId, moned
                       </select>
                     )}
                     {canEdit && <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-                    {canEdit && <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
+                    {canEdit && <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                   </div>
                 </div>
 
                 {/* Votación */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <button onClick={() => handleVoto(p.id, 'favor')} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', background: '#d1fae5', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 700, color: '#059669', cursor: 'pointer' }}>
+                  <button onClick={() => handleVoto(p.id, 'favor')} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', background: 'var(--at-success-tint)', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--at-success-strong)', cursor: 'pointer' }}>
                     👍 {p.votos_favor}
                   </button>
-                  <button onClick={() => handleVoto(p.id, 'contra')} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 700, color: '#ef4444', cursor: 'pointer' }}>
+                  <button onClick={() => handleVoto(p.id, 'contra')} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 12px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--at-danger)', cursor: 'pointer' }}>
                     👎 {p.votos_contra}
                   </button>
                   {totalVotos > 0 && (
-                    <div style={{ flex: 1, height: '6px', background: '#fee2e2', borderRadius: '3px', overflow: 'hidden', maxWidth: '120px' }}>
-                      <div style={{ height: '100%', width: `${(p.votos_favor / totalVotos) * 100}%`, background: '#10b981', borderRadius: '3px' }} />
+                    <div style={{ flex: 1, height: '6px', background: 'var(--at-danger-tint)', borderRadius: '3px', overflow: 'hidden', maxWidth: '120px' }}>
+                      <div style={{ height: '100%', width: `${(p.votos_favor / totalVotos) * 100}%`, background: 'var(--at-success)', borderRadius: '3px' }} />
                     </div>
                   )}
                 </div>

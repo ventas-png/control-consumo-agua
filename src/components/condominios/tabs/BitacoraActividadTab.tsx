@@ -35,13 +35,13 @@ interface Evento {
 const TIPO_CFG: Record<TipoEvento, { icon: string; color: string; bg: string; label: string }> = {
   cuota:        { icon: '💳', color: 'var(--at-primary)', bg: 'var(--at-primary-tint)',  label: 'Cuota' },
   visitante:    { icon: '🚪', color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)',  label: 'Visitante' },
-  ticket:       { icon: '🔧', color: '#d97706', bg: '#fef3c7',  label: 'Ticket' },
+  ticket:       { icon: '🔧', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)',  label: 'Ticket' },
   reserva:      { icon: '🏊', color: 'var(--at-primary-hover)', bg: 'var(--at-primary-tint)',  label: 'Reserva' },
-  anuncio:      { icon: '📢', color: '#16a34a', bg: '#dcfce7',  label: 'Anuncio' },
+  anuncio:      { icon: '📢', color: 'var(--at-success)', bg: 'var(--at-success-tint)',  label: 'Anuncio' },
   conciliacion: { icon: '🔄', color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)',  label: 'Conciliación' },
-  fondo:        { icon: '🏦', color: '#059669', bg: '#d1fae5',  label: 'Fondo' },
-  infraccion:   { icon: '⚖️', color: '#ef4444', bg: '#fef2f2',  label: 'Infracción' },
-  sugerencia:   { icon: '💡', color: '#f59e0b', bg: '#fffbeb',  label: 'Sugerencia' },
+  fondo:        { icon: '🏦', color: 'var(--at-success-strong)', bg: 'var(--at-success-tint)',  label: 'Fondo' },
+  infraccion:   { icon: '⚖️', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)',  label: 'Infracción' },
+  sugerencia:   { icon: '💡', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)',  label: 'Sugerencia' },
 }
 
 const TODOS: TipoEvento[] = ['cuota', 'visitante', 'ticket', 'reserva', 'anuncio', 'conciliacion', 'fondo', 'infraccion', 'sugerencia']
@@ -69,7 +69,7 @@ export default function BitacoraActividadTab({
       fecha: fechaEvento(c.created_at),
       unidad: c.unidad_nombre,
       badge: c.estado,
-      badgeColor: c.estado === 'pagado' ? '#16a34a' : c.estado === 'moroso' ? '#ef4444' : '#d97706',
+      badgeColor: c.estado === 'pagado' ? 'var(--at-success)' : c.estado === 'moroso' ? 'var(--at-danger)' : 'var(--at-warning)',
     }))
 
     visitantes.forEach(v => list.push({
@@ -87,7 +87,7 @@ export default function BitacoraActividadTab({
       fecha: fechaEvento(t.created_at),
       unidad: t.unidad_nombre,
       badge: t.prioridad,
-      badgeColor: t.prioridad === 'urgente' ? '#ef4444' : t.prioridad === 'alta' ? '#d97706' : 'var(--at-ink-3)',
+      badgeColor: t.prioridad === 'urgente' ? 'var(--at-danger)' : t.prioridad === 'alta' ? 'var(--at-warning)' : 'var(--at-ink-3)',
     }))
 
     reservas.forEach(r => list.push({
@@ -97,7 +97,7 @@ export default function BitacoraActividadTab({
       fecha: fechaEvento(r.created_at),
       unidad: r.unidad_nombre,
       badge: r.estado,
-      badgeColor: r.estado === 'confirmada' ? '#16a34a' : r.estado === 'cancelada' ? '#ef4444' : '#d97706',
+      badgeColor: r.estado === 'confirmada' ? 'var(--at-success)' : r.estado === 'cancelada' ? 'var(--at-danger)' : 'var(--at-warning)',
     }))
 
     anuncios.forEach(a => list.push({
@@ -106,7 +106,7 @@ export default function BitacoraActividadTab({
       detalle: a.tipo,
       fecha: fechaEvento(a.created_at),
       badge: a.tipo,
-      badgeColor: a.tipo === 'urgente' ? '#ef4444' : '#16a34a',
+      badgeColor: a.tipo === 'urgente' ? 'var(--at-danger)' : 'var(--at-success)',
     }))
 
     conciliaciones.forEach(c => list.push({
@@ -115,7 +115,7 @@ export default function BitacoraActividadTab({
       detalle: `Recibido ${moneda} ${c.monto_recibido.toFixed(2)} · ${c.estado}`,
       fecha: fechaEvento(c.fecha_pago),
       badge: c.estado,
-      badgeColor: c.estado === 'conciliado' ? '#16a34a' : '#ef4444',
+      badgeColor: c.estado === 'conciliado' ? 'var(--at-success)' : 'var(--at-danger)',
     }))
 
     fondoReservaMovs.forEach(m => list.push({
@@ -124,7 +124,7 @@ export default function BitacoraActividadTab({
       detalle: `${m.tipo} · ${moneda} ${m.monto.toFixed(2)}`,
       fecha: fechaEvento(m.fecha),
       badge: m.tipo,
-      badgeColor: m.tipo === 'retiro' ? '#ef4444' : '#16a34a',
+      badgeColor: m.tipo === 'retiro' ? 'var(--at-danger)' : 'var(--at-success)',
     }))
 
     infracciones.forEach(i => list.push({
@@ -134,7 +134,7 @@ export default function BitacoraActividadTab({
       fecha: fechaEvento(i.fecha_infraccion),
       unidad: i.unidad_nombre,
       badge: i.estado,
-      badgeColor: i.estado === 'resuelta' ? '#16a34a' : i.estado === 'anulada' ? 'var(--at-ink-3)' : '#ef4444',
+      badgeColor: i.estado === 'resuelta' ? 'var(--at-success)' : i.estado === 'anulada' ? 'var(--at-ink-3)' : 'var(--at-danger)',
     }))
 
     sugerencias.forEach(s => list.push({
@@ -144,7 +144,7 @@ export default function BitacoraActividadTab({
       fecha: fechaEvento(s.created_at),
       unidad: s.unidad_nombre,
       badge: s.estado,
-      badgeColor: s.estado === 'respondida' ? '#16a34a' : '#d97706',
+      badgeColor: s.estado === 'respondida' ? 'var(--at-success)' : 'var(--at-warning)',
     }))
 
     return list.sort((a, b) => b.fecha.localeCompare(a.fecha))

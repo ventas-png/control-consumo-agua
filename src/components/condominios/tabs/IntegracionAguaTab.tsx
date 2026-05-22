@@ -146,9 +146,9 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
         {[
           { label: 'Medidores activos', val: resumen.length, color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
-          { label: 'Consumo total último período', val: `${totalConsumo.toLocaleString('es')} m³`, color: '#16a34a', bg: '#f0fdf4' },
+          { label: 'Consumo total último período', val: `${totalConsumo.toLocaleString('es')} m³`, color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
           { label: 'Promedio por unidad', val: isNaN(promedio) || promedio === 0 ? '—' : `${promedio.toFixed(1)} m³`, color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
-          { label: 'Sin lectura registrada', val: sinLectura, color: sinLectura > 0 ? '#d97706' : '#16a34a', bg: sinLectura > 0 ? '#fef3c7' : '#f0fdf4' },
+          { label: 'Sin lectura registrada', val: sinLectura, color: sinLectura > 0 ? 'var(--at-warning)' : 'var(--at-success)', bg: sinLectura > 0 ? 'var(--at-warning-tint)' : 'var(--at-success-tint)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '12px 16px' }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: k.color }}>{k.val}</div>
@@ -242,17 +242,17 @@ export default function IntegracionAguaTab({ unidades, proyectoId, companyId, mo
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--at-ink)' }}>{r.unidad_nombre}</span>
                       <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>#{r.numero_medidor}</span>
-                      {alto && <span style={{ fontSize: 10, background: '#fef2f2', color: '#ef4444', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>⚠ Alto</span>}
+                      {alto && <span style={{ fontSize: 10, background: 'var(--at-danger-tint)', color: 'var(--at-danger)', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>⚠ Alto</span>}
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: alto ? '#ef4444' : 'var(--at-ink)' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: alto ? 'var(--at-danger)' : 'var(--at-ink)' }}>
                         {r.consumo_ultimo !== null ? `${r.consumo_ultimo} m³` : '—'}
                       </span>
                       {r.fecha_lectura && <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{r.fecha_lectura}</div>}
                     </div>
                   </div>
                   <div style={{ background: 'var(--at-line)', borderRadius: 4, height: 6 }}>
-                    <div style={{ height: '100%', background: alto ? '#ef4444' : 'var(--at-primary-2)', width: `${pct}%`, borderRadius: 4 }} />
+                    <div style={{ height: '100%', background: alto ? 'var(--at-danger)' : 'var(--at-primary-2)', width: `${pct}%`, borderRadius: 4 }} />
                   </div>
                 </div>
               )

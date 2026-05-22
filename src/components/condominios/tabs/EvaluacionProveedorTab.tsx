@@ -20,7 +20,7 @@ function Stars({ value, onChange, readOnly = false }: { value: number; onChange?
     <div style={{ display: 'flex', gap: '2px' }}>
       {[1, 2, 3, 4, 5].map(n => (
         <span key={n} onClick={() => !readOnly && onChange?.(n)}
-          style={{ fontSize: readOnly ? '14px' : '18px', cursor: readOnly ? 'default' : 'pointer', color: n <= value ? '#f59e0b' : 'var(--at-line)', lineHeight: 1 }}>
+          style={{ fontSize: readOnly ? '14px' : '18px', cursor: readOnly ? 'default' : 'pointer', color: n <= value ? 'var(--at-warning)' : 'var(--at-line)', lineHeight: 1 }}>
           ★
         </span>
       ))}
@@ -70,7 +70,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar evaluación?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar evaluación?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('evaluaciones_proveedor').delete().eq('id', id)
     onRefresh()
@@ -195,7 +195,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '16px', fontWeight: 800, color: i === 0 ? '#f59e0b' : i === 1 ? 'var(--at-ink-3)' : i === 2 ? '#b45309' : 'var(--at-ink-3)' }}>#{i + 1}</span>
+                    <span style={{ fontSize: '16px', fontWeight: 800, color: i === 0 ? 'var(--at-warning)' : i === 1 ? 'var(--at-ink-3)' : i === 2 ? 'var(--at-warning-strong)' : 'var(--at-ink-3)' }}>#{i + 1}</span>
                     <span style={{ fontWeight: 700, fontSize: '14px' }}>{r.nombre}</span>
                     <span style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>{r.count} evaluación(es)</span>
                   </div>
@@ -209,7 +209,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
                       <div key={f.label} style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: '10px', color: 'var(--at-ink-3)' }}>{f.label}</div>
                         <Stars value={Math.round(f.val)} readOnly />
-                        <div style={{ fontSize: '10px', fontWeight: 700, color: f.val >= 4 ? '#10b981' : f.val >= 3 ? '#f59e0b' : '#ef4444' }}>{f.val}</div>
+                        <div style={{ fontSize: '10px', fontWeight: 700, color: f.val >= 4 ? 'var(--at-success)' : f.val >= 3 ? 'var(--at-warning)' : 'var(--at-danger)' }}>{f.val}</div>
                       </div>
                     ))}
                   </div>
@@ -235,7 +235,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' }}>
                         <span style={{ fontWeight: 700, fontSize: '13px' }}>{e.nombre_proveedor}</span>
                         <Stars value={e.calificacion} readOnly />
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: e.calificacion >= 4 ? '#10b981' : e.calificacion >= 3 ? '#f59e0b' : '#ef4444' }}>{e.calificacion}/5</span>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: e.calificacion >= 4 ? 'var(--at-success)' : e.calificacion >= 3 ? 'var(--at-warning)' : 'var(--at-danger)' }}>{e.calificacion}/5</span>
                       </div>
                       <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--at-ink-3)', flexWrap: 'wrap' }}>
                         {e.puntualidad != null && <span>⏱ Puntualidad: {e.puntualidad}/5</span>}
@@ -251,7 +251,7 @@ export function EvaluacionProveedorTab({ evaluaciones, proveedores, proyectoId, 
                         <button onClick={() => startEdit(e)}
                           style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                         <button onClick={() => handleDelete(e.id)}
-                          style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                          style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                       </div>
                     )}
                   </div>

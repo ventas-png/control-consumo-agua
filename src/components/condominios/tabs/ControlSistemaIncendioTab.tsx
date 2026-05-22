@@ -14,10 +14,10 @@ interface Props {
 }
 
 const TIPOS_SISTEMA: { value: TipoSistemaIncendio; label: string; icon: string; color: string }[] = [
-  { value: 'extintor',      label: 'Extintor',        icon: '🧯', color: '#ef4444' },
+  { value: 'extintor',      label: 'Extintor',        icon: '🧯', color: 'var(--at-danger)' },
   { value: 'rociador',      label: 'Rociador',        icon: '🚿', color: 'var(--at-accent-2)' },
-  { value: 'alarma',        label: 'Alarma',          icon: '🔔', color: '#f59e0b' },
-  { value: 'hidrant',       label: 'Hidrante',        icon: '🚒', color: '#dc2626' },
+  { value: 'alarma',        label: 'Alarma',          icon: '🔔', color: 'var(--at-warning)' },
+  { value: 'hidrant',       label: 'Hidrante',        icon: '🚒', color: 'var(--at-danger)' },
   { value: 'detector_humo', label: 'Detector humo',   icon: '💨', color: 'var(--at-accent)' },
   { value: 'gabinete',      label: 'Gabinete',        icon: '🗄️', color: 'var(--at-accent)' },
   { value: 'otro',          label: 'Otro',            icon: '📋', color: 'var(--at-ink-3)' },
@@ -32,10 +32,10 @@ const TIPOS_INSPECCION: { value: TipoInspeccionIncendio; label: string }[] = [
 ]
 
 const RESULTADOS: { value: ResultadoInspeccionIncendio; label: string; color: string; bg: string; icon: string }[] = [
-  { value: 'aprobado',              label: 'Aprobado',             color: '#10b981', bg: '#d1fae5', icon: '✅' },
-  { value: 'observacion',           label: 'Observación',          color: '#f59e0b', bg: '#fef3c7', icon: '⚠️' },
+  { value: 'aprobado',              label: 'Aprobado',             color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '✅' },
+  { value: 'observacion',           label: 'Observación',          color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '⚠️' },
   { value: 'requiere_mantenimiento',label: 'Req. mantenimiento',   color: 'var(--at-accent)', bg: 'var(--at-accent-tint)', icon: '🔧' },
-  { value: 'fuera_servicio',        label: 'Fuera de servicio',    color: '#ef4444', bg: '#fef2f2', icon: '🚫' },
+  { value: 'fuera_servicio',        label: 'Fuera de servicio',    color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', icon: '🚫' },
 ]
 
 export default function ControlSistemaIncendioTab({ registros, proyectoId, companyId, moneda, canCreate, onRefresh }: Props) {
@@ -108,11 +108,11 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div>
               <span style={{ fontWeight: 600, fontSize: 14 }}>Incendio ({lista.length})</span>
-              {vencidosHoy.length > 0 && <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#fef2f2', color: '#ef4444', fontWeight: 700 }}>{vencidosHoy.length} venc.</span>}
+              {vencidosHoy.length > 0 && <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontWeight: 700 }}>{vencidosHoy.length} venc.</span>}
             </div>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nuevo
               </button>
             )}
@@ -132,7 +132,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
           {resumenPorTipo.map(t => (
             <div key={t.value} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
               <span>{t.icon} {t.label}</span>
-              <span style={{ color: t.problemas > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>
+              <span style={{ color: t.problemas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
                 {t.total}{t.problemas > 0 ? ` (${t.problemas} ⚠)` : ''}
               </span>
             </div>
@@ -147,7 +147,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
           const vencido = r.fecha_vencimiento && new Date(r.fecha_vencimiento) < new Date()
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? '#fef2f2' : 'var(--at-surface)', borderLeft: `3px solid ${vencido ? '#ef4444' : tipo?.color}` }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-danger-tint)' : 'var(--at-surface)', borderLeft: `3px solid ${vencido ? 'var(--at-danger)' : tipo?.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 12 }}>{tipo?.icon} {r.identificador}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: res?.bg, color: res?.color }}>{res?.icon} {res?.label}</span>
@@ -155,7 +155,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
               <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>{r.ubicacion}</div>
               <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>
                 {r.fecha}
-                {r.fecha_vencimiento && <span style={{ color: vencido ? '#ef4444' : 'var(--at-ink-3)' }}> · Vence: {r.fecha_vencimiento}</span>}
+                {r.fecha_vencimiento && <span style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)' }}> · Vence: {r.fecha_vencimiento}</span>}
               </div>
             </div>
           )
@@ -225,7 +225,7 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Registrar'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -255,9 +255,9 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
                 {selected.fecha_vencimiento && (
-                  <div style={{ background: vencido ? '#fef2f2' : 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', border: vencido ? '1px solid #fecaca' : 'none' }}>
-                    <div style={{ fontSize: 11, color: vencido ? '#ef4444' : 'var(--at-ink-3)' }}>Fecha vencimiento</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: vencido ? '#ef4444' : 'var(--at-ink-2)' }}>{selected.fecha_vencimiento}{vencido ? ' ⚠ VENCIDO' : ''}</div>
+                  <div style={{ background: vencido ? 'var(--at-danger-tint)' : 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', border: vencido ? '1px solid var(--at-danger-border)' : 'none' }}>
+                    <div style={{ fontSize: 11, color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>Fecha vencimiento</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: vencido ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>{selected.fecha_vencimiento}{vencido ? ' ⚠ VENCIDO' : ''}</div>
                   </div>
                 )}
                 {selected.proxima_inspeccion && (
@@ -279,15 +279,15 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
                   </div>
                 )}
                 {selected.costo != null && (
-                  <div style={{ background: '#f0fdf4', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#16a34a' }}>Costo</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: '#16a34a' }}>{moneda} {selected.costo.toLocaleString()}</div>
+                  <div style={{ background: 'var(--at-success-tint)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Costo</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {selected.costo.toLocaleString()}</div>
                   </div>
                 )}
               </div>
 
               {selected.observaciones && (
-                <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#92400e' }}>
+                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--at-warning-strong)' }}>
                   {selected.observaciones}
                 </div>
               )}
@@ -298,8 +298,8 @@ export default function ControlSistemaIncendioTab({ registros, proyectoId, compa
         {!mostrarForm && !selected && (
           <div>
             {(vencidosHoy.length > 0 || proximosVencer.length > 0) && (
-              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, color: '#ef4444', marginBottom: 6 }}>🚨 Atención requerida</div>
+              <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--at-danger)', marginBottom: 6 }}>🚨 Atención requerida</div>
                 {vencidosHoy.map(r => <div key={r.id} style={{ fontSize: 12, color: 'var(--at-ink-2)', marginBottom: 2 }}>⚠ {r.identificador} — vencido ({r.fecha_vencimiento})</div>)}
                 {proximosVencer.filter(r => !vencidosHoy.find(v => v.id === r.id)).map(r => <div key={r.id} style={{ fontSize: 12, color: 'var(--at-ink-2)', marginBottom: 2 }}>⏰ {r.identificador} — vence pronto ({r.fecha_vencimiento})</div>)}
               </div>

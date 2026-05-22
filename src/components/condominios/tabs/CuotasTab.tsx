@@ -41,8 +41,8 @@ const CONCEPTOS: { value: ConceptoCuota; label: string }[] = [
 
 const ESTADO_COLORS: Record<EstadoCuota, { bg: string; color: string }> = {
   pendiente: { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  pagado:    { bg: '#f0fdf4', color: '#16a34a' },
-  moroso:    { bg: '#fef2f2', color: '#dc2626' },
+  pagado:    { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  moroso:    { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
 }
 
 export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
@@ -254,7 +254,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
         showCancelButton: true,
         confirmButtonText: 'Confirmar pago',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#16a34a',
+        confirmButtonColor: 'var(--at-success)',
         preConfirm: () => ({
           fecha_pago: (document.getElementById('sw-fecha') as HTMLInputElement).value,
           metodo_pago: (document.getElementById('sw-metodo') as HTMLSelectElement).value,
@@ -288,7 +288,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       title: `Registrar pago para ${ids.length} cuota${ids.length > 1 ? 's' : ''}`,
       html: `
         <div style="text-align:left;font-size:13px;margin-bottom:12px">
-          <span style="font-size:16px;font-weight:800;color:#16a34a">Total: ${moneda} ${totalMonto.toFixed(2)}</span>
+          <span style="font-size:16px;font-weight:800;color:var(--at-success)">Total: ${moneda} ${totalMonto.toFixed(2)}</span>
         </div>
         <div style="text-align:left;font-size:13px">
           <label style="font-weight:600;color:var(--at-ink-2);display:block;margin-bottom:4px">Fecha de pago</label>
@@ -308,7 +308,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       showCancelButton: true,
       confirmButtonText: `✅ Confirmar ${ids.length} pago${ids.length > 1 ? 's' : ''}`,
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#16a34a',
+      confirmButtonColor: 'var(--at-success)',
       preConfirm: () => ({
         fecha_pago: (document.getElementById('sw-fecha') as HTMLInputElement).value,
         metodo_pago: (document.getElementById('sw-metodo') as HTMLSelectElement).value,
@@ -331,7 +331,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
   }
 
   async function eliminar(id: string) {
-    const result = await Swal.fire({ title: '¿Eliminar cuota?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: '#ef4444' })
+    const result = await Swal.fire({ title: '¿Eliminar cuota?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-danger)' })
     if (!result.isConfirmed) return
     await supabase.from('cuotas_condominio').delete().eq('id', id)
     onRefresh()
@@ -348,7 +348,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
       title: `¿Marcar ${vencidas.length} cuota${vencidas.length > 1 ? 's' : ''} como morosas?`,
       html: `<p style="font-size:13px;color:var(--at-ink-2)">Cuotas <strong>pendientes</strong> cuya fecha de vencimiento ya pasó.<br>Esta acción se puede revertir cambiando el estado individualmente.</p>`,
       icon: 'warning', showCancelButton: true,
-      confirmButtonText: '⚡ Aplicar mora', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626',
+      confirmButtonText: '⚡ Aplicar mora', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-danger)',
     })
     if (!isConfirmed) return
     const { error } = await supabase.from('cuotas_condominio').update({ estado: 'moroso' }).in('id', vencidas.map(c => c.id))
@@ -409,7 +409,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {canEdit && seleccionadas.size > 0 && (
             <button onClick={pagoMasivo}
-              style={{ padding: '10px 16px', background: '#16a34a', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+              style={{ padding: '10px 16px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: '10px', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
               ✅ Pagar {seleccionadas.size} · {moneda} {montoSeleccionado.toFixed(2)}
             </button>
           )}
@@ -419,13 +419,13 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
               headers: ['Unidad', 'Concepto', 'Período', 'Monto', 'Vencimiento', 'Estado', 'Método pago', 'Fecha pago'],
               rows: cuotas.map(c => [c.unidad_nombre ?? 'General', c.concepto, c.periodo, c.monto, c.fecha_vencimiento ?? '', c.estado, c.metodo_pago ?? '', c.fecha_pago ?? '']),
             }])}
-            style={{ padding: '10px 16px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+            style={{ padding: '10px 16px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
             📊 Excel
           </button>
           {canEdit && (
             <button onClick={aplicarMoraMasiva}
               title="Marcar como morosas todas las cuotas pendientes con vencimiento pasado"
-              style={{ padding: '10px 16px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
+              style={{ padding: '10px 16px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1.5px solid var(--at-danger-border)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
               ⚡ Mora
             </button>
           )}
@@ -446,7 +446,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
 
       {/* Resumen */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-        {([['pendiente', 'var(--at-primary)', 'var(--at-primary-tint)'], ['moroso', '#dc2626', '#fef2f2'], ['pagado', '#16a34a', '#f0fdf4']] as const).map(([estado, color, bg]) => (
+        {([['pendiente', 'var(--at-primary)', 'var(--at-primary-tint)'], ['moroso', 'var(--at-danger)', 'var(--at-danger-tint)'], ['pagado', 'var(--at-success)', 'var(--at-success-tint)']] as const).map(([estado, color, bg]) => (
           <button key={estado} onClick={() => { setFiltroEstado(filtroEstado === estado ? 'todos' : estado); setSeleccionadas(new Set()) }}
             style={{ padding: '14px', background: filtroEstado === estado ? bg : 'var(--at-surface)', border: `1.5px solid ${filtroEstado === estado ? color : 'var(--at-line)'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'left' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color }}>{moneda} {totales[estado].toFixed(2)}</div>
@@ -539,13 +539,13 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
               </thead>
               <tbody>
                 {csvRows.map((r, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid var(--at-chip)', background: r.status === 'error' ? '#fef2f2' : r.status === 'warn' ? '#fffbeb' : undefined }}>
+                  <tr key={i} style={{ borderBottom: '1px solid var(--at-chip)', background: r.status === 'error' ? 'var(--at-danger-tint)' : r.status === 'warn' ? 'var(--at-warning-tint)' : undefined }}>
                     <td style={{ padding: '7px 12px', fontSize: '14px' }}>
                       {r.status === 'ok' ? '✅' : r.status === 'warn' ? '⚠️' : '❌'}
                     </td>
-                    <td style={{ padding: '7px 12px', color: r.unidadId ? 'var(--at-ink-2)' : '#dc2626' }}>{r.rawUnidad || '—'}</td>
-                    <td style={{ padding: '7px 12px', color: r.concepto ? 'var(--at-ink-2)' : '#dc2626' }}>{r.rawConcepto || '—'}</td>
-                    <td style={{ padding: '7px 12px', color: r.monto ? 'var(--at-ink-2)' : '#dc2626' }}>{r.rawMonto || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: r.unidadId ? 'var(--at-ink-2)' : 'var(--at-danger)' }}>{r.rawUnidad || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: r.concepto ? 'var(--at-ink-2)' : 'var(--at-danger)' }}>{r.rawConcepto || '—'}</td>
+                    <td style={{ padding: '7px 12px', color: r.monto ? 'var(--at-ink-2)' : 'var(--at-danger)' }}>{r.rawMonto || '—'}</td>
                     <td style={{ padding: '7px 12px', color: 'var(--at-ink-2)' }}>{r.rawPeriodo || '—'}</td>
                     <td style={{ padding: '7px 12px', color: 'var(--at-ink-2)' }}>{r.rawVencimiento || '—'}</td>
                     <td style={{ padding: '7px 12px', color: 'var(--at-ink-2)', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.rawNotas || '—'}</td>
@@ -555,7 +555,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
             </table>
           </div>
           {csvRows.some(r => r.errores.length > 0) && (
-            <div style={{ marginTop: '10px', padding: '10px 14px', background: '#fef2f2', borderRadius: '8px', fontSize: '12px', color: '#dc2626' }}>
+            <div style={{ marginTop: '10px', padding: '10px 14px', background: 'var(--at-danger-tint)', borderRadius: '8px', fontSize: '12px', color: 'var(--at-danger)' }}>
               <strong>Errores detectados:</strong>
               <ul style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
                 {csvRows.flatMap((r, i) => r.errores.map(e => <li key={`${i}-${e}`}>Fila {i + 2}: {e}</li>))}
@@ -604,7 +604,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                 const colCount = canEdit ? 9 : 8
 
                 const mainRow = (
-                  <tr key={c.id} style={{ borderBottom: expandido ? 'none' : '1px solid var(--at-chip)', background: seleccionada ? '#f0fdf4' : undefined }}>
+                  <tr key={c.id} style={{ borderBottom: expandido ? 'none' : '1px solid var(--at-chip)', background: seleccionada ? 'var(--at-success-tint)' : undefined }}>
                     {canEdit && (
                       <td style={{ padding: '10px 14px' }}>
                         {esPagable && (
@@ -618,12 +618,12 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                     <td style={{ padding: '10px 14px' }}>
                       <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto.toFixed(2)}</div>
                       {c.estado === 'pagado' && c.metodo_pago && (
-                        <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '1px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--at-success)', marginTop: '1px' }}>
                           {c.metodo_pago}{c.fecha_pago ? ` · ${c.fecha_pago}` : ''}
                         </div>
                       )}
                     </td>
-                    <td style={{ padding: '10px 14px', color: c.fecha_vencimiento && c.fecha_vencimiento < hoy && c.estado !== 'pagado' ? '#dc2626' : 'var(--at-ink-2)' }}>
+                    <td style={{ padding: '10px 14px', color: c.fecha_vencimiento && c.fecha_vencimiento < hoy && c.estado !== 'pagado' ? 'var(--at-danger)' : 'var(--at-ink-2)' }}>
                       {c.fecha_vencimiento || '—'}
                     </td>
                     <td style={{ padding: '10px 14px' }}>
@@ -652,7 +652,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                       <div style={{ display: 'flex', gap: '4px' }}>
                         {(c.estado === 'pendiente' || c.estado === 'moroso') && (
                           <button onClick={() => whatsappRecordatorio(c)} title="Recordatorio por WhatsApp"
-                            style={{ background: '#f0fdf4', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
+                            style={{ background: 'var(--at-success-tint)', border: 'none', cursor: 'pointer', color: 'var(--at-success)', fontSize: '13px', padding: '3px 7px', borderRadius: '6px', fontWeight: 600 }}>
                             💬
                           </button>
                         )}
@@ -662,7 +662,7 @@ export function CuotasTab({ cuotas, unidades, proyectoId, companyId, moneda, can
                             🧾
                           </button>
                         )}
-                        <button onClick={() => eliminar(c.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '16px', padding: '2px 6px', borderRadius: '6px' }}>🗑</button>
+                        <button onClick={() => eliminar(c.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '16px', padding: '2px 6px', borderRadius: '6px' }}>🗑</button>
                       </div>
                     </td>
                   </tr>

@@ -24,14 +24,14 @@ const TIPO_LABELS: Record<TipoSolicitud, { label: string; icon: string }> = {
 }
 
 const ESTADO_STYLE: Record<EstadoSolicitud, { color: string; bg: string; label: string }> = {
-  pendiente:  { color: '#f59e0b', bg: '#fef3c7', label: 'Pendiente' },
+  pendiente:  { color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', label: 'Pendiente' },
   en_proceso: { color: 'var(--at-primary)', bg: 'var(--at-primary-soft)', label: 'En Proceso' },
-  resuelto:   { color: '#10b981', bg: '#dcfce7', label: 'Resuelto' },
-  rechazado:  { color: '#ef4444', bg: '#fee2e2', label: 'Rechazado' },
+  resuelto:   { color: 'var(--at-success)', bg: 'var(--at-success-tint)', label: 'Resuelto' },
+  rechazado:  { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', label: 'Rechazado' },
 }
 
 const PRIORIDAD_COLOR: Record<PrioridadSolicitud, string> = {
-  baja: 'var(--at-ink-3)', normal: 'var(--at-primary)', alta: '#f59e0b', urgente: '#ef4444',
+  baja: 'var(--at-ink-3)', normal: 'var(--at-primary)', alta: 'var(--at-warning)', urgente: 'var(--at-danger)',
 }
 
 const BLANK = {
@@ -83,7 +83,7 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar solicitud?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar solicitud?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('solicitudes_residente').delete().eq('id', id)
     onRefresh()
@@ -108,9 +108,9 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', marginBottom: '16px' }}>
         {[
           { label: 'Total',         value: solicitudes.length, color: 'var(--at-ink)' },
-          { label: 'Pendientes',    value: pendientes,         color: '#f59e0b' },
+          { label: 'Pendientes',    value: pendientes,         color: 'var(--at-warning)' },
           { label: 'En proceso',    value: enProceso,          color: 'var(--at-primary)' },
-          { label: 'Urgentes',      value: urgentes,           color: urgentes > 0 ? '#ef4444' : '#10b981' },
+          { label: 'Urgentes',      value: urgentes,           color: urgentes > 0 ? 'var(--at-danger)' : 'var(--at-success)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.value}</div>
@@ -222,7 +222,7 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
                     <span style={{ fontSize: '11px', fontWeight: 700, color: est.color, background: est.bg, padding: '3px 8px', borderRadius: '20px' }}>{est.label}</span>
                     {canEdit && (
                       <button onClick={e => { e.stopPropagation(); handleDelete(s.id) }}
-                        style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     )}
                   </div>
                 </div>
@@ -231,8 +231,8 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
                   <div style={{ borderTop: '1px solid var(--at-chip)', padding: '12px 14px', background: 'var(--at-surface-2)' }}>
                     <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--at-ink)' }}>{s.descripcion}</p>
                     {s.respuesta && (
-                      <div style={{ background: '#dcfce7', border: '1px solid #bbf7d0', borderRadius: '7px', padding: '8px 10px', marginBottom: '8px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#16a34a', marginBottom: '2px' }}>Respuesta:</div>
+                      <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '7px', padding: '8px 10px', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-success)', marginBottom: '2px' }}>Respuesta:</div>
                         <div style={{ fontSize: '12px', color: 'var(--at-ink)' }}>{s.respuesta}</div>
                       </div>
                     )}
@@ -249,11 +249,11 @@ export function SolicitudesTab({ solicitudes, unidades, proyectoId, companyId, c
                             </button>
                           )}
                           <button onClick={() => handleEstado(s.id, 'resuelto')}
-                            style={{ padding: '5px 12px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                            style={{ padding: '5px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                             ✓ Resolver
                           </button>
                           <button onClick={() => handleEstado(s.id, 'rechazado')}
-                            style={{ padding: '5px 12px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                            style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
                             ✕ Rechazar
                           </button>
                         </div>

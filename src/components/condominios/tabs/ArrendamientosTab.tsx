@@ -17,8 +17,8 @@ interface Props {
 }
 
 const ESTADO_CONFIG: Record<EstadoContrato, { label: string; bg: string; color: string }> = {
-  activo:    { label: 'Activo',    bg: '#f0fdf4', color: '#16a34a' },
-  vencido:   { label: 'Vencido',   bg: '#fef2f2', color: '#dc2626' },
+  activo:    { label: 'Activo',    bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  vencido:   { label: 'Vencido',   bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
   terminado: { label: 'Terminado', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
@@ -120,7 +120,7 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
   }
 
   async function eliminar(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar contrato?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await Swal.fire({ title: '¿Eliminar contrato?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('contratos_arrendamiento').delete().eq('id', id)
     onRefresh()
@@ -133,12 +133,12 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Arrendamientos</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
             {activos.length} contratos activos · <span style={{ fontWeight: 600, color: 'var(--at-primary)' }}>{moneda} {rentaTotal.toFixed(2)}/mes</span>
-            {porVencer.length > 0 && <span style={{ color: '#ea580c', fontWeight: 600 }}> · {porVencer.length} por vencer</span>}
+            {porVencer.length > 0 && <span style={{ color: 'var(--at-warning)', fontWeight: 600 }}> · {porVencer.length} por vencer</span>}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={exportarPDF} disabled={contratos.length === 0} style={{ padding: '9px 14px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>📄 PDF</button>
-          <button onClick={exportarXlsx} disabled={contratos.length === 0} style={{ padding: '9px 14px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>📊 Excel</button>
+          <button onClick={exportarXlsx} disabled={contratos.length === 0} style={{ padding: '9px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>📊 Excel</button>
           {canCreate && (
             <button onClick={() => setShowForm(true)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg,var(--at-primary),var(--at-accent-2))', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}>
               + Nuevo contrato
@@ -149,9 +149,9 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
 
       {/* Alerta por vencer */}
       {porVencer.length > 0 && (
-        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
           <span style={{ fontSize: '18px' }}>⚠️</span>
-          <span style={{ fontSize: '13.5px', color: '#9a3412', fontWeight: 600 }}>
+          <span style={{ fontSize: '13.5px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>
             {porVencer.length} contrato{porVencer.length > 1 ? 's' : ''} vence{porVencer.length > 1 ? 'n' : ''} en los próximos 30 días: {porVencer.map(c => c.arrendatario_nombre).join(', ')}
           </span>
         </div>
@@ -271,9 +271,9 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
                     <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)' }}>{c.unidad_nombre || '—'}</td>
                     <td style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--at-ink)' }}>{moneda} {c.monto_renta.toFixed(2)}</td>
                     <td style={{ padding: '10px 14px', color: 'var(--at-ink-2)' }}>Día {c.dia_pago}</td>
-                    <td style={{ padding: '10px 14px', color: vence30 ? '#ea580c' : 'var(--at-ink-2)', fontWeight: vence30 ? 700 : 400 }}>
+                    <td style={{ padding: '10px 14px', color: vence30 ? 'var(--at-warning)' : 'var(--at-ink-2)', fontWeight: vence30 ? 700 : 400 }}>
                       {c.fecha_inicio}{c.fecha_fin ? ` → ${c.fecha_fin}` : ' →'}
-                      {vence30 && <span style={{ display: 'block', fontSize: '11px', color: '#ea580c' }}>⚠️ Por vencer</span>}
+                      {vence30 && <span style={{ display: 'block', fontSize: '11px', color: 'var(--at-warning)' }}>⚠️ Por vencer</span>}
                     </td>
                     <td style={{ padding: '10px 14px' }}>
                       {canEdit ? (
@@ -295,11 +295,11 @@ export function ArrendamientosTab({ contratos, unidades, proyectoId, companyId, 
                             const msg = `📋 Aviso de vencimiento de contrato\nArrendatario: ${c.arrendatario_nombre}\nUnidad: ${c.unidad_nombre ?? ''}\nVencimiento: ${c.fecha_fin}\nPor favor comuníquese para coordinar la renovación.`
                             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
                           }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: '#16a34a' }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--at-success)' }}
                         >💬</button>
                       )}
                       {canEdit && <button onClick={() => startEdit(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--at-ink-3)' }}>✏️</button>}
-                      <button onClick={() => eliminar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: '#ef4444' }}>🗑</button>
+                      <button onClick={() => eliminar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', color: 'var(--at-danger)' }}>🗑</button>
                     </td>
                   </tr>
                 )

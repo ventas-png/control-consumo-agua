@@ -191,7 +191,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
                     Es menor de edad
                   </label>
                   {form.es_menor && (
-                    <span style={{ padding: '2px 8px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>
+                    <span style={{ padding: '2px 8px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '20px', fontSize: '11px', fontWeight: 700 }}>Menor</span>
                   )}
                 </div>
                 {form.es_menor ? (
@@ -274,7 +274,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
                   {acompanantes.map(a => (
                     <div key={a.tempId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '8px' }}>
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: a.es_menor ? '#fef9c3' : 'var(--at-primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', flexShrink: 0 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: a.es_menor ? 'var(--at-warning-tint)' : 'var(--at-primary-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', flexShrink: 0 }}>
                         {a.es_menor ? '👶' : '👤'}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -286,7 +286,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
                         </div>
                       </div>
                       <button type="button" onClick={() => quitarAcompanante(a.tempId)}
-                        style={{ width: 22, height: 22, borderRadius: '50%', background: '#fee2e2', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--at-danger-tint)', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         ×
                       </button>
                     </div>
@@ -307,7 +307,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
                     <input type="checkbox" checked={acompForm.es_menor}
                       onChange={e => setAcompForm(f => ({ ...f, es_menor: e.target.checked, identificacion: '' }))} />
                     Es menor de edad
-                    {acompForm.es_menor && <span style={{ padding: '2px 8px', background: '#fef9c3', color: '#854d0e', borderRadius: '20px', fontSize: '11px' }}>Menor</span>}
+                    {acompForm.es_menor && <span style={{ padding: '2px 8px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', borderRadius: '20px', fontSize: '11px' }}>Menor</span>}
                   </label>
                   {acompForm.es_menor ? (
                     <div>
@@ -409,7 +409,7 @@ export function PortalVisitantesTab({ visitantes, unidadId, proyectoId, companyI
                     </div>
                   </div>
                   {esHoy && <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-primary-tint)', color: 'var(--at-primary)', flexShrink: 0 }}>Hoy</span>}
-                  {!esHoy && vigente && <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#f0fdf4', color: '#16a34a', flexShrink: 0 }}>Vigente</span>}
+                  {!esHoy && vigente && <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-success-tint)', color: 'var(--at-success)', flexShrink: 0 }}>Vigente</span>}
                   {!vigente && !esHoy && <span style={{ padding: '3px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-surface-2)', color: 'var(--at-ink-3)', flexShrink: 0 }}>Expirada</span>}
                 </div>
               )

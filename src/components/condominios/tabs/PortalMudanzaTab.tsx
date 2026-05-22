@@ -20,12 +20,12 @@ const TIPO_CFG: Record<TipoSolicitudMudanza, { label: string; icon: string; desc
 }
 
 const ESTADO_CFG: Record<EstadoSolicitudMudanza, { label: string; bg: string; color: string; icon: string }> = {
-  pendiente:  { label: 'Pendiente',  bg: '#fef3c7', color: '#d97706', icon: '⏳' },
-  aprobada:   { label: 'Aprobada',   bg: '#f0fdf4', color: '#16a34a', icon: '✅' },
-  rechazada:  { label: 'Rechazada',  bg: '#fef2f2', color: '#dc2626', icon: '❌' },
+  pendiente:  { label: 'Pendiente',  bg: 'var(--at-warning-tint)', color: 'var(--at-warning)', icon: '⏳' },
+  aprobada:   { label: 'Aprobada',   bg: 'var(--at-success-tint)', color: 'var(--at-success)', icon: '✅' },
+  rechazada:  { label: 'Rechazada',  bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', icon: '❌' },
   programada: { label: 'Programada', bg: 'var(--at-primary-soft)', color: 'var(--at-primary)', icon: '📅' },
-  en_curso:   { label: 'En Curso',   bg: '#fef3c7', color: '#f59e0b', icon: '🚚' },
-  completada: { label: 'Completada', bg: '#d1fae5', color: '#10b981', icon: '🏁' },
+  en_curso:   { label: 'En Curso',   bg: 'var(--at-warning-tint)', color: 'var(--at-warning)', icon: '🚚' },
+  completada: { label: 'Completada', bg: 'var(--at-success-tint)', color: 'var(--at-success)', icon: '🏁' },
   cancelada:  { label: 'Cancelada',  bg: 'var(--at-chip)', color: 'var(--at-ink-3)', icon: '🚫' },
 }
 
@@ -271,7 +271,7 @@ export function PortalMudanzaTab({ unidadId, unidadNombre, proyectoId, companyId
                         style={{
                           position: 'absolute', top: '-6px', right: '-6px',
                           width: '18px', height: '18px', borderRadius: '50%',
-                          background: '#ef4444', color: 'white', border: 'none',
+                          background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none',
                           fontSize: '10px', cursor: 'pointer', display: 'flex',
                           alignItems: 'center', justifyContent: 'center', lineHeight: 1,
                         }}

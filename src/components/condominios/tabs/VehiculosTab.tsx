@@ -17,7 +17,7 @@ interface Props {
 const TIPO_LABEL: Record<string, string> = { auto: 'Auto', moto: 'Moto', camion: 'Camión', otro: 'Otro' }
 const TIPO_COLOR: Record<string, { bg: string; color: string }> = {
   auto:   { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
-  moto:   { bg: '#fef3c7', color: '#92400e' },
+  moto:   { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
   camion: { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)' },
   otro:   { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
@@ -63,7 +63,7 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar vehículo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar vehículo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('vehiculos_residentes').delete().eq('id', id)
     onRefresh()
@@ -218,13 +218,13 @@ export function VehiculosTab({ vehiculos, unidades, proyectoId, companyId, canCr
                   {canEdit && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                       <button onClick={() => toggleActivo(v)}
-                        style={{ padding: '3px 7px', background: v.activo ? '#fee2e2' : '#dcfce7', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', color: v.activo ? '#ef4444' : '#16a34a' }}>
+                        style={{ padding: '3px 7px', background: v.activo ? 'var(--at-danger-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', color: v.activo ? 'var(--at-danger)' : 'var(--at-success)' }}>
                         {v.activo ? 'Desactivar' : 'Activar'}
                       </button>
                       <button onClick={() => startEdit(v)}
                         style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(v.id)}
-                        style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </div>
                   )}
                 </div>

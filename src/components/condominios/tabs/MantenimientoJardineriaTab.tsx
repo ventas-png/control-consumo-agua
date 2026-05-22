@@ -14,10 +14,10 @@ interface Props {
 }
 
 const TIPOS: { value: TipoJardineria; label: string; icon: string; color: string }[] = [
-  { value: 'mantenimiento_general', label: 'Mant. general', icon: '🌿', color: '#10b981' },
+  { value: 'mantenimiento_general', label: 'Mant. general', icon: '🌿', color: 'var(--at-success)' },
   { value: 'poda',                  label: 'Poda',          icon: '✂️', color: 'var(--at-accent)' },
-  { value: 'fumigacion',            label: 'Fumigación',    icon: '🧪', color: '#f59e0b' },
-  { value: 'siembra',               label: 'Siembra',       icon: '🌱', color: '#22c55e' },
+  { value: 'fumigacion',            label: 'Fumigación',    icon: '🧪', color: 'var(--at-warning)' },
+  { value: 'siembra',               label: 'Siembra',       icon: '🌱', color: 'var(--at-success)' },
   { value: 'riego',                 label: 'Riego',         icon: '💧', color: 'var(--at-accent-2)' },
   { value: 'limpieza',              label: 'Limpieza',      icon: '🧹', color: 'var(--at-accent)' },
   { value: 'otro',                  label: 'Otro',          icon: '📋', color: 'var(--at-ink-3)' },
@@ -25,8 +25,8 @@ const TIPOS: { value: TipoJardineria; label: string; icon: string; color: string
 
 const ESTADOS: { value: EstadoJardineria; label: string; color: string; bg: string }[] = [
   { value: 'programado',  label: 'Programado', color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
-  { value: 'en_proceso',  label: 'En proceso', color: '#f59e0b', bg: '#fef3c7' },
-  { value: 'completado',  label: 'Completado', color: '#10b981', bg: '#d1fae5' },
+  { value: 'en_proceso',  label: 'En proceso', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  { value: 'completado',  label: 'Completado', color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   { value: 'cancelado',   label: 'Cancelado',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 ]
 
@@ -113,7 +113,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
             <span style={{ fontWeight: 600, fontSize: 14 }}>Jardinería ({lista.length})</span>
             {canCreate && (
               <button onClick={() => { setMostrarForm(true); setSelected(null) }}
-                style={{ padding: '5px 10px', background: '#22c55e', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                style={{ padding: '5px 10px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 + Nuevo
               </button>
             )}
@@ -129,8 +129,8 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
         </div>
 
         {proximos.length > 0 && (
-          <div style={{ padding: '8px 12px', background: '#f0fdf4', borderBottom: '1px solid var(--at-line)' }}>
-            <div style={{ fontSize: 10, color: '#16a34a', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>📅 Próximas visitas</div>
+          <div style={{ padding: '8px 12px', background: 'var(--at-success-tint)', borderBottom: '1px solid var(--at-line)' }}>
+            <div style={{ fontSize: 10, color: 'var(--at-success)', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>📅 Próximas visitas</div>
             {proximos.slice(0, 3).map(r => {
               const tipo = TIPOS.find(t => t.value === r.tipo)
               return (
@@ -150,7 +150,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
           const est = ESTADOS.find(e => e.value === r.estado)
           return (
             <div key={r.id} onClick={() => { setSelected(r); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? '#f0fdf4' : 'var(--at-surface)', borderLeft: `3px solid ${tipo?.color}` }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === r.id ? 'var(--at-success-tint)' : 'var(--at-surface)', borderLeft: `3px solid ${tipo?.color}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{tipo?.icon} {tipo?.label}</span>
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: est?.bg, color: est?.color }}>{est?.label}</span>
@@ -167,9 +167,9 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
         {!mostrarForm && !selected && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-              <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 16px' }}>
-                <div style={{ fontSize: 11, color: '#16a34a' }}>Costo total (completados)</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#16a34a' }}>{moneda} {totalCosto.toLocaleString()}</div>
+              <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '12px 16px' }}>
+                <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Costo total (completados)</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {totalCosto.toLocaleString()}</div>
               </div>
               <div style={{ background: 'var(--at-accent-tint)', borderRadius: 10, padding: '12px 16px' }}>
                 <div style={{ fontSize: 11, color: 'var(--at-accent)' }}>Total registros</div>
@@ -231,7 +231,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
                   {AREAS_COMUNES.map(a => (
                     <button key={a} type="button" onClick={() => toggleArea(a)}
-                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid', fontSize: 11, cursor: 'pointer', background: form.areas.includes(a) ? '#22c55e' : 'var(--at-surface)', color: form.areas.includes(a) ? 'white' : 'var(--at-ink-2)', borderColor: form.areas.includes(a) ? '#22c55e' : 'var(--at-line-strong)' }}>
+                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid', fontSize: 11, cursor: 'pointer', background: form.areas.includes(a) ? 'var(--at-success)' : 'var(--at-surface)', color: form.areas.includes(a) ? 'white' : 'var(--at-ink-2)', borderColor: form.areas.includes(a) ? 'var(--at-success)' : 'var(--at-line-strong)' }}>
                       {a}
                     </button>
                   ))}
@@ -248,7 +248,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Registrar'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -287,9 +287,9 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
                   </div>
                 )}
                 {selected.costo != null && (
-                  <div style={{ background: '#f0fdf4', borderRadius: 8, padding: '10px 14px' }}>
-                    <div style={{ fontSize: 11, color: '#16a34a' }}>Costo</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: '#16a34a' }}>{moneda} {selected.costo.toLocaleString()}</div>
+                  <div style={{ background: 'var(--at-success-tint)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Costo</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {selected.costo.toLocaleString()}</div>
                   </div>
                 )}
               </div>
@@ -298,7 +298,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
                 <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 6 }}>ÁREAS TRATADAS</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {selected.areas.map(a => (
-                    <span key={a} style={{ padding: '3px 10px', background: '#f0fdf4', color: '#16a34a', borderRadius: 6, fontSize: 12, border: '1px solid #bbf7d0' }}>{a}</span>
+                    <span key={a} style={{ padding: '3px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', borderRadius: 6, fontSize: 12, border: '1px solid var(--at-success-border)' }}>{a}</span>
                   ))}
                 </div>
               </div>
@@ -323,7 +323,7 @@ export default function MantenimientoJardineriaTab({ registros, proyectoId, comp
 
               {canEdit && selected.estado !== 'completado' && (
                 <button onClick={() => cambiarEstado(selected, 'completado')}
-                  style={{ padding: '6px 14px', background: '#d1fae5', color: '#10b981', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                  style={{ padding: '6px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                   ✓ Marcar completado
                 </button>
               )}

@@ -279,11 +279,11 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                 <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
-                      background: completado ? '#16a34a' : activo ? 'var(--at-primary)' : 'var(--at-line)',
+                      background: completado ? 'var(--at-success)' : activo ? 'var(--at-primary)' : 'var(--at-line)',
                       color: completado || activo ? 'white' : 'var(--at-ink-3)' }}>
                       {completado ? '✓' : i + 1}
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: activo ? 700 : 500, color: activo ? 'var(--at-primary)' : completado ? '#16a34a' : 'var(--at-ink-3)' }}>
+                    <span style={{ fontSize: 12, fontWeight: activo ? 700 : 500, color: activo ? 'var(--at-primary)' : completado ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                       {labels[i]}
                     </span>
                   </div>
@@ -332,8 +332,8 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
                   </div>
                   {unidadesYaTienen.length > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#d97706' }}>Ya tienen cuota este período</span>
-                      <span style={{ fontWeight: 700, color: '#d97706' }}>{unidadesYaTienen.length}</span>
+                      <span style={{ color: 'var(--at-warning)' }}>Ya tienen cuota este período</span>
+                      <span style={{ fontWeight: 700, color: 'var(--at-warning)' }}>{unidadesYaTienen.length}</span>
                     </div>
                   )}
                 </div>
@@ -374,7 +374,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
               </div>
 
               {alertas.length > 0 && (
-                <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: '#92400e' }}>
+                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid #fcd34d', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: 'var(--at-warning-strong)' }}>
                   ⚠️ Las siguientes unidades no tienen área m² ni alícuota definidas — su cuota será ₡0 en rubros por m² / alícuota:{' '}
                   {alertas.slice(0, 5).join(', ')}{alertas.length > 5 ? ` +${alertas.length - 5} más` : ''}
                 </div>
@@ -453,7 +453,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
               </div>
 
               {unidadesYaTienen.length > 0 && (
-                <div style={{ marginTop: 10, padding: '8px 12px', background: '#fffbeb', borderRadius: 8, fontSize: 11, color: '#d97706' }}>
+                <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--at-warning-tint)', borderRadius: 8, fontSize: 11, color: 'var(--at-warning)' }}>
                   ⚠️ {unidadesYaTienen.length} unidad(es) omitidas — ya tienen cuota de {conceptoFinal} en {periodo}:{' '}
                   {unidadesYaTienen.slice(0, 5).map(u => u.nombre).join(', ')}{unidadesYaTienen.length > 5 ? ` +${unidadesYaTienen.length - 5}` : ''}
                 </div>
@@ -480,7 +480,7 @@ export default function GeneradorCuotasTab({ cuotas, unidades, proyectoId, compa
           {/* ─── PASO C: Resultado ─── */}
           {paso === 'resultado' && resultado && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0', gap: 16 }}>
-              <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>✅</div>
+              <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--at-success-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>✅</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--at-ink)' }}>¡Cuotas generadas!</div>
               <div style={{ fontSize: 14, color: 'var(--at-ink-3)', textAlign: 'center' }}>
                 Se crearon <strong>{resultado.generadas} cuotas</strong> de <strong>{conceptoFinal}</strong><br />

@@ -20,9 +20,9 @@ const TIPO_LABEL: Record<TipoRenta, string> = {
 }
 
 const ESTADO_CFG: Record<EstadoSolicitudRenta, { label: string; color: string; bg: string; icon: string }> = {
-  pendiente: { label: 'Pendiente', color: '#d97706', bg: '#fef3c7', icon: '⏳' },
-  aprobada:  { label: 'Aprobada',  color: '#16a34a', bg: '#dcfce7', icon: '✅' },
-  rechazada: { label: 'Rechazada', color: '#dc2626', bg: '#fef2f2', icon: '❌' },
+  pendiente: { label: 'Pendiente', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '⏳' },
+  aprobada:  { label: 'Aprobada',  color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '✅' },
+  rechazada: { label: 'Rechazada', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', icon: '❌' },
 }
 
 export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdit, onRefresh }: Props) {
@@ -51,7 +51,7 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
       inputLabel: nuevoEstado === 'aprobada' ? 'Comentario (opcional)' : 'Motivo del rechazo (recomendado)',
       inputPlaceholder: 'Escriba un comentario…',
       showCancelButton: true,
-      confirmButtonColor: nuevoEstado === 'aprobada' ? '#16a34a' : '#dc2626',
+      confirmButtonColor: nuevoEstado === 'aprobada' ? 'var(--at-success)' : 'var(--at-danger)',
       confirmButtonText: nuevoEstado === 'aprobada' ? 'Aprobar' : 'Rechazar',
       cancelButtonText: 'Cancelar',
     })
@@ -104,9 +104,9 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
       {/* KPIs */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {[
-          { label: 'Pendientes', count: pendientes, color: '#f59e0b', bg: '#fef3c7' },
-          { label: 'Aprobadas',  count: aprobadas,  color: '#16a34a', bg: '#dcfce7' },
-          { label: 'Rechazadas', count: rechazadas, color: '#dc2626', bg: '#fef2f2' },
+          { label: 'Pendientes', count: pendientes, color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+          { label: 'Aprobadas',  count: aprobadas,  color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+          { label: 'Rechazadas', count: rechazadas, color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
         ].map(k => (
           <div key={k.label} style={{
             background: k.bg, border: `1px solid ${k.color}30`,
@@ -121,9 +121,9 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
       {/* Filters */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <button style={chipStyle(filtroEstado === 'all', 'var(--at-ink-3)')} onClick={() => setFiltroEstado('all')}>Todas</button>
-        <button style={chipStyle(filtroEstado === 'pendiente', '#f59e0b')} onClick={() => setFiltroEstado('pendiente')}>⏳ Pendientes</button>
-        <button style={chipStyle(filtroEstado === 'aprobada', '#16a34a')} onClick={() => setFiltroEstado('aprobada')}>✅ Aprobadas</button>
-        <button style={chipStyle(filtroEstado === 'rechazada', '#dc2626')} onClick={() => setFiltroEstado('rechazada')}>❌ Rechazadas</button>
+        <button style={chipStyle(filtroEstado === 'pendiente', 'var(--at-warning)')} onClick={() => setFiltroEstado('pendiente')}>⏳ Pendientes</button>
+        <button style={chipStyle(filtroEstado === 'aprobada', 'var(--at-success)')} onClick={() => setFiltroEstado('aprobada')}>✅ Aprobadas</button>
+        <button style={chipStyle(filtroEstado === 'rechazada', 'var(--at-danger)')} onClick={() => setFiltroEstado('rechazada')}>❌ Rechazadas</button>
       </div>
 
       {/* List */}
@@ -183,7 +183,7 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
                 )}
 
                 {s.tipo_aprobado && s.estado === 'aprobada' && (
-                  <div style={{ marginTop: '8px', fontSize: '12.5px', color: '#16a34a', fontWeight: 600 }}>
+                  <div style={{ marginTop: '8px', fontSize: '12.5px', color: 'var(--at-success)', fontWeight: 600 }}>
                     ✅ Autorizado para: {TIPO_LABEL[s.tipo_aprobado]}
                   </div>
                 )}
@@ -213,7 +213,7 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
                       disabled={saving}
                       onClick={e => { e.stopPropagation(); resolver(s, 'aprobada') }}
                       style={{
-                        padding: '8px 18px', background: '#16a34a', color: 'white',
+                        padding: '8px 18px', background: 'var(--at-success)', color: 'var(--at-on-status)',
                         border: 'none', borderRadius: '8px', fontWeight: 600,
                         fontSize: '13px', cursor: saving ? 'not-allowed' : 'pointer',
                         opacity: saving ? 0.7 : 1,
@@ -223,7 +223,7 @@ export function SolicitudesRentaTab({ solicitudes, unidades, autorNombre, canEdi
                       disabled={saving}
                       onClick={e => { e.stopPropagation(); resolver(s, 'rechazada') }}
                       style={{
-                        padding: '8px 18px', background: '#dc2626', color: 'white',
+                        padding: '8px 18px', background: 'var(--at-danger)', color: 'var(--at-on-status)',
                         border: 'none', borderRadius: '8px', fontWeight: 600,
                         fontSize: '13px', cursor: saving ? 'not-allowed' : 'pointer',
                         opacity: saving ? 0.7 : 1,

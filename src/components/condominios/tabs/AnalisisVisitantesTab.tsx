@@ -88,8 +88,8 @@ export default function AnalisisVisitantesTab({ visitantes, unidades }: Props) {
             {[
               { label: 'Total visitas', val: String(visitantes.length), color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
               { label: 'Visitantes únicos', val: String(new Set(visitantes.map(v => v.nombre?.toLowerCase())).size), color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
-              { label: 'Visitas recurrentes', val: String(stats.visitantesFrecuentes.length), color: '#d97706', bg: '#fef3c7' },
-              { label: 'Con vehículo', val: String(stats.conPlaca), color: '#16a34a', bg: '#dcfce7' },
+              { label: 'Visitas recurrentes', val: String(stats.visitantesFrecuentes.length), color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+              { label: 'Con vehículo', val: String(stats.conPlaca), color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
               { label: 'Duración prom.', val: stats.promDuracion > 0 ? `${Math.round(stats.promDuracion)} min` : '—', color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
             ].map(k => (
               <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '10px 14px' }}>

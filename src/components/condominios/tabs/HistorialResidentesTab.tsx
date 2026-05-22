@@ -16,12 +16,12 @@ interface Props {
 const TIPO_STYLE: Record<string, { bg: string; color: string; label: string; icon: string }> = {
   propietario:  { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', label: 'Propietario',  icon: '🏠' },
   arrendatario: { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Arrendatario', icon: '🔑' },
-  familiar:     { bg: '#dcfce7', color: '#16a34a', label: 'Familiar',     icon: '👨‍👩‍👧' },
+  familiar:     { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Familiar',     icon: '👨‍👩‍👧' },
   otro:         { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Otro',         icon: '👤' },
 }
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  activo:   { bg: '#dcfce7', color: '#16a34a', label: 'Activo' },
+  activo:   { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Activo' },
   anterior: { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Anterior' },
 }
 
@@ -86,7 +86,7 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
   }
 
   const handleDelete = async (h: HistorialResidente) => {
-    const r = await Swal.fire({ title: '¿Eliminar registro?', text: h.nombre_completo, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' })
+    const r = await Swal.fire({ title: '¿Eliminar registro?', text: h.nombre_completo, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('historial_residentes').delete().eq('id', h.id)
     onRefresh()
@@ -115,7 +115,7 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '14px', marginBottom: '20px' }}>
         {[
-          { label: 'Residentes Activos', value: activos, icon: '🏠', bg: '#f0fdf4', color: '#16a34a' },
+          { label: 'Residentes Activos', value: activos, icon: '🏠', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
           { label: 'Anteriores', value: anteriores, icon: '📋', bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
           { label: 'Total registros', value: historial.length, icon: '👥', bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
         ].map(k => (
@@ -227,7 +227,7 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
                     {unidad?.nombre ?? 'Sin unidad asignada'}
                   </div>
                   {activo && (
-                    <span style={{ padding: '2px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, background: '#dcfce7', color: '#16a34a' }}>
+                    <span style={{ padding: '2px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, background: 'var(--at-success-tint)', color: 'var(--at-success)' }}>
                       Activo: {activo.nombre_completo}
                     </span>
                   )}
@@ -259,11 +259,11 @@ export function HistorialResidentesTab({ historial, unidades, proyectoId, compan
                             <>
                               <button onClick={() => openEdit(h)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>
                               {h.estado === 'activo' && (
-                                <button onClick={() => marcarAnterior(h)} title="Marcar como anterior" style={{ padding: '4px 8px', background: '#fef3c7', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>📤</button>
+                                <button onClick={() => marcarAnterior(h)} title="Marcar como anterior" style={{ padding: '4px 8px', background: 'var(--at-warning-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>📤</button>
                               )}
                             </>
                           )}
-                          <button onClick={() => handleDelete(h)} style={{ padding: '4px 8px', background: '#fef2f2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#ef4444' }}>🗑</button>
+                          <button onClick={() => handleDelete(h)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>
                         </div>
                       </div>
                     )

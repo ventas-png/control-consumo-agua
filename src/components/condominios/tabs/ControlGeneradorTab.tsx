@@ -16,24 +16,24 @@ interface Props {
 const TIPOS: { value: TipoRegistroGenerador; label: string; icon: string; color: string }[] = [
   { value: 'lectura',              label: 'Lectura',             icon: '📊', color: 'var(--at-accent-2)' },
   { value: 'mantenimiento',        label: 'Mantenimiento',       icon: '🔧', color: 'var(--at-accent)' },
-  { value: 'prueba',               label: 'Prueba',              icon: '⚡', color: '#f59e0b' },
-  { value: 'falla',                label: 'Falla',               icon: '⚠️', color: '#ef4444' },
-  { value: 'arranque_emergencia',  label: 'Arranque emergencia', icon: '🚨', color: '#dc2626' },
+  { value: 'prueba',               label: 'Prueba',              icon: '⚡', color: 'var(--at-warning)' },
+  { value: 'falla',                label: 'Falla',               icon: '⚠️', color: 'var(--at-danger)' },
+  { value: 'arranque_emergencia',  label: 'Arranque emergencia', icon: '🚨', color: 'var(--at-danger)' },
 ]
 
 const ESTADOS: { value: EstadoGenerador; label: string; color: string; bg: string; icon: string }[] = [
-  { value: 'standby',      label: 'Standby',      color: '#10b981', bg: '#d1fae5', icon: '✅' },
+  { value: 'standby',      label: 'Standby',      color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '✅' },
   { value: 'operando',     label: 'Operando',      color: 'var(--at-accent)', bg: 'var(--at-accent-tint)', icon: '⚡' },
-  { value: 'mantenimiento',label: 'Mantenimiento', color: '#f59e0b', bg: '#fef3c7', icon: '🔧' },
-  { value: 'falla',        label: 'Falla',         color: '#ef4444', bg: '#fef2f2', icon: '⚠️' },
+  { value: 'mantenimiento',label: 'Mantenimiento', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '🔧' },
+  { value: 'falla',        label: 'Falla',         color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', icon: '⚠️' },
   { value: 'apagado',      label: 'Apagado',       color: 'var(--at-ink-3)', bg: 'var(--at-chip)', icon: '⭕' },
 ]
 
 function nivelCombColor(pct: number | null | undefined): string {
   if (pct == null) return 'var(--at-ink-3)'
-  if (pct >= 50) return '#10b981'
-  if (pct >= 25) return '#f59e0b'
-  return '#ef4444'
+  if (pct >= 50) return 'var(--at-success)'
+  if (pct >= 25) return 'var(--at-warning)'
+  return 'var(--at-danger)'
 }
 
 export default function ControlGeneradorTab({ registros, proyectoId, companyId, moneda, canCreate, onRefresh }: Props) {
@@ -132,7 +132,7 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
                       {r.frecuencia != null && <span style={{ color: 'var(--at-accent)' }}>{r.frecuencia}Hz</span>}
                     </div>
                     {r.proximo_mantenimiento && (
-                      <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 4 }}>🔧 Manto: {r.proximo_mantenimiento}</div>
+                      <div style={{ fontSize: 10, color: 'var(--at-warning)', marginTop: 4 }}>🔧 Manto: {r.proximo_mantenimiento}</div>
                     )}
                   </div>
                 ) : (
@@ -150,13 +150,13 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
           <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-accent)' }}>{registros.length}</div>
           <div style={{ fontSize: 11, color: 'var(--at-accent)' }}>Registros totales</div>
         </div>
-        <div style={{ background: '#fef3c7', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#f59e0b' }}>{totalHoras.toFixed(1)}h</div>
-          <div style={{ fontSize: 11, color: '#f59e0b' }}>Horas operación totales</div>
+        <div style={{ background: 'var(--at-warning-tint)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-warning)' }}>{totalHoras.toFixed(1)}h</div>
+          <div style={{ fontSize: 11, color: 'var(--at-warning)' }}>Horas operación totales</div>
         </div>
-        <div style={{ background: fallas > 0 ? '#fef2f2' : 'var(--at-chip)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: fallas > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>{fallas}</div>
-          <div style={{ fontSize: 11, color: fallas > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>Fallas registradas</div>
+        <div style={{ background: fallas > 0 ? 'var(--at-danger-tint)' : 'var(--at-chip)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: fallas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{fallas}</div>
+          <div style={{ fontSize: 11, color: fallas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>Fallas registradas</div>
         </div>
       </div>
 
@@ -201,7 +201,7 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
             </div>
             <div>
               <label style={lbl}>Nivel combustible (%)</label>
-              <input type="number" step="0.1" min="0" max="100" style={{ ...inp, borderColor: form.nivel_combustible_pct ? (parseFloat(form.nivel_combustible_pct) < 25 ? '#ef4444' : 'var(--at-line-strong)') : 'var(--at-line-strong)' }} value={form.nivel_combustible_pct} onChange={e => setForm(p => ({ ...p, nivel_combustible_pct: e.target.value }))} />
+              <input type="number" step="0.1" min="0" max="100" style={{ ...inp, borderColor: form.nivel_combustible_pct ? (parseFloat(form.nivel_combustible_pct) < 25 ? 'var(--at-danger)' : 'var(--at-line-strong)') : 'var(--at-line-strong)' }} value={form.nivel_combustible_pct} onChange={e => setForm(p => ({ ...p, nivel_combustible_pct: e.target.value }))} />
             </div>
             <div>
               <label style={lbl}>Horas operación</label>
@@ -247,7 +247,7 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Registrar'}
           </button>
         </div>
@@ -262,7 +262,7 @@ export default function ControlGeneradorTab({ registros, proyectoId, companyId, 
             const tipo = TIPOS.find(t => t.value === r.tipo)
             const est = ESTADOS.find(e => e.value === r.estado)
             return (
-              <div key={r.id} style={{ background: 'var(--at-surface)', border: `1px solid ${r.tipo === 'falla' ? '#fecaca' : 'var(--at-line)'}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={r.id} style={{ background: 'var(--at-surface)', border: `1px solid ${r.tipo === 'falla' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>⚡ {r.generador}</span>

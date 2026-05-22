@@ -16,8 +16,8 @@ interface Props {
 
 const ESTADO_CONFIG: Record<EstadoPaquete, { label: string; bg: string; color: string; icon: string }> = {
   pendiente: { label: 'Pendiente', bg: 'var(--at-primary-tint)', color: 'var(--at-primary)', icon: '📦' },
-  entregado: { label: 'Entregado', bg: '#f0fdf4', color: '#16a34a', icon: '✅' },
-  devuelto:  { label: 'Devuelto',  bg: '#fef2f2', color: '#dc2626', icon: '↩️' },
+  entregado: { label: 'Entregado', bg: 'var(--at-success-tint)', color: 'var(--at-success)', icon: '✅' },
+  devuelto:  { label: 'Devuelto',  bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', icon: '↩️' },
 }
 
 export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userId, canCreate, canEdit, onRefresh }: Props) {
@@ -79,7 +79,7 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
   }
 
   async function eliminar(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('paquetes_recibidos').delete().eq('id', id)
     onRefresh()
@@ -196,20 +196,20 @@ export function PaqueteriaTab({ paquetes, unidades, proyectoId, companyId, userI
                         window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
                       }}
                       title="Notificar residente por WhatsApp"
-                      style={{ padding: '5px 10px', background: '#dcfce7', color: '#16a34a', border: '1px solid #86efac', borderRadius: '8px', cursor: 'pointer', fontSize: '11.5px', fontWeight: 600 }}
+                      style={{ padding: '5px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '11.5px', fontWeight: 600 }}
                     >💬 Avisar</button>
                   )}
                   {canEdit && p.estado === 'pendiente' && (
-                    <button onClick={() => marcarEntregado(p.id)} style={{ padding: '6px 12px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #86efac', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                    <button onClick={() => marcarEntregado(p.id)} style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                       ✓ Entregar
                     </button>
                   )}
                   {canEdit && p.estado === 'pendiente' && (
-                    <button onClick={() => cambiarEstado(p.id, 'devuelto')} style={{ padding: '5px 10px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontSize: '11.5px' }}>
+                    <button onClick={() => cambiarEstado(p.id, 'devuelto')} style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: '1px solid var(--at-danger-border)', borderRadius: '8px', cursor: 'pointer', fontSize: '11.5px' }}>
                       ↩ Devolver
                     </button>
                   )}
-                  <button onClick={() => eliminar(p.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
+                  <button onClick={() => eliminar(p.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
                 </div>
               </div>
             )

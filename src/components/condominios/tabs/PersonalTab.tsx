@@ -28,10 +28,10 @@ const CARGOS: { value: CargoPersonal; label: string; icon: string }[] = [
 ]
 
 const ESTADO_CONFIG: Record<EstadoPersonal, { label: string; color: string; bg: string }> = {
-  activo:      { label: 'Activo',      color: '#10b981', bg: '#d1fae5' },
+  activo:      { label: 'Activo',      color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   inactivo:    { label: 'Inactivo',    color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
   vacaciones:  { label: 'Vacaciones',  color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
-  incapacidad: { label: 'Incapacidad', color: '#f59e0b', bg: '#fef3c7' },
+  incapacidad: { label: 'Incapacidad', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
 }
 
 const TIPOS_SANGRE   = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
@@ -151,7 +151,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar personal?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar personal?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('personal_condominio').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -177,7 +177,7 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
   const fullCol: CSSProperties = { gridColumn: '1 / -1' }
   const miniInput: CSSProperties = { ...inputStyle, padding: '6px 8px', fontSize: '12px' }
   const addBtnStyle: CSSProperties = { padding: '6px 12px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1.5px dashed var(--at-line-strong)', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }
-  const rmRowStyle: CSSProperties = { padding: '6px 9px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', flexShrink: 0 }
+  const rmRowStyle: CSSProperties = { padding: '6px 9px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', flexShrink: 0 }
 
   return (
     <div style={{ padding: '20px 24px' }}>
@@ -571,12 +571,12 @@ export function PersonalTab({ personal, proyectoId, companyId, moneda, canCreate
                         </button>
                       )}
                       {(p.estado === 'vacaciones' || p.estado === 'incapacidad') && (
-                        <button onClick={() => handleEstado(p.id, 'activo')} style={{ padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                        <button onClick={() => handleEstado(p.id, 'activo')} style={{ padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                           Reactivar
                         </button>
                       )}
                       <button onClick={() => startEdit(p)} style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
+                      <button onClick={() => handleDelete(p.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
                     </>
                   )}
                 </div>

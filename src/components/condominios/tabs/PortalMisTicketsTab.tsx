@@ -15,16 +15,16 @@ type EstadoTicket = 'abierto' | 'en_proceso' | 'resuelto' | 'cerrado'
 type PrioridadTicket = 'baja' | 'media' | 'alta' | 'urgente'
 
 const ESTADO_CONFIG: Record<EstadoTicket, { label: string; icon: string; bg: string; color: string }> = {
-  abierto:    { label: 'Abierto',     icon: '🟡', bg: '#fff7ed', color: '#c2410c' },
+  abierto:    { label: 'Abierto',     icon: '🟡', bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
   en_proceso: { label: 'En proceso',  icon: '🔵', bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  resuelto:   { label: 'Resuelto',    icon: '🟢', bg: '#f0fdf4', color: '#16a34a' },
+  resuelto:   { label: 'Resuelto',    icon: '🟢', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   cerrado:    { label: 'Cerrado',     icon: '⚪', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
 const PRIORIDAD_CONFIG: Record<PrioridadTicket, { label: string; bg: string; color: string }> = {
-  baja:    { label: 'Baja',    bg: '#f0fdf4', color: '#16a34a' },
-  media:   { label: 'Media',   bg: '#fff7ed', color: '#c2410c' },
-  alta:    { label: 'Alta',    bg: '#fef2f2', color: '#dc2626' },
+  baja:    { label: 'Baja',    bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  media:   { label: 'Media',   bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
+  alta:    { label: 'Alta',    bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
   urgente: { label: 'Urgente', bg: '#fdf2f8', color: 'var(--at-accent-hover)' },
 }
 
@@ -141,7 +141,7 @@ export function PortalMisTicketsTab({ tickets, unidadId, proyectoId, companyId, 
                       <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 700, background: pc.bg, color: pc.color }}>{pc.label}</span>
                       <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>{new Date(t.created_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                     </div>
-                    {t.fecha_cierre && <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '4px' }}>✅ Resuelto el {new Date(t.fecha_cierre).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</div>}
+                    {t.fecha_cierre && <div style={{ fontSize: '12px', color: 'var(--at-success)', marginTop: '4px' }}>✅ Resuelto el {new Date(t.fecha_cierre).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</div>}
                   </div>
                 </div>
               </div>

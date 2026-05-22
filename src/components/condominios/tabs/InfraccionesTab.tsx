@@ -27,9 +27,9 @@ const TIPO_CONFIG: Record<TipoInfraccion, { label: string; icon: string }> = {
 
 const ESTADO_CONFIG: Record<EstadoInfraccion, { label: string; bg: string; color: string }> = {
   emitida:      { label: 'Emitida',      bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  notificada:   { label: 'Notificada',   bg: '#fff7ed', color: '#ea580c' },
-  en_descargo:  { label: 'En descargo',  bg: '#fef3c7', color: '#d97706' },
-  resuelta:     { label: 'Resuelta',     bg: '#f0fdf4', color: '#16a34a' },
+  notificada:   { label: 'Notificada',   bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+  en_descargo:  { label: 'En descargo',  bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+  resuelta:     { label: 'Resuelta',     bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   anulada:      { label: 'Anulada',      bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
@@ -79,7 +79,7 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
   }
 
   async function eliminar(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar infracción?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await Swal.fire({ title: '¿Eliminar infracción?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('infracciones_condominio').delete().eq('id', id)
     onRefresh()
@@ -96,7 +96,7 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
         <div>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Infracciones</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
-            {totales.activas} activas · <span style={{ fontWeight: 600, color: '#dc2626' }}>{moneda} {totales.monto.toFixed(2)} en multas</span>
+            {totales.activas} activas · <span style={{ fontWeight: 600, color: 'var(--at-danger)' }}>{moneda} {totales.monto.toFixed(2)} en multas</span>
           </p>
         </div>
         {canCreate && (
@@ -194,8 +194,8 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px', alignItems: 'center' }}>
                       <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-ink-2)' }}>{tipo.label}</span>
                       {i.unidad_nombre && <span style={{ fontSize: '12.5px', color: 'var(--at-primary)', fontWeight: 600 }}>📍 {i.unidad_nombre}</span>}
-                      {i.monto_multa && <span style={{ fontSize: '12.5px', color: '#dc2626', fontWeight: 700 }}>💰 {moneda} {i.monto_multa.toFixed(2)}</span>}
-                      {vencida && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: '#fef2f2', color: '#dc2626', fontWeight: 700 }}>Descargo vencido</span>}
+                      {i.monto_multa && <span style={{ fontSize: '12.5px', color: 'var(--at-danger)', fontWeight: 700 }}>💰 {moneda} {i.monto_multa.toFixed(2)}</span>}
+                      {vencida && <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontWeight: 700 }}>Descargo vencido</span>}
                     </div>
                     <p style={{ margin: '0 0 6px', fontSize: '13.5px', color: 'var(--at-ink-2)' }}>{i.descripcion}</p>
                     <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
@@ -215,9 +215,9 @@ export function InfraccionesTab({ infracciones, unidades, proyectoId, companyId,
                       <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, background: estado.bg, color: estado.color }}>{estado.label}</span>
                     )}
                     {!['resuelta', 'anulada'].includes(i.estado) && (
-                      <button onClick={() => notificarWA(i)} title="Notificar por WhatsApp" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '15px', padding: '2px 4px' }}>💬</button>
+                      <button onClick={() => notificarWA(i)} title="Notificar por WhatsApp" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-success)', fontSize: '15px', padding: '2px 4px' }}>💬</button>
                     )}
-                    <button onClick={() => eliminar(i.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
+                    <button onClick={() => eliminar(i.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
                   </div>
                 </div>
               </div>

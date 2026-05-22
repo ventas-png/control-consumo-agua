@@ -15,16 +15,16 @@ interface Props {
 }
 
 const CATEGORIA_CFG: Record<CategoriaSugerencia, { label: string; icon: string; color: string }> = {
-  instalaciones: { label: 'Instalaciones', icon: '🔧', color: '#d97706' },
+  instalaciones: { label: 'Instalaciones', icon: '🔧', color: 'var(--at-warning)' },
   seguridad:     { label: 'Seguridad',     icon: '🛡️', color: 'var(--at-accent-hover)' },
   servicios:     { label: 'Servicios',     icon: '🧹', color: 'var(--at-primary-hover)' },
-  convivencia:   { label: 'Convivencia',   icon: '🤝', color: '#16a34a' },
+  convivencia:   { label: 'Convivencia',   icon: '🤝', color: 'var(--at-success)' },
   otro:          { label: 'Otro',          icon: '💬', color: 'var(--at-ink-3)' },
 }
 const ESTADO_CFG: Record<EstadoSugerencia, { label: string; bg: string; color: string; next?: EstadoSugerencia }> = {
-  pendiente:   { label: 'Pendiente',   bg: '#fef3c7', color: '#d97706', next: 'en_revision' },
+  pendiente:   { label: 'Pendiente',   bg: 'var(--at-warning-tint)', color: 'var(--at-warning)', next: 'en_revision' },
   en_revision: { label: 'En revisión', bg: 'var(--at-primary-soft)', color: 'var(--at-primary)', next: 'respondida' },
-  respondida:  { label: 'Respondida',  bg: '#dcfce7', color: '#16a34a', next: 'archivada' },
+  respondida:  { label: 'Respondida',  bg: 'var(--at-success-tint)', color: 'var(--at-success)', next: 'archivada' },
   archivada:   { label: 'Archivada',   bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
 
@@ -98,9 +98,9 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Pendientes', val: pendientes, bg: '#fef3c7', color: '#d97706' },
+          { label: 'Pendientes', val: pendientes, bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
           { label: 'En revisión', val: enRevision, bg: 'var(--at-primary-soft)', color: 'var(--at-primary)' },
-          { label: 'Respondidas', val: sugerencias.filter(s => s.estado === 'respondida').length, bg: '#dcfce7', color: '#16a34a' },
+          { label: 'Respondidas', val: sugerencias.filter(s => s.estado === 'respondida').length, bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
           { label: 'Total', val: sugerencias.length, bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
@@ -231,7 +231,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
                 </div>
               ))}
               {selected.respuesta && (
-                <div style={{ marginTop: 10, padding: '10px 12px', background: '#f0fdf4', borderRadius: 8, fontSize: 12, color: '#166534', lineHeight: 1.4 }}>
+                <div style={{ marginTop: 10, padding: '10px 12px', background: 'var(--at-success-tint)', borderRadius: 8, fontSize: 12, color: 'var(--at-success-strong)', lineHeight: 1.4 }}>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>💬 Respuesta:</div>
                   {selected.respuesta}
                 </div>
@@ -246,7 +246,7 @@ export default function BuzonSugerenciasTab({ sugerencias, unidades, proyectoId,
                   )}
                   {(selected.estado === 'pendiente' || selected.estado === 'en_revision') && (
                     <button onClick={() => responder(selected)}
-                      style={{ padding: '7px 0', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      style={{ padding: '7px 0', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                       💬 Responder
                     </button>
                   )}

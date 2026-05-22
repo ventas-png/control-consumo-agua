@@ -19,9 +19,9 @@ interface Props {
 }
 
 const ESTADO_CFG: Record<EstadoReciboDigital, { label: string; bg: string; color: string }> = {
-  generado: { label: 'Generado', bg: '#fef3c7', color: '#d97706' },
+  generado: { label: 'Generado', bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
   enviado:  { label: 'Enviado',  bg: 'var(--at-primary-soft)', color: 'var(--at-primary)' },
-  anulado:  { label: 'Anulado',  bg: '#fee2e2', color: '#ef4444' },
+  anulado:  { label: 'Anulado',  bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
 }
 
 const BLANK = {
@@ -89,7 +89,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
   }
 
   async function anular(id: string) {
-    const { isConfirmed } = await Swal.fire({ title: '¿Anular recibo?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Anular', cancelButtonText: 'Cancelar' })
+    const { isConfirmed } = await Swal.fire({ title: '¿Anular recibo?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Anular', cancelButtonText: 'Cancelar' })
     if (!isConfirmed) return
     await supabase.from('recibos_digitales').update({ estado: 'anulado' }).eq('id', id)
     onRefresh()
@@ -105,9 +105,9 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
           { label: 'Total recibos', val: recibos.length, bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
-          { label: 'Generados', val: recibos.filter(r => r.estado === 'generado').length, bg: '#fffbeb', color: '#d97706' },
+          { label: 'Generados', val: recibos.filter(r => r.estado === 'generado').length, bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
           { label: 'Enviados', val: recibos.filter(r => r.estado === 'enviado').length, bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-          { label: 'Monto emitido', val: `${moneda} ${totalEmitido.toFixed(2)}`, bg: '#f0fdf4', color: '#16a34a' },
+          { label: 'Monto emitido', val: `${moneda} ${totalEmitido.toFixed(2)}`, bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: k.color }}>{k.val}</div>
@@ -143,7 +143,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
                 r.destinatario_nombre ?? '', r.destinatario_email ?? '', r.estado,
               ]),
             }])}
-            style={{ padding: '7px 14px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            style={{ padding: '7px 14px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             📊 Excel
           </button>
           {canCreate && (
@@ -262,7 +262,7 @@ export default function RecibosDigitalesTab({ recibos, cuotas, unidades, proyect
                               ✉️ Enviado
                             </button>
                             <button onClick={() => anular(r.id)}
-                              style={{ padding: '3px 8px', background: '#fee2e2', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: '#ef4444' }}>
+                              style={{ padding: '3px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: 'var(--at-danger)' }}>
                               ✕
                             </button>
                           </>

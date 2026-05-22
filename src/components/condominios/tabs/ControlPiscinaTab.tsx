@@ -13,16 +13,16 @@ interface Props {
 }
 
 const ESTADOS: { value: EstadoPiscina; label: string; color: string; bg: string; icon: string }[] = [
-  { value: 'abierta',               label: 'Abierta',             color: '#10b981', bg: '#d1fae5', icon: '✅' },
-  { value: 'cerrada_mantenimiento', label: 'Cerrada (manto.)',    color: '#f59e0b', bg: '#fef3c7', icon: '🔧' },
+  { value: 'abierta',               label: 'Abierta',             color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '✅' },
+  { value: 'cerrada_mantenimiento', label: 'Cerrada (manto.)',    color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '🔧' },
   { value: 'cerrada_quimica',       label: 'Cerrada (química)',   color: 'var(--at-accent)', bg: 'var(--at-accent-tint)', icon: '🧪' },
-  { value: 'cerrada_incidente',     label: 'Cerrada (incidente)', color: '#ef4444', bg: '#fef2f2', icon: '🚨' },
+  { value: 'cerrada_incidente',     label: 'Cerrada (incidente)', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', icon: '🚨' },
 ]
 
 const TURBIEDAD: { value: TurbiededadPiscina; label: string; color: string }[] = [
   { value: 'cristalina',          label: 'Cristalina',           color: 'var(--at-accent-2)' },
-  { value: 'ligeramente_turbia',  label: 'Liger. turbia',        color: '#f59e0b' },
-  { value: 'turbia',              label: 'Turbia',               color: '#ef4444' },
+  { value: 'ligeramente_turbia',  label: 'Liger. turbia',        color: 'var(--at-warning)' },
+  { value: 'turbia',              label: 'Turbia',               color: 'var(--at-danger)' },
 ]
 
 const PH_MIN = 7.2
@@ -44,7 +44,7 @@ function cloroStatus(c: number | null | undefined): 'ok' | 'warn' | 'bad' {
   return 'bad'
 }
 
-const STATUS_COLOR = { ok: '#10b981', warn: '#f59e0b', bad: '#ef4444' }
+const STATUS_COLOR = { ok: 'var(--at-success)', warn: 'var(--at-warning)', bad: 'var(--at-danger)' }
 
 export default function ControlPiscinaTab({ registros, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
   const [filtroPiscina, setFiltroPiscina] = useState('')
@@ -228,7 +228,7 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Registrar'}
           </button>
         </div>
@@ -277,13 +277,13 @@ export default function ControlPiscinaTab({ registros, proyectoId, companyId, ca
                   )}
                   {canEdit && r.estado !== 'abierta' && (
                     <button onClick={() => cambiarEstado(r, 'abierta')}
-                      style={{ padding: '4px 10px', background: '#d1fae5', color: '#10b981', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                      style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                       Abrir
                     </button>
                   )}
                   {canEdit && r.estado === 'abierta' && (
                     <button onClick={() => cambiarEstado(r, 'cerrada_mantenimiento')}
-                      style={{ padding: '4px 10px', background: '#fef3c7', color: '#f59e0b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                      style={{ padding: '4px 10px', background: 'var(--at-warning-tint)', color: 'var(--at-warning)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                       Cerrar
                     </button>
                   )}

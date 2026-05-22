@@ -21,9 +21,9 @@ const TIPOS: { value: TipoCamara; label: string; icon: string }[] = [
 ]
 
 const ESTADOS: { value: EstadoCamara; label: string; color: string; bg: string; icon: string }[] = [
-  { value: 'activa',        label: 'Activa',         color: '#10b981', bg: '#d1fae5', icon: '✅' },
-  { value: 'falla',         label: 'Falla',          color: '#ef4444', bg: '#fef2f2', icon: '⚠️' },
-  { value: 'mantenimiento', label: 'Mantenimiento',  color: '#f59e0b', bg: '#fef3c7', icon: '🔧' },
+  { value: 'activa',        label: 'Activa',         color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '✅' },
+  { value: 'falla',         label: 'Falla',          color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', icon: '⚠️' },
+  { value: 'mantenimiento', label: 'Mantenimiento',  color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '🔧' },
   { value: 'sin_señal',     label: 'Sin señal',      color: 'var(--at-accent)', bg: 'var(--at-accent-tint)', icon: '📵' },
   { value: 'inactiva',      label: 'Inactiva',       color: 'var(--at-ink-3)', bg: 'var(--at-chip)', icon: '⭕' },
 ]
@@ -125,7 +125,7 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div>
               <span style={{ fontWeight: 600, fontSize: 14 }}>Cámaras ({lista.length})</span>
-              {totalFallas > 0 && <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#fef2f2', color: '#ef4444', fontWeight: 700 }}>{totalFallas} falla{totalFallas > 1 ? 's' : ''}</span>}
+              {totalFallas > 0 && <span style={{ marginLeft: 6, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'var(--at-danger-tint)', color: 'var(--at-danger)', fontWeight: 700 }}>{totalFallas} falla{totalFallas > 1 ? 's' : ''}</span>}
             </div>
             {canCreate && (
               <button onClick={() => { resetForm(); setEditando(false); setMostrarForm(true); setSelected(null) }}
@@ -236,7 +236,7 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : `✅ ${editando ? 'Actualizar' : 'Registrar'}`}
               </button>
               <button onClick={() => { setMostrarForm(false); setEditando(false); resetForm() }}
@@ -269,9 +269,9 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
                   <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Resolución</div>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{selected.resolucion ?? '—'}</div>
                 </div>
-                <div style={{ background: selected.grabacion ? '#fef2f2' : 'var(--at-chip)', borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ background: selected.grabacion ? 'var(--at-danger-tint)' : 'var(--at-chip)', borderRadius: 8, padding: '10px 14px' }}>
                   <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Grabación</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: selected.grabacion ? '#ef4444' : 'var(--at-ink-3)' }}>{selected.grabacion ? '🔴 Activa' : '⭕ Inactiva'}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: selected.grabacion ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{selected.grabacion ? '🔴 Activa' : '⭕ Inactiva'}</div>
                 </div>
                 <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px' }}>
                   <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Retención</div>
@@ -298,7 +298,7 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
               </div>
 
               {selected.observaciones && (
-                <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
+                <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--at-warning-strong)' }}>
                   {selected.observaciones}
                 </div>
               )}
@@ -311,13 +311,13 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
                   </button>
                   {selected.estado !== 'activa' && (
                     <button onClick={() => cambiarEstado(selected, 'activa')}
-                      style={{ padding: '6px 12px', background: '#d1fae5', color: '#10b981', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ✅ Marcar activa
                     </button>
                   )}
                   {selected.estado === 'activa' && (
                     <button onClick={() => cambiarEstado(selected, 'falla')}
-                      style={{ padding: '6px 12px', background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
+                      style={{ padding: '6px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       ⚠️ Reportar falla
                     </button>
                   )}
@@ -334,13 +334,13 @@ export default function ControlCamarasTab({ camaras, proyectoId, companyId, canC
         {!mostrarForm && !selected && (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-              <div style={{ background: '#d1fae5', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: '#10b981' }}>{totalActivas}</div>
-                <div style={{ fontSize: 11, color: '#10b981' }}>Activas</div>
+              <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--at-success)' }}>{totalActivas}</div>
+                <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Activas</div>
               </div>
-              <div style={{ background: totalFallas > 0 ? '#fef2f2' : 'var(--at-chip)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: totalFallas > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>{totalFallas}</div>
-                <div style={{ fontSize: 11, color: totalFallas > 0 ? '#ef4444' : 'var(--at-ink-3)' }}>Con fallas</div>
+              <div style={{ background: totalFallas > 0 ? 'var(--at-danger-tint)' : 'var(--at-chip)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: totalFallas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{totalFallas}</div>
+                <div style={{ fontSize: 11, color: totalFallas > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>Con fallas</div>
               </div>
               <div style={{ background: 'var(--at-accent-tint)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
                 <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--at-accent)' }}>{camaras.length}</div>

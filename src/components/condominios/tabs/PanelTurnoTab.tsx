@@ -18,7 +18,7 @@ interface Props {
 }
 
 function semaforo(val: number, verde: number, amarillo: number): string {
-  return val <= verde ? '#16a34a' : val <= amarillo ? '#d97706' : '#ef4444'
+  return val <= verde ? 'var(--at-success)' : val <= amarillo ? 'var(--at-warning)' : 'var(--at-danger)'
 }
 
 export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reservas, polizas, contratosProveedores, inspecciones, vencimientosExtra, cuotas }: Props) {
@@ -83,7 +83,7 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
               {activos.slice(0, 8).map(v => (
-                <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 8px', background: '#f0fdf4', borderRadius: 6 }}>
+                <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 8px', background: 'var(--at-success-tint)', borderRadius: 6 }}>
                   <span style={{ fontWeight: 600 }}>{v.nombre}</span>
                   <span style={{ color: 'var(--at-ink-3)' }}>{v.unidad_nombre} · {v.hora_entrada?.slice(11, 16)}</span>
                 </div>
@@ -100,9 +100,9 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
               {ticketsUrgentes.slice(0, 6).map(t => (
-                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 8px', background: '#fef2f2', borderRadius: 6 }}>
+                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 8px', background: 'var(--at-danger-tint)', borderRadius: 6 }}>
                   <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{t.titulo}</span>
-                  <span style={{ color: t.prioridad === 'urgente' ? '#ef4444' : '#f97316', fontWeight: 700, marginLeft: 6, flexShrink: 0 }}>{t.prioridad}</span>
+                  <span style={{ color: t.prioridad === 'urgente' ? 'var(--at-danger)' : 'var(--at-warning)', fontWeight: 700, marginLeft: 6, flexShrink: 0 }}>{t.prioridad}</span>
                 </div>
               ))}
             </div>
@@ -116,9 +116,9 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
               {tareasHoy.map(t => (
-                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 8px', background: '#fef3c7', borderRadius: 6 }}>
+                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 8px', background: 'var(--at-warning-tint)', borderRadius: 6 }}>
                   <span style={{ flex: 1 }}>{t.titulo}</span>
-                  <span style={{ color: '#d97706', fontWeight: 700, flexShrink: 0, marginLeft: 6 }}>{t.estado}</span>
+                  <span style={{ color: 'var(--at-warning)', fontWeight: 700, flexShrink: 0, marginLeft: 6 }}>{t.estado}</span>
                 </div>
               ))}
             </div>
@@ -144,11 +144,11 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
 
       {/* Vencimientos próximos 7 días */}
       {vencProximos.length > 0 && (
-        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: 14, marginTop: 12 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: '#d97706' }}>⏳ Vencimientos en los próximos 7 días ({vencProximos.length})</div>
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 12, padding: 14, marginTop: 12 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: 'var(--at-warning)' }}>⏳ Vencimientos en los próximos 7 días ({vencProximos.length})</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {vencProximos.map((v, i) => (
-              <div key={i} style={{ padding: '4px 10px', background: 'var(--at-surface)', border: '1px solid #fde68a', borderRadius: 8, fontSize: 11 }}>
+              <div key={i} style={{ padding: '4px 10px', background: 'var(--at-surface)', border: '1px solid var(--at-warning-border)', borderRadius: 8, fontSize: 11 }}>
                 <span style={{ marginRight: 4 }}>{v.icon}</span>
                 <strong>{v.titulo}</strong>
                 <span style={{ color: 'var(--at-ink-3)', marginLeft: 6 }}>{v.fecha}</span>

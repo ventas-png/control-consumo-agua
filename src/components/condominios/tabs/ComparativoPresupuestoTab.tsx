@@ -16,9 +16,9 @@ const CAT_LABEL: Record<CategoriaGasto, string> = {
 const MES_LABEL = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
 function semaforo(pct: number): { bg: string; color: string; label: string } {
-  if (pct <= 85)  return { bg: '#dcfce7', color: '#16a34a', label: 'OK' }
-  if (pct <= 100) return { bg: '#fef3c7', color: '#d97706', label: 'Alerta' }
-  return { bg: '#fef2f2', color: '#ef4444', label: 'Excedido' }
+  if (pct <= 85)  return { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'OK' }
+  if (pct <= 100) return { bg: 'var(--at-warning-tint)', color: 'var(--at-warning)', label: 'Alerta' }
+  return { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Excedido' }
 }
 
 function fmt(n: number, moneda: string) {
@@ -97,8 +97,8 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
           { label: 'Presupuesto anual', val: fmt(totalPresup, moneda), color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
-          { label: 'Ejecutado', val: fmt(totalReal, moneda), color: totalReal > totalPresup ? '#ef4444' : '#16a34a', bg: totalReal > totalPresup ? '#fef2f2' : '#dcfce7' },
-          { label: 'Variación', val: fmt(totalReal - totalPresup, moneda), color: totalReal <= totalPresup ? '#16a34a' : '#ef4444', bg: 'var(--at-surface-2)' },
+          { label: 'Ejecutado', val: fmt(totalReal, moneda), color: totalReal > totalPresup ? 'var(--at-danger)' : 'var(--at-success)', bg: totalReal > totalPresup ? 'var(--at-danger-tint)' : 'var(--at-success-tint)' },
+          { label: 'Variación', val: fmt(totalReal - totalPresup, moneda), color: totalReal <= totalPresup ? 'var(--at-success)' : 'var(--at-danger)', bg: 'var(--at-surface-2)' },
           { ...semaforo(totalPct), label: 'Ejecución', val: `${totalPct}%` },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 130px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '10px 14px' }}>
@@ -127,7 +127,7 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
                     <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--at-ink)' }}>{CAT_LABEL[f.cat]}</td>
                     <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--at-ink-3)' }}>{fmt(f.presup, moneda)}</td>
                     <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: 'var(--at-ink)' }}>{fmt(f.real, moneda)}</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', color: f.variacion > 0 ? '#ef4444' : '#16a34a', fontWeight: 600 }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', color: f.variacion > 0 ? 'var(--at-danger)' : 'var(--at-success)', fontWeight: 600 }}>
                       {f.variacion > 0 ? '+' : ''}{fmt(f.variacion, moneda)}
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: sem.color }}>{f.pct === 999 ? 'N/A' : `${f.pct}%`}</td>
@@ -148,7 +148,7 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
                 <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--at-ink)' }}>TOTAL</td>
                 <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>{fmt(totalPresup, moneda)}</td>
                 <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>{fmt(totalReal, moneda)}</td>
-                <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: (totalReal - totalPresup) > 0 ? '#ef4444' : '#16a34a' }}>
+                <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: (totalReal - totalPresup) > 0 ? 'var(--at-danger)' : 'var(--at-success)' }}>
                   {(totalReal - totalPresup) > 0 ? '+' : ''}{fmt(totalReal - totalPresup, moneda)}
                 </td>
                 <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: semaforo(totalPct).color }}>{totalPct}%</td>
@@ -185,8 +185,8 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
           </div>
           <div style={{ display: 'flex', gap: 16, fontSize: 10, color: 'var(--at-ink-3)' }}>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--at-primary-soft-2)', borderRadius: 2, marginRight: 4 }} />Presupuesto</span>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#16a34a', borderRadius: 2, marginRight: 4 }} />Real (OK)</span>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#ef4444', borderRadius: 2, marginRight: 4 }} />Real (excedido)</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--at-success)', borderRadius: 2, marginRight: 4 }} />Real (OK)</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, background: 'var(--at-danger)', borderRadius: 2, marginRight: 4 }} />Real (excedido)</span>
           </div>
 
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginTop: 16 }}>
@@ -205,7 +205,7 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
                     <td style={{ padding: '7px 10px', fontWeight: 500 }}>{f.label}</td>
                     <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--at-ink-3)' }}>{fmt(f.presup, moneda)}</td>
                     <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 600 }}>{fmt(f.real, moneda)}</td>
-                    <td style={{ padding: '7px 10px', textAlign: 'right', color: f.real - f.presup > 0 ? '#ef4444' : '#16a34a' }}>
+                    <td style={{ padding: '7px 10px', textAlign: 'right', color: f.real - f.presup > 0 ? 'var(--at-danger)' : 'var(--at-success)' }}>
                       {f.real - f.presup > 0 ? '+' : ''}{fmt(f.real - f.presup, moneda)}
                     </td>
                     <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: sem.color }}>{f.pct}%</td>
@@ -218,7 +218,7 @@ export default function ComparativoPresupuestoTab({ gastos, presupuestos, moneda
       )}
 
       {totalPresup === 0 && (
-        <div style={{ marginTop: 12, padding: '10px 14px', background: '#fef3c7', borderRadius: 8, fontSize: 12, color: '#92400e' }}>
+        <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--at-warning-tint)', borderRadius: 8, fontSize: 12, color: 'var(--at-warning-strong)' }}>
           ⚠️ No hay presupuesto configurado para {anio}. Agrega presupuestos en la pestaña <strong>Presupuesto</strong> para ver el comparativo.
         </div>
       )}

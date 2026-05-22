@@ -23,9 +23,9 @@ function hace30Dias() { const d = new Date(); d.setDate(d.getDate() - 30); retur
 function hoy() { return new Date().toISOString().slice(0, 10) }
 
 function semaforo(score: number): { color: string; bg: string; label: string; emoji: string } {
-  if (score >= 80) return { color: '#16a34a', bg: '#dcfce7', label: 'Excelente', emoji: '🟢' }
-  if (score >= 60) return { color: '#d97706', bg: '#fef3c7', label: 'Regular',   emoji: '🟡' }
-  return              { color: '#ef4444', bg: '#fef2f2', label: 'Deficiente', emoji: '🔴' }
+  if (score >= 80) return { color: 'var(--at-success)', bg: 'var(--at-success-tint)', label: 'Excelente', emoji: '🟢' }
+  if (score >= 60) return { color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', label: 'Regular',   emoji: '🟡' }
+  return              { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', label: 'Deficiente', emoji: '🔴' }
 }
 
 interface SubIndice {
@@ -164,12 +164,12 @@ export default function IndiceCalidadTab({ cuotas, tickets, incidentes, encuesta
       <div style={{ display: 'flex', gap: 20, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ background: semGlobal.bg, border: `2px solid ${semGlobal.color}`, borderRadius: 16, padding: '20px 32px', textAlign: 'center', minWidth: 160 }}>
           <svg width="160" height="90" viewBox="0 0 160 90" style={{ display: 'block', margin: '0 auto' }}>
-            <path d={`M ${x1} ${y1} A ${r} ${r} 0 1 1 ${cx + r} ${cy}`} fill="none" stroke="#E1DDD0" strokeWidth="12" strokeLinecap="round" />
+            <path d={`M ${x1} ${y1} A ${r} ${r} 0 1 1 ${cx + r} ${cy}`} fill="none" stroke="var(--at-line)" strokeWidth="12" strokeLinecap="round" />
             {scoreGlobal > 0 && (
               <path d={`M ${cx - r} ${cy} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`} fill="none" stroke={semGlobal.color} strokeWidth="12" strokeLinecap="round" />
             )}
             <text x={cx} y={cy - 2} textAnchor="middle" fontSize="26" fontWeight="800" fill={semGlobal.color}>{scoreGlobal}</text>
-            <text x={cx} y={cy + 14} textAnchor="middle" fontSize="10" fill="#7E9389">/ 100</text>
+            <text x={cx} y={cy + 14} textAnchor="middle" fontSize="10" fill="var(--at-ink-3)">/ 100</text>
           </svg>
           <div style={{ fontSize: 16, fontWeight: 800, color: semGlobal.color }}>{semGlobal.emoji} {semGlobal.label}</div>
           <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginTop: 2 }}>Score global</div>
@@ -211,7 +211,7 @@ export default function IndiceCalidadTab({ cuotas, tickets, incidentes, encuesta
                 {s.componentes.map((c, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', borderBottom: i < s.componentes.length - 1 ? '1px solid var(--at-chip)' : undefined }}>
                     <span style={{ color: 'var(--at-ink-3)' }}>{c.label}</span>
-                    <span style={{ fontWeight: 700, color: c.positivo ? '#16a34a' : '#ef4444' }}>{c.valor}</span>
+                    <span style={{ fontWeight: 700, color: c.positivo ? 'var(--at-success)' : 'var(--at-danger)' }}>{c.valor}</span>
                   </div>
                 ))}
               </div>

@@ -15,7 +15,7 @@ interface Props {
 
 const ESTADO_CONFIG: Record<EstadoObjeto, { label: string; color: string; bg: string }> = {
   en_custodia: { label: 'En Custodia',  color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
-  reclamado:   { label: 'Reclamado',    color: '#10b981', bg: '#d1fae5' },
+  reclamado:   { label: 'Reclamado',    color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   donado:      { label: 'Donado',       color: 'var(--at-accent)', bg: 'var(--at-accent-tint)' },
   descartado:  { label: 'Descartado',   color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
@@ -85,7 +85,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
   async function handleDelete(id: string) {
     const result = await Swal.fire({
       title: '¿Eliminar objeto?', icon: 'warning', showCancelButton: true,
-      confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444',
+      confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)',
     })
     if (!result.isConfirmed) return
     const { error } = await supabase.from('objetos_perdidos').delete().eq('id', id)
@@ -183,7 +183,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
             <input style={{ ...inputStyle, marginBottom: '16px' }} value={reclamadoPor} onChange={e => setReclamadoPor(e.target.value)} placeholder="Nombre de quien reclama…" autoFocus />
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
               <button onClick={() => setReclamoId(null)} style={{ padding: '8px 14px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={confirmarReclamo} style={{ padding: '8px 14px', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Confirmar Reclamo</button>
+              <button onClick={confirmarReclamo} style={{ padding: '8px 14px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Confirmar Reclamo</button>
             </div>
           </div>
         </div>
@@ -246,7 +246,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
                   <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
                     {o.estado === 'en_custodia' && (
                       <>
-                        <button onClick={() => handleEstado(o.id, 'reclamado')} style={{ padding: '4px 10px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                        <button onClick={() => handleEstado(o.id, 'reclamado')} style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                           Reclamado
                         </button>
                         <button onClick={() => handleEstado(o.id, 'donado')} style={{ padding: '4px 10px', background: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
@@ -258,7 +258,7 @@ export function ObjetosTab({ objetos, proyectoId, companyId, userId, canCreate, 
                       </>
                     )}
                     <button onClick={() => startEdit(o)} style={{ padding: '4px 10px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                    <button onClick={() => handleDelete(o.id)} style={{ padding: '4px 10px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
+                    <button onClick={() => handleDelete(o.id)} style={{ padding: '4px 10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
                   </div>
                 )}
               </div>

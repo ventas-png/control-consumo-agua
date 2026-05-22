@@ -22,8 +22,8 @@ const BLANK = {
 }
 
 const ESTADO: Record<string, { bg: string; color: string; label: string }> = {
-  pendiente: { bg: '#fef3c7', color: '#92400e', label: 'Pendiente' },
-  pagado:    { bg: '#dcfce7', color: '#16a34a', label: 'Pagado' },
+  pendiente: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Pendiente' },
+  pagado:    { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Pagado' },
   anulado:   { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Anulado' },
   apelado:   { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'En apelación' },
 }
@@ -85,9 +85,9 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
           { label: 'Total',            value: String(sanciones.length),              color: 'var(--at-ink)' },
-          { label: 'Pendientes',       value: String(pendientes.length),             color: '#f59e0b' },
-          { label: 'Monto pendiente',  value: `${moneda} ${totalPendiente.toFixed(2)}`, color: '#ef4444' },
-          { label: 'Vencidas',         value: String(vencidas.length),              color: '#ef4444' },
+          { label: 'Pendientes',       value: String(pendientes.length),             color: 'var(--at-warning)' },
+          { label: 'Monto pendiente',  value: `${moneda} ${totalPendiente.toFixed(2)}`, color: 'var(--at-danger)' },
+          { label: 'Vencidas',         value: String(vencidas.length),              color: 'var(--at-danger)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
@@ -184,9 +184,9 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
                   <tr key={s.id} style={{ background: i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)' }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>{s.unidad_nombre ?? '—'}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--at-ink-2)' }}>{s.concepto}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#ef4444' }}>{moneda} {s.monto.toFixed(2)}</td>
+                    <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {s.monto.toFixed(2)}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', fontSize: '12px' }}>{s.fecha_emision}</td>
-                    <td style={{ padding: '10px 12px', fontSize: '12px', fontWeight: vencida ? 700 : 400, color: vencida ? '#ef4444' : 'var(--at-ink-3)' }}>
+                    <td style={{ padding: '10px 12px', fontSize: '12px', fontWeight: vencida ? 700 : 400, color: vencida ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
                       {s.fecha_vencimiento ?? '—'}{vencida ? ' ⚠️' : ''}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
@@ -198,7 +198,7 @@ export function SancionesTab({ sanciones, unidades, infracciones, proyectoId, co
                       {canEdit && s.estado === 'pendiente' && (
                         <div style={{ display: 'flex', gap: '4px' }}>
                           <button onClick={() => cambiarEstado(s.id, 'pagado', '¿Marcar como pagada?')}
-                            style={{ padding: '3px 8px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                            style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                             Pagado
                           </button>
                           <button onClick={() => cambiarEstado(s.id, 'apelado')}

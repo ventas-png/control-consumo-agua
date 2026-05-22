@@ -16,15 +16,15 @@ interface Props {
 const TIPO_CONFIG: Record<TipoAgenda, { label: string; icon: string; color: string }> = {
   tarea:         { label: 'Tarea',         icon: '✅', color: 'var(--at-primary)' },
   evento:        { label: 'Evento',        icon: '🎉', color: 'var(--at-accent)' },
-  mantenimiento: { label: 'Mantenimiento', icon: '🔧', color: '#f59e0b' },
-  reunion:       { label: 'Reunión',       icon: '👥', color: '#10b981' },
+  mantenimiento: { label: 'Mantenimiento', icon: '🔧', color: 'var(--at-warning)' },
+  reunion:       { label: 'Reunión',       icon: '👥', color: 'var(--at-success)' },
   otro:          { label: 'Otro',          icon: '📋', color: 'var(--at-ink-3)' },
 }
 
 const ESTADO_CONFIG: Record<EstadoAgenda, { label: string; color: string; bg: string }> = {
-  pendiente:  { label: 'Pendiente',  color: '#f59e0b', bg: '#fef3c7' },
+  pendiente:  { label: 'Pendiente',  color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   en_curso:   { label: 'En Curso',   color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
-  completado: { label: 'Completado', color: '#10b981', bg: '#d1fae5' },
+  completado: { label: 'Completado', color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   cancelado:  { label: 'Cancelado',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 
@@ -117,7 +117,7 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
   async function handleDelete(id: string) {
     const result = await Swal.fire({
       title: '¿Eliminar elemento?', icon: 'warning', showCancelButton: true,
-      confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444',
+      confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)',
     })
     if (!result.isConfirmed) return
     const { error } = await supabase.from('agenda_operativa').delete().eq('id', id)
@@ -148,17 +148,17 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
     <div style={{ padding: '20px 24px' }}>
       {/* Alert banners */}
       {vencidos.length > 0 && (
-        <div style={{ background: '#fee2e2', border: '1px solid #ef4444', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger)', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>🚨</span>
-          <span style={{ fontSize: '13px', color: '#991b1b', fontWeight: 600 }}>
+          <span style={{ fontSize: '13px', color: 'var(--at-danger-strong)', fontWeight: 600 }}>
             {vencidos.length} tarea{vencidos.length > 1 ? 's' : ''} vencida{vencidos.length > 1 ? 's' : ''} sin completar
           </span>
         </div>
       )}
       {proximos7.length > 0 && (
-        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>📅</span>
-          <span style={{ fontSize: '13px', color: '#92400e', fontWeight: 600 }}>
+          <span style={{ fontSize: '13px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>
             {proximos7.length} elemento{proximos7.length > 1 ? 's' : ''} para los próximos 7 días
           </span>
         </div>
@@ -323,12 +323,12 @@ export function AgendaTab({ agenda, proyectoId, companyId, userId, canCreate, ca
                               </button>
                             )}
                             {a.estado === 'en_curso' && (
-                              <button onClick={() => handleEstado(a.id, 'completado')} style={{ padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>
+                              <button onClick={() => handleEstado(a.id, 'completado')} style={{ padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>
                                 ✓
                               </button>
                             )}
                             <button onClick={() => startEdit(a)} style={{ padding: '4px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                            <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
+                            <button onClick={() => handleDelete(a.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>🗑️</button>
                           </div>
                         )}
                       </div>

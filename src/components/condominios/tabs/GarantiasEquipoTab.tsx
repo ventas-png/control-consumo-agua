@@ -14,9 +14,9 @@ interface Props {
 }
 
 const ESTADO_STYLE: Record<EstadoGarantia, { bg: string; color: string; label: string }> = {
-  vigente:      { bg: '#dcfce7', color: '#16a34a', label: 'Vigente' },
-  vencida:      { bg: '#fee2e2', color: '#ef4444', label: 'Vencida' },
-  reclamada:    { bg: '#fef3c7', color: '#92400e', label: 'Reclamada' },
+  vigente:      { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Vigente' },
+  vencida:      { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Vencida' },
+  reclamada:    { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Reclamada' },
   sin_garantia: { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Sin garantía' },
 }
 
@@ -63,7 +63,7 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar garantía?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar garantía?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('garantias_equipo').delete().eq('id', id)
     onRefresh()
@@ -103,8 +103,8 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
       {/* Alerts */}
       {(porVencer > 0 || vencidas > 0) && (
         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-          {vencidas > 0 && <div style={{ background: '#fee2e2', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>⚠️ {vencidas} garantía(s) expirada(s) sin actualizar</div>}
-          {porVencer > 0 && <div style={{ background: '#fef3c7', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#92400e', fontWeight: 600 }}>🕐 {porVencer} por vencer en 60 días</div>}
+          {vencidas > 0 && <div style={{ background: 'var(--at-danger-tint)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: 'var(--at-danger)', fontWeight: 600 }}>⚠️ {vencidas} garantía(s) expirada(s) sin actualizar</div>}
+          {porVencer > 0 && <div style={{ background: 'var(--at-warning-tint)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>🕐 {porVencer} por vencer en 60 días</div>}
         </div>
       )}
 
@@ -205,21 +205,21 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
             const expirando = g.estado === 'vigente' && g.fecha_vencimiento && g.fecha_vencimiento <= addDays(today, 60)
             const expirada = g.estado === 'vigente' && g.fecha_vencimiento && g.fecha_vencimiento < today
             return (
-              <div key={g.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${expirada ? '#fca5a5' : expirando ? '#fde68a' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px' }}>
+              <div key={g.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${expirada ? 'var(--at-danger-border)' : expirando ? 'var(--at-warning-border)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: '13px' }}>{g.equipo}</span>
                       <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px', background: es.bg, color: es.color }}>{es.label}</span>
-                      {expirada && <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 700 }}>⚠️ Expirada</span>}
-                      {!expirada && expirando && <span style={{ fontSize: '10px', color: '#f59e0b', fontWeight: 700 }}>🕐 Por vencer</span>}
+                      {expirada && <span style={{ fontSize: '10px', color: 'var(--at-danger)', fontWeight: 700 }}>⚠️ Expirada</span>}
+                      {!expirada && expirando && <span style={{ fontSize: '10px', color: 'var(--at-warning)', fontWeight: 700 }}>🕐 Por vencer</span>}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                       {g.area && <span>📍 {g.area}</span>}
                       {g.numero_serie && <span>SN: {g.numero_serie}</span>}
                       {g.proveedor && <span>🏢 {g.proveedor}</span>}
                       {g.fecha_compra && <span>🛒 {g.fecha_compra}</span>}
-                      {g.fecha_vencimiento && <span style={{ color: expirada ? '#ef4444' : expirando ? '#f59e0b' : 'var(--at-ink-3)', fontWeight: (expirada || expirando) ? 700 : 400 }}>📅 Vence: {g.fecha_vencimiento}</span>}
+                      {g.fecha_vencimiento && <span style={{ color: expirada ? 'var(--at-danger)' : expirando ? 'var(--at-warning)' : 'var(--at-ink-3)', fontWeight: (expirada || expirando) ? 700 : 400 }}>📅 Vence: {g.fecha_vencimiento}</span>}
                       {g.monto_compra && <span>💰 {fmt(Number(g.monto_compra), moneda)}</span>}
                     </div>
                     {g.contacto_soporte && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>Soporte: {g.contacto_soporte}</div>}
@@ -229,14 +229,14 @@ export function GarantiasEquipoTab({ garantias, proyectoId, companyId, moneda, c
                     <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
                       {g.estado === 'vigente' && (
                         <button onClick={() => cambiarEstado(g.id, 'reclamada')}
-                          style={{ padding: '3px 7px', background: '#fef3c7', color: '#92400e', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                          style={{ padding: '3px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
                           Reclamar
                         </button>
                       )}
                       <button onClick={() => startEdit(g)}
                         style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(g.id)}
-                        style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </div>
                   )}
                 </div>

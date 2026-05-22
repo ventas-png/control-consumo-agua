@@ -20,8 +20,8 @@ interface UnidadInfo {
 }
 
 const ESTADO_CFG: Record<EstadoUnidad, { label: string; color: string; bg: string; border: string; icon: string }> = {
-  al_dia:    { label: 'Al día',     color: '#16a34a', bg: '#dcfce7', border: '#86efac', icon: '🟢' },
-  mora:      { label: 'En mora',    color: '#ef4444', bg: '#fef2f2', border: '#fca5a5', icon: '🔴' },
+  al_dia:    { label: 'Al día',     color: 'var(--at-success)', bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', icon: '🟢' },
+  mora:      { label: 'En mora',    color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', border: 'var(--at-danger-border)', icon: '🔴' },
   arrendada: { label: 'Arrendada',  color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', border: 'var(--at-accent-2)', icon: '🔑' },
   vacia:     { label: 'Sin cuotas', color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)', border: 'var(--at-line)', icon: '⬜' },
 }
@@ -106,7 +106,7 @@ export default function MapaUnidadesTab({ unidades, cuotas, contratos, moneda }:
                   <div style={{ fontSize: 13, fontWeight: 700, color: cfg.color }}>{info.unidad.nombre}</div>
                   <div style={{ fontSize: 9, color: cfg.color, marginTop: 2 }}>{cfg.icon}</div>
                   {info.cuotasVencidas > 0 && (
-                    <div style={{ fontSize: 9, color: '#ef4444', fontWeight: 700 }}>{info.cuotasVencidas} venc.</div>
+                    <div style={{ fontSize: 9, color: 'var(--at-danger)', fontWeight: 700 }}>{info.cuotasVencidas} venc.</div>
                   )}
                 </div>
 
@@ -134,12 +134,12 @@ export default function MapaUnidadesTab({ unidades, cuotas, contratos, moneda }:
                       {info.cuotasVencidas > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span style={{ color: 'var(--at-ink-3)' }}>Cuotas vencidas</span>
-                          <span style={{ fontWeight: 700, color: '#ef4444' }}>{info.cuotasVencidas}</span>
+                          <span style={{ fontWeight: 700, color: 'var(--at-danger)' }}>{info.cuotasVencidas}</span>
                         </div>
                       )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--at-chip)', paddingTop: 4, marginTop: 2 }}>
                         <span style={{ color: 'var(--at-ink-3)' }}>Saldo pendiente</span>
-                        <span style={{ fontWeight: 700, color: info.saldoPendiente > 0 ? '#ef4444' : '#16a34a' }}>
+                        <span style={{ fontWeight: 700, color: info.saldoPendiente > 0 ? 'var(--at-danger)' : 'var(--at-success)' }}>
                           {moneda} {info.saldoPendiente.toLocaleString('es', { minimumFractionDigits: 2 })}
                         </span>
                       </div>

@@ -17,8 +17,8 @@ interface Props {
 }
 
 const ESTADO_CFG: Record<EstadoCierreAnual, { label: string; bg: string; color: string }> = {
-  borrador: { label: 'Borrador', bg: '#fef3c7', color: '#d97706' },
-  cerrado:  { label: 'Cerrado',  bg: '#dcfce7', color: '#16a34a' },
+  borrador: { label: 'Borrador', bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+  cerrado:  { label: 'Cerrado',  bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
 }
 
 export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, companyId, moneda, autorNombre, canCreate, onRefresh }: Props) {
@@ -88,16 +88,16 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
     <div style={{ padding: 16 }}>
       {/* KPIs globales */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
-        <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#16a34a' }}>{moneda} {totalIngresos.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-          <div style={{ fontSize: 11, color: '#16a34a' }}>Ingresos totales (todos los años)</div>
+        <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {totalIngresos.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Ingresos totales (todos los años)</div>
         </div>
-        <div style={{ background: '#fef2f2', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#ef4444' }}>{moneda} {totalEgresos.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-          <div style={{ fontSize: 11, color: '#ef4444' }}>Egresos totales</div>
+        <div style={{ background: 'var(--at-danger-tint)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {totalEgresos.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-danger)' }}>Egresos totales</div>
         </div>
-        <div style={{ background: saldoAcumulado >= 0 ? 'var(--at-primary-tint)' : '#fef2f2', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: saldoAcumulado >= 0 ? 'var(--at-primary)' : '#ef4444' }}>
+        <div style={{ background: saldoAcumulado >= 0 ? 'var(--at-primary-tint)' : 'var(--at-danger-tint)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: saldoAcumulado >= 0 ? 'var(--at-primary)' : 'var(--at-danger)' }}>
             {moneda} {Math.abs(saldoAcumulado).toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </div>
           <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Saldo acumulado {saldoAcumulado < 0 ? '(déficit)' : '(superávit)'}</div>
@@ -126,7 +126,7 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[...cierres].sort((a, b) => b.anio - a.anio).map(c => {
               const ec = ESTADO_CFG[c.estado]
-              const tasaColor = (c.tasa_recaudacion ?? 0) >= 80 ? '#16a34a' : (c.tasa_recaudacion ?? 0) >= 60 ? '#d97706' : '#ef4444'
+              const tasaColor = (c.tasa_recaudacion ?? 0) >= 80 ? 'var(--at-success)' : (c.tasa_recaudacion ?? 0) >= 60 ? 'var(--at-warning)' : 'var(--at-danger)'
               return (
                 <div key={c.id} onClick={() => setSelected(c === selected ? null : c)}
                   style={{ background: selected?.id === c.id ? '#f0fdfa' : 'var(--at-surface)', border: `1.5px solid ${selected?.id === c.id ? 'var(--at-accent-2)' : 'var(--at-line)'}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}>
@@ -136,9 +136,9 @@ export default function CierreAnualTab({ cierres, cuotas, gastos, proyectoId, co
                       <span style={{ padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 20, fontSize: 12, color: 'var(--at-ink-3)' }}>
-                      <span>Ingresos: <strong style={{ color: '#16a34a' }}>{moneda} {c.total_ingresos.toFixed(2)}</strong></span>
-                      <span>Egresos: <strong style={{ color: '#ef4444' }}>{moneda} {c.total_egresos.toFixed(2)}</strong></span>
-                      <span>Saldo: <strong style={{ color: c.saldo >= 0 ? 'var(--at-primary)' : '#ef4444' }}>{moneda} {c.saldo.toFixed(2)}</strong></span>
+                      <span>Ingresos: <strong style={{ color: 'var(--at-success)' }}>{moneda} {c.total_ingresos.toFixed(2)}</strong></span>
+                      <span>Egresos: <strong style={{ color: 'var(--at-danger)' }}>{moneda} {c.total_egresos.toFixed(2)}</strong></span>
+                      <span>Saldo: <strong style={{ color: c.saldo >= 0 ? 'var(--at-primary)' : 'var(--at-danger)' }}>{moneda} {c.saldo.toFixed(2)}</strong></span>
                       {c.tasa_recaudacion != null && (
                         <span>Recaudación: <strong style={{ color: tasaColor }}>{c.tasa_recaudacion}%</strong></span>
                       )}

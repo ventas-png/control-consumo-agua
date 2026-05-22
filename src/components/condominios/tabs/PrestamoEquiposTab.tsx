@@ -14,9 +14,9 @@ interface Props {
 }
 
 const ESTADO_STYLE: Record<EstadoPrestamo, { color: string; bg: string; label: string }> = {
-  prestado: { color: '#f59e0b', bg: '#fef3c7', label: 'Prestado' },
-  devuelto: { color: '#10b981', bg: '#dcfce7', label: 'Devuelto' },
-  dañado:   { color: '#ef4444', bg: '#fee2e2', label: 'Dañado'   },
+  prestado: { color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', label: 'Prestado' },
+  devuelto: { color: 'var(--at-success)', bg: 'var(--at-success-tint)', label: 'Devuelto' },
+  dañado:   { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', label: 'Dañado'   },
   perdido:  { color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint)', label: 'Perdido'  },
 }
 
@@ -66,7 +66,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
 
   async function marcarDevuelto(p: PrestamoEquipo) {
     const r = await Swal.fire({
-      title: '¿Marcar como devuelto?', icon: 'question', showCancelButton: true, confirmButtonText: 'Sí, devuelto', confirmButtonColor: '#10b981',
+      title: '¿Marcar como devuelto?', icon: 'question', showCancelButton: true, confirmButtonText: 'Sí, devuelto', confirmButtonColor: 'var(--at-success)',
       input: 'text', inputLabel: 'Observaciones de devolución (opcional)', inputPlaceholder: 'Ej: devuelto en buen estado',
     })
     if (!r.isConfirmed) return
@@ -85,7 +85,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('prestamos_equipo').delete().eq('id', id)
     onRefresh()
@@ -108,10 +108,10 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', marginBottom: '16px' }}>
         {[
-          { label: 'Activos (prestados)', value: activos,                   color: '#f59e0b' },
+          { label: 'Activos (prestados)', value: activos,                   color: 'var(--at-warning)' },
           { label: 'Total histórico',     value: prestamos.length,          color: 'var(--at-ink)' },
           { label: 'Con depósito',        value: conDeposito,               color: 'var(--at-accent)' },
-          { label: 'Dañados/Perdidos',    value: prestamos.filter(p => p.estado === 'dañado' || p.estado === 'perdido').length, color: '#ef4444' },
+          { label: 'Dañados/Perdidos',    value: prestamos.filter(p => p.estado === 'dañado' || p.estado === 'perdido').length, color: 'var(--at-danger)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.value}</div>
@@ -221,7 +221,7 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
                     <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)' }}>{p.fecha_devolucion ?? <span style={{ color: 'var(--at-line-strong)' }}>—</span>}</td>
                     <td style={{ padding: '10px 12px' }}>
                       {p.deposito ? (
-                        <span style={{ fontSize: '12px', color: p.deposito_pagado ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+                        <span style={{ fontSize: '12px', color: p.deposito_pagado ? 'var(--at-success)' : 'var(--at-warning)', fontWeight: 600 }}>
                           {p.deposito_pagado ? '✓' : '!'} {p.deposito.toFixed(2)}
                         </span>
                       ) : <span style={{ color: 'var(--at-line-strong)' }}>—</span>}
@@ -235,11 +235,11 @@ export function PrestamoEquiposTab({ prestamos, unidades, proyectoId, companyId,
                           {p.estado === 'prestado' && (
                             <>
                               <button onClick={() => marcarDevuelto(p)}
-                                style={{ padding: '3px 8px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                                style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                                 ✓ Devuelto
                               </button>
                               <button onClick={() => marcarEstado(p.id, 'dañado')}
-                                style={{ padding: '3px 7px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+                                style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
                                 Dañado
                               </button>
                             </>

@@ -21,8 +21,8 @@ function ultimosMeses(n: number): { ym: string; label: string }[] {
 const CAT_SOST = ['servicios', 'limpieza', 'obras'] as const
 const CAT_CFG: Record<string, { label: string; color: string; bg: string }> = {
   servicios: { label: 'Agua y Energía', color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
-  limpieza:  { label: 'Limpieza',        color: '#16a34a', bg: '#dcfce7' },
-  obras:     { label: 'Obras / Mejoras', color: '#d97706', bg: '#fef3c7' },
+  limpieza:  { label: 'Limpieza',        color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  obras:     { label: 'Obras / Mejoras', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
 }
 
 export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }: Props) {
@@ -82,8 +82,8 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
           { label: 'Gasto total 12m', val: `${moneda} ${totalGeneral.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
           { label: 'Promedio mensual', val: `${moneda} ${Math.round(promMensual).toLocaleString('es')}`, color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
           { label: 'Costo/unidad/mes', val: `${moneda} ${Math.round(costoUnitario).toLocaleString('es')}`, color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
-          { label: 'Variación este mes', val: `${pctVariacion >= 0 ? '+' : ''}${pctVariacion.toFixed(1)}%`, color: Math.abs(pctVariacion) < 10 ? '#16a34a' : pctVariacion > 0 ? '#ef4444' : '#16a34a', bg: Math.abs(pctVariacion) < 10 ? '#dcfce7' : pctVariacion > 0 ? '#fef2f2' : '#dcfce7' },
-          { label: 'CO₂ estimado 12m', val: `${(co2Estimado / 1000).toFixed(2)} ton`, color: '#16a34a', bg: '#dcfce7' },
+          { label: 'Variación este mes', val: `${pctVariacion >= 0 ? '+' : ''}${pctVariacion.toFixed(1)}%`, color: Math.abs(pctVariacion) < 10 ? 'var(--at-success)' : pctVariacion > 0 ? 'var(--at-danger)' : 'var(--at-success)', bg: Math.abs(pctVariacion) < 10 ? 'var(--at-success-tint)' : pctVariacion > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)' },
+          { label: 'CO₂ estimado 12m', val: `${(co2Estimado / 1000).toFixed(2)} ton`, color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 110px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
@@ -149,7 +149,7 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
           </thead>
           <tbody>
             {[...tendencia].reverse().map((t, i) => (
-              <tr key={t.ym} style={{ borderTop: '1px solid var(--at-chip)', background: i === 0 ? '#fffbeb' : undefined }}>
+              <tr key={t.ym} style={{ borderTop: '1px solid var(--at-chip)', background: i === 0 ? 'var(--at-warning-tint)' : undefined }}>
                 <td style={{ padding: '7px 12px', color: 'var(--at-ink-2)', fontWeight: i === 0 ? 700 : 400 }}>{t.label}</td>
                 {CAT_SOST.map(c => (
                   <td key={c} style={{ padding: '7px 10px', textAlign: 'right', color: t[c] as number > 0 ? CAT_CFG[c].color : 'var(--at-line-strong)' }}>
@@ -184,7 +184,7 @@ export default function DashboardSostenibilidadTab({ gastos, unidades, moneda }:
         </table>
       </div>
 
-      <div style={{ marginTop: 12, padding: '8px 14px', background: '#f0fdf4', borderRadius: 8, fontSize: 11, color: '#15803d' }}>
+      <div style={{ marginTop: 12, padding: '8px 14px', background: 'var(--at-success-tint)', borderRadius: 8, fontSize: 11, color: 'var(--at-success-strong)' }}>
         🌿 El índice CO₂ es una estimación simplificada basada en el gasto en servicios. Para datos de consumo real de agua y energía, consulta los módulos de Contadores y Servicios de Energía.
       </div>
     </div>

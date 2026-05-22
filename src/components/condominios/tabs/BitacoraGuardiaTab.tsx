@@ -13,7 +13,7 @@ interface Props {
 }
 
 const TURNOS: { value: TurnoGuardia; label: string; color: string }[] = [
-  { value: 'mañana', label: '🌅 Mañana', color: '#f59e0b' },
+  { value: 'mañana', label: '🌅 Mañana', color: 'var(--at-warning)' },
   { value: 'tarde', label: '🌆 Tarde', color: 'var(--at-accent)' },
   { value: 'noche', label: '🌙 Noche', color: 'var(--at-ink)' },
 ]
@@ -21,7 +21,7 @@ const TURNOS: { value: TurnoGuardia; label: string; color: string }[] = [
 const TIPOS_NOV: { value: TipoNovedadGuardia; label: string; color: string }[] = [
   { value: 'normal', label: 'Normal', color: 'var(--at-ink-3)' },
   { value: 'informativo', label: 'Informativo', color: 'var(--at-primary-2)' },
-  { value: 'urgente', label: 'Urgente', color: '#ef4444' },
+  { value: 'urgente', label: 'Urgente', color: 'var(--at-danger)' },
 ]
 
 export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
@@ -121,7 +121,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
               style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === b.id ? 'var(--at-accent-tint)' : 'var(--at-surface)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{b.fecha}</span>
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: b.estado === 'cerrado' ? 'var(--at-chip)' : '#fef3c7', color: b.estado === 'cerrado' ? 'var(--at-ink-3)' : '#92400e' }}>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: b.estado === 'cerrado' ? 'var(--at-chip)' : 'var(--at-warning-tint)', color: b.estado === 'cerrado' ? 'var(--at-ink-3)' : 'var(--at-warning-strong)' }}>
                   {b.estado === 'cerrado' ? 'Cerrado' : 'Abierto'}
                 </span>
               </div>
@@ -172,7 +172,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
                     <span style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>{n.hora}</span>
                     <span style={{ fontSize: 13, marginLeft: 8 }}>{n.descripcion}</span>
                   </div>
-                  <button onClick={() => removeNovedad(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>✕</button>
+                  <button onClick={() => removeNovedad(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: 14 }}>✕</button>
                 </div>
               ))}
               <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 110px 80px', gap: 8, marginTop: 8 }}>
@@ -190,7 +190,7 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Guardar turno'}
               </button>
               <button onClick={() => setMostrarForm(false)}
@@ -249,8 +249,8 @@ export default function BitacoraGuardiaTab({ registros, proyectoId, companyId, c
             </div>
 
             {selected.observaciones && (
-              <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: 12 }}>
-                <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: '#92400e' }}>Observaciones</div>
+              <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 8, padding: 12 }}>
+                <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: 'var(--at-warning-strong)' }}>Observaciones</div>
                 <div style={{ fontSize: 13 }}>{selected.observaciones}</div>
               </div>
             )}

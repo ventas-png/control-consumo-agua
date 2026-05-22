@@ -17,8 +17,8 @@ const FRECUENCIA_DIAS: Record<string, number> = { diaria: 1, semanal: 7, quincen
 const FRECUENCIA_LABEL: Record<string, { label: string; bg: string; color: string }> = {
   diaria:    { label: 'Diaria',    bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
   semanal:   { label: 'Semanal',   bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)' },
-  quincenal: { label: 'Quincenal', bg: '#fef3c7', color: '#92400e' },
-  mensual:   { label: 'Mensual',   bg: '#dcfce7', color: '#16a34a' },
+  quincenal: { label: 'Quincenal', bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
+  mensual:   { label: 'Mensual',   bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
 }
 
 const inputStyle: CSSProperties = {
@@ -44,9 +44,9 @@ function getAlerta(p: ProgramacionLimpieza): 'vencida' | 'proxima' | 'ok' | 'sin
 }
 
 const ALERTA_STYLE = {
-  vencida:   { bg: '#fee2e2', border: '#fca5a5', badge: '#ef4444', badgeBg: '#fee2e2', label: 'Vencida' },
-  proxima:   { bg: '#fefce8', border: '#fde68a', badge: '#92400e', badgeBg: '#fef3c7', label: 'Próxima' },
-  ok:        { bg: '#f0fdf4', border: '#bbf7d0', badge: '#16a34a', badgeBg: '#dcfce7', label: 'Al día' },
+  vencida:   { bg: 'var(--at-danger-tint)', border: 'var(--at-danger-border)', badge: 'var(--at-danger)', badgeBg: 'var(--at-danger-tint)', label: 'Vencida' },
+  proxima:   { bg: 'var(--at-warning-tint)', border: 'var(--at-warning-border)', badge: 'var(--at-warning-strong)', badgeBg: 'var(--at-warning-tint)', label: 'Próxima' },
+  ok:        { bg: 'var(--at-success-tint)', border: 'var(--at-success-border)', badge: 'var(--at-success)', badgeBg: 'var(--at-success-tint)', label: 'Al día' },
   sin_fecha: { bg: 'var(--at-surface-2)', border: 'var(--at-line)', badge: 'var(--at-ink-3)', badgeBg: 'var(--at-chip)', label: 'Sin fecha' },
 }
 
@@ -104,7 +104,7 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
   }
 
   const handleDelete = async (p: ProgramacionLimpieza) => {
-    const r = await Swal.fire({ title: '¿Eliminar programación?', text: p.area, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' })
+    const r = await Swal.fire({ title: '¿Eliminar programación?', text: p.area, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('programacion_limpieza').delete().eq('id', p.id)
     onRefresh()
@@ -124,9 +124,9 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '14px', marginBottom: '20px' }}>
         {[
-          { label: 'Vencidas', value: vencidas, icon: '🔴', bg: '#fee2e2', color: '#ef4444' },
-          { label: 'Próximas (≤3d)', value: proximas, icon: '🟡', bg: '#fefce8', color: '#92400e' },
-          { label: 'Al día', value: alDia, icon: '🟢', bg: '#f0fdf4', color: '#16a34a' },
+          { label: 'Vencidas', value: vencidas, icon: '🔴', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
+          { label: 'Próximas (≤3d)', value: proximas, icon: '🟡', bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
+          { label: 'Al día', value: alDia, icon: '🟢', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
             <div style={{ fontSize: '24px', marginBottom: '4px' }}>{k.icon}</div>
@@ -223,7 +223,7 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
                   </div>
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginLeft: '8px' }}>
                     {canEdit && <button onClick={() => openEdit(p)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>✏️</button>}
-                    <button onClick={() => handleDelete(p)} style={{ padding: '4px 8px', background: '#fef2f2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: '#ef4444' }}>🗑</button>
+                    <button onClick={() => handleDelete(p)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>🗑</button>
                   </div>
                 </div>
 
@@ -235,21 +235,21 @@ export function ProgramacionLimpiezaTab({ programaciones, proyectoId, companyId,
 
                 <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '10px' }}>
                   <div>Última: {p.ultima_ejecucion ?? '—'}</div>
-                  <div style={{ fontWeight: p.proxima_ejecucion && getAlerta(p) === 'vencida' ? 700 : 400, color: getAlerta(p) === 'vencida' ? '#ef4444' : 'var(--at-ink-3)' }}>
+                  <div style={{ fontWeight: p.proxima_ejecucion && getAlerta(p) === 'vencida' ? 700 : 400, color: getAlerta(p) === 'vencida' ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
                     Próxima: {p.proxima_ejecucion ?? '—'}
                   </div>
                 </div>
 
                 {canEdit && p.activo && (
                   <div style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={() => marcarEjecutada(p)} style={{ flex: 1, padding: '6px', background: '#16a34a', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
+                    <button onClick={() => marcarEjecutada(p)} style={{ flex: 1, padding: '6px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
                       ✓ Ejecutada hoy
                     </button>
-                    <button onClick={() => toggleActivo(p)} style={{ padding: '6px 10px', background: '#fef2f2', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#ef4444' }}>⏸</button>
+                    <button onClick={() => toggleActivo(p)} style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-danger)' }}>⏸</button>
                   </div>
                 )}
                 {canEdit && !p.activo && (
-                  <button onClick={() => toggleActivo(p)} style={{ width: '100%', padding: '6px', background: '#f0fdf4', color: '#16a34a', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>▶ Activar</button>
+                  <button onClick={() => toggleActivo(p)} style={{ width: '100%', padding: '6px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>▶ Activar</button>
                 )}
                 {p.notas && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '8px' }}>{p.notas}</div>}
               </div>

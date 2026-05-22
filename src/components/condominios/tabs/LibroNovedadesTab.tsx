@@ -23,8 +23,8 @@ const BLANK = {
 }
 
 const TURNO_COLORS: Record<string, { bg: string; color: string; icon: string }> = {
-  'mañana': { bg: '#fef9c3', color: '#92400e', icon: '🌅' },
-  tarde:    { bg: '#fff7ed', color: '#c2410c', icon: '☀️' },
+  'mañana': { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', icon: '🌅' },
+  tarde:    { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', icon: '☀️' },
   noche:    { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-darker)', icon: '🌙' },
 }
 const TIPO_INCIDENTE = ['observacion', 'incidente', 'emergencia', 'visita', 'reparacion', 'otro']
@@ -67,7 +67,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar entrada?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar entrada?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('libro_novedades').delete().eq('id', id)
     onRefresh()
@@ -76,7 +76,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
   function handlePrint(n: LibroNovedad) {
     const tc = TURNO_COLORS[n.turno] ?? { icon: '📋' }
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Novedad ${n.fecha}</title>
-    <style>body{font-family:sans-serif;padding:32px;color:#15291F}h1{font-size:18px}p{font-size:13px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid #E1DDD0}th{background:#FAF7EF}</style>
+    <style>body{font-family:sans-serif;padding:32px;color:#15291F}h1{font-size:18px}p{font-size:13px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid var(--at-line)}th{background:var(--at-surface-2)}</style>
     </head><body>
     <h1>${tc.icon} Libro de Novedades — ${n.fecha} (${n.turno})</h1>
     <p><b>Responsable:</b> ${n.responsable} &nbsp; <b>Horario:</b> ${n.hora_inicio ?? '—'} – ${n.hora_fin ?? '—'}</p>
@@ -165,7 +165,7 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
                   {TIPO_INCIDENTE.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
                 <input style={inputStyle} value={inc.descripcion} onChange={e => setIncidente(i, 'descripcion', e.target.value)} placeholder="Descripción del incidente" />
-                <button onClick={() => removeIncidente(i)} style={{ padding: '6px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>✕</button>
+                <button onClick={() => removeIncidente(i)} style={{ padding: '6px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>✕</button>
               </div>
             ))}
           </div>
@@ -217,11 +217,11 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
                         <span style={{ fontSize: '16px' }}>{tc.icon}</span>
                         <span style={{ fontWeight: 700, fontSize: '13px' }}>{n.fecha}</span>
                         <span style={{ fontSize: '11px', fontWeight: 600, padding: '1px 7px', borderRadius: '10px', background: tc.bg, color: tc.color }}>{n.turno}</span>
-                        {n.firmado && <span style={{ fontSize: '10px', color: '#16a34a', fontWeight: 700 }}>✓ Firmado</span>}
+                        {n.firmado && <span style={{ fontSize: '10px', color: 'var(--at-success)', fontWeight: 700 }}>✓ Firmado</span>}
                       </div>
                       <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
                         {n.responsable}{n.hora_inicio ? ` · ${n.hora_inicio}–${n.hora_fin ?? '?'}` : ''}
-                        {incs.length > 0 && <span style={{ marginLeft: '8px', color: '#ef4444', fontWeight: 600 }}>{incs.length} incidente(s)</span>}
+                        {incs.length > 0 && <span style={{ marginLeft: '8px', color: 'var(--at-danger)', fontWeight: 600 }}>{incs.length} incidente(s)</span>}
                       </div>
                       <div style={{ fontSize: '12px', color: 'var(--at-ink-2)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '500px' }}>
                         {n.novedades}
@@ -232,11 +232,11 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
                         style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🖨️</button>
                       {canEdit && !n.firmado && (
                         <button onClick={e => { e.stopPropagation(); toggleFirmado(n.id, n.firmado) }}
-                          style={{ padding: '3px 7px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Firmar</button>
+                          style={{ padding: '3px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Firmar</button>
                       )}
                       {canEdit && (
                         <button onClick={e => { e.stopPropagation(); handleDelete(n.id) }}
-                          style={{ padding: '3px 7px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
+                          style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>🗑️</button>
                       )}
                     </div>
                   </div>
@@ -264,8 +264,8 @@ export function LibroNovedadesTab({ novedades, proyectoId, companyId, canCreate,
               <>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '6px' }}>Incidentes</div>
                 {(detail.incidentes as Incidente[]).map((inc, i) => (
-                  <div key={i} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '6px 8px', marginBottom: '4px', fontSize: '12px' }}>
-                    <span style={{ fontWeight: 700, color: '#ef4444' }}>{inc.hora}</span>
+                  <div key={i} style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '6px', padding: '6px 8px', marginBottom: '4px', fontSize: '12px' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--at-danger)' }}>{inc.hora}</span>
                     <span style={{ color: 'var(--at-ink-3)', marginLeft: '6px', fontSize: '11px' }}>[{inc.tipo}]</span>
                     <span style={{ marginLeft: '6px', color: 'var(--at-ink-2)' }}>{inc.descripcion}</span>
                   </div>

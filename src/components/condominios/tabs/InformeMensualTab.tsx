@@ -20,8 +20,8 @@ interface Props {
 }
 
 const ESTADO_CFG: Record<EstadoInformeMensual, { label: string; bg: string; color: string }> = {
-  borrador:  { label: 'Borrador',  bg: '#fef3c7', color: '#d97706' },
-  publicado: { label: 'Publicado', bg: '#dcfce7', color: '#16a34a' },
+  borrador:  { label: 'Borrador',  bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+  publicado: { label: 'Publicado', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
 }
 
 export default function InformeMensualTab({ informes, cuotas, gastos, tickets, visitantes, incidentes, proyectoId, companyId, moneda, autorNombre, canCreate, onRefresh }: Props) {
@@ -126,17 +126,17 @@ export default function InformeMensualTab({ informes, cuotas, gastos, tickets, v
                       <span style={{ padding: '2px 9px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: ec.bg, color: ec.color }}>{ec.label}</span>
                       {inf.firmado_por && <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>— {inf.firmado_por}</span>}
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: saldo >= 0 ? '#16a34a' : '#ef4444' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: saldo >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
                       {saldo >= 0 ? '+' : ''}{moneda} {saldo.toFixed(2)}
                     </div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6 }}>
-                    {stat('Recaudado', `${moneda} ${inf.total_recaudado.toFixed(2)}`, '#16a34a', '#f0fdf4')}
-                    {stat('Gastos', `${moneda} ${inf.total_gastos.toFixed(2)}`, '#ef4444', '#fef2f2')}
-                    {stat('Recaudación', `${tasa}%`, tasa >= 80 ? '#16a34a' : '#d97706', tasa >= 80 ? '#f0fdf4' : '#fffbeb')}
+                    {stat('Recaudado', `${moneda} ${inf.total_recaudado.toFixed(2)}`, 'var(--at-success)', 'var(--at-success-tint)')}
+                    {stat('Gastos', `${moneda} ${inf.total_gastos.toFixed(2)}`, 'var(--at-danger)', 'var(--at-danger-tint)')}
+                    {stat('Recaudación', `${tasa}%`, tasa >= 80 ? 'var(--at-success)' : 'var(--at-warning)', tasa >= 80 ? 'var(--at-success-tint)' : 'var(--at-warning-tint)')}
                     {stat('Tickets', inf.num_tickets, 'var(--at-accent-hover)', 'var(--at-accent-tint-2)')}
                     {stat('Visitantes', inf.num_visitantes, 'var(--at-primary-hover)', 'var(--at-primary-tint)')}
-                    {stat('Incidentes', inf.num_incidentes, inf.num_incidentes > 0 ? '#ef4444' : 'var(--at-ink-3)', inf.num_incidentes > 0 ? '#fef2f2' : 'var(--at-surface-2)')}
+                    {stat('Incidentes', inf.num_incidentes, inf.num_incidentes > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)', inf.num_incidentes > 0 ? 'var(--at-danger-tint)' : 'var(--at-surface-2)')}
                   </div>
                 </div>
               )

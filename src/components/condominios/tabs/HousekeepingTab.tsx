@@ -15,10 +15,10 @@ interface Props {
 }
 
 const ESTADO_CONFIG: Record<EstadoHousekeeping, { label: string; color: string; bg: string }> = {
-  pendiente:  { label: 'Pendiente',  color: '#f59e0b', bg: '#fef3c7' },
+  pendiente:  { label: 'Pendiente',  color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   en_proceso: { label: 'En proceso', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
-  completado: { label: 'Completado', color: '#10b981', bg: '#d1fae5' },
-  cancelado:  { label: 'Cancelado',  color: '#ef4444', bg: '#fee2e2' },
+  completado: { label: 'Completado', color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  cancelado:  { label: 'Cancelado',  color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
 const TIPO_CONFIG: Record<TipoHousekeeping, { label: string; icon: string }> = {
@@ -91,7 +91,7 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar servicio?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar servicio?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('servicios_housekeeping').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -113,9 +113,9 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Pendientes',       value: String(pendientes),                                                     icon: '⏳', color: '#f59e0b' },
+          { label: 'Pendientes',       value: String(pendientes),                                                     icon: '⏳', color: 'var(--at-warning)' },
           { label: 'En proceso',       value: String(enProceso),                                                      icon: '🔄', color: 'var(--at-primary)' },
-          { label: 'Completados (mes)',value: String(completados),                                                    icon: '✅', color: '#10b981' },
+          { label: 'Completados (mes)',value: String(completados),                                                    icon: '✅', color: 'var(--at-success)' },
           { label: 'Costo del mes',    value: costoMes > 0 ? `${moneda} ${costoMes.toFixed(0)}` : '—',               icon: '💰', color: 'var(--at-accent)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
@@ -216,9 +216,9 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                 <div style={{ height: '1px', flex: 1, background: 'var(--at-line)' }} />
                 <span style={{ fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap',
-                  background: fecha === today ? '#fef3c7' : 'var(--at-surface)', padding: '2px 8px', borderRadius: '10px',
+                  background: fecha === today ? 'var(--at-warning-tint)' : 'var(--at-surface)', padding: '2px 8px', borderRadius: '10px',
                   border: `1.5px solid ${fecha === today ? '#fcd34d' : 'var(--at-line)'}`,
-                  color: fecha === today ? '#92400e' : 'var(--at-ink-3)' }}>
+                  color: fecha === today ? 'var(--at-warning-strong)' : 'var(--at-ink-3)' }}>
                   {fecha === today ? '⭐ Hoy' : ''} {fecha}
                 </span>
                 <div style={{ height: '1px', flex: 1, background: 'var(--at-line)' }} />
@@ -245,10 +245,10 @@ export function HousekeepingTab({ servicios, unidades, proyectoId, companyId, mo
                             <button onClick={() => handleEstado(s.id, 'en_proceso')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Iniciar</button>
                           )}
                           {s.estado === 'en_proceso' && (
-                            <button onClick={() => handleEstado(s.id, 'completado')} style={{ flex: 1, padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Completar</button>
+                            <button onClick={() => handleEstado(s.id, 'completado')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Completar</button>
                           )}
                           <button onClick={() => startEdit(s)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                          <button onClick={() => handleDelete(s.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                          <button onClick={() => handleDelete(s.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                         </div>
                       )}
                     </div>

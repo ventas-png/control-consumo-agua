@@ -14,9 +14,9 @@ interface Props {
 }
 
 const TIPO_STYLE: Record<string, { label: string; icon: string; bg: string; color: string; unidadDefault: string }> = {
-  electricidad: { label: 'Electricidad', icon: '⚡', bg: '#fef3c7', color: '#92400e', unidadDefault: 'kWh' },
+  electricidad: { label: 'Electricidad', icon: '⚡', bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', unidadDefault: 'kWh' },
   agua:         { label: 'Agua',         icon: '💧', bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', unidadDefault: 'm3' },
-  gas:          { label: 'Gas',          icon: '🔥', bg: '#fed7aa', color: '#c2410c', unidadDefault: 'm3' },
+  gas:          { label: 'Gas',          icon: '🔥', bg: 'var(--at-warning-border)', color: 'var(--at-warning-strong)', unidadDefault: 'm3' },
   otro:         { label: 'Otro',         icon: '📊', bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', unidadDefault: 'unidad' },
 }
 
@@ -84,7 +84,7 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
   }
 
   const handleDelete = async (c: ConsumoEnergiaArea) => {
-    const r = await Swal.fire({ title: '¿Eliminar registro?', text: `${c.area} · ${c.periodo}`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' })
+    const r = await Swal.fire({ title: '¿Eliminar registro?', text: `${c.area} · ${c.periodo}`, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('consumo_energia_areas').delete().eq('id', c.id)
     onRefresh()
@@ -118,8 +118,8 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
       {latestPeriodo && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '14px', marginBottom: '20px' }}>
           {[
-            { label: `Costo total ${latestPeriodo}`, value: fmt(totalCostoPeriodo, moneda), icon: '💰', bg: '#f0fdf4', color: '#16a34a' },
-            { label: `Electricidad ${latestPeriodo}`, value: `${totalElec.toFixed(1)} kWh`, icon: '⚡', bg: '#fef3c7', color: '#92400e' },
+            { label: `Costo total ${latestPeriodo}`, value: fmt(totalCostoPeriodo, moneda), icon: '💰', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+            { label: `Electricidad ${latestPeriodo}`, value: `${totalElec.toFixed(1)} kWh`, icon: '⚡', bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
             { label: `Agua ${latestPeriodo}`, value: `${totalAgua.toFixed(1)} m³`, icon: '💧', bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
           ].map(k => (
             <div key={k.label} style={{ background: k.bg, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
@@ -193,12 +193,12 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
               <input style={inputStyle} type="date" value={form.fecha_lectura} onChange={e => setF('fecha_lectura', e.target.value)} />
             </div>
             {form.lectura_anterior && form.lectura_actual && form.costo_unitario && (
-              <div style={{ background: '#f0fdf4', borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ background: 'var(--at-success-tint)', borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                 <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', fontWeight: 600 }}>Consumo calculado</div>
-                <div style={{ fontSize: '14px', fontWeight: 800, color: '#16a34a' }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--at-success)' }}>
                   {(parseFloat(form.lectura_actual) - parseFloat(form.lectura_anterior)).toFixed(2)} {form.unidad}
                 </div>
-                <div style={{ fontSize: '12px', color: '#16a34a' }}>
+                <div style={{ fontSize: '12px', color: 'var(--at-success)' }}>
                   ≈ {fmt((parseFloat(form.lectura_actual) - parseFloat(form.lectura_anterior)) * parseFloat(form.costo_unitario), moneda)}
                 </div>
               </div>
@@ -252,14 +252,14 @@ export function ConsumoEnergiaAreasTab({ consumos, proyectoId, companyId, moneda
                     <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--at-ink-3)' }}>
                       {c.costo_unitario != null ? `${c.costo_unitario.toFixed(4)}` : '—'}
                     </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-success)' }}>
                       {c.total_costo != null ? fmt(c.total_costo, moneda) : '—'}
                     </td>
                     <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', whiteSpace: 'nowrap' }}>{c.fecha_lectura}</td>
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         {canEdit && <button onClick={() => openEdit(c)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>✏️</button>}
-                        <button onClick={() => handleDelete(c)} style={{ padding: '4px 8px', background: '#fef2f2', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', color: '#ef4444' }}>🗑</button>
+                        <button onClick={() => handleDelete(c)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', color: 'var(--at-danger)' }}>🗑</button>
                       </div>
                     </td>
                   </tr>

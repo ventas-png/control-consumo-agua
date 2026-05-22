@@ -67,7 +67,7 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
   }
 
   async function deletePlantilla(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar plantilla?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await Swal.fire({ title: '¿Eliminar plantilla?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('plantillas_tarea_cargo').delete().eq('id', id)
     onRefresh()
@@ -89,7 +89,7 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
         </div>
         {canCreate && (
           <button onClick={() => { resetForm(); setShowForm(true) }}
-            style={{ padding: '9px 16px', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+            style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
             + Nueva plantilla
           </button>
         )}
@@ -119,7 +119,7 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px', border: '1.5px solid var(--at-line)' }}>
                 {ICONOS.map(ic => (
                   <button key={ic} onClick={() => setForm(f => ({ ...f, icono: ic }))}
-                    style={{ width: '34px', height: '34px', fontSize: '18px', borderRadius: '7px', border: '2px solid', borderColor: form.icono === ic ? '#f59e0b' : 'transparent', background: form.icono === ic ? '#fef3c7' : 'transparent', cursor: 'pointer' }}>
+                    style={{ width: '34px', height: '34px', fontSize: '18px', borderRadius: '7px', border: '2px solid', borderColor: form.icono === ic ? 'var(--at-warning)' : 'transparent', background: form.icono === ic ? 'var(--at-warning-tint)' : 'transparent', cursor: 'pointer' }}>
                     {ic}
                   </button>
                 ))}
@@ -151,7 +151,7 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
             </div>
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={save} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={save} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
               {saving ? 'Guardando...' : editId ? 'Actualizar' : 'Guardar'}
             </button>
             <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
@@ -164,7 +164,7 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
         {(['todos', ...cargos] as string[]).map(c => (
           <button key={c} onClick={() => setFiltroCargo(c)}
             style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: 'none',
-              background: filtroCargo === c ? '#fef3c7' : 'var(--at-chip)', color: filtroCargo === c ? '#d97706' : 'var(--at-ink-3)' }}>
+              background: filtroCargo === c ? 'var(--at-warning-tint)' : 'var(--at-chip)', color: filtroCargo === c ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>
             {c === 'todos' ? `Todos (${plantillas.length})` : `${c} (${plantillas.filter(p => p.cargo === c).length})`}
           </button>
         ))}
@@ -181,7 +181,7 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
           {cargosPorGrupo.map(([cargo, tareas]) => (
             <div key={cargo}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                <span style={{ fontWeight: 800, fontSize: '14px', color: '#92400e', background: '#fef3c7', padding: '4px 12px', borderRadius: '20px' }}>
+                <span style={{ fontWeight: 800, fontSize: '14px', color: 'var(--at-warning-strong)', background: 'var(--at-warning-tint)', padding: '4px 12px', borderRadius: '20px' }}>
                   {cargo}
                 </span>
                 <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{tareas.length} tarea{tareas.length !== 1 ? 's' : ''}</span>
@@ -192,7 +192,7 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
                   return (
                     <div key={p.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${p.activo ? 'var(--at-line)' : 'var(--at-chip)'}`, borderRadius: '12px', padding: '14px', opacity: p.activo ? 1 : 0.55 }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                        <span style={{ fontSize: '24px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fef3c7', borderRadius: '9px', flexShrink: 0 }}>{p.icono}</span>
+                        <span style={{ fontSize: '24px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--at-warning-tint)', borderRadius: '9px', flexShrink: 0 }}>{p.icono}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 700, fontSize: '13.5px', color: 'var(--at-ink)' }}>{p.titulo}</div>
                           {p.descripcion && <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{p.descripcion}</div>}
@@ -206,10 +206,10 @@ export function PlantillasCargoTab({ plantillas, areas, proyectoId, companyId, c
                       {canEdit && (
                         <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
                           <button onClick={() => startEdit(p)} style={{ flex: 1, padding: '5px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)', fontWeight: 600 }}>✏️ Editar</button>
-                          <button onClick={() => toggleActivo(p)} style={{ padding: '5px 10px', background: p.activo ? '#fef9c3' : '#f0fdf4', border: `1px solid ${p.activo ? '#fde047' : '#86efac'}`, borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: p.activo ? '#92400e' : '#16a34a' }}>
+                          <button onClick={() => toggleActivo(p)} style={{ padding: '5px 10px', background: p.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: `1px solid ${p.activo ? '#fde047' : 'var(--at-success-border)'}`, borderRadius: '6px', cursor: 'pointer', fontSize: '12px', color: p.activo ? 'var(--at-warning-strong)' : 'var(--at-success)' }}>
                             {p.activo ? 'Desactivar' : 'Activar'}
                           </button>
-                          <button onClick={() => deletePlantilla(p.id)} style={{ padding: '5px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', color: '#dc2626' }}>🗑</button>
+                          <button onClick={() => deletePlantilla(p.id)} style={{ padding: '5px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-danger)' }}>🗑</button>
                         </div>
                       )}
                     </div>

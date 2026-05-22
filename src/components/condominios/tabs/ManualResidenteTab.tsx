@@ -55,7 +55,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
   }
 
   async function eliminar(id: string) {
-    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar artículo?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const { isConfirmed } = await Swal.fire({ title: '¿Eliminar artículo?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!isConfirmed) return
     await supabase.from('manual_residente_cond').delete().eq('id', id)
     onRefresh()
@@ -154,10 +154,10 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {items.map(a => (
-                    <div key={a.id} style={{ background: 'var(--at-surface)', border: `1px solid ${a.activo ? 'var(--at-line)' : '#fde68a'}`, borderRadius: 8, overflow: 'hidden', opacity: a.activo ? 1 : 0.7 }}>
+                    <div key={a.id} style={{ background: 'var(--at-surface)', border: `1px solid ${a.activo ? 'var(--at-line)' : 'var(--at-warning-border)'}`, borderRadius: 8, overflow: 'hidden', opacity: a.activo ? 1 : 0.7 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', cursor: 'pointer' }}
                         onClick={() => setExpandido(expandido === a.id ? null : a.id)}>
-                        {!a.activo && <span style={{ fontSize: 10, background: '#fef3c7', color: '#d97706', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>Oculto</span>}
+                        {!a.activo && <span style={{ fontSize: 10, background: 'var(--at-warning-tint)', color: 'var(--at-warning)', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>Oculto</span>}
                         <span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>{a.titulo}</span>
                         <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>#{a.orden}</span>
                         {canEdit && (
@@ -167,7 +167,7 @@ export default function ManualResidenteTab({ articulos, proyectoId, companyId, c
                               {a.activo ? 'Ocultar' : 'Mostrar'}
                             </button>
                             <button onClick={() => eliminar(a.id)}
-                              style={{ padding: '3px 8px', background: '#fef2f2', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: '#ef4444' }}>✕</button>
+                              style={{ padding: '3px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: 10, color: 'var(--at-danger)' }}>✕</button>
                           </div>
                         )}
                         <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{expandido === a.id ? '▲' : '▼'}</span>

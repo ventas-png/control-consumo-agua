@@ -105,22 +105,22 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
       <Section title="1. Resumen General">
         <KpiGrid items={[
           { label: 'Período',          value: periodoActual,                              color: 'var(--at-primary)' },
-          { label: 'Cuotas pendientes',value: String(cuotasPendientes),                  color: '#f59e0b' },
-          { label: 'Cuotas morosas',   value: String(cuotasMorosas),                     color: '#ef4444' },
-          { label: 'Tickets abiertos', value: String(ticketsAbiertos + ticketsEnProceso), color: ticketsUrgentes > 0 ? '#ef4444' : 'var(--at-ink)' },
-          { label: 'Contratos activos',value: String(contratosActivos),                  color: '#10b981' },
+          { label: 'Cuotas pendientes',value: String(cuotasPendientes),                  color: 'var(--at-warning)' },
+          { label: 'Cuotas morosas',   value: String(cuotasMorosas),                     color: 'var(--at-danger)' },
+          { label: 'Tickets abiertos', value: String(ticketsAbiertos + ticketsEnProceso), color: ticketsUrgentes > 0 ? 'var(--at-danger)' : 'var(--at-ink)' },
+          { label: 'Contratos activos',value: String(contratosActivos),                  color: 'var(--at-success)' },
         ]} />
       </Section>
 
       {/* 2. Financiero */}
       <Section title="2. Financiero">
         <KpiGrid items={[
-          { label: 'Recaudado (cuotas)', value: `${moneda} ${fmt(montoRecaudado)}`,  color: '#10b981' },
-          { label: 'Por cobrar',         value: `${moneda} ${fmt(montoPendiente)}`,   color: '#f59e0b' },
-          { label: 'Cuotas pagadas',     value: String(cuotasPagadas),                color: '#10b981' },
-          { label: `Gastos ${currentYear}`, value: `${moneda} ${fmt(totalGastosAnio)}`, color: '#ef4444' },
+          { label: 'Recaudado (cuotas)', value: `${moneda} ${fmt(montoRecaudado)}`,  color: 'var(--at-success)' },
+          { label: 'Por cobrar',         value: `${moneda} ${fmt(montoPendiente)}`,   color: 'var(--at-warning)' },
+          { label: 'Cuotas pagadas',     value: String(cuotasPagadas),                color: 'var(--at-success)' },
+          { label: `Gastos ${currentYear}`, value: `${moneda} ${fmt(totalGastosAnio)}`, color: 'var(--at-danger)' },
           { label: 'Presupuesto anual',  value: `${moneda} ${fmt(totalPresupuesto)}`, color: 'var(--at-primary)' },
-          { label: '% Ejecución ppto.',  value: `${pctEjec}%`,                        color: pctEjec >= 100 ? '#ef4444' : pctEjec >= 80 ? '#f59e0b' : '#10b981' },
+          { label: '% Ejecución ppto.',  value: `${pctEjec}%`,                        color: pctEjec >= 100 ? 'var(--at-danger)' : pctEjec >= 80 ? 'var(--at-warning)' : 'var(--at-success)' },
         ]} />
 
         {topCategorias.length > 0 && (
@@ -152,10 +152,10 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
       {/* 3. Mantenimiento */}
       <Section title="3. Mantenimiento">
         <KpiGrid items={[
-          { label: 'Abiertos',       value: String(ticketsAbiertos),   color: '#f59e0b' },
+          { label: 'Abiertos',       value: String(ticketsAbiertos),   color: 'var(--at-warning)' },
           { label: 'En proceso',     value: String(ticketsEnProceso),  color: 'var(--at-primary)' },
-          { label: 'Resueltos/Cerrados', value: String(ticketsResueltos), color: '#10b981' },
-          { label: 'Urgentes activos',   value: String(ticketsUrgentes),  color: ticketsUrgentes > 0 ? '#ef4444' : '#10b981' },
+          { label: 'Resueltos/Cerrados', value: String(ticketsResueltos), color: 'var(--at-success)' },
+          { label: 'Urgentes activos',   value: String(ticketsUrgentes),  color: ticketsUrgentes > 0 ? 'var(--at-danger)' : 'var(--at-success)' },
           { label: 'Costo acumulado',    value: `${moneda} ${fmt(costoTickets)}`, color: 'var(--at-accent)' },
         ]} />
       </Section>
@@ -171,8 +171,8 @@ export function ReportesTab({ cuotas, tickets, visitantes, contratos, gastos, pr
       {/* 5. Contratos y Vencimientos */}
       <Section title="5. Contratos y Vencimientos">
         <KpiGrid items={[
-          { label: 'Contratos activos',     value: String(contratosActivos),   color: '#10b981' },
-          { label: 'Vencen en 30 días',     value: String(contratosPorVencer), color: contratosPorVencer > 0 ? '#ef4444' : '#10b981' },
+          { label: 'Contratos activos',     value: String(contratosActivos),   color: 'var(--at-success)' },
+          { label: 'Vencen en 30 días',     value: String(contratosPorVencer), color: contratosPorVencer > 0 ? 'var(--at-danger)' : 'var(--at-success)' },
           { label: 'Contratos vencidos/term.', value: String(contratos.filter(c => c.estado !== 'activo').length), color: 'var(--at-ink-3)' },
         ]} />
       </Section>

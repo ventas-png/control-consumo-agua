@@ -22,10 +22,10 @@ type TipoEvento = 'visitante' | 'ticket' | 'incidente' | 'anuncio' | 'orden_comp
 const TIPO_CFG: Record<TipoEvento, { label: string; icon: string; color: string; bg: string }> = {
   visitante:    { label: 'Visitante',    icon: '🚪', color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
   ticket:       { label: 'Ticket',       icon: '🔧', color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
-  incidente:    { label: 'Incidente',    icon: '🚨', color: '#ef4444', bg: '#fef2f2' },
+  incidente:    { label: 'Incidente',    icon: '🚨', color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
   anuncio:      { label: 'Anuncio',      icon: '📢', color: 'var(--at-primary-hover)', bg: 'var(--at-primary-tint)' },
-  orden_compra: { label: 'Orden compra', icon: '🛒', color: '#d97706', bg: '#fef3c7' },
-  asamblea:     { label: 'Asamblea',     icon: '🖥️', color: '#16a34a', bg: '#dcfce7' },
+  orden_compra: { label: 'Orden compra', icon: '🛒', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  asamblea:     { label: 'Asamblea',     icon: '🖥️', color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   gasto:        { label: 'Gasto',        icon: '💸', color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
   cuota:        { label: 'Cuota',        icon: '💳', color: 'var(--at-ink)', bg: 'var(--at-surface-2)' },
 }
@@ -70,7 +70,7 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
       titulo: t.titulo,
       subtitulo: `${t.tipo === 'preventivo' ? 'Preventivo' : 'Correctivo'} · ${t.prioridad}`,
       badge: t.estado,
-      badgeColor: t.estado === 'resuelto' || t.estado === 'cerrado' ? '#16a34a' : t.estado === 'en_proceso' ? '#d97706' : 'var(--at-ink-3)',
+      badgeColor: t.estado === 'resuelto' || t.estado === 'cerrado' ? 'var(--at-success)' : t.estado === 'en_proceso' ? 'var(--at-warning)' : 'var(--at-ink-3)',
     }))
 
     incidentes.forEach(i => list.push({
@@ -79,7 +79,7 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
       titulo: `Incidente: ${i.tipo}`,
       subtitulo: i.area ?? i.descripcion?.slice(0, 60) ?? '',
       badge: i.estado,
-      badgeColor: '#ef4444',
+      badgeColor: 'var(--at-danger)',
     }))
 
     anuncios.forEach(a => list.push({
@@ -96,7 +96,7 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
       titulo: `OC-${String(o.correlativo ?? 0).padStart(4, '0')}: ${o.concepto}`,
       subtitulo: o.proveedor_nombre,
       badge: o.estado,
-      badgeColor: o.estado === 'recibida' ? '#16a34a' : o.estado === 'cancelada' ? '#ef4444' : '#d97706',
+      badgeColor: o.estado === 'recibida' ? 'var(--at-success)' : o.estado === 'cancelada' ? 'var(--at-danger)' : 'var(--at-warning)',
       detalle: o.monto_estimado != null ? `${moneda} ${o.monto_estimado.toLocaleString('es', { maximumFractionDigits: 0 })}` : undefined,
     }))
 
@@ -106,7 +106,7 @@ export default function BitacoraEventosTab({ visitantes, tickets, incidentes, an
       titulo: a.titulo,
       subtitulo: a.modalidad,
       badge: a.estado,
-      badgeColor: a.estado === 'finalizada' ? '#16a34a' : a.estado === 'en_curso' ? '#d97706' : 'var(--at-primary)',
+      badgeColor: a.estado === 'finalizada' ? 'var(--at-success)' : a.estado === 'en_curso' ? 'var(--at-warning)' : 'var(--at-primary)',
     }))
 
     gastos.filter(g => g.estado !== 'anulado').forEach(g => list.push({

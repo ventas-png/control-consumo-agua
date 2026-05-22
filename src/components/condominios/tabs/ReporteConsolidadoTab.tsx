@@ -160,10 +160,10 @@ export function ReporteConsolidadoTab({
         <Section title="Resumen General" icon="📊">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px,1fr))', gap: '10px' }}>
             <KpiBox label="Unidades totales"   value={String(totalUnidades)} sub={`${ocupadas} ocupadas`} />
-            <KpiBox label="Tasa ocupación"     value={`${tasaOcupacion}%`} color={tasaOcupacion > 85 ? '#16a34a' : '#d97706'} />
-            <KpiBox label="Cobrado"             value={fmt(cobrado, moneda)} color='#16a34a' bg='#f0fdf4' border='#86efac' />
-            <KpiBox label="Pendiente"           value={fmt(pendiente, moneda)} color={pendiente > 0 ? '#dc2626' : '#16a34a'} bg={pendiente > 0 ? '#fef2f2' : '#f0fdf4'} border={pendiente > 0 ? '#fecaca' : '#86efac'} />
-            <KpiBox label="Tickets abiertos"   value={String(ticketsAbiertos.length)} color={ticketsAbiertos.length > 5 ? '#dc2626' : '#d97706'} />
+            <KpiBox label="Tasa ocupación"     value={`${tasaOcupacion}%`} color={tasaOcupacion > 85 ? 'var(--at-success)' : 'var(--at-warning)'} />
+            <KpiBox label="Cobrado"             value={fmt(cobrado, moneda)} color='var(--at-success)' bg='var(--at-success-tint)' border='var(--at-success-border)' />
+            <KpiBox label="Pendiente"           value={fmt(pendiente, moneda)} color={pendiente > 0 ? 'var(--at-danger)' : 'var(--at-success)'} bg={pendiente > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)'} border={pendiente > 0 ? 'var(--at-danger-border)' : 'var(--at-success-border)'} />
+            <KpiBox label="Tickets abiertos"   value={String(ticketsAbiertos.length)} color={ticketsAbiertos.length > 5 ? 'var(--at-danger)' : 'var(--at-warning)'} />
             <KpiBox label="Rondas realizadas"  value={String(rondasCompletadas)} sub={`de ${rondasPeriodo.length}`} />
           </div>
         </Section>
@@ -171,12 +171,12 @@ export function ReporteConsolidadoTab({
         {/* 2. Financiero */}
         <Section title="Financiero" icon="💰">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px,1fr))', gap: '10px', marginBottom: '14px' }}>
-            <KpiBox label="Cobrado período"      value={fmt(cobrado, moneda)}    color='#16a34a' bg='#f0fdf4' border='#86efac' />
-            <KpiBox label="Pendiente período"    value={fmt(pendiente, moneda)}  color={pendiente > 0 ? '#dc2626' : '#16a34a'} />
-            <KpiBox label="Cuotas morosas"       value={String(morosos)}          color={morosos > 0 ? '#dc2626' : '#16a34a'} />
+            <KpiBox label="Cobrado período"      value={fmt(cobrado, moneda)}    color='var(--at-success)' bg='var(--at-success-tint)' border='var(--at-success-border)' />
+            <KpiBox label="Pendiente período"    value={fmt(pendiente, moneda)}  color={pendiente > 0 ? 'var(--at-danger)' : 'var(--at-success)'} />
+            <KpiBox label="Cuotas morosas"       value={String(morosos)}          color={morosos > 0 ? 'var(--at-danger)' : 'var(--at-success)'} />
             <KpiBox label="Total gastos"         value={fmt(totalGastos, moneda)} color='#9C5733' />
             <KpiBox label="Ppto. mensual est."   value={presupuestoPeriodo > 0 ? fmt(presupuestoPeriodo, moneda) : '—'} sub='Pro-rata anual' />
-            <KpiBox label="% Cobrado vs ppto."   value={presupuestoPeriodo > 0 ? pct(cobrado, presupuestoPeriodo) : '—'} color={cobrado >= presupuestoPeriodo ? '#16a34a' : '#dc2626'} />
+            <KpiBox label="% Cobrado vs ppto."   value={presupuestoPeriodo > 0 ? pct(cobrado, presupuestoPeriodo) : '—'} color={cobrado >= presupuestoPeriodo ? 'var(--at-success)' : 'var(--at-danger)'} />
           </div>
           {Object.keys(gastosXCat).length > 0 && (
             <div style={{ background: 'var(--at-surface-2)', borderRadius: '10px', padding: '12px 14px' }}>
@@ -197,9 +197,9 @@ export function ReporteConsolidadoTab({
         <Section title="Mantenimiento" icon="🔧">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px,1fr))', gap: '10px' }}>
             <KpiBox label="Tickets abiertos"   value={String(ticketsPeriodo.length)}    sub='en el período' />
-            <KpiBox label="Resueltos"          value={String(ticketsCerrados.length)}   color='#16a34a' bg='#f0fdf4' border='#86efac' sub={pct(ticketsCerrados.length, ticketsPeriodo.length) + ' resolución'} />
-            <KpiBox label="Alta/Urgente"       value={String(ticketsUrgentes.length)}   color={ticketsUrgentes.length > 0 ? '#dc2626' : '#16a34a'} />
-            <KpiBox label="Aún abiertos"       value={String(ticketsAbiertos.length)}   color={ticketsAbiertos.length > 3 ? '#dc2626' : '#d97706'} sub='acumulados' />
+            <KpiBox label="Resueltos"          value={String(ticketsCerrados.length)}   color='var(--at-success)' bg='var(--at-success-tint)' border='var(--at-success-border)' sub={pct(ticketsCerrados.length, ticketsPeriodo.length) + ' resolución'} />
+            <KpiBox label="Alta/Urgente"       value={String(ticketsUrgentes.length)}   color={ticketsUrgentes.length > 0 ? 'var(--at-danger)' : 'var(--at-success)'} />
+            <KpiBox label="Aún abiertos"       value={String(ticketsAbiertos.length)}   color={ticketsAbiertos.length > 3 ? 'var(--at-danger)' : 'var(--at-warning)'} sub='acumulados' />
             <KpiBox label="Tiempo prom. res."  value={avgResolucion > 0 ? `${avgResolucion}d` : '—'} sub='días hábiles' />
           </div>
         </Section>
@@ -209,9 +209,9 @@ export function ReporteConsolidadoTab({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px,1fr))', gap: '10px' }}>
             <KpiBox label="Turnos registrados" value={String(bloquesPeriodo.length)} />
             <KpiBox label="Turnos evaluados"   value={String(bloquesCerrados.length)} sub={pct(bloquesCerrados.length, bloquesPeriodo.length) + ' evaluados'} />
-            <KpiBox label="Puntaje promedio"   value={avgPuntaje > 0 ? `${avgPuntaje}%` : '—'} color={avgPuntaje >= 90 ? '#16a34a' : avgPuntaje >= 70 ? '#d97706' : '#dc2626'} />
+            <KpiBox label="Puntaje promedio"   value={avgPuntaje > 0 ? `${avgPuntaje}%` : '—'} color={avgPuntaje >= 90 ? 'var(--at-success)' : avgPuntaje >= 70 ? 'var(--at-warning)' : 'var(--at-danger)'} />
             <KpiBox label="Tareas completadas" value={String(tareasCompletadas)} sub={`de ${tareasPeriodo.length} asignadas`} />
-            <KpiBox label="% completitud"      value={tareasPeriodo.length ? pct(tareasCompletadas, tareasPeriodo.length) : '—'} color={tareasCompletadas / Math.max(tareasPeriodo.length,1) >= 0.9 ? '#16a34a' : '#d97706'} />
+            <KpiBox label="% completitud"      value={tareasPeriodo.length ? pct(tareasCompletadas, tareasPeriodo.length) : '—'} color={tareasCompletadas / Math.max(tareasPeriodo.length,1) >= 0.9 ? 'var(--at-success)' : 'var(--at-warning)'} />
           </div>
         </Section>
 
@@ -219,9 +219,9 @@ export function ReporteConsolidadoTab({
         <Section title="Seguridad & Accesos" icon="🛡️">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px,1fr))', gap: '10px' }}>
             <KpiBox label="Rondas realizadas"   value={String(rondasPeriodo.length)} />
-            <KpiBox label="Rondas completadas"  value={String(rondasCompletadas)} color='#16a34a' bg='#f0fdf4' border='#86efac' sub={pct(rondasCompletadas, rondasPeriodo.length)} />
+            <KpiBox label="Rondas completadas"  value={String(rondasCompletadas)} color='var(--at-success)' bg='var(--at-success-tint)' border='var(--at-success-border)' sub={pct(rondasCompletadas, rondasPeriodo.length)} />
             <KpiBox label="Visitantes"          value={String(visitantesPeriodo.length)} sub='registrados' />
-            <KpiBox label="Novedades"           value={String(novedadesPeriodo.length)} color={novedadesPeriodo.length > 3 ? '#dc2626' : novedadesPeriodo.length > 0 ? '#d97706' : '#16a34a'} />
+            <KpiBox label="Novedades"           value={String(novedadesPeriodo.length)} color={novedadesPeriodo.length > 3 ? 'var(--at-danger)' : novedadesPeriodo.length > 0 ? 'var(--at-warning)' : 'var(--at-success)'} />
           </div>
         </Section>
 

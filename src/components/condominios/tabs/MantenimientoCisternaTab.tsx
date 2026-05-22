@@ -15,17 +15,17 @@ interface Props {
 
 const TIPOS: { value: TipoMantenimientoCisterna; label: string; icon: string; color: string }[] = [
   { value: 'lectura',    label: 'Lectura',    icon: '📊', color: 'var(--at-accent-2)' },
-  { value: 'limpieza',   label: 'Limpieza',   icon: '🧹', color: '#10b981' },
+  { value: 'limpieza',   label: 'Limpieza',   icon: '🧹', color: 'var(--at-success)' },
   { value: 'cloracion',  label: 'Cloración',  icon: '🧪', color: 'var(--at-accent)' },
   { value: 'inspeccion', label: 'Inspección', icon: '🔍', color: 'var(--at-accent)' },
-  { value: 'reparacion', label: 'Reparación', icon: '🔧', color: '#f59e0b' },
+  { value: 'reparacion', label: 'Reparación', icon: '🔧', color: 'var(--at-warning)' },
 ]
 
 const ESTADOS: { value: EstadoCisterna; label: string; color: string; bg: string; icon: string }[] = [
-  { value: 'normal',        label: 'Normal',        color: '#10b981', bg: '#d1fae5', icon: '✅' },
-  { value: 'bajo_nivel',    label: 'Bajo nivel',    color: '#f59e0b', bg: '#fef3c7', icon: '⚠️' },
+  { value: 'normal',        label: 'Normal',        color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '✅' },
+  { value: 'bajo_nivel',    label: 'Bajo nivel',    color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '⚠️' },
   { value: 'mantenimiento', label: 'Mantenimiento', color: 'var(--at-accent)', bg: 'var(--at-accent-tint)', icon: '🔧' },
-  { value: 'fuera_servicio',label: 'Fuera servicio',color: '#ef4444', bg: '#fef2f2', icon: '🚫' },
+  { value: 'fuera_servicio',label: 'Fuera servicio',color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', icon: '🚫' },
 ]
 
 const CLORO_MIN = 0.2
@@ -35,9 +35,9 @@ const PH_MAX = 8.5
 
 function nivelColor(pct: number | null | undefined): string {
   if (pct == null) return 'var(--at-ink-3)'
-  if (pct >= 60) return '#10b981'
-  if (pct >= 30) return '#f59e0b'
-  return '#ef4444'
+  if (pct >= 60) return 'var(--at-success)'
+  if (pct >= 30) return 'var(--at-warning)'
+  return 'var(--at-danger)'
 }
 
 export default function MantenimientoCisternaTab({ registros, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
@@ -128,8 +128,8 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: 12, fontSize: 11 }}>
-                      {r.cloro_residual != null && <span style={{ color: r.cloro_residual >= CLORO_MIN && r.cloro_residual <= CLORO_MAX ? '#10b981' : '#ef4444' }}>Cl: {r.cloro_residual}</span>}
-                      {r.ph != null && <span style={{ color: r.ph >= PH_MIN && r.ph <= PH_MAX ? '#10b981' : '#ef4444' }}>pH: {r.ph}</span>}
+                      {r.cloro_residual != null && <span style={{ color: r.cloro_residual >= CLORO_MIN && r.cloro_residual <= CLORO_MAX ? 'var(--at-success)' : 'var(--at-danger)' }}>Cl: {r.cloro_residual}</span>}
+                      {r.ph != null && <span style={{ color: r.ph >= PH_MIN && r.ph <= PH_MAX ? 'var(--at-success)' : 'var(--at-danger)' }}>pH: {r.ph}</span>}
                       <span style={{ color: 'var(--at-ink-3)' }}>{r.fecha}</span>
                     </div>
                   </div>
@@ -193,7 +193,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
             </div>
             <div>
               <label style={lbl}>Nivel agua (%)</label>
-              <input type="number" step="0.1" min="0" max="100" style={{ ...inp, borderColor: form.nivel_agua_pct ? (parseFloat(form.nivel_agua_pct) < 30 ? '#ef4444' : 'var(--at-line-strong)') : 'var(--at-line-strong)' }} value={form.nivel_agua_pct} onChange={e => setForm(p => ({ ...p, nivel_agua_pct: e.target.value }))} />
+              <input type="number" step="0.1" min="0" max="100" style={{ ...inp, borderColor: form.nivel_agua_pct ? (parseFloat(form.nivel_agua_pct) < 30 ? 'var(--at-danger)' : 'var(--at-line-strong)') : 'var(--at-line-strong)' }} value={form.nivel_agua_pct} onChange={e => setForm(p => ({ ...p, nivel_agua_pct: e.target.value }))} />
             </div>
             <div>
               <label style={lbl}>Cloro residual <span style={{ color: 'var(--at-ink-3)' }}>({CLORO_MIN}–{CLORO_MAX})</span></label>
@@ -231,7 +231,7 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Registrar'}
           </button>
         </div>
@@ -269,18 +269,18 @@ export default function MantenimientoCisternaTab({ registros, proyectoId, compan
                   {r.cloro_residual != null && (
                     <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>Cl</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: r.cloro_residual >= CLORO_MIN && r.cloro_residual <= CLORO_MAX ? '#10b981' : '#ef4444' }}>{r.cloro_residual}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: r.cloro_residual >= CLORO_MIN && r.cloro_residual <= CLORO_MAX ? 'var(--at-success)' : 'var(--at-danger)' }}>{r.cloro_residual}</div>
                     </div>
                   )}
                   {r.ph != null && (
                     <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>pH</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: r.ph >= PH_MIN && r.ph <= PH_MAX ? '#10b981' : '#ef4444' }}>{r.ph}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: r.ph >= PH_MIN && r.ph <= PH_MAX ? 'var(--at-success)' : 'var(--at-danger)' }}>{r.ph}</div>
                     </div>
                   )}
                   {canEdit && r.estado === 'bajo_nivel' && (
                     <button onClick={() => cambiarEstado(r, 'normal')}
-                      style={{ padding: '4px 10px', background: '#d1fae5', color: '#10b981', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
+                      style={{ padding: '4px 10px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11 }}>
                       Normalizar
                     </button>
                   )}

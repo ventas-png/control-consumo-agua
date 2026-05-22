@@ -41,8 +41,8 @@ function Badge({ v, invertido = false }: { v: ReturnType<typeof variacion>; inve
   const isGood = invertido ? v.dir === 'down' : v.dir === 'up'
   return (
     <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 20,
-      background: isGood ? '#dcfce7' : '#fef2f2',
-      color: isGood ? '#16a34a' : '#ef4444' }}>
+      background: isGood ? 'var(--at-success-tint)' : 'var(--at-danger-tint)',
+      color: isGood ? 'var(--at-success)' : 'var(--at-danger)' }}>
       {v.dir === 'up' ? '▲' : '▼'} {Math.abs(v.pct).toFixed(1)}%
     </span>
   )
@@ -131,13 +131,13 @@ export default function ComparativoAnualTab({ cuotas, gastos, moneda }: Props) {
                   <div style={{ flex: 1, background: 'var(--at-primary)', opacity: 0.85, borderRadius: '2px 2px 0 0',
                     height: `${(mA.ingresos / maxVal) * 100}%`, minHeight: mA.ingresos > 0 ? 2 : 0 }} />
                   {/* Año A — egresos */}
-                  <div style={{ flex: 1, background: '#f97316', opacity: 0.85, borderRadius: '2px 2px 0 0',
+                  <div style={{ flex: 1, background: 'var(--at-warning)', opacity: 0.85, borderRadius: '2px 2px 0 0',
                     height: `${(mA.egresos / maxVal) * 100}%`, minHeight: mA.egresos > 0 ? 2 : 0 }} />
                   {/* Año B — ingresos */}
                   <div style={{ flex: 1, background: 'var(--at-accent-hover)', opacity: 0.6, borderRadius: '2px 2px 0 0',
                     height: `${(mB.ingresos / maxVal) * 100}%`, minHeight: mB.ingresos > 0 ? 2 : 0 }} />
                   {/* Año B — egresos */}
-                  <div style={{ flex: 1, background: '#f97316', opacity: 0.4, borderRadius: '2px 2px 0 0',
+                  <div style={{ flex: 1, background: 'var(--at-warning)', opacity: 0.4, borderRadius: '2px 2px 0 0',
                     height: `${(mB.egresos / maxVal) * 100}%`, minHeight: mB.egresos > 0 ? 2 : 0 }} />
                 </div>
                 <div style={{ fontSize: 8, color: 'var(--at-ink-3)' }}>{mes}</div>
@@ -148,9 +148,9 @@ export default function ComparativoAnualTab({ cuotas, gastos, moneda }: Props) {
         <div style={{ display: 'flex', gap: 14, marginTop: 8, fontSize: 10, flexWrap: 'wrap' }}>
           {[
             { color: 'var(--at-primary)', opacity: '0.85', label: `${anioA} Ingresos` },
-            { color: '#f97316', opacity: '0.85', label: `${anioA} Egresos` },
+            { color: 'var(--at-warning)', opacity: '0.85', label: `${anioA} Egresos` },
             { color: 'var(--at-accent-hover)', opacity: '0.6', label: `${anioB} Ingresos` },
-            { color: '#f97316', opacity: '0.4', label: `${anioB} Egresos` },
+            { color: 'var(--at-warning)', opacity: '0.4', label: `${anioB} Egresos` },
           ].map(l => (
             <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ width: 10, height: 10, background: l.color, opacity: parseFloat(l.opacity), borderRadius: 2, display: 'inline-block' }} />
@@ -189,14 +189,14 @@ export default function ComparativoAnualTab({ cuotas, gastos, moneda }: Props) {
               return (
                 <tr key={mes} style={{ borderTop: '1px solid var(--at-chip)', opacity: noData ? 0.4 : 1 }}>
                   <td style={{ padding: '7px 10px', fontWeight: 600, color: 'var(--at-ink-2)' }}>{mes}</td>
-                  <td style={{ padding: '7px 10px', textAlign: 'right', color: '#16a34a' }}>{mA.ingresos > 0 ? `${moneda} ${Math.round(mA.ingresos).toLocaleString('es')}` : '—'}</td>
-                  <td style={{ padding: '7px 10px', textAlign: 'right', color: '#ef4444' }}>{mA.egresos > 0 ? `${moneda} ${Math.round(mA.egresos).toLocaleString('es')}` : '—'}</td>
-                  <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: mA.superavit >= 0 ? '#16a34a' : '#ef4444', borderRight: '2px solid var(--at-line)' }}>
+                  <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--at-success)' }}>{mA.ingresos > 0 ? `${moneda} ${Math.round(mA.ingresos).toLocaleString('es')}` : '—'}</td>
+                  <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--at-danger)' }}>{mA.egresos > 0 ? `${moneda} ${Math.round(mA.egresos).toLocaleString('es')}` : '—'}</td>
+                  <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: mA.superavit >= 0 ? 'var(--at-success)' : 'var(--at-danger)', borderRight: '2px solid var(--at-line)' }}>
                     {(mA.ingresos > 0 || mA.egresos > 0) ? `${mA.superavit >= 0 ? '+' : ''}${moneda} ${Math.round(mA.superavit).toLocaleString('es')}` : '—'}
                   </td>
                   <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--at-accent-hover)' }}>{mB.ingresos > 0 ? `${moneda} ${Math.round(mB.ingresos).toLocaleString('es')}` : '—'}</td>
                   <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--at-accent-hover)' }}>{mB.egresos > 0 ? `${moneda} ${Math.round(mB.egresos).toLocaleString('es')}` : '—'}</td>
-                  <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: mB.superavit >= 0 ? 'var(--at-accent-hover)' : '#ef4444', borderRight: '2px solid var(--at-line)' }}>
+                  <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: mB.superavit >= 0 ? 'var(--at-accent-hover)' : 'var(--at-danger)', borderRight: '2px solid var(--at-line)' }}>
                     {(mB.ingresos > 0 || mB.egresos > 0) ? `${mB.superavit >= 0 ? '+' : ''}${moneda} ${Math.round(mB.superavit).toLocaleString('es')}` : '—'}
                   </td>
                   <td style={{ padding: '7px 10px', textAlign: 'center' }}>
@@ -209,14 +209,14 @@ export default function ComparativoAnualTab({ cuotas, gastos, moneda }: Props) {
           <tfoot>
             <tr style={{ borderTop: '2px solid var(--at-line)', background: 'var(--at-surface-2)' }}>
               <td style={{ padding: '8px 10px', fontWeight: 700 }}>TOTAL</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{moneda} {Math.round(totalesA.ingresos).toLocaleString('es')}</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#ef4444' }}>{moneda} {Math.round(totalesA.egresos).toLocaleString('es')}</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: totalesA.superavit >= 0 ? '#16a34a' : '#ef4444', borderRight: '2px solid var(--at-line)' }}>
+              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: 'var(--at-success)' }}>{moneda} {Math.round(totalesA.ingresos).toLocaleString('es')}</td>
+              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {Math.round(totalesA.egresos).toLocaleString('es')}</td>
+              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: totalesA.superavit >= 0 ? 'var(--at-success)' : 'var(--at-danger)', borderRight: '2px solid var(--at-line)' }}>
                 {totalesA.superavit >= 0 ? '+' : ''}{moneda} {Math.round(totalesA.superavit).toLocaleString('es')}
               </td>
               <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: 'var(--at-accent-hover)' }}>{moneda} {Math.round(totalesB.ingresos).toLocaleString('es')}</td>
               <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: 'var(--at-accent-hover)' }}>{moneda} {Math.round(totalesB.egresos).toLocaleString('es')}</td>
-              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: totalesB.superavit >= 0 ? 'var(--at-accent-hover)' : '#ef4444', borderRight: '2px solid var(--at-line)' }}>
+              <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: totalesB.superavit >= 0 ? 'var(--at-accent-hover)' : 'var(--at-danger)', borderRight: '2px solid var(--at-line)' }}>
                 {totalesB.superavit >= 0 ? '+' : ''}{moneda} {Math.round(totalesB.superavit).toLocaleString('es')}
               </td>
               <td style={{ padding: '8px 10px', textAlign: 'center' }}>

@@ -23,7 +23,7 @@ const TIPO_MSG: Record<TipoMensajePortal, { label: string; icon: string }> = {
 const ESTADO_MSG: Record<string, { label: string; color: string }> = {
   nuevo:       { label: 'Nuevo',       color: 'var(--at-primary)' },
   leido:       { label: 'Leído',       color: 'var(--at-ink-3)' },
-  respondido:  { label: 'Respondido',  color: '#16a34a' },
+  respondido:  { label: 'Respondido',  color: 'var(--at-success)' },
   cerrado:     { label: 'Cerrado',     color: 'var(--at-ink-3)' },
 }
 
@@ -99,7 +99,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
                 📋 Copiar
               </button>
               <button onClick={onGenerarToken}
-                style={{ padding: '7px 14px', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                style={{ padding: '7px 14px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: '1px solid var(--at-warning-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>
                 🔄 Regenerar
               </button>
             </div>
@@ -174,8 +174,8 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
                     </div>
                     <p style={{ margin: '0 0 5px', fontSize: '13px', color: 'var(--at-ink-2)' }}>{m.cuerpo}</p>
                     {m.respuesta && (
-                      <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '8px 12px', marginTop: '6px' }}>
-                        <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#16a34a', marginBottom: '2px' }}>Respuesta de administración:</div>
+                      <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '8px', padding: '8px 12px', marginTop: '6px' }}>
+                        <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--at-success)', marginBottom: '2px' }}>Respuesta de administración:</div>
                         <div style={{ fontSize: '13px', color: 'var(--at-ink-2)' }}>{m.respuesta}</div>
                       </div>
                     )}
@@ -185,7 +185,7 @@ export function PortalMiUnidadTab({ unidad, mensajes, proyectoId, companyId, isA
                   </div>
                   {isAdmin && m.estado !== 'respondido' && m.estado !== 'cerrado' && (
                     <button onClick={() => responderMensaje(m.id)}
-                      style={{ padding: '5px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: '#16a34a', fontWeight: 600, flexShrink: 0 }}>
+                      style={{ padding: '5px 12px', background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-success)', fontWeight: 600, flexShrink: 0 }}>
                       Responder
                     </button>
                   )}

@@ -24,9 +24,9 @@ const CATEGORIAS: { value: CategoriaDocumento; label: string; icon: string }[] =
 ]
 
 const VISIBILIDAD: { value: VisibilidadDocumento; label: string; color: string }[] = [
-  { value: 'admin',      label: 'Solo Admin',   color: '#ef4444' },
+  { value: 'admin',      label: 'Solo Admin',   color: 'var(--at-danger)' },
   { value: 'residentes', label: 'Residentes',   color: 'var(--at-primary)' },
-  { value: 'todos',      label: 'Público',      color: '#10b981' },
+  { value: 'todos',      label: 'Público',      color: 'var(--at-success)' },
 ]
 
 const blank = (): Partial<DocumentoCondominio> => ({
@@ -80,7 +80,7 @@ export function DocumentosTab({ documentos, proyectoId, companyId, userId, canCr
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar documento?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar documento?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('documentos_condominio').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -244,8 +244,8 @@ function DocumentCard({ doc, catInfo, visInfo, canEdit, onEdit, onDelete, onTogg
             📄 Abrir
           </a>
           {canEdit && <button onClick={() => onEdit(doc)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-          {canEdit && <button onClick={() => onToggle(doc)} style={{ padding: '4px 8px', background: doc.vigente ? '#fef3c7' : '#d1fae5', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }} title={doc.vigente ? 'Archivar' : 'Reactivar'}>{doc.vigente ? '📦' : '♻️'}</button>}
-          {canEdit && <button onClick={() => onDelete(doc.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
+          {canEdit && <button onClick={() => onToggle(doc)} style={{ padding: '4px 8px', background: doc.vigente ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }} title={doc.vigente ? 'Archivar' : 'Reactivar'}>{doc.vigente ? '📦' : '♻️'}</button>}
+          {canEdit && <button onClick={() => onDelete(doc.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
         </div>
       </div>
     </div>

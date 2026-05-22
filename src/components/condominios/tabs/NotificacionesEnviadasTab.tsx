@@ -7,16 +7,16 @@ interface Props {
 }
 
 const CANAL_CFG: Record<CanalNotificacion, { label: string; icon: string; bg: string; color: string }> = {
-  whatsapp: { label: 'WhatsApp', icon: '💬', bg: '#dcfce7', color: '#16a34a' },
+  whatsapp: { label: 'WhatsApp', icon: '💬', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   email:    { label: 'Email',    icon: '✉️',  bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
   sms:      { label: 'SMS',      icon: '📱', bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)' },
-  push:     { label: 'Push',     icon: '🔔', bg: '#fef3c7', color: '#d97706' },
+  push:     { label: 'Push',     icon: '🔔', bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
 }
 
 const ESTADO_CFG: Record<EstadoNotificacion, { label: string; bg: string; color: string }> = {
-  enviado:   { label: 'Enviado',   bg: '#dcfce7', color: '#16a34a' },
-  fallido:   { label: 'Fallido',   bg: '#fee2e2', color: '#ef4444' },
-  pendiente: { label: 'Pendiente', bg: '#fef3c7', color: '#d97706' },
+  enviado:   { label: 'Enviado',   bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
+  fallido:   { label: 'Fallido',   bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
+  pendiente: { label: 'Pendiente', bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
   leido:     { label: 'Leído',     bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
 }
 
@@ -93,7 +93,7 @@ export default function NotificacionesEnviadasTab({ notificaciones, unidades }: 
             const ecfg = ESTADO_CFG[n.estado]
             const isOpen = expanded === n.id
             return (
-              <div key={n.id} style={{ background: 'var(--at-surface)', border: `1px solid ${n.estado === 'fallido' ? '#fecaca' : 'var(--at-line)'}`, borderRadius: 10, overflow: 'hidden' }}>
+              <div key={n.id} style={{ background: 'var(--at-surface)', border: `1px solid ${n.estado === 'fallido' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: 10, overflow: 'hidden' }}>
                 <div onClick={() => setExpanded(isOpen ? null : n.id)}
                   style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
                   <span style={{ fontSize: 18, flexShrink: 0 }}>{ccfg.icon}</span>
@@ -115,7 +115,7 @@ export default function NotificacionesEnviadasTab({ notificaciones, unidades }: 
                   <div style={{ padding: '10px 14px', borderTop: '1px solid var(--at-chip)', background: 'var(--at-surface-2)' }}>
                     <div style={{ fontSize: 13, color: 'var(--at-ink-2)', whiteSpace: 'pre-wrap', lineHeight: 1.5, maxHeight: 200, overflowY: 'auto' }}>{n.contenido}</div>
                     {n.error_detalle && (
-                      <div style={{ marginTop: 8, padding: '8px 12px', background: '#fee2e2', borderRadius: 8, fontSize: 12, color: '#ef4444' }}>
+                      <div style={{ marginTop: 8, padding: '8px 12px', background: 'var(--at-danger-tint)', borderRadius: 8, fontSize: 12, color: 'var(--at-danger)' }}>
                         Error: {n.error_detalle}
                       </div>
                     )}

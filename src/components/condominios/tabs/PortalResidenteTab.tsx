@@ -73,7 +73,7 @@ export function PortalResidenteTab({
   function badge(n: number) {
     if (n === 0) return null
     return (
-      <span style={{ marginLeft: '5px', background: '#ef4444', color: 'white', borderRadius: '10px',
+      <span style={{ marginLeft: '5px', background: 'var(--at-danger)', color: 'var(--at-on-status)', borderRadius: '10px',
         fontSize: '10px', fontWeight: 800, padding: '1px 6px', verticalAlign: 'middle' }}>
         {n}
       </span>

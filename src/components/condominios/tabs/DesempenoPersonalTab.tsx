@@ -16,15 +16,15 @@ interface Props {
 type Periodo = '7' | '30' | '90'
 
 function scoreColor(s: number): string {
-  if (s >= 90) return '#16a34a'
-  if (s >= 70) return '#d97706'
-  return '#dc2626'
+  if (s >= 90) return 'var(--at-success)'
+  if (s >= 70) return 'var(--at-warning)'
+  return 'var(--at-danger)'
 }
 
 function scoreBg(s: number): string {
-  if (s >= 90) return '#f0fdf4'
-  if (s >= 70) return '#fffbeb'
-  return '#fef2f2'
+  if (s >= 90) return 'var(--at-success-tint)'
+  if (s >= 70) return 'var(--at-warning-tint)'
+  return 'var(--at-danger-tint)'
 }
 
 function medalla(rank: number): string {
@@ -216,8 +216,8 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
                       <div style={{ minWidth: '110px' }}>
                         <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Turnos</div>
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '12px', background: '#f0fdf4', color: '#16a34a', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>✅ {s.bloquesCompletados}</span>
-                          {s.bloquesCerrados > s.bloquesCompletados && <span style={{ fontSize: '12px', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>⚠ {s.bloquesCerrados - s.bloquesCompletados}</span>}
+                          <span style={{ fontSize: '12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>✅ {s.bloquesCompletados}</span>
+                          {s.bloquesCerrados > s.bloquesCompletados && <span style={{ fontSize: '12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>⚠ {s.bloquesCerrados - s.bloquesCompletados}</span>}
                         </div>
                       </div>
                     )}
@@ -225,8 +225,8 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
                       <div style={{ minWidth: '140px' }}>
                         <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Tareas ({s.tareaTotal})</div>
                         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '12px', background: '#f0fdf4', color: '#16a34a', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>✅ {s.tareaCompletadas}</span>
-                          {s.tareaObservacion > 0 && <span style={{ fontSize: '12px', background: '#fffbeb', color: '#d97706', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>⚠ {s.tareaObservacion}</span>}
+                          <span style={{ fontSize: '12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>✅ {s.tareaCompletadas}</span>
+                          {s.tareaObservacion > 0 && <span style={{ fontSize: '12px', background: 'var(--at-warning-tint)', color: 'var(--at-warning)', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>⚠ {s.tareaObservacion}</span>}
                           {s.tareaOmitidas > 0 && <span style={{ fontSize: '12px', background: 'var(--at-surface-2)', color: 'var(--at-ink-3)', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>⏭ {s.tareaOmitidas}</span>}
                         </div>
                       </div>
@@ -235,8 +235,8 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
                       <div style={{ minWidth: '110px' }}>
                         <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Revisión admin</div>
                         <div style={{ display: 'flex', gap: '5px' }}>
-                          <span style={{ fontSize: '12px', background: '#f0fdf4', color: '#16a34a', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>👍 {s.aprobadas}</span>
-                          {s.rechazadas > 0 && <span style={{ fontSize: '12px', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>👎 {s.rechazadas}</span>}
+                          <span style={{ fontSize: '12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>👍 {s.aprobadas}</span>
+                          {s.rechazadas > 0 && <span style={{ fontSize: '12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>👎 {s.rechazadas}</span>}
                         </div>
                         <div style={{ fontSize: '11px', color: scoreColor(s.tasaAprobacion), marginTop: '3px', fontWeight: 700 }}>{s.tasaAprobacion}% aprobación</div>
                       </div>
@@ -245,8 +245,8 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
                       <div style={{ minWidth: '110px' }}>
                         <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--at-ink-3)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Rondas</div>
                         <div style={{ display: 'flex', gap: '5px' }}>
-                          <span style={{ fontSize: '12px', background: '#f0fdf4', color: '#16a34a', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>✅ {s.rondasCompletadas}</span>
-                          {s.rondasTotal > s.rondasCompletadas && <span style={{ fontSize: '12px', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>❌ {s.rondasTotal - s.rondasCompletadas}</span>}
+                          <span style={{ fontSize: '12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>✅ {s.rondasCompletadas}</span>
+                          {s.rondasTotal > s.rondasCompletadas && <span style={{ fontSize: '12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', borderRadius: '6px', padding: '2px 7px', fontWeight: 700 }}>❌ {s.rondasTotal - s.rondasCompletadas}</span>}
                         </div>
                         {(s.visitasOk + s.visitasNov) > 0 && (
                           <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '3px' }}>

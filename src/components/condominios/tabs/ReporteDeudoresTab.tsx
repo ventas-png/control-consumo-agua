@@ -92,10 +92,10 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
 
   type TotalesKey = 't0_30' | 't31_60' | 't61_90' | 't90plus'
   const columnas: { key: TotalesKey; label: string; color: string }[] = [
-    { key: 't0_30',   label: '0–30 días',   color: '#d97706' },
-    { key: 't31_60',  label: '31–60 días',  color: '#ea580c' },
-    { key: 't61_90',  label: '61–90 días',  color: '#dc2626' },
-    { key: 't90plus', label: '+90 días',    color: '#991b1b' },
+    { key: 't0_30',   label: '0–30 días',   color: 'var(--at-warning)' },
+    { key: 't31_60',  label: '31–60 días',  color: 'var(--at-warning)' },
+    { key: 't61_90',  label: '61–90 días',  color: 'var(--at-danger)' },
+    { key: 't90plus', label: '+90 días',    color: 'var(--at-danger-strong)' },
   ]
 
   return (
@@ -108,7 +108,7 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={exportarExcelDeudores}
-            style={{ padding: '6px 14px', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            style={{ padding: '6px 14px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             📊 Excel
           </button>
           <button onClick={exportarCSV}
@@ -121,11 +121,11 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
       {/* KPIs por tramo */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
-          { label: 'Total deuda', val: `${moneda} ${totales.total.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#ef4444', bg: '#fef2f2' },
-          { label: '0–30 días', val: `${moneda} ${totales.t0_30.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#d97706', bg: '#fef3c7' },
-          { label: '31–60 días', val: `${moneda} ${totales.t31_60.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#ea580c', bg: '#fff7ed' },
-          { label: '61–90 días', val: `${moneda} ${totales.t61_90.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#dc2626', bg: '#fef2f2' },
-          { label: '+90 días', val: `${moneda} ${totales.t90plus.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: '#991b1b', bg: '#fef2f2' },
+          { label: 'Total deuda', val: `${moneda} ${totales.total.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
+          { label: '0–30 días', val: `${moneda} ${totales.t0_30.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+          { label: '31–60 días', val: `${moneda} ${totales.t31_60.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+          { label: '61–90 días', val: `${moneda} ${totales.t61_90.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
+          { label: '+90 días', val: `${moneda} ${totales.t90plus.toLocaleString('es', { minimumFractionDigits: 2 })}`, color: 'var(--at-danger-strong)', bg: 'var(--at-danger-tint)' },
           { label: 'Unidades deudoras', val: String(deudores.length), color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
@@ -174,10 +174,10 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
             <thead>
               <tr style={{ background: 'var(--at-surface-2)' }}>
                 <th style={{ padding: '9px 12px', textAlign: 'left', color: 'var(--at-ink-3)', fontWeight: 600 }}>Unidad</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: '#d97706', fontWeight: 600 }}>0–30 días</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: '#ea580c', fontWeight: 600 }}>31–60 días</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: '#dc2626', fontWeight: 600 }}>61–90 días</th>
-                <th style={{ padding: '9px 12px', textAlign: 'right', color: '#991b1b', fontWeight: 600 }}>+90 días</th>
+                <th style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--at-warning)', fontWeight: 600 }}>0–30 días</th>
+                <th style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--at-warning)', fontWeight: 600 }}>31–60 días</th>
+                <th style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--at-danger)', fontWeight: 600 }}>61–90 días</th>
+                <th style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--at-danger-strong)', fontWeight: 600 }}>+90 días</th>
                 <th style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--at-ink-2)', fontWeight: 700 }}>Total</th>
                 <th style={{ padding: '9px 12px', textAlign: 'center', color: 'var(--at-ink-3)', fontWeight: 600 }}>Cuotas</th>
                 <th style={{ padding: '9px 12px' }} />
@@ -185,21 +185,21 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
             </thead>
             <tbody>
               {deudores.map((d, i) => (
-                <tr key={d.unidadId} style={{ borderTop: i > 0 ? '1px solid var(--at-chip)' : undefined, background: d.t90plus > 0 ? '#fef2f200' : undefined }}>
+                <tr key={d.unidadId} style={{ borderTop: i > 0 ? '1px solid var(--at-chip)' : undefined, background: d.t90plus > 0 ? 'var(--at-danger-tint)00' : undefined }}>
                   <td style={{ padding: '9px 12px', fontWeight: 600, color: 'var(--at-ink)' }}>{d.unidadNombre}</td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t0_30 > 0 ? '#d97706' : 'var(--at-ink-3)' }}>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t0_30 > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>
                     {d.t0_30 > 0 ? `${moneda} ${d.t0_30.toFixed(2)}` : '—'}
                   </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t31_60 > 0 ? '#ea580c' : 'var(--at-ink-3)' }}>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t31_60 > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>
                     {d.t31_60 > 0 ? `${moneda} ${d.t31_60.toFixed(2)}` : '—'}
                   </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t61_90 > 0 ? '#dc2626' : 'var(--at-ink-3)' }}>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', color: d.t61_90 > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
                     {d.t61_90 > 0 ? `${moneda} ${d.t61_90.toFixed(2)}` : '—'}
                   </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: d.t90plus > 0 ? 700 : 400, color: d.t90plus > 0 ? '#991b1b' : 'var(--at-ink-3)' }}>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: d.t90plus > 0 ? 700 : 400, color: d.t90plus > 0 ? 'var(--at-danger-strong)' : 'var(--at-ink-3)' }}>
                     {d.t90plus > 0 ? `${moneda} ${d.t90plus.toFixed(2)}` : '—'}
                   </td>
-                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: 'var(--at-danger)' }}>
                     {moneda} {d.total.toFixed(2)}
                   </td>
                   <td style={{ padding: '9px 12px', textAlign: 'center', color: 'var(--at-ink-3)' }}>{d.cuotasCount}</td>
@@ -215,11 +215,11 @@ export default function ReporteDeudoresTab({ cuotas, unidades, moneda, proyectoN
             <tfoot>
               <tr style={{ borderTop: '2px solid var(--at-line)', background: 'var(--at-surface-2)' }}>
                 <td style={{ padding: '9px 12px', fontWeight: 700 }}>TOTAL</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#d97706' }}>{moneda} {totales.t0_30.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#ea580c' }}>{moneda} {totales.t31_60.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>{moneda} {totales.t61_90.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#991b1b' }}>{moneda} {totales.t90plus.toFixed(2)}</td>
-                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>{moneda} {totales.total.toFixed(2)}</td>
+                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-warning)' }}>{moneda} {totales.t0_30.toFixed(2)}</td>
+                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-warning)' }}>{moneda} {totales.t31_60.toFixed(2)}</td>
+                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-danger)' }}>{moneda} {totales.t61_90.toFixed(2)}</td>
+                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--at-danger-strong)' }}>{moneda} {totales.t90plus.toFixed(2)}</td>
+                <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: 'var(--at-danger)' }}>{moneda} {totales.total.toFixed(2)}</td>
                 <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-ink-3)' }}>
                   {deudores.reduce((s, d) => s + d.cuotasCount, 0)}
                 </td>

@@ -25,9 +25,9 @@ const TIPOS: { value: TipoInspeccion; label: string; icon: string }[] = [
 ]
 
 const RESULTADO_CONFIG: Record<ResultadoInspeccion, { label: string; color: string; bg: string }> = {
-  aprobado:                      { label: 'Aprobado',          color: '#10b981', bg: '#d1fae5' },
-  aprobado_con_observaciones:    { label: 'Con Observaciones', color: '#f59e0b', bg: '#fef3c7' },
-  reprobado:                     { label: 'Reprobado',         color: '#ef4444', bg: '#fee2e2' },
+  aprobado:                      { label: 'Aprobado',          color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  aprobado_con_observaciones:    { label: 'Con Observaciones', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  reprobado:                     { label: 'Reprobado',         color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
   pendiente:                     { label: 'Pendiente',         color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 
@@ -89,7 +89,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar inspección?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar inspección?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('inspecciones_normativas').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -105,17 +105,17 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
     <div style={{ padding: '20px 24px' }}>
 
       {reprobadas.length > 0 && (
-        <div style={{ background: '#fee2e2', border: '1px solid #ef4444', borderRadius: '10px', padding: '10px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger)', borderRadius: '10px', padding: '10px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>🚨</span>
-          <span style={{ fontSize: '13px', color: '#991b1b', fontWeight: 600 }}>
+          <span style={{ fontSize: '13px', color: 'var(--at-danger-strong)', fontWeight: 600 }}>
             {reprobadas.length} inspección{reprobadas.length > 1 ? 'es' : ''} reprobada{reprobadas.length > 1 ? 's' : ''} requieren atención
           </span>
         </div>
       )}
       {proximasVencer.length > 0 && (
-        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '10px', padding: '10px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', borderRadius: '10px', padding: '10px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>📅</span>
-          <span style={{ fontSize: '13px', color: '#92400e', fontWeight: 600 }}>
+          <span style={{ fontSize: '13px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>
             {proximasVencer.length} inspección{proximasVencer.length > 1 ? 'es' : ''} programada{proximasVencer.length > 1 ? 's' : ''} en los próximos 30 días
           </span>
         </div>
@@ -216,7 +216,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
             const proximaAlerta = ins.fecha_proxima && ins.fecha_proxima >= hoy &&
               new Date(ins.fecha_proxima).getTime() - Date.now() < 30 * 24 * 3600 * 1000
             return (
-              <div key={ins.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${ins.resultado === 'reprobado' ? '#fca5a5' : 'var(--at-line)'}`, borderRadius: '10px', padding: '14px 16px' }}>
+              <div key={ins.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${ins.resultado === 'reprobado' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '14px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '24px' }}>{ti.icon}</span>
@@ -237,7 +237,7 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
                       <SecureFileLink src={ins.certificado_url} style={{ padding: '4px 8px', background: 'var(--at-chip)', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', color: 'var(--at-ink-2)' }}>📄</SecureFileLink>
                     )}
                     {canEdit && <button onClick={() => startEdit(ins)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-                    {canEdit && <button onClick={() => handleDelete(ins.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
+                    {canEdit && <button onClick={() => handleDelete(ins.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                   </div>
                 </div>
                 {ins.hallazgos && (
@@ -246,12 +246,12 @@ export function InspeccionesTab({ inspecciones, proyectoId, companyId, canCreate
                   </div>
                 )}
                 {ins.acciones_correctivas && (
-                  <div style={{ marginTop: '6px', padding: '8px 12px', background: '#f0fdf4', borderRadius: '8px', fontSize: '12px', color: '#166534' }}>
+                  <div style={{ marginTop: '6px', padding: '8px 12px', background: 'var(--at-success-tint)', borderRadius: '8px', fontSize: '12px', color: 'var(--at-success-strong)' }}>
                     <strong>Acciones:</strong> {ins.acciones_correctivas}
                   </div>
                 )}
                 {ins.fecha_proxima && (
-                  <div style={{ marginTop: '6px', fontSize: '12px', color: proximaAlerta ? '#92400e' : 'var(--at-ink-3)', fontWeight: proximaAlerta ? 600 : 400 }}>
+                  <div style={{ marginTop: '6px', fontSize: '12px', color: proximaAlerta ? 'var(--at-warning-strong)' : 'var(--at-ink-3)', fontWeight: proximaAlerta ? 600 : 400 }}>
                     {proximaAlerta ? '⚠️' : '📅'} Próxima inspección: {ins.fecha_proxima}
                   </div>
                 )}

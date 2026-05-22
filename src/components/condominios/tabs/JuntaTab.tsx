@@ -18,9 +18,9 @@ const CARGO_ORDER: CargoJunta[] = ['presidente','vicepresidente','tesorero','sec
 const CARGO_LABELS: Record<CargoJunta, { label: string; icon: string; color: string }> = {
   presidente:     { label: 'Presidente',      icon: '👑', color: 'var(--at-accent)' },
   vicepresidente: { label: 'Vicepresidente',  icon: '🌟', color: 'var(--at-primary)' },
-  tesorero:       { label: 'Tesorero',        icon: '💰', color: '#10b981' },
-  secretario:     { label: 'Secretario',      icon: '📝', color: '#f59e0b' },
-  fiscal:         { label: 'Fiscal',          icon: '🔍', color: '#ef4444' },
+  tesorero:       { label: 'Tesorero',        icon: '💰', color: 'var(--at-success)' },
+  secretario:     { label: 'Secretario',      icon: '📝', color: 'var(--at-warning)' },
+  fiscal:         { label: 'Fiscal',          icon: '🔍', color: 'var(--at-danger)' },
   vocal:          { label: 'Vocal',           icon: '🗣️', color: 'var(--at-ink-3)' },
   otro:           { label: 'Otro',            icon: '👤', color: 'var(--at-ink-3)' },
 }
@@ -81,7 +81,7 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar miembro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar miembro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('junta_directiva').delete().eq('id', id)
     onRefresh()
@@ -188,7 +188,7 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '4px' }}>
                       <button onClick={() => startEdit(m)} style={{ padding: '3px 7px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDelete(m.id)} style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                      <button onClick={() => handleDelete(m.id)} style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </div>
                   )}
                 </div>
@@ -225,7 +225,7 @@ export function JuntaTab({ junta, unidades, proyectoId, companyId, canCreate, ca
                     <span style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginLeft: '8px' }}>{CARGO_LABELS[m.cargo].label} — {m.periodo_inicio}{m.periodo_fin ? ` a ${m.periodo_fin}` : ''}</span>
                   </div>
                   {canEdit && (
-                    <button onClick={() => handleDelete(m.id)} style={{ padding: '2px 6px', background: '#fee2e2', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                    <button onClick={() => handleDelete(m.id)} style={{ padding: '2px 6px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                   )}
                 </div>
               ))}

@@ -16,15 +16,15 @@ interface Props {
 
 const ETAPAS: EtapaCobranzaJudicial[] = ['carta_notarial', 'juzgado', 'sentencia', 'ejecutado', 'archivado']
 const ETAPA_CFG: Record<EtapaCobranzaJudicial, { label: string; icon: string; color: string; bg: string }> = {
-  carta_notarial: { label: 'Carta notarial', icon: '📬', color: '#d97706', bg: '#fef3c7' },
+  carta_notarial: { label: 'Carta notarial', icon: '📬', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   juzgado:        { label: 'En juzgado',     icon: '⚖️',  color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
   sentencia:      { label: 'Sentencia',       icon: '📋', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
-  ejecutado:      { label: 'Ejecutado',       icon: '✅', color: '#16a34a', bg: '#dcfce7' },
+  ejecutado:      { label: 'Ejecutado',       icon: '✅', color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   archivado:      { label: 'Archivado',       icon: '📁', color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
 const ESTADO_CFG: Record<EstadoCobranzaJudicial, { label: string; bg: string; color: string }> = {
-  activo:   { label: 'Activo',   bg: '#fef2f2', color: '#ef4444' },
-  resuelto: { label: 'Resuelto', bg: '#dcfce7', color: '#16a34a' },
+  activo:   { label: 'Activo',   bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
+  resuelto: { label: 'Resuelto', bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   archivado:{ label: 'Archivado',bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
 
@@ -99,9 +99,9 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Casos activos', val: activos, bg: '#fef2f2', color: '#ef4444' },
-          { label: 'Monto en litigio', val: `${moneda} ${montoTotal.toFixed(2)}`, bg: '#fff7ed', color: '#ea580c' },
-          { label: 'Resueltos', val: cobranzas.filter(c => c.estado === 'resuelto').length, bg: '#dcfce7', color: '#16a34a' },
+          { label: 'Casos activos', val: activos, bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
+          { label: 'Monto en litigio', val: `${moneda} ${montoTotal.toFixed(2)}`, bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+          { label: 'Resueltos', val: cobranzas.filter(c => c.estado === 'resuelto').length, bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
           { label: 'Total casos', val: cobranzas.length, bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
@@ -116,14 +116,14 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
         <div style={{ display: 'flex', gap: 6 }}>
           {(['', 'activo', 'resuelto', 'archivado'] as (EstadoCobranzaJudicial | '')[]).map(e => (
             <button key={e} onClick={() => setFiltroEstado(e)}
-              style={{ padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? '#ef4444' : 'var(--at-line)', background: filtroEstado === e ? '#fef2f2' : 'var(--at-surface)', color: filtroEstado === e ? '#ef4444' : 'var(--at-ink-3)' }}>
+              style={{ padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1.5px solid', borderColor: filtroEstado === e ? 'var(--at-danger)' : 'var(--at-line)', background: filtroEstado === e ? 'var(--at-danger-tint)' : 'var(--at-surface)', color: filtroEstado === e ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
               {e === '' ? 'Todos' : ESTADO_CFG[e].label}
             </button>
           ))}
         </div>
         {canCreate && (
           <button onClick={() => setMostrarForm(!mostrarForm)}
-            style={{ padding: '8px 16px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 16px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {mostrarForm ? '✕ Cancelar' : '+ Nuevo caso'}
           </button>
         )}
@@ -131,7 +131,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
 
       {/* Formulario */}
       {mostrarForm && (
-        <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ background: '#fff5f5', border: '1px solid var(--at-danger-border)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Nuevo caso de cobranza judicial</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
@@ -169,7 +169,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
             </div>
           </div>
           <button onClick={guardar} disabled={saving}
-            style={{ padding: '8px 20px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+            style={{ padding: '8px 20px', background: 'var(--at-danger)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
             {saving ? 'Guardando…' : '✅ Crear caso'}
           </button>
         </div>
@@ -191,7 +191,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
               const unidad = unidades.find(u => u.id === c.unidad_id)
               return (
                 <div key={c.id} onClick={() => setSelected(c === selected ? null : c)}
-                  style={{ background: selected?.id === c.id ? '#fff5f5' : 'var(--at-surface)', border: `1.5px solid ${selected?.id === c.id ? '#ef4444' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
+                  style={{ background: selected?.id === c.id ? '#fff5f5' : 'var(--at-surface)', border: `1.5px solid ${selected?.id === c.id ? 'var(--at-danger)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                     <div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 2 }}>
@@ -213,8 +213,8 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
                       const current = i === etapaIdx && c.etapa !== 'archivado'
                       return (
                         <Fragment key={et}>
-                          <div style={{ width: 10, height: 10, borderRadius: '50%', background: current ? '#ef4444' : done ? '#fca5a5' : 'var(--at-line)', border: current ? '2px solid #ef4444' : 'none', flexShrink: 0 }} />
-                          {i < 3 && <div style={{ flex: 1, height: 2, background: i < etapaIdx && c.etapa !== 'archivado' ? '#fca5a5' : 'var(--at-line)' }} />}
+                          <div style={{ width: 10, height: 10, borderRadius: '50%', background: current ? 'var(--at-danger)' : done ? 'var(--at-danger-border)' : 'var(--at-line)', border: current ? '2px solid var(--at-danger)' : 'none', flexShrink: 0 }} />
+                          {i < 3 && <div style={{ flex: 1, height: 2, background: i < etapaIdx && c.etapa !== 'archivado' ? 'var(--at-danger-border)' : 'var(--at-line)' }} />}
                         </Fragment>
                       )
                     })}
@@ -259,7 +259,7 @@ export default function CobranzaJudicialTab({ cobranzas, unidades, proyectoId, c
                   </button>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button onClick={() => cambiarEstado(selected.id, 'resuelto')}
-                      style={{ flex: 1, padding: '6px 0', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                      style={{ flex: 1, padding: '6px 0', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
                       ✅ Resuelto
                     </button>
                     <button onClick={() => cambiarEstado(selected.id, 'archivado')}

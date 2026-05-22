@@ -198,7 +198,7 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
                 <span style={{ color: 'var(--at-primary-hover)' }}>Ya tienen cuota este período</span>
-                <span style={{ fontWeight: 700, color: '#d97706' }}>{unidadesYaTienen.length}</span>
+                <span style={{ fontWeight: 700, color: 'var(--at-warning)' }}>{unidadesYaTienen.length}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--at-primary-soft-2)', marginTop: 4, paddingTop: 4 }}>
                 <span style={{ fontWeight: 700, color: 'var(--at-primary-hover)' }}>Total a generar</span>
@@ -227,7 +227,7 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
             </div>
 
             {unidadesFiltradas.length === 0 && (
-              <div style={{ textAlign: 'center', color: '#16a34a', padding: '30px 0', fontSize: 13 }}>
+              <div style={{ textAlign: 'center', color: 'var(--at-success)', padding: '30px 0', fontSize: 13 }}>
                 <div style={{ fontSize: 28, marginBottom: 6 }}>✅</div>
                 Todas las unidades ya tienen cuota de <strong>{conceptoFinal}</strong> para {periodo}
               </div>
@@ -248,7 +248,7 @@ export default function GeneracionCuotasTab({ cuotas, unidades, proyectoId, comp
             </div>
 
             {unidadesYaTienen.length > 0 && (
-              <div style={{ marginTop: 12, padding: '8px 12px', background: '#fffbeb', borderRadius: 8, fontSize: 11, color: '#d97706' }}>
+              <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--at-warning-tint)', borderRadius: 8, fontSize: 11, color: 'var(--at-warning)' }}>
                 ⚠️ {unidadesYaTienen.length} unidad(es) omitidas — ya tienen cuota de {conceptoFinal} en {periodo}:{' '}
                 {unidadesYaTienen.slice(0, 5).map(u => u.nombre).join(', ')}{unidadesYaTienen.length > 5 ? `… +${unidadesYaTienen.length - 5}` : ''}
               </div>

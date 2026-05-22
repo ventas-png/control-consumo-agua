@@ -19,16 +19,16 @@ interface Props {
 }
 
 const PRIORIDAD_COLORS: Record<string, { bg: string; color: string }> = {
-  baja:    { bg: '#f0fdf4', color: '#16a34a' },
+  baja:    { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   media:   { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  alta:    { bg: '#fff7ed', color: '#ea580c' },
-  urgente: { bg: '#fef2f2', color: '#dc2626' },
+  alta:    { bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+  urgente: { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)' },
 }
 
 const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
   abierto:    { bg: 'var(--at-primary-tint)', color: 'var(--at-primary)' },
-  en_proceso: { bg: '#fff7ed', color: '#ea580c' },
-  resuelto:   { bg: '#f0fdf4', color: '#16a34a' },
+  en_proceso: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning)' },
+  resuelto:   { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   cerrado:    { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' },
 }
 
@@ -151,7 +151,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
   }
 
   async function eliminar(id: string) {
-    const result = await Swal.fire({ title: '¿Eliminar ticket?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: '#ef4444' })
+    const result = await Swal.fire({ title: '¿Eliminar ticket?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar', confirmButtonColor: 'var(--at-danger)' })
     if (!result.isConfirmed) return
     await supabase.from('tickets_mantenimiento').delete().eq('id', id)
     onRefresh()
@@ -163,7 +163,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
         <div>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--at-ink)' }}>Mantenimiento</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--at-ink-3)', fontSize: '13.5px' }}>
-            {conteos.abierto} abiertos · {conteos.en_proceso} en proceso · <span style={{ color: '#dc2626', fontWeight: 600 }}>{conteos.urgentes} urgentes</span>
+            {conteos.abierto} abiertos · {conteos.en_proceso} en proceso · <span style={{ color: 'var(--at-danger)', fontWeight: 600 }}>{conteos.urgentes} urgentes</span>
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -172,7 +172,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             📄 PDF
           </button>
           <button onClick={exportarXlsx} disabled={filtrados.length === 0}
-            style={{ padding: '9px 14px', background: filtrados.length === 0 ? 'var(--at-chip)' : '#f0fdf4', color: filtrados.length === 0 ? 'var(--at-ink-3)' : '#16a34a', border: '1.5px solid #bbf7d0', borderRadius: '9px', fontSize: '12px', fontWeight: 600, cursor: filtrados.length === 0 ? 'not-allowed' : 'pointer' }}>
+            style={{ padding: '9px 14px', background: filtrados.length === 0 ? 'var(--at-chip)' : 'var(--at-success-tint)', color: filtrados.length === 0 ? 'var(--at-ink-3)' : 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '9px', fontSize: '12px', fontWeight: 600, cursor: filtrados.length === 0 ? 'not-allowed' : 'pointer' }}>
             📊 Excel
           </button>
           {canCreate && (
@@ -187,9 +187,9 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
         {[
           { label: 'Total tickets', val: tickets.length, color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', icon: '🔧' },
-          { label: 'Urgentes activos', val: urgentesActivos, color: urgentesActivos > 0 ? '#dc2626' : '#16a34a', bg: urgentesActivos > 0 ? '#fef2f2' : '#f0fdf4', icon: '🚨' },
-          { label: 'Costo estimado', val: costoEstimadoTotal > 0 ? costoEstimadoTotal.toFixed(2) : '—', color: '#ea580c', bg: '#fff7ed', icon: '💰' },
-          { label: `% Resueltos`, val: `${pctResueltos}%`, color: pctResueltos >= 70 ? '#16a34a' : '#ea580c', bg: pctResueltos >= 70 ? '#f0fdf4' : '#fff7ed', icon: '✅' },
+          { label: 'Urgentes activos', val: urgentesActivos, color: urgentesActivos > 0 ? 'var(--at-danger)' : 'var(--at-success)', bg: urgentesActivos > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)', icon: '🚨' },
+          { label: 'Costo estimado', val: costoEstimadoTotal > 0 ? costoEstimadoTotal.toFixed(2) : '—', color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', icon: '💰' },
+          { label: `% Resueltos`, val: `${pctResueltos}%`, color: pctResueltos >= 70 ? 'var(--at-success)' : 'var(--at-warning)', bg: pctResueltos >= 70 ? 'var(--at-success-tint)' : 'var(--at-warning-tint)', icon: '✅' },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, borderRadius: '10px', padding: '12px 14px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', marginBottom: '3px' }}>{k.icon}</div>
@@ -203,7 +203,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
         <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '8px', padding: '8px 14px', marginBottom: '14px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
           Costo real acumulado: <strong style={{ color: 'var(--at-ink)' }}>{costoRealTotal.toFixed(2)}</strong>
           {costoEstimadoTotal > 0 && (
-            <span style={{ marginLeft: 10, color: costoRealTotal > costoEstimadoTotal ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
+            <span style={{ marginLeft: 10, color: costoRealTotal > costoEstimadoTotal ? 'var(--at-danger)' : 'var(--at-success)', fontWeight: 600 }}>
               ({costoRealTotal > costoEstimadoTotal ? '+' : ''}{((costoRealTotal - costoEstimadoTotal) / costoEstimadoTotal * 100).toFixed(1)}% vs estimado)
             </span>
           )}
@@ -313,19 +313,19 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
             const eColor = ESTADO_COLORS[t.estado] ?? { bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)' }
             const vencido = t.fecha_limite && t.fecha_limite < new Date().toISOString().slice(0, 10) && t.estado !== 'cerrado'
             return (
-              <div key={t.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${t.prioridad === 'urgente' && t.estado !== 'cerrado' ? '#fecaca' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px 18px' }}>
+              <div key={t.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${t.prioridad === 'urgente' && t.estado !== 'cerrado' ? 'var(--at-danger-border)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px 18px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
                       <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: pColor.bg, color: pColor.color }}>{t.prioridad}</span>
                       <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 600, background: 'var(--at-chip)', color: 'var(--at-ink-3)' }}>{t.tipo}</span>
-                      {vencido && <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: '#fef2f2', color: '#dc2626' }}>Vencido</span>}
+                      {vencido && <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>Vencido</span>}
                     </div>
                     <div style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--at-ink)', marginBottom: '4px' }}>{t.titulo}</div>
                     {t.descripcion && <div style={{ fontSize: '13px', color: 'var(--at-ink-3)', marginBottom: '6px' }}>{t.descripcion}</div>}
                     <div style={{ display: 'flex', gap: '14px', fontSize: '12px', color: 'var(--at-ink-3)', flexWrap: 'wrap' }}>
                       {t.unidad_nombre && <span>📍 {t.unidad_nombre}</span>}
-                      {t.fecha_limite && <span style={{ color: vencido ? '#dc2626' : 'var(--at-ink-3)' }}>📅 {t.fecha_limite}</span>}
+                      {t.fecha_limite && <span style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>📅 {t.fecha_limite}</span>}
                       {t.costo_estimado && <span>💰 Est. {t.costo_estimado.toFixed(2)}</span>}
                       {t.costo_real && <span>✅ Real {t.costo_real.toFixed(2)}</span>}
                       <span>🕐 {new Date(t.created_at).toLocaleDateString('es')}</span>
@@ -350,7 +350,7 @@ export function MantenimientoTab({ tickets, unidades, proyectoId, companyId, use
                         {t.estado.replace('_', ' ')}
                       </span>
                     )}
-                    <button onClick={() => eliminar(t.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
+                    <button onClick={() => eliminar(t.id)} title="Eliminar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '15px', padding: '2px 4px' }}>🗑</button>
                   </div>
                 </div>
               </div>

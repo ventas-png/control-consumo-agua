@@ -95,7 +95,7 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
     todos:          { label: `Todos (${resumen.total})`,                color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
     con_propietario:{ label: `Propietario (${resumen.conPropietario})`, color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
     en_renta:       { label: `En renta (${resumen.enRenta})`,          color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
-    libre:          { label: `Libre (${resumen.libre})`,               color: '#16a34a', bg: '#dcfce7' },
+    libre:          { label: `Libre (${resumen.libre})`,               color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
     inactiva:       { label: `Inactiva (${resumen.inactiva})`,         color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)' },
   }
 
@@ -117,8 +117,8 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
         {[
           { label: 'Propietarios',   val: String(resumen.conPropietario), color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
           { label: 'Arrendatarios',  val: String(resumen.enRenta),        color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)' },
-          { label: 'Libres',         val: String(resumen.libre),          color: '#16a34a', bg: '#dcfce7' },
-          { label: 'Mascotas',       val: String(resumen.totalMascotas),  color: '#f59e0b', bg: '#fffbeb' },
+          { label: 'Libres',         val: String(resumen.libre),          color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+          { label: 'Mascotas',       val: String(resumen.totalMascotas),  color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
           { label: 'Vehículos',      val: String(resumen.totalVehiculos), color: 'var(--at-ink-2)', bg: 'var(--at-surface-2)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 90px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '8px 12px' }}>
@@ -164,7 +164,7 @@ export default function DirectorioComunidadTab({ unidades, contratos, mascotas, 
           <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--at-ink-3)', fontSize: 12 }}>Sin unidades en este filtro.</div>
         ) : filtrado.map((d, i) => {
           const abierta = expandida === d.u.id
-          const estadoColor = d.estado === 'en_renta' ? 'var(--at-accent-hover)' : d.estado === 'con_propietario' ? 'var(--at-primary)' : d.estado === 'libre' ? '#16a34a' : 'var(--at-ink-3)'
+          const estadoColor = d.estado === 'en_renta' ? 'var(--at-accent-hover)' : d.estado === 'con_propietario' ? 'var(--at-primary)' : d.estado === 'libre' ? 'var(--at-success)' : 'var(--at-ink-3)'
           return (
             <div key={d.u.id}>
               <div onClick={() => setExpandida(abierta ? null : d.u.id)}

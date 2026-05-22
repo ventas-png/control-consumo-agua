@@ -15,17 +15,17 @@ interface Props {
 
 const TIPOS: { value: TipoResiduo; label: string; icon: string; color: string }[] = [
   { value: 'general',     label: 'General',     icon: '🗑️', color: 'var(--at-ink-3)' },
-  { value: 'reciclable',  label: 'Reciclable',  icon: '♻️', color: '#10b981' },
+  { value: 'reciclable',  label: 'Reciclable',  icon: '♻️', color: 'var(--at-success)' },
   { value: 'organico',    label: 'Orgánico',    icon: '🥬', color: '#84cc16' },
   { value: 'electronico', label: 'Electrónico', icon: '💻', color: 'var(--at-primary)' },
-  { value: 'peligroso',   label: 'Peligroso',   icon: '☢️', color: '#ef4444' },
-  { value: 'escombros',   label: 'Escombros',   icon: '🧱', color: '#d97706' },
+  { value: 'peligroso',   label: 'Peligroso',   icon: '☢️', color: 'var(--at-danger)' },
+  { value: 'escombros',   label: 'Escombros',   icon: '🧱', color: 'var(--at-warning)' },
 ]
 
 const ESTADO_CONFIG: Record<EstadoResiduo, { label: string; color: string; bg: string }> = {
-  pendiente:   { label: 'Pendiente',   color: '#f59e0b', bg: '#fef3c7' },
+  pendiente:   { label: 'Pendiente',   color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   recolectado: { label: 'Recolectado', color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
-  procesado:   { label: 'Procesado',   color: '#10b981', bg: '#d1fae5' },
+  procesado:   { label: 'Procesado',   color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
 }
 
 const blank = (): Partial<RegistroResiduo> => ({
@@ -88,7 +88,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar registro?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('registros_residuos').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -110,9 +110,9 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
     <div style={{ padding: '20px 24px' }}>
 
       {incidencias.length > 0 && (
-        <div style={{ background: '#fee2e2', border: '1px solid #ef4444', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger)', borderRadius: '10px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>🚨</span>
-          <span style={{ fontSize: '13px', color: '#991b1b', fontWeight: 600 }}>
+          <span style={{ fontSize: '13px', color: 'var(--at-danger-strong)', fontWeight: 600 }}>
             {incidencias.length} incidencia{incidencias.length > 1 ? 's' : ''} registrada{incidencias.length > 1 ? 's' : ''}
           </span>
         </div>
@@ -122,8 +122,8 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
           { label: 'Total registros', value: String(residuos.length), icon: '📊', color: 'var(--at-primary)' },
-          { label: 'Pendientes', value: String(pendientes.length), icon: '⏳', color: '#f59e0b' },
-          { label: 'Total Kg registrado', value: totalKgAll > 0 ? `${totalKgAll.toFixed(1)} kg` : '—', icon: '⚖️', color: '#10b981' },
+          { label: 'Pendientes', value: String(pendientes.length), icon: '⏳', color: 'var(--at-warning)' },
+          { label: 'Total Kg registrado', value: totalKgAll > 0 ? `${totalKgAll.toFixed(1)} kg` : '—', icon: '⚖️', color: 'var(--at-success)' },
           { label: '% Reciclaje', value: totalKgAll > 0 ? `${pctReciclaje}%` : '—', icon: '♻️', color: '#84cc16' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
@@ -243,10 +243,10 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
                 const ti = tipoInfo(r.tipo_residuo)
                 const est = ESTADO_CONFIG[r.estado]
                 return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: r.incidencia ? '#fff7ed' : 'var(--at-surface)' }}>
+                  <tr key={r.id} style={{ borderBottom: '1px solid var(--at-chip)', background: r.incidencia ? 'var(--at-warning-tint)' : 'var(--at-surface)' }}>
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ fontWeight: 600 }}>{r.fecha}</div>
-                      {r.incidencia && <span style={{ fontSize: '10px', fontWeight: 700, color: '#ef4444' }}>⚠ Incidencia</span>}
+                      {r.incidencia && <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--at-danger)' }}>⚠ Incidencia</span>}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{ fontSize: '16px' }}>{ti.icon}</span>
@@ -268,7 +268,7 @@ export function ResiduosTab({ residuos, proyectoId, companyId, userId, canCreate
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ display: 'flex', gap: '4px' }}>
                         {canEdit && <button onClick={() => startEdit(r)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>}
-                        {canEdit && <button onClick={() => handleDelete(r.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>}
+                        {canEdit && <button onClick={() => handleDelete(r.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>}
                       </div>
                     </td>
                   </tr>

@@ -15,7 +15,7 @@ interface Props {
 }
 
 const ESTADO_CONFIG: Record<EstadoBodega, { label: string; color: string; bg: string }> = {
-  disponible: { label: 'Disponible', color: '#10b981', bg: '#d1fae5' },
+  disponible: { label: 'Disponible', color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   asignada:   { label: 'Asignada',   color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
   bloqueada:  { label: 'Bloqueada',  color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
 }
@@ -68,7 +68,7 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar bodega?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar bodega?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('bodegas_condominio').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -94,9 +94,9 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
           { label: 'Total bodegas', value: String(bodegas.length), icon: '🗄️', color: 'var(--at-primary)' },
-          { label: 'Disponibles', value: String(disponibles), icon: '✅', color: '#10b981' },
+          { label: 'Disponibles', value: String(disponibles), icon: '✅', color: 'var(--at-success)' },
           { label: 'Asignadas', value: String(bodegas.filter(b => b.estado === 'asignada').length), icon: '🔑', color: 'var(--at-accent)' },
-          { label: 'Renta mensual', value: rentaTotal > 0 ? `${moneda} ${rentaTotal.toFixed(0)}` : '—', icon: '💰', color: '#f59e0b' },
+          { label: 'Renta mensual', value: rentaTotal > 0 ? `${moneda} ${rentaTotal.toFixed(0)}` : '—', icon: '💰', color: 'var(--at-warning)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
@@ -208,12 +208,12 @@ export function BodegasTab({ bodegas, unidades, proyectoId, companyId, moneda, c
                       </button>
                     )}
                     {b.estado === 'asignada' && (
-                      <button onClick={() => handleEstado(b.id, 'disponible')} style={{ flex: 1, padding: '4px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                      <button onClick={() => handleEstado(b.id, 'disponible')} style={{ flex: 1, padding: '4px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                         Liberar
                       </button>
                     )}
                     <button onClick={() => startEdit(b)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                    <button onClick={() => handleDelete(b.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                    <button onClick={() => handleDelete(b.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                   </div>
                 )}
               </div>

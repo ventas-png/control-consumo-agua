@@ -85,8 +85,8 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
   }
 
   const nivelColor: Record<Alerta['nivel'], { bg: string; border: string; color: string; dot: string }> = {
-    error:   { bg: '#fef2f2', border: '#fecaca', color: '#dc2626', dot: '#dc2626' },
-    warning: { bg: '#fffbeb', border: '#fde68a', color: '#92400e', dot: '#f59e0b' },
+    error:   { bg: 'var(--at-danger-tint)', border: 'var(--at-danger-border)', color: 'var(--at-danger)', dot: 'var(--at-danger)' },
+    warning: { bg: 'var(--at-warning-tint)', border: 'var(--at-warning-border)', color: 'var(--at-warning-strong)', dot: 'var(--at-warning)' },
     info:    { bg: 'var(--at-primary-tint)', border: 'var(--at-primary-soft-2)', color: 'var(--at-ink-deep)', dot: 'var(--at-primary-2)' },
   }
 
@@ -125,9 +125,9 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
 
   const kpis = [
     { label: 'Cuotas pendientes', value: cuotasPendientes.length, sub: `${moneda} ${montoPendiente.toFixed(2)}`, color: 'var(--at-primary)', bg: 'rgba(27, 59, 54,0.1)', icon: '💳' },
-    { label: 'Cuotas en mora',    value: cuotasMorosas.length,   sub: 'unidades morosas',                   color: '#ef4444', bg: 'rgba(239,68,68,0.1)',    icon: '⚠️' },
-    { label: 'Tickets abiertos',  value: ticketsAbiertos.length, sub: `${ticketsUrgentes.length} urgentes`, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',    icon: '🔧' },
-    { label: 'Visitas hoy',       value: visitantesHoy.length,   sub: 'registradas',                        color: '#10b981', bg: 'rgba(16,185,129,0.1)',    icon: '🚪' },
+    { label: 'Cuotas en mora',    value: cuotasMorosas.length,   sub: 'unidades morosas',                   color: 'var(--at-danger)', bg: 'rgba(239,68,68,0.1)',    icon: '⚠️' },
+    { label: 'Tickets abiertos',  value: ticketsAbiertos.length, sub: `${ticketsUrgentes.length} urgentes`, color: 'var(--at-warning)', bg: 'rgba(245,158,11,0.1)',    icon: '🔧' },
+    { label: 'Visitas hoy',       value: visitantesHoy.length,   sub: 'registradas',                        color: 'var(--at-success)', bg: 'rgba(16,185,129,0.1)',    icon: '🚪' },
     { label: 'Amenidades',        value: amenidadesActivas.length, sub: 'disponibles',                      color: 'var(--at-accent)', bg: 'rgba(185, 106, 63,0.1)',    icon: '🏊' },
   ]
 
@@ -182,7 +182,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
           <div style={{ display: 'flex', gap: 14, fontSize: '11px', color: 'var(--at-ink-3)' }}>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'var(--at-primary-soft-2)', marginRight: 4 }} />Emitido</span>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#34d399', marginRight: 4 }} />Cobrado</span>
-            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#fca5a5', marginRight: 4 }} />Gastos</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'var(--at-danger-border)', marginRight: 4 }} />Gastos</span>
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -199,9 +199,9 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
                   {/* Cobrado */}
                   <rect x={x + barW + gap} y={chartH - hC} width={barW} height={hC} rx={3} fill="#34d399" />
                   {/* Gastos */}
-                  <rect x={x + (barW + gap) * 2} y={chartH - hG} width={barW} height={hG} rx={3} fill="#fca5a5" />
+                  <rect x={x + (barW + gap) * 2} y={chartH - hG} width={barW} height={hG} rx={3} fill="var(--at-danger-border)" />
                   {/* Mes label */}
-                  <text x={x + groupW / 2} y={chartH + 16} textAnchor="middle" fontSize={11} fill="#7E9389">{d.mes}</text>
+                  <text x={x + groupW / 2} y={chartH + 16} textAnchor="middle" fontSize={11} fill="var(--at-ink-3)">{d.mes}</text>
                 </g>
               )
             })}
@@ -211,9 +211,9 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
         {/* Saldo del mes */}
         <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
           {[
-            { label: 'Cobrado este mes', val: recaudadoMes, color: '#16a34a' },
-            { label: 'Gastado este mes',  val: gastadoMes,   color: '#dc2626' },
-            { label: 'Saldo neto',        val: saldoMes,     color: saldoMes >= 0 ? '#16a34a' : '#dc2626' },
+            { label: 'Cobrado este mes', val: recaudadoMes, color: 'var(--at-success)' },
+            { label: 'Gastado este mes',  val: gastadoMes,   color: 'var(--at-danger)' },
+            { label: 'Saldo neto',        val: saldoMes,     color: saldoMes >= 0 ? 'var(--at-success)' : 'var(--at-danger)' },
           ].map(k => (
             <div key={k.label} style={{ flex: 1, minWidth: 120, background: 'var(--at-surface-2)', borderRadius: 10, padding: '10px 14px' }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: k.color }}>{saldoMes !== 0 && k.label === 'Saldo neto' && saldoMes > 0 ? '+' : ''}{moneda} {k.val.toFixed(2)}</div>
@@ -232,8 +232,8 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
               {ticketsAbiertos.slice(0, 5).map(t => (
                 <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'var(--at-surface-2)', borderRadius: '9px' }}>
                   <span style={{ padding: '2px 7px', borderRadius: '20px', fontSize: '10px', fontWeight: 700,
-                    background: t.prioridad === 'urgente' ? '#fef2f2' : t.prioridad === 'alta' ? '#fff7ed' : '#f0fdf4',
-                    color: t.prioridad === 'urgente' ? '#dc2626' : t.prioridad === 'alta' ? '#ea580c' : '#16a34a' }}>
+                    background: t.prioridad === 'urgente' ? 'var(--at-danger-tint)' : t.prioridad === 'alta' ? 'var(--at-warning-tint)' : 'var(--at-success-tint)',
+                    color: t.prioridad === 'urgente' ? 'var(--at-danger)' : t.prioridad === 'alta' ? 'var(--at-warning)' : 'var(--at-success)' }}>
                     {t.prioridad}
                   </span>
                   <span style={{ flex: 1, fontSize: '12.5px', color: 'var(--at-ink-2)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.titulo}</span>
@@ -267,7 +267,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{new Date(v.hora_entrada).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</div>
-                    {!v.hora_salida && <div style={{ fontSize: '10px', color: '#16a34a', fontWeight: 600 }}>Activo</div>}
+                    {!v.hora_salida && <div style={{ fontSize: '10px', color: 'var(--at-success)', fontWeight: 600 }}>Activo</div>}
                   </div>
                 </div>
               ))}
@@ -290,8 +290,8 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
                     <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{r.hora_inicio} – {r.hora_fin}</div>
                   </div>
                   <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: '10px', fontWeight: 700,
-                    background: r.estado === 'confirmada' ? '#f0fdf4' : '#fffbeb',
-                    color: r.estado === 'confirmada' ? '#16a34a' : '#92400e' }}>
+                    background: r.estado === 'confirmada' ? 'var(--at-success-tint)' : 'var(--at-warning-tint)',
+                    color: r.estado === 'confirmada' ? 'var(--at-success)' : 'var(--at-warning-strong)' }}>
                     {r.estado}
                   </span>
                 </div>

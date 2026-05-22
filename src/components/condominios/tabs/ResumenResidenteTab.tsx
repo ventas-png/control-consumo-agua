@@ -16,16 +16,16 @@ interface Props {
 }
 
 const ESTADO_CUOTA_CFG: Record<string, { color: string; bg: string; label: string }> = {
-  pagado:   { color: '#16a34a', bg: '#dcfce7', label: 'Pagado' },
-  pendiente:{ color: '#d97706', bg: '#fef3c7', label: 'Pendiente' },
-  moroso:   { color: '#ef4444', bg: '#fef2f2', label: 'Moroso' },
+  pagado:   { color: 'var(--at-success)', bg: 'var(--at-success-tint)', label: 'Pagado' },
+  pendiente:{ color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', label: 'Pendiente' },
+  moroso:   { color: 'var(--at-danger)', bg: 'var(--at-danger-tint)', label: 'Moroso' },
 }
 
 const ESTADO_TICKET_CFG: Record<string, { color: string; bg: string }> = {
   abierto:    { color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)' },
-  en_proceso: { color: '#d97706', bg: '#fef3c7' },
+  en_proceso: { color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
   resuelto:   { color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
-  cerrado:    { color: '#16a34a', bg: '#dcfce7' },
+  cerrado:    { color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
 }
 
 const ANUNCIO_ICON: Record<string, string> = {
@@ -75,26 +75,26 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
     <title>Resumen Residente — ${unidad?.nombre}</title>
     <style>
       body{font-family:Arial,sans-serif;padding:32px;max-width:700px;margin:auto;color:#15291F;font-size:13px}
-      h1{font-size:20px;margin:0}h2{font-size:13px;color:#7E9389;font-weight:normal;margin:4px 0 0}
+      h1{font-size:20px;margin:0}h2{font-size:13px;color:var(--at-ink-3);font-weight:normal;margin:4px 0 0}
       .header{border-bottom:2px solid #15291F;padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between}
       .kpi{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:16px 0}
-      .kpi-card{background:#FAF7EF;border-radius:8px;padding:10px 14px;border:1px solid #E1DDD0}
+      .kpi-card{background:var(--at-surface-2);border-radius:8px;padding:10px 14px;border:1px solid var(--at-line)}
       .kpi-val{font-size:18px;font-weight:800;margin:2px 0}
       table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px}
-      th{background:#EAE6D8;padding:7px 10px;text-align:left;color:#7E9389;font-weight:600}
-      td{padding:7px 10px;border-bottom:1px solid #EAE6D8}
+      th{background:var(--at-chip);padding:7px 10px;text-align:left;color:var(--at-ink-3);font-weight:600}
+      td{padding:7px 10px;border-bottom:1px solid var(--at-chip)}
       section{margin-top:20px}
-      h3{font-size:14px;font-weight:700;border-bottom:1px solid #E1DDD0;padding-bottom:6px;margin-bottom:12px}
-      .footer{margin-top:32px;font-size:10px;color:#7E9389;border-top:1px solid #E1DDD0;padding-top:8px}
+      h3{font-size:14px;font-weight:700;border-bottom:1px solid var(--at-line);padding-bottom:6px;margin-bottom:12px}
+      .footer{margin-top:32px;font-size:10px;color:var(--at-ink-3);border-top:1px solid var(--at-line);padding-top:8px}
     </style></head><body>
     <div class="header">
       <div><h1>${proyectoNombre ?? 'Condominio'}</h1><h2>Resumen de Residente — ${unidad?.nombre ?? unidadId}</h2></div>
-      <div style="font-size:11px;color:#7E9389">Generado: ${new Date().toLocaleDateString('es')}</div>
+      <div style="font-size:11px;color:var(--at-ink-3)">Generado: ${new Date().toLocaleDateString('es')}</div>
     </div>
     <div class="kpi">
-      <div class="kpi-card"><div style="font-size:10px;color:#7E9389">Saldo cuotas</div><div class="kpi-val" style="color:${saldoPendiente > 0 ? '#ef4444' : '#16a34a'}">${moneda} ${saldoPendiente.toFixed(2)}</div></div>
-      <div class="kpi-card"><div style="font-size:10px;color:#7E9389">Recargos pendientes</div><div class="kpi-val" style="color:${saldoRecargos > 0 ? '#d97706' : '#16a34a'}">${moneda} ${saldoRecargos.toFixed(2)}</div></div>
-      <div class="kpi-card"><div style="font-size:10px;color:#7E9389">Tickets activos</div><div class="kpi-val" style="color:#1B3B36">${ticketsUnidad.length}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Saldo cuotas</div><div class="kpi-val" style="color:${saldoPendiente > 0 ? 'var(--at-danger)' : 'var(--at-success)'}">${moneda} ${saldoPendiente.toFixed(2)}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Recargos pendientes</div><div class="kpi-val" style="color:${saldoRecargos > 0 ? 'var(--at-warning)' : 'var(--at-success)'}">${moneda} ${saldoRecargos.toFixed(2)}</div></div>
+      <div class="kpi-card"><div style="font-size:10px;color:var(--at-ink-3)">Tickets activos</div><div class="kpi-val" style="color:#1B3B36">${ticketsUnidad.length}</div></div>
     </div>
     <section><h3>Cuotas (últimos 12 meses)</h3>
     <table><tr><th>Concepto</th><th>Período</th><th>Monto</th><th>Estado</th></tr>
@@ -132,22 +132,22 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
 
       {/* Banner de estado */}
       {pendientes.length > 0 ? (
-        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '12px 16px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: 10, padding: '12px 16px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontWeight: 700, color: '#ef4444', fontSize: 13 }}>⚠️ Tiene pagos pendientes</div>
-            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 2 }}>{pendientes.length} cuota{pendientes.length > 1 ? 's' : ''} por regularizar</div>
+            <div style={{ fontWeight: 700, color: 'var(--at-danger)', fontSize: 13 }}>⚠️ Tiene pagos pendientes</div>
+            <div style={{ fontSize: 11, color: 'var(--at-danger)', marginTop: 2 }}>{pendientes.length} cuota{pendientes.length > 1 ? 's' : ''} por regularizar</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Saldo pendiente</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#ef4444' }}>{moneda} {saldoPendiente.toFixed(2)}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--at-danger)' }}>{moneda} {saldoPendiente.toFixed(2)}</div>
           </div>
         </div>
       ) : (
-        <div style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: 10, padding: '12px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ background: 'var(--at-success-tint)', border: '1px solid var(--at-success-border)', borderRadius: 10, padding: '12px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 22 }}>✅</span>
           <div>
-            <div style={{ fontWeight: 700, color: '#16a34a', fontSize: 13 }}>Unidad al día</div>
-            <div style={{ fontSize: 11, color: '#15803d' }}>No hay cuotas pendientes. ¡Gracias por su pago oportuno!</div>
+            <div style={{ fontWeight: 700, color: 'var(--at-success)', fontSize: 13 }}>Unidad al día</div>
+            <div style={{ fontSize: 11, color: 'var(--at-success-strong)' }}>No hay cuotas pendientes. ¡Gracias por su pago oportuno!</div>
           </div>
         </div>
       )}
@@ -157,8 +157,8 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
         {[
           { label: 'Unidad', val: unidad?.nombre ?? '—', color: 'var(--at-ink)', bg: 'var(--at-surface-2)' },
           { label: 'Cuota este mes', val: cuotaMes ? ESTADO_CUOTA_CFG[cuotaMes.estado]?.label ?? cuotaMes.estado : 'Sin cuota', color: cuotaMes ? (ESTADO_CUOTA_CFG[cuotaMes.estado]?.color ?? 'var(--at-ink-3)') : 'var(--at-ink-3)', bg: cuotaMes ? (ESTADO_CUOTA_CFG[cuotaMes.estado]?.bg ?? 'var(--at-surface-2)') : 'var(--at-surface-2)' },
-          { label: 'Recargos pend.', val: `${moneda} ${saldoRecargos.toFixed(2)}`, color: saldoRecargos > 0 ? '#d97706' : '#16a34a', bg: saldoRecargos > 0 ? '#fef3c7' : '#dcfce7' },
-          { label: 'Tickets activos', val: String(ticketsUnidad.length), color: ticketsUnidad.length > 0 ? '#d97706' : '#16a34a', bg: ticketsUnidad.length > 0 ? '#fef3c7' : '#dcfce7' },
+          { label: 'Recargos pend.', val: `${moneda} ${saldoRecargos.toFixed(2)}`, color: saldoRecargos > 0 ? 'var(--at-warning)' : 'var(--at-success)', bg: saldoRecargos > 0 ? 'var(--at-warning-tint)' : 'var(--at-success-tint)' },
+          { label: 'Tickets activos', val: String(ticketsUnidad.length), color: ticketsUnidad.length > 0 ? 'var(--at-warning)' : 'var(--at-success)', bg: ticketsUnidad.length > 0 ? 'var(--at-warning-tint)' : 'var(--at-success-tint)' },
           { label: 'Reservas próx.', val: String(reservasUnidad.length), color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 100px', background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 10, padding: '8px 12px' }}>
@@ -200,12 +200,12 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Recargos pendientes */}
           {recargosUnidad.length > 0 && (
-            <div style={{ background: 'var(--at-surface)', border: '1px solid #fde68a', borderRadius: 12, padding: 14 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#d97706', marginBottom: 10 }}>⚡ Recargos por mora</div>
+            <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-warning-border)', borderRadius: 12, padding: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-warning)', marginBottom: 10 }}>⚡ Recargos por mora</div>
               {recargosUnidad.map(r => (
-                <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #fef3c7' }}>
+                <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--at-warning-tint)' }}>
                   <div style={{ fontSize: 12, color: 'var(--at-ink-2)' }}>{r.motivo ?? r.tipo}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#d97706' }}>{moneda} {r.monto_calculado.toFixed(2)}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--at-warning)' }}>{moneda} {r.monto_calculado.toFixed(2)}</div>
                 </div>
               ))}
             </div>
@@ -263,11 +263,11 @@ export default function ResumenResidenteTab({ cuotas, recargosMora, reservas, an
               const isUrgente = a.tipo === 'urgente'
               return (
                 <div key={a.id} style={{ padding: '10px 14px', borderRadius: 10,
-                  border: `1px solid ${isUrgente ? '#fca5a5' : 'var(--at-line)'}`,
-                  background: isUrgente ? '#fef2f2' : 'var(--at-surface-2)' }}>
+                  border: `1px solid ${isUrgente ? 'var(--at-danger-border)' : 'var(--at-line)'}`,
+                  background: isUrgente ? 'var(--at-danger-tint)' : 'var(--at-surface-2)' }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
                     <span style={{ fontSize: 16 }}>{ANUNCIO_ICON[a.tipo] ?? '📢'}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: isUrgente ? '#ef4444' : 'var(--at-ink)' }}>{a.titulo}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: isUrgente ? 'var(--at-danger)' : 'var(--at-ink)' }}>{a.titulo}</span>
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--at-ink-2)', lineHeight: 1.5 }}>
                     {a.contenido.length > 100 ? a.contenido.slice(0, 100) + '…' : a.contenido}

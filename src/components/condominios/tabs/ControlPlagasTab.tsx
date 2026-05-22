@@ -21,9 +21,9 @@ const TIPOS: { value: TipoControlPlagas; label: string; icon: string }[] = [
 ]
 
 const RESULTADOS: { value: ResultadoControlPlagas; label: string; color: string }[] = [
-  { value: 'satisfactorio',        label: 'Satisfactorio',        color: '#10b981' },
-  { value: 'con_observaciones',    label: 'Con observaciones',    color: '#f59e0b' },
-  { value: 'requiere_seguimiento', label: 'Requiere seguimiento', color: '#ef4444' },
+  { value: 'satisfactorio',        label: 'Satisfactorio',        color: 'var(--at-success)' },
+  { value: 'con_observaciones',    label: 'Con observaciones',    color: 'var(--at-warning)' },
+  { value: 'requiere_seguimiento', label: 'Requiere seguimiento', color: 'var(--at-danger)' },
   { value: 'no_realizado',         label: 'No realizado',         color: 'var(--at-ink-3)' },
 ]
 
@@ -105,7 +105,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
         </div>
 
         {proximas.length > 0 && (
-          <div style={{ padding: '8px 12px', background: '#fef3c7', borderBottom: '1px solid #fde68a', fontSize: 12, color: '#92400e' }}>
+          <div style={{ padding: '8px 12px', background: 'var(--at-warning-tint)', borderBottom: '1px solid var(--at-warning-border)', fontSize: 12, color: 'var(--at-warning-strong)' }}>
             ⏰ {proximas.length} visita(s) próxima(s) en los próximos 30 días
           </div>
         )}
@@ -129,7 +129,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
               </div>
               <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{r.areas.slice(0, 3).join(', ')}{r.areas.length > 3 ? ` +${r.areas.length - 3}` : ''}</div>
               {diasProx !== null && diasProx <= 30 && (
-                <div style={{ fontSize: 11, color: diasProx <= 7 ? '#ef4444' : '#f59e0b', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: diasProx <= 7 ? 'var(--at-danger)' : 'var(--at-warning)', marginTop: 2 }}>
                   ⏰ Próx. visita en {diasProx} días
                 </div>
               )}
@@ -217,7 +217,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Guardar'}
               </button>
               <button onClick={() => { setMostrarForm(false); setAreasSeleccionadas([]) }}
@@ -242,7 +242,7 @@ export default function ControlPlagasTab({ registros, proyectoId, companyId, mon
               </div>
 
               {diasProx !== null && diasProx <= 30 && (
-                <div style={{ background: diasProx <= 7 ? '#fef2f2' : '#fef3c7', border: `1px solid ${diasProx <= 7 ? '#fecaca' : '#fde68a'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: diasProx <= 7 ? '#dc2626' : '#92400e' }}>
+                <div style={{ background: diasProx <= 7 ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)', border: `1px solid ${diasProx <= 7 ? 'var(--at-danger-border)' : 'var(--at-warning-border)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: diasProx <= 7 ? 'var(--at-danger)' : 'var(--at-warning-strong)' }}>
                   ⏰ Próxima visita: {selected.proxima_visita} ({diasProx} días)
                 </div>
               )}

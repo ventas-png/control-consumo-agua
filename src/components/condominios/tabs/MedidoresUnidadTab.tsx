@@ -74,7 +74,7 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
   }
 
   async function handleDesactivar(id: string) {
-    const r = await Swal.fire({ title: '¿Desvincular medidor?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Desvincular', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Desvincular medidor?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Desvincular', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('medidores_unidad').update({ activo: false }).eq('id', id)
     onRefresh()
@@ -99,7 +99,7 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Vínculos activos', value: String(activosCount),        color: '#10b981' },
+          { label: 'Vínculos activos', value: String(activosCount),        color: 'var(--at-success)' },
           { label: 'Contadores disp.', value: String(contadores.length),   color: 'var(--at-primary)' },
           { label: `Consumo ${mesFiltro}`, value: `${totalConsumo.toFixed(1)} m³`, color: 'var(--at-accent)' },
         ].map(k => (
@@ -175,15 +175,15 @@ export function MedidoresUnidadTab({ medidores, unidades, proyectoId, companyId,
                     <td style={{ padding: '10px 12px', color: 'var(--at-ink-3)', fontSize: '12px' }}>{cons?.ultima_lectura ?? '—'}</td>
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 7px', borderRadius: '20px',
-                        background: m.activo ? '#dcfce7' : 'var(--at-chip)',
-                        color: m.activo ? '#16a34a' : 'var(--at-ink-3)' }}>
+                        background: m.activo ? 'var(--at-success-tint)' : 'var(--at-chip)',
+                        color: m.activo ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                         {m.activo ? 'Activo' : 'Desvinculado'}
                       </span>
                     </td>
                     <td style={{ padding: '10px 12px' }}>
                       {canEdit && m.activo && (
                         <button onClick={() => handleDesactivar(m.id)}
-                          style={{ padding: '3px 8px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
+                          style={{ padding: '3px 8px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>
                           Desvincular
                         </button>
                       )}

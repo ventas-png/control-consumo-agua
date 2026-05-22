@@ -97,12 +97,12 @@ export default function PronosticoFinancieroTab({ cuotas, gastos, moneda }: Prop
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
         {[
-          { label: 'Ingreso prom./mes', val: `${moneda} ${Math.round(promedios.ingresos).toLocaleString('es')}`, color: '#16a34a', bg: '#dcfce7' },
-          { label: 'Egreso prom./mes',  val: `${moneda} ${Math.round(promedios.egresos).toLocaleString('es')}`,  color: '#ef4444', bg: '#fef2f2' },
-          { label: 'Superávit prom.',   val: `${moneda} ${Math.round(promedios.ingresos - promedios.egresos).toLocaleString('es')}`, color: (promedios.ingresos - promedios.egresos) >= 0 ? '#16a34a' : '#ef4444', bg: (promedios.ingresos - promedios.egresos) >= 0 ? '#dcfce7' : '#fef2f2' },
-          { label: 'Tasa cobro hist.',  val: `${Math.round(promedios.tasaCobro * 100)}%`,  color: promedios.tasaCobro >= 0.8 ? '#16a34a' : '#d97706', bg: promedios.tasaCobro >= 0.8 ? '#dcfce7' : '#fef3c7' },
-          { label: 'Proyectado 6m',     val: `${moneda} ${Math.round(saldoAcumulado).toLocaleString('es')}`, color: saldoAcumulado >= 0 ? '#16a34a' : '#ef4444', bg: saldoAcumulado >= 0 ? '#dcfce7' : '#fef2f2' },
-          { label: 'Meses en rojo',     val: String(mesesEnRojo), color: mesesEnRojo === 0 ? '#16a34a' : '#ef4444', bg: mesesEnRojo === 0 ? '#dcfce7' : '#fef2f2' },
+          { label: 'Ingreso prom./mes', val: `${moneda} ${Math.round(promedios.ingresos).toLocaleString('es')}`, color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+          { label: 'Egreso prom./mes',  val: `${moneda} ${Math.round(promedios.egresos).toLocaleString('es')}`,  color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
+          { label: 'Superávit prom.',   val: `${moneda} ${Math.round(promedios.ingresos - promedios.egresos).toLocaleString('es')}`, color: (promedios.ingresos - promedios.egresos) >= 0 ? 'var(--at-success)' : 'var(--at-danger)', bg: (promedios.ingresos - promedios.egresos) >= 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)' },
+          { label: 'Tasa cobro hist.',  val: `${Math.round(promedios.tasaCobro * 100)}%`,  color: promedios.tasaCobro >= 0.8 ? 'var(--at-success)' : 'var(--at-warning)', bg: promedios.tasaCobro >= 0.8 ? 'var(--at-success-tint)' : 'var(--at-warning-tint)' },
+          { label: 'Proyectado 6m',     val: `${moneda} ${Math.round(saldoAcumulado).toLocaleString('es')}`, color: saldoAcumulado >= 0 ? 'var(--at-success)' : 'var(--at-danger)', bg: saldoAcumulado >= 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)' },
+          { label: 'Meses en rojo',     val: String(mesesEnRojo), color: mesesEnRojo === 0 ? 'var(--at-success)' : 'var(--at-danger)', bg: mesesEnRojo === 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)' },
         ].map(k => (
           <div key={k.label} style={{ flex: '1 1 120px', background: k.bg, border: `1px solid ${k.color}33`, borderRadius: 10, padding: '10px 14px' }}>
             <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{k.label}</div>
@@ -118,14 +118,14 @@ export default function PronosticoFinancieroTab({ cuotas, gastos, moneda }: Prop
           {promedios.historico.map((m, i) => (
             <div key={i} style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600, marginBottom: 3 }}>{labelMes(m.mes)}</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#16a34a', marginBottom: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--at-success)', marginBottom: 1 }}>
                 <span>Cobrado</span><span style={{ fontWeight: 700 }}>{moneda} {Math.round(m.ingresos).toLocaleString('es')}</span>
               </div>
-              {barra(m.ingresos, '#16a34a')}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#ef4444', marginBottom: 1, marginTop: 4 }}>
+              {barra(m.ingresos, 'var(--at-success)')}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--at-danger)', marginBottom: 1, marginTop: 4 }}>
                 <span>Egresos</span><span style={{ fontWeight: 700 }}>{moneda} {Math.round(m.egresos).toLocaleString('es')}</span>
               </div>
-              {barra(m.egresos, '#ef4444')}
+              {barra(m.egresos, 'var(--at-danger)')}
             </div>
           ))}
         </div>
@@ -140,7 +140,7 @@ export default function PronosticoFinancieroTab({ cuotas, gastos, moneda }: Prop
               <div key={i} style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
                   <span style={{ fontSize: 11, color: 'var(--at-ink-3)', fontWeight: 600 }}>{labelMes(p.mes)}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: balance >= 0 ? '#16a34a' : '#ef4444' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: balance >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
                     {balance >= 0 ? '+' : ''}{moneda} {Math.round(balance).toLocaleString('es')}
                   </span>
                 </div>
@@ -148,17 +148,17 @@ export default function PronosticoFinancieroTab({ cuotas, gastos, moneda }: Prop
                   <span>Ingresos</span><span>{moneda} {Math.round(p.ingresos).toLocaleString('es')}</span>
                 </div>
                 {barra(p.ingresos, 'var(--at-primary)', 0.7)}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#f97316', marginBottom: 1, marginTop: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--at-warning)', marginBottom: 1, marginTop: 4 }}>
                   <span>Egresos</span><span>{moneda} {Math.round(p.egresos).toLocaleString('es')}</span>
                 </div>
-                {barra(p.egresos, '#f97316', 0.7)}
+                {barra(p.egresos, 'var(--at-warning)', 0.7)}
               </div>
             )
           })}
 
-          <div style={{ marginTop: 12, padding: '8px 12px', background: saldoAcumulado >= 0 ? '#dcfce7' : '#fef2f2', borderRadius: 8 }}>
+          <div style={{ marginTop: 12, padding: '8px 12px', background: saldoAcumulado >= 0 ? 'var(--at-success-tint)' : 'var(--at-danger-tint)', borderRadius: 8 }}>
             <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Balance proyectado 6 meses</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: saldoAcumulado >= 0 ? '#16a34a' : '#ef4444' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: saldoAcumulado >= 0 ? 'var(--at-success)' : 'var(--at-danger)' }}>
               {saldoAcumulado >= 0 ? '+' : ''}{moneda} {Math.round(saldoAcumulado).toLocaleString('es')}
             </div>
           </div>

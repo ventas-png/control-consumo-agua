@@ -15,25 +15,25 @@ interface Props {
 }
 
 const TIPO_STYLE: Record<string, { bg: string; color: string; label: string; icon: string }> = {
-  queja:          { bg: '#fee2e2', color: '#ef4444', label: 'Queja',           icon: '😤' },
-  sugerencia:     { bg: '#dcfce7', color: '#16a34a', label: 'Sugerencia',      icon: '💡' },
-  reclamo_formal: { bg: '#fef3c7', color: '#92400e', label: 'Reclamo Formal',  icon: '📋' },
+  queja:          { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Queja',           icon: '😤' },
+  sugerencia:     { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Sugerencia',      icon: '💡' },
+  reclamo_formal: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'Reclamo Formal',  icon: '📋' },
   apelacion:      { bg: 'var(--at-accent-tint)', color: 'var(--at-accent-hover)', label: 'Apelación',       icon: '⚖️' },
 }
 
 const ESTADO_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   recibido:    { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Recibido' },
-  en_revision: { bg: '#fef3c7', color: '#92400e', label: 'En revisión' },
-  respondido:  { bg: '#dcfce7', color: '#16a34a', label: 'Respondido' },
+  en_revision: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', label: 'En revisión' },
+  respondido:  { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Respondido' },
   cerrado:     { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Cerrado' },
-  escalado:    { bg: '#fee2e2', color: '#ef4444', label: 'Escalado' },
+  escalado:    { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Escalado' },
 }
 
 const PRIORIDAD_STYLE: Record<string, { color: string; label: string }> = {
   baja:    { color: 'var(--at-ink-3)', label: 'Baja' },
   normal:  { color: 'var(--at-primary)', label: 'Normal' },
-  alta:    { color: '#f59e0b', label: 'Alta' },
-  urgente: { color: '#ef4444', label: 'Urgente' },
+  alta:    { color: 'var(--at-warning)', label: 'Alta' },
+  urgente: { color: 'var(--at-danger)', label: 'Urgente' },
 }
 
 const BLANK = { unidad_id: '', tipo: 'queja', asunto: '', descripcion: '', prioridad: 'normal', plazo_respuesta: '', anonimo: false }
@@ -80,7 +80,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar reclamo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar reclamo?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('reclamos_condominio').delete().eq('id', id)
     if (selected?.id === id) setSelected(null)
@@ -226,7 +226,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
             const vencido = (r.estado === 'recibido' || r.estado === 'en_revision') && r.plazo_respuesta && r.plazo_respuesta < today
             return (
               <div key={r.id} onClick={() => setSelected(selected?.id === r.id ? null : r)}
-                style={{ background: 'var(--at-surface)', border: `1.5px solid ${vencido ? '#fca5a5' : selected?.id === r.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
+                style={{ background: 'var(--at-surface)', border: `1.5px solid ${vencido ? 'var(--at-danger-border)' : selected?.id === r.id ? 'var(--at-primary)' : 'var(--at-line)'}`, borderRadius: '10px', padding: '12px 14px', cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', gap: '5px', alignItems: 'center', marginBottom: '3px', flexWrap: 'wrap' }}>
@@ -240,14 +240,14 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
                       {r.anonimo && <span style={{ color: 'var(--at-ink-3)' }}>🔒 Anónimo</span>}
                       <span style={{ color: pr.color, fontWeight: 600 }}>● {pr.label}</span>
                       <span>📅 {r.created_at.slice(0, 10)}</span>
-                      {r.plazo_respuesta && <span style={{ color: vencido ? '#ef4444' : 'var(--at-ink-3)' }}>⏰ Plazo: {r.plazo_respuesta}{vencido ? ' ⚠️' : ''}</span>}
+                      {r.plazo_respuesta && <span style={{ color: vencido ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>⏰ Plazo: {r.plazo_respuesta}{vencido ? ' ⚠️' : ''}</span>}
                     </div>
                   </div>
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                       {r.estado === 'recibido' && (
                         <button onClick={() => cambiarEstado(r.id, 'en_revision')}
-                          style={{ padding: '3px 7px', background: '#fef3c7', color: '#92400e', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
+                          style={{ padding: '3px 7px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
                           En revisión
                         </button>
                       )}
@@ -260,7 +260,7 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
                       <button onClick={() => startEdit(r)}
                         style={{ padding: '3px 7px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
                       <button onClick={() => handleDelete(r.id)}
-                        style={{ padding: '3px 7px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                        style={{ padding: '3px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </div>
                   )}
                 </div>
@@ -297,8 +297,8 @@ export function ReclamosTab({ reclamos, unidades, proyectoId, companyId, canCrea
             )}
 
             {selected.respuesta_admin && (
-              <div style={{ background: '#dcfce7', borderRadius: '8px', padding: '8px', border: '1px solid #86efac', marginBottom: '10px' }}>
-                <div style={{ fontSize: '10px', color: '#16a34a', fontWeight: 700, marginBottom: '3px' }}>Respuesta{selected.respondido_por ? ` de ${selected.respondido_por}` : ''} ({selected.fecha_respuesta})</div>
+              <div style={{ background: 'var(--at-success-tint)', borderRadius: '8px', padding: '8px', border: '1px solid var(--at-success-border)', marginBottom: '10px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--at-success)', fontWeight: 700, marginBottom: '3px' }}>Respuesta{selected.respondido_por ? ` de ${selected.respondido_por}` : ''} ({selected.fecha_respuesta})</div>
                 <div style={{ fontSize: '12px', color: 'var(--at-ink-2)' }}>{selected.respuesta_admin}</div>
               </div>
             )}

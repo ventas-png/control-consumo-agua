@@ -26,7 +26,7 @@ const BLANK: FormState = {
 }
 
 const ESTADO_COLORS: Record<string, { bg: string; color: string }> = {
-  abierta: { bg: '#dcfce7', color: '#16a34a' },
+  abierta: { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   cerrada: { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' },
   anulada: { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
@@ -88,7 +88,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
   }
 
   async function handleCerrar(id: string) {
-    const r = await Swal.fire({ title: '¿Cerrar votación?', text: 'No se podrán registrar más votos.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Cerrar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Cerrar votación?', text: 'No se podrán registrar más votos.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Cerrar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const v = votaciones.find(x => x.id === id)
     const counts = (v?.opciones ?? []).map(o => ({ texto: o.texto, count: votos.filter(vt => vt.opcion_id === o.id).length }))
@@ -161,7 +161,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
                   placeholder={`Opción ${i + 1}`} />
                 {form.opciones.length > 2 && (
                   <button onClick={() => setForm(f => ({ ...f, opciones: f.opciones.filter((_, j) => j !== i) }))}
-                    style={{ padding: '6px 10px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>✕</button>
+                    style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>✕</button>
                 )}
               </div>
             ))}
@@ -220,7 +220,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
               </div>
               {canEdit && votacion.estado === 'abierta' && (
                 <button onClick={() => handleCerrar(votacion.id)}
-                  style={{ padding: '5px 12px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                  style={{ padding: '5px 12px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
                   Cerrar votación
                 </button>
               )}
@@ -243,7 +243,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
                     </div>
                     <div style={{ height: '8px', background: 'var(--at-chip)', borderRadius: '4px', overflow: 'hidden' }}>
                       <div style={{ height: '100%', borderRadius: '4px', transition: 'width 0.3s',
-                        background: c.count === maxCount && c.count > 0 ? '#10b981' : 'var(--at-primary)',
+                        background: c.count === maxCount && c.count > 0 ? 'var(--at-success)' : 'var(--at-primary)',
                         width: `${totalVotos > 0 ? c.count / totalVotos * 100 : 0}%` }} />
                     </div>
                   </div>
@@ -274,7 +274,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
                   </div>
                 </div>
                 <button onClick={handleVotar} disabled={registering || !selUnidad || !selOpcion}
-                  style={{ padding: '6px 16px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                  style={{ padding: '6px 16px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                   {registering ? '…' : 'Registrar voto'}
                 </button>
               </div>
@@ -299,7 +299,7 @@ export function VotacionesTab({ votaciones, unidades, asambleas, proyectoId, com
             )}
 
             {votacion.resultado && votacion.estado === 'cerrada' && (
-              <div style={{ marginTop: '12px', background: '#dcfce7', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>
+              <div style={{ marginTop: '12px', background: 'var(--at-success-tint)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: 'var(--at-success)', fontWeight: 600 }}>
                 ✓ Resultado: {votacion.resultado}
               </div>
             )}

@@ -34,10 +34,10 @@ const BLANK: FormData = {
 }
 
 const CONDICION_STYLE: Record<string, { label: string; color: string; bg: string }> = {
-  excelente: { label: 'Excelente', color: '#16a34a', bg: '#f0fdf4' },
+  excelente: { label: 'Excelente', color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   bueno:     { label: 'Bueno',     color: 'var(--at-primary)', bg: 'var(--at-primary-tint)' },
-  regular:   { label: 'Regular',   color: '#f59e0b', bg: '#fef3c7' },
-  malo:      { label: 'Malo',      color: '#dc2626', bg: '#fef2f2' },
+  regular:   { label: 'Regular',   color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
+  malo:      { label: 'Malo',      color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
 export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, canCreate, canEdit, onRefresh }: Props) {
@@ -86,7 +86,7 @@ export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, ca
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar acta de entrega?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar acta de entrega?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('entrega_unidades').delete().eq('id', id)
     if (selected?.id === id) setSelected(null)
@@ -104,10 +104,10 @@ export function EntregaUnidadTab({ entregas, unidades, proyectoId, companyId, ca
     const inv = (e.inventario_items ?? []) as ItemInventario[]
     const cond = CONDICION_STYLE[e.condicion_general]
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acta de ${e.tipo === 'entrega' ? 'Entrega' : 'Devolución'}</title>
-<style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;margin:16px 0 6px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#FAF7EF}
+<style>body{font-family:Arial,sans-serif;padding:30px;font-size:13px}h1{font-size:18px;margin-bottom:4px}h2{font-size:14px;margin:16px 0 6px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:var(--at-surface-2)}
 .sig{margin-top:40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}.sig-box{border-top:1px solid #000;padding-top:6px;font-size:11px}</style></head><body>
 <h1>Acta de ${e.tipo === 'entrega' ? 'Entrega' : 'Devolución'} de Unidad</h1>
-<p style="color:#7E9389">Fecha: ${e.fecha}</p>
+<p style="color:var(--at-ink-3)">Fecha: ${e.fecha}</p>
 <h2>Datos Generales</h2>
 <table><tr><th>Unidad</th><td>${unidad?.nombre ?? '—'}</td><th>Condición general</th><td>${cond?.label ?? e.condicion_general}</td></tr>
 <tr><th>Inquilino</th><td>${e.inquilino ?? '—'}</td><th>Propietario</th><td>${e.propietario ?? '—'}</td></tr>
@@ -200,7 +200,7 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
                   {Object.entries(CONDICION_STYLE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
                 <input style={inputStyle} placeholder="Notas" value={it.notas} onChange={e => setItem(i, 'notas', e.target.value)} />
-                <button onClick={() => removeItem(i)} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
+                <button onClick={() => removeItem(i)} style={{ background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>×</button>
               </div>
             ))}
             {items.length === 0 && <p style={{ fontSize: '12px', color: 'var(--at-ink-3)', margin: 0 }}>Sin artículos de inventario</p>}
@@ -282,12 +282,12 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => toggleFirma(e, 'firmado_propietario')}
-                          style={{ padding: '5px 12px', borderRadius: '7px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: e.firmado_propietario ? '#f0fdf4' : 'var(--at-surface-2)', color: e.firmado_propietario ? '#16a34a' : 'var(--at-ink-3)' }}>
+                          style={{ padding: '5px 12px', borderRadius: '7px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: e.firmado_propietario ? 'var(--at-success-tint)' : 'var(--at-surface-2)', color: e.firmado_propietario ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                           {e.firmado_propietario ? '✓' : '□'} Firma Propietario
                         </button>
                         <button
                           onClick={() => toggleFirma(e, 'firmado_inquilino')}
-                          style={{ padding: '5px 12px', borderRadius: '7px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: e.firmado_inquilino ? '#f0fdf4' : 'var(--at-surface-2)', color: e.firmado_inquilino ? '#16a34a' : 'var(--at-ink-3)' }}>
+                          style={{ padding: '5px 12px', borderRadius: '7px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: e.firmado_inquilino ? 'var(--at-success-tint)' : 'var(--at-surface-2)', color: e.firmado_inquilino ? 'var(--at-success)' : 'var(--at-ink-3)' }}>
                           {e.firmado_inquilino ? '✓' : '□'} Firma Inquilino
                         </button>
                       </div>
@@ -296,7 +296,7 @@ ${inv.length > 0 ? `<h2>Inventario</h2><table><tr><th>Artículo</th><th>Condici�
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button onClick={() => handlePrint(e)} style={{ padding: '6px 14px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>🖨️ Imprimir</button>
                       {canEdit && <button onClick={() => startEdit(e)} style={{ padding: '6px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>✏️ Editar</button>}
-                      {canEdit && <button onClick={() => handleDelete(e.id)} style={{ padding: '6px 14px', background: '#fef2f2', color: '#dc2626', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>🗑️ Eliminar</button>}
+                      {canEdit && <button onClick={() => handleDelete(e.id)} style={{ padding: '6px 14px', background: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>🗑️ Eliminar</button>}
                     </div>
                   </div>
                 )}

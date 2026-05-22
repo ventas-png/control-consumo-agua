@@ -13,7 +13,7 @@ interface Props {
 }
 
 const CANAL_CFG: Record<CanalPlantilla, { label: string; color: string; bg: string; icon: string }> = {
-  whatsapp: { label: 'WhatsApp', color: '#16a34a', bg: '#dcfce7', icon: '💬' },
+  whatsapp: { label: 'WhatsApp', color: 'var(--at-success)', bg: 'var(--at-success-tint)', icon: '💬' },
   email:    { label: 'Email',    color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', icon: '📧' },
   sms:      { label: 'SMS',      color: 'var(--at-accent-hover)', bg: 'var(--at-accent-tint-2)', icon: '📱' },
 }
@@ -84,7 +84,7 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
   }
 
   async function eliminar(p: PlantillaMensajeCond) {
-    const r = await Swal.fire({ title: '¿Eliminar plantilla?', text: p.nombre, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' })
+    const r = await Swal.fire({ title: '¿Eliminar plantilla?', text: p.nombre, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('plantillas_mensaje_cond').delete().eq('id', p.id)
     onRefresh()
@@ -144,7 +144,7 @@ export default function PlantillasMensajeTab({ plantillas, proyectoId, companyId
                       <button onClick={() => setPreview(p)} style={{ fontSize: 11, padding: '3px 8px', border: '1px solid var(--at-line)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-surface-2)' }}>👁</button>
                       {canEdit && <button onClick={() => abrirEditar(p)} style={{ fontSize: 11, padding: '3px 8px', border: '1px solid var(--at-line)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-surface-2)' }}>✏️</button>}
                       {canEdit && <button onClick={() => toggleActiva(p)} style={{ fontSize: 11, padding: '3px 8px', border: '1px solid var(--at-line)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-surface-2)' }}>{p.activa ? '⏸' : '▶'}</button>}
-                      {canEdit && <button onClick={() => eliminar(p)} style={{ fontSize: 11, padding: '3px 8px', border: '1px solid #fecaca', borderRadius: 5, cursor: 'pointer', background: '#fef2f2', color: '#ef4444' }}>🗑</button>}
+                      {canEdit && <button onClick={() => eliminar(p)} style={{ fontSize: 11, padding: '3px 8px', border: '1px solid var(--at-danger-border)', borderRadius: 5, cursor: 'pointer', background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>🗑</button>}
                     </div>
                   </div>
                 </div>

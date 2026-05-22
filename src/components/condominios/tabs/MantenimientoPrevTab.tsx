@@ -38,10 +38,10 @@ function getStatus(p: PlanMantenimiento): 'vencido' | 'urgente' | 'proximo' | 'o
 }
 
 const STATUS: Record<string, { bg: string; color: string; label: string }> = {
-  vencido:   { bg: '#fee2e2', color: '#ef4444', label: 'Vencido' },
-  urgente:   { bg: '#fef3c7', color: '#d97706', label: 'Urgente' },
+  vencido:   { bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', label: 'Vencido' },
+  urgente:   { bg: 'var(--at-warning-tint)', color: 'var(--at-warning)', label: 'Urgente' },
   proximo:   { bg: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', label: 'Próximo' },
-  ok:        { bg: '#dcfce7', color: '#16a34a', label: 'Al día' },
+  ok:        { bg: 'var(--at-success-tint)', color: 'var(--at-success)', label: 'Al día' },
   sin_fecha: { bg: 'var(--at-chip)', color: 'var(--at-ink-3)', label: 'Sin fecha' },
 }
 
@@ -136,9 +136,9 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
         {[
-          { label: 'Planes activos', value: String(planesActivos.length), color: '#10b981' },
-          { label: 'Vencidos',       value: String(vencidos),            color: '#ef4444' },
-          { label: 'Próximos 7d',    value: String(proximos),            color: '#f59e0b' },
+          { label: 'Planes activos', value: String(planesActivos.length), color: 'var(--at-success)' },
+          { label: 'Vencidos',       value: String(vencidos),            color: 'var(--at-danger)' },
+          { label: 'Próximos 7d',    value: String(proximos),            color: 'var(--at-warning)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '18px', fontWeight: 800, color: k.color }}>{k.value}</div>
@@ -242,7 +242,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
               <div style={{ display: 'flex', gap: '6px' }}>
                 {canEdit && (
                   <button onClick={() => toggleActivo(plan.id, plan.activo)}
-                    style={{ padding: '4px 10px', background: plan.activo ? '#fef3c7' : '#dcfce7', color: plan.activo ? '#92400e' : '#16a34a', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                    style={{ padding: '4px 10px', background: plan.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', color: plan.activo ? 'var(--at-warning-strong)' : 'var(--at-success)', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                     {plan.activo ? 'Desactivar' : 'Activar'}
                   </button>
                 )}
@@ -286,7 +286,7 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
                 </div>
                 <div style={{ display: 'flex', gap: '6px', marginTop: '8px', alignItems: 'center' }}>
                   <button onClick={handleRegistrarEjecucion} disabled={savingEjec}
-                    style={{ padding: '6px 14px', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                    style={{ padding: '6px 14px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                     {savingEjec ? '…' : 'Guardar'}
                   </button>
                   <button onClick={() => setShowEjecForm(false)}
@@ -309,8 +309,8 @@ export function MantenimientoPrevTab({ planes, proyectoId, companyId, moneda, ca
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {ejecuciones.map(e => {
-                  const bg = e.estado === 'completado' ? '#dcfce7' : e.estado === 'parcial' ? '#fef3c7' : 'var(--at-chip)'
-                  const color = e.estado === 'completado' ? '#16a34a' : e.estado === 'parcial' ? '#92400e' : 'var(--at-ink-3)'
+                  const bg = e.estado === 'completado' ? 'var(--at-success-tint)' : e.estado === 'parcial' ? 'var(--at-warning-tint)' : 'var(--at-chip)'
+                  const color = e.estado === 'completado' ? 'var(--at-success)' : e.estado === 'parcial' ? 'var(--at-warning-strong)' : 'var(--at-ink-3)'
                   return (
                     <div key={e.id} style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '8px', padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                       <div style={{ flex: 1 }}>

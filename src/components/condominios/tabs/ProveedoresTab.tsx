@@ -28,8 +28,8 @@ const SERVICIOS: { value: ServicioProveedor; label: string; icon: string }[] = [
 ]
 
 const ESTADO_COLORS: Record<string, string> = {
-  activo:    '#10b981',
-  vencido:   '#f59e0b',
+  activo:    'var(--at-success)',
+  vencido:   'var(--at-warning)',
   terminado: 'var(--at-ink-3)',
 }
 
@@ -133,7 +133,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
   async function handleDelete(id: string) {
     const result = await Swal.fire({
       title: '¿Eliminar contrato?', text: 'Esta acción no se puede deshacer.',
-      icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444',
+      icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)',
     })
     if (!result.isConfirmed) return
     const { error } = await supabase.from('contratos_proveedores').delete().eq('id', id)
@@ -182,9 +182,9 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
 
       {/* Alert por vencer */}
       {porVencer.length > 0 && (
-        <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>⚠️</span>
-          <span style={{ fontSize: '13px', color: '#92400e', fontWeight: 600 }}>
+          <span style={{ fontSize: '13px', color: 'var(--at-warning-strong)', fontWeight: 600 }}>
             {porVencer.length} contrato{porVencer.length > 1 ? 's' : ''} vence{porVencer.length === 1 ? '' : 'n'} en menos de 30 días
           </span>
         </div>
@@ -202,7 +202,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={exportarPDF} disabled={contratos.length === 0} style={{ padding: '7px 12px', background: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: '1.5px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📄 PDF</button>
-          <button onClick={exportarXlsx} disabled={contratos.length === 0} style={{ padding: '7px 12px', background: '#f0fdf4', color: '#16a34a', border: '1.5px solid #86efac', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
+          <button onClick={exportarXlsx} disabled={contratos.length === 0} style={{ padding: '7px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1.5px solid var(--at-success-border)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '12px' }}>📊 Excel</button>
           {canCreate && !showForm && (
             <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               + Nuevo Contrato
@@ -329,11 +329,11 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
                 const si = servicioInfo(c.servicio)
                 const vencido = isVencido(c)
                 return (
-                  <tr key={c.id} style={{ borderBottom: '1px solid var(--at-chip)', background: vencido ? '#fff7ed' : 'var(--at-surface)' }}>
+                  <tr key={c.id} style={{ borderBottom: '1px solid var(--at-chip)', background: vencido ? 'var(--at-warning-tint)' : 'var(--at-surface)' }}>
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{c.proveedor_nombre}</div>
                       {c.descripcion && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)', marginTop: '2px' }}>{c.descripcion.slice(0, 50)}{c.descripcion.length > 50 ? '…' : ''}</div>}
-                      {vencido && <span style={{ fontSize: '11px', background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>Expirado</span>}
+                      {vencido && <span style={{ fontSize: '11px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>Expirado</span>}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
                       <span style={{ fontSize: '18px' }}>{si.icon}</span>
@@ -377,7 +377,7 @@ export function ProveedoresTab({ contratos, proyectoId, companyId, moneda, proye
                           <button onClick={() => startEdit(c)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-ink-2)' }}>✏️</button>
                         )}
                         {canEdit && (
-                          <button onClick={() => handleDelete(c.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                          <button onClick={() => handleDelete(c.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                         )}
                       </div>
                     </td>

@@ -75,7 +75,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
   }
 
   async function deleteArea(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar área?', text: 'Se eliminará de las rutas que la usan.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await Swal.fire({ title: '¿Eliminar área?', text: 'Se eliminará de las rutas que la usan.', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('areas_condominio').delete().eq('id', id)
     onRefresh()
@@ -114,7 +114,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
   }
 
   async function deleteRuta(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar ruta?', text: 'Se eliminarán también los puntos de control.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const r = await Swal.fire({ title: '¿Eliminar ruta?', text: 'Se eliminarán también los puntos de control.', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!r.isConfirmed) return
     await supabase.from('rutas_ronda').delete().eq('id', id)
     if (selectedRutaId === id) setSelectedRutaId(null)
@@ -261,7 +261,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button onClick={() => startEditArea(a)} style={{ flex: 1, padding: '6px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)', fontWeight: 600 }}>✏️ Editar</button>
-                      <button onClick={() => deleteArea(a.id)} style={{ padding: '6px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: '#dc2626' }}>🗑</button>
+                      <button onClick={() => deleteArea(a.id)} style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-danger)' }}>🗑</button>
                     </div>
                   )}
                 </div>
@@ -325,13 +325,13 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                         <div style={{ fontSize: '12.5px', color: 'var(--at-ink-3)', display: 'flex', gap: '14px', marginTop: '2px', flexWrap: 'wrap' }}>
                           {ruta.tiempo_estimado_min && <span>⏱ ~{ruta.tiempo_estimado_min} min</span>}
                           <span>📍 {puntos.length} punto{puntos.length !== 1 ? 's' : ''}</span>
-                          {!ruta.activo && <span style={{ color: '#ef4444' }}>Inactiva</span>}
+                          {!ruta.activo && <span style={{ color: 'var(--at-danger)' }}>Inactiva</span>}
                         </div>
                       </div>
                       {canEdit && (
                         <div style={{ display: 'flex', gap: '6px' }} onClick={e => e.stopPropagation()}>
                           <button onClick={() => startEditRuta(ruta)} style={{ padding: '6px 12px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)', fontWeight: 600 }}>✏️</button>
-                          <button onClick={() => deleteRuta(ruta.id)} style={{ padding: '6px 10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: '#dc2626' }}>🗑</button>
+                          <button onClick={() => deleteRuta(ruta.id)} style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-danger)' }}>🗑</button>
                         </div>
                       )}
                       <span style={{ color: 'var(--at-ink-3)', fontSize: '16px', transition: 'transform .2s', transform: isOpen ? 'rotate(180deg)' : 'none' }}>▾</span>
@@ -359,7 +359,7 @@ export function RutasRondaTab({ areas, rutas, puntosControl, proyectoId, company
                                     <div style={{ display: 'flex', gap: '4px' }}>
                                       <button onClick={() => movePunto(p, 'up')} disabled={idx === 0} style={{ padding: '4px 8px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, fontSize: '12px' }}>▲</button>
                                       <button onClick={() => movePunto(p, 'down')} disabled={idx === puntos.length - 1} style={{ padding: '4px 8px', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '6px', cursor: idx === puntos.length - 1 ? 'default' : 'pointer', opacity: idx === puntos.length - 1 ? 0.3 : 1, fontSize: '12px' }}>▼</button>
-                                      <button onClick={() => deletePunto(p.id)} style={{ padding: '4px 8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', color: '#dc2626', fontSize: '12px' }}>✕</button>
+                                      <button onClick={() => deletePunto(p.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--at-danger)', fontSize: '12px' }}>✕</button>
                                     </div>
                                   )}
                                 </div>

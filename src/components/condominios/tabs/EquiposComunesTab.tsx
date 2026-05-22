@@ -24,9 +24,9 @@ const CATEGORIAS: { value: CategoriaEquipo; label: string; icon: string }[] = [
 ]
 
 const ESTADOS: { value: EstadoEquipo; label: string; color: string }[] = [
-  { value: 'operativo', label: 'Operativo', color: '#10b981' },
-  { value: 'mantenimiento', label: 'En mantenimiento', color: '#f59e0b' },
-  { value: 'fuera_servicio', label: 'Fuera de servicio', color: '#ef4444' },
+  { value: 'operativo', label: 'Operativo', color: 'var(--at-success)' },
+  { value: 'mantenimiento', label: 'En mantenimiento', color: 'var(--at-warning)' },
+  { value: 'fuera_servicio', label: 'Fuera de servicio', color: 'var(--at-danger)' },
   { value: 'baja', label: 'De baja', color: 'var(--at-ink-3)' },
 ]
 
@@ -157,8 +157,8 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
 
         {/* Alertas */}
         {alertas.length > 0 && (
-          <div style={{ padding: '8px 12px', background: '#fef3c7', borderBottom: '1px solid #fde68a' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#92400e' }}>⚠️ {alertas.length} equipos requieren atención</div>
+          <div style={{ padding: '8px 12px', background: 'var(--at-warning-tint)', borderBottom: '1px solid var(--at-warning-border)' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-warning-strong)' }}>⚠️ {alertas.length} equipos requieren atención</div>
           </div>
         )}
 
@@ -171,7 +171,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
           const dias = diasParaManto(e.proximo_mantenimiento)
           return (
             <div key={e.id} onClick={() => { setSelected(e); setMostrarForm(false) }}
-              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === e.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: alerta === 'vencido' ? '3px solid #ef4444' : alerta === 'proximo' ? '3px solid #f59e0b' : '3px solid transparent' }}>
+              style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === e.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: alerta === 'vencido' ? '3px solid var(--at-danger)' : alerta === 'proximo' ? '3px solid var(--at-warning)' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {e.nombre}</span>
                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: est?.color + '20', color: est?.color }}>{est?.label}</span>
@@ -181,7 +181,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
                 {e.ubicacion && <span>{e.ubicacion}</span>}
               </div>
               {dias !== null && (
-                <div style={{ fontSize: 11, color: alerta === 'vencido' ? '#ef4444' : alerta === 'proximo' ? '#f59e0b' : 'var(--at-ink-3)', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: alerta === 'vencido' ? 'var(--at-danger)' : alerta === 'proximo' ? 'var(--at-warning)' : 'var(--at-ink-3)', marginTop: 2 }}>
                   {alerta === 'vencido' ? `⚠️ Manto vencido hace ${Math.abs(dias)} días` : alerta === 'proximo' ? `⏳ Manto en ${dias} días` : `Próx. manto: ${e.proximo_mantenimiento}`}
                 </div>
               )}
@@ -255,7 +255,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                 {saving ? 'Guardando…' : '✅ Guardar equipo'}
               </button>
               <button onClick={() => { setMostrarForm(false); resetForm() }}
@@ -286,8 +286,8 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
 
               {/* Alerta mantenimiento */}
               {alerta !== 'ok' && alerta !== 'sin_fecha' && (
-                <div style={{ background: alerta === 'vencido' ? '#fef2f2' : '#fef3c7', border: `1px solid ${alerta === 'vencido' ? '#fecaca' : '#fde68a'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
-                  <div style={{ fontWeight: 600, color: alerta === 'vencido' ? '#dc2626' : '#92400e', fontSize: 13 }}>
+                <div style={{ background: alerta === 'vencido' ? 'var(--at-danger-tint)' : 'var(--at-warning-tint)', border: `1px solid ${alerta === 'vencido' ? 'var(--at-danger-border)' : 'var(--at-warning-border)'}`, borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
+                  <div style={{ fontWeight: 600, color: alerta === 'vencido' ? 'var(--at-danger)' : 'var(--at-warning-strong)', fontSize: 13 }}>
                     {alerta === 'vencido' ? `⚠️ Mantenimiento vencido hace ${Math.abs(dias!)} días` : `⏳ Mantenimiento en ${dias} días (${selected.proximo_mantenimiento})`}
                   </div>
                 </div>
@@ -321,7 +321,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
               {canEdit && (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button onClick={() => registrarMantenimiento(selected)}
-                    style={{ padding: '7px 14px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                    style={{ padding: '7px 14px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
                     🔧 Registrar mantenimiento
                   </button>
                   {ESTADOS.filter(s => s.value !== selected.estado).map(s => (

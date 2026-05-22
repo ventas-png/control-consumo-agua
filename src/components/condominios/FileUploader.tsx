@@ -99,20 +99,20 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
       {label && <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', marginBottom: '6px', display: 'block' }}>{label}</label>}
 
       {value ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--at-success-tint)', border: '1.5px solid var(--at-success-border)', borderRadius: '8px' }}>
           <span style={{ fontSize: '22px' }}>{fileIcon(fileName ?? '')}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#166534', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-success-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</div>
             <div style={{ fontSize: '11px', color: '#4ade80' }}>Subido</div>
           </div>
           {signedUrl && (
             <a href={signedUrl} target="_blank" rel="noreferrer"
-              style={{ padding: '4px 10px', background: '#16a34a', color: 'white', borderRadius: '6px', fontSize: '11px', fontWeight: 600, textDecoration: 'none' }}>
+              style={{ padding: '4px 10px', background: 'var(--at-success)', color: 'var(--at-on-status)', borderRadius: '6px', fontSize: '11px', fontWeight: 600, textDecoration: 'none' }}>
               Ver
             </a>
           )}
           <button onClick={removeFile}
-            style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', color: '#dc2626', cursor: 'pointer', fontSize: '13px' }}>
+            style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', color: 'var(--at-danger)', cursor: 'pointer', fontSize: '13px' }}>
             ✕
           </button>
         </div>
@@ -148,7 +148,7 @@ export function FileUploader({ value, onChange, folder, label = 'Adjuntar docume
         </div>
       )}
 
-      {error && <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>{error}</div>}
+      {error && <div style={{ fontSize: '11px', color: 'var(--at-danger)', marginTop: '4px' }}>{error}</div>}
 
       <input ref={ref} type="file" accept={accept} style={{ display: 'none' }}
         onChange={e => handleFiles(e.target.files)} />

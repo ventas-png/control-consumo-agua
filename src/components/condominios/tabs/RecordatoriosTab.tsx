@@ -16,8 +16,8 @@ interface Props {
 
 const PRIORIDAD_CFG: Record<PrioridadRecordatorio, { label: string; bg: string; color: string; icon: string }> = {
   normal:  { label: 'Normal',  bg: 'var(--at-chip)', color: 'var(--at-ink-2)', icon: '📌' },
-  alta:    { label: 'Alta',    bg: '#fef3c7', color: '#92400e', icon: '⚠️' },
-  critica: { label: 'Crítica', bg: '#fee2e2', color: '#ef4444', icon: '🚨' },
+  alta:    { label: 'Alta',    bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', icon: '⚠️' },
+  critica: { label: 'Crítica', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', icon: '🚨' },
 }
 
 const TIPO_LABELS: Record<TipoEntidadRecordatorio, string> = {
@@ -86,7 +86,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
   }
 
   async function eliminar(id: string) {
-    const res = await Swal.fire({ title: '¿Eliminar recordatorio?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
+    const res = await Swal.fire({ title: '¿Eliminar recordatorio?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' })
     if (!res.isConfirmed) return
     await supabase.from('recordatorios_condominio').delete().eq('id', id)
     onRefresh()
@@ -99,17 +99,17 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
     <div style={{ padding: 16 }}>
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
-        <div style={{ background: '#fef2f2', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#ef4444' }}>{vencidosHoy}</div>
-          <div style={{ fontSize: 11, color: '#ef4444' }}>Vencidos</div>
+        <div style={{ background: 'var(--at-danger-tint)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--at-danger)' }}>{vencidosHoy}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-danger)' }}>Vencidos</div>
         </div>
-        <div style={{ background: '#fef3c7', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#d97706' }}>{proximosSemana}</div>
-          <div style={{ fontSize: 11, color: '#d97706' }}>Esta semana</div>
+        <div style={{ background: 'var(--at-warning-tint)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--at-warning)' }}>{proximosSemana}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-warning)' }}>Esta semana</div>
         </div>
-        <div style={{ background: '#f0fdf4', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#16a34a' }}>{recordatorios.filter(r => r.completado).length}</div>
-          <div style={{ fontSize: 11, color: '#16a34a' }}>Completados</div>
+        <div style={{ background: 'var(--at-success-tint)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--at-success)' }}>{recordatorios.filter(r => r.completado).length}</div>
+          <div style={{ fontSize: 11, color: 'var(--at-success)' }}>Completados</div>
         </div>
         <div style={{ background: 'var(--at-surface-2)', borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--at-ink-2)' }}>{recordatorios.length}</div>
@@ -191,7 +191,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
             const urgente = !r.completado && dias >= 0 && dias <= 3
             const pcfg = PRIORIDAD_CFG[r.prioridad]
             return (
-              <div key={r.id} style={{ background: r.completado ? 'var(--at-surface-2)' : vencido ? '#fef2f2' : urgente ? '#fffbeb' : 'var(--at-surface)', border: `1px solid ${vencido ? '#fecaca' : urgente ? '#fde68a' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div key={r.id} style={{ background: r.completado ? 'var(--at-surface-2)' : vencido ? 'var(--at-danger-tint)' : urgente ? 'var(--at-warning-tint)' : 'var(--at-surface)', border: `1px solid ${vencido ? 'var(--at-danger-border)' : urgente ? 'var(--at-warning-border)' : 'var(--at-line)'}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <input type="checkbox" checked={r.completado} onChange={() => marcarCompletado(r)}
                   style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
@@ -201,7 +201,7 @@ export default function RecordatoriosTab({ recordatorios, proyectoId, companyId,
                     {r.tipo_entidad && <span style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{TIPO_LABELS[r.tipo_entidad]}</span>}
                   </div>
                   {r.descripcion && <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>{r.descripcion}</div>}
-                  <div style={{ fontSize: 11, marginTop: 3, color: vencido ? '#ef4444' : urgente ? '#d97706' : 'var(--at-ink-3)', fontWeight: vencido || urgente ? 600 : 400 }}>
+                  <div style={{ fontSize: 11, marginTop: 3, color: vencido ? 'var(--at-danger)' : urgente ? 'var(--at-warning)' : 'var(--at-ink-3)', fontWeight: vencido || urgente ? 600 : 400 }}>
                     {r.completado
                       ? `✓ Completado ${r.fecha_completado ? new Date(r.fecha_completado).toLocaleDateString('es') : ''}`
                       : vencido

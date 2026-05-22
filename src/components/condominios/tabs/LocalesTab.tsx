@@ -14,9 +14,9 @@ interface Props {
 }
 
 const ESTADO_CONFIG: Record<EstadoLocal, { label: string; color: string; bg: string }> = {
-  disponible:       { label: 'Disponible',      color: '#10b981', bg: '#d1fae5' },
+  disponible:       { label: 'Disponible',      color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   ocupado:          { label: 'Ocupado',          color: 'var(--at-primary)', bg: 'var(--at-primary-soft)' },
-  en_remodelacion:  { label: 'Remodelación',     color: '#f59e0b', bg: '#fef3c7' },
+  en_remodelacion:  { label: 'Remodelación',     color: 'var(--at-warning)', bg: 'var(--at-warning-tint)' },
 }
 
 const GIRO_ICON: Record<GiroLocal, string> = {
@@ -82,7 +82,7 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
   }
 
   async function handleDelete(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar local?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar local?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     const { error } = await supabase.from('locales_comerciales').delete().eq('id', id)
     if (error) return Swal.fire('Error', error.message, 'error')
@@ -100,8 +100,8 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
         {[
           { label: 'Total locales',   value: String(locales.length),  icon: '🏪', color: 'var(--at-primary)' },
           { label: 'Ocupados',        value: String(ocupados),        icon: '🔑', color: 'var(--at-accent)' },
-          { label: 'Disponibles',     value: String(locales.filter(l => l.estado === 'disponible').length), icon: '✅', color: '#10b981' },
-          { label: 'Renta + CAM/mes', value: rentaTotal > 0 ? `${moneda} ${rentaTotal.toFixed(0)}` : '—', icon: '💰', color: '#f59e0b' },
+          { label: 'Disponibles',     value: String(locales.filter(l => l.estado === 'disponible').length), icon: '✅', color: 'var(--at-success)' },
+          { label: 'Renta + CAM/mes', value: rentaTotal > 0 ? `${moneda} ${rentaTotal.toFixed(0)}` : '—', icon: '💰', color: 'var(--at-warning)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
@@ -235,7 +235,7 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
                     </div>
                   )}
                   {l.fecha_fin && (
-                    <div style={{ color: vence ? '#ef4444' : 'var(--at-ink-3)' }}>
+                    <div style={{ color: vence ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>
                       📅 Vence: {l.fecha_fin}{vence ? ' ⚠️ Vencido' : ''}
                     </div>
                   )}
@@ -243,7 +243,7 @@ export function LocalesTab({ locales, proyectoId, companyId, moneda, canCreate, 
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button onClick={() => startEdit(l)} style={{ padding: '4px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>✏️</button>
-                    <button onClick={() => handleDelete(l.id)} style={{ padding: '4px 8px', background: '#fee2e2', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                    <button onClick={() => handleDelete(l.id)} style={{ padding: '4px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                   </div>
                 )}
               </div>

@@ -6,12 +6,12 @@ interface Props {
 }
 
 const ACCION_CFG: Record<AccionBitacora, { label: string; bg: string; color: string; icon: string }> = {
-  crear:    { label: 'Crear',    bg: '#f0fdf4', color: '#16a34a', icon: '➕' },
+  crear:    { label: 'Crear',    bg: 'var(--at-success-tint)', color: 'var(--at-success)', icon: '➕' },
   editar:   { label: 'Editar',   bg: 'var(--at-primary-tint)', color: 'var(--at-primary)', icon: '✏️' },
-  eliminar: { label: 'Eliminar', bg: '#fef2f2', color: '#ef4444', icon: '🗑' },
-  aprobar:  { label: 'Aprobar',  bg: '#f0fdf4', color: '#16a34a', icon: '✅' },
-  rechazar: { label: 'Rechazar', bg: '#fef2f2', color: '#ef4444', icon: '❌' },
-  pagar:    { label: 'Pagar',    bg: '#f0fdf4', color: 'var(--at-accent-2)', icon: '💳' },
+  eliminar: { label: 'Eliminar', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', icon: '🗑' },
+  aprobar:  { label: 'Aprobar',  bg: 'var(--at-success-tint)', color: 'var(--at-success)', icon: '✅' },
+  rechazar: { label: 'Rechazar', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', icon: '❌' },
+  pagar:    { label: 'Pagar',    bg: 'var(--at-success-tint)', color: 'var(--at-accent-2)', icon: '💳' },
   cerrar:   { label: 'Cerrar',   bg: 'var(--at-chip)', color: 'var(--at-ink-2)', icon: '🔒' },
 }
 

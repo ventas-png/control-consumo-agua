@@ -19,9 +19,9 @@ type EstadoOC = OrdenCompra['estado']
 const ESTADO_CFG: Record<EstadoOC, { label: string; color: string; bg: string; next?: EstadoOC; nextLabel?: string }> = {
   borrador:  { label: 'Borrador',   color: 'var(--at-ink-3)', bg: 'var(--at-chip)', next: 'aprobada',  nextLabel: 'Aprobar' },
   aprobada:  { label: 'Aprobada',   color: 'var(--at-primary)', bg: 'var(--at-primary-tint)', next: 'emitida',   nextLabel: 'Emitir OC' },
-  emitida:   { label: 'Emitida',    color: '#d97706', bg: '#fef3c7', next: 'recibida',  nextLabel: 'Marcar recibida' },
-  recibida:  { label: 'Recibida',   color: '#16a34a', bg: '#dcfce7' },
-  cancelada: { label: 'Cancelada',  color: '#ef4444', bg: '#fef2f2' },
+  emitida:   { label: 'Emitida',    color: 'var(--at-warning)', bg: 'var(--at-warning-tint)', next: 'recibida',  nextLabel: 'Marcar recibida' },
+  recibida:  { label: 'Recibida',   color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
+  cancelada: { label: 'Cancelada',  color: 'var(--at-danger)', bg: 'var(--at-danger-tint)' },
 }
 
 const BLANK = {
@@ -96,14 +96,14 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
   }
 
   async function cancelar(orden: OrdenCompra) {
-    const r = await Swal.fire({ title: '¿Cancelar orden?', text: orden.concepto, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Cancelar OC' })
+    const r = await Swal.fire({ title: '¿Cancelar orden?', text: orden.concepto, icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Cancelar OC' })
     if (!r.isConfirmed) return
     await supabase.from('ordenes_compra').update({ estado: 'cancelada' }).eq('id', orden.id)
     onRefresh()
   }
 
   async function eliminar(orden: OrdenCompra) {
-    const r = await Swal.fire({ title: '¿Eliminar borrador?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Eliminar' })
+    const r = await Swal.fire({ title: '¿Eliminar borrador?', icon: 'warning', showCancelButton: true, confirmButtonColor: 'var(--at-danger)', confirmButtonText: 'Eliminar' })
     if (!r.isConfirmed) return
     await supabase.from('ordenes_compra').delete().eq('id', orden.id)
     onRefresh()
@@ -228,7 +228,7 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
                   <div style={{ padding: '0 14px 14px', borderTop: '1px solid var(--at-chip)' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, margin: '10px 0', fontSize: 11, color: 'var(--at-ink-3)' }}>
                       {orden.fecha_entrega_esperada && <div>Entrega esperada: <strong>{orden.fecha_entrega_esperada}</strong></div>}
-                      {orden.estado === 'recibida' && <div>Recibido: <strong style={{ color: '#16a34a' }}>✓</strong></div>}
+                      {orden.estado === 'recibida' && <div>Recibido: <strong style={{ color: 'var(--at-success)' }}>✓</strong></div>}
                       {orden.monto_real && <div>Monto real: <strong style={{ color: 'var(--at-ink)' }}>{moneda} {orden.monto_real.toFixed(2)}</strong></div>}
                     </div>
                     {orden.notas && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', marginBottom: 10 }}>📝 {orden.notas}</div>}
@@ -247,13 +247,13 @@ export default function OrdenesCompraTab({ ordenes, proveedores, proyectoId, com
                       )}
                       {canEdit && (orden.estado === 'borrador' || orden.estado === 'aprobada') && (
                         <button onClick={() => cancelar(orden)}
-                          style={{ padding: '5px 12px', border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: '#fef2f2', color: '#ef4444' }}>
+                          style={{ padding: '5px 12px', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>
                           Cancelar OC
                         </button>
                       )}
                       {canEdit && orden.estado === 'borrador' && (
                         <button onClick={() => eliminar(orden)}
-                          style={{ padding: '5px 12px', border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: '#fef2f2', color: '#ef4444' }}>
+                          style={{ padding: '5px 12px', border: '1px solid var(--at-danger-border)', borderRadius: 6, cursor: 'pointer', fontSize: 11, background: 'var(--at-danger-tint)', color: 'var(--at-danger)' }}>
                           🗑 Eliminar
                         </button>
                       )}

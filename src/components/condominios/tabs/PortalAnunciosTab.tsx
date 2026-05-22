@@ -8,9 +8,9 @@ type TipoAnuncio = 'aviso' | 'urgente' | 'evento' | 'mantenimiento'
 
 const TIPO_CONFIG: Record<TipoAnuncio, { label: string; icon: string; bg: string; color: string; border: string }> = {
   aviso:         { label: 'Aviso',         icon: '📢', bg: 'var(--at-primary-tint)', color: 'var(--at-primary)', border: 'var(--at-primary-soft-2)' },
-  urgente:       { label: 'Urgente',       icon: '🚨', bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
-  evento:        { label: 'Evento',        icon: '🎉', bg: '#f0fdf4', color: '#16a34a', border: '#86efac' },
-  mantenimiento: { label: 'Mantenimiento', icon: '🔧', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
+  urgente:       { label: 'Urgente',       icon: '🚨', bg: 'var(--at-danger-tint)', color: 'var(--at-danger)', border: 'var(--at-danger-border)' },
+  evento:        { label: 'Evento',        icon: '🎉', bg: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'var(--at-success-border)' },
+  mantenimiento: { label: 'Mantenimiento', icon: '🔧', bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', border: 'var(--at-warning-border)' },
 }
 
 export function PortalAnunciosTab({ anuncios }: Props) {
@@ -22,8 +22,8 @@ export function PortalAnunciosTab({ anuncios }: Props) {
       <h3 style={{ margin: '0 0 18px', fontSize: '17px', fontWeight: 700, color: 'var(--at-ink)' }}>Comunicados del condominio</h3>
 
       {urgentes.length > 0 && (
-        <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: '12px', padding: '14px 16px', marginBottom: '18px' }}>
-          <div style={{ fontWeight: 700, fontSize: '13px', color: '#dc2626', marginBottom: '8px' }}>🚨 AVISOS URGENTES</div>
+        <div style={{ background: 'var(--at-danger-tint)', border: '1.5px solid var(--at-danger-border)', borderRadius: '12px', padding: '14px 16px', marginBottom: '18px' }}>
+          <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--at-danger)', marginBottom: '8px' }}>🚨 AVISOS URGENTES</div>
           {urgentes.map(a => (
             <div key={a.id} style={{ marginBottom: '6px' }}>
               <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--at-ink)' }}>{a.titulo}</div>

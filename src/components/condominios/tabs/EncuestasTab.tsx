@@ -17,7 +17,7 @@ interface Props {
 
 const ESTADO_CONFIG: Record<EstadoEncuesta, { label: string; color: string; bg: string }> = {
   borrador: { label: 'Borrador', color: 'var(--at-ink-3)', bg: 'var(--at-chip)' },
-  activa:   { label: 'Activa',   color: '#10b981', bg: '#d1fae5' },
+  activa:   { label: 'Activa',   color: 'var(--at-success)', bg: 'var(--at-success-tint)' },
   cerrada:  { label: 'Cerrada',  color: 'var(--at-ink-3)', bg: 'var(--at-surface-2)' },
 }
 
@@ -74,7 +74,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
   }
 
   async function handleDeleteEncuesta(id: string) {
-    const r = await Swal.fire({ title: '¿Eliminar encuesta?', text: 'Se borrarán también las respuestas.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: '#ef4444' })
+    const r = await Swal.fire({ title: '¿Eliminar encuesta?', text: 'Se borrarán también las respuestas.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Eliminar', confirmButtonColor: 'var(--at-danger)' })
     if (!r.isConfirmed) return
     await supabase.from('respuestas_encuesta').delete().eq('encuesta_id', id)
     const { error } = await supabase.from('encuestas').delete().eq('id', id)
@@ -171,7 +171,7 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
                     <option value="rating_5">Puntuación 1-5</option>
                     <option value="si_no">Sí / No</option>
                   </select>
-                  <button onClick={() => removePregunta(i)} style={{ padding: '6px 10px', background: '#fee2e2', border: 'none', borderRadius: '6px', color: '#ef4444', cursor: 'pointer' }}>🗑️</button>
+                  <button onClick={() => removePregunta(i)} style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '6px', color: 'var(--at-danger)', cursor: 'pointer' }}>🗑️</button>
                 </div>
               ))}
             </div>
@@ -211,10 +211,10 @@ export function EncuestasTab({ encuestas, respuestas, unidades, proyectoId, comp
                   </div>
                   {canEdit && (
                     <div style={{ display: 'flex', gap: '5px', marginTop: '8px' }} onClick={e => e.stopPropagation()}>
-                      {enc.estado === 'borrador' && <button onClick={() => handleEstadoEncuesta(enc.id, 'activa')} style={{ padding: '3px 8px', background: '#d1fae5', color: '#059669', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Activar</button>}
+                      {enc.estado === 'borrador' && <button onClick={() => handleEstadoEncuesta(enc.id, 'activa')} style={{ padding: '3px 8px', background: 'var(--at-success-tint)', color: 'var(--at-success-strong)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Activar</button>}
                       {enc.estado === 'activa'   && <button onClick={() => handleEstadoEncuesta(enc.id, 'cerrada')} style={{ padding: '3px 8px', background: 'var(--at-chip)', color: 'var(--at-ink-3)', border: 'none', borderRadius: '5px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Cerrar</button>}
                       <button onClick={() => startEditEncuesta(enc)} style={{ padding: '3px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer' }}>✏️</button>
-                      <button onClick={() => handleDeleteEncuesta(enc.id)} style={{ padding: '3px 8px', background: '#fee2e2', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: '#ef4444' }}>🗑️</button>
+                      <button onClick={() => handleDeleteEncuesta(enc.id)} style={{ padding: '3px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', color: 'var(--at-danger)' }}>🗑️</button>
                     </div>
                   )}
                 </div>

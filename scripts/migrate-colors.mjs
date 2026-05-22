@@ -44,6 +44,18 @@ const MAP = {
   '#2563eb': 'var(--at-info)', '#3b82f6': 'var(--at-info)',
   '#1d4ed8': 'var(--at-info-strong)',
   '#dbeafe': 'var(--at-info-tint)', '#eff6ff': 'var(--at-info-tint)', '#bfdbfe': 'var(--at-info-border)',
+  // status: tonos fuertes/tints adicionales vistos en el repo
+  '#166534': 'var(--at-success-strong)', '#065f46': 'var(--at-success-strong)', '#6ee7b7': 'var(--at-success-border)',
+  '#854d0e': 'var(--at-warning-strong)', '#9a3412': 'var(--at-warning-strong)', '#b45309': 'var(--at-warning-strong)', '#ffedd5': 'var(--at-warning-tint)',
+  '#7f1d1d': 'var(--at-danger-strong)', '#fff1f2': 'var(--at-danger-tint)',
+  // neutrales de marca = valores EXACTOS del tema claro en index.css. Mapearlos
+  // a su token añade soporte de modo oscuro (eran grises/superficies fijos).
+  // Sólo los inequívocos (texto atenuado, líneas, superficies, chip, fondo);
+  // se omiten los "ink" oscuros (#15291f/#3e5a4c) y el blanco por ambigüedad
+  // texto-vs-fondo.
+  '#7e9389': 'var(--at-ink-3)',
+  '#e1ddd0': 'var(--at-line)', '#c7c2b0': 'var(--at-line-strong)',
+  '#faf7ef': 'var(--at-surface-2)', '#f2efe7': 'var(--at-bg)', '#eae6d8': 'var(--at-chip)',
 }
 
 const args = process.argv.slice(2)
@@ -65,7 +77,7 @@ function walk(dir) {
   return out
 }
 
-let totalRepl = 0, totalFiles = 0, totalWarn = 0
+let totalRepl = 0, totalFiles = 0, totalWarn = 0, totalSolid = 0
 for (const file of walk(root)) {
   let src = readFileSync(file, 'utf8')
   let count = 0
@@ -73,19 +85,35 @@ for (const file of walk(root)) {
     const re = new RegExp(hex, 'gi')
     src = src.replace(re, () => { count++; return token })
   }
-  if (count === 0) continue
+  // Pasada de badges sólidos: si una línea usa un token de estado como fondo
+  // (color directo, gradiente, o clave `bg:`) y además texto blanco
+  // hardcodeado, ese blanco pierde contraste en modo oscuro (el base se
+  // aclara). Cámbialo por var(--at-on-status), que se invierte por tema
+  // (blanco en claro, casi negro en oscuro). Corre independiente del conteo
+  // de hex para poder arreglar también archivos ya tokenizados.
+  let solid = 0
+  src = src.split('\n').map(line => {
+    const hasStatusToken = /var\(--at-(?:success|warning|danger|info)(?:-strong)?\)/.test(line)
+    const inBgContext = /(background|gradient|\bbg\s*:)/.test(line)
+    if (!hasStatusToken || !inBgContext) return line
+    return line.replace(/(color\s*:\s*)(['"`])(white|#fff|#ffffff)\2/gi, (_m, p, q) => { solid++; return `${p}${q}var(--at-on-status)${q}` })
+  }).join('\n')
+  totalSolid += solid
+
+  if (count === 0 && solid === 0) continue
   totalFiles++
   totalRepl += count
 
-  // Aviso: fondo de estado + texto blanco = badge sólido a revisar a mano.
+  // Aviso: tras la pasada anterior, líneas que aún combinan token de estado +
+  // texto blanco (p. ej. fondo/color en líneas distintas) → revisión manual.
   const warnLines = src.split('\n').filter(l =>
     /var\(--at-(success|warning|danger|info)\)/.test(l) && /(color:\s*['"`]?(white|#fff{1,3})\b)/i.test(l)
   )
   if (warnLines.length) totalWarn += warnLines.length
 
-  console.log(`${write ? '✏️ ' : '· '}${file}: ${count} reemplazos${warnLines.length ? `  ⚠ ${warnLines.length} posible(s) badge sólido` : ''}`)
+  console.log(`${write ? '✏️ ' : '· '}${file}: ${count} reemplazos${solid ? `, ${solid} badge(s) sólido(s)` : ''}${warnLines.length ? `  ⚠ ${warnLines.length} línea(s) a revisar` : ''}`)
   if (write) writeFileSync(file, src)
 }
 
-console.log(`\n${write ? 'Aplicado' : 'DRY-RUN'}: ${totalRepl} reemplazos en ${totalFiles} archivos. ${totalWarn} línea(s) marcadas para revisión manual.`)
+console.log(`\n${write ? 'Aplicado' : 'DRY-RUN'}: ${totalRepl} reemplazos + ${totalSolid} badges sólidos en ${totalFiles} archivos. ${totalWarn} línea(s) para revisión manual.`)
 if (!write) console.log('Re-ejecuta con --write para aplicar.')

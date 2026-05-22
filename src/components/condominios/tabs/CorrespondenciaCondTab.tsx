@@ -17,8 +17,8 @@ const CAT_LABELS: Record<string, string> = {
   carta: 'Carta', notificacion_legal: 'Notif. Legal', factura: 'Factura', circular: 'Circular', otro: 'Otro',
 }
 const ESTADO_STYLE: Record<string, { bg: string; color: string }> = {
-  pendiente: { bg: '#fef3c7', color: '#92400e' },
-  atendido:  { bg: '#dcfce7', color: '#16a34a' },
+  pendiente: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' },
+  atendido:  { bg: 'var(--at-success-tint)', color: 'var(--at-success)' },
   archivado: { bg: 'var(--at-chip)', color: 'var(--at-ink-3)' },
 }
 
@@ -89,8 +89,8 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
         {[
           { label: 'Entrada',   value: String(entrada),    color: 'var(--at-primary)' },
           { label: 'Salida',    value: String(salida),     color: 'var(--at-accent)' },
-          { label: 'Pendiente', value: String(pendientes), color: '#f59e0b' },
-          { label: 'Urgente',   value: String(urgentes),   color: '#ef4444' },
+          { label: 'Pendiente', value: String(pendientes), color: 'var(--at-warning)' },
+          { label: 'Urgente',   value: String(urgentes),   color: 'var(--at-danger)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
             <div style={{ fontSize: '20px', fontWeight: 800, color: k.color }}>{k.value}</div>
@@ -211,7 +211,7 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
                         style={{ background: selected === c.id ? 'var(--at-primary-tint)' : i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer' }}>
                         <td style={{ padding: '9px 12px' }}>
                           <span style={{ fontSize: '13px' }}>{c.tipo === 'entrada' ? '📥' : '📤'}</span>
-                          {c.prioridad === 'urgente' && <span style={{ fontSize: '10px', marginLeft: '4px', color: '#ef4444', fontWeight: 700 }}>URG</span>}
+                          {c.prioridad === 'urgente' && <span style={{ fontSize: '10px', marginLeft: '4px', color: 'var(--at-danger)', fontWeight: 700 }}>URG</span>}
                         </td>
                         <td style={{ padding: '9px 12px', fontWeight: 600, color: 'var(--at-ink)' }}>{c.asunto}</td>
                         <td style={{ padding: '9px 12px', color: 'var(--at-ink-3)', fontSize: '12px' }}>{CAT_LABELS[c.categoria]}</td>
@@ -223,7 +223,7 @@ export function CorrespondenciaCondTab({ correspondencia, unidades, proyectoId, 
                           {canEdit && c.estado === 'pendiente' && (
                             <div style={{ display: 'flex', gap: '4px' }}>
                               <button onClick={e => { e.stopPropagation(); cambiarEstado(c.id, 'atendido') }}
-                                style={{ padding: '2px 7px', background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                                style={{ padding: '2px 7px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
                                 Atender
                               </button>
                               <button onClick={e => { e.stopPropagation(); cambiarEstado(c.id, 'archivado') }}

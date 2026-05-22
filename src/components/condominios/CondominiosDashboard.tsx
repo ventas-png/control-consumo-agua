@@ -122,10 +122,10 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
 
   const kpis = [
     { label: 'Unidades ocupadas', value: `${stats.ocupadas}/${stats.totalUnidades}`, sub: 'habitadas vs total', icon: '🏠', from: 'var(--at-accent)', to: 'var(--at-accent-hover)' },
-    { label: 'Cuotas pendientes', value: stats.cuotasPendientes, sub: 'por cobrar', icon: '💰', from: '#f59e0b', to: '#d97706' },
-    { label: 'Cuotas en mora', value: stats.cuotasMora, sub: 'vencidas', icon: '⚠️', from: '#ef4444', to: '#dc2626' },
+    { label: 'Cuotas pendientes', value: stats.cuotasPendientes, sub: 'por cobrar', icon: '💰', from: 'var(--at-warning)', to: 'var(--at-warning)' },
+    { label: 'Cuotas en mora', value: stats.cuotasMora, sub: 'vencidas', icon: '⚠️', from: 'var(--at-danger)', to: 'var(--at-danger)' },
     { label: 'Visitantes hoy', value: stats.visitantesHoy, sub: 'entradas del día', icon: '👥', from: 'var(--at-accent-2)', to: 'var(--at-primary-hover)' },
-    { label: 'Tickets abiertos', value: stats.ticketsAbiertos, sub: 'mantenimiento', icon: '🔧', from: '#f97316', to: '#ea580c' },
+    { label: 'Tickets abiertos', value: stats.ticketsAbiertos, sub: 'mantenimiento', icon: '🔧', from: 'var(--at-warning)', to: 'var(--at-warning)' },
     { label: 'Comun. sin asignar', value: stats.comunSinAsignar, sub: 'sin agente', icon: '💬', from: 'var(--at-primary)', to: 'var(--at-primary-hover)' },
   ] as const
 
@@ -209,10 +209,10 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
                 <tr style={{ background: 'var(--at-surface-2)' }}>
                   <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, color: 'var(--at-ink-2)', borderBottom: '2px solid var(--at-line)' }}>Proyecto</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-accent-hover)', borderBottom: '2px solid var(--at-line)' }}>🏠 Ocupación</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#d97706', borderBottom: '2px solid var(--at-line)' }}>💰 Pendientes</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#dc2626', borderBottom: '2px solid var(--at-line)' }}>⚠️ Mora</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-warning)', borderBottom: '2px solid var(--at-line)' }}>💰 Pendientes</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-danger)', borderBottom: '2px solid var(--at-line)' }}>⚠️ Mora</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-primary-hover)', borderBottom: '2px solid var(--at-line)' }}>👥 Visitantes hoy</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#ea580c', borderBottom: '2px solid var(--at-line)' }}>🔧 Tickets</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-warning)', borderBottom: '2px solid var(--at-line)' }}>🔧 Tickets</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--at-primary-hover)', borderBottom: '2px solid var(--at-line)' }}>💬 Sin asignar</th>
                 </tr>
               </thead>
@@ -229,14 +229,14 @@ export function CondominiosDashboard({ currentUser, proyectos, unidades, onNavig
                       onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? 'var(--at-surface)' : 'var(--at-surface-2)'}
                     >
                       <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--at-ink)', borderBottom: '1px solid var(--at-chip)' }}>
-                        {hasMora && <span style={{ color: '#ef4444', marginRight: 6 }}>●</span>}
+                        {hasMora && <span style={{ color: 'var(--at-danger)', marginRight: 6 }}>●</span>}
                         {p.nombre}
                       </td>
                       <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', color: 'var(--at-accent-hover)', fontWeight: 600 }}>{s.ocupadas}/{s.totalUnidades}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cuotasPendientes > 0 ? 700 : 400, color: s.cuotasPendientes > 0 ? '#d97706' : 'var(--at-ink-3)' }}>{s.cuotasPendientes}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cuotasMora > 0 ? 700 : 400, color: s.cuotasMora > 0 ? '#dc2626' : 'var(--at-ink-3)' }}>{s.cuotasMora}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cuotasPendientes > 0 ? 700 : 400, color: s.cuotasPendientes > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{s.cuotasPendientes}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.cuotasMora > 0 ? 700 : 400, color: s.cuotasMora > 0 ? 'var(--at-danger)' : 'var(--at-ink-3)' }}>{s.cuotasMora}</td>
                       <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.visitantesHoy > 0 ? 700 : 400, color: s.visitantesHoy > 0 ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>{s.visitantesHoy}</td>
-                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.ticketsAbiertos > 0 ? 700 : 400, color: s.ticketsAbiertos > 0 ? '#ea580c' : 'var(--at-ink-3)' }}>{s.ticketsAbiertos}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.ticketsAbiertos > 0 ? 700 : 400, color: s.ticketsAbiertos > 0 ? 'var(--at-warning)' : 'var(--at-ink-3)' }}>{s.ticketsAbiertos}</td>
                       <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--at-chip)', fontWeight: s.comunSinAsignar > 0 ? 700 : 400, color: s.comunSinAsignar > 0 ? 'var(--at-primary-hover)' : 'var(--at-ink-3)' }}>{s.comunSinAsignar}</td>
                     </tr>
                   )
