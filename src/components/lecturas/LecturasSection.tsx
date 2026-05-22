@@ -274,7 +274,9 @@ export function LecturasSection({
     }
 
     const registro = {
-      cliente_id: clienteDeUnidad?.id ?? null,
+      // El cliente se toma de la unidad (siempre cargada), no de la lista `clientes`
+      // en memoria: un operador puede no tenerla por RLS y se perdía el cliente_id.
+      cliente_id: unidadSeleccionada.cliente_id ?? null,
       cliente_nombre: clienteDeUnidad?.nombre ?? unidadSeleccionada.nombre,
       contador_id: contadorSeleccionado.id,
       project_id: projectId,
