@@ -26,6 +26,7 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   delete_role:       { label: 'Eliminó rol',      color: 'var(--at-danger)' },
   grant_permission:  { label: 'Agregó permiso',   color: 'var(--at-success)' },
   revoke_permission: { label: 'Quitó permiso',    color: 'var(--at-danger)' },
+  user_deleted:      { label: 'Eliminó usuario',  color: 'var(--at-danger)' },
 }
 
 export function AuditLogModal({ onClose }: Props) {
@@ -161,7 +162,11 @@ export function AuditLogModal({ onClose }: Props) {
                 {rows.map(r => {
                   const a = ACTION_LABELS[r.action] ?? { label: r.action, color: 'var(--at-ink-3)' }
                   const actor = r.actor_id ? users[r.actor_id] ?? '—' : 'Sistema'
-                  const targetUser = r.target_user_id ? users[r.target_user_id] : null
+                  // For deletions the user row is gone (target_user_id is null),
+                  // so fall back to the name captured in details.
+                  const targetUser = r.target_user_id
+                    ? users[r.target_user_id] ?? null
+                    : (typeof r.details?.full_name === 'string' ? r.details.full_name : null)
                   const targetRole = r.target_role_id ? roles[r.target_role_id] : null
                   return (
                     <tr key={r.id} style={{ borderTop: '1px solid var(--at-chip)' }}>
@@ -235,6 +240,7 @@ function DetailsCell({ details }: { details: Record<string, unknown> | null }) {
     if (details.permission_key) parts.push(String(details.permission_key))
     if (details.effect)         parts.push(`(${details.effect})`)
     if (details.name)           parts.push(`"${details.name}"`)
+    if (details.role)           parts.push(`rol: ${String(details.role)}`)
     if (details.expires_at)     parts.push(`expira: ${formatDate(String(details.expires_at))}`)
     return parts.length > 0 ? parts.join(' ') : JSON.stringify(details).slice(0, 60)
   }, [details])
