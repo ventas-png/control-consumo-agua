@@ -451,7 +451,7 @@ export default function App() {
             </button>
           </div>
         )}
-        <Topbar activeSection={activeSection} currentUser={currentUser} onMenuToggle={() => setSidebarOpen(prev => !prev)} />
+        <Topbar activeSection={activeSection} currentUser={currentUser} onMenuToggle={() => setSidebarOpen(prev => !prev)} onNavigate={setActiveSection} />
         <main className="app-main" style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
           <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}><div style={{ width: 36, height: 36, border: '3px solid var(--at-line)', borderTop: '3px solid var(--at-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>}>
           {activeSection === 'clientes' && (
@@ -494,7 +494,12 @@ export default function App() {
                 onRegistroAdded={addRegistro}
                 rutaActiva={rutaActivaParaLecturas}
                 onClearRuta={() => setRutaActivaParaLecturas(null)}
-                onRutaCompletada={id => updateRuta(id, { completada: true })}
+                onRutaCompletada={id => {
+                  // Las rutas recurrentes no se marcan como completadas: cada
+                  // ocurrencia se completa por separado y la ruta sigue activa.
+                  const r = rutas.find(x => x.id === id)
+                  if (!r || (r.frecuencia ?? 'unica') === 'unica') updateRuta(id, { completada: true })
+                }}
                 canCreate={canCreate('lecturas')}
               />
             </ErrorBoundary>

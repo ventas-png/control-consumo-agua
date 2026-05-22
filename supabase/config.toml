@@ -15,3 +15,7 @@ verify_jwt = false
 
 [functions.complete-oauth-onboarding]
 verify_jwt = false
+
+# Recordatorios de rutas: autentica con service key (cron) o JWT de admin.
+[functions.route-reminders]
+verify_jwt = false

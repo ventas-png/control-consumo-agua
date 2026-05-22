@@ -212,6 +212,38 @@ export function LecturasSection({
     setFoto(null)
   }
 
+  // Marca la ocurrencia relevante (hoy / la más cercana pendiente) como completada
+  // para rutas recurrentes, en lugar de cerrar la ruta entera.
+  async function marcarOcurrenciaCompletada(rutaId: string) {
+    const hoyGT = new Date(Date.now() - 6 * 3600 * 1000).toISOString().slice(0, 10)
+    const enRango = await supabase
+      .from('ruta_ocurrencias')
+      .select('id')
+      .eq('ruta_id', rutaId)
+      .in('estado', ['pendiente', 'vencida'])
+      .lte('fecha', hoyGT)
+      .order('fecha', { ascending: false })
+      .limit(1)
+    let occId = enRango.data?.[0]?.id as string | undefined
+    if (!occId) {
+      const proxima = await supabase
+        .from('ruta_ocurrencias')
+        .select('id')
+        .eq('ruta_id', rutaId)
+        .in('estado', ['pendiente', 'vencida'])
+        .gte('fecha', hoyGT)
+        .order('fecha', { ascending: true })
+        .limit(1)
+      occId = proxima.data?.[0]?.id as string | undefined
+    }
+    if (occId) {
+      await supabase
+        .from('ruta_ocurrencias')
+        .update({ estado: 'completada', completada_at: new Date().toISOString() })
+        .eq('id', occId)
+    }
+  }
+
   async function handleGuardar() {
     if (!unidadSeleccionada) return Swal.fire('Atención', 'Seleccione una unidad primero', 'warning')
     if (!contadorSeleccionado) return Swal.fire('Atención', 'Seleccione un contador', 'warning')
@@ -348,7 +380,12 @@ export function LecturasSection({
         setFoto(null)
       } else {
         if (rutaActiva) {
-          await supabase.from('rutas').update({ completada: true }).eq('id', rutaActiva.id)
+          const esRecurrente = !!rutaActiva.frecuencia && rutaActiva.frecuencia !== 'unica'
+          if (esRecurrente) {
+            await marcarOcurrenciaCompletada(rutaActiva.id)
+          } else {
+            await supabase.from('rutas').update({ completada: true }).eq('id', rutaActiva.id)
+          }
           onRutaCompletada?.(rutaActiva.id)
           onClearRuta?.()
         } else {

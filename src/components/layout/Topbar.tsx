@@ -3,6 +3,7 @@ import type { AppSection, UserSession } from '../../types'
 import { useOffline } from '../../hooks/useOffline'
 import { useTheme } from '../../hooks/useTheme'
 import { getDisplayRoleLabel } from '../../lib/permissions'
+import { NotificationBell } from './NotificationBell'
 
 const PAGE_TITLES: Record<AppSection, string> = {
   clientes: 'Clientes',
@@ -69,9 +70,10 @@ interface Props {
   activeSection: AppSection
   currentUser: UserSession
   onMenuToggle: () => void
+  onNavigate?: (section: AppSection) => void
 }
 
-export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
+export function Topbar({ activeSection, currentUser, onMenuToggle, onNavigate }: Props) {
   const { isOnline } = useOffline()
   const { pref, cycle } = useTheme()
   const themeIcon = pref === 'auto' ? '🌗' : pref === 'light' ? '☀️' : '🌙'
@@ -178,6 +180,9 @@ export function Topbar({ activeSection, currentUser, onMenuToggle }: Props) {
           />
           {isOnline ? 'Conectado' : 'Sin conexión'}
         </span>
+
+        {/* Campana de notificaciones */}
+        {onNavigate && <NotificationBell userId={currentUser.user_id} onNavigate={onNavigate} />}
 
         {/* Theme toggle (auto → claro → oscuro) */}
         <button

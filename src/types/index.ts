@@ -177,6 +177,8 @@ export interface RoleWithPermissions extends RoleDef {
   permission_keys: string[];
 }
 
+export type FrecuenciaRuta = 'unica' | 'diaria' | 'semanal' | 'quincenal' | 'mensual' | 'fechas';
+
 export interface Ruta {
   id: string;
   nombre: string;
@@ -192,6 +194,47 @@ export interface Ruta {
   asignado_telefono?: string;
   fecha_programada?: string; // 'YYYY-MM-DD'
   completada: boolean;
+  created_at: string;
+  // Periodicidad
+  frecuencia?: FrecuenciaRuta;
+  dias_semana?: number[];          // ISO 1=lunes .. 7=domingo (para 'semanal')
+  intervalo_dias?: number | null;  // para 'quincenal'/personalizado
+  dia_mes?: number | null;         // para 'mensual'
+  fechas_especificas?: string[];   // ['YYYY-MM-DD', ...] (para 'fechas')
+  hora_programada?: string | null; // 'HH:MM' u 'HH:MM:SS' local GT
+  recurrencia_activa?: boolean;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+  recordatorio_anticipacion_min?: number; // minutos antes (1440 = 1 día)
+  recordatorio_canales?: string[];        // ['email','app']
+}
+
+export interface RutaOcurrencia {
+  id: string;
+  ruta_id: string;
+  company_id?: string | null;
+  project_id?: string | null;
+  fecha: string; // 'YYYY-MM-DD'
+  hora?: string | null;
+  estado: 'pendiente' | 'completada' | 'vencida' | 'omitida';
+  completada_at?: string | null;
+  recordatorio_enviado: boolean;
+  recordatorio_enviado_at?: string | null;
+  created_at: string;
+}
+
+export interface UserNotification {
+  id: string;
+  user_id: string;
+  company_id?: string | null;
+  tipo: string;
+  titulo: string;
+  cuerpo?: string | null;
+  seccion?: string | null;
+  ruta_id?: string | null;
+  ocurrencia_id?: string | null;
+  leido: boolean;
+  leido_at?: string | null;
   created_at: string;
 }
 
