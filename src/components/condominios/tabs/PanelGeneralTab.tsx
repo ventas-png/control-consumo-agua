@@ -1,6 +1,6 @@
 import type {
   CuotaCondominio, TicketMantenimiento, Visitante, Amenidad,
-  ReservaAmenidad, PolizaSeguro, InspeccionNormativa, GastoCondominio,
+  ReservaAmenidad, PolizaSeguro, InspeccionNormativa, GastoCondominio, PaqueteRecibido,
 } from '../../../types'
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
   polizas: PolizaSeguro[]
   inspecciones: InspeccionNormativa[]
   gastos: GastoCondominio[]
+  paquetes: PaqueteRecibido[]
   moneda: string
   proyectoNombre?: string
 }
@@ -32,7 +33,7 @@ function mesLabel(periodo: string): string {
   return ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(m) - 1]
 }
 
-export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reservas, polizas, inspecciones, gastos, moneda, proyectoNombre }: Props) {
+export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reservas, polizas, inspecciones, gastos, paquetes, moneda, proyectoNombre }: Props) {
   const hoy = new Date().toISOString().slice(0, 10)
 
   // ── KPI base ─────────────────────────────────────────────────────────────────
@@ -44,6 +45,8 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
   const visitantesHoy     = visitantes.filter(v => v.hora_entrada.startsWith(hoy))
   const amenidadesActivas = amenidades.filter(a => a.activo)
   const reservasHoy       = reservas.filter(r => r.fecha === hoy && r.estado !== 'cancelada')
+  const paqEntrantesPend  = paquetes.filter(p => (p.direccion ?? 'entrante') === 'entrante' && p.estado === 'pendiente')
+  const paqSalidasPend    = paquetes.filter(p => p.direccion === 'saliente_tercero' && p.estado === 'pendiente')
 
   // ── Alertas inteligentes ──────────────────────────────────────────────────────
   const alertas: Alerta[] = []
@@ -82,6 +85,11 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
   // Reservas de hoy
   if (reservasHoy.length > 0) {
     alertas.push({ nivel: 'info', icon: '🏊', titulo: `${reservasHoy.length} reserva${reservasHoy.length > 1 ? 's' : ''} de amenidades hoy`, desc: reservasHoy.slice(0, 2).map(r => `${r.hora_inicio}–${r.hora_fin}`).join(', ') })
+  }
+
+  // Paquetes pendientes en portería
+  if (paqEntrantesPend.length > 0) {
+    alertas.push({ nivel: 'info', icon: '📦', titulo: `${paqEntrantesPend.length} paquete${paqEntrantesPend.length > 1 ? 's' : ''} por entregar`, desc: 'Pendientes de retiro por el residente en portería' })
   }
 
   const nivelColor: Record<Alerta['nivel'], { bg: string; border: string; color: string; dot: string }> = {
@@ -129,6 +137,7 @@ export function PanelGeneralTab({ cuotas, tickets, visitantes, amenidades, reser
     { label: 'Tickets abiertos',  value: ticketsAbiertos.length, sub: `${ticketsUrgentes.length} urgentes`, color: 'var(--at-warning)', bg: 'rgba(245,158,11,0.1)',    icon: '🔧' },
     { label: 'Visitas hoy',       value: visitantesHoy.length,   sub: 'registradas',                        color: 'var(--at-success)', bg: 'rgba(16,185,129,0.1)',    icon: '🚪' },
     { label: 'Amenidades',        value: amenidadesActivas.length, sub: 'disponibles',                      color: 'var(--at-accent)', bg: 'rgba(185, 106, 63,0.1)',    icon: '🏊' },
+    { label: 'Paquetes pendientes', value: paqEntrantesPend.length + paqSalidasPend.length, sub: `${paqEntrantesPend.length} por entregar · ${paqSalidasPend.length} por retirar`, color: 'var(--at-primary)', bg: 'rgba(27, 59, 54,0.1)', icon: '📦' },
   ]
 
   return (

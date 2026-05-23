@@ -447,6 +447,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
             {tab === 'paquetes' && (
               <PortalPaquetesTab
                 paquetes={paquetesU}
+                unidadId={selectedUnidadId}
                 nombrePrefill={currentUser.name}
                 onRefresh={cargarDatos}
               />
