@@ -1697,6 +1697,7 @@ export interface MemoriaLabores {
 // ── Fase 7: STR, Locales Comerciales, Housekeeping ────────────────────────────
 export type PlataformaSTR = 'airbnb' | 'booking' | 'vrbo' | 'directo' | 'otro'
 export type EstadoSTR = 'confirmada' | 'en_curso' | 'completada' | 'cancelada'
+export type PoliticaCancelacionSTR = 'flexible' | 'moderada' | 'estricta' | 'no_reembolsable' | 'na' | 'otra'
 export interface ReservaSTR {
   id: string
   company_id: string
@@ -1705,14 +1706,21 @@ export interface ReservaSTR {
   huesped_nombre: string
   huesped_email?: string | null
   huesped_telefono?: string | null
+  codigo_confirmacion?: string | null
+  fecha_reservacion?: string | null
   fecha_entrada: string
   fecha_salida: string
+  hora_llegada_estimada?: string | null
+  hora_salida_estimada?: string | null
   num_adultos: number
   num_ninos: number
+  num_bebes: number
   plataforma: PlataformaSTR
   monto_noche?: number | null
   monto_total?: number | null
   estado: EstadoSTR
+  politica_cancelacion?: PoliticaCancelacionSTR | null
+  mascotas: boolean
   notas?: string | null
   foto_url?: string | null
   foto_documento_url?: string | null

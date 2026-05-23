@@ -1,6 +1,6 @@
 import { useState, useEffect, type CSSProperties } from 'react'
 import { supabase } from '../../../lib/supabase'
-import type { ReservaSTR, EstadoSTR, PlataformaSTR, Unidad, HuespedSTR } from '../../../types'
+import type { ReservaSTR, EstadoSTR, PlataformaSTR, PoliticaCancelacionSTR, Unidad, HuespedSTR } from '../../../types'
 import Swal from 'sweetalert2'
 import { ImageUploader } from '../ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
@@ -44,11 +44,19 @@ const PLATAFORMA_ICON: Record<PlataformaSTR, string> = {
   airbnb: '🏠', booking: '🌐', vrbo: '🏡', directo: '📱', otro: '📋',
 }
 
+const POLITICA_LABEL: Record<PoliticaCancelacionSTR, string> = {
+  flexible: 'Flexible', moderada: 'Moderada', estricta: 'Estricta',
+  no_reembolsable: 'No reembolsable', na: 'N/A', otra: 'Otra',
+}
+
 const blank = (): Partial<ReservaSTR> => ({
   huesped_nombre: '', huesped_email: '', huesped_telefono: '',
-  fecha_entrada: '', fecha_salida: '', num_adultos: 1, num_ninos: 0,
+  codigo_confirmacion: '', fecha_reservacion: '',
+  fecha_entrada: '', fecha_salida: '',
+  hora_llegada_estimada: '', hora_salida_estimada: '',
+  num_adultos: 1, num_ninos: 0, num_bebes: 0,
   plataforma: 'directo', monto_noche: undefined, monto_total: undefined,
-  estado: 'confirmada', notas: '',
+  estado: 'confirmada', politica_cancelacion: 'na', mascotas: false, notas: '',
 })
 
 function calcNoches(entrada: string, salida: string) {
@@ -109,10 +117,16 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
     setForm({
       huesped_nombre: r.huesped_nombre, huesped_email: r.huesped_email ?? '',
       huesped_telefono: r.huesped_telefono ?? '', unidad_id: r.unidad_id ?? undefined,
+      codigo_confirmacion: r.codigo_confirmacion ?? '',
+      fecha_reservacion: r.fecha_reservacion ?? '',
       fecha_entrada: r.fecha_entrada, fecha_salida: r.fecha_salida,
-      num_adultos: r.num_adultos, num_ninos: r.num_ninos,
+      hora_llegada_estimada: (r.hora_llegada_estimada ?? '').slice(0, 5),
+      hora_salida_estimada: (r.hora_salida_estimada ?? '').slice(0, 5),
+      num_adultos: r.num_adultos, num_ninos: r.num_ninos, num_bebes: r.num_bebes ?? 0,
       plataforma: r.plataforma, monto_noche: r.monto_noche ?? undefined,
-      monto_total: r.monto_total ?? undefined, estado: r.estado, notas: r.notas ?? '',
+      monto_total: r.monto_total ?? undefined, estado: r.estado,
+      politica_cancelacion: r.politica_cancelacion ?? 'na', mascotas: r.mascotas ?? false,
+      notas: r.notas ?? '',
     })
     setFotoUrl(r.foto_url ?? null)
     setFotoDocumentoUrl(r.foto_documento_url ?? null)
@@ -210,13 +224,20 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
       huesped_nombre: form.huesped_nombre!.trim(),
       huesped_email: form.huesped_email || null,
       huesped_telefono: form.huesped_telefono || null,
+      codigo_confirmacion: form.codigo_confirmacion?.trim() || null,
+      fecha_reservacion: form.fecha_reservacion || null,
       unidad_id: form.unidad_id || null,
       fecha_entrada: form.fecha_entrada!, fecha_salida: form.fecha_salida!,
+      hora_llegada_estimada: form.hora_llegada_estimada || null,
+      hora_salida_estimada: form.hora_salida_estimada || null,
       num_adultos: form.num_adultos ?? 1, num_ninos: form.num_ninos ?? 0,
+      num_bebes: form.num_bebes ?? 0,
       plataforma: form.plataforma ?? 'directo',
       monto_noche: form.monto_noche ?? null,
       monto_total: form.monto_total ?? null,
       estado: form.estado ?? 'confirmada',
+      politica_cancelacion: form.politica_cancelacion || null,
+      mascotas: form.mascotas ?? false,
       notas: form.notas || null,
       foto_url: fotoUrl,
       foto_documento_url: fotoDocumentoUrl,
@@ -282,8 +303,15 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
       </div>
 
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Reserva' : 'Nueva Reserva STR'}</h3>
+        <div onClick={e => { if (e.target === e.currentTarget) cancelForm() }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--at-surface)', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '680px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>{editId ? 'Editar Reserva' : 'Nueva Reserva STR'}</h3>
+              <button onClick={cancelForm}
+                style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--at-chip)', border: 'none', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--at-ink-3)', lineHeight: 1 }}>×</button>
+            </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
             <div>
               <label style={labelStyle}>Huésped *</label>
@@ -298,11 +326,19 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
               <input style={inputStyle} value={form.huesped_telefono ?? ''} onChange={e => setForm(f => ({ ...f, huesped_telefono: e.target.value }))} />
             </div>
             <div>
+              <label style={labelStyle}>Código de confirmación</label>
+              <input style={inputStyle} value={form.codigo_confirmacion ?? ''} onChange={e => setForm(f => ({ ...f, codigo_confirmacion: e.target.value }))} placeholder="Ej. HMABCD123" />
+            </div>
+            <div>
               <label style={labelStyle}>Unidad</label>
               <select style={inputStyle} value={form.unidad_id ?? ''} onChange={e => setForm(f => ({ ...f, unidad_id: e.target.value || undefined }))}>
                 <option value="">Sin asignar</option>
                 {unidades.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
               </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Fecha de reservación</label>
+              <input style={inputStyle} type="date" value={form.fecha_reservacion ?? ''} onChange={e => setForm(f => ({ ...f, fecha_reservacion: e.target.value }))} />
             </div>
             <div>
               <label style={labelStyle}>Entrada *</label>
@@ -313,12 +349,24 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
               <input style={inputStyle} type="date" value={form.fecha_salida ?? ''} onChange={e => setForm(f => recalcTotal({ ...f, fecha_salida: e.target.value }))} />
             </div>
             <div>
+              <label style={labelStyle}>Hora estimada de llegada</label>
+              <input style={inputStyle} type="time" value={form.hora_llegada_estimada ?? ''} onChange={e => setForm(f => ({ ...f, hora_llegada_estimada: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Hora estimada de salida</label>
+              <input style={inputStyle} type="time" value={form.hora_salida_estimada ?? ''} onChange={e => setForm(f => ({ ...f, hora_salida_estimada: e.target.value }))} />
+            </div>
+            <div>
               <label style={labelStyle}>Adultos</label>
               <input style={inputStyle} type="number" min="1" value={form.num_adultos ?? 1} onChange={e => setForm(f => ({ ...f, num_adultos: Number(e.target.value) }))} />
             </div>
             <div>
               <label style={labelStyle}>Niños</label>
               <input style={inputStyle} type="number" min="0" value={form.num_ninos ?? 0} onChange={e => setForm(f => ({ ...f, num_ninos: Number(e.target.value) }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Bebés</label>
+              <input style={inputStyle} type="number" min="0" value={form.num_bebes ?? 0} onChange={e => setForm(f => ({ ...f, num_bebes: Number(e.target.value) }))} />
             </div>
             <div>
               <label style={labelStyle}>Plataforma</label>
@@ -342,6 +390,19 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
               <label style={labelStyle}>Estado</label>
               <select style={inputStyle} value={form.estado ?? 'confirmada'} onChange={e => setForm(f => ({ ...f, estado: e.target.value as EstadoSTR }))}>
                 {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Política de cancelación</label>
+              <select style={inputStyle} value={form.politica_cancelacion ?? 'na'} onChange={e => setForm(f => ({ ...f, politica_cancelacion: e.target.value as PoliticaCancelacionSTR }))}>
+                {Object.entries(POLITICA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Mascotas</label>
+              <select style={inputStyle} value={form.mascotas ? 'si' : 'no'} onChange={e => setForm(f => ({ ...f, mascotas: e.target.value === 'si' }))}>
+                <option value="no">No</option>
+                <option value="si">Sí</option>
               </select>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
@@ -476,6 +537,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
               {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
             </button>
           </div>
+          </div>
         </div>
       )}
 
@@ -528,9 +590,14 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '10px' }}>
                   <div>📅 {r.fecha_entrada} → {r.fecha_salida} <span style={{ fontWeight: 600, color: 'var(--at-ink)' }}>({noches}n)</span></div>
-                  <div>👥 {r.num_adultos} adultos{r.num_ninos > 0 ? ` · ${r.num_ninos} niños` : ''}</div>
+                  {(r.hora_llegada_estimada || r.hora_salida_estimada) && (
+                    <div>🕒 {r.hora_llegada_estimada ? `Llegada ${r.hora_llegada_estimada.slice(0, 5)}` : ''}{r.hora_llegada_estimada && r.hora_salida_estimada ? ' · ' : ''}{r.hora_salida_estimada ? `Salida ${r.hora_salida_estimada.slice(0, 5)}` : ''}</div>
+                  )}
+                  <div>👥 {r.num_adultos} adultos{r.num_ninos > 0 ? ` · ${r.num_ninos} niños` : ''}{r.num_bebes > 0 ? ` · ${r.num_bebes} bebés` : ''}{r.mascotas ? ' · 🐾 mascotas' : ''}</div>
                   {r.monto_total && <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>💰 {moneda} {r.monto_total.toFixed(2)}</div>}
                   {r.huesped_telefono && <div>📞 {r.huesped_telefono}</div>}
+                  {r.codigo_confirmacion && <div>🔖 {r.codigo_confirmacion}</div>}
+                  {r.politica_cancelacion && r.politica_cancelacion !== 'na' && <div>📋 {POLITICA_LABEL[r.politica_cancelacion]}</div>}
                 </div>
                 {/* Group progress */}
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
