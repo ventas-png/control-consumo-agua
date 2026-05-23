@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { BrandLogo } from '../shared/BrandLogo'
+import { EditModal } from '../shared/EditModal'
+import { NotificationBell } from '../layout/NotificationBell'
 import type {
   UserSession, Unidad, CuotaCondominio, Amenidad,
   ReservaAmenidad, BloqueoAmenidad, TicketMantenimiento,
-  AnuncioComunidad, Visitante, MensajePortal, SolicitudRentaUnidad,
+  AnuncioComunidad, Visitante, MensajePortal, SolicitudRentaUnidad, PaqueteRecibido,
 } from '../../types'
 import { PortalReservasTab }   from '../condominios/tabs/PortalReservasTab'
 import { PortalMiCuentaTab }   from '../condominios/tabs/PortalMiCuentaTab'
@@ -14,13 +16,14 @@ import { PortalVisitantesTab } from '../condominios/tabs/PortalVisitantesTab'
 import { PortalAnunciosTab }   from '../condominios/tabs/PortalAnunciosTab'
 import { PortalRentasTab }     from '../condominios/tabs/PortalRentasTab'
 import { PortalMudanzaTab }    from '../condominios/tabs/PortalMudanzaTab'
+import { PortalPaquetesTab }   from '../condominios/tabs/PortalPaquetesTab'
 
 interface Props {
   currentUser: UserSession
   onLogout: () => void
 }
 
-type PortalTab = 'mi_unidad' | 'reservas' | 'cuenta' | 'tickets' | 'visitantes' | 'anuncios' | 'rentas' | 'mudanza'
+type PortalTab = 'mi_unidad' | 'reservas' | 'cuenta' | 'tickets' | 'visitantes' | 'paquetes' | 'anuncios' | 'rentas' | 'mudanza'
 
 const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
   { id: 'mi_unidad',  label: 'Mi Unidad',    icon: '🏠' },
@@ -28,6 +31,7 @@ const PORTAL_TABS: { id: PortalTab; label: string; icon: string }[] = [
   { id: 'cuenta',     label: 'Mi Cuenta',     icon: '💳' },
   { id: 'tickets',    label: 'Mantenimiento', icon: '🔧' },
   { id: 'visitantes', label: 'Visitantes',    icon: '🚪' },
+  { id: 'paquetes',   label: 'Paquetería',    icon: '📦' },
   { id: 'anuncios',   label: 'Anuncios',      icon: '📢' },
   { id: 'rentas',     label: 'Rentas',        icon: '🏨' },
   { id: 'mudanza',    label: 'Mudanzas',      icon: '🚛' },
@@ -71,6 +75,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const [visitantes, setVisitantes]               = useState<Visitante[]>([])
   const [mensajes, setMensajes]                   = useState<MensajePortal[]>([])
   const [solicitudesRenta, setSolicitudesRenta]   = useState<SolicitudRentaUnidad[]>([])
+  const [paquetes, setPaquetes]                   = useState<PaqueteRecibido[]>([])
+  const [popupOpen, setPopupOpen]                 = useState(false)
 
   const cargarDatos = useCallback(async () => {
     if (!clienteId) { setLoading(false); return }
@@ -112,6 +118,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         { data: visitantesData },
         { data: mensajesData },
         { data: solicitudesRentaData },
+        { data: paquetesData },
       ] = await Promise.all([
         supabase.from('projects').select('id, company_id, moneda_condominios, moneda').in('id', projectIds),
         supabase.from('amenidades').select('*').in('project_id', projectIds).eq('activo', true),
@@ -136,6 +143,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
           .order('created_at', { ascending: false })
           .limit(100),
         supabase.from('solicitud_renta_unidad').select('*').in('unidad_id', unidadIds).order('created_at', { ascending: false }).limit(50),
+        supabase.from('paquetes_recibidos').select('*, unidades(nombre)').in('unidad_id', unidadIds).order('hora_recepcion', { ascending: false }).limit(100),
       ])
 
       const proj = (projData as { id: string; company_id: string; moneda_condominios: string | null; moneda: string }[] | null)?.[0]
@@ -156,12 +164,25 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       setVisitantes((visitantesData as Visitante[]) ?? [])
       setMensajes((mensajesData as MensajePortal[]) ?? [])
       setSolicitudesRenta((solicitudesRentaData as SolicitudRentaUnidad[]) ?? [])
+      setPaquetes(((paquetesData as (PaqueteRecibido & { unidades?: { nombre: string } | null })[]) ?? [])
+        .map(r => ({ ...r, unidad_nombre: r.unidades?.nombre })))
     } finally {
       setLoading(false)
     }
   }, [clienteId, currentUser.company_id])
 
   useEffect(() => { cargarDatos() }, [cargarDatos])
+
+  // Pop-up de aviso: muestra los paquetes pendientes una vez por sesión (set de
+  // ids vistos en sessionStorage para no repetir en cada refresco).
+  useEffect(() => {
+    if (loading) return
+    const pend = paquetes.filter(p => p.estado === 'pendiente')
+    if (pend.length === 0) return
+    let seen: string[] = []
+    try { seen = JSON.parse(sessionStorage.getItem('paq_popup_seen') ?? '[]') } catch { seen = [] }
+    if (pend.some(p => !seen.includes(p.id))) setPopupOpen(true)
+  }, [loading, paquetes])
 
   // No services guard (only after initial load)
   if (!loading && unidades.length === 0) {
@@ -209,7 +230,15 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   const cuotasU        = cuotas.filter(c => c.unidad_id === selectedUnidadId)
   const ticketsU       = tickets.filter(t => t.unidad_id === selectedUnidadId)
   const visitantesU    = visitantes.filter(v => v.unidad_id === selectedUnidadId)
+  const paquetesU      = paquetes.filter(p => p.unidad_id === selectedUnidadId)
   const mensajesU      = mensajes.filter(m => m.unidad_id === selectedUnidadId)
+  const paquetesPendientes = paquetes.filter(p => p.estado === 'pendiente')
+
+  function cerrarPopup(irA?: boolean) {
+    try { sessionStorage.setItem('paq_popup_seen', JSON.stringify(paquetesPendientes.map(p => p.id))) } catch { /* ignore */ }
+    setPopupOpen(false)
+    if (irA) setTab('paquetes')
+  }
   // Most recent rental authorization for the selected unit (null = none submitted)
   const solicitudRentaU = solicitudesRenta.find(s => s.unidad_id === selectedUnidadId) ?? null
 
@@ -286,6 +315,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 border: '1.5px solid rgba(255,255,255,0.3)',
               }}>🏠 {unidad.nombre}</div>
             )}
+
+            <NotificationBell userId={currentUser.user_id} onNavigate={s => { if (s === 'paquetes') setTab('paquetes') }} />
 
             <button
               onClick={onLogout}
@@ -413,6 +444,13 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 onRefresh={cargarDatos}
               />
             )}
+            {tab === 'paquetes' && (
+              <PortalPaquetesTab
+                paquetes={paquetesU}
+                nombrePrefill={currentUser.name}
+                onRefresh={cargarDatos}
+              />
+            )}
             {tab === 'anuncios' && (
               anunciosP.length === 0 ? (
                 <EmptyState icon="📢" title="Sin anuncios" text="No hay anuncios publicados en este momento." />
@@ -443,6 +481,35 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
           </div>
         )}
       </div>
+
+      {popupOpen && paquetesPendientes.length > 0 && (
+        <EditModal title="📦 Tienes paquetes en portería" onClose={() => cerrarPopup()} maxWidth="440px">
+          <p style={{ margin: '0 0 14px', fontSize: '14px', color: 'var(--at-ink-2)', lineHeight: 1.5 }}>
+            {paquetesPendientes.length === 1 ? 'Hay un envío esperándote' : `Hay ${paquetesPendientes.length} envíos esperándote`} en portería. Al retirarlo podrás firmar la recepción desde tu portal.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px', maxHeight: '240px', overflowY: 'auto' }}>
+            {paquetesPendientes.map(p => (
+              <div key={p.id} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '10px', padding: '10px 12px' }}>
+                <span style={{ fontSize: '22px', flexShrink: 0 }}>📦</span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--at-ink)' }}>{p.descripcion}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>
+                    {p.unidad_nombre ? `📍 ${p.unidad_nombre}` : ''}{p.remitente ? ` · De: ${p.remitente}` : ''}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => cerrarPopup(true)} style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg,var(--at-accent-hover),var(--at-accent))', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+              Ver y firmar
+            </button>
+            <button onClick={() => cerrarPopup()} style={{ padding: '11px 18px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}>
+              Después
+            </button>
+          </div>
+        </EditModal>
+      )}
     </div>
   )
 }

@@ -233,6 +233,7 @@ export interface UserNotification {
   seccion?: string | null;
   ruta_id?: string | null;
   ocurrencia_id?: string | null;
+  paquete_id?: string | null;
   leido: boolean;
   leido_at?: string | null;
   created_at: string;
@@ -443,7 +444,8 @@ export type AppSection =
   | 'condominios_dashboard'
   | 'condominios_visitantes'
   | 'condominios_cuotas'
-  | 'condominios_mantenimiento';
+  | 'condominios_mantenimiento'
+  | 'paquetes';
 
 // ── Módulo Condominios ────────────────────────────────────────────────────────
 
@@ -675,6 +677,7 @@ export interface AnuncioComunidad {
 export type TipoParqueo = 'asignado' | 'visita' | 'discapacitado'
 export type EspecieMascota = 'perro' | 'gato' | 'ave' | 'otro'
 export type EstadoPaquete = 'pendiente' | 'entregado' | 'devuelto'
+export type TipoPaquete = 'paquete' | 'documento' | 'sobre' | 'otro'
 export type TipoInfraccion = 'ruido' | 'basura' | 'estacionamiento' | 'mascota' | 'daños' | 'otro'
 export type EstadoInfraccion = 'emitida' | 'notificada' | 'en_descargo' | 'resuelta' | 'anulada'
 export type EstadoRonda = 'en_curso' | 'completada' | 'incompleta'
@@ -727,11 +730,17 @@ export interface PaqueteRecibido {
   descripcion: string
   num_guia?: string | null
   empresa_mensajeria?: string | null
+  tipo: TipoPaquete
   estado: EstadoPaquete
+  fotos?: string[] | null
+  firma_path?: string | null
   hora_recepcion: string
   hora_entrega?: string | null
   recibido_por?: string | null
   entregado_por?: string | null
+  entregado_a_nombre?: string | null
+  entregado_via?: 'portal' | 'porteria' | null
+  notificado_at?: string | null
   notas?: string | null
   created_at: string
   // joins

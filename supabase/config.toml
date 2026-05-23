@@ -19,3 +19,7 @@ verify_jwt = false
 # Recordatorios de rutas: autentica con service key (cron) o JWT de admin.
 [functions.route-reminders]
 verify_jwt = false
+
+# Aviso de paquete al residente: autentica con service key o JWT de la empresa.
+[functions.notify-package]
+verify_jwt = false
