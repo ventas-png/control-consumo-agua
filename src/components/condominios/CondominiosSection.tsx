@@ -1301,7 +1301,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
         {/* Tab content */}
         <div style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
-        {activeTab === 'panel' && <PanelGeneralTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} amenidades={amenidades} reservas={reservas} polizas={polizas} inspecciones={inspecciones} gastos={gastos} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
+        {activeTab === 'panel' && <PanelGeneralTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} amenidades={amenidades} reservas={reservas} polizas={polizas} inspecciones={inspecciones} gastos={gastos} paquetes={paquetes} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
 
         {activeTab === 'cuotas' && <CuotasTab cuotas={cuotas} unidades={unidadesProyecto} proyectos={proyectosActivos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 
@@ -1333,7 +1333,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
         {activeTab === 'desempeno_personal' && <DesempenoPersonalTab bloques={bloquesTurno} tareas={tareasBloque} revisiones={revisionesTarea} rondas={rondas} visitasControl={visitasControl} personal={personal} />}
 
-        {activeTab === 'reporte_consolidado' && <ReporteConsolidadoTab cuotas={cuotas} gastos={gastos} tickets={tickets} presupuestos={presupuestos} visitantes={visitantes} novedades={novedades} rondas={rondas} anuncios={anuncios} reservas={reservas} bloques={bloquesTurno} tareas={tareasBloque} unidades={unidadesProyecto} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
+        {activeTab === 'reporte_consolidado' && <ReporteConsolidadoTab cuotas={cuotas} gastos={gastos} tickets={tickets} presupuestos={presupuestos} visitantes={visitantes} novedades={novedades} rondas={rondas} anuncios={anuncios} reservas={reservas} bloques={bloquesTurno} tareas={tareasBloque} unidades={unidadesProyecto} paquetes={paquetes} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
 
         {activeTab === 'arrendamientos' && <ArrendamientosTab contratos={contratos} unidades={unidadesProyecto} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
 

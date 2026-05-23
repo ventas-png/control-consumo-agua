@@ -678,6 +678,7 @@ export type TipoParqueo = 'asignado' | 'visita' | 'discapacitado'
 export type EspecieMascota = 'perro' | 'gato' | 'ave' | 'otro'
 export type EstadoPaquete = 'pendiente' | 'entregado' | 'devuelto'
 export type TipoPaquete = 'paquete' | 'documento' | 'sobre' | 'otro'
+export type DireccionPaquete = 'entrante' | 'saliente_tercero'
 export type TipoInfraccion = 'ruido' | 'basura' | 'estacionamiento' | 'mascota' | 'daños' | 'otro'
 export type EstadoInfraccion = 'emitida' | 'notificada' | 'en_descargo' | 'resuelta' | 'anulada'
 export type EstadoRonda = 'en_curso' | 'completada' | 'incompleta'
@@ -732,8 +733,14 @@ export interface PaqueteRecibido {
   empresa_mensajeria?: string | null
   tipo: TipoPaquete
   estado: EstadoPaquete
+  direccion?: DireccionPaquete | null
   fotos?: string[] | null
   firma_path?: string | null
+  // Salida para retiro por tercero
+  autorizado_nombre?: string | null
+  autorizado_documento?: string | null
+  autorizado_telefono?: string | null
+  codigo_retiro?: string | null
   hora_recepcion: string
   hora_entrega?: string | null
   recibido_por?: string | null

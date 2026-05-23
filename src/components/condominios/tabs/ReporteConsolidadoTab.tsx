@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode} from 'react'
 import type {
   CuotaCondominio, GastoCondominio, TicketMantenimiento, PresupuestoCondominio,
   Visitante, NovedadSeguridad, RondaSeguridad, AnuncioComunidad,
-  ReservaAmenidad, BloqueTurno, TareaBloque, Unidad,
+  ReservaAmenidad, BloqueTurno, TareaBloque, Unidad, PaqueteRecibido,
 } from '../../../types'
 
 interface Props {
@@ -18,6 +18,7 @@ interface Props {
   bloques:       BloqueTurno[]
   tareas:        TareaBloque[]
   unidades:      Unidad[]
+  paquetes:      PaqueteRecibido[]
   moneda:        string
   proyectoNombre?: string
 }
@@ -54,7 +55,7 @@ export function ReporteConsolidadoTab({
   cuotas, gastos, tickets, presupuestos,
   visitantes, novedades, rondas,
   anuncios, reservas, bloques, tareas,
-  unidades, moneda, proyectoNombre,
+  unidades, paquetes, moneda, proyectoNombre,
 }: Props) {
   const hoy     = new Date()
   const [mes, setMes]   = useState(hoy.getMonth())
@@ -101,6 +102,17 @@ export function ReporteConsolidadoTab({
   const rondasCompletadas = rondasPeriodo.filter(r => r.estado === 'completada').length
   const visitantesPeriodo = visitantes.filter(v => v.hora_entrada.slice(0,10) >= periodo.desde && v.hora_entrada.slice(0,10) <= periodo.hasta)
   const novedadesPeriodo  = novedades.filter(n => n.created_at.slice(0,10) >= periodo.desde && n.created_at.slice(0,10) <= periodo.hasta)
+
+  // ── Paquetería ──────────────────────────────────────────────────────────────
+  const enFecha = (iso?: string | null) => !!iso && iso.slice(0,10) >= periodo.desde && iso.slice(0,10) <= periodo.hasta
+  const paqEntrantes     = paquetes.filter(p => (p.direccion ?? 'entrante') === 'entrante')
+  const paqSalientes     = paquetes.filter(p => p.direccion === 'saliente_tercero')
+  const paqRecibidosPer  = paqEntrantes.filter(p => enFecha(p.hora_recepcion))
+  const paqEntregadosPer = paqEntrantes.filter(p => p.estado === 'entregado' && enFecha(p.hora_entrega))
+  const paqPendientes    = paqEntrantes.filter(p => p.estado === 'pendiente').length
+  const paqSalidasPer    = paqSalientes.filter(p => enFecha(p.hora_recepcion))
+  const paqRetiradosPer  = paqSalientes.filter(p => p.estado === 'entregado' && enFecha(p.hora_entrega))
+  const paqPorRetirar    = paqSalientes.filter(p => p.estado === 'pendiente').length
 
   // ── Comunidad ─────────────────────────────────────────────────────────────
   const anunciosPeriodo   = anuncios.filter(a => a.created_at.slice(0,10) >= periodo.desde && a.created_at.slice(0,10) <= periodo.hasta)
@@ -225,7 +237,19 @@ export function ReporteConsolidadoTab({
           </div>
         </Section>
 
-        {/* 6. Comunidad */}
+        {/* 6. Paquetería */}
+        <Section title="Paquetería & Recepción" icon="📦">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px,1fr))', gap: '10px' }}>
+            <KpiBox label="Paquetes recibidos"   value={String(paqRecibidosPer.length)} sub="en el período" />
+            <KpiBox label="Entregados"           value={String(paqEntregadosPer.length)} color='var(--at-success)' bg='var(--at-success-tint)' border='var(--at-success-border)' sub={pct(paqEntregadosPer.length, paqRecibidosPer.length) + ' del período'} />
+            <KpiBox label="Pendientes de entrega" value={String(paqPendientes)} color={paqPendientes > 0 ? 'var(--at-warning)' : 'var(--at-success)'} sub="acumulados" />
+            <KpiBox label="Salidas (retiro 3º)"  value={String(paqSalidasPer.length)} sub="en el período" />
+            <KpiBox label="Retirados por 3º"     value={String(paqRetiradosPer.length)} color='var(--at-success)' />
+            <KpiBox label="Por retirar"          value={String(paqPorRetirar)} color={paqPorRetirar > 0 ? 'var(--at-warning)' : 'var(--at-success)'} sub="en custodia" />
+          </div>
+        </Section>
+
+        {/* 7. Comunidad */}
         <Section title="Comunidad & Amenidades" icon="🏘️">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px,1fr))', gap: '10px' }}>
             <KpiBox label="Anuncios publicados"  value={String(anunciosPeriodo.length)} />
