@@ -4,7 +4,7 @@ import { supabase } from '../../../lib/supabase'
 import { ImageUploader } from '../ImageUploader'
 import type {
   ContratoArrendamiento, ReservaSTR,
-  EstadoContrato, EstadoSTR, PlataformaSTR,
+  EstadoContrato, EstadoSTR, PlataformaSTR, PoliticaCancelacionSTR,
   SolicitudRentaUnidad, TipoRenta, HuespedSTR,
 } from '../../../types'
 
@@ -59,6 +59,11 @@ const PLATAFORMAS: Record<PlataformaSTR, string> = {
   otro:    'Otro',
 }
 
+const POLITICA_CANCELACION: Record<PoliticaCancelacionSTR, string> = {
+  flexible: 'Flexible', moderada: 'Moderada', estricta: 'Estricta',
+  no_reembolsable: 'No reembolsable', na: 'N/A', otra: 'Otra',
+}
+
 const TIPO_RENTA_LABEL: Record<TipoRenta, string> = {
   arrendamiento: 'Arrendamiento (largo plazo)',
   str:           'STR / Corto Plazo',
@@ -78,10 +83,12 @@ function blankContrato(): Partial<ContratoArrendamiento> {
 function blankReserva(): Partial<ReservaSTR> {
   return {
     huesped_nombre: '', huesped_email: '', huesped_telefono: '',
+    codigo_confirmacion: '', fecha_reservacion: '',
     fecha_entrada: '', fecha_salida: '',
-    num_adultos: 1, num_ninos: 0,
+    hora_llegada_estimada: '', hora_salida_estimada: '',
+    num_adultos: 1, num_ninos: 0, num_bebes: 0,
     plataforma: 'directo', monto_noche: 0, monto_total: 0,
-    estado: 'confirmada', notas: '',
+    estado: 'confirmada', politica_cancelacion: 'na', mascotas: false, notas: '',
   }
 }
 
@@ -319,7 +326,12 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
   }
 
   function openEditSTR(r: ReservaSTR) {
-    setEditSTR(r); setFormSTR({ ...r })
+    setEditSTR(r)
+    setFormSTR({
+      ...r,
+      hora_llegada_estimada: (r.hora_llegada_estimada ?? '').slice(0, 5),
+      hora_salida_estimada: (r.hora_salida_estimada ?? '').slice(0, 5),
+    })
     setFotoUrl(r.foto_url ?? null)
     setFotoDocumentoUrl(r.foto_documento_url ?? null)
     setHuespedes((reservaHuespedes[r.id] ?? []).map(h => ({
@@ -407,14 +419,21 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
       huesped_nombre: formSTR.huesped_nombre!.trim(),
       huesped_email: formSTR.huesped_email || null,
       huesped_telefono: formSTR.huesped_telefono || null,
+      codigo_confirmacion: formSTR.codigo_confirmacion?.trim() || null,
+      fecha_reservacion: formSTR.fecha_reservacion || null,
       fecha_entrada: formSTR.fecha_entrada,
       fecha_salida: formSTR.fecha_salida,
+      hora_llegada_estimada: formSTR.hora_llegada_estimada || null,
+      hora_salida_estimada: formSTR.hora_salida_estimada || null,
       num_adultos: Number(formSTR.num_adultos) || 1,
       num_ninos: Number(formSTR.num_ninos) || 0,
+      num_bebes: Number(formSTR.num_bebes) || 0,
       plataforma: formSTR.plataforma ?? 'directo',
       monto_noche: Number(formSTR.monto_noche) || null,
       monto_total: total || null,
       estado: formSTR.estado ?? 'confirmada',
+      politica_cancelacion: formSTR.politica_cancelacion || null,
+      mascotas: formSTR.mascotas ?? false,
       notas: formSTR.notas || null,
       foto_url: fotoUrl,
       foto_documento_url: fotoDocumentoUrl,
@@ -678,10 +697,20 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                     <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)' }}>
                       📅 {r.fecha_entrada} → {r.fecha_salida}{nights > 0 && ` (${nights} noche${nights !== 1 ? 's' : ''})`}
                     </div>
+                    {(r.hora_llegada_estimada || r.hora_salida_estimada) && (
+                      <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)', marginTop: '2px' }}>
+                        🕒 {r.hora_llegada_estimada ? `Llegada ${r.hora_llegada_estimada.slice(0, 5)}` : ''}{r.hora_llegada_estimada && r.hora_salida_estimada ? ' · ' : ''}{r.hora_salida_estimada ? `Salida ${r.hora_salida_estimada.slice(0, 5)}` : ''}
+                      </div>
+                    )}
                     <div style={{ fontSize: '12.5px', color: 'var(--at-ink-2)', marginTop: '2px' }}>
-                      👥 {r.num_adultos} adulto{r.num_adultos !== 1 ? 's' : ''}{r.num_ninos > 0 ? `, ${r.num_ninos} niño${r.num_ninos !== 1 ? 's' : ''}` : ''}{'  ·  '}🌐 {PLATAFORMAS[r.plataforma]}{r.monto_total ? `  ·  💰 ${r.monto_total.toLocaleString()}` : ''}
+                      👥 {r.num_adultos} adulto{r.num_adultos !== 1 ? 's' : ''}{r.num_ninos > 0 ? `, ${r.num_ninos} niño${r.num_ninos !== 1 ? 's' : ''}` : ''}{r.num_bebes > 0 ? `, ${r.num_bebes} bebé${r.num_bebes !== 1 ? 's' : ''}` : ''}{'  ·  '}🌐 {PLATAFORMAS[r.plataforma]}{r.monto_total ? `  ·  💰 ${r.monto_total.toLocaleString()}` : ''}{r.mascotas ? '  ·  🐾' : ''}
                       {preregistrados > 0 && ` · ${1 + preregistrados}/${capacidad} personas pre-registradas`}
                     </div>
+                    {(r.codigo_confirmacion || (r.politica_cancelacion && r.politica_cancelacion !== 'na')) && (
+                      <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginTop: '2px' }}>
+                        {r.codigo_confirmacion ? `🔖 ${r.codigo_confirmacion}` : ''}{r.codigo_confirmacion && r.politica_cancelacion && r.politica_cancelacion !== 'na' ? '  ·  ' : ''}{r.politica_cancelacion && r.politica_cancelacion !== 'na' ? `📋 ${POLITICA_CANCELACION[r.politica_cancelacion]}` : ''}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11.5px', fontWeight: 600, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
@@ -715,6 +744,14 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                     <input style={fieldStyle} type="email" value={formSTR.huesped_email ?? ''} onChange={e => setFormSTR(p => ({ ...p, huesped_email: e.target.value }))} placeholder="correo@ejemplo.com" />
                   </div>
                   <div>
+                    <label style={labelStyle}>Código de confirmación</label>
+                    <input style={fieldStyle} value={formSTR.codigo_confirmacion ?? ''} onChange={e => setFormSTR(p => ({ ...p, codigo_confirmacion: e.target.value }))} placeholder="Ej. HMABCD123" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Fecha de reservación</label>
+                    <input style={fieldStyle} type="date" value={formSTR.fecha_reservacion ?? ''} onChange={e => setFormSTR(p => ({ ...p, fecha_reservacion: e.target.value }))} />
+                  </div>
+                  <div>
                     <label style={labelStyle}>Fecha entrada *</label>
                     <input style={fieldStyle} type="date" value={formSTR.fecha_entrada ?? ''} onChange={e => setFormSTR(p => ({ ...p, fecha_entrada: e.target.value }))} />
                   </div>
@@ -723,12 +760,24 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                     <input style={fieldStyle} type="date" value={formSTR.fecha_salida ?? ''} onChange={e => setFormSTR(p => ({ ...p, fecha_salida: e.target.value }))} />
                   </div>
                   <div>
+                    <label style={labelStyle}>Hora estimada de llegada</label>
+                    <input style={fieldStyle} type="time" value={formSTR.hora_llegada_estimada ?? ''} onChange={e => setFormSTR(p => ({ ...p, hora_llegada_estimada: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Hora estimada de salida</label>
+                    <input style={fieldStyle} type="time" value={formSTR.hora_salida_estimada ?? ''} onChange={e => setFormSTR(p => ({ ...p, hora_salida_estimada: e.target.value }))} />
+                  </div>
+                  <div>
                     <label style={labelStyle}>Adultos</label>
                     <input style={fieldStyle} type="number" min={1} value={formSTR.num_adultos ?? 1} onChange={e => setFormSTR(p => ({ ...p, num_adultos: Number(e.target.value) }))} />
                   </div>
                   <div>
                     <label style={labelStyle}>Niños</label>
                     <input style={fieldStyle} type="number" min={0} value={formSTR.num_ninos ?? 0} onChange={e => setFormSTR(p => ({ ...p, num_ninos: Number(e.target.value) }))} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Bebés</label>
+                    <input style={fieldStyle} type="number" min={0} value={formSTR.num_bebes ?? 0} onChange={e => setFormSTR(p => ({ ...p, num_bebes: Number(e.target.value) }))} />
                   </div>
                   <div>
                     <label style={labelStyle}>Plataforma</label>
@@ -754,6 +803,21 @@ export function PortalRentasTab({ unidadId, unidadNombre, proyectoId, companyId,
                       <option value="en_curso">En curso</option>
                       <option value="completada">Completada</option>
                       <option value="cancelada">Cancelada</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Política de cancelación</label>
+                    <select style={fieldStyle} value={formSTR.politica_cancelacion ?? 'na'} onChange={e => setFormSTR(p => ({ ...p, politica_cancelacion: e.target.value as PoliticaCancelacionSTR }))}>
+                      {(Object.entries(POLITICA_CANCELACION) as [PoliticaCancelacionSTR, string][]).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Mascotas</label>
+                    <select style={fieldStyle} value={formSTR.mascotas ? 'si' : 'no'} onChange={e => setFormSTR(p => ({ ...p, mascotas: e.target.value === 'si' }))}>
+                      <option value="no">No</option>
+                      <option value="si">Sí</option>
                     </select>
                   </div>
                   <div style={{ gridColumn: '1/-1' }}>
