@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { captureException } from '../lib/monitoring'
 
 interface Props {
   children: ReactNode
@@ -44,6 +45,15 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(`[ErrorBoundary] Section "${this.props.sectionName ?? 'unknown'}" crashed:`, error, info)
+
+    // Report real crashes to Sentry. Chunk-load errors are transient (stale tab
+    // after a deploy) and self-heal via reload, so don't pollute the dashboard.
+    if (!isChunkLoadError(error)) {
+      captureException(error, {
+        section: this.props.sectionName ?? 'unknown',
+        componentStack: info.componentStack,
+      })
+    }
 
     // Auto-reload on first chunk-load error (stale tab after deploy). Guard
     // with a sessionStorage flag so a genuinely broken build doesn't loop.

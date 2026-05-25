@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
+import { track } from '../../lib/analytics'
 import { canViewCondominiosTabByPermission } from '../../lib/permissions'
 import type {
   UserSession, Proyecto, Unidad,
@@ -1179,6 +1180,11 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
   }, [selectedProyectoId, currentUser.company_id])
 
   useEffect(() => { cargarDatos() }, [cargarDatos])
+
+  // Feature-usage analytics: which of the condominios tabs are actually used.
+  useEffect(() => {
+    track('condominios_tab_viewed', { tab: activeTab, section: activeSection })
+  }, [activeTab, activeSection])
 
   const unidadesProyecto = unidades.filter(u => u.project_id === selectedProyectoId)
   const proyectoActual = proyectos.find(p => p.id === selectedProyectoId)
