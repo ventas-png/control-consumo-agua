@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { supabase } from '../../lib/supabase'
 import { track } from '../../lib/analytics'
 import { canViewCondominiosTabByPermission } from '../../lib/permissions'
@@ -46,187 +46,198 @@ import type {
   FondoReservaMovimiento,
   ConfigCondominio,
 } from '../../types'
-import { PanelGeneralTab } from './tabs/PanelGeneralTab'
-import { CuotasTab } from './tabs/CuotasTab'
-import { VisitantesTab } from './tabs/VisitantesTab'
-import { AmenidadesTab } from './tabs/AmenidadesTab'
-import { MantenimientoTab } from './tabs/MantenimientoTab'
-import { ComunidadTab } from './tabs/ComunidadTab'
-import { ParqueosTab } from './tabs/ParqueosTab'
-import { MascotasTab } from './tabs/MascotasTab'
-import { PaqueteriaTab } from './tabs/PaqueteriaTab'
-import { InfraccionesTab } from './tabs/InfraccionesTab'
-import { SeguridadTab } from './tabs/SeguridadTab'
-import { RutasRondaTab } from './tabs/RutasRondaTab'
-import { PlantillasCargoTab } from './tabs/PlantillasCargoTab'
-import { TareasPersonalTab } from './tabs/TareasPersonalTab'
-import { RevisionTareasTab } from './tabs/RevisionTareasTab'
-import { DesempenoPersonalTab } from './tabs/DesempenoPersonalTab'
-import { ReporteConsolidadoTab } from './tabs/ReporteConsolidadoTab'
-import { ArrendamientosTab } from './tabs/ArrendamientosTab'
-import { AsambleasTab } from './tabs/AsambleasTab'
-import { ProveedoresTab } from './tabs/ProveedoresTab'
-import { ObjetosTab } from './tabs/ObjetosTab'
-import { AgendaTab } from './tabs/AgendaTab'
-import { InventarioTab } from './tabs/InventarioTab'
-import { PolizasTab } from './tabs/PolizasTab'
-import { InspeccionesTab } from './tabs/InspeccionesTab'
-import { PersonalTab } from './tabs/PersonalTab'
-import { EmergenciasTab } from './tabs/EmergenciasTab'
-import { DocumentosTab } from './tabs/DocumentosTab'
-import { ResiduosTab } from './tabs/ResiduosTab'
-import { BodegasTab } from './tabs/BodegasTab'
-import { OnboardingTab } from './tabs/OnboardingTab'
-import { PropuestasTab } from './tabs/PropuestasTab'
-import { MemoriaTab } from './tabs/MemoriaTab'
-import { STRTab } from './tabs/STRTab'
-import { LocalesTab } from './tabs/LocalesTab'
-import { SostenibilidadTab } from './tabs/SostenibilidadTab'
-import { HousekeepingTab } from './tabs/HousekeepingTab'
-import { FirmaDigitalTab } from './tabs/FirmaDigitalTab'
-import { ConciergeTab } from './tabs/ConciergeTab'
-import { LlavesTab } from './tabs/LlavesTab'
-import { EncuestasTab } from './tabs/EncuestasTab'
-import { ContabilidadTab } from './tabs/ContabilidadTab'
-import { PresupuestoTab } from './tabs/PresupuestoTab'
-import { AlertasTab } from './tabs/AlertasTab'
-import { ReportesTab } from './tabs/ReportesTab'
-import { EstadoCuentaTab } from './tabs/EstadoCuentaTab'
-import { CalendarioTab } from './tabs/CalendarioTab'
-import { CumpleanosTab } from './tabs/CumpleanosTab'
-import { DirectorioTab } from './tabs/DirectorioTab'
-import { ConfiguracionTab } from './tabs/ConfiguracionTab'
-import { SolicitudesTab } from './tabs/SolicitudesTab'
-import { SolicitudesRentaTab } from './tabs/SolicitudesRentaTab'
-import { SolicitudesMudanzaTab } from './tabs/SolicitudesMudanzaTab'
-import { JuntaTab } from './tabs/JuntaTab'
-import { PrestamoEquiposTab } from './tabs/PrestamoEquiposTab'
-import { ComunicadosTab } from './tabs/ComunicadosTab'
-import { ActasTab } from './tabs/ActasTab'
-import { CierresMensualesTab } from './tabs/CierresMensualesTab'
-import { NotificacionesTab } from './tabs/NotificacionesTab'
-import { MedidoresUnidadTab } from './tabs/MedidoresUnidadTab'
-import { VotacionesTab } from './tabs/VotacionesTab'
-import { SancionesTab } from './tabs/SancionesTab'
-import { MantenimientoPrevTab } from './tabs/MantenimientoPrevTab'
-import { PortalResidenteTab } from './tabs/PortalResidenteTab'
-import { CorrespondenciaCondTab } from './tabs/CorrespondenciaCondTab'
-import { LibroNovedadesTab } from './tabs/LibroNovedadesTab'
-import { SeguimientoAcuerdosTab } from './tabs/SeguimientoAcuerdosTab'
-import { DashboardEjecutivoTab } from './tabs/DashboardEjecutivoTab'
-import { VehiculosTab } from './tabs/VehiculosTab'
-import { EventosComunidadTab } from './tabs/EventosComunidadTab'
-import { CajaChicaTab } from './tabs/CajaChicaTab'
-import { ObrasTab } from './tabs/ObrasTab'
-import { PlanPagoCondTab } from './tabs/PlanPagoCondTab'
-import { AccesosResTab } from './tabs/AccesosResTab'
-import { GarantiasEquipoTab } from './tabs/GarantiasEquipoTab'
-import { EntregaUnidadTab } from './tabs/EntregaUnidadTab'
-import { AvisosCobroTab } from './tabs/AvisosCobroTab'
-import { BitacoraManto as BitacoraMantoTab } from './tabs/BitacoraManto'
-import { EvaluacionProveedorTab } from './tabs/EvaluacionProveedorTab'
-import { ReclamosTab } from './tabs/ReclamosTab'
-import { FondoReservaTab } from './tabs/FondoReservaTab'
-import { PermisosObraTab } from './tabs/PermisosObraTab'
-import { TarifasTab } from './tabs/TarifasTab'
-import { IncidentesTab } from './tabs/IncidentesTab'
-import { ChecklistAreasTab } from './tabs/ChecklistAreasTab'
-import { ProgramacionLimpiezaTab } from './tabs/ProgramacionLimpiezaTab'
-import { ConsumoEnergiaAreasTab } from './tabs/ConsumoEnergiaAreasTab'
-import { HistorialResidentesTab } from './tabs/HistorialResidentesTab'
-import EstacionamientoVisitaTab from './tabs/EstacionamientoVisitaTab'
-import BitacoraGuardiaTab from './tabs/BitacoraGuardiaTab'
-import EquiposComunesTab from './tabs/EquiposComunesTab'
-import PresenciaPersonalTab from './tabs/PresenciaPersonalTab'
-import SuministrosTab from './tabs/SuministrosTab'
-import TareasCondominioTab from './tabs/TareasCondominioTab'
-import GestionCobranzaTab from './tabs/GestionCobranzaTab'
-import SolicitudCertificadoTab from './tabs/SolicitudCertificadoTab'
-import VisitasFrecuentesTab from './tabs/VisitasFrecuentesTab'
-import ReglamentoTab from './tabs/ReglamentoTab'
-import ControlPlagasTab from './tabs/ControlPlagasTab'
-import CargosAdicionalesTab from './tabs/CargosAdicionalesTab'
-import ProgramaActividadesTab from './tabs/ProgramaActividadesTab'
-import RegistroAutoridadesTab from './tabs/RegistroAutoridadesTab'
-import NotasAdminTab from './tabs/NotasAdminTab'
-import ControlPiscinaTab from './tabs/ControlPiscinaTab'
-import MantenimientoJardineriaTab from './tabs/MantenimientoJardineriaTab'
-import IncidenciasElevadorTab from './tabs/IncidenciasElevadorTab'
-import MantenimientoCisternaTab from './tabs/MantenimientoCisternaTab'
-import ControlGeneradorTab from './tabs/ControlGeneradorTab'
-import ControlSistemaIncendioTab from './tabs/ControlSistemaIncendioTab'
-import ControlCamarasTab from './tabs/ControlCamarasTab'
-import LecturasMedidorGasTab from './tabs/LecturasMedidorGasTab'
-import ComentariosTicketTab from './tabs/ComentariosTicketTab'
-import RecordatoriosTab from './tabs/RecordatoriosTab'
-import PlantillasCuotaTab from './tabs/PlantillasCuotaTab'
-import BitacoraAccionesTab from './tabs/BitacoraAccionesTab'
-import RecargosTab from './tabs/RecargosTab'
-import ConveniosCuotaTab from './tabs/ConveniosCuotaTab'
-import HistorialSaldosTab from './tabs/HistorialSaldosTab'
-import NotificacionesEnviadasTab from './tabs/NotificacionesEnviadasTab'
-import ReglasMoraTab from './tabs/ReglasMoraTab'
-import CampanasCobroTab from './tabs/CampanasCobroTab'
-import CierreAnualTab from './tabs/CierreAnualTab'
-import KpisFinancierosTab from './tabs/KpisFinancierosTab'
-import CobranzaJudicialTab from './tabs/CobranzaJudicialTab'
-import RecibosDigitalesTab from './tabs/RecibosDigitalesTab'
-import InformeMensualTab from './tabs/InformeMensualTab'
-import BuzonSugerenciasTab from './tabs/BuzonSugerenciasTab'
-import VencimientosCriticosTab from './tabs/VencimientosCriticosTab'
-import CapacitacionPersonalTab from './tabs/CapacitacionPersonalTab'
-import ProyectosCondominioTab from './tabs/ProyectosCondominioTab'
-import MetricasServicioTab from './tabs/MetricasServicioTab'
-import AnalisisCarteraTab from './tabs/AnalisisCarteraTab'
-import IntegracionAguaTab from './tabs/IntegracionAguaTab'
-import CentroCostosTab from './tabs/CentroCostosTab'
-import ManualResidenteTab from './tabs/ManualResidenteTab'
-import ExportacionTab from './tabs/ExportacionTab'
-import MultiCondominioTab from './tabs/MultiCondominioTab'
-import AutomatizacionesTab from './tabs/AutomatizacionesTab'
-import ScoringUnidadesTab from './tabs/ScoringUnidadesTab'
-import PanelTurnoTab from './tabs/PanelTurnoTab'
-import PlantillasMensajeTab from './tabs/PlantillasMensajeTab'
-import FlujoAprobacionTab from './tabs/FlujoAprobacionTab'
-import CuadroMandoTab from './tabs/CuadroMandoTab'
-import GeneradorCuotasTab from './tabs/GeneradorCuotasTab'
-import MapaUnidadesTab from './tabs/MapaUnidadesTab'
-import EnvioMasivoTab from './tabs/EnvioMasivoTab'
-import ResumenEjecutivoTab from './tabs/ResumenEjecutivoTab'
-import OrdenesCompraTab from './tabs/OrdenesCompraTab'
-import GraficasTendenciasTab from './tabs/GraficasTendenciasTab'
-import ControlAccesosQRTab from './tabs/ControlAccesosQRTab'
-import CentroNotificacionesTab from './tabs/CentroNotificacionesTab'
-import AsambleaDigitalTab from './tabs/AsambleaDigitalTab'
-import ComparativoPresupuestoTab from './tabs/ComparativoPresupuestoTab'
-import ProformasTab from './tabs/ProformasTab'
-import BitacoraEventosTab from './tabs/BitacoraEventosTab'
-import IndiceCalidadTab from './tabs/IndiceCalidadTab'
-import KanbanTicketsTab from './tabs/KanbanTicketsTab'
-import ConciliacionCobrosTab from './tabs/ConciliacionCobrosTab'
-import EstadoCuentaResidenteTab from './tabs/EstadoCuentaResidenteTab'
-import PronosticoFinancieroTab from './tabs/PronosticoFinancieroTab'
-import SimuladorCuotasTab from './tabs/SimuladorCuotasTab'
-import CalendarioMantenimientoTab from './tabs/CalendarioMantenimientoTab'
-import ReporteDeudoresTab from './tabs/ReporteDeudoresTab'
-import ResumenResidenteTab from './tabs/ResumenResidenteTab'
-import GestorAlertasTab from './tabs/GestorAlertasTab'
-import UtilizacionAmenidadesTab from './tabs/UtilizacionAmenidadesTab'
-import ComparativoAnualTab from './tabs/ComparativoAnualTab'
-import GanttMantenimientoTab from './tabs/GanttMantenimientoTab'
-import MapaCalorCuotasTab from './tabs/MapaCalorCuotasTab'
-import EncuestaDashboardTab from './tabs/EncuestaDashboardTab'
-import AnalisisVisitantesTab from './tabs/AnalisisVisitantesTab'
-import InformeEjecutivoTab from './tabs/InformeEjecutivoTab'
-import TableroOcupacionTab from './tabs/TableroOcupacionTab'
-import GestionFondoReservaTab from './tabs/GestionFondoReservaTab'
-import DashboardSostenibilidadTab from './tabs/DashboardSostenibilidadTab'
-import ConfiguracionCondominioTab from './tabs/ConfiguracionCondominioTab'
-import BitacoraActividadTab from './tabs/BitacoraActividadTab'
-import PanelDirectivoTab from './tabs/PanelDirectivoTab'
-import GestionConflictosTab from './tabs/GestionConflictosTab'
-import DirectorioComunidadTab from './tabs/DirectorioComunidadTab'
+const PanelGeneralTab = lazy(() => import('./tabs/PanelGeneralTab').then(m => ({ default: m.PanelGeneralTab })))
+const CuotasTab = lazy(() => import('./tabs/CuotasTab').then(m => ({ default: m.CuotasTab })))
+const VisitantesTab = lazy(() => import('./tabs/VisitantesTab').then(m => ({ default: m.VisitantesTab })))
+const AmenidadesTab = lazy(() => import('./tabs/AmenidadesTab').then(m => ({ default: m.AmenidadesTab })))
+const MantenimientoTab = lazy(() => import('./tabs/MantenimientoTab').then(m => ({ default: m.MantenimientoTab })))
+const ComunidadTab = lazy(() => import('./tabs/ComunidadTab').then(m => ({ default: m.ComunidadTab })))
+const ParqueosTab = lazy(() => import('./tabs/ParqueosTab').then(m => ({ default: m.ParqueosTab })))
+const MascotasTab = lazy(() => import('./tabs/MascotasTab').then(m => ({ default: m.MascotasTab })))
+const PaqueteriaTab = lazy(() => import('./tabs/PaqueteriaTab').then(m => ({ default: m.PaqueteriaTab })))
+const InfraccionesTab = lazy(() => import('./tabs/InfraccionesTab').then(m => ({ default: m.InfraccionesTab })))
+const SeguridadTab = lazy(() => import('./tabs/SeguridadTab').then(m => ({ default: m.SeguridadTab })))
+const RutasRondaTab = lazy(() => import('./tabs/RutasRondaTab').then(m => ({ default: m.RutasRondaTab })))
+const PlantillasCargoTab = lazy(() => import('./tabs/PlantillasCargoTab').then(m => ({ default: m.PlantillasCargoTab })))
+const TareasPersonalTab = lazy(() => import('./tabs/TareasPersonalTab').then(m => ({ default: m.TareasPersonalTab })))
+const RevisionTareasTab = lazy(() => import('./tabs/RevisionTareasTab').then(m => ({ default: m.RevisionTareasTab })))
+const DesempenoPersonalTab = lazy(() => import('./tabs/DesempenoPersonalTab').then(m => ({ default: m.DesempenoPersonalTab })))
+const ReporteConsolidadoTab = lazy(() => import('./tabs/ReporteConsolidadoTab').then(m => ({ default: m.ReporteConsolidadoTab })))
+const ArrendamientosTab = lazy(() => import('./tabs/ArrendamientosTab').then(m => ({ default: m.ArrendamientosTab })))
+const AsambleasTab = lazy(() => import('./tabs/AsambleasTab').then(m => ({ default: m.AsambleasTab })))
+const ProveedoresTab = lazy(() => import('./tabs/ProveedoresTab').then(m => ({ default: m.ProveedoresTab })))
+const ObjetosTab = lazy(() => import('./tabs/ObjetosTab').then(m => ({ default: m.ObjetosTab })))
+const AgendaTab = lazy(() => import('./tabs/AgendaTab').then(m => ({ default: m.AgendaTab })))
+const InventarioTab = lazy(() => import('./tabs/InventarioTab').then(m => ({ default: m.InventarioTab })))
+const PolizasTab = lazy(() => import('./tabs/PolizasTab').then(m => ({ default: m.PolizasTab })))
+const InspeccionesTab = lazy(() => import('./tabs/InspeccionesTab').then(m => ({ default: m.InspeccionesTab })))
+const PersonalTab = lazy(() => import('./tabs/PersonalTab').then(m => ({ default: m.PersonalTab })))
+const EmergenciasTab = lazy(() => import('./tabs/EmergenciasTab').then(m => ({ default: m.EmergenciasTab })))
+const DocumentosTab = lazy(() => import('./tabs/DocumentosTab').then(m => ({ default: m.DocumentosTab })))
+const ResiduosTab = lazy(() => import('./tabs/ResiduosTab').then(m => ({ default: m.ResiduosTab })))
+const BodegasTab = lazy(() => import('./tabs/BodegasTab').then(m => ({ default: m.BodegasTab })))
+const OnboardingTab = lazy(() => import('./tabs/OnboardingTab').then(m => ({ default: m.OnboardingTab })))
+const PropuestasTab = lazy(() => import('./tabs/PropuestasTab').then(m => ({ default: m.PropuestasTab })))
+const MemoriaTab = lazy(() => import('./tabs/MemoriaTab').then(m => ({ default: m.MemoriaTab })))
+const STRTab = lazy(() => import('./tabs/STRTab').then(m => ({ default: m.STRTab })))
+const LocalesTab = lazy(() => import('./tabs/LocalesTab').then(m => ({ default: m.LocalesTab })))
+const SostenibilidadTab = lazy(() => import('./tabs/SostenibilidadTab').then(m => ({ default: m.SostenibilidadTab })))
+const HousekeepingTab = lazy(() => import('./tabs/HousekeepingTab').then(m => ({ default: m.HousekeepingTab })))
+const FirmaDigitalTab = lazy(() => import('./tabs/FirmaDigitalTab').then(m => ({ default: m.FirmaDigitalTab })))
+const ConciergeTab = lazy(() => import('./tabs/ConciergeTab').then(m => ({ default: m.ConciergeTab })))
+const LlavesTab = lazy(() => import('./tabs/LlavesTab').then(m => ({ default: m.LlavesTab })))
+const EncuestasTab = lazy(() => import('./tabs/EncuestasTab').then(m => ({ default: m.EncuestasTab })))
+const ContabilidadTab = lazy(() => import('./tabs/ContabilidadTab').then(m => ({ default: m.ContabilidadTab })))
+const PresupuestoTab = lazy(() => import('./tabs/PresupuestoTab').then(m => ({ default: m.PresupuestoTab })))
+const AlertasTab = lazy(() => import('./tabs/AlertasTab').then(m => ({ default: m.AlertasTab })))
+const ReportesTab = lazy(() => import('./tabs/ReportesTab').then(m => ({ default: m.ReportesTab })))
+const EstadoCuentaTab = lazy(() => import('./tabs/EstadoCuentaTab').then(m => ({ default: m.EstadoCuentaTab })))
+const CalendarioTab = lazy(() => import('./tabs/CalendarioTab').then(m => ({ default: m.CalendarioTab })))
+const CumpleanosTab = lazy(() => import('./tabs/CumpleanosTab').then(m => ({ default: m.CumpleanosTab })))
+const DirectorioTab = lazy(() => import('./tabs/DirectorioTab').then(m => ({ default: m.DirectorioTab })))
+const ConfiguracionTab = lazy(() => import('./tabs/ConfiguracionTab').then(m => ({ default: m.ConfiguracionTab })))
+const SolicitudesTab = lazy(() => import('./tabs/SolicitudesTab').then(m => ({ default: m.SolicitudesTab })))
+const SolicitudesRentaTab = lazy(() => import('./tabs/SolicitudesRentaTab').then(m => ({ default: m.SolicitudesRentaTab })))
+const SolicitudesMudanzaTab = lazy(() => import('./tabs/SolicitudesMudanzaTab').then(m => ({ default: m.SolicitudesMudanzaTab })))
+const JuntaTab = lazy(() => import('./tabs/JuntaTab').then(m => ({ default: m.JuntaTab })))
+const PrestamoEquiposTab = lazy(() => import('./tabs/PrestamoEquiposTab').then(m => ({ default: m.PrestamoEquiposTab })))
+const ComunicadosTab = lazy(() => import('./tabs/ComunicadosTab').then(m => ({ default: m.ComunicadosTab })))
+const ActasTab = lazy(() => import('./tabs/ActasTab').then(m => ({ default: m.ActasTab })))
+const CierresMensualesTab = lazy(() => import('./tabs/CierresMensualesTab').then(m => ({ default: m.CierresMensualesTab })))
+const NotificacionesTab = lazy(() => import('./tabs/NotificacionesTab').then(m => ({ default: m.NotificacionesTab })))
+const MedidoresUnidadTab = lazy(() => import('./tabs/MedidoresUnidadTab').then(m => ({ default: m.MedidoresUnidadTab })))
+const VotacionesTab = lazy(() => import('./tabs/VotacionesTab').then(m => ({ default: m.VotacionesTab })))
+const SancionesTab = lazy(() => import('./tabs/SancionesTab').then(m => ({ default: m.SancionesTab })))
+const MantenimientoPrevTab = lazy(() => import('./tabs/MantenimientoPrevTab').then(m => ({ default: m.MantenimientoPrevTab })))
+const PortalResidenteTab = lazy(() => import('./tabs/PortalResidenteTab').then(m => ({ default: m.PortalResidenteTab })))
+const CorrespondenciaCondTab = lazy(() => import('./tabs/CorrespondenciaCondTab').then(m => ({ default: m.CorrespondenciaCondTab })))
+const LibroNovedadesTab = lazy(() => import('./tabs/LibroNovedadesTab').then(m => ({ default: m.LibroNovedadesTab })))
+const SeguimientoAcuerdosTab = lazy(() => import('./tabs/SeguimientoAcuerdosTab').then(m => ({ default: m.SeguimientoAcuerdosTab })))
+const DashboardEjecutivoTab = lazy(() => import('./tabs/DashboardEjecutivoTab').then(m => ({ default: m.DashboardEjecutivoTab })))
+const VehiculosTab = lazy(() => import('./tabs/VehiculosTab').then(m => ({ default: m.VehiculosTab })))
+const EventosComunidadTab = lazy(() => import('./tabs/EventosComunidadTab').then(m => ({ default: m.EventosComunidadTab })))
+const CajaChicaTab = lazy(() => import('./tabs/CajaChicaTab').then(m => ({ default: m.CajaChicaTab })))
+const ObrasTab = lazy(() => import('./tabs/ObrasTab').then(m => ({ default: m.ObrasTab })))
+const PlanPagoCondTab = lazy(() => import('./tabs/PlanPagoCondTab').then(m => ({ default: m.PlanPagoCondTab })))
+const AccesosResTab = lazy(() => import('./tabs/AccesosResTab').then(m => ({ default: m.AccesosResTab })))
+const GarantiasEquipoTab = lazy(() => import('./tabs/GarantiasEquipoTab').then(m => ({ default: m.GarantiasEquipoTab })))
+const EntregaUnidadTab = lazy(() => import('./tabs/EntregaUnidadTab').then(m => ({ default: m.EntregaUnidadTab })))
+const AvisosCobroTab = lazy(() => import('./tabs/AvisosCobroTab').then(m => ({ default: m.AvisosCobroTab })))
+const BitacoraMantoTab = lazy(() => import('./tabs/BitacoraManto').then(m => ({ default: m.BitacoraManto })))
+const EvaluacionProveedorTab = lazy(() => import('./tabs/EvaluacionProveedorTab').then(m => ({ default: m.EvaluacionProveedorTab })))
+const ReclamosTab = lazy(() => import('./tabs/ReclamosTab').then(m => ({ default: m.ReclamosTab })))
+const FondoReservaTab = lazy(() => import('./tabs/FondoReservaTab').then(m => ({ default: m.FondoReservaTab })))
+const PermisosObraTab = lazy(() => import('./tabs/PermisosObraTab').then(m => ({ default: m.PermisosObraTab })))
+const TarifasTab = lazy(() => import('./tabs/TarifasTab').then(m => ({ default: m.TarifasTab })))
+const IncidentesTab = lazy(() => import('./tabs/IncidentesTab').then(m => ({ default: m.IncidentesTab })))
+const ChecklistAreasTab = lazy(() => import('./tabs/ChecklistAreasTab').then(m => ({ default: m.ChecklistAreasTab })))
+const ProgramacionLimpiezaTab = lazy(() => import('./tabs/ProgramacionLimpiezaTab').then(m => ({ default: m.ProgramacionLimpiezaTab })))
+const ConsumoEnergiaAreasTab = lazy(() => import('./tabs/ConsumoEnergiaAreasTab').then(m => ({ default: m.ConsumoEnergiaAreasTab })))
+const HistorialResidentesTab = lazy(() => import('./tabs/HistorialResidentesTab').then(m => ({ default: m.HistorialResidentesTab })))
+const EstacionamientoVisitaTab = lazy(() => import('./tabs/EstacionamientoVisitaTab'))
+const BitacoraGuardiaTab = lazy(() => import('./tabs/BitacoraGuardiaTab'))
+const EquiposComunesTab = lazy(() => import('./tabs/EquiposComunesTab'))
+const PresenciaPersonalTab = lazy(() => import('./tabs/PresenciaPersonalTab'))
+const SuministrosTab = lazy(() => import('./tabs/SuministrosTab'))
+const TareasCondominioTab = lazy(() => import('./tabs/TareasCondominioTab'))
+const GestionCobranzaTab = lazy(() => import('./tabs/GestionCobranzaTab'))
+const SolicitudCertificadoTab = lazy(() => import('./tabs/SolicitudCertificadoTab'))
+const VisitasFrecuentesTab = lazy(() => import('./tabs/VisitasFrecuentesTab'))
+const ReglamentoTab = lazy(() => import('./tabs/ReglamentoTab'))
+const ControlPlagasTab = lazy(() => import('./tabs/ControlPlagasTab'))
+const CargosAdicionalesTab = lazy(() => import('./tabs/CargosAdicionalesTab'))
+const ProgramaActividadesTab = lazy(() => import('./tabs/ProgramaActividadesTab'))
+const RegistroAutoridadesTab = lazy(() => import('./tabs/RegistroAutoridadesTab'))
+const NotasAdminTab = lazy(() => import('./tabs/NotasAdminTab'))
+const ControlPiscinaTab = lazy(() => import('./tabs/ControlPiscinaTab'))
+const MantenimientoJardineriaTab = lazy(() => import('./tabs/MantenimientoJardineriaTab'))
+const IncidenciasElevadorTab = lazy(() => import('./tabs/IncidenciasElevadorTab'))
+const MantenimientoCisternaTab = lazy(() => import('./tabs/MantenimientoCisternaTab'))
+const ControlGeneradorTab = lazy(() => import('./tabs/ControlGeneradorTab'))
+const ControlSistemaIncendioTab = lazy(() => import('./tabs/ControlSistemaIncendioTab'))
+const ControlCamarasTab = lazy(() => import('./tabs/ControlCamarasTab'))
+const LecturasMedidorGasTab = lazy(() => import('./tabs/LecturasMedidorGasTab'))
+const ComentariosTicketTab = lazy(() => import('./tabs/ComentariosTicketTab'))
+const RecordatoriosTab = lazy(() => import('./tabs/RecordatoriosTab'))
+const PlantillasCuotaTab = lazy(() => import('./tabs/PlantillasCuotaTab'))
+const BitacoraAccionesTab = lazy(() => import('./tabs/BitacoraAccionesTab'))
+const RecargosTab = lazy(() => import('./tabs/RecargosTab'))
+const ConveniosCuotaTab = lazy(() => import('./tabs/ConveniosCuotaTab'))
+const HistorialSaldosTab = lazy(() => import('./tabs/HistorialSaldosTab'))
+const NotificacionesEnviadasTab = lazy(() => import('./tabs/NotificacionesEnviadasTab'))
+const ReglasMoraTab = lazy(() => import('./tabs/ReglasMoraTab'))
+const CampanasCobroTab = lazy(() => import('./tabs/CampanasCobroTab'))
+const CierreAnualTab = lazy(() => import('./tabs/CierreAnualTab'))
+const KpisFinancierosTab = lazy(() => import('./tabs/KpisFinancierosTab'))
+const CobranzaJudicialTab = lazy(() => import('./tabs/CobranzaJudicialTab'))
+const RecibosDigitalesTab = lazy(() => import('./tabs/RecibosDigitalesTab'))
+const InformeMensualTab = lazy(() => import('./tabs/InformeMensualTab'))
+const BuzonSugerenciasTab = lazy(() => import('./tabs/BuzonSugerenciasTab'))
+const VencimientosCriticosTab = lazy(() => import('./tabs/VencimientosCriticosTab'))
+const CapacitacionPersonalTab = lazy(() => import('./tabs/CapacitacionPersonalTab'))
+const ProyectosCondominioTab = lazy(() => import('./tabs/ProyectosCondominioTab'))
+const MetricasServicioTab = lazy(() => import('./tabs/MetricasServicioTab'))
+const AnalisisCarteraTab = lazy(() => import('./tabs/AnalisisCarteraTab'))
+const IntegracionAguaTab = lazy(() => import('./tabs/IntegracionAguaTab'))
+const CentroCostosTab = lazy(() => import('./tabs/CentroCostosTab'))
+const ManualResidenteTab = lazy(() => import('./tabs/ManualResidenteTab'))
+const ExportacionTab = lazy(() => import('./tabs/ExportacionTab'))
+const MultiCondominioTab = lazy(() => import('./tabs/MultiCondominioTab'))
+const AutomatizacionesTab = lazy(() => import('./tabs/AutomatizacionesTab'))
+const ScoringUnidadesTab = lazy(() => import('./tabs/ScoringUnidadesTab'))
+const PanelTurnoTab = lazy(() => import('./tabs/PanelTurnoTab'))
+const PlantillasMensajeTab = lazy(() => import('./tabs/PlantillasMensajeTab'))
+const FlujoAprobacionTab = lazy(() => import('./tabs/FlujoAprobacionTab'))
+const CuadroMandoTab = lazy(() => import('./tabs/CuadroMandoTab'))
+const GeneradorCuotasTab = lazy(() => import('./tabs/GeneradorCuotasTab'))
+const MapaUnidadesTab = lazy(() => import('./tabs/MapaUnidadesTab'))
+const EnvioMasivoTab = lazy(() => import('./tabs/EnvioMasivoTab'))
+const ResumenEjecutivoTab = lazy(() => import('./tabs/ResumenEjecutivoTab'))
+const OrdenesCompraTab = lazy(() => import('./tabs/OrdenesCompraTab'))
+const GraficasTendenciasTab = lazy(() => import('./tabs/GraficasTendenciasTab'))
+const ControlAccesosQRTab = lazy(() => import('./tabs/ControlAccesosQRTab'))
+const CentroNotificacionesTab = lazy(() => import('./tabs/CentroNotificacionesTab'))
+const AsambleaDigitalTab = lazy(() => import('./tabs/AsambleaDigitalTab'))
+const ComparativoPresupuestoTab = lazy(() => import('./tabs/ComparativoPresupuestoTab'))
+const ProformasTab = lazy(() => import('./tabs/ProformasTab'))
+const BitacoraEventosTab = lazy(() => import('./tabs/BitacoraEventosTab'))
+const IndiceCalidadTab = lazy(() => import('./tabs/IndiceCalidadTab'))
+const KanbanTicketsTab = lazy(() => import('./tabs/KanbanTicketsTab'))
+const ConciliacionCobrosTab = lazy(() => import('./tabs/ConciliacionCobrosTab'))
+const EstadoCuentaResidenteTab = lazy(() => import('./tabs/EstadoCuentaResidenteTab'))
+const PronosticoFinancieroTab = lazy(() => import('./tabs/PronosticoFinancieroTab'))
+const SimuladorCuotasTab = lazy(() => import('./tabs/SimuladorCuotasTab'))
+const CalendarioMantenimientoTab = lazy(() => import('./tabs/CalendarioMantenimientoTab'))
+const ReporteDeudoresTab = lazy(() => import('./tabs/ReporteDeudoresTab'))
+const ResumenResidenteTab = lazy(() => import('./tabs/ResumenResidenteTab'))
+const GestorAlertasTab = lazy(() => import('./tabs/GestorAlertasTab'))
+const UtilizacionAmenidadesTab = lazy(() => import('./tabs/UtilizacionAmenidadesTab'))
+const ComparativoAnualTab = lazy(() => import('./tabs/ComparativoAnualTab'))
+const GanttMantenimientoTab = lazy(() => import('./tabs/GanttMantenimientoTab'))
+const MapaCalorCuotasTab = lazy(() => import('./tabs/MapaCalorCuotasTab'))
+const EncuestaDashboardTab = lazy(() => import('./tabs/EncuestaDashboardTab'))
+const AnalisisVisitantesTab = lazy(() => import('./tabs/AnalisisVisitantesTab'))
+const InformeEjecutivoTab = lazy(() => import('./tabs/InformeEjecutivoTab'))
+const TableroOcupacionTab = lazy(() => import('./tabs/TableroOcupacionTab'))
+const GestionFondoReservaTab = lazy(() => import('./tabs/GestionFondoReservaTab'))
+const DashboardSostenibilidadTab = lazy(() => import('./tabs/DashboardSostenibilidadTab'))
+const ConfiguracionCondominioTab = lazy(() => import('./tabs/ConfiguracionCondominioTab'))
+const BitacoraActividadTab = lazy(() => import('./tabs/BitacoraActividadTab'))
+const PanelDirectivoTab = lazy(() => import('./tabs/PanelDirectivoTab'))
+const GestionConflictosTab = lazy(() => import('./tabs/GestionConflictosTab'))
+const DirectorioComunidadTab = lazy(() => import('./tabs/DirectorioComunidadTab'))
 import { ComunicacionSection } from '../comunicacion/ComunicacionSection'
+
+// Shown while a lazily-loaded tab chunk is fetched. Each tab is code-split, so
+// only the active tab's JS is downloaded instead of one ~2 MB bundle.
+function TabFallback() {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+      <div style={{ width: 32, height: 32, border: '3px solid var(--at-line)', borderTop: '3px solid var(--at-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
+}
 
 type CondominioTab =
   | 'panel' | 'cuotas' | 'visitantes' | 'amenidades' | 'mantenimiento' | 'comunidad'
@@ -1307,6 +1318,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
 
         {/* Tab content */}
         <div style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+        <Suspense fallback={<TabFallback />}>
         {activeTab === 'panel' && <PanelGeneralTab cuotas={cuotas} tickets={tickets} visitantes={visitantes} amenidades={amenidades} reservas={reservas} polizas={polizas} inspecciones={inspecciones} gastos={gastos} paquetes={paquetes} moneda={moneda} proyectoNombre={proyectoActual?.nombre} />}
 
         {activeTab === 'cuotas' && <CuotasTab cuotas={cuotas} unidades={unidadesProyecto} proyectos={proyectosActivos} proyectoId={selectedProyectoId} companyId={cid} moneda={moneda} canCreate={canCreate('condominios')} canEdit={canEdit('condominios')} onRefresh={cargarDatos} />}
@@ -1548,6 +1560,7 @@ export function CondominiosSection({ proyectos, unidades, currentUser, canCreate
             onClose={() => setTicketSeleccionado(null)}
           />
         )}
+        </Suspense>
         </div>
       </div>
     </div>
