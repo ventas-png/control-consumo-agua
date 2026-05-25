@@ -3,6 +3,12 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import './components/shared/shared.css'
 import App from './App'
+import { initMonitoring } from './lib/monitoring'
+import { initAnalytics } from './lib/analytics'
+
+// Error monitoring + product analytics. Both no-op without their env vars.
+initMonitoring()
+initAnalytics()
 
 // One-time migration: remove stale v1 cache key
 localStorage.removeItem('aquacontrol_data_v1')

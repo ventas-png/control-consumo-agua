@@ -6,6 +6,8 @@ import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { initEmailJS } from './lib/email'
+import { identify, resetAnalytics } from './lib/analytics'
+import { setMonitoringUser } from './lib/monitoring'
 import { LandingPage } from './components/landing/LandingPage'
 import { BrandLogo } from './components/shared/BrandLogo'
 import { PasswordResetModal } from './components/auth/PasswordResetModal'
@@ -165,6 +167,21 @@ export default function App() {
 
   const { canViewModule, canCreate, canEdit, canChangeStatus } = usePermissions(currentUser)
 
+  // Identify the signed-in user for analytics + error monitoring (both no-op
+  // when their env vars are absent).
+  useEffect(() => {
+    if (!currentUser) return
+    const traits = { company_id: currentUser.company_id, role: currentUser.role }
+    identify(currentUser.user_id, traits)
+    setMonitoringUser({ id: currentUser.user_id, companyId: currentUser.company_id, role: currentUser.role })
+  }, [currentUser?.user_id])
+
+  const handleLogout = useCallback(() => {
+    resetAnalytics()
+    setMonitoringUser(null)
+    logout()
+  }, [logout])
+
   const [activeSection, setActiveSection] = useState<AppSection>('clientes')
   const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -319,12 +336,12 @@ export default function App() {
     const tieneCondominios = !!currentUser.servicio_condominios
     const tieneAgua = currentUser.servicio_agua !== false
     if (tieneCondominios && tieneAgua) {
-      return <DualServicePortal currentUser={currentUser} onLogout={logout} />
+      return <DualServicePortal currentUser={currentUser} onLogout={handleLogout} />
     }
     if (tieneCondominios) {
-      return <CondominiosClientPortal currentUser={currentUser} onLogout={logout} />
+      return <CondominiosClientPortal currentUser={currentUser} onLogout={handleLogout} />
     }
-    return <CustomerPortal currentUser={currentUser} onLogout={logout} />
+    return <CustomerPortal currentUser={currentUser} onLogout={handleLogout} />
   }
 
   // Banner: rutas pendientes asignadas al usuario actual
@@ -402,7 +419,7 @@ export default function App() {
         currentUser={currentUser}
         canViewModule={canViewModule}
         onSelect={(section) => { setActiveSection(section); setSidebarOpen(false) }}
-        onLogout={logout}
+        onLogout={handleLogout}
         isOpen={sidebarOpen}
         unreadComunicacion={unreadComunicacion}
       />
@@ -612,7 +629,7 @@ export default function App() {
           {activeSection === 'configuracion' && (
             <ErrorBoundary sectionName="configuracion">
               <RoleGuard userRole={currentUser.role} allowedRoles={['admin', 'super_admin', 'company_owner']}>
-              <ConfiguracionSection onLogout={logout} />
+              <ConfiguracionSection onLogout={handleLogout} />
               </RoleGuard>
             </ErrorBoundary>
           )}
