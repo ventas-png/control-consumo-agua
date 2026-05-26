@@ -455,6 +455,13 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     }))
   }, [])
 
+  const deleteRegistro = useCallback((id: string) => {
+    setData(prev => ({
+      ...prev,
+      registros: prev.registros.filter(r => r.id !== id),
+    }))
+  }, [])
+
   const setFuentesAgua = useCallback((fuentes: FuenteAgua[]) => {
     setData(prev => ({ ...prev, fuentesAgua: fuentes }))
   }, [])
@@ -612,6 +619,7 @@ export function useData(companyId?: string, userId?: string, userRole?: string, 
     deleteCliente,
     addRegistro,
     updateRegistroEstado,
+    deleteRegistro,
     setFuentesAgua,
     setRegistrosCalidad,
     recargarFuentesAgua,

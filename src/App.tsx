@@ -154,7 +154,7 @@ export default function App() {
     moneda, maxUnidadesPorTipo,
     proveedoresEnergia, tarifasEnergia, fuentesEnergia, facturasEnergia,
     isLoading: dataLoading,
-    cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado,
+    cargarDatos, addCliente, updateCliente, deleteCliente, addRegistro, updateRegistroEstado, deleteRegistro,
     setFuentesAgua, setRegistrosCalidad, addRuta, updateRuta, deleteRuta,
     addTarifa, updateTarifa, deleteTarifa,
     addContador, updateContador, deleteContador,
@@ -532,6 +532,7 @@ export default function App() {
                 userRole={currentUser.role}
                 moneda={moneda}
                 onEstadoUpdated={updateRegistroEstado}
+                onRegistroDeleted={deleteRegistro}
                 canEdit={canEdit('tabla')}
                 canChangeStatus={canChangeStatus('tabla')}
               />
