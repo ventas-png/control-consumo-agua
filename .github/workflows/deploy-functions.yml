@@ -7,6 +7,7 @@ on:
     paths:
       - 'supabase/functions/**'
       - 'supabase/config.toml'
+      - '.github/workflows/deploy-functions.yml'
 
 jobs:
   check-secrets:
@@ -82,5 +83,32 @@ jobs:
       - name: Deploy complete-oauth-onboarding (no JWT — verifies token itself)
         run: |
           supabase functions deploy complete-oauth-onboarding \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
+
+      - name: Deploy google-oauth-initiate
+        run: |
+          supabase functions deploy google-oauth-initiate \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy google-oauth-callback
+        run: |
+          supabase functions deploy google-oauth-callback \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy send-email
+        run: |
+          supabase functions deploy send-email \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy notify-package (no JWT — invoked by trigger via pg_net with service_role)
+        run: |
+          supabase functions deploy notify-package \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
+
+      - name: Deploy route-reminders (no JWT — invoked by pg_cron with service_role)
+        run: |
+          supabase functions deploy route-reminders \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
             --no-verify-jwt
