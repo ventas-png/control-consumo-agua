@@ -139,7 +139,7 @@ export function HistorialSection({
     setSavingEstado(true)
     const { error } = await supabase
       .from('registros')
-      .update({ estado: editModal.estado, updated_at: new Date().toISOString() })
+      .update({ estado: editModal.estado })
       .eq('id', editModal.registroId)
     if (!error) {
       onEstadoUpdated(editModal.registroId, editModal.estado)
