@@ -16,6 +16,7 @@ interface Props {
   userRole: UserRole
   moneda?: string
   onEstadoUpdated: (id: string, estado: Registro['estado']) => void
+  onRegistroDeleted?: (id: string) => void
   canEdit?: boolean
   canChangeStatus?: boolean
 }
@@ -42,6 +43,7 @@ export function HistorialSection({
   userRole,
   moneda = 'Q',
   onEstadoUpdated,
+  onRegistroDeleted,
   canEdit: canEditProp = true,
   canChangeStatus: canChangeStatusProp = true,
 }: Props) {
@@ -151,6 +153,35 @@ export function HistorialSection({
     setSavingEstado(false)
   }
 
+  async function eliminarRegistro(registro: Registro) {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: '¿Eliminar lectura?',
+      html: `Se eliminará la lectura de <b>${registro.cliente_nombre ?? 'este cliente'}</b> del <b>${formatDate(registro.fecha)}</b>.<br/>Esta acción no se puede deshacer.`,
+      showCancelButton: true,
+      confirmButtonText: '🗑️ Eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: 'var(--at-danger)',
+      reverseButtons: true,
+      focusCancel: true,
+    })
+    if (!result.isConfirmed) return
+    const { error, count } = await supabase
+      .from('registros')
+      .delete({ count: 'exact' })
+      .eq('id', registro.id)
+    if (error) {
+      Swal.fire('Error', 'No se pudo eliminar la lectura', 'error')
+      return
+    }
+    if (count === 0) {
+      Swal.fire('Sin permisos', 'No tienes permisos para eliminar esta lectura.', 'warning')
+      return
+    }
+    onRegistroDeleted?.(registro.id)
+    Swal.fire({ icon: 'success', title: 'Lectura eliminada', timer: 1500, showConfirmButton: false })
+  }
+
   function resetFiltros() {
     setFiltroTexto(''); setFiltroEstado(''); setFiltroProyecto('')
     setFiltroUnidad(''); setFiltroTipoAgua('')
@@ -218,10 +249,17 @@ export function HistorialSection({
             aria-label="Enviar por WhatsApp"
             style={btnWaStyle}
           >💬 WhatsApp</button>
+          {canEdit && onRegistroDeleted && (
+            <button
+              onClick={() => eliminarRegistro(r)}
+              aria-label="Eliminar lectura"
+              style={btnDeleteStyle}
+            >🗑️ Eliminar</button>
+          )}
         </div>
       ),
     },
-  ], [moneda, canEdit])
+  ], [moneda, canEdit, onRegistroDeleted])
 
   return (
     <div style={{ background: 'var(--at-surface)', borderRadius: 24, padding: 32, boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
@@ -358,9 +396,12 @@ export function HistorialSection({
                   <span style={pillStyle(p)}>{p.icon} {r.estado}</span>
                   <div style={{ display: 'flex', gap: 6 }}>
                     {canEdit && (
-                      <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado })} style={{ padding: '6px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>✏️</button>
+                      <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado })} aria-label="Editar estado" style={{ padding: '6px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>✏️</button>
                     )}
-                    <button onClick={() => enviarWhatsApp(r)} style={{ padding: '6px 10px', background: '#25D366', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>💬</button>
+                    <button onClick={() => enviarWhatsApp(r)} aria-label="Enviar por WhatsApp" style={{ padding: '6px 10px', background: '#25D366', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>💬</button>
+                    {canEdit && onRegistroDeleted && (
+                      <button onClick={() => eliminarRegistro(r)} aria-label="Eliminar lectura" style={{ padding: '6px 10px', background: 'var(--at-danger)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>🗑️</button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -530,6 +571,12 @@ const btnEditStyle: CSSProperties = {
 
 const btnWaStyle: CSSProperties = {
   padding: '8px 12px', minHeight: 36, background: '#25D366',
+  color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
+  fontSize: 12, fontWeight: 600,
+}
+
+const btnDeleteStyle: CSSProperties = {
+  padding: '8px 12px', minHeight: 36, background: 'var(--at-danger)',
   color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer',
   fontSize: 12, fontWeight: 600,
 }
