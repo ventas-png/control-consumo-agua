@@ -50,7 +50,7 @@ function getCorsHeaders(origin: string | null) {
   const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0]
   return {
     'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-application-name',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   }
 }
