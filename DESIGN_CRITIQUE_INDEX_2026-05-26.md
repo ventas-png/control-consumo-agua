@@ -255,6 +255,8 @@ Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior
 | `infra:I37` | Renovate config | [#167](https://github.com/ventas-png/control-consumo-agua/pull/167) | schedule semanal, grouping conservador |
 | `infra:I38` | CODEOWNERS | [#167](https://github.com/ventas-png/control-consumo-agua/pull/167) | reviews en auth/RLS/payments/migrations |
 | `infra:I32` | Edge function `health` | [#168](https://github.com/ventas-png/control-consumo-agua/pull/168) | smoke check de env vars; sin JWT; pensada para UptimeRobot/Pingdom |
+| `infra:I10` | PostHog tagging multi-tenant | [#169](https://github.com/ventas-png/control-consumo-agua/pull/169) | `registerSuperProperties({company_id, role, plan})` desde App.tsx |
+| `infra:I11` | Sentry sampler por severity | [#169](https://github.com/ventas-png/control-consumo-agua/pull/169) | 100% rutas críticas + errores / 10% resto en prod |
 
 ### Hallazgos parciales (avance real, falta cierre)
 
@@ -265,37 +267,38 @@ Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior
 | `infra:I15` | ⏳ **Parcial** | `.env.example` ya documenta dónde va cada secreto (PR #167); pendiente `SECRETS_INVENTORY.md` exhaustivo con política de rotación. |
 | `infra:I7`  | ⏳ **Parcial** | PR #168 agrega `npm run test:coverage` + upload de artifact en CI como advisory. Pendiente: arreglar el flake del test de `ImportModal` con `--coverage` y fijar threshold inicial (p. ej. lines ≥ 50%). |
 | `infra:I8`  | ⏳ **Parcial** | PR #168 agrega job `lint-functions` con `deno fmt --check` + `deno lint` (advisory). Pendiente: limpiar baseline de las 14 funciones existentes y quitar `continue-on-error` para hacerlo enforce. |
+| `infra:I33` | ⏳ **Parcial** | PR #169 introduce `src/lib/logger.ts` con niveles estructurados + Sentry breadcrumbs. Pendiente: migración gradual de `console.log` (PRs por dominio) + pipe servidor a Datadog/Logtail. |
+| `cond:A10`  | ⏳ **Parcial** | PR #169 mueve 3/4 componentes (`FileUploader`, `ImageUploader`, `ImageGallery`) a `shared/`. `RubrosBuilder` se queda atado a `cond:C9` por su dependencia de tipos del dominio. |
+| `agua:C11` + `cond:C14` | ⏳ **Parcial** | PR #169 crea `.github/workflows/types-drift.yml` (advisory, manual + cron semanal). Pendiente: primer run para validar secretos, baseline committed, refactor de tipos. |
 
 ### Métricas de avance
 
-| Concepto | Antes | Después PR #167 | Después PR #168 | Pendientes |
-|----------|-------|-----------------|-----------------|------------|
-| Hallazgos totales      | 219 | 219 | **220** (+`I39`) | — |
-| Resueltos             | 0   | 5   | 6   | 214 |
-| Docs/falsos positivos | 0   | 1 (`I30`) + parte de `I36` | 2 (`I30` + cierre docs `I36`) | — |
-| Parciales activos      | 0   | 2 (`I15, I36`) | 3 (`I15, I7, I8`) | — |
-| Nuevos descubiertos    | 0   | 0   | **1 (`I39`)** — bug pre-existente revelado por CI | — |
-| % progreso (resueltos) | 0%  | 2.3% | 2.7% | — |
+| Concepto | Antes | PR #167 | PR #168 | PR #169 | Pendientes |
+|----------|-------|---------|---------|---------|------------|
+| Hallazgos totales      | 219 | 219 | **220** (+`I39`) | 220 | — |
+| Resueltos             | 0   | 5   | 6   | **8** (+`I10, I11`) | 212 |
+| Docs/falsos positivos | 0   | 1 (`I30`) + parte de `I36` | 2 (`I30` + cierre docs `I36`) | 2 | — |
+| Parciales activos      | 0   | 2 (`I15, I36`) | 3 (`I15, I7, I8`) | **6** (+`I33, cond:A10, agua:C11, cond:C14`) | — |
+| Nuevos descubiertos    | 0   | 0   | **1 (`I39`)** | 0 | — |
+| % progreso (resueltos) | 0%  | 2.3% | 2.7% | **3.6%** | — |
 
-### Próximo lote candidato — Lote 3 (revisado tras descubrir `I39`)
+### Próximo lote candidato — Lote 4 (revisado tras lote 3)
 
-**Decisión:** `infra:I39` es crítico bloqueante para SaaS branching, staging y reproducibilidad, pero su resolución requiere **PR dedicado** (no quick win): crear migración baseline `CREATE TABLE IF NOT EXISTS` para 4 tablas legacy validadas contra producción. Lo dejo como **PR 4 separado** y el lote 3 conserva los quick wins originales.
+**Recordatorio:** `infra:I39` sigue como **PR dedicado separado** (no quick win) para destrabar Supabase Branching, staging y reproducibilidad. Riesgo medio; requiere validar `pg_dump` contra producción.
 
-1. **`agua:C11` + `cond:C14`** — Workflow `types-drift.yml` (manual/cron) que regenera `database.types.ts` desde Supabase y reporta drift como artifact. No bloquea PRs, solo informa.
-2. **`infra:I33`** — Wrapper `logger` estructurado (`src/lib/logger.ts`) con niveles `debug/info/warn/error` que enriquece breadcrumbs de Sentry y desactiva `debug` en prod. Reemplazo gradual de `console.log` repartidos.
-3. **`infra:I11`** — Sentry `tracesSampler` por severity (100% errores; 10% transacciones normales). Solo cambia `monitoring.ts`.
-4. **`infra:I10`** — PostHog `register({ company_id, role, plan })` automático desde `useAuth` para que cada `track()` herede props multi-tenant.
-5. **`agua:A10` + `cond:A10`** — Mover `FileUploader`, `ImageUploader`, `ImageGallery`, `RubrosBuilder` desde `components/condominios/` a `components/shared/` (refactor mecánico de imports, sin cambio de comportamiento).
+**Lote 4 sugerido (cinco quick wins de bajo riesgo):**
 
-Todos son aditivos o de configuración. Sin DB, sin auth, sin RLS.
+1. **`infra:I27`** — `useOffline` flag con TTL (24h por defecto) y UI clara para alternar. Evita que un usuario quede en modo offline indefinido. Cambio de ~20 líneas en un hook.
+2. **`com:N22`** — Lazy import de `chart.js` en `admin-dashboard/`. Envolver imports con `lazy()` o `import()` dinámico al renderizar. Reduce el chunk `vendor-charts` (~64KB gzip) del bundle inicial.
+3. **`com:N20`** — `paquetesNotify` con retry visible. Tabla `paquetes_notificaciones_intentos` (migración pequeña) + lista de fallidos en UI. **Riesgo: migración** — sujeto a resolución previa de `infra:I39` para validar en branch antes de mergear.
+4. **`agua:B10`** — Sidebar 256px → 64px colapsable en `<1024px`. Cambio CSS + estado. No toca lógica.
+5. **`agua:A10` cierre + `cond:C9` arranque** — Iniciar partición de `src/types/index.ts`: crear `src/types/condominios.ts` solo con `MetodoCalculo` y `RubroConfig` + re-exportarlos desde `src/types/index.ts`. Destrabaría mover `RubrosBuilder` a `shared/`. Riesgo: bajo (re-export idempotente).
 
-**PR 4 (dedicado, separado del lote 3) — `infra:I39` baseline de tablas legacy:**
-- `supabase/migrations/<timestamp_anterior_al_más_antiguo>_baseline_legacy_tables.sql` con `CREATE TABLE IF NOT EXISTS` para `companies`, `projects`, `user_project_assignments`, `pagos`.
-- Schema copiado del proyecto principal vía `pg_dump --schema-only`.
-- Validación: `supabase db reset` aplica todas las migraciones sin error.
-- Validación: `pg_dump` del schema final coincide con el proyecto principal.
-- Documento `supabase/migrations/README.md` con convención hacia adelante.
-- Riesgo: medio. Aunque `IF NOT EXISTS` lo hace idempotente, requiere asegurarse de que el schema declarado matchea exactamente con el de producción.
+**Decisión recomendada:**
+- **Opción A (priorizar `I39` ya):** abrir PR 4 con `I39` baseline; el lote 4 de quick wins se hace en paralelo o después.
+- **Opción B (mantener cadencia de quick wins):** ejecutar lote 4 ahora, abordar `I39` después con tiempo para validar el dump.
+
+Mi recomendación: **opción A** porque `I39` desbloquea validación temprana de migraciones para todos los siguientes hallazgos de Postgres (`cond:C2` CHECK constraints, `agua:C1` validación de lectura, `plat:P1` billing tables, etc.) y para `com:N20` mismo del lote 4.
 
 ### Monitoreo de impacto
 
@@ -308,6 +311,11 @@ A medida que se resuelven hallazgos, anotar aquí si la solución impacta (resue
 - **`infra:I7` parcial (coverage)** → expone que el flake de `ImportModal.test.tsx` con `--coverage` se debe a timing — anotar como deuda en la sección "Tests" de `agua:C7`. Coverage limpio habilita el threshold definitivo en Fase 5.
 - **`infra:I8` parcial (deno lint advisory)** → al limpiar baseline + hacerlo enforce, también impone consistencia en futuras funciones que se creen para `com:N2` (orquestador de notificaciones), `cond:A9` (edge functions de condominios), `plat:P3` (invite) y `plat:P36` (límites de plan). Inversión que se amortiza.
 - **`infra:I39` (nuevo — migraciones no replicables)** → bloquea `infra:I16` (no se puede crear staging confiable sin reproducibilidad), `infra:I19` (canary), `infra:I20` (rollback) y onboarding de devs. Su resolución destraba el Supabase Branching por PR, que a su vez habilita validación temprana de migraciones para `cond:C2` (CHECK constraints), `agua:C1` (validaciones de lectura), `plat:P1` (billing tables), etc. Es el "primer dominó" del backlog de Postgres.
+- **`infra:I10` (PostHog super-props, PR #169)** → cada `track()` ahora arrastra `company_id` y `role`. Esto descongela parte de `infra:D4` y `D5` (dashboards de negocio multi-tenant) porque ya hay segmentación correcta para construir cohortes en PostHog. La convención de naming de eventos (verb_object) sigue pendiente.
+- **`infra:I11` (Sentry sampler, PR #169)** → al conservar 100% en rutas críticas (login/oauth/payment/stripe/create-user/delete-user), genera evidencia mucho más completa para diagnosticar bugs en pagos (`plat:P36` enforcement) y auth (`plat:P4` MFA). Reduce el riesgo de "el bug pasó pero no quedó traza" durante la Fase 2.
+- **`infra:I33` (logger, PR #169)** → introducir `logger.*` habilita una migración gradual de `console.log` dispersos. Útil cuando se ataquen god-components (`agua:A2`, `cond:A2`, `plat:P12`) y se necesite trazar flujos sin contaminar la consola de prod.
+- **`cond:A10` parcial (componentes shared)** → al mover 3 archivos a `shared/`, agua ya puede importar `FileUploader` para fotos de medidores y `ImageUploader` para evidencias de lectura (atado a `agua:B7` — loading state durante guardado). Cierre completo de `A10` depende de mover `RubrosBuilder`, que a su vez depende de `cond:C9` (partir tipos).
+- **`agua:C11` + `cond:C14` (workflow types-drift)** → al detectar drift entre Supabase y el repo, encuentra automáticamente las migraciones que no llegaron al repo o tablas creadas a mano. **Pista directa a `infra:I39`**: la primera ejecución dirá exactamente qué tablas existen en prod pero no en migrations.
 
 ---
 

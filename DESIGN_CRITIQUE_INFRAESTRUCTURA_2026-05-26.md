@@ -155,22 +155,21 @@ Protección actual: CORS origin check + `ALLOWED_ORIGINS` secret. Si el secret l
 
 ---
 
-### I10 · 🟠 Alto — PostHog sin tagging multi-tenant automático
+### I10 · ✅ Resuelto en [PR #169](https://github.com/ventas-png/control-consumo-agua/pull/169) — ~~PostHog sin tagging multi-tenant automático~~
 
-`src/lib/analytics.ts:41 LOC` inicializa PostHog y permite `identify(id, props)` + `track(event, props)`. Pero no:
-- Set automático de `company_id` / `tenant_id` en cada track.
-- Convención de eventos (verb_object_object).
-- Aliases en register para super-properties.
-
-**Recomendación:** En `setMonitoringUser()` y al cambiar de tenant, llamar `posthog.register({ company_id, plan, role })` para que cada evento herede esas props.
+> **Resolución:** nueva función `registerSuperProperties({ company_id, role, plan })` en `src/lib/analytics.ts`. `src/App.tsx` la invoca dentro del efecto que identifica al usuario después del login, justo a continuación de `identify()`. Cada `track()` posterior llevará esas props automáticamente; `resetAnalytics()` las limpia vía `posthog.reset()` en el logout. La convención de eventos (verb_object) queda pendiente para una guía de estilo separada.
 
 ---
 
-### I11 · 🟠 Alto — Sentry sample rate 10% en prod sin sampling por severity
+### I11 · ✅ Resuelto en [PR #169](https://github.com/ventas-png/control-consumo-agua/pull/169) — ~~Sentry sample rate 10% en prod sin sampling por severity~~
 
-`src/lib/monitoring.ts:21` — `tracesSampleRate: 0.1` en prod. Eventos críticos pueden perderse.
-
-**Recomendación:** `tracesSampler` que aplique 100% en errores y 10% en transacciones normales.
+> **Resolución:** `src/lib/monitoring.ts` reemplaza `tracesSampleRate: 0.1` por `tracesSampler` por función:
+> - **No-prod:** 100% (debug local conserva todo).
+> - **Prod, rutas críticas** (`login`, `oauth`, `payment`, `stripe`, `create-user`, `delete-user`, `create-payment-intent`): 100%.
+> - **Prod, traces con `parentSampled === true`** (heredan de un trace ya sampleado o de error): 100%.
+> - **Prod, resto:** 10%.
+>
+> Cuando se introduzca routing real (Fase 1), refactorizar para leer la lista de rutas críticas de un registry en vez de string-match.
 
 ---
 
@@ -351,11 +350,13 @@ Scripts y estilos servidos desde Vercel no usan SRI. Si un CDN se compromete, el
 
 ---
 
-### I33 · 🟡 Medio — Sin export de logs estructurados
+### I33 · ⏳ Parcial ([PR #169](https://github.com/ventas-png/control-consumo-agua/pull/169)) — ~~Sin export de logs estructurados~~
 
-Logs en edge functions van a Supabase Functions Logs, pero sin pipe a Datadog/Logtail/Loki para retención larga + búsqueda avanzada.
-
-**Recomendación:** Hooks de logs Supabase → Logtail / Datadog.
+> **Avance:** nuevo `src/lib/logger.ts` con wrapper `logger.{debug,info,warn,error}` que (a) en producción silencia `debug`, (b) deja breadcrumbs estructurados en Sentry (`Sentry.addBreadcrumb`), (c) captura `exception` automáticamente cuando `level='error'` recibe un `error` como tercer argumento.
+>
+> **Pendiente:**
+> - Migración gradual de `console.log/warn/error` repartidos en hooks, components y libs a `logger.*`. Se hará en PRs siguientes por dominio (agua, condominios, plataforma) para mantener el blast radius pequeño.
+> - Pipe del lado servidor (edge functions → Datadog/Logtail) para retención larga y búsqueda avanzada. Backend separado, no cubierto por `logger.ts`.
 
 ---
 
@@ -485,8 +486,8 @@ Pero **ninguna migración del repo crea estas tablas** — sólo `public.app_use
 | I7  | ⏳   | ~~CI sin lint / coverage / bundle-size~~ — parcial PR #168 (coverage advisory) | `.github/workflows/ci.yml` + `vite.config.ts` coverage v8       | 4    |
 | I8  | ⏳   | ~~Deploy de edge functions sin tests~~ — parcial PR #168 (deno lint/fmt advisory) | `.github/workflows/deploy-functions.yml` job `lint-functions` | 2    |
 | I9  | 🟠   | `apply-migration` con riesgo de inyección                         | `.github/workflows/apply-migration.yml`                                    | 2    |
-| I10 | 🟠   | PostHog sin tagging multi-tenant automático                       | `src/lib/analytics.ts:41 LOC`                                              | 4    |
-| I11 | 🟠   | Sentry sample 10% sin sampling por severity                       | `src/lib/monitoring.ts:21`                                                 | 4    |
+| I10 | ✅   | ~~PostHog sin tagging multi-tenant automático~~ — resuelto PR #169 (`registerSuperProperties`) | `src/lib/analytics.ts`, `src/App.tsx:175` | —    |
+| I11 | ✅   | ~~Sentry sample 10% sin sampling por severity~~ — resuelto PR #169 (`tracesSampler` 100%/10%) | `src/lib/monitoring.ts:21-46` | —    |
 | I12 | 🟠   | Source maps Sentry "best-effort"                                   | `vite.config.ts`                                                           | 4    |
 | I13 | 🟠   | File upload validation solo client-side                            | `src/lib/fileValidation.ts:12-13`                                          | 2    |
 | I14 | 🟠   | Storage policies abren bucket a `authenticated`                    | `supabase/migrations/20260516000003_security_private_condominios_media_bucket.sql` | 2 |
@@ -508,7 +509,7 @@ Pero **ninguna migración del repo crea estas tablas** — sólo `public.app_use
 | I30 | ✅   | ~~`Permissions-Policy: geolocation=()` bloquea GPS~~ — falso positivo, ya `geolocation=(self)` | `vercel.json:14`                                                  | —    |
 | I31 | 🟡   | Sin Subresource Integrity (SRI)                                      | `vite.config.ts`                                                           | 4    |
 | I32 | ✅   | ~~Sin `HEAD` health endpoint~~ — resuelto PR #168                       | `supabase/functions/health/index.ts`                                       | —    |
-| I33 | 🟡   | Sin export de logs estructurados                                      | logs solo en Supabase                                                      | 4    |
+| I33 | ⏳   | ~~Sin export de logs estructurados~~ — parcial PR #169 (`src/lib/logger.ts` creado; migración gradual + pipe servidor pendiente) | `src/lib/logger.ts`                                | 4    |
 | I34 | ✅   | ~~Sin `robots.txt`~~ — resuelto PR #167; sitemap pendiente landing pública | `public/robots.txt`                                                  | 4    |
 | I35 | ✅   | ~~`.env.example` sin sección "secretos fuera de aquí"~~ — resuelto PR #167 | tabla de secretos al inicio de `.env.example`                          | —    |
 | I36 | ✅   | ~~Sentry environment hard-coded a "production"~~ — docs cerradas PRs #167+#168; setear `VITE_APP_ENV=$VERCEL_ENV` en panel Vercel queda fuera del repo | `monitoring.ts:8` ya usa `VITE_APP_ENV \|\| MODE`                | —    |

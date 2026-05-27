@@ -164,11 +164,11 @@ Los 191 tabs usan `React.lazy()` (bueno), pero sin prefetch al hover sobre el í
 
 ---
 
-### A10 · 🔵 Bajo — Sub-componentes shared atrapados en `components/condominios/`
+### A10 · ⏳ Parcial ([PR #169](https://github.com/ventas-png/control-consumo-agua/pull/169)) — ~~Sub-componentes shared atrapados en `components/condominios/`~~
 
-`FileUploader.tsx`, `ImageUploader.tsx`, `ImageGallery.tsx`, `RubrosBuilder.tsx` son reusables fuera del módulo (agua podría usar `FileUploader` para fotos de medidores), pero viven dentro de `components/condominios/`.
-
-**Recomendación:** Promover a `src/components/shared/` y documentar.
+> **Resolución parcial:** `FileUploader.tsx`, `ImageUploader.tsx` (con `MultiImageUploader`) y `ImageGallery.tsx` movidos a `src/components/shared/` y exportados desde el barrel. 16 imports en `condominios/tabs/` actualizados a `'../../shared/<comp>'`.
+>
+> **Pendiente:** `RubrosBuilder.tsx` se queda en `condominios/` porque importa `MetodoCalculo` y `RubroConfig` desde `src/types/index.ts`, tipos específicos de **cuotas de condominio** (alícuota, por m², fijo). Moverlo a `shared/` crearía un acoplamiento inverso (`shared/` dependiente de tipos de condominios). Su movimiento queda enlazado a `cond:C9` (partir `types/index.ts` por dominio) en Fase 1 del roadmap.
 
 ---
 
@@ -454,9 +454,14 @@ Cambiar la alícuota o la tarifa no deja rastro retroactivo. Las cuotas pasadas 
 
 ---
 
-### C14 · 🔵 Bajo — Sin generación auto de tipos desde Supabase
+### C14 · ⏳ Parcial ([PR #169](https://github.com/ventas-png/control-consumo-agua/pull/169)) — ~~Sin generación auto de tipos desde Supabase~~
 
-Igual que agua: `generate_typescript_types` MCP disponible pero no usado.
+> **Avance:** nuevo `.github/workflows/types-drift.yml` (`workflow_dispatch` + cron lunes 10:00 UTC) que regenera `database.types.ts` desde el proyecto Supabase y reporta drift como artifact + summary en GitHub Actions. **No bloquea PRs**, solo informa.
+>
+> **Pendiente:**
+> - Primera ejecución manual tras merge para validar secretos.
+> - Commitear el `database.types.ts` generado como baseline en un PR separado.
+> - Refactor gradual de tipos en `src/types/index.ts` para apoyarse en los tipos generados (futuro: Fase 1).
 
 ---
 
@@ -605,7 +610,7 @@ Mismo problema que agua.
 | A7  | Arq | 🟡   | Lazy sin prefetch                                          | `CondominiosSection.tsx` líneas 49-228                                    | 1    |
 | A8  | Arq | 🟡   | `IntegracionAguaTab` acopla sin contrato                   | `tabs/IntegracionAguaTab.tsx`                                             | 2    |
 | A9  | Arq | 🟡   | Cero edge functions de condominios                         | `supabase/functions/`                                                     | 4    |
-| A10 | Arq | 🔵   | Sub-componentes shared atrapados                           | `FileUploader.tsx`, `ImageUploader.tsx`, `RubrosBuilder.tsx`              | 5    |
+| A10 | Arq | ⏳   | ~~Sub-componentes shared atrapados~~ — 3/4 movidos PR #169; `RubrosBuilder` queda atado a `cond:C9` | `src/components/shared/{FileUploader,ImageUploader,ImageGallery}.tsx` | 5    |
 | B1  | UX  | 🔴   | 191 tabs sin búsqueda/favoritos/recientes                  | `CondominiosSection.tsx`                                                  | 1    |
 | B2  | UX  | 🔴   | 189/191 tabs con `<table>` HTML desnudas                   | tabs/*                                                                    | 3    |
 | B3  | UX  | 🔴   | Accesibilidad rota (htmlFor, role tablist, SweetAlert2)    | `CuotasTab.tsx:464-495`, `AmenidadesTab.tsx`, otros                       | 3    |
@@ -633,7 +638,7 @@ Mismo problema que agua.
 | C11 | Dom | 🟡   | Sin audit log genérico                                     | solo `generacion_cuotas_log`, `conciliacion_cobros_log`                   | 2    |
 | C12 | Dom | 🟡   | Migraciones `fase1..fase43` sin documentación              | `supabase/migrations/`                                                    | 5    |
 | C13 | Dom | 🟡   | Sin versionado/historial de configuraciones                | tarifas/alícuotas mutan in-place                                          | 2    |
-| C14 | Dom | 🔵   | Sin generación auto de tipos desde Supabase                | `types/index.ts` manual                                                   | 5    |
+| C14 | Dom | ⏳   | ~~Sin generación auto de tipos desde Supabase~~ — parcial PR #169 (workflow `types-drift.yml` advisory) | `.github/workflows/types-drift.yml` | 5    |
 | D1  | Perf| 🔴   | Sin paginación / virtualización                            | `CuotasTab`, `VisitantesTab`, `TicketsTab`, `PaquetesTab`, etc.           | 4    |
 | D2  | Perf| 🟠   | Bundle pesado por `CondominiosSection`                     | `CondominiosSection.tsx` (1.568 líneas + 191 lazy imports)                | 1    |
 | D3  | Perf| 🟠   | Sin caché de queries                                       | tabs/*                                                                    | 1    |

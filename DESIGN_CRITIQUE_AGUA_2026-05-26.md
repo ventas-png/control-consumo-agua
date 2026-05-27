@@ -356,11 +356,9 @@ Borrar un contador o un cliente parece ser delete físico. En SaaS, esto rompe i
 
 ---
 
-### C11 · 🔵 Bajo — Sin generación automática de tipos desde Supabase
+### C11 · ⏳ Parcial ([PR #169](https://github.com/ventas-png/control-consumo-agua/pull/169)) — ~~Sin generación automática de tipos desde Supabase~~
 
-`generate_typescript_types` del MCP de Supabase está disponible pero no se usa. Los tipos en `types/index.ts` se mantienen a mano.
-
-**Recomendación:** Job en CI que regenere `src/types/database.types.ts` y haga check de drift.
+> **Avance:** ver `cond:C14` (mismo workflow `.github/workflows/types-drift.yml` resuelve ambos hallazgos a nivel infraestructura). Pendiente la primera ejecución, baseline committed y refactor de tipos.
 
 ---
 
@@ -534,7 +532,7 @@ Una administradora con miles de contadores ejecuta `SELECT` complejos. Sin índi
 | C8  | Dom | 🟡   | `businessEnergia.ts` aislado, duplicación conceptual   | `src/lib/business.ts` vs `src/lib/businessEnergia.ts`                     | 2    |
 | C9  | Dom | 🟡   | Sin auditoría de cambios                               | falta tabla `audit_log` genérica                                          | 2    |
 | C10 | Dom | 🟡   | Sin soft-delete                                        | schema                                                                    | 2    |
-| C11 | Dom | 🔵   | Sin generación auto de tipos desde Supabase            | `src/types/index.ts` manual                                               | 1    |
+| C11 | Dom | ⏳   | ~~Sin generación auto de tipos desde Supabase~~ — parcial PR #169 (workflow `types-drift.yml` advisory) | `.github/workflows/types-drift.yml` | 1    |
 | D1  | Perf| 🟠   | Sin caché de queries / refetch on focus                | `useData.ts`                                                              | 1    |
 | D2  | Perf| 🟠   | Sin paginación ni virtualización                       | `ContadoresSection`, `CobrosSection`, `historial`                         | 4    |
 | D3  | Perf| 🟠   | Bundle sin code-splitting agresivo                     | `package.json` deps + `App.tsx:26-45`                                     | 4    |
