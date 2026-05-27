@@ -66,9 +66,10 @@ El SQL describe el "qué". El comentario al inicio del archivo o en bloques debe
 
 ## Estado de baselines (infra:I39)
 
-| Fase | Tablas | Estado |
-|------|--------|--------|
-| 1    | `companies`, `projects`, `user_project_assignments`, `pagos` | ✅ en `20260317000000_baseline_legacy_tables_phase1.sql` |
-| 2    | `clientes`, `registros`, `convenios_pago`, `fuentes_agua`, `registros_calidad`, `payment_requests`, `password_reset_tokens`, `user_sessions`, `security_logs`, `empresa`, `empresa_pagos_config` | ⏳ pendiente PR dedicado |
+| Fase | Cobertura | Estado |
+|------|-----------|--------|
+| 1    | 5 tablas (`app_users`, `companies`, `projects`, `user_project_assignments`, `pagos`) | ✅ `20260317000000_baseline_legacy_tables_phase1.sql` |
+| 2    | 11 tablas (`empresa`, `security_logs`, `user_sessions`, `fuentes_agua`, `clientes`, `registros`, `registros_calidad`, `convenios_pago`, `payment_requests`, `password_reset_tokens`, `empresa_pagos_config`) + 7 funciones legacy + FKs cross-fase de la fase 1 | ✅ `20260317000001_baseline_legacy_tables_phase2.sql` |
+| 3+   | Objetos adicionales (triggers, vistas, secuencias) que aparezcan en errores subsiguientes | Iterativo, según se detecten |
 
-Una vez completas ambas fases, Supabase Branching debería levantar branches limpias sin errores y `supabase db reset` debería aplicar todas las migraciones de extremo a extremo.
+Una vez completas las fases 1 y 2 (y eventuales fases 3+ si surgen), Supabase Branching debería levantar branches limpias sin errores y `supabase db reset` debería aplicar todas las migraciones de extremo a extremo.
