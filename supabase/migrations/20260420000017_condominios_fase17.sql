@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS public.evaluaciones_proveedor (
   id                uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id        uuid        NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   project_id        uuid        NOT NULL REFERENCES public.projects(id)  ON DELETE CASCADE,
-  proveedor_id      uuid        REFERENCES public.contratos_proveedor(id) ON DELETE SET NULL,
+  proveedor_id      uuid        REFERENCES public.contratos_proveedores(id) ON DELETE SET NULL,
   nombre_proveedor  text        NOT NULL,
   calificacion      int         NOT NULL CHECK (calificacion BETWEEN 1 AND 5),
   puntualidad       int         CHECK (puntualidad BETWEEN 1 AND 5),

@@ -21,9 +21,13 @@ CREATE TABLE IF NOT EXISTS public.infracciones_condominio (
   created_at            timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE public.infracciones_condominio ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "infracciones_select" ON public.infracciones_condominio;
 CREATE POLICY "infracciones_select" ON public.infracciones_condominio FOR SELECT TO authenticated USING (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "infracciones_insert" ON public.infracciones_condominio;
 CREATE POLICY "infracciones_insert" ON public.infracciones_condominio FOR INSERT TO authenticated WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "infracciones_update" ON public.infracciones_condominio;
 CREATE POLICY "infracciones_update" ON public.infracciones_condominio FOR UPDATE TO authenticated USING (company_id = get_my_company_id() OR is_super_admin()) WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "infracciones_delete" ON public.infracciones_condominio;
 CREATE POLICY "infracciones_delete" ON public.infracciones_condominio FOR DELETE TO authenticated USING (is_super_admin() OR (current_user_role() = ANY(ARRAY['company_owner','admin']) AND company_id = get_my_company_id()));
 CREATE INDEX IF NOT EXISTS idx_infracciones_project ON public.infracciones_condominio(project_id);
 CREATE INDEX IF NOT EXISTS idx_infracciones_unidad  ON public.infracciones_condominio(unidad_id);
@@ -43,9 +47,13 @@ CREATE TABLE IF NOT EXISTS public.rondas_seguridad (
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE public.rondas_seguridad ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "rondas_select" ON public.rondas_seguridad;
 CREATE POLICY "rondas_select" ON public.rondas_seguridad FOR SELECT TO authenticated USING (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "rondas_insert" ON public.rondas_seguridad;
 CREATE POLICY "rondas_insert" ON public.rondas_seguridad FOR INSERT TO authenticated WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "rondas_update" ON public.rondas_seguridad;
 CREATE POLICY "rondas_update" ON public.rondas_seguridad FOR UPDATE TO authenticated USING (company_id = get_my_company_id() OR is_super_admin()) WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "rondas_delete" ON public.rondas_seguridad;
 CREATE POLICY "rondas_delete" ON public.rondas_seguridad FOR DELETE TO authenticated USING (is_super_admin() OR (current_user_role() = ANY(ARRAY['company_owner','admin']) AND company_id = get_my_company_id()));
 CREATE INDEX IF NOT EXISTS idx_rondas_project ON public.rondas_seguridad(project_id);
 CREATE INDEX IF NOT EXISTS idx_rondas_inicio  ON public.rondas_seguridad(inicio DESC);
@@ -67,9 +75,13 @@ CREATE TABLE IF NOT EXISTS public.novedades_seguridad (
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE public.novedades_seguridad ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "novedades_select" ON public.novedades_seguridad;
 CREATE POLICY "novedades_select" ON public.novedades_seguridad FOR SELECT TO authenticated USING (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "novedades_insert" ON public.novedades_seguridad;
 CREATE POLICY "novedades_insert" ON public.novedades_seguridad FOR INSERT TO authenticated WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "novedades_update" ON public.novedades_seguridad;
 CREATE POLICY "novedades_update" ON public.novedades_seguridad FOR UPDATE TO authenticated USING (company_id = get_my_company_id() OR is_super_admin()) WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "novedades_delete" ON public.novedades_seguridad;
 CREATE POLICY "novedades_delete" ON public.novedades_seguridad FOR DELETE TO authenticated USING (is_super_admin() OR (current_user_role() = ANY(ARRAY['company_owner','admin']) AND company_id = get_my_company_id()));
 CREATE INDEX IF NOT EXISTS idx_novedades_project  ON public.novedades_seguridad(project_id);
 CREATE INDEX IF NOT EXISTS idx_novedades_ronda    ON public.novedades_seguridad(ronda_id);
@@ -96,9 +108,13 @@ CREATE TABLE IF NOT EXISTS public.contratos_arrendamiento (
   created_at                  timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE public.contratos_arrendamiento ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "arrend_select" ON public.contratos_arrendamiento;
 CREATE POLICY "arrend_select" ON public.contratos_arrendamiento FOR SELECT TO authenticated USING (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "arrend_insert" ON public.contratos_arrendamiento;
 CREATE POLICY "arrend_insert" ON public.contratos_arrendamiento FOR INSERT TO authenticated WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "arrend_update" ON public.contratos_arrendamiento;
 CREATE POLICY "arrend_update" ON public.contratos_arrendamiento FOR UPDATE TO authenticated USING (company_id = get_my_company_id() OR is_super_admin()) WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "arrend_delete" ON public.contratos_arrendamiento;
 CREATE POLICY "arrend_delete" ON public.contratos_arrendamiento FOR DELETE TO authenticated USING (is_super_admin() OR (current_user_role() = ANY(ARRAY['company_owner','admin']) AND company_id = get_my_company_id()));
 CREATE INDEX IF NOT EXISTS idx_arrend_project ON public.contratos_arrendamiento(project_id);
 CREATE INDEX IF NOT EXISTS idx_arrend_unidad  ON public.contratos_arrendamiento(unidad_id);
