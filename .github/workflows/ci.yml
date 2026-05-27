@@ -32,5 +32,22 @@ jobs:
       - name: Test
         run: npm run test
 
+      # Coverage en step separado y advisory: la instrumentación de v8 altera
+      # el timing de tests sensibles a timers. El gate sigue siendo `Test`;
+      # este paso solo recopila métricas para el dashboard de calidad.
+      - name: Coverage (advisory)
+        if: always()
+        run: npm run test:coverage
+        continue-on-error: true
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ github.run_id }}
+          path: coverage/
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Build
         run: npm run build
