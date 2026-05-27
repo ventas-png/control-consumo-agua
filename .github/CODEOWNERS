@@ -1,0 +1,50 @@
+# CODEOWNERS — quien debe revisar PRs que toquen archivos sensibles.
+# Ver https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+#
+# Convención: dueño primario aparece primero; entradas posteriores GANAN para
+# matches específicos. Reemplazar @ventas-png con el handle real cuando
+# corresponda. Mientras tanto, este archivo deja explícito el inventario de
+# zonas que requieren revisión cuidadosa.
+
+# Default: cualquier cambio requiere revisión del owner principal del repo.
+*                                       @ventas-png
+
+# ── Seguridad y autenticación ─────────────────────────────────────────────
+/src/hooks/useAuth.ts                   @ventas-png
+/src/hooks/usePermissions.ts            @ventas-png
+/src/lib/security.ts                    @ventas-png
+/src/lib/fileValidation.ts              @ventas-png
+/src/lib/validation.ts                  @ventas-png
+/src/lib/permissions.ts                 @ventas-png
+/src/lib/systemRoleIds.ts               @ventas-png
+/src/lib/aguaPermissions.ts             @ventas-png
+/src/lib/condominiosRoles.ts            @ventas-png
+/src/components/auth/                   @ventas-png
+
+# ── Edge functions sensibles (pagos, usuarios, OAuth) ──────────────────────
+/supabase/functions/create-user/                  @ventas-png
+/supabase/functions/delete-user/                  @ventas-png
+/supabase/functions/create-cliente-account/       @ventas-png
+/supabase/functions/google-oauth-initiate/        @ventas-png
+/supabase/functions/google-oauth-callback/        @ventas-png
+/supabase/functions/complete-oauth-onboarding/    @ventas-png
+/supabase/functions/save-payment-config/          @ventas-png
+/supabase/functions/create-payment-intent/        @ventas-png
+/supabase/functions/stripe-webhook-handler/       @ventas-png
+/supabase/functions/log-security-event/           @ventas-png
+
+# ── Migraciones SQL (cualquier cambio de schema/RLS) ──────────────────────
+/supabase/migrations/                   @ventas-png
+
+# ── CI / Deploy / Infra ────────────────────────────────────────────────────
+/.github/workflows/                     @ventas-png
+/.github/CODEOWNERS                     @ventas-png
+/vercel.json                            @ventas-png
+/vite.config.ts                         @ventas-png
+/package.json                           @ventas-png
+/package-lock.json                      @ventas-png
+
+# ── Documentos de auditoría / critique ─────────────────────────────────────
+/DESIGN_CRITIQUE_*.md                   @ventas-png
+/SECURITY_*.md                          @ventas-png
+/DEPLOYMENT.md                          @ventas-png

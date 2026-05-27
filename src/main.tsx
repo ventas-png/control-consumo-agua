@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import './components/shared/shared.css'
 import App from './App'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { initMonitoring } from './lib/monitoring'
 import { initAnalytics } from './lib/analytics'
 
@@ -20,8 +21,12 @@ if (savedTheme === 'dark' || savedTheme === 'light') {
   document.documentElement.setAttribute('data-theme', savedTheme)
 }
 
+// Root-level boundary: catches anything that escapes the per-section boundaries
+// in App.tsx so a crash never shows a blank page.
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary sectionName="root">
+      <App />
+    </ErrorBoundary>
   </StrictMode>
 )
