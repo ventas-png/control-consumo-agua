@@ -2,10 +2,14 @@
 -- Baseline legacy tables — phase 2 (16 of 16) + 8 legacy functions
 -- ============================================================================
 -- Continuación de la fase 1 (20260317000000_baseline_legacy_tables_phase1.sql).
--- Cubre las 11 tablas legacy restantes y las 8 funciones legacy que la
--- migración 20260318000001_fix_function_search_path_and_move_extensions.sql
--- (y 20260417000013_consolidate_rls_policies_part2.sql para get_my_user_id)
+-- Cubre las 11 tablas legacy restantes y 8 funciones legacy que la migración
+-- 20260318000001_fix_function_search_path_and_move_extensions.sql (y
+-- 20260417000013_consolidate_rls_policies_part2.sql para get_my_user_id)
 -- ALTERan sin que ninguna migración del repo las hubiera creado.
+-- has_admin_or_owner_access_in_company y is_user_cliente_with_id dependen de
+-- get_my_company_id (definido en 20260320000003) y get_my_cliente_id
+-- (20260330000001), por lo que viven en una migración separada posterior:
+-- 20260330000002_baseline_legacy_rls_helpers.sql.
 --
 -- Hallazgo: infra:I39 — Migraciones no aplicables desde cero
 --   DESIGN_CRITIQUE_INFRAESTRUCTURA_2026-05-26.md
