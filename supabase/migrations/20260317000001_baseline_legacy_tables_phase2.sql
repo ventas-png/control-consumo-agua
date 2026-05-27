@@ -1,10 +1,11 @@
 -- ============================================================================
--- Baseline legacy tables — phase 2 (16 of 16) + 7 legacy functions
+-- Baseline legacy tables — phase 2 (16 of 16) + 8 legacy functions
 -- ============================================================================
 -- Continuación de la fase 1 (20260317000000_baseline_legacy_tables_phase1.sql).
--- Cubre las 11 tablas legacy restantes y las 7 funciones legacy que la
+-- Cubre las 11 tablas legacy restantes y las 8 funciones legacy que la
 -- migración 20260318000001_fix_function_search_path_and_move_extensions.sql
--- ALTERa sin que ninguna migración del repo las hubiera creado.
+-- (y 20260417000013_consolidate_rls_policies_part2.sql para get_my_user_id)
+-- ALTERan sin que ninguna migración del repo las hubiera creado.
 --
 -- Hallazgo: infra:I39 — Migraciones no aplicables desde cero
 --   DESIGN_CRITIQUE_INFRAESTRUCTURA_2026-05-26.md
@@ -18,8 +19,8 @@
 --   Tablas:    clientes, registros, convenios_pago, fuentes_agua,
 --              registros_calidad, payment_requests, password_reset_tokens,
 --              user_sessions, security_logs, empresa, empresa_pagos_config
---   Funciones: current_user_role, request_password_reset (×2 overloads),
---              validate_reset_token (×2), update_user_password,
+--   Funciones: current_user_role, get_my_user_id, request_password_reset
+--              (×2 overloads), validate_reset_token (×2), update_user_password,
 --              migrate_custom_auth_to_supabase_unconfirmed
 --   FKs cross-fase de fase 1: completa los TODO documentados en
 --              20260317000000 para pagos.cliente_id, .registro_id,
@@ -389,6 +390,20 @@ STABLE SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
   SELECT role FROM public.app_users WHERE id = auth.uid()
+$function$;
+
+-- get_my_user_id — wrapper estable sobre auth.uid() usado por la policy
+-- "user_module_permissions_select" en 20260417000013_consolidate_rls_policies_part2.sql.
+-- Existe en prod desde fase 1 (auditado vía MCP el 2026-05-27) pero ninguna
+-- migración del repo la creaba — segunda capa de la "cebolla" infra:I39, ya
+-- aplicada parcialmente con las funciones de password_reset y current_user_role.
+CREATE OR REPLACE FUNCTION public.get_my_user_id()
+RETURNS uuid
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT auth.uid()
 $function$;
 
 -- request_password_reset (overload con varchar) — flujo legacy
