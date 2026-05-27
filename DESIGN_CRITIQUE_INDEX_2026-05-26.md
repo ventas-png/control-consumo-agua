@@ -270,7 +270,7 @@ Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior
 | `infra:I33` | ⏳ **Parcial** | PR #169 introduce `src/lib/logger.ts` con niveles estructurados + Sentry breadcrumbs. Pendiente: migración gradual de `console.log` (PRs por dominio) + pipe servidor a Datadog/Logtail. |
 | `cond:A10`  | ⏳ **Parcial** | PR #169 mueve 3/4 componentes (`FileUploader`, `ImageUploader`, `ImageGallery`) a `shared/`. `RubrosBuilder` se queda atado a `cond:C9` por su dependencia de tipos del dominio. |
 | `agua:C11` + `cond:C14` | ⏳ **Parcial** | PR #169 crea `.github/workflows/types-drift.yml` (advisory, manual + cron semanal). Pendiente: primer run para validar secretos, baseline committed, refactor de tipos. |
-| `infra:I39` | ⏳ **Parcial — fase 1 en PR #170** | Baseline `CREATE TABLE IF NOT EXISTS` para 4 de 15 tablas legacy (`companies`, `projects`, `user_project_assignments`, `pagos`) + `README.md` de convención. **Alcance refinado durante la implementación**: son 15 tablas legacy, no 4. Fase 2 (11 restantes + FKs cross-fase) queda como PR dedicado siguiente. |
+| `infra:I39` | ⏳ **Parcial — fase 1 en PR #170** | Baseline `CREATE TABLE IF NOT EXISTS` para 5 tablas legacy (`app_users`, `companies`, `projects`, `user_project_assignments`, `pagos`) + `README.md` de convención. **Alcance refinado tres veces**: la auditoría original estimaba 4 tablas; al implementar descubrí 15 tablas legacy (+ `app_users` por bug de orden); tras el reset de Supabase Preview el error cambió y aparecieron 7 **funciones legacy** afectadas. El alcance real son 16 tablas + 7+ funciones; requerirá 3 fases en vez de 2. Fase 1 cumplida con #170 (las 5 tablas más críticas + sus RLS); fase 2 (11 tablas + 7 funciones) y fase 3 (objetos adicionales que aparezcan) en PRs siguientes. |
 
 ### Métricas de avance
 
@@ -306,7 +306,20 @@ Los 5 quick wins propuestos siguen válidos. Una vez se haya mergeado el PR #170
 
 ### Y un PR 5 paralelo / posterior: `infra:I39` fase 2
 
-Cubre las 11 tablas legacy restantes (`clientes`, `registros`, `convenios_pago`, `fuentes_agua`, `registros_calidad`, `payment_requests`, `password_reset_tokens`, `user_sessions`, `security_logs`, `empresa`, `empresa_pagos_config`) + completa las FKs `-- TODO infra:I39-fase2` documentadas en `20260317000000_baseline_legacy_tables_phase1.sql`. Mismo enfoque: schema replicado de prod vía MCP, `IF NOT EXISTS` idempotente. Cuando esté completo, `supabase db reset` debería aplicar toda la cadena de migraciones desde cero sin errores.
+Tras el descubrimiento del PR #170, el alcance de la fase 2 se expande:
+
+- **11 tablas legacy restantes** (`clientes`, `registros`, `convenios_pago`, `fuentes_agua`, `registros_calidad`, `payment_requests`, `password_reset_tokens`, `user_sessions`, `security_logs`, `empresa`, `empresa_pagos_config`).
+- **7 funciones legacy** referenciadas por la migración `20260318000001_fix_function_search_path_and_move_extensions.sql`: `current_user_role()`, `request_password_reset(varchar/text)`, `validate_reset_token(varchar/text)`, `update_user_password()`, `migrate_custom_auth_to_supabase_unconfirmed()`. Schema extraído vía MCP listo para reusar con `CREATE OR REPLACE FUNCTION` (idempotente).
+- **Completar las FKs cross-fase** documentadas como `-- TODO infra:I39-fase2` en `20260317000000_baseline_legacy_tables_phase1.sql`.
+
+Mismo enfoque que fase 1: schema replicado de prod vía MCP, `IF NOT EXISTS` / `CREATE OR REPLACE` idempotentes. **Probable fase 3 iterativa** si tras la fase 2 aparece un cuarto nivel de objetos legacy (triggers, vistas, secuencias). El proceso converge en pocas iteraciones porque cada fase ataca el siguiente nivel del error.
+
+### Nota importante: el PR #170 NO debe bloquearse por el sub-error
+
+Aunque el Supabase Preview del PR #170 muestra ❌, eso es porque expone el SIGUIENTE error en la cadena (función legacy), no porque su fase 1 haya fallado. Mergear el PR #170 es seguro porque:
+- En producción es no-op idempotente (`IF NOT EXISTS` no toca tablas existentes).
+- Sus 5 tablas baseline + RLS aplicadas en branches sí funcionan (validado por el cambio de tipo de error).
+- El próximo PR (fase 2) atacará el siguiente nivel.
 
 ### Monitoreo de impacto
 
