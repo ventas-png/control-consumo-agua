@@ -113,6 +113,17 @@ CREATE POLICY payment_requests_update ON public.payment_requests
 -- ============================================================
 -- 5. Add missing indexes on foreign keys (performance)
 -- ============================================================
+--
+-- Idempotencia (infra:I42): varias columnas referenciadas por los índices
+-- de abajo son legacy — existen en producción porque se agregaron vía SQL
+-- Editor antes de versionar con migrations, pero ninguna migration del
+-- repo las crea. ADD COLUMN IF NOT EXISTS las garantiza en branches DB
+-- nuevas (Supabase Branching, supabase db reset). En producción es no-op.
+
+ALTER TABLE public.contadores ADD COLUMN IF NOT EXISTS updated_by uuid;
+ALTER TABLE public.tarifas    ADD COLUMN IF NOT EXISTS updated_by uuid;
+ALTER TABLE public.unidades   ADD COLUMN IF NOT EXISTS updated_by uuid;
+ALTER TABLE public.unidades   ADD COLUMN IF NOT EXISTS cliente_id uuid;
 
 CREATE INDEX IF NOT EXISTS idx_clientes_project_id ON public.clientes(project_id);
 CREATE INDEX IF NOT EXISTS idx_clientes_updated_by ON public.clientes(updated_by);
