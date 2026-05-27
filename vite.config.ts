@@ -20,6 +20,23 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    coverage: {
+      provider: 'v8',
+      // Reporters: html para verlo localmente, text para el log de CI,
+      // json-summary para futura comparación entre PRs.
+      reporter: ['text', 'html', 'json-summary'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.test.{ts,tsx}',
+        'src/**/__tests__/**',
+        'src/**/*.d.ts',
+        'src/main.tsx',
+        'src/vite-env.d.ts',
+      ],
+      // Sin thresholds en esta primera iteración: solo reportar. Cuando haya
+      // baseline estable, fijar mínimos (p. ej. lines: 60) y subirlos por PR.
+    },
   },
   build: {
     // Hidden maps are generated only when we upload+delete them, so they're

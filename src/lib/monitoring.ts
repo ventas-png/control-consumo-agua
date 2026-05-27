@@ -5,6 +5,10 @@ import * as Sentry from '@sentry/react'
 // without any account or secret.
 
 const DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined
+// Tag del entorno para Sentry. En Vercel: setear la variable de proyecto
+// `VITE_APP_ENV = $VERCEL_ENV` para que preview/production lleguen como
+// entornos distintos al dashboard de Sentry. Sin esa variable cae a
+// `MODE` de Vite (`development` local, `production` en builds).
 const ENV = (import.meta.env.VITE_APP_ENV as string | undefined) ?? import.meta.env.MODE
 const RELEASE = import.meta.env.VITE_APP_VERSION as string | undefined
 

@@ -24,8 +24,28 @@ jobs:
             exit 1
           fi
 
+  # Lint y formato de las edge functions. Modo advisory (no bloquea el deploy)
+  # mientras estabilizamos la baseline. Una vez la base esté limpia, quitar
+  # `continue-on-error` para hacerlo enforce.
+  lint-functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: deno fmt --check
+        run: deno fmt --check supabase/functions/
+        continue-on-error: true
+
+      - name: deno lint
+        run: deno lint supabase/functions/
+        continue-on-error: true
+
   deploy:
-    needs: check-secrets
+    needs: [check-secrets, lint-functions]
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -110,5 +130,11 @@ jobs:
       - name: Deploy route-reminders (no JWT — invoked by pg_cron with service_role)
         run: |
           supabase functions deploy route-reminders \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --no-verify-jwt
+
+      - name: Deploy health (no JWT — public health probe for external monitoring)
+        run: |
+          supabase functions deploy health \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
             --no-verify-jwt
