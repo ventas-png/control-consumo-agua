@@ -394,9 +394,9 @@ Scripts y estilos servidos desde Vercel no usan SRI. Si un CDN se compromete, el
 
 ---
 
-### I39 · 🔴 Crítico — Migraciones no aplicables desde cero (Supabase Branching roto)
+### I39 · ⏳ Parcial — ~~Migraciones no aplicables desde cero (Supabase Branching roto)~~
 
-> **Descubierto al correr CI del [PR #168](https://github.com/ventas-png/control-consumo-agua/pull/168).**
+> **Descubierto al correr CI del [PR #168](https://github.com/ventas-png/control-consumo-agua/pull/168). Avance en [PR #170](https://github.com/ventas-png/control-consumo-agua/pull/170) (fase 1).**
 
 La primera migración cronológica del repo es `supabase/migrations/20260318000000_enable_rls_public_schema.sql` y arranca con:
 
@@ -408,17 +408,19 @@ ALTER TABLE public.user_project_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pagos ENABLE ROW LEVEL SECURITY;
 ```
 
-Pero **ninguna migración del repo crea estas tablas** — sólo `public.app_users` aparece como `CREATE TABLE` en migrations (`20260320000000_fix_superadmin_app_users_uuid.sql`). Las demás (`companies`, `projects`, `user_project_assignments`, `pagos`) viven en el proyecto Supabase principal porque se crearon manualmente antes de comenzar a versionar con migrations.
+Pero **ninguna migración del repo crea estas tablas** — sólo `public.app_users` aparece como `CREATE TABLE` en migrations (`20260320000000_fix_superadmin_app_users_uuid.sql`). Las demás viven en el proyecto Supabase principal porque se crearon manualmente antes de comenzar a versionar con migrations.
 
-**Consecuencia inmediata:** Supabase Branching levanta una DB limpia y al aplicar la primera migración explota con `relation "public.companies" does not exist (SQLSTATE 42P01)`. Esto rompe la integración de preview branches por PR.
+**Alcance real (descubierto durante PR #170):** son **15 tablas legacy**, no 4. Las 4 que disparaban el error inmediato son `companies`, `projects`, `user_project_assignments`, `pagos`. Las 11 restantes (`clientes`, `registros`, `convenios_pago`, `fuentes_agua`, `registros_calidad`, `payment_requests`, `password_reset_tokens`, `user_sessions`, `security_logs`, `empresa`, `empresa_pagos_config`) también son legacy y harán fallar Supabase Branching tan pronto como una migración posterior las referencia.
 
-**Consecuencia mayor:** el repo **no es reproducible desde cero** (`supabase db reset` falla; clonar y aplicar migrations también). Bloqueante para `infra:I16` (separación staging/prod), `infra:I20` (pipeline de rollback) y para onboarding de nuevos devs.
+**Avance PR #170 (fase 1):**
+- Crea `supabase/migrations/20260317000000_baseline_legacy_tables_phase1.sql` con `CREATE TABLE IF NOT EXISTS` para las 4 tablas que disparan el error inmediato. Schema replicado exactamente desde producción vía MCP (validado: no-op en prod, row counts intactos).
+- FKs cross-schema (`auth.users`) y cross-fase (a tablas de fase 2) documentadas como `-- TODO infra:I39-fase2`.
+- Agrega `supabase/migrations/README.md` con la convención hacia adelante (toda tabla nace de migration, RLS junto al CREATE TABLE, etc.).
 
-**Recomendación SaaS:**
-1. **PR dedicado** (no quick win) que cree `supabase/migrations/20260100000000_baseline_legacy_tables.sql` con `CREATE TABLE IF NOT EXISTS` de las 4 tablas legacy (`companies`, `projects`, `user_project_assignments`, `pagos`) usando el schema actual de producción.
-2. Validar contra el proyecto principal con `pg_dump --schema-only` antes de mergear.
-3. Verificar localmente con `supabase db reset` que todas las migrations aplican limpias.
-4. Documentar en `supabase/migrations/README.md` la convención: nuevas tablas siempre con `CREATE TABLE` versionado.
+**Pendiente — fase 2 (PR dedicado):**
+- Baseline de las 11 tablas legacy restantes con sus FKs internas.
+- Completar las FKs documentadas como TODO en la fase 1.
+- Validar `supabase db reset` ejecuta toda la cadena de migraciones limpia.
 
 ---
 
@@ -515,7 +517,7 @@ Pero **ninguna migración del repo crea estas tablas** — sólo `public.app_use
 | I36 | ✅   | ~~Sentry environment hard-coded a "production"~~ — docs cerradas PRs #167+#168; setear `VITE_APP_ENV=$VERCEL_ENV` en panel Vercel queda fuera del repo | `monitoring.ts:8` ya usa `VITE_APP_ENV \|\| MODE`                | —    |
 | I37 | ✅   | ~~Sin Dependabot / Renovate~~ — resuelto PR #167                       | `.github/renovate.json`                                                     | —    |
 | I38 | ✅   | ~~Sin CODEOWNERS~~ — resuelto PR #167                                  | `.github/CODEOWNERS`                                                        | —    |
-| I39 | 🔴   | **Migraciones no aplicables desde cero** — `companies/projects/user_project_assignments/pagos` no se crean en ninguna migración; Supabase Branching falla | `supabase/migrations/20260318000000_enable_rls_public_schema.sql:5` | 2    |
+| I39 | ⏳   | ~~Migraciones no aplicables desde cero~~ — fase 1 PR #170 (4 de 15 tablas legacy); fase 2 pendiente para las 11 restantes | `supabase/migrations/20260317000000_baseline_legacy_tables_phase1.sql` + `supabase/migrations/README.md` | 2    |
 
 ---
 
