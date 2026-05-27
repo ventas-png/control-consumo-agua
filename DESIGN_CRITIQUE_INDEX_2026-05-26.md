@@ -252,32 +252,37 @@ Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior
 | `infra:I35` | `.env.example` claridad de secretos | [#167](https://github.com/ventas-png/control-consumo-agua/pull/167) | tabla de qué va dónde |
 | `infra:I37` | Renovate config | [#167](https://github.com/ventas-png/control-consumo-agua/pull/167) | schedule semanal, grouping conservador |
 | `infra:I38` | CODEOWNERS | [#167](https://github.com/ventas-png/control-consumo-agua/pull/167) | reviews en auth/RLS/payments/migrations |
+| `infra:I32` | Edge function `health` | [#168](https://github.com/ventas-png/control-consumo-agua/pull/168) | smoke check de env vars; sin JWT; pensada para UptimeRobot/Pingdom |
 
-### Hallazgos corregidos por verificación (falsos positivos / parciales)
+### Hallazgos parciales (avance real, falta cierre)
 
 | ID | Estado actual | Comentario |
 |----|----------------|-----------|
 | `infra:I30` | ✅ **Falso positivo** | `vercel.json:14` ya tiene `geolocation=(self)`. La auditoría original era incorrecta. |
-| `infra:I36` | ⏳ **Parcial** | `monitoring.ts` ya lee `VITE_APP_ENV \|\| MODE`. Falta setear `VITE_APP_ENV=$VERCEL_ENV` en variables de Vercel (documentado en `.env.example` por PR #167). |
+| `infra:I36` | ✅ **Docs cerradas** | `monitoring.ts` ya lee `VITE_APP_ENV \|\| MODE`; PR #167+#168 documentan que en Vercel hay que setear `VITE_APP_ENV=$VERCEL_ENV`. Acción operativa fuera del repo (panel Vercel). |
 | `infra:I15` | ⏳ **Parcial** | `.env.example` ya documenta dónde va cada secreto (PR #167); pendiente `SECRETS_INVENTORY.md` exhaustivo con política de rotación. |
+| `infra:I7`  | ⏳ **Parcial** | PR #168 agrega `npm run test:coverage` + upload de artifact en CI como advisory. Pendiente: arreglar el flake del test de `ImportModal` con `--coverage` y fijar threshold inicial (p. ej. lines ≥ 50%). |
+| `infra:I8`  | ⏳ **Parcial** | PR #168 agrega job `lint-functions` con `deno fmt --check` + `deno lint` (advisory). Pendiente: limpiar baseline de las 14 funciones existentes y quitar `continue-on-error` para hacerlo enforce. |
 
 ### Métricas de avance
 
-| Concepto | Antes | Después de PRs mergeados | Pendientes |
-|----------|-------|--------------------------|------------|
-| Hallazgos totales | 219 | 219 | 219 |
-| Resueltos        | 0   | 5 (`infra:I3,I34,I35,I37,I38`) | 214 |
-| Falsos positivos | -   | 1 (`infra:I30`)                 | -   |
-| Parciales        | -   | 2 (`infra:I15,I36`)             | -   |
-| % progreso       | 0%  | ~2.3% (5/219)                    | -   |
+| Concepto | Antes | Después PR #167 | Después PR #168 | Pendientes |
+|----------|-------|-----------------|-----------------|------------|
+| Hallazgos totales      | 219 | 219 | 219 | — |
+| Resueltos             | 0   | 5   | 6   | 213 |
+| Docs/falsos positivos | 0   | 1 (`I30`) + parte de `I36` | 2 (`I30` + cierre docs `I36`) | — |
+| Parciales activos      | 0   | 2 (`I15, I36`) | 3 (`I15, I7, I8`) | — |
+| % progreso (resueltos) | 0%  | 2.3% | 2.7% | — |
 
-### Próximo lote candidato (mismo criterio: bajo riesgo, alto valor)
+### Próximo lote candidato — Lote 3 (sigue el criterio: bajo riesgo, alto valor)
 
-1. **`infra:I7` parcial** — agregar `vitest --coverage` con reporte sin threshold inicial (solo reporta). Habilita la fase 5 de calidad.
-2. **`infra:I36` cierre** — declarar `VITE_APP_ENV=$VERCEL_ENV` en variables de proyecto Vercel + opcional `vercel.json` env mapping.
-3. **`agua:C11` + `cond:C14`** — job CI que regenere `database.types.ts` desde Supabase y haga drift-check.
-4. **`infra:I32`** — Edge function `health` que pingea DB + Storage + Auth (puro código nuevo).
-5. **`infra:I8` parcial** — `deno lint` + `deno fmt --check` en `deploy-functions.yml` (sin tests aún).
+1. **`agua:C11` + `cond:C14`** — Workflow `types-drift.yml` (manual/cron) que regenera `database.types.ts` desde Supabase y reporta drift como artifact. No bloquea PRs, solo informa. Habilita la futura Fase 5 de tipos auto-generados.
+2. **`infra:I33`** — Wrapper `logger` estructurado (`src/lib/logger.ts`) con niveles `debug/info/warn/error` que enriquece breadcrumbs de Sentry y desactiva `debug` en prod. Reemplazo gradual (no de un solo golpe) de `console.log` repartidos.
+3. **`infra:I11`** — Sentry `tracesSampler` por severity (100% en errores y rutas críticas; 10% en transacciones normales). Sigue siendo no invasivo (solo cambia `monitoring.ts`).
+4. **`infra:I10`** — PostHog `register({ company_id, role, plan })` automático desde `useAuth` para que cada `track()` herede props multi-tenant. Mejora drásticamente la analítica sin tocar nada más.
+5. **`agua:A10` + `cond:A10`** — Mover `FileUploader`, `ImageUploader`, `ImageGallery`, `RubrosBuilder` desde `components/condominios/` a `components/shared/` (refactor mecánico de imports, sin cambio de comportamiento).
+
+Todos son aditivos o de configuración. Sin DB, sin auth, sin RLS.
 
 ### Monitoreo de impacto
 
@@ -286,6 +291,9 @@ A medida que se resuelven hallazgos, anotar aquí si la solución impacta (resue
 - **`infra:I3` (ErrorBoundary global)** → no afecta otros hallazgos; complementa los boundaries por sección existentes en App.tsx (`agua:A7`).
 - **`infra:I38` (CODEOWNERS)** → habilita Fase 5 de calidad continua para todos los documentos.
 - **`infra:I37` (Renovate)** → resuelve dependencias estancadas; relevante para `infra:I8` (deno) cuando se añadan tests futuros.
+- **`infra:I32` (health endpoint)** → habilita la observabilidad externa que mencionan `infra:I18` (alertas Slack/email) e `infra:I16` (separación staging/prod, ya que cada env tendrá su propio probe).
+- **`infra:I7` parcial (coverage)** → expone que el flake de `ImportModal.test.tsx` con `--coverage` se debe a timing — anotar como deuda en la sección "Tests" de `agua:C7`. Coverage limpio habilita el threshold definitivo en Fase 5.
+- **`infra:I8` parcial (deno lint advisory)** → al limpiar baseline + hacerlo enforce, también impone consistencia en futuras funciones que se creen para `com:N2` (orquestador de notificaciones), `cond:A9` (edge functions de condominios), `plat:P3` (invite) y `plat:P36` (límites de plan). Inversión que se amortiza.
 
 ---
 

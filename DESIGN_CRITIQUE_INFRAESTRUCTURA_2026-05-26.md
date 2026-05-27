@@ -120,31 +120,26 @@ Protección actual: CORS origin check + `ALLOWED_ORIGINS` secret. Si el secret l
 
 ---
 
-### I7 · 🔴 Crítico — CI sin lint / sin coverage threshold / sin bundle-size budget
+### I7 · ⏳ Parcial — ~~CI sin lint / sin coverage threshold / sin bundle-size budget~~
 
-`.github/workflows/ci.yml`:
-- `npm run type-check` ✓
-- `npm run test` ✓
-- `npm run build` ✓
-- **ESLint ausente.**
-- **Sin `vitest --coverage` con threshold.**
-- **Sin `size-limit` ni Lighthouse CI.**
-
-`vite.config.ts` fragmenta vendors pero no impone tamaño máximo. `chart.js` + `leaflet` + `exceljs` + `jspdf` suman ~1-2MB sin enforcement.
-
-**Recomendación:**
-- ESLint con `@typescript-eslint`, `react-hooks`, `react-refresh`, `tailwindcss` plugins (si aplica).
-- Coverage threshold 60% mínimo en business.ts, validation.ts, security.ts.
-- `size-limit` con presupuesto por chunk (`vendor-charts < 200KB`, `vendor-pdf < 250KB`).
-- Lighthouse CI sobre URL de preview Vercel.
+> **Avance ([PR #168](https://github.com/ventas-png/control-consumo-agua/pull/168)):** se agregó `npm run test:coverage` con `@vitest/coverage-v8` (text/html/json-summary) y un step en `ci.yml` que sube el reporte como artifact. **Sin threshold inicial** porque la instrumentación de v8 hace flake un test de timing en `ImportModal.test.tsx`; el step corre como advisory (`continue-on-error: true`) y `npm run test` sin coverage sigue siendo el gate.
+>
+> **Pendiente** en lotes posteriores:
+> - Arreglar el flake del test sensible al timing (probable: aumentar `waitFor` timeout o cambiar a `act`).
+> - Fijar threshold mínimo en archivos críticos (`business.ts`, `validation.ts`, `security.ts`).
+> - ESLint (`@typescript-eslint`, `react-hooks`, `react-refresh`) en CI.
+> - `size-limit` con presupuesto por chunk (`vendor-charts < 200KB`, `vendor-pdf < 250KB`).
+> - Lighthouse CI sobre URL de preview Vercel.
 
 ---
 
-### I8 · 🟠 Alto — Deploy de edge functions sin tests
+### I8 · ⏳ Parcial — ~~Deploy de edge functions sin tests~~
 
-`.github/workflows/deploy-functions.yml` solo hace checkout y `supabase functions deploy`. Sin `deno test`, sin lint, sin type-check.
-
-**Recomendación:** Job `deno-test` antes del deploy. `deno lint` + `deno fmt --check`. Smoke tests con `deno test` por función crítica.
+> **Avance ([PR #168](https://github.com/ventas-png/control-consumo-agua/pull/168)):** nuevo job `lint-functions` en `deploy-functions.yml` con `deno fmt --check` y `deno lint` (vía `denoland/setup-deno@v1`). Modo **advisory** (`continue-on-error: true`) mientras se estabiliza la baseline; ya queda como prerequisito (`needs: [check-secrets, lint-functions]`) del job de deploy.
+>
+> **Pendiente:**
+> - Limpiar baseline aplicando `deno fmt -w` y resolviendo warnings de `deno lint` en las 14 funciones existentes; luego quitar `continue-on-error` para hacerlo enforce.
+> - Tests con `deno test` por función crítica (`create-payment-intent`, `stripe-webhook-handler`, `notify-package`, etc.).
 
 ---
 
@@ -346,11 +341,11 @@ Scripts y estilos servidos desde Vercel no usan SRI. Si un CDN se compromete, el
 
 ---
 
-### I32 · 🟡 Medio — Sin `HEAD` health endpoint
+### I32 · ✅ Resuelto en [PR #168](https://github.com/ventas-png/control-consumo-agua/pull/168) — ~~Sin `HEAD` health endpoint~~
 
-Para monitoring externo (Pingdom, UptimeRobot) se necesita un endpoint barato que confirme que la app está viva.
-
-**Recomendación:** Edge function `health` que verifica DB + Storage + Auth.
+> **Resolución:** `supabase/functions/health/index.ts` agregado: endpoint público (sin JWT), soporta `GET` y `HEAD`, devuelve 200/503 con JSON `{ status, timestamp, uptime_ms, checks }`. Verifica presencia de `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` sin abrir conexiones (latencia <100ms). Listo para apuntar UptimeRobot/Pingdom/Better Uptime a `https://<project>.supabase.co/functions/v1/health`.
+>
+> **Próximo paso opcional:** ampliar a checks activos de DB + Storage cuando se introduzca staging (`infra:I16`).
 
 ---
 
@@ -374,11 +369,13 @@ Logs en edge functions van a Supabase Functions Logs, pero sin pipe a Datadog/Lo
 
 ---
 
-### I36 · ⏳ Parcial — ~~Sentry environment hard-coded a "production"~~
+### I36 · ✅ Docs cerradas (PRs [#167](https://github.com/ventas-png/control-consumo-agua/pull/167) + [#168](https://github.com/ventas-png/control-consumo-agua/pull/168)) — ~~Sentry environment hard-coded a "production"~~
 
-> **Verificación:** `src/lib/monitoring.ts:8` ya lee `VITE_APP_ENV || MODE`. El gap real es que `.env.example` lo sugería como `production` fijo, ignorando `$VERCEL_ENV` en builds de preview.
+> **Verificación inicial:** `src/lib/monitoring.ts:8` ya lee `VITE_APP_ENV || MODE`. El gap real era que `.env.example` no explicaba la conexión con `$VERCEL_ENV`.
 >
-> **PR #167:** documenta apuntarlo a `$VERCEL_ENV` en `.env.example`. **Pendiente:** setear la variable en el panel de Vercel (`VITE_APP_ENV=$VERCEL_ENV` en preview y production) — acción manual fuera del repo.
+> **PR #167** documenta apuntar `VITE_APP_ENV` a `$VERCEL_ENV` en `.env.example`. **PR #168** agrega un comentario explícito en `monitoring.ts` con la misma guía para quien lea el código.
+>
+> **Acción operativa restante (fuera del repo):** setear en el panel de Vercel — Project Settings → Environment Variables — la variable `VITE_APP_ENV` con valor `$VERCEL_ENV` para preview y production. Tras eso, Sentry mostrará los eventos en environments separados (`preview`, `production`, `development`).
 
 ---
 
@@ -455,8 +452,8 @@ Logs en edge functions van a Supabase Functions Logs, pero sin pipe a Datadog/Lo
 | I4  | 🔴   | `useOffline` solo detecta, no offline-first                     | `src/hooks/useOffline.ts:31 LOC`                                           | 2    |
 | I5  | 🔴   | Sidebar NAV hard-coded                                            | `src/components/layout/Sidebar.tsx:683 LOC`                                 | 1    |
 | I6  | 🔴   | Topbar PAGE_TITLES/ICONS hard-coded                              | `src/components/layout/Topbar.tsx:250 LOC`                                  | 1    |
-| I7  | 🔴   | CI sin lint / coverage / bundle-size                              | `.github/workflows/ci.yml:37 LOC`                                          | 4    |
-| I8  | 🟠   | Deploy de edge functions sin tests                                | `.github/workflows/deploy-functions.yml`                                   | 2    |
+| I7  | ⏳   | ~~CI sin lint / coverage / bundle-size~~ — parcial PR #168 (coverage advisory) | `.github/workflows/ci.yml` + `vite.config.ts` coverage v8       | 4    |
+| I8  | ⏳   | ~~Deploy de edge functions sin tests~~ — parcial PR #168 (deno lint/fmt advisory) | `.github/workflows/deploy-functions.yml` job `lint-functions` | 2    |
 | I9  | 🟠   | `apply-migration` con riesgo de inyección                         | `.github/workflows/apply-migration.yml`                                    | 2    |
 | I10 | 🟠   | PostHog sin tagging multi-tenant automático                       | `src/lib/analytics.ts:41 LOC`                                              | 4    |
 | I11 | 🟠   | Sentry sample 10% sin sampling por severity                       | `src/lib/monitoring.ts:21`                                                 | 4    |
@@ -480,11 +477,11 @@ Logs en edge functions van a Supabase Functions Logs, pero sin pipe a Datadog/Lo
 | I29 | 🟡   | `NotificationBell` polling redundante con Realtime                  | `src/components/layout/NotificationBell.tsx:108 LOC`                       | 3    |
 | I30 | ✅   | ~~`Permissions-Policy: geolocation=()` bloquea GPS~~ — falso positivo, ya `geolocation=(self)` | `vercel.json:14`                                                  | —    |
 | I31 | 🟡   | Sin Subresource Integrity (SRI)                                      | `vite.config.ts`                                                           | 4    |
-| I32 | 🟡   | Sin `HEAD` health endpoint                                            | sin edge function                                                          | 4    |
+| I32 | ✅   | ~~Sin `HEAD` health endpoint~~ — resuelto PR #168                       | `supabase/functions/health/index.ts`                                       | —    |
 | I33 | 🟡   | Sin export de logs estructurados                                      | logs solo en Supabase                                                      | 4    |
 | I34 | ✅   | ~~Sin `robots.txt`~~ — resuelto PR #167; sitemap pendiente landing pública | `public/robots.txt`                                                  | 4    |
 | I35 | ✅   | ~~`.env.example` sin sección "secretos fuera de aquí"~~ — resuelto PR #167 | tabla de secretos al inicio de `.env.example`                          | —    |
-| I36 | ⏳   | ~~Sentry environment hard-coded a "production"~~ — parcial; falta setear `VITE_APP_ENV=$VERCEL_ENV` en Vercel | `monitoring.ts:8` ya usa `VITE_APP_ENV \|\| MODE`                | 4    |
+| I36 | ✅   | ~~Sentry environment hard-coded a "production"~~ — docs cerradas PRs #167+#168; setear `VITE_APP_ENV=$VERCEL_ENV` en panel Vercel queda fuera del repo | `monitoring.ts:8` ya usa `VITE_APP_ENV \|\| MODE`                | —    |
 | I37 | ✅   | ~~Sin Dependabot / Renovate~~ — resuelto PR #167                       | `.github/renovate.json`                                                     | —    |
 | I38 | ✅   | ~~Sin CODEOWNERS~~ — resuelto PR #167                                  | `.github/CODEOWNERS`                                                        | —    |
 
