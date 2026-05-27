@@ -272,41 +272,47 @@ Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior
 | `agua:C11` + `cond:C14` | ⏳ **Parcial** | PR #169 crea `.github/workflows/types-drift.yml` (advisory, manual + cron semanal). Pendiente: primer run para validar secretos, baseline committed, refactor de tipos. |
 | `infra:I39` | ⏳ **Fase 1 en PR #170 + Fase 2 en PR #171** | Baseline completo de 16 tablas legacy + 7 funciones legacy + FKs cross-fase. **Alcance refinado tres veces durante implementación**: 4 → 16 tablas + 7 funciones. **PR #171 es superset del PR #170** (base apuntando a `main`, contiene ambas migraciones), por lo que se puede mergear solo el #171 si se quiere consolidar. Fase 3 quedaría sólo si tras mergear aparece un nuevo tipo de objeto legacy (triggers/vistas/secuencias). |
 
-### Métricas de avance
+### Métricas de avance (post-merge a main)
 
-| Concepto | Antes | PR #167 | PR #168 | PR #169 | PR #170 | PR #171 | Pendientes |
-|----------|-------|---------|---------|---------|---------|---------|------------|
-| Hallazgos totales      | 219 | 219 | **220** (+`I39`) | 220 | 220 | 220 | — |
-| Resueltos             | 0   | 5   | 6   | **8** | 8 | **9** (+`I39` completo cuando ambos PRs mergeados) | 211 |
-| Docs/falsos positivos | 0   | 1 + parte de `I36` | 2 | 2 | 2 | 2 | — |
-| Parciales activos      | 0   | 2   | 3   | 6   | 7 | **6** (-`I39` que pasa a resuelto) | — |
-| Nuevos descubiertos    | 0   | 0   | 1 (`I39`) | 0 | 0 | 0 (alcance final: 16 tablas + 7 funciones, todo cubierto) | — |
-| % progreso (resueltos) | 0%  | 2.3% | 2.7% | 3.6% | 3.6% | **4.1%** | — |
+| Concepto | Antes | Final (post 6 merges, 2026-05-27) |
+|----------|-------|-----------------------------------|
+| Hallazgos totales      | 219 | **222** (+`I39`, `I40`, `I41`, `I42` descubiertos durante implementación; `I40`-`I42` derivados de `I39`) |
+| Resueltos             | 0   | **12** (`I3, I10, I11, I32, I34, I35, I37, I38, I39, I40, I41, I42`) |
+| Docs/falsos positivos | 0   | 2 (`I30, I36`) |
+| Parciales activos     | 0   | 6 (`I15, I7, I8, I33, cond:A10, agua:C11+cond:C14`) |
+| % progreso (resueltos) | 0%  | **5.4%** (12/222) |
+| % cobertura del lote 1+2+3 | 0% | ~95% (todo lo planeado mergeado a main) |
 
-### Orden recomendado de merge para los 5 PRs abiertos
+### Orden de merge ejecutado — TODOS LOS PRs EN `main` ✅
 
-Una vez los PRs estén con CI verde, sugiero este orden de merge a `main`:
+| PR | Sha | Logro |
+|----|-----|-------|
+| ❌ #170 | (cerrado) | Superseded por #171 (que es superset) |
+| ✅ #171 | `d96eb11` | `infra:I39` fases 1+2 — 16 tablas legacy + 7 funciones + FKs cross-fase + README convención |
+| ✅ #167 | `8fa70a0` | Gobernanza — ErrorBoundary global, CODEOWNERS, Renovate, robots.txt, .env.example |
+| ✅ #169 | `c3e0e0f` | Lote 3 quick wins — logger, Sentry sampler, PostHog super-props, mover shared, types-drift |
+| ✅ #172 | `4e4ba52` | `infra:I40` — timestamp duplicado 20260324000005 renombrado a 20260324000007 |
+| ✅ #173 | `f354045` | `infra:I41 + I42` — policies idempotentes + columnas legacy faltantes |
+| ✅ #168 | `b3b6117` | Lote 2 quick wins — coverage CI, edge function `health`, deno lint advisory |
 
-**Opción A — Consolidada (recomendada):** cerrar #170 y mergear sólo #171 (que ya lo contiene).
+**6 PRs mergeados, 0 abiertos.**
 
-1. **PR #171** (baseline fases 1+2 completas: 16 tablas + 7 funciones + FKs cross-fase) — destraba Supabase Branching completamente.
-2. **PR #167** (gobernanza) — sin dependencias.
-3. **PR #169** (quick wins lote 3) — sin dependencias.
-4. **PR #168** (coverage, health, deno lint) — rebase sobre main → Supabase Preview pasará → merge.
+### Hallazgos nuevos descubiertos durante la ejecución
 
-**Opción B — Atómica por fase:** mergear ambos PRs de baseline por separado para auditar cada fase.
+- `infra:I39` — Migraciones no aplicables desde cero (vía CI del #168).
+- `infra:I40` — Timestamps duplicados `20260324000005` (al validar #170 → #171).
+- `infra:I41` — Policies duplicadas sin `DROP IF EXISTS` previo (al validar #173).
+- `infra:I42` — Columnas legacy faltantes en branches DB nuevas (al iterar #173).
 
-1. **PR #170** primero — fase 1.
-2. **PR #171** segundo — luego cambiar base de #171 de `main` a la rama del #170 ya no aplica; rebase contra main solo aplica la fase 2.
-3. **PR #167** → **#169** → **#168**.
+### Deuda residual de Supabase Branching
 
-Mi recomendación: **Opción A**. Más simple, mismo resultado en `main` (los 2 archivos están en orden cronológico correcto: `20260317000000` y `20260317000001`).
+Tras los 6 merges, Supabase Branching avanza ~20+ migraciones más que antes pero todavía tiene bugs "cebolla" aguas abajo (otras policies duplicadas, otras columnas legacy faltantes). Cada uno requiere PR pequeño con uno de dos patrones:
+- `DROP POLICY IF EXISTS` antes de `CREATE POLICY` duplicado.
+- `ALTER TABLE ADD COLUMN IF NOT EXISTS` antes de referenciar columna legacy.
 
-**Limitación encontrada:** Supabase tiene un límite de preview branches concurrentes. Al cambiar el base de #171 a `main`, el bot indicó que "ignoró" la branch porque se llegó al límite. La validación Supabase del #171 quedará pendiente hasta que se libere un slot (cerrando #170 o mergeando algún otro).
+**Producción no afectada** — las migraciones ya están aplicadas con su estado correcto allí. Solo afectan a Supabase Branching y `supabase db reset`. Se atienden como **track de mantenimiento continuo**, no como bloqueo del roadmap.
 
-Tras estos merges: arrancar Lote 4 de quick wins.
-
-### Próximo lote candidato — Lote 4 (sin cambios)
+### Próximo lote candidato — Lote 4 (5 quick wins, sin cambios)
 
 Los 5 quick wins propuestos siguen válidos. Una vez se haya mergeado el PR #170 (baseline tablas), el #3 (`com:N20`) deja de tener riesgo de migración bloqueada.
 
