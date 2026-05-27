@@ -449,18 +449,14 @@ export type AppSection =
 
 // ── Módulo Condominios ────────────────────────────────────────────────────────
 
-export type MetodoCalculo = 'fijo' | 'por_m2' | 'alicuota'
-
-export interface RubroConfig {
-  nombre: string
-  metodo: MetodoCalculo
-  valor: number        // fijo: monto total; por_m2: precio/m²; alicuota: monto total del gasto
-  notas?: string
-}
-
-export interface RubroDetalle extends RubroConfig {
-  monto_calculado: number
-}
+// Tipos compartidos por la UI de cuotas. Re-exportados desde el archivo
+// dedicado del dominio (cond:C9 — partición progresiva de este monolito).
+// El re-export mantiene compatibilidad con todos los imports existentes que
+// hacen `import { MetodoCalculo, RubroConfig, RubroDetalle } from '@/types'`.
+// El import-luego-export trae los nombres al scope local para que otras
+// interfaces de este archivo (CuotaCondominio, etc.) puedan referenciarlos.
+import type { MetodoCalculo, RubroConfig, RubroDetalle } from './condominios'
+export type { MetodoCalculo, RubroConfig, RubroDetalle }
 
 export type ConceptoCuota = 'mantenimiento' | 'extraordinaria' | 'CAM' | 'amenidad' | 'otro'
 export type EstadoCuota = 'pendiente' | 'pagado' | 'moroso'
