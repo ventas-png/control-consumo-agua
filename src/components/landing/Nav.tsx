@@ -56,15 +56,23 @@ interface LoginModalProps {
   onLoginWithGoogle: () => Promise<string | null>
   onForgotPassword: () => void
   onRegister: () => void
+  // Si el usuario tiene un factor TOTP verificado, login() arranca un challenge
+  // y deja currentUser en null. El padre nos pasa el challenge activo + cb de
+  // verificación/cancelación para renderizar el segundo paso.
+  mfaChallenge: { email: string } | null
+  onVerifyMfa: (code: string) => Promise<string | null>
+  onCancelMfa: () => Promise<void>
 }
 
-export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onForgotPassword, onRegister }: LoginModalProps) {
+export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onForgotPassword, onRegister, mfaChallenge, onVerifyMfa, onCancelMfa }: LoginModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [mfaCode, setMfaCode] = useState('')
+  const [mfaLoading, setMfaLoading] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -98,6 +106,23 @@ export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onFor
     setGoogleLoading(false)
   }
 
+  async function handleVerifyMfa(e: React.FormEvent) {
+    e.preventDefault()
+    if (mfaLoading) return
+    setError('')
+    setMfaLoading(true)
+    const err = await onVerifyMfa(mfaCode)
+    if (err) setError(err)
+    else setMfaCode('')
+    setMfaLoading(false)
+  }
+
+  async function handleCancelMfa() {
+    setError('')
+    setMfaCode('')
+    await onCancelMfa()
+  }
+
   return (
     <div className="modal-veil" onClick={onClose} role="dialog" aria-modal="true" aria-label={t.login.title}>
       <div className="modal-card" ref={dialogRef} onClick={(e) => e.stopPropagation()}>
@@ -120,65 +145,105 @@ export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onFor
           </div>
 
           <div className="login-form">
-            <header className="login-h">
-              <h2>{t.login.title}</h2>
-              <p>{t.login.sub}</p>
-            </header>
+            {mfaChallenge ? (
+              <>
+                <header className="login-h">
+                  <h2>{t.login.mfa_title}</h2>
+                  <p>{t.login.mfa_sub}</p>
+                </header>
 
-            <button className="btn-google" onClick={handleGoogle} disabled={googleLoading || loading} type="button">
-              <Icon.google />
-              <span>{googleLoading ? t.login.google_loading : t.login.google}</span>
-            </button>
+                <form className="login-fields" onSubmit={handleVerifyMfa}>
+                  <label className="field">
+                    <span>{t.login.email}</span>
+                    <input type="email" value={mfaChallenge.email} disabled autoComplete="username" />
+                  </label>
+                  <label className="field">
+                    <span>{t.login.mfa_code}</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      autoComplete="one-time-code"
+                      placeholder="123456"
+                      value={mfaCode}
+                      onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      autoFocus
+                      style={{ fontSize: '20px', letterSpacing: '6px', textAlign: 'center' }}
+                    />
+                  </label>
+                  {error && <div className="login-error" role="alert">⚠️ {error}</div>}
+                  <button type="submit" className="btn-primary btn-block" disabled={mfaLoading || mfaCode.length !== 6}>
+                    {mfaLoading ? t.login.mfa_verifying : t.login.mfa_verify}
+                  </button>
+                  <button type="button" className="link-quiet" onClick={handleCancelMfa} style={{ marginTop: '12px', display: 'block', width: '100%', textAlign: 'center' }}>
+                    {t.login.mfa_cancel}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <header className="login-h">
+                  <h2>{t.login.title}</h2>
+                  <p>{t.login.sub}</p>
+                </header>
 
-            <div className="login-or"><span>{t.login.or}</span></div>
+                <button className="btn-google" onClick={handleGoogle} disabled={googleLoading || loading} type="button">
+                  <Icon.google />
+                  <span>{googleLoading ? t.login.google_loading : t.login.google}</span>
+                </button>
 
-            <form className="login-fields" onSubmit={handleSubmit}>
-              <label className="field">
-                <span>{t.login.email}</span>
-                <input
-                  type="email"
-                  placeholder="nombre@empresa.com"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </label>
-              <label className="field">
-                <span>{t.login.password}</span>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </label>
-              {error && <div className="login-error" role="alert">⚠️ {error}</div>}
-              <div className="login-row">
-                <label className="check">
-                  <input type="checkbox" defaultChecked />
-                  <span>{t.login.remember}</span>
-                </label>
-                <button type="button" className="link-quiet" onClick={() => { onClose(); onForgotPassword() }}>{t.login.forgot}</button>
-              </div>
-              <button type="submit" className="btn-primary btn-block" disabled={loading || googleLoading}>
-                {loading ? t.login.submitting : t.login.submit}
-              </button>
-            </form>
+                <div className="login-or"><span>{t.login.or}</span></div>
 
-            <div className="login-foot">
-              <div className="login-resident">
-                <div>
-                  <strong>{t.login.resident_q}</strong>
-                  <span>{t.login.resident_a}</span>
+                <form className="login-fields" onSubmit={handleSubmit}>
+                  <label className="field">
+                    <span>{t.login.email}</span>
+                    <input
+                      type="email"
+                      placeholder="nombre@empresa.com"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>{t.login.password}</span>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                  </label>
+                  {error && <div className="login-error" role="alert">⚠️ {error}</div>}
+                  <div className="login-row">
+                    <label className="check">
+                      <input type="checkbox" defaultChecked />
+                      <span>{t.login.remember}</span>
+                    </label>
+                    <button type="button" className="link-quiet" onClick={() => { onClose(); onForgotPassword() }}>{t.login.forgot}</button>
+                  </div>
+                  <button type="submit" className="btn-primary btn-block" disabled={loading || googleLoading}>
+                    {loading ? t.login.submitting : t.login.submit}
+                  </button>
+                </form>
+
+                <div className="login-foot">
+                  <div className="login-resident">
+                    <div>
+                      <strong>{t.login.resident_q}</strong>
+                      <span>{t.login.resident_a}</span>
+                    </div>
+                    <button className="btn-quiet" onClick={() => { onClose(); onRegister() }}>{t.login.resident_cta} <Icon.arrow_right size={14} /></button>
+                  </div>
+                  <div className="login-newcomer">
+                    <span>{t.login.no_account}</span>
+                    <button className="link-bold" onClick={() => { onClose(); onRegister() }}>{t.login.signup} <Icon.arrow_right size={13} /></button>
+                  </div>
                 </div>
-                <button className="btn-quiet" onClick={() => { onClose(); onRegister() }}>{t.login.resident_cta} <Icon.arrow_right size={14} /></button>
-              </div>
-              <div className="login-newcomer">
-                <span>{t.login.no_account}</span>
-                <button className="link-bold" onClick={() => { onClose(); onRegister() }}>{t.login.signup} <Icon.arrow_right size={13} /></button>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
       </div>

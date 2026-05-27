@@ -298,12 +298,24 @@ async function refreshSessionFromSupabase(
   return null
 }
 
+// MFA challenge pending after a successful password sign-in when the user has
+// at least one verified TOTP factor enrolled. Signals the login UI to render a
+// 6-digit code input. The session is NOT stored until verifyMfaChallenge()
+// succeeds — Supabase keeps the AAL1 token in its own auth.* tables but our
+// UserSession layer treats AAL1 as "not logged in" for app purposes.
+export interface MfaChallenge {
+  factorId: string
+  challengeId: string
+  email: string
+}
+
 export function useAuth() {
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [pendingOAuthUser, setPendingOAuthUser] = useState<{ id: string; email: string; full_name: string } | null>(null)
+  const [mfaChallenge, setMfaChallenge] = useState<MfaChallenge | null>(null)
 
   // On mount: restore session + handle OAuth redirect
   useEffect(() => {
@@ -569,6 +581,34 @@ export function useAuth() {
 
       const { user, session } = data
 
+      // Check if the user requires a second factor (TOTP) before we hand them
+      // a UserSession. Supabase's getAuthenticatorAssuranceLevel() returns the
+      // current AAL of the token plus the next required one based on enrolled
+      // factors. If nextLevel === 'aal2' and current is 'aal1' the user must
+      // verify a TOTP code before being treated as logged in.
+      const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (!aal.error && aal.data && aal.data.nextLevel === 'aal2' && aal.data.currentLevel === 'aal1') {
+        const factorsResult = await supabase.auth.mfa.listFactors()
+        const totpFactor = factorsResult.data?.totp?.[0] ?? factorsResult.data?.all?.find(f => f.factor_type === 'totp' && f.status === 'verified')
+        if (totpFactor) {
+          const challengeResult = await supabase.auth.mfa.challenge({ factorId: totpFactor.id })
+          if (!challengeResult.error && challengeResult.data) {
+            setMfaChallenge({
+              factorId: totpFactor.id,
+              challengeId: challengeResult.data.id,
+              email: cleanEmail,
+            })
+            logSecurityEvent('mfa_challenge_started', { email: cleanEmail }, user.id).catch(console.error)
+            return null
+          }
+        }
+        // If we got here, the user has MFA required but we couldn't surface a
+        // challenge. Sign out the half-authenticated token to avoid leaving a
+        // residual session and surface the error.
+        await supabase.auth.signOut().catch(() => undefined)
+        return 'No fue posible iniciar el segundo factor. Intente de nuevo.'
+      }
+
       const sessionData = await buildSessionFromSupabase(user.id, user.email ?? '', session.expires_at)
       storeSession(sessionData)
       setCurrentUser(sessionData)
@@ -593,6 +633,59 @@ export function useAuth() {
       if (msg.includes('desactivada')) return msg
       return `Error de conexión: ${msg}`
     }
+  }, [])
+
+  // Verifica el código TOTP del segundo factor y finaliza el login. Solo se
+  // llama cuando mfaChallenge !== null (es decir, login() previamente detectó
+  // que el usuario tiene un factor verificado). En éxito construye la sesión
+  // completa y limpia el challenge; en error devuelve mensaje para el UI.
+  const verifyMfaChallenge = useCallback(async (code: string): Promise<string | null> => {
+    if (!mfaChallenge) return 'No hay un desafío MFA activo. Vuelve a iniciar sesión.'
+    const trimmed = code.trim()
+    if (!/^\d{6}$/.test(trimmed)) return 'El código debe tener 6 dígitos.'
+
+    try {
+      const { error } = await supabase.auth.mfa.verify({
+        factorId: mfaChallenge.factorId,
+        challengeId: mfaChallenge.challengeId,
+        code: trimmed,
+      })
+      if (error) {
+        logSecurityEvent('mfa_verify_failed', { email: mfaChallenge.email, reason: error.message }).catch(console.error)
+        const msg = (error.message ?? '').toLowerCase()
+        if (msg.includes('invalid') || msg.includes('verification') || msg.includes('totp')) {
+          return 'Código incorrecto o expirado. Revisa la app de autenticación e intenta de nuevo.'
+        }
+        return error.message ? `Error: ${error.message}` : 'No fue posible verificar el código.'
+      }
+
+      const { data: sessionRes } = await supabase.auth.getSession()
+      const userId = sessionRes.session?.user?.id
+      const email = sessionRes.session?.user?.email ?? mfaChallenge.email
+      const expiresAt = sessionRes.session?.expires_at
+      if (!userId) {
+        return 'La sesión expiró durante la verificación. Vuelve a iniciar sesión.'
+      }
+
+      const sessionData = await buildSessionFromSupabase(userId, email, expiresAt)
+      storeSession(sessionData)
+      setCurrentUser(sessionData)
+      setMfaChallenge(null)
+      clearLoginFailures()
+      logSecurityEvent('mfa_verify_success', { email }, userId).catch(console.error)
+      return null
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'unknown'
+      logSecurityEvent('mfa_verify_error', { email: mfaChallenge.email, error: msg }).catch(console.error)
+      return `Error de conexión: ${msg}`
+    }
+  }, [mfaChallenge])
+
+  // Aborta un challenge MFA en curso: cierra la sesión Supabase a medias y
+  // limpia el estado para que el usuario regrese a la pantalla de email/pass.
+  const cancelMfaChallenge = useCallback(async (): Promise<void> => {
+    setMfaChallenge(null)
+    try { await supabase.auth.signOut() } catch { /* ignore */ }
   }, [])
 
   const loginWithGoogle = useCallback(async (): Promise<string | null> => {
@@ -666,5 +759,5 @@ export function useAuth() {
     }
   }, [])
 
-  return { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile }
+  return { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge }
 }

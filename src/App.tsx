@@ -146,7 +146,7 @@ async function handleGmailOAuthCallback(params: GmailOAuthParams): Promise<void>
 }
 
 export default function App() {
-  const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile } = useAuth()
+  const { currentUser, loading, isPasswordRecovery, needsOnboarding, pendingOAuthUser, completeOnboarding, login, loginWithGoogle, logout, updateProfile, mfaChallenge, verifyMfaChallenge, cancelMfaChallenge } = useAuth()
   const {
     clientes, registros, empresa, fuentesAgua, registrosCalidad, rutas, tarifas, contadores, unidades, proyectos,
     moneda, maxUnidadesPorTipo,
@@ -324,6 +324,9 @@ export default function App() {
           onLoginWithGoogle={loginWithGoogle}
           onForgotPassword={() => setShowPasswordReset(true)}
           onRegister={() => setShowRegister(true)}
+          mfaChallenge={mfaChallenge ? { email: mfaChallenge.email } : null}
+          onVerifyMfa={verifyMfaChallenge}
+          onCancelMfa={cancelMfaChallenge}
         />
         {showPasswordReset && (
           <PasswordResetModal onClose={() => setShowPasswordReset(false)} />

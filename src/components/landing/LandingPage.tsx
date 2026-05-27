@@ -12,6 +12,9 @@ interface LandingPageProps {
   onLoginWithGoogle: () => Promise<string | null>
   onForgotPassword: () => void
   onRegister: () => void
+  mfaChallenge: { email: string } | null
+  onVerifyMfa: (code: string) => Promise<string | null>
+  onCancelMfa: () => Promise<void>
 }
 
 function initialLang(): Lang {
@@ -19,9 +22,16 @@ function initialLang(): Lang {
   return urlLang === 'en' ? 'en' : 'es'
 }
 
-export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRegister }: LandingPageProps) {
+export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRegister, mfaChallenge, onVerifyMfa, onCancelMfa }: LandingPageProps) {
   const [loginOpen, setLoginOpen] = useState(false)
   const [lang, setLang] = useState<Lang>(initialLang)
+
+  // Si hay un challenge MFA activo, asegurarnos de que el modal de login esté
+  // abierto para mostrar el segundo paso (evita que el usuario quede atrapado
+  // si por algún motivo el modal se cerró entre el password OK y el code).
+  useEffect(() => {
+    if (mfaChallenge) setLoginOpen(true)
+  }, [mfaChallenge])
 
   // Keep <html lang> and the shareable ?lang= URL in sync with the active locale.
   useEffect(() => {
@@ -58,6 +68,9 @@ export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
         onLoginWithGoogle={onLoginWithGoogle}
         onForgotPassword={onForgotPassword}
         onRegister={onRegister}
+        mfaChallenge={mfaChallenge}
+        onVerifyMfa={onVerifyMfa}
+        onCancelMfa={onCancelMfa}
       />
     </div>
   )
