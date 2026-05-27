@@ -270,29 +270,41 @@ Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior
 | `infra:I33` | ⏳ **Parcial** | PR #169 introduce `src/lib/logger.ts` con niveles estructurados + Sentry breadcrumbs. Pendiente: migración gradual de `console.log` (PRs por dominio) + pipe servidor a Datadog/Logtail. |
 | `cond:A10`  | ⏳ **Parcial** | PR #169 mueve 3/4 componentes (`FileUploader`, `ImageUploader`, `ImageGallery`) a `shared/`. `RubrosBuilder` se queda atado a `cond:C9` por su dependencia de tipos del dominio. |
 | `agua:C11` + `cond:C14` | ⏳ **Parcial** | PR #169 crea `.github/workflows/types-drift.yml` (advisory, manual + cron semanal). Pendiente: primer run para validar secretos, baseline committed, refactor de tipos. |
-| `infra:I39` | ⏳ **Parcial — fase 1 en PR #170** | Baseline `CREATE TABLE IF NOT EXISTS` para 5 tablas legacy (`app_users`, `companies`, `projects`, `user_project_assignments`, `pagos`) + `README.md` de convención. **Alcance refinado tres veces**: la auditoría original estimaba 4 tablas; al implementar descubrí 15 tablas legacy (+ `app_users` por bug de orden); tras el reset de Supabase Preview el error cambió y aparecieron 7 **funciones legacy** afectadas. El alcance real son 16 tablas + 7+ funciones; requerirá 3 fases en vez de 2. Fase 1 cumplida con #170 (las 5 tablas más críticas + sus RLS); fase 2 (11 tablas + 7 funciones) y fase 3 (objetos adicionales que aparezcan) en PRs siguientes. |
+| `infra:I39` | ⏳ **Fase 1 en PR #170 + Fase 2 en PR #171** | Baseline completo de 16 tablas legacy + 7 funciones legacy + FKs cross-fase. **Alcance refinado tres veces durante implementación**: 4 → 16 tablas + 7 funciones. **PR #171 es superset del PR #170** (base apuntando a `main`, contiene ambas migraciones), por lo que se puede mergear solo el #171 si se quiere consolidar. Fase 3 quedaría sólo si tras mergear aparece un nuevo tipo de objeto legacy (triggers/vistas/secuencias). |
 
 ### Métricas de avance
 
-| Concepto | Antes | PR #167 | PR #168 | PR #169 | PR #170 | Pendientes |
-|----------|-------|---------|---------|---------|---------|------------|
-| Hallazgos totales      | 219 | 219 | **220** (+`I39`) | 220 | 220 | — |
-| Resueltos             | 0   | 5   | 6   | **8** | 8 | 212 |
-| Docs/falsos positivos | 0   | 1 + parte de `I36` | 2 | 2 | 2 | — |
-| Parciales activos      | 0   | 2   | 3   | 6   | **7** (+`I39`) | — |
-| Nuevos descubiertos    | 0   | 0   | 1 (`I39`) | 0 | 0 (alcance de `I39` refinado: 4 → 15 tablas) | — |
-| % progreso (resueltos) | 0%  | 2.3% | 2.7% | 3.6% | 3.6% (`I39` queda parcial; fase 1 de 2) | — |
+| Concepto | Antes | PR #167 | PR #168 | PR #169 | PR #170 | PR #171 | Pendientes |
+|----------|-------|---------|---------|---------|---------|---------|------------|
+| Hallazgos totales      | 219 | 219 | **220** (+`I39`) | 220 | 220 | 220 | — |
+| Resueltos             | 0   | 5   | 6   | **8** | 8 | **9** (+`I39` completo cuando ambos PRs mergeados) | 211 |
+| Docs/falsos positivos | 0   | 1 + parte de `I36` | 2 | 2 | 2 | 2 | — |
+| Parciales activos      | 0   | 2   | 3   | 6   | 7 | **6** (-`I39` que pasa a resuelto) | — |
+| Nuevos descubiertos    | 0   | 0   | 1 (`I39`) | 0 | 0 | 0 (alcance final: 16 tablas + 7 funciones, todo cubierto) | — |
+| % progreso (resueltos) | 0%  | 2.3% | 2.7% | 3.6% | 3.6% | **4.1%** | — |
 
-### Orden recomendado de merge para los 4 PRs abiertos
+### Orden recomendado de merge para los 5 PRs abiertos
 
-Una vez los 4 PRs estén con CI verde, sugiero este orden de merge a `main`:
+Una vez los PRs estén con CI verde, sugiero este orden de merge a `main`:
 
-1. **PR #170** (baseline legacy tables, fase 1) — **primero**, porque destraba Supabase Branching para los demás PRs y para todos los futuros. Sin él, cualquier PR que toque `supabase/` arrastra el fail de Supabase Preview (visible pero no bloqueante hoy).
-2. **PR #167** (gobernanza: CODEOWNERS, Renovate, robots.txt, ErrorBoundary global, `.env.example`) — sin dependencias.
-3. **PR #169** (logger, Sentry sampler, PostHog super-props, mover shared, types-drift) — sin dependencias.
-4. **PR #168** (coverage, health, deno lint) — **rebase sobre main** antes del merge para incorporar el baseline del #170; después de eso su Supabase Preview debería pasar.
+**Opción A — Consolidada (recomendada):** cerrar #170 y mergear sólo #171 (que ya lo contiene).
 
-Tras estos 4 merges: arrancar PR 5 (fase 2 de `infra:I39`) + Lote 5 de quick wins en paralelo.
+1. **PR #171** (baseline fases 1+2 completas: 16 tablas + 7 funciones + FKs cross-fase) — destraba Supabase Branching completamente.
+2. **PR #167** (gobernanza) — sin dependencias.
+3. **PR #169** (quick wins lote 3) — sin dependencias.
+4. **PR #168** (coverage, health, deno lint) — rebase sobre main → Supabase Preview pasará → merge.
+
+**Opción B — Atómica por fase:** mergear ambos PRs de baseline por separado para auditar cada fase.
+
+1. **PR #170** primero — fase 1.
+2. **PR #171** segundo — luego cambiar base de #171 de `main` a la rama del #170 ya no aplica; rebase contra main solo aplica la fase 2.
+3. **PR #167** → **#169** → **#168**.
+
+Mi recomendación: **Opción A**. Más simple, mismo resultado en `main` (los 2 archivos están en orden cronológico correcto: `20260317000000` y `20260317000001`).
+
+**Limitación encontrada:** Supabase tiene un límite de preview branches concurrentes. Al cambiar el base de #171 a `main`, el bot indicó que "ignoró" la branch porque se llegó al límite. La validación Supabase del #171 quedará pendiente hasta que se libere un slot (cerrando #170 o mergeando algún otro).
+
+Tras estos merges: arrancar Lote 4 de quick wins.
 
 ### Próximo lote candidato — Lote 4 (sin cambios)
 
