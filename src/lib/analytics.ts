@@ -29,6 +29,22 @@ export function identify(id: string, props?: Record<string, unknown>): void {
   posthog.identify(id, props)
 }
 
+// Super-properties multi-tenant: cada `track()` llevará estas props automáticamente
+// (sin tener que pasarlas en cada call). PostHog las persiste hasta el siguiente
+// `reset()`. Reservado para datos del tenant activo (company_id, role, plan), no
+// para datos del evento puntual.
+export interface SuperProperties {
+  company_id?: string | null
+  role?: string | null
+  plan?: string | null
+  [key: string]: unknown
+}
+
+export function registerSuperProperties(props: SuperProperties): void {
+  if (!enabled) return
+  posthog.register(props)
+}
+
 export function track(event: string, props?: Record<string, unknown>): void {
   if (!enabled) return
   posthog.capture(event, props)
@@ -36,5 +52,7 @@ export function track(event: string, props?: Record<string, unknown>): void {
 
 export function resetAnalytics(): void {
   if (!enabled) return
+  // posthog.reset() ya limpia las super-properties registradas, no necesita
+  // llamada adicional.
   posthog.reset()
 }

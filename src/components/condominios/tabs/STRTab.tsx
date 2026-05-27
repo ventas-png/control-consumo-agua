@@ -2,7 +2,7 @@ import { useState, useEffect, type CSSProperties } from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { ReservaSTR, EstadoSTR, PlataformaSTR, PoliticaCancelacionSTR, Unidad, HuespedSTR } from '../../../types'
 import Swal from 'sweetalert2'
-import { ImageUploader } from '../ImageUploader'
+import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import { SecureFileLink } from '../../shared/SecureFileLink'
 

@@ -20,7 +20,7 @@ const PLATAFORMA_COLOR: Record<string, { bg: string; color: string }> = {
   directo:  { bg: 'var(--at-accent-tint-2)', color: 'var(--at-accent-hover)' },
   otro:     { bg: 'var(--at-surface-2)', color: 'var(--at-ink-2)' },
 }
-import { ImageUploader, MultiImageUploader } from '../ImageUploader'
+import { ImageUploader, MultiImageUploader } from '../../shared/ImageUploader'
 
 interface Props {
   rondas: RondaSeguridad[]

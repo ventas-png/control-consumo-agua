@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
-import { ImageUploader } from '../ImageUploader'
+import { ImageUploader } from '../../shared/ImageUploader'
 import type {
   ContratoArrendamiento, ReservaSTR,
   EstadoContrato, EstadoSTR, PlataformaSTR, PoliticaCancelacionSTR,
