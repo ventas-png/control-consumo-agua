@@ -229,10 +229,13 @@ DO $$
 DECLARE
   ur record;
 BEGIN
+  -- Alias `t` para evitar colision con la variable PL/pgSQL `ur`: PostgreSQL
+  -- rechaza con "record ur is not assigned" cuando el mismo nombre se usa
+  -- como variable de loop y como alias de tabla en la misma query.
   FOR ur IN
-    SELECT DISTINCT ur.user_id, ur.role_id
-    FROM public.user_roles ur
-    JOIN public.roles r ON r.id = ur.role_id
+    SELECT DISTINCT t.user_id, t.role_id
+    FROM public.user_roles t
+    JOIN public.roles r ON r.id = t.role_id
     WHERE r.service = 'agua'
   LOOP
     -- Touch the row to force the trigger to fire
