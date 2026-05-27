@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcularTotalPagar } from '../business'
+import { calcularTotalPagar, validarLectura } from '../business'
 
 describe('calcularTotalPagar', () => {
   describe('Tramo 1 — canon fijo (consumo ≤ mínimo)', () => {
@@ -77,5 +77,78 @@ describe('calcularTotalPagar', () => {
       const result = calcularTotalPagar(20, 0, 0, 0)
       expect(result.total).toBe(0)
     })
+  })
+})
+
+describe('validarLectura', () => {
+  it('lectura actual mayor que anterior: válida, consumo positivo', () => {
+    const r = validarLectura(100, 150)
+    expect(r.valid).toBe(true)
+    expect(r.consumo).toBe(50)
+    expect(r.error).toBeUndefined()
+    expect(r.warning).toBeUndefined()
+  })
+
+  it('lectura actual igual a la anterior: válida, consumo cero (medidor sin uso)', () => {
+    const r = validarLectura(100, 100)
+    expect(r.valid).toBe(true)
+    expect(r.consumo).toBe(0)
+  })
+
+  it('lectura actual menor sin resetContador: inválida', () => {
+    const r = validarLectura(100, 80)
+    expect(r.valid).toBe(false)
+    expect(r.error).toMatch(/menor que la anterior/)
+  })
+
+  it('lectura actual menor con resetContador: válida con warning', () => {
+    const r = validarLectura(100, 5, { resetContador: true })
+    expect(r.valid).toBe(true)
+    expect(r.consumo).toBe(0)
+    expect(r.warning).toMatch(/reset/i)
+  })
+
+  it('lectura negativa: inválida', () => {
+    const r = validarLectura(100, -10)
+    expect(r.valid).toBe(false)
+    expect(r.error).toMatch(/no puede ser negativa/)
+  })
+
+  it('lectura anterior negativa: inválida', () => {
+    const r = validarLectura(-5, 10)
+    expect(r.valid).toBe(false)
+    expect(r.error).toMatch(/anterior no puede ser negativa/)
+  })
+
+  it('lectura no numérica: inválida', () => {
+    const r = validarLectura(NaN, 100)
+    expect(r.valid).toBe(false)
+    expect(r.error).toMatch(/números válidos/)
+  })
+
+  it('null/undefined se trata como 0', () => {
+    expect(validarLectura(null, 50).consumo).toBe(50)
+    expect(validarLectura(undefined, 50).consumo).toBe(50)
+  })
+
+  it('consumo dentro del rango histórico: sin warning', () => {
+    const r = validarLectura(100, 130, { promedioHistorico: 20 })
+    expect(r.valid).toBe(true)
+    expect(r.consumo).toBe(30)
+    expect(r.warning).toBeUndefined()
+  })
+
+  it('consumo >3× promedio histórico: válida con warning de salto anómalo', () => {
+    const r = validarLectura(100, 250, { promedioHistorico: 20 })
+    expect(r.valid).toBe(true)
+    expect(r.consumo).toBe(150)
+    expect(r.warning).toMatch(/promedio histórico/)
+  })
+
+  it('factor anormal custom respetado', () => {
+    // Con factor=10, 100m³ vs promedio 20 NO debe alertar
+    const r = validarLectura(100, 200, { promedioHistorico: 20, factorAnormal: 10 })
+    expect(r.valid).toBe(true)
+    expect(r.warning).toBeUndefined()
   })
 })
