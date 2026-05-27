@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { AnuncioComunidad, TipoAnuncio } from '../../../types'
-import { ImageUploader } from '../ImageUploader'
+import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 
 interface Props {

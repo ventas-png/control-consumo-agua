@@ -4,7 +4,7 @@ import type {
   PersonalCondominio, CargoPersonal, EstadoPersonal, TurnoPersonal,
   ContactoEmergenciaPersonal, CodigoAccesoPersonal, EquipoAsignadoPersonal,
 } from '../../../types'
-import { ImageUploader } from '../ImageUploader'
+import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import Swal from 'sweetalert2'
 

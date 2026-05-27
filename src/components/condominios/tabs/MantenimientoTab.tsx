@@ -2,8 +2,8 @@ import { useState } from 'react'
 import Swal from 'sweetalert2'
 import { supabase } from '../../../lib/supabase'
 import type { TicketMantenimiento, Unidad } from '../../../types'
-import { MultiImageUploader } from '../ImageUploader'
-import { ImageGallery } from '../ImageGallery'
+import { MultiImageUploader } from '../../shared/ImageUploader'
+import { ImageGallery } from '../../shared/ImageGallery'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 
 interface Props {

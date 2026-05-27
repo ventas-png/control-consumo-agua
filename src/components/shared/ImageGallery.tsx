@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent} from 'react'
-import { SecureImage } from '../shared/SecureImage'
+import { SecureImage } from './SecureImage'
 
 interface Props {
   urls: string[]

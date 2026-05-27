@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { toast } from '../../../lib/toast'
-import { ImageUploader } from '../ImageUploader'
+import { ImageUploader } from '../../shared/ImageUploader'
 import type { Visitante } from '../../../types'
 
 interface Props {

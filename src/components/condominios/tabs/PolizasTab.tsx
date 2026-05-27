@@ -2,7 +2,7 @@ import { useState, type CSSProperties} from 'react'
 import { supabase } from '../../../lib/supabase'
 import type { PolizaSeguro, TipoPoliza, EstadoPoliza } from '../../../types'
 import Swal from 'sweetalert2'
-import { FileUploader } from '../FileUploader'
+import { FileUploader } from '../../shared/FileUploader'
 import { SecureFileLink } from '../../shared/SecureFileLink'
 import { exportarPDFTabla, exportarExcel } from '../exportUtils'
 

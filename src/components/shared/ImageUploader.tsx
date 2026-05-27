@@ -1,7 +1,7 @@
 import { useRef, useState, type DragEvent} from 'react'
 import { supabase } from '../../lib/supabase'
 import { validateFileMagic, buildUploadPath } from '../../lib/fileValidation'
-import { SecureImage } from '../shared/SecureImage'
+import { SecureImage } from './SecureImage'
 
 const MAX_DIMENSION = 1280
 const QUALITY = 0.82
