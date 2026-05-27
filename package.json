@@ -13,7 +13,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@emailjs/browser": "^3.12.1",
     "@sentry/react": "^10.53.1",
     "@supabase/supabase-js": "^2.39.0",
     "chart.js": "^4.4.0",

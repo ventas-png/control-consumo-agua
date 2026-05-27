@@ -3,10 +3,4 @@ export const APP_CONFIG = {
   TOKEN_REFRESH_INTERVAL: 30 * 60 * 1000, // Refresh token every 30 minutes
   SESSION_WARNING_BEFORE_EXPIRY: 5 * 60 * 1000, // Show warning 5 minutes before expiry
   COUNTRY_CODE: import.meta.env.VITE_COUNTRY_CODE ?? '502',
-  EMAILJS_PUBLIC_KEY: import.meta.env.VITE_EMAILJS_PUBLIC_KEY as string,
-  EMAILJS_SERVICE_ID: import.meta.env.VITE_EMAILJS_SERVICE_ID as string,
-  EMAILJS_TEMPLATE_RECIBO: import.meta.env.VITE_EMAILJS_TEMPLATE_RECIBO as string,
-  EMAILJS_TEMPLATE_PASSWORD_RESET: import.meta.env.VITE_EMAILJS_TEMPLATE_PASSWORD_RESET as string,
-  EMAILJS_TEMPLATE_RUTA_ASIGNADA: import.meta.env.VITE_EMAILJS_TEMPLATE_RUTA_ASIGNADA as string,
-  EMAILJS_TEMPLATE_DIFUSION: import.meta.env.VITE_EMAILJS_TEMPLATE_DIFUSION as string,
 } as const
