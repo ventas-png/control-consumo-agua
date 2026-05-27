@@ -1,5 +1,5 @@
 -- ============================================================================
--- Baseline legacy tables — phase 1 (4 of 15)
+-- Baseline legacy tables — phase 1 (5 of 16)
 -- ============================================================================
 -- Tablas que existen en el proyecto Supabase principal pero nunca fueron
 -- creadas vía migración versionada. Schema replicado tal cual desde
@@ -11,6 +11,7 @@
 -- Motivo: la siguiente migración cronológica
 -- (20260318000000_enable_rls_public_schema.sql) ejecuta
 --   ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
+--   ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
 --   ALTER TABLE public.projects  ENABLE ROW LEVEL SECURITY;
 --   ALTER TABLE public.user_project_assignments ENABLE ROW LEVEL SECURITY;
 --   ALTER TABLE public.pagos ENABLE ROW LEVEL SECURITY;
@@ -20,7 +21,7 @@
 -- (idempotente: no afecta producción donde las tablas ya existen).
 --
 -- ALCANCE EXPLÍCITO DE ESTA FASE 1
---   Incluye:  companies, projects, user_project_assignments, pagos
+--   Incluye:  app_users, companies, projects, user_project_assignments, pagos
 --   Omite:    clientes, registros, convenios_pago, empresa,
 --             empresa_pagos_config, fuentes_agua, password_reset_tokens,
 --             payment_requests, registros_calidad, security_logs,
@@ -35,7 +36,45 @@
 -- FKs las tablas siguen siendo funcionales; solo pierden integridad
 -- referencial declarativa en branches/staging/dev (en producción las FKs
 -- siguen existiendo intactas porque IF NOT EXISTS no las recrea).
+--
+-- NOTA SOBRE app_users:
+-- La migración 20260320000000_fix_superadmin_app_users_uuid.sql hace
+-- DROP TABLE IF EXISTS app_users CASCADE + CREATE TABLE. En DB nueva, eso
+-- borrará la tabla que crea este baseline y la recreará con el mismo schema
+-- + INSERT del super_admin inicial. En producción, IF NOT EXISTS hace que
+-- esta migración sea no-op y la cadena sigue como hasta ahora.
 -- ============================================================================
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- app_users — usuarios de la app vinculados a auth.users (mismo id)
+-- ────────────────────────────────────────────────────────────────────────────
+-- Schema replica el de la migración 20260320000000 que DROP+CREATE esta tabla
+-- (con role check más amplio). La migración 20260318000000 hace ENABLE RLS
+-- sobre app_users antes de la 20260320, por lo que necesitamos crearla aquí.
+-- ────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.app_users (
+    id              uuid              PRIMARY KEY,
+    full_name       text,
+    role            text              NOT NULL,
+    created_at      timestamptz       DEFAULT now(),
+    cliente_id      uuid,
+    permission_type text,
+    project_id      uuid,
+    company_id      uuid,
+    activo          boolean           NOT NULL DEFAULT true,
+    CONSTRAINT app_users_role_check CHECK (role IN (
+        'super_admin','superadmin','company_owner','admin','operator',
+        'user','viewer','visor','operador','cliente'
+    )),
+    CONSTRAINT app_users_permission_type_check CHECK (permission_type IS NULL OR permission_type IN (
+        'total','lectura','financiero','administrativo'
+    ))
+    -- TODO infra:I39-fase2:
+    --   id → auth.users(id) ON DELETE CASCADE (cross-schema)
+    --   company_id → companies(id) ON DELETE CASCADE (FK opcional)
+    --   project_id → projects(id) ON DELETE SET NULL (FK opcional)
+    --   cliente_id → clientes(id) ON DELETE SET NULL (cross-fase)
+);
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- companies — empresa/tenant operadora (raíz de la jerarquía multi-tenant)
