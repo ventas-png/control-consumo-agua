@@ -239,7 +239,57 @@ Lista corta de lo que **no se puede saltar** antes del primer cliente que paga.
 
 ---
 
-## 7. Trabajo compartido entre documentos
+## 7. Estado de implementación
+
+Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior, se marca aquí + en el documento de critique correspondiente.
+
+### Hallazgos resueltos
+
+| ID | Hallazgo | PR | Notas |
+|----|----------|----|-------|
+| `infra:I3`  | ErrorBoundary global | [#167](https://github.com/ventas-png/control-consumo-agua/pull/167) | `<App />` envuelto en `main.tsx` |
+| `infra:I34` | robots.txt          | [#167](https://github.com/ventas-png/control-consumo-agua/pull/167) | bloquea rutas internas + previews |
+| `infra:I35` | `.env.example` claridad de secretos | [#167](https://github.com/ventas-png/control-consumo-agua/pull/167) | tabla de qué va dónde |
+| `infra:I37` | Renovate config | [#167](https://github.com/ventas-png/control-consumo-agua/pull/167) | schedule semanal, grouping conservador |
+| `infra:I38` | CODEOWNERS | [#167](https://github.com/ventas-png/control-consumo-agua/pull/167) | reviews en auth/RLS/payments/migrations |
+
+### Hallazgos corregidos por verificación (falsos positivos / parciales)
+
+| ID | Estado actual | Comentario |
+|----|----------------|-----------|
+| `infra:I30` | ✅ **Falso positivo** | `vercel.json:14` ya tiene `geolocation=(self)`. La auditoría original era incorrecta. |
+| `infra:I36` | ⏳ **Parcial** | `monitoring.ts` ya lee `VITE_APP_ENV \|\| MODE`. Falta setear `VITE_APP_ENV=$VERCEL_ENV` en variables de Vercel (documentado en `.env.example` por PR #167). |
+| `infra:I15` | ⏳ **Parcial** | `.env.example` ya documenta dónde va cada secreto (PR #167); pendiente `SECRETS_INVENTORY.md` exhaustivo con política de rotación. |
+
+### Métricas de avance
+
+| Concepto | Antes | Después de PRs mergeados | Pendientes |
+|----------|-------|--------------------------|------------|
+| Hallazgos totales | 219 | 219 | 219 |
+| Resueltos        | 0   | 5 (`infra:I3,I34,I35,I37,I38`) | 214 |
+| Falsos positivos | -   | 1 (`infra:I30`)                 | -   |
+| Parciales        | -   | 2 (`infra:I15,I36`)             | -   |
+| % progreso       | 0%  | ~2.3% (5/219)                    | -   |
+
+### Próximo lote candidato (mismo criterio: bajo riesgo, alto valor)
+
+1. **`infra:I7` parcial** — agregar `vitest --coverage` con reporte sin threshold inicial (solo reporta). Habilita la fase 5 de calidad.
+2. **`infra:I36` cierre** — declarar `VITE_APP_ENV=$VERCEL_ENV` en variables de proyecto Vercel + opcional `vercel.json` env mapping.
+3. **`agua:C11` + `cond:C14`** — job CI que regenere `database.types.ts` desde Supabase y haga drift-check.
+4. **`infra:I32`** — Edge function `health` que pingea DB + Storage + Auth (puro código nuevo).
+5. **`infra:I8` parcial** — `deno lint` + `deno fmt --check` en `deploy-functions.yml` (sin tests aún).
+
+### Monitoreo de impacto
+
+A medida que se resuelven hallazgos, anotar aquí si la solución impacta (resuelve o requiere actualizar) hallazgos en otros documentos:
+
+- **`infra:I3` (ErrorBoundary global)** → no afecta otros hallazgos; complementa los boundaries por sección existentes en App.tsx (`agua:A7`).
+- **`infra:I38` (CODEOWNERS)** → habilita Fase 5 de calidad continua para todos los documentos.
+- **`infra:I37` (Renovate)** → resuelve dependencias estancadas; relevante para `infra:I8` (deno) cuando se añadan tests futuros.
+
+---
+
+## 8. Trabajo compartido entre documentos
 
 Estos esfuerzos resuelven **múltiples** hallazgos de **varios** módulos a la vez:
 

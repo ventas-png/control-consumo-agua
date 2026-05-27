@@ -79,17 +79,11 @@ Protección actual: CORS origin check + `ALLOWED_ORIGINS` secret. Si el secret l
 
 ---
 
-### I3 · 🔴 Crítico — Sin `ErrorBoundary` global
+### I3 · ✅ Resuelto en [PR #167](https://github.com/ventas-png/control-consumo-agua/pull/167) — ~~Sin `ErrorBoundary` global~~
 
-`grep -r "ErrorBoundary" src/` retorna vacío. Un crash de cualquier componente muestra pantalla blanca al usuario sin captura automática a Sentry ni mensaje contextual.
-
-**Recomendación:**
-```tsx
-<ErrorBoundary fallback={<ErrorScreen />} onError={(error) => Sentry.captureException(error)}>
-  <App />
-</ErrorBoundary>
-```
-Con fallbacks por nivel (root, route, widget).
+> **Hallazgo original:** la clase `ErrorBoundary` existía en `src/components/ErrorBoundary.tsx` (con captura a Sentry + manejo de chunk-load errors tras deploy) pero solo se usaba por sección dentro de `App.tsx`, dejando expuesto cualquier crash que escapara esos boundaries (e.g. errores durante el montaje del shell, layout, providers).
+>
+> **Resolución:** `src/main.tsx` ahora envuelve `<App />` con `<ErrorBoundary sectionName="root">`. Reutiliza el componente existente (cero código nuevo de lógica, cero riesgo).
 
 ---
 
@@ -336,11 +330,11 @@ Si bien existe Realtime para `useNotifications`, el bell hace polling redundante
 
 ---
 
-### I30 · 🟡 Medio — `permissions-Policy` muy restrictivo
+### I30 · ✅ Falso positivo — ~~`permissions-Policy` muy restrictivo~~
 
-`vercel.json` declara `Permissions-Policy: camera=(), microphone=(), geolocation=()` — pero la app **usa geolocation** para capturar GPS en lecturas. Riesgo de bloqueo silencioso.
-
-**Recomendación:** `geolocation=(self)`. Verificar todas las APIs usadas.
+> **Hallazgo original:** se afirmaba que `vercel.json` declaraba `geolocation=()`, bloqueando silenciosamente la captura GPS en lecturas.
+>
+> **Verificación posterior:** `vercel.json:14` ya tiene `Permissions-Policy: camera=(), microphone=(), geolocation=(self)`. El hallazgo era incorrecto. Lección: verificar con `curl -I` o devtools antes de afirmar bloqueo de un header.
 
 ---
 
@@ -368,39 +362,35 @@ Logs en edge functions van a Supabase Functions Logs, pero sin pipe a Datadog/Lo
 
 ---
 
-### I34 · 🟡 Medio — Sin `robots.txt` ni `sitemap.xml`
+### I34 · ✅ Parcial resuelto en [PR #167](https://github.com/ventas-png/control-consumo-agua/pull/167) — ~~Sin `robots.txt` ni `sitemap.xml`~~
 
-Para SEO de landing pública (cuando exista).
-
----
-
-### I35 · 🔵 Bajo — `.env.example` sin sección de "secretos que no van aquí"
-
-Buena estructura, pero al final podría listar explícitamente qué secrets van a Supabase y a GH Actions.
+> **Resolución:** `public/robots.txt` agregado bloqueando rutas internas (`/auth`, `/admin`, `/empresa`, `/superadmin`, `/condominios`, `/agua`, `/api`) y declarando host canónico. `sitemap.xml` queda pendiente para cuando exista landing pública (depende de `infra:I25`).
 
 ---
 
-### I36 · 🔵 Bajo — Sentry environment hard-coded a "production"
+### I35 · ✅ Resuelto en [PR #167](https://github.com/ventas-png/control-consumo-agua/pull/167) — ~~`.env.example` sin sección de "secretos que no van aquí"~~
 
-Sentry no diferencia preview, staging, prod.
-
-**Recomendación:** `environment: process.env.VERCEL_ENV` o `VITE_SENTRY_ENV`.
+> **Resolución:** `.env.example` abre con una tabla explícita: qué secretos van a Supabase Edge Functions vs GitHub Actions Secrets, regla "nada sensible con prefijo `VITE_`", referencia cruzada a `SECURITY_FIX_SUMMARY.md`.
 
 ---
 
-### I37 · 🔵 Bajo — Sin Dependabot / Renovate
+### I36 · ⏳ Parcial — ~~Sentry environment hard-coded a "production"~~
 
-`package-lock.json` no se actualiza automáticamente. Vulnerabilidades de deps quedan abiertas hasta que alguien las nota.
-
-**Recomendación:** Renovate config en `.github/renovate.json`.
+> **Verificación:** `src/lib/monitoring.ts:8` ya lee `VITE_APP_ENV || MODE`. El gap real es que `.env.example` lo sugería como `production` fijo, ignorando `$VERCEL_ENV` en builds de preview.
+>
+> **PR #167:** documenta apuntarlo a `$VERCEL_ENV` en `.env.example`. **Pendiente:** setear la variable en el panel de Vercel (`VITE_APP_ENV=$VERCEL_ENV` en preview y production) — acción manual fuera del repo.
 
 ---
 
-### I38 · 🔵 Bajo — Sin `CODEOWNERS`
+### I37 · ✅ Resuelto en [PR #167](https://github.com/ventas-png/control-consumo-agua/pull/167) — ~~Sin Dependabot / Renovate~~
 
-`.github/CODEOWNERS` no existe. Cualquiera puede aprobar PR a archivos críticos (RLS, edge functions de pago).
+> **Resolución:** `.github/renovate.json` con schedule semanal (lunes 8am, TZ America/Guatemala), grouping por familia (`react`, `supabase`, `observability`, `vite & vitest`, `documents & charts`, etc.), sin automerge, `vulnerabilityAlerts` activadas, `lockFileMaintenance` mensual. Requiere instalar la app de Renovate en el repo desde el marketplace de GitHub para que la config tome efecto.
 
-**Recomendación:** CODEOWNERS para `supabase/migrations/`, `supabase/functions/`, `src/lib/security.ts`, `src/hooks/useAuth.ts`.
+---
+
+### I38 · ✅ Resuelto en [PR #167](https://github.com/ventas-png/control-consumo-agua/pull/167) — ~~Sin `CODEOWNERS`~~
+
+> **Resolución:** `.github/CODEOWNERS` con reviews obligatorios en: auth/RBAC (`useAuth.ts`, `usePermissions.ts`, `security.ts`, `permissions.ts`, etc.), edge functions de pagos/usuarios/OAuth, migraciones SQL, workflows CI, `vercel.json`, `vite.config.ts`, `package.json` y documentos de critique/seguridad. Para enforcement real, configurar branch protection en `main` con "Require review from Code Owners".
 
 ---
 
@@ -461,7 +451,7 @@ Sentry no diferencia preview, staging, prod.
 |-----|------|----------------------------------------------------------------|----------------------------------------------------------------------------|------|
 | I1  | 🔴   | 6 edge functions sin JWT                                        | `.github/workflows/deploy-functions.yml:39-115`                            | 2    |
 | I2  | 🔴   | Rate-limiting ausente en edge functions críticas                | `supabase/functions/create-user`, `create-cliente-account`                 | 2    |
-| I3  | 🔴   | Sin `ErrorBoundary` global                                       | `grep -r "ErrorBoundary" src/` empty                                       | 1    |
+| I3  | ✅   | ~~Sin `ErrorBoundary` global~~ — resuelto PR #167                | `src/main.tsx` envuelve `<App />` con `<ErrorBoundary sectionName="root">` | 1    |
 | I4  | 🔴   | `useOffline` solo detecta, no offline-first                     | `src/hooks/useOffline.ts:31 LOC`                                           | 2    |
 | I5  | 🔴   | Sidebar NAV hard-coded                                            | `src/components/layout/Sidebar.tsx:683 LOC`                                 | 1    |
 | I6  | 🔴   | Topbar PAGE_TITLES/ICONS hard-coded                              | `src/components/layout/Topbar.tsx:250 LOC`                                  | 1    |
@@ -488,15 +478,15 @@ Sentry no diferencia preview, staging, prod.
 | I27 | 🟡   | `useOffline` flag sin TTL                                            | `useOffline.ts`                                                            | 2    |
 | I28 | 🟡   | `useOffline` sin clock sync                                          | `useOffline.ts`                                                            | 2    |
 | I29 | 🟡   | `NotificationBell` polling redundante con Realtime                  | `src/components/layout/NotificationBell.tsx:108 LOC`                       | 3    |
-| I30 | 🟡   | `Permissions-Policy: geolocation=()` bloquea GPS                    | `vercel.json`                                                              | 3    |
+| I30 | ✅   | ~~`Permissions-Policy: geolocation=()` bloquea GPS~~ — falso positivo, ya `geolocation=(self)` | `vercel.json:14`                                                  | —    |
 | I31 | 🟡   | Sin Subresource Integrity (SRI)                                      | `vite.config.ts`                                                           | 4    |
 | I32 | 🟡   | Sin `HEAD` health endpoint                                            | sin edge function                                                          | 4    |
 | I33 | 🟡   | Sin export de logs estructurados                                      | logs solo en Supabase                                                      | 4    |
-| I34 | 🟡   | Sin `robots.txt` ni `sitemap.xml`                                     | `public/` con `favicon.svg` only                                            | 4    |
-| I35 | 🔵   | `.env.example` sin sección "secretos fuera de aquí"                  | `.env.example`                                                             | 5    |
-| I36 | 🔵   | Sentry environment hard-coded a "production"                          | `monitoring.ts`                                                            | 4    |
-| I37 | 🔵   | Sin Dependabot / Renovate                                              | `.github/`                                                                  | 5    |
-| I38 | 🔵   | Sin CODEOWNERS                                                         | `.github/CODEOWNERS` no existe                                              | 5    |
+| I34 | ✅   | ~~Sin `robots.txt`~~ — resuelto PR #167; sitemap pendiente landing pública | `public/robots.txt`                                                  | 4    |
+| I35 | ✅   | ~~`.env.example` sin sección "secretos fuera de aquí"~~ — resuelto PR #167 | tabla de secretos al inicio de `.env.example`                          | —    |
+| I36 | ⏳   | ~~Sentry environment hard-coded a "production"~~ — parcial; falta setear `VITE_APP_ENV=$VERCEL_ENV` en Vercel | `monitoring.ts:8` ya usa `VITE_APP_ENV \|\| MODE`                | 4    |
+| I37 | ✅   | ~~Sin Dependabot / Renovate~~ — resuelto PR #167                       | `.github/renovate.json`                                                     | —    |
+| I38 | ✅   | ~~Sin CODEOWNERS~~ — resuelto PR #167                                  | `.github/CODEOWNERS`                                                        | —    |
 
 ---
 
