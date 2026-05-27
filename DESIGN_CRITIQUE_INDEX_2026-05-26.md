@@ -15,8 +15,10 @@
 | 3 | [`DESIGN_CRITIQUE_PLATAFORMA_SAAS_2026-05-26.md`](./DESIGN_CRITIQUE_PLATAFORMA_SAAS_2026-05-26.md) | 37 | ~7.000 |
 | 4 | [`DESIGN_CRITIQUE_SERVICIOS_2026-05-26.md`](./DESIGN_CRITIQUE_SERVICIOS_2026-05-26.md) | 28 | ~2.500 |
 | 5 | [`DESIGN_CRITIQUE_COMUNICACION_2026-05-26.md`](./DESIGN_CRITIQUE_COMUNICACION_2026-05-26.md) | 29 | ~4.000 |
-| 6 | [`DESIGN_CRITIQUE_INFRAESTRUCTURA_2026-05-26.md`](./DESIGN_CRITIQUE_INFRAESTRUCTURA_2026-05-26.md) | 37 | ~5.000 |
-| | **Total** | **219** | **~125.000+** |
+| 6 | [`DESIGN_CRITIQUE_INFRAESTRUCTURA_2026-05-26.md`](./DESIGN_CRITIQUE_INFRAESTRUCTURA_2026-05-26.md) | 38 | ~5.000 |
+| | **Total** | **220** | **~125.000+** |
+
+> Nota: el conteo de Infraestructura subió de 37 → 38 al descubrir `infra:I39` (migraciones no aplicables desde cero) vía el fail de Supabase Branching en el PR #168. Detallado en §7 "Estado de implementación".
 
 ---
 
@@ -28,7 +30,7 @@
 | 🟠 Alto    | 14  | 16   | 13   | 11   | 11  | 14   | **79**   |
 | 🟡 Medio   | 12  | 14   | 9    | 10   | 9   | 12   | **66**   |
 | 🔵 Bajo    | 5   | 4    | 3    | 4    | 3   | 4    | **23**   |
-| **Total** | 41  | 47   | 37   | 28   | 29  | 37   | **219**  |
+| **Total** | 41  | 47   | 37   | 28   | 29  | 38   | **220**  |
 
 ---
 
@@ -268,21 +270,32 @@ Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior
 
 | Concepto | Antes | Después PR #167 | Después PR #168 | Pendientes |
 |----------|-------|-----------------|-----------------|------------|
-| Hallazgos totales      | 219 | 219 | 219 | — |
-| Resueltos             | 0   | 5   | 6   | 213 |
+| Hallazgos totales      | 219 | 219 | **220** (+`I39`) | — |
+| Resueltos             | 0   | 5   | 6   | 214 |
 | Docs/falsos positivos | 0   | 1 (`I30`) + parte de `I36` | 2 (`I30` + cierre docs `I36`) | — |
 | Parciales activos      | 0   | 2 (`I15, I36`) | 3 (`I15, I7, I8`) | — |
+| Nuevos descubiertos    | 0   | 0   | **1 (`I39`)** — bug pre-existente revelado por CI | — |
 | % progreso (resueltos) | 0%  | 2.3% | 2.7% | — |
 
-### Próximo lote candidato — Lote 3 (sigue el criterio: bajo riesgo, alto valor)
+### Próximo lote candidato — Lote 3 (revisado tras descubrir `I39`)
 
-1. **`agua:C11` + `cond:C14`** — Workflow `types-drift.yml` (manual/cron) que regenera `database.types.ts` desde Supabase y reporta drift como artifact. No bloquea PRs, solo informa. Habilita la futura Fase 5 de tipos auto-generados.
-2. **`infra:I33`** — Wrapper `logger` estructurado (`src/lib/logger.ts`) con niveles `debug/info/warn/error` que enriquece breadcrumbs de Sentry y desactiva `debug` en prod. Reemplazo gradual (no de un solo golpe) de `console.log` repartidos.
-3. **`infra:I11`** — Sentry `tracesSampler` por severity (100% en errores y rutas críticas; 10% en transacciones normales). Sigue siendo no invasivo (solo cambia `monitoring.ts`).
-4. **`infra:I10`** — PostHog `register({ company_id, role, plan })` automático desde `useAuth` para que cada `track()` herede props multi-tenant. Mejora drásticamente la analítica sin tocar nada más.
+**Decisión:** `infra:I39` es crítico bloqueante para SaaS branching, staging y reproducibilidad, pero su resolución requiere **PR dedicado** (no quick win): crear migración baseline `CREATE TABLE IF NOT EXISTS` para 4 tablas legacy validadas contra producción. Lo dejo como **PR 4 separado** y el lote 3 conserva los quick wins originales.
+
+1. **`agua:C11` + `cond:C14`** — Workflow `types-drift.yml` (manual/cron) que regenera `database.types.ts` desde Supabase y reporta drift como artifact. No bloquea PRs, solo informa.
+2. **`infra:I33`** — Wrapper `logger` estructurado (`src/lib/logger.ts`) con niveles `debug/info/warn/error` que enriquece breadcrumbs de Sentry y desactiva `debug` en prod. Reemplazo gradual de `console.log` repartidos.
+3. **`infra:I11`** — Sentry `tracesSampler` por severity (100% errores; 10% transacciones normales). Solo cambia `monitoring.ts`.
+4. **`infra:I10`** — PostHog `register({ company_id, role, plan })` automático desde `useAuth` para que cada `track()` herede props multi-tenant.
 5. **`agua:A10` + `cond:A10`** — Mover `FileUploader`, `ImageUploader`, `ImageGallery`, `RubrosBuilder` desde `components/condominios/` a `components/shared/` (refactor mecánico de imports, sin cambio de comportamiento).
 
 Todos son aditivos o de configuración. Sin DB, sin auth, sin RLS.
+
+**PR 4 (dedicado, separado del lote 3) — `infra:I39` baseline de tablas legacy:**
+- `supabase/migrations/<timestamp_anterior_al_más_antiguo>_baseline_legacy_tables.sql` con `CREATE TABLE IF NOT EXISTS` para `companies`, `projects`, `user_project_assignments`, `pagos`.
+- Schema copiado del proyecto principal vía `pg_dump --schema-only`.
+- Validación: `supabase db reset` aplica todas las migraciones sin error.
+- Validación: `pg_dump` del schema final coincide con el proyecto principal.
+- Documento `supabase/migrations/README.md` con convención hacia adelante.
+- Riesgo: medio. Aunque `IF NOT EXISTS` lo hace idempotente, requiere asegurarse de que el schema declarado matchea exactamente con el de producción.
 
 ### Monitoreo de impacto
 
@@ -294,6 +307,7 @@ A medida que se resuelven hallazgos, anotar aquí si la solución impacta (resue
 - **`infra:I32` (health endpoint)** → habilita la observabilidad externa que mencionan `infra:I18` (alertas Slack/email) e `infra:I16` (separación staging/prod, ya que cada env tendrá su propio probe).
 - **`infra:I7` parcial (coverage)** → expone que el flake de `ImportModal.test.tsx` con `--coverage` se debe a timing — anotar como deuda en la sección "Tests" de `agua:C7`. Coverage limpio habilita el threshold definitivo en Fase 5.
 - **`infra:I8` parcial (deno lint advisory)** → al limpiar baseline + hacerlo enforce, también impone consistencia en futuras funciones que se creen para `com:N2` (orquestador de notificaciones), `cond:A9` (edge functions de condominios), `plat:P3` (invite) y `plat:P36` (límites de plan). Inversión que se amortiza.
+- **`infra:I39` (nuevo — migraciones no replicables)** → bloquea `infra:I16` (no se puede crear staging confiable sin reproducibilidad), `infra:I19` (canary), `infra:I20` (rollback) y onboarding de devs. Su resolución destraba el Supabase Branching por PR, que a su vez habilita validación temprana de migraciones para `cond:C2` (CHECK constraints), `agua:C1` (validaciones de lectura), `plat:P1` (billing tables), etc. Es el "primer dominó" del backlog de Postgres.
 
 ---
 
