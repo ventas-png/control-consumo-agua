@@ -274,14 +274,15 @@ Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior
 
 ### Métricas de avance (post-merge a main)
 
-| Concepto | Antes | Final (post 6 merges, 2026-05-27) |
+| Concepto | Antes | Final (post 7 merges, 2026-05-27) |
 |----------|-------|-----------------------------------|
-| Hallazgos totales      | 219 | **222** (+`I39`, `I40`, `I41`, `I42` descubiertos durante implementación; `I40`-`I42` derivados de `I39`) |
-| Resueltos             | 0   | **12** (`I3, I10, I11, I32, I34, I35, I37, I38, I39, I40, I41, I42`) |
-| Docs/falsos positivos | 0   | 2 (`I30, I36`) |
-| Parciales activos     | 0   | 6 (`I15, I7, I8, I33, cond:A10, agua:C11+cond:C14`) |
-| % progreso (resueltos) | 0%  | **5.4%** (12/222) |
-| % cobertura del lote 1+2+3 | 0% | ~95% (todo lo planeado mergeado a main) |
+| Hallazgos totales      | 219 | **222** (+`I39`, `I40`, `I41`, `I42` descubiertos durante implementación) |
+| Resueltos             | 0   | **14** (`I3, I10, I11, I27, I32, I34, I35, I37, I38, I39, I40, I41, I42, cond:C9 arranque`) |
+| Docs/falsos positivos | 0   | **3** (`I30, I36, com:N22`) |
+| Parciales activos     | 0   | **7** (`I15, I7, I8, I33, com:N20, cond:A10, agua:C11+cond:C14`) |
+| Deferidos             | 0   | 1 (`agua:B10` — sidebar colapsable requiere rediseño) |
+| % progreso (resueltos) | 0%  | **6.3%** (14/222) |
+| % cobertura del lote 1+2+3+4 | 0% | **~98%** (todo lo planeado mergeado a main) |
 
 ### Orden de merge ejecutado — TODOS LOS PRs EN `main` ✅
 
@@ -294,8 +295,11 @@ Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior
 | ✅ #172 | `4e4ba52` | `infra:I40` — timestamp duplicado 20260324000005 renombrado a 20260324000007 |
 | ✅ #173 | `f354045` | `infra:I41 + I42` — policies idempotentes + columnas legacy faltantes |
 | ✅ #168 | `b3b6117` | Lote 2 quick wins — coverage CI, edge function `health`, deno lint advisory |
+| ✅ #174 | `36dba01` | Lote 4 quick wins — useOffline TTL, paquetesNotify retry, types/condominios |
 
-**6 PRs mergeados, 0 abiertos.**
+**7 PRs mergeados, 0 abiertos.**
+
+**Tracking en Supabase:** las baselines de `infra:I39` registradas en `supabase_migrations.schema_migrations` (versions `20260317000000` y `20260317000001`).
 
 ### Hallazgos nuevos descubiertos durante la ejecución
 
@@ -306,38 +310,162 @@ Tabla viva del progreso. Cada vez que un hallazgo se resuelve en un PR posterior
 
 ### Deuda residual de Supabase Branching
 
-Tras los 6 merges, Supabase Branching avanza ~20+ migraciones más que antes pero todavía tiene bugs "cebolla" aguas abajo (otras policies duplicadas, otras columnas legacy faltantes). Cada uno requiere PR pequeño con uno de dos patrones:
+Tras los 7 merges, Supabase Branching avanza ~20+ migraciones más que antes pero todavía tiene bugs "cebolla" aguas abajo (otras policies duplicadas, otras columnas legacy faltantes). Cada uno requiere PR pequeño con uno de dos patrones:
 - `DROP POLICY IF EXISTS` antes de `CREATE POLICY` duplicado.
 - `ALTER TABLE ADD COLUMN IF NOT EXISTS` antes de referenciar columna legacy.
 
 **Producción no afectada** — las migraciones ya están aplicadas con su estado correcto allí. Solo afectan a Supabase Branching y `supabase db reset`. Se atienden como **track de mantenimiento continuo**, no como bloqueo del roadmap.
 
-### Próximo lote candidato — Lote 4 (5 quick wins, sin cambios)
+### Lote 4 — ✅ Cerrado (PR #174 mergeado, sha `36dba01`)
 
-Los 5 quick wins propuestos siguen válidos. Una vez se haya mergeado el PR #170 (baseline tablas), el #3 (`com:N20`) deja de tener riesgo de migración bloqueada.
+| Hallazgo | Estado | Notas |
+|----------|--------|-------|
+| `infra:I27` | ✅ Resuelto | useOffline con TTL 24h + `clearOfflineMode()` |
+| `com:N20` | ⏳ Parcial | Retry con backoff + logging. Tabla `paquetes_notificaciones_intentos` queda para PR DB dedicado. |
+| `cond:C9` | ⏳ Arranque | `src/types/condominios.ts` creado con `MetodoCalculo/RubroConfig/RubroDetalle`. Re-export en `index.ts`. |
+| `com:N22` | ✅ **Falso positivo** | `chart.js` ya en `vendor-charts` chunk; componentes ya `lazy()`. |
+| `agua:B10` | ⏸️ **Deferido** | Sidebar 683L sin iconos por entry — rediseño no-trivial. PR dedicado. |
 
-1. **`infra:I27`** — `useOffline` flag con TTL (24h) + UI para alternar.
-2. **`com:N22`** — Lazy import de `chart.js` en `admin-dashboard/`. Reduce ~64KB gzip del bundle inicial.
-3. **`com:N20`** — `paquetesNotify` con retry visible. Migración pequeña — ya es seguro tras `infra:I39` fase 1 mergeado.
-4. **`agua:B10`** — Sidebar 256px → 64px colapsable en `<1024px`.
-5. **`agua:A10` cierre + `cond:C9` arranque** — Empezar partición de `src/types/index.ts`.
+---
 
-### Y un PR 5 paralelo / posterior: `infra:I39` fase 2
+## Fase 2 — Dominio sólido, seguridad e identidad
 
-Tras el descubrimiento del PR #170, el alcance de la fase 2 se expande:
+Tras cerrar el lote 4 (~98% del plan inicial fase 1 ejecutado), arranca la **Fase 2** del roadmap original: hallazgos críticos para SaaS que requieren más diseño que un quick win.
 
-- **11 tablas legacy restantes** (`clientes`, `registros`, `convenios_pago`, `fuentes_agua`, `registros_calidad`, `payment_requests`, `password_reset_tokens`, `user_sessions`, `security_logs`, `empresa`, `empresa_pagos_config`).
-- **7 funciones legacy** referenciadas por la migración `20260318000001_fix_function_search_path_and_move_extensions.sql`: `current_user_role()`, `request_password_reset(varchar/text)`, `validate_reset_token(varchar/text)`, `update_user_password()`, `migrate_custom_auth_to_supabase_unconfirmed()`. Schema extraído vía MCP listo para reusar con `CREATE OR REPLACE FUNCTION` (idempotente).
-- **Completar las FKs cross-fase** documentadas como `-- TODO infra:I39-fase2` en `20260317000000_baseline_legacy_tables_phase1.sql`.
+### Orden de ejecución propuesto (8 PRs, ~6 semanas)
 
-Mismo enfoque que fase 1: schema replicado de prod vía MCP, `IF NOT EXISTS` / `CREATE OR REPLACE` idempotentes. **Probable fase 3 iterativa** si tras la fase 2 aparece un cuarto nivel de objetos legacy (triggers, vistas, secuencias). El proceso converge en pocas iteraciones porque cada fase ataca el siguiente nivel del error.
+Ordenado por **valor de seguridad × dificultad** (los más críticos y baratos primero):
 
-### Nota importante: el PR #170 NO debe bloquearse por el sub-error
+#### F2.1 · `com:N1` — Eliminar EmailJS del cliente — **PR aislado, prioritario**
 
-Aunque el Supabase Preview del PR #170 muestra ❌, eso es porque expone el SIGUIENTE error en la cadena (función legacy), no porque su fase 1 haya fallado. Mergear el PR #170 es seguro porque:
-- En producción es no-op idempotente (`IF NOT EXISTS` no toca tablas existentes).
-- Sus 5 tablas baseline + RLS aplicadas en branches sí funcionan (validado por el cambio de tipo de error).
-- El próximo PR (fase 2) atacará el siguiente nivel.
+**Por qué urgente:** la `VITE_EMAILJS_PUBLIC_KEY` viaja en el bundle del navegador. Cualquiera con la key + service_id + template_id puede enviar emails con tu cuenta → spam, blacklist de dominio, factura inflada.
+
+**Alcance:**
+- Eliminar `@emailjs/browser` del cliente.
+- Mover todo envío de email a la edge function existente `send-email` (Gmail API ya cableado).
+- Si el provider de Gmail falla, fallback a Resend/Postmark vía edge function (API key en Supabase Secrets).
+- Cliente solo invoca `supabase.functions.invoke('send-email', { template, vars })`.
+
+**Riesgo:** Medio. Requiere migrar flujos que hoy usan EmailJS directo (recibo cobro, ruta asignada, password reset, comunicado masivo). Hay que verificar uno por uno.
+
+**Esfuerzo:** 1-2 días.
+
+#### F2.2 · `infra:I1` — JWT obligatorio en edge functions sensibles
+
+**Por qué:** `create-user`, `delete-user`, `create-cliente-account`, `log-security-event`, etc. corren con `--no-verify-jwt`. Solo CORS las protege. Si `ALLOWED_ORIGINS` filtra, son endpoints abiertos.
+
+**Alcance:**
+- Auditar las 14 edge functions y clasificar las 6 con `--no-verify-jwt`.
+- Para `create-user` y `delete-user`: requerir JWT + verificar caller es admin del tenant target.
+- Para `complete-oauth-onboarding`: validar state token firmado.
+- Para `notify-package` y `route-reminders` (invocadas por triggers/cron): header `X-Internal-Secret` rotable.
+- `log-security-event` y `create-cliente-account` requieren más análisis (deben funcionar pre-login).
+
+**Riesgo:** Medio-alto. Si una función pierde acceso indebido, rompe flujos de admin. Validar en preview antes de prod.
+
+**Esfuerzo:** 2-3 días.
+
+#### F2.3 · `cond:C2` + `agua:C1` — CHECK constraints + validación de lectura
+
+**Por qué:** Hoy `cuota.monto > 0`, `lectura_actual ≥ anterior`, `fecha_vencimiento >= now()` viven en cliente. Una validación a nivel DB es la última línea de defensa.
+
+**Alcance:**
+- Migración `condominios_constraints.sql` con CHECK en `cuotas_condominio.monto > 0`, `visitante.hora_salida >= hora_entrada`, `asamblea.fecha >= now()`, etc.
+- Validación de lectura en `business.ts:calcularTotalPagar` (`lectura_actual >= anterior` o `reseteo_contador=true` con motivo).
+- Detección de salto sospechoso (`consumo > histórico_p95 × 3`).
+
+**Riesgo:** Bajo (CHECK constraints son aditivos). Medio en validación cliente (toca flujo de captura).
+
+**Esfuerzo:** 2-3 días.
+
+#### F2.4 · `agua:C2` + `cond:C1` — RLS row-level por unidad / ruta
+
+**Por qué:** Hoy un residente con permiso "leer cuotas" puede ver cuotas de **otras unidades** porque las policies filtran solo por `company_id`. Brecha de privacidad.
+
+**Alcance:**
+- Tabla `unidad_users` (user_id, unidad_id) si no existe.
+- Policies adicionales en `cuotas_condominio`, `tickets_mantenimiento`, `visitantes`, `infracciones` que restrinjan a `unidad_id IN (SELECT unidad_id FROM unidad_users WHERE user_id = auth.uid())`.
+- Para agua: filtrar `clientes` y `registros` por colector asignado a la ruta.
+- Tests con pgTAP / scripts SQL que validen aislamiento con users de distintos roles.
+
+**Riesgo:** Alto. Si la policy es demasiado restrictiva, los admins pierden acceso. Si es demasiado laxa, no resuelve nada. Validar exhaustivamente en preview.
+
+**Esfuerzo:** 4-5 días.
+
+#### F2.5 · `plat:P7` — Realtime de permisos
+
+**Por qué:** Hoy `buildSessionFromSupabase` lee permisos UNA vez al login. Revocar un permiso requiere logout o expiración de JWT. Pueden pasar horas hasta que un usuario pierda acceso revocado.
+
+**Alcance:**
+- Suscripción Realtime sobre `user_roles` (filtrada por `user_id = auth.uid()`).
+- Al recibir evento, llamar `refreshPermissions()` que re-invoca `get_user_permissions()` RPC.
+- Fallback: re-llamar la RPC cada 5 minutos o al volver de tab inactiva.
+
+**Riesgo:** Bajo. Solo afecta `useAuth.ts` y la session caché. Si falla, comportamiento equivale al actual (sin realtime).
+
+**Esfuerzo:** 1-2 días.
+
+#### F2.6 · `plat:P4` — MFA TOTP
+
+**Por qué:** Bloqueante para clientes corporativos. SOC 2 / ISO 27001 / requerimientos bancarios exigen 2FA en cuentas privilegiadas.
+
+**Alcance:**
+- Activar `enrolled_factors` en Supabase Auth (ya viene soportado).
+- Página `/auth/enroll-mfa` obligatoria para `super_admin`/`company_owner`/`admin`.
+- Backup codes generados al enroll.
+- UI de "Mis dispositivos confiables".
+
+**Riesgo:** Medio. Toca el flujo de auth, que es sensible. Hay que rolloutear primero a un tenant beta antes de hacerlo obligatorio.
+
+**Esfuerzo:** 3-4 días.
+
+#### F2.7 · Audit log genérico + soft delete
+
+**Por qué:** Hoy solo `permission_audit_log`, `generacion_cuotas_log`, `conciliacion_cobros_log`. Cualquier cambio en `companies`, `app_users`, `cuotas`, etc. no deja rastro de quién modificó qué.
+
+**Alcance:**
+- Tabla `audit_log` (entity, entity_id, user_id, action, before, after, ts).
+- Trigger Postgres genérico aplicado a tablas críticas (5-8 tablas inicialmente).
+- `deleted_at timestamptz` en tablas relevantes + RLS que filtra `deleted_at IS NULL`.
+
+**Riesgo:** Bajo. Aditivo, no afecta queries existentes.
+
+**Esfuerzo:** 2-3 días.
+
+#### F2.8 · `infra:I4` — PWA + offline-first real
+
+**Por qué:** El flujo más usado en campo (captura de lecturas) ocurre con red intermitente. Hoy `useOffline` solo detecta; no hay cola de sync.
+
+**Alcance:**
+- Vite PWA Plugin + manifest + service worker (Workbox runtime caching).
+- IndexedDB para cola de mutations pendientes (lecturas capturadas sin red).
+- Sync automático al recuperar conexión.
+- Indicador visual de "N pendientes" en topbar.
+
+**Riesgo:** Medio. Servicio worker mal configurado puede romper la app o cachear contenido incorrecto. Requiere testing en navegadores reales.
+
+**Esfuerzo:** 4-5 días.
+
+### Dependencias y orden recomendado
+
+```
+F2.1 (EmailJS)         — independiente, hacer primero por urgencia de seguridad
+F2.2 (JWT functions)   — independiente, en paralelo
+F2.3 (CHECK + lectura) — independiente, en paralelo
+F2.4 (RLS row-level)   — depende de F2.3 (constraints deben pasar antes)
+F2.5 (realtime perms)  — independiente, en paralelo
+F2.6 (MFA)             — independiente, recomendado tras F2.5
+F2.7 (audit + soft del)— independiente, en paralelo
+F2.8 (PWA offline)     — independiente, último por complejidad
+```
+
+**Estimado total**: ~6 semanas con 1-2 ingenieros, asumiendo paralelismo. Cada PR atómico, validado y mergeable independiente.
+
+### Bloqueo no resuelto: Supabase Branching aún tiene deuda residual
+
+Antes de cualquier PR de Fase 2 que toque migraciones (F2.3, F2.4, F2.7), conviene completar la cadena de fixes `infra:I41+I42` en migraciones aguas abajo (la "cebolla" que dejamos pendiente). Sin eso, Supabase Preview de esos PRs seguirá fallando y obstaculiza la validación.
+
+**Recomendación**: en paralelo a F2.1 y F2.2, ir limpiando bugs de Supabase Branching uno a uno conforme aparezcan (PRs pequeñísimos como #173).
 
 ### Monitoreo de impacto
 
