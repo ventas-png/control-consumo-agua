@@ -177,6 +177,119 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     setPwLoading(false)
   }
 
+  // — 2FA TOTP —
+  // Permite al usuario activar un segundo factor usando una app autenticadora
+  // (Google Authenticator / Authy / 1Password). Supabase MFA gestiona el
+  // secreto y la verificación; nosotros sólo orquestamos enroll → challenge →
+  // verify y mostramos el estado.
+  type TotpFactor = { id: string; status: 'verified' | 'unverified'; friendly_name?: string | null; created_at?: string }
+  const [mfaFactors, setMfaFactors] = useState<TotpFactor[]>([])
+  const [mfaLoading, setMfaLoading] = useState(false)
+  const [mfaFb, setMfaFb] = useState<FeedbackState>(null)
+  const [enrollState, setEnrollState] = useState<{ factorId: string; qrSvg: string; secret: string; challengeId?: string } | null>(null)
+  const [mfaCode, setMfaCode] = useState('')
+
+  const verifiedFactor = mfaFactors.find(f => f.status === 'verified') ?? null
+
+  // Carga inicial de factores. Re-ejecuta cuando el usuario completa o cancela
+  // un enrollment para mantener el badge sincronizado.
+  useEffect(() => {
+    let alive = true
+    void supabase.auth.mfa.listFactors().then(({ data }) => {
+      if (!alive || !data) return
+      const all = (data.all ?? []) as TotpFactor[]
+      setMfaFactors(all.filter(f => (f as unknown as { factor_type: string }).factor_type === 'totp'))
+    })
+    return () => { alive = false }
+  }, [enrollState])
+
+  async function handleEnableMfa() {
+    setMfaFb(null)
+    setMfaLoading(true)
+    // Limpia factores TOTP huérfanos (unverified) de intentos previos antes de
+    // crear uno nuevo, para evitar que Supabase rechace el enroll con
+    // "factor already exists".
+    const orphans = mfaFactors.filter(f => f.status === 'unverified')
+    for (const o of orphans) {
+      await supabase.auth.mfa.unenroll({ factorId: o.id }).catch(() => undefined)
+    }
+    const { data, error } = await supabase.auth.mfa.enroll({
+      factorType: 'totp',
+      friendlyName: `Authenticator (${new Date().toISOString().slice(0, 10)})`,
+    })
+    if (error || !data) {
+      setMfaFb({ type: 'error', msg: error?.message ?? 'No fue posible iniciar el enrolamiento.' })
+      setMfaLoading(false)
+      return
+    }
+    setEnrollState({ factorId: data.id, qrSvg: data.totp.qr_code, secret: data.totp.secret })
+    setMfaLoading(false)
+  }
+
+  async function handleVerifyEnroll(e: FormEvent) {
+    e.preventDefault()
+    if (!enrollState) return
+    setMfaFb(null)
+    if (!/^\d{6}$/.test(mfaCode.trim())) {
+      setMfaFb({ type: 'error', msg: 'El código debe tener 6 dígitos.' })
+      return
+    }
+    setMfaLoading(true)
+    let challengeId = enrollState.challengeId
+    if (!challengeId) {
+      const ch = await supabase.auth.mfa.challenge({ factorId: enrollState.factorId })
+      if (ch.error || !ch.data) {
+        setMfaFb({ type: 'error', msg: ch.error?.message ?? 'No fue posible crear el desafío.' })
+        setMfaLoading(false)
+        return
+      }
+      challengeId = ch.data.id
+    }
+    const { error } = await supabase.auth.mfa.verify({
+      factorId: enrollState.factorId,
+      challengeId,
+      code: mfaCode.trim(),
+    })
+    if (error) {
+      setMfaFb({ type: 'error', msg: 'Código incorrecto. Revisa la app de autenticación e intenta de nuevo.' })
+      setMfaLoading(false)
+      return
+    }
+    setEnrollState(null)
+    setMfaCode('')
+    setMfaFb({ type: 'success', msg: 'Autenticación en dos pasos activada. La próxima vez que ingreses te pediremos el código de tu app.' })
+    setMfaLoading(false)
+  }
+
+  async function handleCancelEnroll() {
+    if (!enrollState) return
+    setMfaLoading(true)
+    await supabase.auth.mfa.unenroll({ factorId: enrollState.factorId }).catch(() => undefined)
+    setEnrollState(null)
+    setMfaCode('')
+    setMfaFb(null)
+    setMfaLoading(false)
+  }
+
+  async function handleDisableMfa() {
+    if (!verifiedFactor) return
+    const confirm = window.confirm(
+      'Vas a desactivar la verificación en dos pasos. Tu cuenta quedará protegida solo con contraseña. ¿Estás seguro?',
+    )
+    if (!confirm) return
+    setMfaFb(null)
+    setMfaLoading(true)
+    const { error } = await supabase.auth.mfa.unenroll({ factorId: verifiedFactor.id })
+    if (error) {
+      setMfaFb({ type: 'error', msg: error.message ?? 'No fue posible desactivar el segundo factor.' })
+      setMfaLoading(false)
+      return
+    }
+    setMfaFactors(prev => prev.filter(f => f.id !== verifiedFactor.id))
+    setMfaFb({ type: 'success', msg: 'Verificación en dos pasos desactivada.' })
+    setMfaLoading(false)
+  }
+
   // — Correo —
   const [newEmail, setNewEmail] = useState('')
   const [emailLoading, setEmailLoading] = useState(false)
@@ -312,6 +425,106 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
             </form>
           </Card>
         )}
+
+        {/* Card 2b — Autenticación en dos pasos (TOTP) */}
+        <Card title="Verificación en dos pasos (2FA)">
+          {enrollState ? (
+            <form onSubmit={handleVerifyEnroll}>
+              <div style={{ fontSize: '13px', color: 'var(--at-ink-2)', marginBottom: '12px', lineHeight: 1.5 }}>
+                1. Escanea este código con tu app de autenticación (Google Authenticator, Authy, 1Password, etc.).<br />
+                2. Ingresa abajo el código de 6 dígitos que muestra la app.
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
+                <img
+                  src={enrollState.qrSvg}
+                  alt="Código QR para configurar autenticación en dos pasos"
+                  style={{ width: '180px', height: '180px', border: '1px solid var(--at-line)', borderRadius: '8px', background: 'white', padding: '8px' }}
+                />
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '14px', textAlign: 'center' }}>
+                ¿No puedes escanear?{' '}
+                <span style={{ fontFamily: 'monospace', fontSize: '13px', background: 'var(--at-surface-2)', padding: '2px 6px', borderRadius: '4px', userSelect: 'all' }}>
+                  {enrollState.secret}
+                </span>
+              </div>
+              <InputField
+                id="perfil-mfa-code"
+                label="Código de la app"
+                value={mfaCode}
+                onChange={(v) => setMfaCode(v.replace(/\D/g, '').slice(0, 6))}
+                placeholder="123456"
+              />
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <SubmitBtn loading={mfaLoading} label="Confirmar y activar" color="var(--at-success-strong, var(--at-accent-2))" />
+                <button
+                  type="button"
+                  onClick={handleCancelEnroll}
+                  disabled={mfaLoading}
+                  style={{ background: 'none', border: 'none', color: 'var(--at-ink-3)', cursor: 'pointer', fontSize: '13px', textDecoration: 'underline' }}
+                >
+                  Cancelar
+                </button>
+              </div>
+              <FeedbackMsg fb={mfaFb} />
+            </form>
+          ) : verifiedFactor ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                <span style={{ background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: 700 }}>
+                  ✅ Activa
+                </span>
+                <span style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>
+                  {verifiedFactor.friendly_name ?? 'Autenticador TOTP'}
+                </span>
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--at-ink-2)', marginBottom: '14px', lineHeight: 1.5 }}>
+                Al iniciar sesión te pediremos un código de 6 dígitos de tu app de autenticación además de tu contraseña.
+              </div>
+              <button
+                type="button"
+                onClick={handleDisableMfa}
+                disabled={mfaLoading}
+                style={{
+                  padding: '8px 16px',
+                  background: 'var(--at-danger-tint)',
+                  color: 'var(--at-danger)',
+                  border: '1px solid var(--at-danger-border)',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  cursor: mfaLoading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {mfaLoading ? 'Procesando…' : 'Desactivar 2FA'}
+              </button>
+              <FeedbackMsg fb={mfaFb} />
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: '13px', color: 'var(--at-ink-2)', marginBottom: '14px', lineHeight: 1.5 }}>
+                Agrega una capa extra de seguridad: necesitarás un código de 6 dígitos de una app de autenticación además de tu contraseña al iniciar sesión.
+              </div>
+              <button
+                type="button"
+                onClick={handleEnableMfa}
+                disabled={mfaLoading}
+                style={{
+                  padding: '10px 22px',
+                  background: mfaLoading ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-accent-2), var(--at-primary))',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: mfaLoading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {mfaLoading ? 'Generando…' : '🔐 Activar verificación en dos pasos'}
+              </button>
+              <FeedbackMsg fb={mfaFb} />
+            </>
+          )}
+        </Card>
 
         {/* Card 3 — Correo */}
         <Card title="Cambiar correo electrónico">
