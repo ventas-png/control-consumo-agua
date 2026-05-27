@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Swal from 'sweetalert2'
 import type { UserSession, UserRole, AssignedRoleInfo } from '../types'
 import { supabase } from '../lib/supabase'
@@ -260,6 +260,44 @@ function buildAssignedRoles(result: { data: unknown; error: unknown }): Assigned
     }))
 }
 
+// Reconstruye la sesion desde Supabase y la persiste si cambiaron role,
+// company/cliente, service flags o el set de permisos. Devuelve la nueva
+// sesion (o null si no aplico cambio) para que el caller decida si re-render.
+// Usado tanto por el refresh inicial al montar como por el listener Realtime
+// que reacciona a INSERT/DELETE en user_roles / role_permissions / app_users.
+async function refreshSessionFromSupabase(
+  current: UserSession,
+  expiresAt: number | undefined,
+): Promise<UserSession | null> {
+  try {
+    const fresh = await buildSessionFromSupabase(
+      current.user_id,
+      current.email,
+      expiresAt,
+    )
+    const freshPerms = fresh.permissions ? [...fresh.permissions].sort() : []
+    const currentPerms = current.permissions ? [...current.permissions].sort() : []
+    const permissionsChanged = JSON.stringify(freshPerms) !== JSON.stringify(currentPerms)
+    if (
+      fresh.role !== current.role ||
+      fresh.name !== current.name ||
+      fresh.company_id !== current.company_id ||
+      fresh.cliente_id !== current.cliente_id ||
+      fresh.servicio_condominios !== current.servicio_condominios ||
+      fresh.servicio_agua !== current.servicio_agua ||
+      permissionsChanged
+    ) {
+      // Conservar expires_at original — el refresh de permisos no extiende la sesion
+      const merged = { ...fresh, expires_at: current.expires_at }
+      storeSession(merged)
+      return merged
+    }
+  } catch {
+    // ignore — keep existing session on error
+  }
+  return null
+}
+
 export function useAuth() {
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null)
   const [loading, setLoading] = useState(true)
@@ -276,30 +314,8 @@ export function useAuth() {
       // Background role refresh: if role changed in DB, update cached session
       supabase.auth.getSession().then(async ({ data: { session } }) => {
         if (session?.user) {
-          try {
-            const fresh = await buildSessionFromSupabase(
-              session.user.id,
-              session.user.email ?? '',
-              session.expires_at
-            )
-            const freshPerms = fresh.permissions ? [...fresh.permissions].sort() : []
-            const storedPerms = stored.permissions ? [...stored.permissions].sort() : []
-            const permissionsChanged = JSON.stringify(freshPerms) !== JSON.stringify(storedPerms)
-            if (
-              fresh.role !== stored.role ||
-              fresh.name !== stored.name ||
-              fresh.company_id !== stored.company_id ||
-              fresh.cliente_id !== stored.cliente_id ||
-              fresh.servicio_condominios !== stored.servicio_condominios ||
-              fresh.servicio_agua !== stored.servicio_agua ||
-              permissionsChanged
-            ) {
-              storeSession(fresh)
-              setCurrentUser(fresh)
-            }
-          } catch {
-            // keep existing session on error
-          }
+          const updated = await refreshSessionFromSupabase(stored, session.expires_at)
+          if (updated) setCurrentUser(updated)
         }
       })
       return
@@ -381,6 +397,83 @@ export function useAuth() {
 
     return () => clearInterval(interval)
   }, [currentUser])
+
+  // Realtime de permisos (plat:P7, F2.5).
+  //
+  // Antes el set de permisos solo se reconstruia al login o cuando el usuario
+  // recargaba la SPA. Si un admin asignaba/revocaba un rol mid-sesion, el
+  // residente tenia que cerrar y volver a abrir para verlo.
+  //
+  // Ahora nos suscribimos a las tres tablas RBAC relevantes para el usuario
+  // actual y, en cualquier evento, re-corremos buildSessionFromSupabase via
+  // refreshSessionFromSupabase. Si algo cambio realmente, persistimos y
+  // re-renderizamos; si no, la llamada es no-op (la comparacion vive dentro).
+  //
+  //   - user_roles  (filter user_id=eq.me): admin asigna/revoca rol al usuario
+  //   - app_users   (filter id=eq.me):      cambio de role legacy / company / activo
+  //   - role_permissions (sin filtro):      admin modifica permisos de un rol.
+  //     RLS limita lo que se entrega; un cambio en un rol que no pertenece a
+  //     mi company se filtra antes de llegar. El refresh es no-op si los
+  //     permisos efectivos no cambiaron.
+  //
+  // Debounce de 800ms: cuando un admin granular bulk-inserta varios permisos
+  // a un rol, llegan en rafaga — un solo refresh basta.
+  //
+  // Fallback visibilitychange: si la pestana estuvo inactiva mucho rato y se
+  // perdieron eventos (e.g. el navegador pauso websockets), refrescamos al
+  // volver a primer plano.
+  //
+  // El effect depende solo de user_id (no de currentUser) para no tirar y
+  // recrear el canal con cada actualizacion local; usamos un ref para que el
+  // callback vea siempre la ultima sesion sin reabrir suscripcion.
+  const userRef = useRef<UserSession | null>(currentUser)
+  useEffect(() => { userRef.current = currentUser }, [currentUser])
+  const refreshTimerRef = useRef<number | undefined>(undefined)
+  const userId = currentUser?.user_id
+  useEffect(() => {
+    if (!userId) return
+
+    const triggerRefresh = () => {
+      window.clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = window.setTimeout(async () => {
+        const cur = userRef.current
+        if (!cur) return
+        const { data: { session } } = await supabase.auth.getSession()
+        const updated = await refreshSessionFromSupabase(cur, session?.expires_at)
+        if (updated) setCurrentUser(updated)
+      }, 800)
+    }
+
+    const channel = supabase
+      .channel(`auth_rbac:${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_roles', filter: `user_id=eq.${userId}` },
+        triggerRefresh,
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'app_users', filter: `id=eq.${userId}` },
+        triggerRefresh,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'role_permissions' },
+        triggerRefresh,
+      )
+      .subscribe()
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') triggerRefresh()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      window.clearTimeout(refreshTimerRef.current)
+      document.removeEventListener('visibilitychange', onVisibility)
+      void supabase.removeChannel(channel)
+    }
+  }, [userId])
 
   // Session expiry warning (5 minutes before expiry) and forced logout
   useEffect(() => {
