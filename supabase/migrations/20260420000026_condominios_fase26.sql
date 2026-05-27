@@ -18,9 +18,13 @@ CREATE TABLE IF NOT EXISTS public.parqueos_condominio (
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE public.parqueos_condominio ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "parqueos_select" ON public.parqueos_condominio;
 CREATE POLICY "parqueos_select" ON public.parqueos_condominio FOR SELECT TO authenticated USING (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "parqueos_insert" ON public.parqueos_condominio;
 CREATE POLICY "parqueos_insert" ON public.parqueos_condominio FOR INSERT TO authenticated WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "parqueos_update" ON public.parqueos_condominio;
 CREATE POLICY "parqueos_update" ON public.parqueos_condominio FOR UPDATE TO authenticated USING (company_id = get_my_company_id() OR is_super_admin()) WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "parqueos_delete" ON public.parqueos_condominio;
 CREATE POLICY "parqueos_delete" ON public.parqueos_condominio FOR DELETE TO authenticated USING (is_super_admin() OR (current_user_role() = ANY(ARRAY['company_owner','admin']) AND company_id = get_my_company_id()));
 CREATE INDEX IF NOT EXISTS idx_parqueos_project ON public.parqueos_condominio(project_id);
 CREATE INDEX IF NOT EXISTS idx_parqueos_unidad  ON public.parqueos_condominio(unidad_id);
@@ -44,9 +48,13 @@ CREATE TABLE IF NOT EXISTS public.mascotas (
   created_at           timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE public.mascotas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "mascotas_select" ON public.mascotas;
 CREATE POLICY "mascotas_select" ON public.mascotas FOR SELECT TO authenticated USING (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "mascotas_insert" ON public.mascotas;
 CREATE POLICY "mascotas_insert" ON public.mascotas FOR INSERT TO authenticated WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "mascotas_update" ON public.mascotas;
 CREATE POLICY "mascotas_update" ON public.mascotas FOR UPDATE TO authenticated USING (company_id = get_my_company_id() OR is_super_admin()) WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "mascotas_delete" ON public.mascotas;
 CREATE POLICY "mascotas_delete" ON public.mascotas FOR DELETE TO authenticated USING (is_super_admin() OR (current_user_role() = ANY(ARRAY['company_owner','admin']) AND company_id = get_my_company_id()));
 CREATE INDEX IF NOT EXISTS idx_mascotas_project ON public.mascotas(project_id);
 CREATE INDEX IF NOT EXISTS idx_mascotas_unidad  ON public.mascotas(unidad_id);
@@ -71,9 +79,13 @@ CREATE TABLE IF NOT EXISTS public.paquetes_recibidos (
   created_at          timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE public.paquetes_recibidos ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "paquetes_select" ON public.paquetes_recibidos;
 CREATE POLICY "paquetes_select" ON public.paquetes_recibidos FOR SELECT TO authenticated USING (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "paquetes_insert" ON public.paquetes_recibidos;
 CREATE POLICY "paquetes_insert" ON public.paquetes_recibidos FOR INSERT TO authenticated WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "paquetes_update" ON public.paquetes_recibidos;
 CREATE POLICY "paquetes_update" ON public.paquetes_recibidos FOR UPDATE TO authenticated USING (company_id = get_my_company_id() OR is_super_admin()) WITH CHECK (company_id = get_my_company_id() OR is_super_admin());
+DROP POLICY IF EXISTS "paquetes_delete" ON public.paquetes_recibidos;
 CREATE POLICY "paquetes_delete" ON public.paquetes_recibidos FOR DELETE TO authenticated USING (is_super_admin() OR (current_user_role() = ANY(ARRAY['company_owner','admin']) AND company_id = get_my_company_id()));
 CREATE INDEX IF NOT EXISTS idx_paquetes_project  ON public.paquetes_recibidos(project_id);
 CREATE INDEX IF NOT EXISTS idx_paquetes_unidad   ON public.paquetes_recibidos(unidad_id);

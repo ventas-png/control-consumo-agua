@@ -7,20 +7,24 @@
 DROP POLICY IF EXISTS "staff_recipients_all" ON broadcast_recipients;
 
 -- SELECT / UPDATE / DELETE — use company_id directly (indexed, fast, no join)
+DROP POLICY IF EXISTS "staff_recipients_select" ON broadcast_recipients;
 CREATE POLICY "staff_recipients_select" ON broadcast_recipients
   FOR SELECT
   USING (company_id IN (SELECT company_id FROM app_users WHERE id = auth.uid()));
 
+DROP POLICY IF EXISTS "staff_recipients_update" ON broadcast_recipients;
 CREATE POLICY "staff_recipients_update" ON broadcast_recipients
   FOR UPDATE
   USING (company_id IN (SELECT company_id FROM app_users WHERE id = auth.uid()));
 
+DROP POLICY IF EXISTS "staff_recipients_delete" ON broadcast_recipients;
 CREATE POLICY "staff_recipients_delete" ON broadcast_recipients
   FOR DELETE
   USING (company_id IN (SELECT company_id FROM app_users WHERE id = auth.uid()));
 
 -- INSERT — check via broadcast_id (broadcasts RLS no longer references
 -- broadcast_recipients, so no recursion)
+DROP POLICY IF EXISTS "staff_recipients_insert" ON broadcast_recipients;
 CREATE POLICY "staff_recipients_insert" ON broadcast_recipients
   FOR INSERT
   WITH CHECK (
