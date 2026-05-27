@@ -28,6 +28,18 @@ CREATE INDEX IF NOT EXISTS idx_payment_secrets_company_id
   ON public.company_payment_secrets(company_id);
 
 -- 4. Migrar datos existentes desde companies
+--
+-- Idempotencia (infra:I42): en producción companies tiene/tenía estas
+-- columnas legacy (luego eliminadas por la sección 5). En branch nueva
+-- (Supabase Branching / supabase db reset) el baseline phase 1 no las
+-- crea, por lo que el SELECT explota. ADD COLUMN IF NOT EXISTS las
+-- garantiza temporalmente: en prod las columnas siguen existiendo
+-- hasta el DROP de abajo; en branch nueva las crea vacías, el INSERT
+-- no inserta nada (no hay datos), y el DROP las elimina.
+ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS stripe_secret_key text;
+ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS stripe_webhook_secret text;
+ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS paypal_client_secret text;
+
 INSERT INTO public.company_payment_secrets (company_id, stripe_secret_key, stripe_webhook_secret, paypal_client_secret)
 SELECT id, stripe_secret_key, stripe_webhook_secret, paypal_client_secret
 FROM public.companies
