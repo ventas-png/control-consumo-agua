@@ -21,8 +21,34 @@ export function initMonitoring(): void {
     environment: ENV,
     release: RELEASE,
     integrations: [Sentry.browserTracingIntegration()],
-    // Sample 10% of transactions in prod, everything elsewhere.
-    tracesSampleRate: ENV === 'production' ? 0.1 : 1.0,
+    // Sampling por severidad: en prod, las transacciones normales se reducen
+    // al 10% para mantener el costo bajo, pero las que tienen marca de error
+    // o pertenecen a flujos críticos (pagos, auth) se conservan al 100%.
+    // En no-prod conservamos todo para debug local.
+    tracesSampler: (samplingContext) => {
+      if (ENV !== 'production') return 1.0
+
+      // Rutas que SIEMPRE queremos capturar al 100% en producción.
+      // Mantener la lista corta: cada entrada es un trace siempre incluido.
+      const criticalNames = [
+        'login',
+        'oauth',
+        'payment',
+        'stripe',
+        'create-user',
+        'delete-user',
+        'create-payment-intent',
+      ]
+      const name = samplingContext.name ?? ''
+      if (criticalNames.some(c => name.toLowerCase().includes(c))) return 1.0
+
+      // Transacciones que ya nacieron como error: siempre.
+      const parent = samplingContext.parentSampled
+      if (parent === true) return 1.0
+
+      // Resto: 10%.
+      return 0.1
+    },
     // Don't attach IP / cookies. We set a minimal user (id/company/role) explicitly.
     sendDefaultPii: false,
   })

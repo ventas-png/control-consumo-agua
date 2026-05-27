@@ -1,0 +1,97 @@
+name: Types drift check (Supabase ↔ TypeScript)
+
+# Workflow ADVISORY: regenera src/types/database.types.ts desde el schema
+# real del proyecto Supabase principal y reporta diferencias contra el archivo
+# committeado (si existe).
+#
+# No bloquea PRs. Sirve para detectar:
+#   - Tablas/columnas nuevas en Supabase que no llegaron al repo.
+#   - Tipos manuales en src/types/index.ts que quedaron desincronizados.
+#
+# Triggers:
+#   - workflow_dispatch:   ejecución manual desde la UI de Actions.
+#   - schedule:            cada lunes a las 10:00 UTC (≈ 4:00 LATAM/GT).
+#
+# Para activarlo, agregar los secretos SUPABASE_ACCESS_TOKEN y
+# SUPABASE_PROJECT_ID (mismos del deploy-functions). Sin secretos, el job
+# falla con un mensaje claro.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 10 * * 1'
+
+jobs:
+  check-drift:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify required secrets are set
+        run: |
+          missing=""
+          [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] && missing="$missing SUPABASE_ACCESS_TOKEN"
+          [ -z "${{ secrets.SUPABASE_PROJECT_ID }}" ]   && missing="$missing SUPABASE_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing GitHub secrets:$missing"
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Generate types from Supabase project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          mkdir -p generated
+          supabase gen types typescript \
+            --project-id "${{ secrets.SUPABASE_PROJECT_ID }}" \
+            --schema public \
+            > generated/database.types.ts
+          wc -l generated/database.types.ts
+
+      - name: Diff against committed file (if any)
+        id: diff
+        run: |
+          if [ -f src/types/database.types.ts ]; then
+            if diff -q src/types/database.types.ts generated/database.types.ts > /dev/null; then
+              echo "result=clean" >> "$GITHUB_OUTPUT"
+              echo "::notice::No drift detected between Supabase schema and committed types."
+            else
+              echo "result=drift" >> "$GITHUB_OUTPUT"
+              echo "::warning::Drift detected — see uploaded artifact and the diff below."
+              diff -u src/types/database.types.ts generated/database.types.ts | head -200 || true
+            fi
+          else
+            echo "result=no-baseline" >> "$GITHUB_OUTPUT"
+            echo "::notice::No baseline at src/types/database.types.ts — uploading generated file as starting point."
+          fi
+
+      - name: Upload generated types
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-types-${{ github.run_id }}
+          path: generated/database.types.ts
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Summary
+        run: |
+          echo "## Types drift check" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          case "${{ steps.diff.outputs.result }}" in
+            clean)
+              echo "✅ **No drift.** El schema de Supabase coincide con \`src/types/database.types.ts\`." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            drift)
+              echo "⚠️ **Drift detectado.** Descarga el artifact \`database-types-${{ github.run_id }}\` y compáralo con \`src/types/database.types.ts\`." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            no-baseline)
+              echo "ℹ️ **Sin baseline.** Aún no existe \`src/types/database.types.ts\` en el repo. Descarga el artifact para comenzar a versionarlo." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+          esac

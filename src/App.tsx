@@ -6,7 +6,7 @@ import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
 import { initEmailJS } from './lib/email'
-import { identify, resetAnalytics } from './lib/analytics'
+import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
 import { setMonitoringUser } from './lib/monitoring'
 import { LandingPage } from './components/landing/LandingPage'
 import { BrandLogo } from './components/shared/BrandLogo'
@@ -173,6 +173,9 @@ export default function App() {
     if (!currentUser) return
     const traits = { company_id: currentUser.company_id, role: currentUser.role }
     identify(currentUser.user_id, traits)
+    // Super-properties: cada evento que dispare la app llevará company_id y role
+    // automáticamente, así no hay que pasarlos en cada track() del código.
+    registerSuperProperties({ company_id: currentUser.company_id, role: currentUser.role })
     setMonitoringUser({ id: currentUser.user_id, companyId: currentUser.company_id, role: currentUser.role })
   }, [currentUser?.user_id])
 
