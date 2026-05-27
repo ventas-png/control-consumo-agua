@@ -56,7 +56,19 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy create-cliente-account (no JWT)
+      # ───────────────────────────────────────────────────────────────────────
+      # Convención (infra:I1, F2.2):
+      #   --no-verify-jwt SOLO para funciones que tienen razón legítima:
+      #     a) Endpoints pre-login (no hay JWT del usuario aún).
+      #     b) Invocadas por triggers/cron con service_role (Supabase mete
+      #        Authorization: Bearer <service_role_key>, no JWT del usuario).
+      #     c) Endpoints públicos por diseño (health).
+      #   El resto deben verificar JWT a nivel platform como defense in depth
+      #   adicional a las verificaciones de rol que cada función hace en su
+      #   código.
+      # ───────────────────────────────────────────────────────────────────────
+
+      - name: Deploy create-cliente-account (no JWT — onboarding pre-login)
         run: |
           supabase functions deploy create-cliente-account \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
@@ -67,17 +79,15 @@ jobs:
           supabase functions deploy create-payment-intent \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
 
-      - name: Deploy create-user
+      - name: Deploy create-user (JWT requerido — el código valida rol admin del caller)
         run: |
           supabase functions deploy create-user \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
 
-      - name: Deploy delete-user
+      - name: Deploy delete-user (JWT requerido — el código valida rol admin del caller)
         run: |
           supabase functions deploy delete-user \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --no-verify-jwt
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
 
       - name: Deploy save-payment-config
         run: |
@@ -94,13 +104,13 @@ jobs:
           supabase functions deploy test-stripe \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
 
-      - name: Deploy log-security-event (no JWT — fires before login)
+      - name: Deploy log-security-event (no JWT — pre-login eventos como failed_login_attempt)
         run: |
           supabase functions deploy log-security-event \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
             --no-verify-jwt
 
-      - name: Deploy complete-oauth-onboarding (no JWT — verifies token itself)
+      - name: Deploy complete-oauth-onboarding (no JWT — verifica access_token Google internamente)
         run: |
           supabase functions deploy complete-oauth-onboarding \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
@@ -121,19 +131,19 @@ jobs:
           supabase functions deploy send-email \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
 
-      - name: Deploy notify-package (no JWT — invoked by trigger via pg_net with service_role)
+      - name: Deploy notify-package (no JWT — invocada por trigger Postgres con service_role)
         run: |
           supabase functions deploy notify-package \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
             --no-verify-jwt
 
-      - name: Deploy route-reminders (no JWT — invoked by pg_cron with service_role)
+      - name: Deploy route-reminders (no JWT — invocada por pg_cron con service_role)
         run: |
           supabase functions deploy route-reminders \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
             --no-verify-jwt
 
-      - name: Deploy health (no JWT — public health probe for external monitoring)
+      - name: Deploy health (no JWT — endpoint público para monitoreo externo)
         run: |
           supabase functions deploy health \
             --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
