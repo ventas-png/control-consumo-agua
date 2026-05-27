@@ -18,9 +18,6 @@ export function ConfiguracionSection({ onLogout }: Props) {
         <div style={{ marginBottom: '8px', color: 'var(--at-ink-3)' }}>Variables de entorno configuradas:</div>
         <div>✅ VITE_SUPABASE_URL</div>
         <div>✅ VITE_SUPABASE_ANON_KEY</div>
-        <div>✅ VITE_EMAILJS_PUBLIC_KEY</div>
-        <div>✅ VITE_EMAILJS_SERVICE_ID</div>
-        <div>✅ VITE_EMAILJS_TEMPLATE_RECIBO</div>
         <div>✅ VITE_COUNTRY_CODE</div>
       </div>
       <div style={{ display: 'flex', gap: '12px' }}>

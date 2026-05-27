@@ -5,7 +5,6 @@ import type { AppSection, Ruta, UserSession } from './types'
 import { supabase } from './lib/supabase'
 import { useAuth } from './hooks/useAuth'
 import { useData } from './hooks/useData'
-import { initEmailJS } from './lib/email'
 import { identify, registerSuperProperties, resetAnalytics } from './lib/analytics'
 import { setMonitoringUser } from './lib/monitoring'
 import { LandingPage } from './components/landing/LandingPage'
@@ -44,7 +43,6 @@ const ServiciosEnergiaSection = lazy(() => import('./components/servicios-energi
 const CondominiosSection = lazy(() => import('./components/condominios/CondominiosSection').then(m => ({ default: m.CondominiosSection })))
 const CondominiosDashboard = lazy(() => import('./components/condominios/CondominiosDashboard').then(m => ({ default: m.CondominiosDashboard })))
 
-initEmailJS()
 
 // Shown when a client has both servicio_agua and servicio_condominios active
 function DualServicePortal({ currentUser, onLogout }: { currentUser: UserSession; onLogout: () => void }) {
