@@ -12,6 +12,7 @@ interface LandingPageProps {
   onLoginWithGoogle: () => Promise<string | null>
   onForgotPassword: () => void
   onRegister: () => void
+  onSignupCompany: () => void
   mfaChallenge: { email: string } | null
   onVerifyMfa: (code: string) => Promise<string | null>
   onCancelMfa: () => Promise<void>
@@ -22,7 +23,7 @@ function initialLang(): Lang {
   return urlLang === 'en' ? 'en' : 'es'
 }
 
-export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRegister, mfaChallenge, onVerifyMfa, onCancelMfa }: LandingPageProps) {
+export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa }: LandingPageProps) {
   const [loginOpen, setLoginOpen] = useState(false)
   const [lang, setLang] = useState<Lang>(initialLang)
 
@@ -53,7 +54,7 @@ export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
         <ModulesShowcase t={t} />
         <DemoVideo t={t} />
         <FeaturesGrid t={t} />
-        <PricingSection t={t} onCta={() => setLoginOpen(true)} />
+        <PricingSection t={t} onCta={onSignupCompany} />
         <Testimonials t={t} />
         <FAQ t={t} />
         <FinalCTA t={t} onSignup={goPricing} />
@@ -68,6 +69,7 @@ export function LandingPage({ onLogin, onLoginWithGoogle, onForgotPassword, onRe
         onLoginWithGoogle={onLoginWithGoogle}
         onForgotPassword={onForgotPassword}
         onRegister={onRegister}
+        onSignupCompany={onSignupCompany}
         mfaChallenge={mfaChallenge}
         onVerifyMfa={onVerifyMfa}
         onCancelMfa={onCancelMfa}

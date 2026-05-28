@@ -12,6 +12,7 @@ import { BrandLogo } from './components/shared/BrandLogo'
 import { PasswordResetModal } from './components/auth/PasswordResetModal'
 import { PasswordResetPage } from './components/auth/PasswordResetPage'
 import { RegisterScreen } from './components/auth/RegisterScreen'
+import { SignupCompanyScreen } from './components/auth/SignupCompanyScreen'
 import OAuthOnboardingScreen from './components/auth/OAuthOnboardingScreen'
 import { CustomerPortal } from './components/portal/CustomerPortal'
 import { CondominiosClientPortal } from './components/portal/CondominiosClientPortal'
@@ -187,6 +188,7 @@ export default function App() {
   const [rutaActivaParaLecturas, setRutaActivaParaLecturas] = useState<Ruta | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
+  const [showSignupCompany, setShowSignupCompany] = useState(false)
   const [unreadComunicacion, setUnreadComunicacion] = useState(0)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
   // Legacy: kept for backward compatibility with old reset links already sent
@@ -317,6 +319,19 @@ export default function App() {
         />
       )
     }
+    if (showSignupCompany) {
+      return (
+        <SignupCompanyScreen
+          onBack={() => setShowSignupCompany(false)}
+          onSignedUp={() => {
+            // El usuario debe confirmar email antes de poder iniciar sesion.
+            // Volvemos al landing para que use el form de login normal cuando
+            // tenga confirmado el correo.
+            setShowSignupCompany(false)
+          }}
+        />
+      )
+    }
     return (
       <>
         <LandingPage
@@ -324,6 +339,7 @@ export default function App() {
           onLoginWithGoogle={loginWithGoogle}
           onForgotPassword={() => setShowPasswordReset(true)}
           onRegister={() => setShowRegister(true)}
+          onSignupCompany={() => setShowSignupCompany(true)}
           mfaChallenge={mfaChallenge ? { email: mfaChallenge.email } : null}
           onVerifyMfa={verifyMfaChallenge}
           onCancelMfa={cancelMfaChallenge}

@@ -14,6 +14,7 @@ function setup(opts: { mfaChallenge?: { email: string } | null } = {}) {
   const onLoginWithGoogle = vi.fn(async () => null)
   const onForgotPassword = vi.fn()
   const onRegister = vi.fn()
+  const onSignupCompany = vi.fn()
   const onVerifyMfa = vi.fn(async () => null)
   const onCancelMfa = vi.fn(async () => undefined)
   const utils = render(
@@ -22,12 +23,13 @@ function setup(opts: { mfaChallenge?: { email: string } | null } = {}) {
       onLoginWithGoogle={onLoginWithGoogle}
       onForgotPassword={onForgotPassword}
       onRegister={onRegister}
+      onSignupCompany={onSignupCompany}
       mfaChallenge={opts.mfaChallenge ?? null}
       onVerifyMfa={onVerifyMfa}
       onCancelMfa={onCancelMfa}
     />,
   )
-  return { onLogin, onLoginWithGoogle, onForgotPassword, onRegister, onVerifyMfa, onCancelMfa, ...utils }
+  return { onLogin, onLoginWithGoogle, onForgotPassword, onRegister, onSignupCompany, onVerifyMfa, onCancelMfa, ...utils }
 }
 
 describe('LandingPage', () => {

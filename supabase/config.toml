@@ -23,3 +23,8 @@ verify_jwt = false
 # Aviso de paquete al residente: autentica con service key o JWT de la empresa.
 [functions.notify-package]
 verify_jwt = false
+
+# Signup self-service: publico por diseño, valida origen + fuerza de la
+# password + email confirmation de Supabase Auth.
+[functions.signup-company]
+verify_jwt = false
