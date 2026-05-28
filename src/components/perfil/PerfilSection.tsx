@@ -290,6 +290,44 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
     setMfaLoading(false)
   }
 
+  // — Plan / Suscripción —
+  // Read-only por ahora: muestra el plan actual + estado + features.
+  // F2.12 agregara "Gestionar suscripcion" con Stripe Billing Portal.
+  type SubscriptionRow = {
+    status: string
+    billing_cycle: string
+    current_period_end: string
+    trial_end: string | null
+    cancel_at_period_end: boolean
+    plan: {
+      code: string
+      name: string
+      description: string | null
+      price_monthly_cents: number
+      currency: string
+      features: string[]
+    } | null
+  }
+  const [subscription, setSubscription] = useState<SubscriptionRow | null>(null)
+  const [subLoading, setSubLoading] = useState(true)
+
+  useEffect(() => {
+    if (!currentUser.company_id) { setSubLoading(false); return }
+    let alive = true
+    void supabase
+      .from('subscriptions')
+      .select('status, billing_cycle, current_period_end, trial_end, cancel_at_period_end, plan:billing_plans!inner(code, name, description, price_monthly_cents, currency, features)')
+      .eq('company_id', currentUser.company_id)
+      .in('status', ['trialing', 'active', 'past_due', 'incomplete'])
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!alive) return
+        setSubscription(data as unknown as SubscriptionRow | null)
+        setSubLoading(false)
+      })
+    return () => { alive = false }
+  }, [currentUser.company_id])
+
   // — Correo —
   const [newEmail, setNewEmail] = useState('')
   const [emailLoading, setEmailLoading] = useState(false)
@@ -545,6 +583,84 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
             <FeedbackMsg fb={emailFb} />
           </form>
         </Card>
+
+        {/* Card — Plan & Suscripción (read-only en F2.11; F2.12 agrega Stripe portal) */}
+        {currentUser.company_id && (
+          <Card title="Mi plan">
+            {subLoading ? (
+              <div style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>Cargando…</div>
+            ) : !subscription ? (
+              <div style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>
+                Sin suscripción activa. Comuníquese con su administrador.
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '17px', fontWeight: 700, color: 'var(--at-ink)' }}>
+                        {subscription.plan?.name ?? 'Plan'}
+                      </span>
+                      <span style={{
+                        padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
+                        background:
+                          subscription.status === 'active' ? 'var(--at-success-tint)'
+                          : subscription.status === 'trialing' ? 'var(--at-primary-tint, rgba(27,59,54,.1))'
+                          : 'var(--at-warning-tint)',
+                        color:
+                          subscription.status === 'active' ? 'var(--at-success)'
+                          : subscription.status === 'trialing' ? 'var(--at-primary-hover)'
+                          : 'var(--at-warning-strong)',
+                      }}>
+                        {subscription.status === 'active' && '✓ Activa'}
+                        {subscription.status === 'trialing' && '⏱ Trial'}
+                        {subscription.status === 'past_due' && '⚠ Pago pendiente'}
+                        {subscription.status === 'incomplete' && '⏳ Incompleta'}
+                      </span>
+                    </div>
+                    {subscription.plan?.description && (
+                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)' }}>{subscription.plan.description}</p>
+                    )}
+                  </div>
+                  {subscription.plan && (
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--at-ink)' }}>
+                        ${(subscription.plan.price_monthly_cents / 100).toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>USD / mes</div>
+                    </div>
+                  )}
+                </div>
+
+                {subscription.plan?.features && subscription.plan.features.length > 0 && (
+                  <div style={{ marginTop: '14px' }}>
+                    <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '13px', color: 'var(--at-ink-2)', lineHeight: 1.7 }}>
+                      {subscription.plan.features.map((f, i) => (<li key={i}>{f}</li>))}
+                    </ul>
+                  </div>
+                )}
+
+                <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--at-chip)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', fontSize: '12px', color: 'var(--at-ink-3)' }}>
+                  <span>
+                    Próxima renovación: <strong style={{ color: 'var(--at-ink-2)' }}>
+                      {new Date(subscription.current_period_end).toLocaleDateString('es-GT', { dateStyle: 'long' })}
+                    </strong>
+                  </span>
+                  {subscription.cancel_at_period_end && (
+                    <span style={{ color: 'var(--at-warning-strong)', fontWeight: 600 }}>
+                      Se cancelará al finalizar el período
+                    </span>
+                  )}
+                  {subscription.trial_end && new Date(subscription.trial_end) > new Date() && (
+                    <span>
+                      Trial hasta: <strong>{new Date(subscription.trial_end).toLocaleDateString('es-GT')}</strong>
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+          </Card>
+        )}
 
       </div>
     </div>
